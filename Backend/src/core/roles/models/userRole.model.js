@@ -13,17 +13,18 @@ const userRoleSchema = new mongoose.Schema({
     },
     franchiseId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Franchise",
+        ref: "FoodFranchise",
         default: null
     },
     storeId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Store",
+        ref: "FoodStore",
         default: null
     },
     assignedBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User"
+        ref: "User",
+        default: null
     },
     assignedAt: {
         type: Date,
@@ -42,5 +43,22 @@ const userRoleSchema = new mongoose.Schema({
     timestamps: true,
     collection: 'userRoles'
 });
+
+// ─── Production Indexes ───────────────────────────────────────────────────────
+// Compound unique index: prevents duplicate role assignments for the same
+// user + role + franchise + store combination (the source of truth for authorization)
+userRoleSchema.index(
+    { userId: 1, roleId: 1, franchiseId: 1, storeId: 1 },
+    { unique: true, name: 'uq_user_role_franchise_store' }
+);
+
+// Efficient lookup: "give me all active roles for this user"
+userRoleSchema.index({ userId: 1, status: 1 });
+
+// Efficient lookup: "give me all users assigned to this franchise"
+userRoleSchema.index({ franchiseId: 1, status: 1 });
+
+// Efficient lookup: "give me all users assigned to this store"
+userRoleSchema.index({ storeId: 1, status: 1 });
 
 export const UserRole = mongoose.model('UserRole', userRoleSchema);

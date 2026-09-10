@@ -3,6 +3,7 @@ import ms from "ms";
 import { User } from "../users/models/user.model.js";
 import { Profile } from "../users/models/profile.model.js";
 import { Role } from "../roles/models/role.model.js";
+import { UserRole } from "../roles/models/userRole.model.js";
 import { FoodAdmin } from "../admin/admin.model.js";
 import { AdminResetOtp } from "../admin/adminResetOtp.model.js";
 
@@ -270,21 +271,22 @@ export const verifyUserOtpAndLogin = async (
   const payload = { userId: user._id.toString(), role: user.role || "USER" };
 
   const accessToken = signAccessToken(payload);
-  const refreshToken = signRefreshToken(payload);
+  const rawRefreshToken = signRefreshToken(payload);
+  const tokenHash = RefreshToken.hashToken(rawRefreshToken);
 
   const ttlMs = ms(config.jwtRefreshExpiresIn || "7d");
   const expiresAt = new Date(Date.now() + ttlMs);
 
   await RefreshToken.create({
     userId: user._id,
-    token: refreshToken,
+    tokenHash,
     expiresAt,
   });
 
   return {
     token: accessToken,
     accessToken,
-    refreshToken,
+    refreshToken: rawRefreshToken,
     user: sanitizeUserForAuthResponse(user),
     isNewUser,
   };
@@ -295,47 +297,44 @@ export const adminLogin = async ({ email, mobile, password } = {}, allowedRoles 
     throw new ValidationError("Email/mobile and password are required");
   }
 
-  const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+  const normalizedEmail  = typeof email  === "string" ? email.trim().toLowerCase()    : "";
   const normalizedMobile = typeof mobile === "string" ? mobile.replace(/\D/g, "") : "";
   const filters = [];
-  if (normalizedEmail) filters.push({ email: normalizedEmail });
-  if (normalizedMobile) {
-    filters.push({ mobile: normalizedMobile });
-  }
+  if (normalizedEmail)  filters.push({ email: normalizedEmail });
+  if (normalizedMobile) filters.push({ mobile: normalizedMobile });
 
-  const user = await User.findOne(filters.length > 1 ? { $or: filters } : filters[0]).populate('primaryRole');
-  console.log("DEBUG LOGIN: User found?", !!user);
-  if (!user) {
-    console.log("DEBUG LOGIN: Failed because user is null. Filters used:", filters);
-    throw new AuthError("Invalid credentials");
-  }
+  const user = await User.findOne(
+    filters.length > 1 ? { $or: filters } : filters[0],
+    null,
+    { lean: false }
+  ).populate('primaryRole');
 
-  console.log("DEBUG LOGIN: User details:", { email: user.email, isActive: user.isActive, isBlocked: user.isBlocked, isDeleted: user.isDeleted });
-  if (user.isActive === false || user.isBlocked === true || user.isDeleted === true) {
-    throw new AuthError("Your account is inactive. Please contact support.");
-  }
+  if (!user) throw new AuthError("Invalid credentials");
+
+  // Account state checks
+  if (user.isDeleted === true)                      throw new AuthError("Account not found");
+  if (user.isActive === false || user.isBlocked === true) throw new AuthError("Your account is inactive. Please contact support.");
+  if (user.isLocked && user.isLocked())             throw new AuthError("Too many failed attempts. Account locked for 30 minutes.");
 
   const isMatch = await user.comparePassword(password);
-  console.log("DEBUG LOGIN: Password match?", isMatch);
   if (!isMatch) {
-    console.log("DEBUG LOGIN: Failed because password did not match bcrypt hash");
+    // Increment failed attempts (with auto-lockout after 5 fails)
+    await user.incrementFailedLogin();
     throw new AuthError("Invalid credentials");
   }
 
+  // Reset failed attempts on successful login
+  await user.resetFailedLogin();
+
   if (!user.primaryRole) {
-     console.log("DEBUG LOGIN: Failed because primaryRole is missing on user");
-     throw new AuthError("This account has no roles assigned");
+    throw new AuthError("This account has no roles assigned. Contact Super Admin.");
   }
 
   let role = normalizeAdminRole(user.primaryRole.code);
-  console.log("DEBUG LOGIN: Normalized Role:", role);
-  if (role === 'super-admin') {
-      role = 'superadmin';
-      console.log("DEBUG LOGIN: Adjusted Role to:", role);
-  }
-  
-  if (!ADMIN_PANEL_ROLES.has(role) && !ADMIN_PANEL_ROLES.has(String(user.primaryRole.code || "").toUpperCase())) {
-    console.log("DEBUG LOGIN: Failed because role not in ADMIN_PANEL_ROLES. Expected one of:", Array.from(ADMIN_PANEL_ROLES));
+  // Normalize SUPER_ADMIN -> superadmin
+  if (role === 'super-admin' || role === 'super_admin') role = 'superadmin';
+
+  if (!ADMIN_PANEL_ROLES.has(role)) {
     throw new AuthError("This account is not allowed to access admin panels");
   }
 
@@ -343,36 +342,51 @@ export const adminLogin = async ({ email, mobile, password } = {}, allowedRoles 
     throw new AuthError("Access denied: Insufficient permissions for this portal");
   }
 
-  const payload = { userId: user._id.toString(), role };
+  // Fetch the active userRole to get franchiseId + storeId for JWT
+  // This is the production-correct approach: context-aware JWT payload
+  const activeUserRole = await UserRole.findOne({
+    userId: user._id,
+    roleId: user.primaryRole._id,
+    status: 'ACTIVE'
+  }).lean();
 
-  const accessToken = signAccessToken(payload);
-  const refreshToken = signRefreshToken(payload);
+  const jwtPayload = {
+    userId:      user._id.toString(),
+    role,
+    franchiseId: activeUserRole?.franchiseId?.toString() || null,
+    storeId:     activeUserRole?.storeId?.toString()     || null,
+  };
 
-  const ttlMs = ms(config.jwtRefreshExpiresIn || "7d");
+  const accessToken     = signAccessToken(jwtPayload);
+  const rawRefreshToken = signRefreshToken(jwtPayload);
+  const tokenHash       = RefreshToken.hashToken(rawRefreshToken);
+
+  const ttlMs     = ms(config.jwtRefreshExpiresIn || "7d");
   const expiresAt = new Date(Date.now() + ttlMs);
 
   await RefreshToken.create({
     userId: user._id,
-    token: refreshToken,
+    tokenHash,
     expiresAt,
   });
 
   user.lastLoginAt = new Date();
   await user.save();
 
-  // Return formatted response
   const profile = await Profile.findOne({ userId: user._id }).lean();
-  
+
   const userResponse = {
-    id: user._id,
-    _id: user._id,
-    name: profile ? `${profile.firstName} ${profile.lastName}`.trim() : "",
-    email: user.email,
-    mobile: user.mobile,
-    role: role,
+    id:          user._id,
+    _id:         user._id,
+    name:        profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() : "",
+    email:       user.email,
+    mobile:      user.mobile,
+    role,
+    franchiseId: jwtPayload.franchiseId,
+    storeId:     jwtPayload.storeId,
   };
 
-  return { accessToken, refreshToken, user: userResponse };
+  return { accessToken, refreshToken: rawRefreshToken, user: userResponse };
 };
 
 
@@ -507,7 +521,9 @@ export const logout = async (refreshToken, fcmToken, platform) => {
   }
 
   // 2. Invalidate the refresh token (standard logout procedure)
-  const deleted = await RefreshToken.deleteOne({ token: refreshToken });
+  // Delete by hash — we never store raw tokens
+  const tokenHash = RefreshToken.hashToken(refreshToken);
+  const deleted = await RefreshToken.deleteOne({ tokenHash });
   return { invalidated: deleted.deletedCount > 0 };
 };
 
@@ -818,9 +834,10 @@ export const refreshAccessToken = async (token) => {
     throw new ValidationError("Refresh token is required");
   }
 
-  const stored = await RefreshToken.findOne({ token }).lean();
+  // Look up by hash — DB never stores raw tokens
+  const stored = await RefreshToken.findByRawToken(token);
   if (!stored) {
-    throw new AuthError("Invalid refresh token");
+    throw new AuthError("Invalid or expired refresh token");
   }
 
   const jwt = await import("jsonwebtoken");
@@ -828,20 +845,24 @@ export const refreshAccessToken = async (token) => {
   try {
     payload = jwt.default.verify(token, config.jwtRefreshSecret);
   } catch {
-    throw new AuthError("Invalid refresh token");
+    // Token is invalid or expired — remove stale record
+    await RefreshToken.deleteOne({ _id: stored._id });
+    throw new AuthError("Refresh token has expired. Please log in again.");
   }
 
-  // If deactivated user, do not issue fresh access tokens (forces logout on client)
-  if (payload?.role === "USER") {
-    const u = await User.findById(payload.userId).select("isActive").lean();
-    if (!u || u.isActive === false) {
-      throw new AuthError("User account is deactivated");
-    }
+  // Enforce active status check on every token refresh
+  const u = await User.findById(payload.userId).select("isActive isBlocked isDeleted").lean();
+  if (!u || u.isActive === false || u.isBlocked === true || u.isDeleted === true) {
+    await RefreshToken.deleteOne({ _id: stored._id });
+    throw new AuthError("Account is deactivated. Please contact support.");
   }
 
+  // Issue new access token with same payload (including franchiseId + storeId)
   const newAccessToken = signAccessToken({
-    userId: payload.userId,
-    role: payload.role,
+    userId:      payload.userId,
+    role:        payload.role,
+    franchiseId: payload.franchiseId || null,
+    storeId:     payload.storeId     || null,
   });
 
   return { accessToken: newAccessToken, refreshToken: token };

@@ -39,7 +39,8 @@ const franchiseSchema = new mongoose.Schema(
             type: String,
             required: true,
             unique: true,
-            trim: true
+            trim: true,
+            uppercase: true
         },
         regionId: { type: String, trim: true, default: '' },
         zoneId: { type: String, trim: true, default: '' },
@@ -76,9 +77,19 @@ const franchiseSchema = new mongoose.Schema(
             default: true,
             index: true
         },
+        // References the User who owns/manages this franchise.
+        // This is the auth identity link — populated after user account creation.
+        ownerUserId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            default: null,
+            index: true
+        },
+        // References the Super Admin User who created this franchise record.
+        // Changed from FoodAdmin ref to User ref — single source of identity.
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'FoodAdmin',
+            ref: 'User',
             default: null
         }
     },
@@ -87,5 +98,11 @@ const franchiseSchema = new mongoose.Schema(
         timestamps: true
     }
 );
+
+// ─── Production Indexes ───────────────────────────────────────────────────────
+// Note: franchiseCode and email already have unique:true on field definition
+// Only add indexes not already covered by unique constraints
+franchiseSchema.index({ isActive: 1, createdAt: -1 });
+franchiseSchema.index({ ownerUserId: 1 }, { sparse: true });
 
 export const FoodFranchise = mongoose.model('FoodFranchise', franchiseSchema);

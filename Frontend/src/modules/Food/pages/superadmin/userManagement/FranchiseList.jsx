@@ -192,6 +192,30 @@ export default function FranchiseList() {
     }
   }
 
+  const handleViewAdmin = async (fran) => {
+    try {
+      // Fetch full details by ID
+      const res = await apiClient.get(`/food/admin/franchises/${fran._id}`);
+      const fullData = res.data.data;
+      
+      // Merge list-specific data (like regionName/zoneName) with the full API response
+      setSelectedAdmin({
+        ...fran,
+        ...fullData,
+        // Override with fully populated ownerUserId if available
+        email: fullData?.ownerUserId?.email || fullData?.email || fran.email,
+        phone: fullData?.ownerUserId?.mobile || fullData?.phone || fran.phone,
+      });
+      setIsDrawerOpen(true);
+    } catch (err) {
+      console.error("Error fetching franchise details:", err);
+      showToast("Failed to fetch full franchise details", "error");
+      // Fallback to local data if API fails
+      setSelectedAdmin(fran);
+      setIsDrawerOpen(true);
+    }
+  }
+
   const handleResetFilters = () => {
     setSearchQuery("")
     setStatusFilter("All Statuses")
@@ -393,10 +417,7 @@ export default function FranchiseList() {
                     <td className="px-3 py-2.5 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
-                          onClick={() => {
-                            setSelectedAdmin(fran)
-                            setIsDrawerOpen(true)
-                          }}
+                          onClick={() => handleViewAdmin(fran)}
                           className="p-1 rounded-md bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800/50 dark:hover:bg-zinc-800 text-black dark:text-white opacity-70 hover:opacity-100 hover:text-[var(--primary)] transition-colors cursor-pointer"
                           title="View Profile"
                         >

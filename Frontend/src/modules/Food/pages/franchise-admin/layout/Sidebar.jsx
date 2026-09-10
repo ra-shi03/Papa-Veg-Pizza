@@ -23,7 +23,7 @@ export default function Sidebar({ isOpen, onClose, isCollapsed = false, onToggle
     return () => window.removeEventListener("resize", handleResize)
   }, [])
 
-  const displayCollapsed = isCollapsed && !isMobile
+  const displayCollapsed = isCollapsed
   const [expandedGroups, setExpandedGroups] = useState({
     "STORE MANAGEMENT": true,
     "STAFF MANAGEMENT": true,
@@ -82,11 +82,17 @@ export default function Sidebar({ isOpen, onClose, isCollapsed = false, onToggle
       <aside
         id="sidebar"
         className={`fixed inset-y-0 left-0 z-[60] flex flex-col bg-white dark:bg-zinc-900 border-r border-zinc-150 dark:border-zinc-800 transition-all duration-300 ease-in-out lg:translate-x-0 ${
-          displayCollapsed ? "lg:w-[72px] w-[280px]" : "w-[280px]"
+          displayCollapsed ? "w-[72px]" : "w-[280px]"
         } ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
+        onMouseEnter={() => {
+          if (isCollapsed && window.matchMedia('(min-width: 1024px)').matches) setIsHovered(true)
+        }}
+        onMouseLeave={() => {
+          if (isCollapsed && window.matchMedia('(min-width: 1024px)').matches) setIsHovered(false)
+        }}
       >
         {/* Header / Logo section */}
-        <div className={`px-4 py-4 flex items-center justify-between border-b border-zinc-150 dark:border-zinc-800 ${displayCollapsed ? "lg:justify-center lg:px-2" : ""}`}>
+        <div className={`py-4 flex items-center justify-between border-b border-zinc-150 dark:border-zinc-800 ${displayCollapsed ? "justify-center px-2 flex-col gap-3" : "px-4"}`}>
           <div className="flex items-center gap-2.5 overflow-hidden">
             {logo ? (
               <img src={logo} alt="Logo" className="w-9 h-9 object-contain rounded-lg shrink-0 animate-fade-in" />
@@ -105,21 +111,24 @@ export default function Sidebar({ isOpen, onClose, isCollapsed = false, onToggle
             )}
           </div>
 
-          {/* Collapse Toggle Button (Desktop Only) */}
-          <button
-            onClick={onToggleCollapse}
-            className="hidden lg:flex p-1 rounded-md text-zinc-400 hover:text-black dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
-            title={displayCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-          >
-            {displayCollapsed ? <Icons.ChevronRight size={16} /> : <Icons.ChevronLeft size={16} />}
-          </button>
+            {/* Buttons stack horizontally when expanded, vertically/hidden when collapsed */}
+            <div className={`flex items-center gap-1 ${displayCollapsed ? "flex-col" : ""}`}>
+              {/* Collapse Toggle Button */}
+              <button
+                onClick={onToggleCollapse}
+                className="flex p-1 rounded-md text-zinc-400 hover:text-black dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
+                title={displayCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+              >
+                {displayCollapsed ? <Icons.ChevronRight size={16} /> : <Icons.ChevronLeft size={16} />}
+              </button>
 
-          <button
-            onClick={onClose}
-            className="p-1 rounded-md text-black dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 lg:hidden transition-colors"
-          >
-            <Icons.X size={16} />
-          </button>
+              <button
+                onClick={onClose}
+                className={`p-1 rounded-md text-black dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 lg:hidden transition-colors shrink-0 ${displayCollapsed ? "hidden" : ""}`}
+              >
+                <Icons.X size={16} />
+              </button>
+            </div>
         </div>
 
         {/* Search bar section */}

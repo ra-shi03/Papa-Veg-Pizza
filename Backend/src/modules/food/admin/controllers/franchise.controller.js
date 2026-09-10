@@ -1,175 +1,335 @@
+import mongoose from 'mongoose';
 import { FoodFranchise } from '../../franchise/models/franchise.model.js';
-import { FoodAdmin } from '../../../../core/admin/admin.model.js';
+import { User } from '../../../../core/users/models/user.model.js';
+import { Profile } from '../../../../core/users/models/profile.model.js';
+import { Role } from '../../../../core/roles/models/role.model.js';
+import { UserRole } from '../../../../core/roles/models/userRole.model.js';
 import { sendError, sendResponse } from '../../../../utils/response.js';
 
+// ─── Create Franchise + Franchise Admin ──────────────────────────────────────
+// This is the critical production-level flow. All 4 operations run inside
+// a MongoDB transaction — if any step fails, everything is rolled back
+// atomically. No orphan documents, no partial state.
+//
+// Creates:
+//   1. food_franchises  — business entity
+//   2. users            — authentication account (email + mobile + hashed password)
+//   3. profiles         — personal information (firstName, lastName, phone)
+//   4. userRoles        — connects user → FRANCHISE_ADMIN role → franchise
 export const createFranchise = async (req, res) => {
+    const session = await mongoose.startSession();
+
     try {
-        const {
-            name,
-            email,
-            phone,
-            password,
-            franchiseName,
-            franchiseCode,
-            regionId,
-            zoneId,
-            territoryId,
-            city,
-            state,
-            type,
-            totalStores,
-            status,
-            franchiseDuration,
-            franchiseCost,
-            paidAmount,
-            dueAmount,
-            gstNumber,
-            address
-        } = req.body;
+        let result;
 
-        // Validation
-        if (!name || !email || !phone || !password || !franchiseName || !franchiseCode) {
-            return sendError(res, 400, 'Required fields are missing');
-        }
+        await session.withTransaction(async () => {
+            const {
+                name,           // Owner's full name e.g. "Anchal Singh"
+                email,          // Login email for franchise admin
+                phone,          // Login mobile for franchise admin
+                password,       // Initial password
+                franchiseName,  // Business name e.g. "Papa Veg Pizza Sector 10"
+                franchiseCode,
+                regionId,
+                zoneId,
+                territoryId,
+                city,
+                state,
+                type,
+                totalStores,
+                status,
+                franchiseDuration,
+                franchiseCost,
+                paidAmount,
+                dueAmount,
+                gstNumber,
+                address
+            } = req.body;
 
-        // Check if admin email exists
-        const existingAdmin = await FoodAdmin.findOne({ email: email.toLowerCase(), isDeleted: false });
-        if (existingAdmin) {
-            return sendError(res, 400, 'Admin email already exists');
-        }
-
-        // Check if franchise code exists
-        const existingCode = await FoodFranchise.findOne({ franchiseCode });
-        if (existingCode) {
-            return sendError(res, 400, 'Franchise code already exists');
-        }
-
-        // Create franchise
-        const newFranchise = await FoodFranchise.create({
-            name: franchiseName,
-            ownerName: name,
-            email: email.toLowerCase(),
-            phone,
-            gstNumber,
-            address,
-            franchiseCode,
-            regionId,
-            zoneId,
-            territoryId,
-            city,
-            state,
-            type,
-            totalStores,
-            franchiseDuration,
-            franchiseCost,
-            paidAmount,
-            dueAmount,
-            isActive: status === 'ACTIVE',
-            createdBy: req.user?._id || null
-        });
-
-        // Create franchise admin
-        const newAdmin = await FoodAdmin.create({
-            email: email.toLowerCase(),
-            password,
-            name,
-            phone,
-            role: 'franchise-admin',
-            franchiseId: newFranchise._id,
-            isActive: status === 'ACTIVE',
-            createdBy: req.user?._id || null
-        });
-
-        return sendResponse(res, 201, 'Franchise and admin created successfully', {
-            franchise: newFranchise,
-            admin: {
-                _id: newAdmin._id,
-                email: newAdmin.email,
-                name: newAdmin.name,
-                role: newAdmin.role
+            // ── Validation ─────────────────────────────────────────────────
+            if (!name || !email || !phone || !password || !franchiseName || !franchiseCode) {
+                throw Object.assign(new Error('Required fields are missing: name, email, phone, password, franchiseName, franchiseCode'), { statusCode: 400 });
             }
+
+            if (String(password).length < 8) {
+                throw Object.assign(new Error('Password must be at least 8 characters'), { statusCode: 400 });
+            }
+
+            const normalizedEmail = String(email).trim().toLowerCase();
+            const normalizedPhone = String(phone).trim();
+            const normalizedCode  = String(franchiseCode).trim().toUpperCase();
+
+            // ── Uniqueness Checks (before opening transaction writes) ───────
+            const [existingUser, existingPhone, existingCode] = await Promise.all([
+                User.findOne({ email: normalizedEmail, isDeleted: false }).select('_id').lean(),
+                User.findOne({ mobile: normalizedPhone, isDeleted: false }).select('_id').lean(),
+                FoodFranchise.findOne({ franchiseCode: normalizedCode }).select('_id').lean()
+            ]);
+
+            if (existingUser)  throw Object.assign(new Error('An account with this email already exists'), { statusCode: 409 });
+            if (existingPhone) throw Object.assign(new Error('An account with this phone already exists'), { statusCode: 409 });
+            if (existingCode)  throw Object.assign(new Error('Franchise code already in use'), { statusCode: 409 });
+
+            // ── Fetch the FRANCHISE_ADMIN role from DB ─────────────────────
+            const franchiseAdminRole = await Role.findOne({ code: 'FRANCHISE_ADMIN' }).lean();
+            if (!franchiseAdminRole) {
+                throw Object.assign(
+                    new Error('FRANCHISE_ADMIN role not found. Please run seed-roles.js first.'),
+                    { statusCode: 500 }
+                );
+            }
+
+            // ── Step 1: Create User (authentication account) ───────────────
+            const [newUser] = await User.create([{
+                email: normalizedEmail,
+                mobile: normalizedPhone,
+                password,                   // pre-save hook hashes this
+                loginType: 'PASSWORD',
+                primaryRole: franchiseAdminRole._id,
+                emailVerified: false,
+                mobileVerified: false,
+                isActive: status !== 'INACTIVE',
+                isBlocked: false,
+                isDeleted: false
+            }], { session });
+
+            // ── Step 2: Create Profile (personal data) ─────────────────────
+            // Split the owner name into firstName + lastName
+            const nameParts = String(name || '').trim().split(/\s+/);
+            const firstName = nameParts[0] || '';
+            const lastName  = nameParts.slice(1).join(' ') || '';
+
+            await Profile.create([{
+                userId: newUser._id,
+                firstName,
+                lastName,
+                phone: normalizedPhone,
+                country: 'India',
+                timezone: 'Asia/Kolkata',
+                language: 'en'
+            }], { session });
+
+            // ── Step 3: Create Franchise (business entity) ────────────────
+            const [newFranchise] = await FoodFranchise.create([{
+                name: String(franchiseName || '').trim(),
+                ownerName: String(name || '').trim(),
+                email: normalizedEmail,
+                phone: normalizedPhone,
+                gstNumber,
+                address,
+                franchiseCode: normalizedCode,
+                regionId,
+                zoneId,
+                territoryId,
+                city,
+                state,
+                type,
+                totalStores,
+                franchiseDuration,
+                franchiseCost,
+                paidAmount,
+                dueAmount,
+                isActive: status !== 'INACTIVE',
+                ownerUserId: newUser._id,
+                createdBy: req.user?.userId || null
+            }], { session });
+
+            // ── Step 4: Create UserRole (authorization link) ───────────────
+            // This is the critical connection: User → FRANCHISE_ADMIN → Franchise
+            await UserRole.create([{
+                userId: newUser._id,
+                roleId: franchiseAdminRole._id,
+                franchiseId: newFranchise._id,
+                storeId: null,
+                assignedBy: req.user?.userId || null,
+                assignedAt: new Date(),
+                isPrimary: true,
+                status: 'ACTIVE'
+            }], { session });
+
+            result = {
+                franchise: {
+                    _id: newFranchise._id,
+                    name: newFranchise.name,
+                    franchiseCode: newFranchise.franchiseCode,
+                    ownerName: newFranchise.ownerName,
+                    isActive: newFranchise.isActive
+                },
+                admin: {
+                    _id: newUser._id,
+                    email: newUser.email,
+                    mobile: newUser.mobile,
+                    role: 'franchise-admin',
+                    // Never expose the password hash in response
+                }
+            };
         });
+
+        return sendResponse(res, 201, 'Franchise and admin account created successfully', result);
+
     } catch (error) {
-        console.error('Error creating franchise:', error);
-        return sendError(res, 500, 'Failed to create franchise', error.message);
+        console.error('[createFranchise] Error:', error.message);
+        const status = error.statusCode || 500;
+        return sendError(res, status, error.message || 'Failed to create franchise');
+    } finally {
+        session.endSession();
     }
 };
 
+// ─── List Franchises ─────────────────────────────────────────────────────────
 export const getFranchises = async (req, res) => {
     try {
-        const franchises = await FoodFranchise.find().sort({ createdAt: -1 });
+        const filter = {};
+        if (req.query.status === 'ACTIVE')   filter.isActive = true;
+        if (req.query.status === 'INACTIVE') filter.isActive = false;
+
+        const franchises = await FoodFranchise.find(filter)
+            .sort({ createdAt: -1 })
+            .lean();
+
+        // Frontend expects a flat array here
         return sendResponse(res, 200, 'Franchises fetched successfully', franchises);
     } catch (error) {
-        console.error('Error fetching franchises:', error);
+        console.error('[getFranchises] Error:', error.message);
         return sendError(res, 500, 'Failed to fetch franchises', error.message);
     }
 };
 
+// ─── Get Single Franchise ────────────────────────────────────────────────────
 export const getFranchiseById = async (req, res) => {
     try {
         const { id } = req.params;
-        const franchise = await FoodFranchise.findById(id);
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return sendError(res, 400, 'Invalid franchise ID');
+        }
+
+        const franchise = await FoodFranchise.findById(id)
+            .populate('ownerUserId', 'email mobile isActive lastLoginAt')
+            .lean();
+
         if (!franchise) {
             return sendError(res, 404, 'Franchise not found');
         }
+
         return sendResponse(res, 200, 'Franchise fetched successfully', franchise);
     } catch (error) {
-        console.error('Error fetching franchise:', error);
+        console.error('[getFranchiseById] Error:', error.message);
         return sendError(res, 500, 'Failed to fetch franchise', error.message);
     }
 };
 
+// ─── Update Franchise ────────────────────────────────────────────────────────
 export const updateFranchise = async (req, res) => {
+    const session = await mongoose.startSession();
+
     try {
         const { id } = req.params;
-        const updates = req.body;
-        
-        // If status is toggled (from frontend it sends status: "ACTIVE" or "INACTIVE")
-        if (updates.status !== undefined) {
-            updates.isActive = updates.status === 'ACTIVE';
-            delete updates.status;
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return sendError(res, 400, 'Invalid franchise ID');
         }
 
-        const updatedFranchise = await FoodFranchise.findByIdAndUpdate(
-            id,
-            { $set: updates },
-            { new: true, runValidators: true }
-        );
+        let updatedFranchise;
 
-        if (!updatedFranchise) {
-            return sendError(res, 404, 'Franchise not found');
-        }
+        await session.withTransaction(async () => {
+            const updates = { ...req.body };
 
-        // Keep Admin account in sync if active status changes
-        if (updates.isActive !== undefined) {
-            await FoodAdmin.updateMany(
-                { franchiseId: id },
-                { $set: { isActive: updates.isActive } }
+            // Normalize status field
+            if (updates.status !== undefined) {
+                updates.isActive = updates.status === 'ACTIVE';
+                delete updates.status;
+            }
+
+            // Never allow overwriting ownerUserId or createdBy via patch
+            delete updates.ownerUserId;
+            delete updates.createdBy;
+
+            updatedFranchise = await FoodFranchise.findByIdAndUpdate(
+                id,
+                { $set: updates },
+                { new: true, runValidators: true, session }
             );
-        }
+
+            if (!updatedFranchise) {
+                throw Object.assign(new Error('Franchise not found'), { statusCode: 404 });
+            }
+
+            // Sync the franchise admin's User.isActive when franchise is toggled
+            if (updates.isActive !== undefined && updatedFranchise.ownerUserId) {
+                await User.updateOne(
+                    { _id: updatedFranchise.ownerUserId },
+                    { $set: { isActive: updates.isActive } },
+                    { session }
+                );
+
+                // Also sync the UserRole status
+                const newRoleStatus = updates.isActive ? 'ACTIVE' : 'SUSPENDED';
+                await UserRole.updateMany(
+                    { franchiseId: id },
+                    { $set: { status: newRoleStatus } },
+                    { session }
+                );
+            }
+        });
 
         return sendResponse(res, 200, 'Franchise updated successfully', updatedFranchise);
     } catch (error) {
-        console.error('Error updating franchise:', error);
-        return sendError(res, 500, 'Failed to update franchise', error.message);
+        console.error('[updateFranchise] Error:', error.message);
+        const status = error.statusCode || 500;
+        return sendError(res, status, error.message || 'Failed to update franchise');
+    } finally {
+        session.endSession();
     }
 };
 
+// ─── Delete Franchise (Soft Delete) ─────────────────────────────────────────
+// Senior note: We never hard-delete franchise data in production.
+// Financial records (franchiseCost, paidAmount, dueAmount) must be preserved
+// for audit purposes. We soft-delete the auth accounts and revoke roles.
 export const deleteFranchise = async (req, res) => {
+    const session = await mongoose.startSession();
+
     try {
         const { id } = req.params;
-        
-        const deletedFranchise = await FoodFranchise.findByIdAndDelete(id);
-        if (!deletedFranchise) {
-            return sendError(res, 404, 'Franchise not found');
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return sendError(res, 400, 'Invalid franchise ID');
         }
 
-        // Also delete associated admins
-        await FoodAdmin.deleteMany({ franchiseId: id });
+        await session.withTransaction(async () => {
+            const franchise = await FoodFranchise.findById(id).select('ownerUserId').lean();
+            if (!franchise) {
+                throw Object.assign(new Error('Franchise not found'), { statusCode: 404 });
+            }
 
-        return sendResponse(res, 200, 'Franchise deleted successfully');
+            // 1. Soft-delete the franchise record
+            await FoodFranchise.findByIdAndUpdate(
+                id,
+                { $set: { isActive: false } },
+                { session }
+            );
+
+            // 2. Revoke all userRoles linked to this franchise
+            await UserRole.updateMany(
+                { franchiseId: id },
+                { $set: { status: 'REMOVED' } },
+                { session }
+            );
+
+            // 3. Soft-delete the owner User account
+            if (franchise.ownerUserId) {
+                await User.updateOne(
+                    { _id: franchise.ownerUserId },
+                    { $set: { isActive: false, isDeleted: true } },
+                    { session }
+                );
+            }
+        });
+
+        return sendResponse(res, 200, 'Franchise deactivated successfully');
     } catch (error) {
-        console.error('Error deleting franchise:', error);
-        return sendError(res, 500, 'Failed to delete franchise', error.message);
+        console.error('[deleteFranchise] Error:', error.message);
+        const status = error.statusCode || 500;
+        return sendError(res, status, error.message || 'Failed to delete franchise');
+    } finally {
+        session.endSession();
     }
 };
