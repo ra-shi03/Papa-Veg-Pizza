@@ -3,30 +3,35 @@ import { useNavigate, Link } from "react-router-dom"
 import { motion } from "framer-motion"
 import { adminAPI } from "@food/api"
 import { setAuthData } from "@food/utils/auth"
-import { Pizza, ArrowRight, Loader2, Mail, Lock, Eye, EyeOff, ShieldCheck } from "lucide-react"
-import { Button } from "@food/components/ui/button"
+import { ShieldCheck, ArrowRight, Loader2, Mail, Lock, Eye, EyeOff } from "lucide-react"
 import { useSystemTheme } from "@/shared/utils/themeSync"
 import logoNew from "@/assets/logo1.png"
+import pizzaImage from "@/assets/login-pizza.jpg"
 import { toast } from "sonner"
 
 export default function StoreLogin() {
   const navigate = useNavigate()
-  const { logo, themeMode } = useSystemTheme()
+  const { logo, themeMode, primaryColor } = useSystemTheme()
   const [identifier, setIdentifier] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [focusedField, setFocusedField] = useState(null)
   const submitting = useRef(false)
 
   const isDarkMode = themeMode === "dark"
+  const brandColor = primaryColor || "#dc2626"
+  const hoverColor = `${brandColor}e6`
 
   useEffect(() => {
     const linkFonts = document.createElement("link")
-    linkFonts.href = "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Inter:wght@400;600;700&display=swap"
+    linkFonts.href = "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
     linkFonts.rel = "stylesheet"
     document.head.appendChild(linkFonts)
     return () => {
-      document.head.removeChild(linkFonts)
+      if (document.head.contains(linkFonts)) {
+        document.head.removeChild(linkFonts)
+      }
     }
   }, [])
 
@@ -79,159 +84,195 @@ export default function StoreLogin() {
 
   return (
     <div
-      className={`min-h-screen flex flex-col relative overflow-hidden transition-colors duration-300 ${isDarkMode ? "dark" : ""}`}
+      className={`min-h-screen flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-300 ${isDarkMode ? "dark" : ""}`}
       style={{
-        backgroundColor: isDarkMode ? "#111111" : "#fbf9f8",
-        color: isDarkMode ? "#e5e2e1" : "#1c1b1b",
-        fontFamily: "'Inter', sans-serif"
+        backgroundColor: isDarkMode ? "#7f1d1d" : "#ef4444",
+        fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif"
       }}
     >
-      {/* Dynamic CSS Styling Injector */}
       <style dangerouslySetInnerHTML={{
         __html: `
-        .glass-card {
-          background: ${isDarkMode ? "rgba(255, 255, 255, 0.05)" : "rgba(255, 255, 255, 0.9)"} !important;
-          backdrop-filter: blur(20px) !important;
-          border: 1px solid ${isDarkMode ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.06)"} !important;
-          box-shadow: ${isDarkMode ? "none" : "0 4px 6px -1px rgba(0, 0, 0, 0.05)"} !important;
+        .login-card-container {
+           box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.6), 0 20px 30px -10px rgba(0, 0, 0, 0.4);
+        }
+        .form-side {
+           box-shadow: -20px 0 40px -15px rgba(0, 0, 0, 0.4), 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        .input-3d {
+          background: ${isDarkMode ? "#12141a" : "#ffffff"} !important;
+          border: 1.5px solid ${isDarkMode ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)"} !important;
+          box-shadow: ${isDarkMode ? "inset 0 2px 4px rgba(0, 0, 0, 0.5)" : "inset 0 2px 4px rgba(0, 0, 0, 0.03)"} !important;
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .input-3d:focus {
+          border-color: ${brandColor} !important;
+          box-shadow: 0 0 0 4px ${brandColor}22, ${isDarkMode ? "inset 0 2px 4px rgba(0, 0, 0, 0.5)" : "inset 0 2px 4px rgba(0, 0, 0, 0.02)"} !important;
+          background: ${isDarkMode ? "#151821" : "#ffffff"} !important;
+        }
+        .brand-text {
+          color: ${brandColor} !important;
+        }
+        .brand-3d-btn {
+          background: ${brandColor} !important;
+          box-shadow: 0 4px 14px 0 ${brandColor}66 !important;
+          transition: all 0.2s ease !important;
+        }
+        .brand-3d-btn:hover:not(:disabled) {
+          transform: translateY(-2px) !important;
+          box-shadow: 0 6px 20px 0 ${brandColor}88 !important;
+        }
+        .brand-3d-btn:active:not(:disabled) {
+          transform: translateY(0px) !important;
         }
         `
       }} />
 
-      {/* Decorative Background Elements */}
-      <div className="absolute top-0 left-0 w-full h-[600px] bg-gradient-to-b from-[var(--primary)]/10 via-[var(--primary)]/5 to-transparent pointer-events-none" />
-      <div className="absolute top-[-100px] right-[-100px] w-[500px] h-[500px] bg-[var(--primary)]/5 rounded-full blur-[120px] pointer-events-none animate-pulse" />
-      <div className="absolute bottom-[-100px] left-[-100px] w-[400px] h-[400px] bg-[var(--primary)]/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-red-500 to-red-800 opacity-90" />
+      
+      <div className="relative z-10 flex flex-col md:flex-row items-center justify-center w-full max-w-5xl">
+         
+         <motion.div 
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 1.2, ease: "easeOut" }}
+            className="w-full md:w-1/2 h-[350px] md:h-[550px] rounded-2xl overflow-hidden relative z-10 flex-shrink-0 login-card-container"
+         >
+            <img 
+               src={pizzaImage} 
+               alt="Pizza Background" 
+               className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent flex flex-col justify-end p-8 text-white">
+               <h2 className="text-3xl md:text-4xl font-extrabold mb-2 leading-tight">Need some<br/>Pizza, yo?</h2>
+               <p className="text-sm md:text-base text-gray-200 opacity-90 max-w-xs font-medium">C'mon and order from nearby Pizza delivery and pickup restaurants</p>
+               <div className="flex gap-1.5 mt-4">
+                  <div className="w-2 h-2 rounded-full bg-white opacity-100"></div>
+                  <div className="w-2 h-2 rounded-full bg-white opacity-50"></div>
+                  <div className="w-2 h-2 rounded-full bg-white opacity-50"></div>
+               </div>
+            </div>
+         </motion.div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 relative z-10">
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-          className="w-full max-w-[340px]"
-        >
-          {/* Logo & Header */}
-          <div className="text-center mb-4">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.4 }}
-              className="relative inline-block mb-1.5"
-            >
-              <img
-                src={logo || logoNew}
-                alt="Papa Veg Pizza Logo"
-                className="w-16 h-16 object-contain mx-auto transition-transform duration-300 hover:scale-105"
-              />
-            </motion.div>
+         <motion.div 
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 1.2, ease: "easeOut" }}
+            className="w-full md:w-1/2 max-w-[420px] md:max-w-none md:-ml-8 -mt-10 md:mt-0 bg-white dark:bg-[#181a20] rounded-2xl p-6 sm:px-8 sm:py-6 shadow-2xl z-20 form-side flex flex-col justify-center"
+         >
+            <div className="flex justify-between items-start mb-4">
+               <div className="flex flex-col">
+                  <span className="text-gray-400 dark:text-gray-500 font-semibold text-sm mb-1 uppercase tracking-widest">
+                    Store Operations
+                  </span>
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    Welcome Back
+                  </h3>
+               </div>
+               <img src={logo || logoNew} alt="Logo" className="w-16 h-16 object-contain" />
+            </div>
 
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="text-gray-400 dark:text-gray-500 font-semibold text-[9px] uppercase tracking-[0.2em]"
-            >
-              STORE OPERATIONS
-            </motion.p>
-          </div>
-
-          {/* Login Card */}
-          <div className="glass-card rounded-xl p-5 sm:p-6 shadow-[0_12px_24px_-10px_rgba(229,57,53,0.1)] dark:shadow-none relative overflow-hidden">
-             <form onSubmit={handleLogin} className="space-y-3.5">
-              <div className="space-y-2.5">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 ml-0.5">Email or Mobile</label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      required
-                      autoFocus
-                      value={identifier}
-                      onChange={(e) => setIdentifier(e.target.value)}
-                      className="block w-full pl-9 pr-3 py-2 bg-gray-50 dark:bg-gray-900/50 text-gray-900 dark:text-white border border-transparent focus:border-[var(--primary)]/50 rounded-lg outline-none transition-all placeholder:text-gray-400 font-medium text-xs"
-                      placeholder="manager@papavegpizza.com or 9876543210"
-                    />
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Email or Mobile
+                </label>
+                <div className="relative">
+                  <div className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors duration-200 pointer-events-none ${focusedField === 'identifier' ? 'brand-text' : 'text-gray-400'}`}>
+                    <Mail className="w-4 h-4" />
                   </div>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center px-0.5">
-                    <label className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">Password</label>
-                  </div>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="block w-full pl-9 pr-9 py-2 bg-gray-50 dark:bg-gray-900/50 text-gray-900 dark:text-white border border-transparent focus:border-[var(--primary)]/50 rounded-lg outline-none transition-all placeholder:text-gray-400 font-medium text-xs"
-                      placeholder="••••••••"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-655 dark:hover:text-zinc-200 transition-colors"
-                    >
-                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={identifier}
+                    onFocus={() => setFocusedField('identifier')}
+                    onBlur={() => setFocusedField(null)}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    className="input-3d block w-full pl-11 pr-4 py-3 text-gray-900 dark:text-white rounded-xl outline-none placeholder:text-gray-400 font-medium text-sm"
+                    placeholder="manager@papavegpizza.com"
+                  />
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2 bg-[var(--primary)] hover:bg-[var(--sa-primary-hover)] disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 text-white rounded-lg font-bold text-xs shadow-md shadow-[var(--primary)]/10 transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 group overflow-hidden relative border-0 cursor-pointer"
-              >
-                {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    <span>Enter Portal</span>
-                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                  </>
-                )}
-              </button>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Password
+                </label>
+                <div className="relative">
+                  <div className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors duration-200 pointer-events-none ${focusedField === 'password' ? 'brand-text' : 'text-gray-400'}`}>
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onFocus={() => setFocusedField('password')}
+                    onBlur={() => setFocusedField(null)}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="input-3d block w-full pl-11 pr-11 py-3 text-gray-900 dark:text-white rounded-xl outline-none placeholder:text-gray-400 font-medium text-sm"
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1.5 rounded-md focus:outline-none transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3.5 brand-3d-btn disabled:opacity-50 text-white rounded-xl font-bold text-sm tracking-wide flex items-center justify-center gap-2 group relative cursor-pointer"
+                >
+                  {loading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-white" />
+                  ) : (
+                    <>
+                      <span>Enter Portal</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </form>
-          </div>
 
-          {/* Quick Info / Role Map */}
-          <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200/10 text-[10px] opacity-75">
-            <h4 className="font-semibold text-gray-500 dark:text-gray-400 mb-1">Simulated Credentials (Click to fill)</h4>
-            <div className="space-y-0.5 text-xs">
-              <div 
-                className="flex justify-between cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-800 p-1 rounded transition-colors"
-                onClick={() => { setIdentifier("manager@papavegpizza.com"); setPassword("12345678"); }}
-              >
-                <span className="text-gray-400">Manager:</span> <code className="text-gray-600 dark:text-gray-300 font-semibold">manager@papavegpizza.com</code>
-              </div>
-              <div 
-                className="flex justify-between cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-800 p-1 rounded transition-colors"
-                onClick={() => { setIdentifier("supervisor@papavegpizza.com"); setPassword("12345678"); }}
-              >
-                <span className="text-gray-400">Supervisor:</span> <code className="text-gray-600 dark:text-gray-300 font-semibold">supervisor@papavegpizza.com</code>
-              </div>
-              <div 
-                className="flex justify-between cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-800 p-1 rounded transition-colors"
-                onClick={() => { setIdentifier("staff@papavegpizza.com"); setPassword("12345678"); }}
-              >
-                <span className="text-gray-400">Staff:</span> <code className="text-gray-600 dark:text-gray-300 font-semibold">staff@papavegpizza.com</code>
+            {/* Quick Info / Role Map */}
+            <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800 text-[10px]">
+              <h4 className="font-semibold text-gray-500 dark:text-gray-400 mb-1 text-[9px] uppercase tracking-wider">Simulated Credentials</h4>
+              <div className="space-y-0.5 text-[10px]">
+                <div 
+                  className="flex justify-between cursor-pointer hover:bg-white dark:hover:bg-gray-800 p-1 rounded-md transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-700"
+                  onClick={() => { setIdentifier("manager@papavegpizza.com"); setPassword("12345678"); }}
+                >
+                  <span className="text-gray-500">Manager:</span> <code className="text-gray-700 dark:text-gray-300 font-semibold truncate ml-2">manager@papavegpizza.com</code>
+                </div>
+                <div 
+                  className="flex justify-between cursor-pointer hover:bg-white dark:hover:bg-gray-800 p-1 rounded-md transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-700"
+                  onClick={() => { setIdentifier("supervisor@papavegpizza.com"); setPassword("12345678"); }}
+                >
+                  <span className="text-gray-500">Supervisor:</span> <code className="text-gray-700 dark:text-gray-300 font-semibold truncate ml-2">supervisor@papavegpizza.com</code>
+                </div>
+                <div 
+                  className="flex justify-between cursor-pointer hover:bg-white dark:hover:bg-gray-800 p-1 rounded-md transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-700"
+                  onClick={() => { setIdentifier("staff@papavegpizza.com"); setPassword("12345678"); }}
+                >
+                  <span className="text-gray-500">Staff:</span> <code className="text-gray-700 dark:text-gray-300 font-semibold truncate ml-2">staff@papavegpizza.com</code>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="mt-4 flex flex-col items-center gap-2 text-[10px] text-gray-400 dark:text-gray-500 font-medium">
-            <div className="flex items-center gap-1 opacity-50">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Secure Operations Portal</span>
+            <div className="mt-4 flex flex-col items-center text-[11px] font-medium">
+              <Link 
+                to="/user/auth/support" 
+                className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+              >
+                Need Support? Contact Support
+              </Link>
             </div>
-            <Link to="/user/auth/support" className="hover:text-[var(--primary)] hover:underline transition-colors opacity-70">
-              Need Support? Contact Support
-            </Link>
-          </div>
-        </motion.div>
+         </motion.div>
       </div>
     </div>
   )
