@@ -1,0 +1,991 @@
+Table AuditLog {
+  id ObjectId [pk]
+  userId ObjectId
+  role String
+  module String
+  action String
+  oldValue Object
+  newValue Object
+  ipAddress String
+  device String
+  createdAt Date
+  updatedAt Date
+}
+
+Table Permission {
+  id ObjectId [pk]
+  module String
+  action String
+  description String
+  createdAt Date
+  updatedAt Date
+}
+
+Table RolePermission {
+  id ObjectId [pk]
+  roleId ObjectId
+  permissionId ObjectId
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodNotification {
+  id ObjectId [pk]
+  userId ObjectId
+  title String
+  message String
+  link String
+  category String
+  source String
+  broadcastId ObjectId
+  metadata Object
+  isRead Boolean
+  readAt Date
+  dismissedAt Date
+  createdAt Date
+  updatedAt Date
+  notificationType String
+  priority String
+  expiresAt Date
+}
+
+Table BroadcastNotification {
+  id ObjectId [pk]
+  title String
+  message String
+  targetType String
+  targetIds Array
+  targets Array
+  link String
+  createdBy ObjectId
+  targetCount Number
+  createdAt Date
+}
+
+Table Payment {
+  id ObjectId [pk]
+  orderId ObjectId
+  userId ObjectId
+  amount Number
+  currency String
+  method String
+  gateway String
+  gatewayOrderId String
+  gatewayPaymentId String
+  status String
+  module String
+  rawResponse Object
+  metadata Object
+  createdAt Date
+  updatedAt Date
+}
+
+Table Refund {
+  id ObjectId [pk]
+  paymentId ObjectId
+  orderId ObjectId
+  userId ObjectId
+  amount Number
+  currency String
+  reason String
+  status String
+  refundTo String
+  gatewayRefundId String
+  processedAt Date
+  processedBy ObjectId
+  metadata Object
+  createdAt Date
+  updatedAt Date
+}
+
+Table Settlement {
+  id ObjectId [pk]
+  storeId ObjectId
+  deliveryPartnerId ObjectId
+  franchiseId ObjectId
+  amount Number
+  currency String
+  transactionIds Array
+  status String
+  payoutRef String
+  processedAt Date
+  processedBy ObjectId
+  periodStart Date
+  periodEnd Date
+  notes String
+  metadata Object
+  createdAt Date
+  updatedAt Date
+}
+
+Table Transaction {
+  id ObjectId [pk]
+  paymentId ObjectId
+  orderId ObjectId
+  entityType String
+  entityId ObjectId
+  type String
+  amount Number
+  balanceAfter Number
+  currency String
+  status String
+  description String
+  category String
+  module String
+  metadata Object
+  createdAt Date
+  updatedAt Date
+}
+
+Table EmployeeProfile {
+  id ObjectId [pk]
+  userId ObjectId
+  employeeId String
+  firstName String
+  lastName String
+  phone String
+  profileImage String
+  joiningDate Date
+  designation String
+  salary Number
+  emergencyContact String
+  address String
+  servicesAccess Array
+  createdBy ObjectId
+  updatedBy ObjectId
+  createdAt Date
+  updatedAt Date
+}
+
+Table AccountDeletion {
+  id ObjectId [pk]
+  accountType String
+  originalId ObjectId
+  phone String
+  name String
+  email String
+  deletedAt Date
+  totalOrderAmount Number
+  walletBalance Number
+  pendingRefunds Number
+  totalEarnings Number
+  pendingWithdrawals Number
+  totalCommissionPaid Number
+  orderCount Number
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodAdminWallet {
+  id ObjectId [pk]
+  key String
+  balance Number
+  totalRevenue Number
+  totalPayouts Number
+  totalRefunds Number
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodBusinessSettings {
+  id ObjectId [pk]
+  companyName String
+  email String
+  countryCode String
+  number String
+  address String
+  state String
+  pincode String
+  region String
+  logoUrl String
+  logoPublicId String
+  faviconUrl String
+  faviconPublicId String
+  supportEmail String
+  supportPhone String
+  supportHours String
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodCategory {
+  id ObjectId [pk]
+  name String
+  imageUrl String
+  imagePublicId String
+  description String
+  sortOrder Number
+  isActive Boolean
+  createdAt Date
+  updatedAt Date
+  isDeleted Boolean
+  deletedAt Date
+  deletedBy ObjectId
+}
+
+Table DeliveryBonusTransaction {
+  id ObjectId [pk]
+  deliveryPartnerId ObjectId
+  transactionId String
+  amount Number
+  reference String
+  createdByAdminId ObjectId
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodDeliveryCashLimit {
+  id ObjectId [pk]
+  deliveryCashLimit Number
+  deliveryWithdrawalLimit Number
+  isActive Boolean
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodDeliveryCommissionRule {
+  id ObjectId [pk]
+  name String
+  minDistance Number
+  maxDistance Number
+  commissionPerKm Number
+  basePayout Number
+  status Boolean
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodDeliveryEmergencyHelp {
+  id ObjectId [pk]
+  medicalEmergency String
+  accidentHelpline String
+  contactPolice String
+  insurance String
+  isActive Boolean
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodEarningAddon {
+  id ObjectId [pk]
+  title String
+  description String
+  requiredOrders Number
+  earningAmount Number
+  startDate Date
+  endDate Date
+  maxRedemptions Number
+  currentRedemptions Number
+  status String
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodEarningAddonHistory {
+  id ObjectId [pk]
+  offerId ObjectId
+  deliveryPartnerId ObjectId
+  ordersCompleted Number
+  ordersRequired Number
+  earningAmount Number
+  totalEarning Number
+  status String
+  completedAt Date
+  creditedAt Date
+  creditedNotes String
+  cancelledAt Date
+  cancelReason String
+  createdAt Date
+  updatedAt Date
+}
+
+Table FeedbackExperience {
+  id ObjectId [pk]
+  userId ObjectId
+  userModel String
+  storeId ObjectId
+  rating Number
+  comment String
+  module String
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodFeeSettings {
+  id ObjectId [pk]
+  deliveryFee Number
+  deliveryFeeRanges Array
+  freeDeliveryUpTo Number
+  freeDeliveryThreshold Number
+  platformFee Number
+  packagingFee Number
+  gstRate Number
+  isActive Boolean
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodItem {
+  id ObjectId [pk]
+  storeId ObjectId
+  categoryId ObjectId
+  categoryName String
+  name String
+  description String
+  price Number
+  priceOnOtherPlatforms Number
+  otherPlatformGst Number
+  variants Array
+  image String
+  foodType String
+  isAvailable Boolean
+  preparationTime String
+  approvalStatus String
+  rejectionReason String
+  requestedAt Date
+  approvedAt Date
+  rejectedAt Date
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodOffer {
+  id ObjectId [pk]
+  couponCode String
+  discountType String
+  discountValue Number
+  customerScope String
+  storeScope String
+  storeId ObjectId
+  minOrderValue Number
+  maxDiscount Number
+  usageLimit Number
+  perUserLimit Number
+  usedCount Number
+  startDate Date
+  isFirstOrderOnly Boolean
+  endDate Date
+  status String
+  showInCart Boolean
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodOfferUsage {
+  id ObjectId [pk]
+  offerId ObjectId
+  userId ObjectId
+  count Number
+  lastUsedAt Date
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodPageContent {
+  id ObjectId [pk]
+  key String
+  legal String
+  about String
+  support String
+  updatedBy ObjectId
+  updatedByRole String
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodReferralLog {
+  id ObjectId [pk]
+  referrerId ObjectId
+  refereeId ObjectId
+  role String
+  rewardAmount Number
+  status String
+  reason String
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodReferralSettings {
+  id ObjectId [pk]
+  referralRewardUser Number
+  referralRewardDelivery Number
+  referralLimitUser Number
+  referralLimitDelivery Number
+  isActive Boolean
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodRegion {
+  id ObjectId [pk]
+  name String
+  country String
+  description String
+  isActive Boolean
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodSafetyEmergencyReport {
+  id ObjectId [pk]
+  userId ObjectId
+  userName String
+  userEmail String
+  userPhone String
+  message String
+  status String
+  priority String
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodStoreCommission {
+  id ObjectId [pk]
+  storeId ObjectId
+  type String
+  value Number
+  notes String
+  status Boolean
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodTerritory {
+  id ObjectId [pk]
+  name String
+  zoneId ObjectId
+  description String
+  isActive Boolean
+  postalCodes Array
+  coordinates Array
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodZone {
+  id ObjectId [pk]
+  name String
+  regionId ObjectId
+  description String
+  zoneName String
+  country String
+  serviceLocation String
+  unit String
+  coordinates Array
+  isActive Boolean
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodDeliveryWallet {
+  id ObjectId [pk]
+  deliveryPartnerId ObjectId
+  balance Number
+  lockedAmount Number
+  cashInHand Number
+  totalEarnings Number
+  totalBonus Number
+  totalSettled Number
+  totalDeliveries Number
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodDeliveryCashDeposit {
+  id ObjectId [pk]
+  deliveryPartnerId ObjectId
+  amount Number
+  paymentMethod String
+  status String
+  razorpayOrderId String
+  razorpayPaymentId String
+  adminId ObjectId
+  adminNote String
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodDeliveryWithdrawal {
+  id ObjectId [pk]
+  deliveryPartnerId ObjectId
+  amount Number
+  status String
+  paymentMethod String
+  accountNumber String
+  ifscCode String
+  bankName String
+  accountHolderName String
+  upiId String
+  upiQrCode String
+  adminNote String
+  rejectionReason String
+  transactionId String
+  processedAt Date
+  createdAt Date
+  updatedAt Date
+}
+
+Table DeliverySupportTicket {
+  id ObjectId [pk]
+  deliveryPartnerId ObjectId
+  ticketId String
+  subject String
+  description String
+  category String
+  priority String
+  status String
+  adminResponse String
+  respondedAt Date
+  createdAt Date
+  updatedAt Date
+}
+
+Table StoreFoodPrice {
+  id ObjectId [pk]
+  storeId ObjectId
+  foodId ObjectId
+  price Number
+  isAvailable Boolean
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodTransaction {
+  id ObjectId [pk]
+  orderId ObjectId
+  userId ObjectId
+  storeId ObjectId
+  deliveryPartnerId ObjectId
+  paymentMethod String
+  status String
+  subtotal Number
+  tax Number
+  packagingFee Number
+  deliveryFee Number
+  platformFee Number
+  discount Number
+  total Number
+  totalCustomerPaid Number
+  storeShare Number
+  storeCommission Number
+  riderShare Number
+  platformNetProfit Number
+  taxAmount Number
+  provider String
+  razorpayOrderId String
+  razorpayPaymentId String
+  razorpaySignature String
+  qrUrl String
+  qrExpiresAt Date
+  isStoreSettled Boolean
+  storeSettledAt Date
+  isRiderSettled Boolean
+  riderSettledAt Date
+  history Array
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodOrder {
+  id ObjectId [pk]
+  order_id String
+  orderId String
+  userId ObjectId
+  franchiseId ObjectId
+  storeId ObjectId
+  zoneId ObjectId
+  transactionId ObjectId
+  couponId ObjectId
+  offerId ObjectId
+  deliveryPartnerId ObjectId
+  deliveryAddress String
+  customerName String
+  customerPhone String
+  pricing String
+  orderStatus String
+  cancelReason String
+  storeNote String
+  note String
+  sendCutlery Boolean
+  deliveryFleet String
+  scheduledAt Date
+  estimatedDeliveryTime Date
+  actualDeliveryTime Date
+  riderEarning Number
+  platformProfit Number
+  deliveryOtp String
+  type String
+  coordinates Array
+  createdAt Date
+  updatedAt Date
+}
+
+Table OrderDispatch {
+  id ObjectId [pk]
+  orderId ObjectId
+  modeAtCreation String
+  status String
+  deliveryPartnerId ObjectId
+  assignedAt Date
+  acceptedAt Date
+  offeredTo Array
+  dispatchingAt Date
+  currentPhase String
+  deliveryStateStatus String
+  reachedPickupAt Date
+  reachedDropAt Date
+  pickedUpAt Date
+  deliveredAt Date
+  dropOtpRequired Boolean
+  dropOtpVerified Boolean
+  createdAt Date
+  updatedAt Date
+}
+
+Table OrderItem {
+  id ObjectId [pk]
+  orderId ObjectId
+  itemId String
+  name String
+  variantId String
+  variantName String
+  variantPrice Number
+  price Number
+  quantity Number
+  isVeg Boolean
+  image String
+  notes String
+  createdAt Date
+  updatedAt Date
+}
+
+Table OrderPayment {
+  id ObjectId [pk]
+  orderId ObjectId
+  method String
+  status String
+  amountDue Number
+  razorpayOrderId String
+  razorpayPaymentId String
+  razorpaySignature String
+  qrId String
+  qrImageUrl String
+  qrPaymentLinkId String
+  qrShortUrl String
+  qrStatus String
+  qrExpiresAt Date
+  refundStatus String
+  refundDestination String
+  refundAmount Number
+  refundId String
+  refundProcessedAt Date
+  createdAt Date
+  updatedAt Date
+}
+
+Table OrderRating {
+  id ObjectId [pk]
+  orderId ObjectId
+  targetType String
+  targetId ObjectId
+  userId ObjectId
+  rating Number
+  comment String
+  createdAt Date
+  updatedAt Date
+}
+
+Table OrderStatusHistory {
+  id ObjectId [pk]
+  orderId ObjectId
+  at Date
+  byRole String
+  byId ObjectId
+  from String
+  to String
+  note String
+  createdAt Date
+  updatedAt Date
+}
+
+Table AppSettings {
+  id ObjectId [pk]
+  appName String
+  logo String
+  favicon String
+  primaryColor String
+  secondaryColor String
+  accentColor String
+  supportPhone String
+  supportEmail String
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodBanner {
+  id ObjectId [pk]
+  title String
+  image String
+  type String
+  franchiseId ObjectId
+  storeId ObjectId
+  isActive Boolean
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodCoupon {
+  id ObjectId [pk]
+  code String
+  discountType String
+  value Number
+  minimumOrderAmount Number
+  maxUsage Number
+  startDate Date
+  endDate Date
+  isActive Boolean
+  createdAt Date
+  updatedAt Date
+}
+
+Table KitchenTask {
+  id ObjectId [pk]
+  orderId ObjectId
+  storeId ObjectId
+  assignedTo ObjectId
+  assignedBy ObjectId
+  status String
+  startedAt Date
+  completedAt Date
+  notes String
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodStore {
+  id ObjectId [pk]
+  franchiseId ObjectId
+  storeName String
+  code String
+  phone String
+  email String
+  address String
+  city String
+  state String
+  pincode String
+  latitude Number
+  longitude Number
+  managerId ObjectId
+  isActive Boolean
+  createdBy ObjectId
+  createdAt Date
+  updatedAt Date
+  isDeleted Boolean
+  deletedAt Date
+  deletedBy ObjectId
+}
+
+Table FoodAddress {
+  id ObjectId [pk]
+  userId ObjectId
+  addressType String
+  houseNumber String
+  street String
+  city String
+  state String
+  pincode String
+  latitude Number
+  longitude Number
+  isDefault Boolean
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodSupportTicket {
+  id ObjectId [pk]
+  userId ObjectId
+  type String
+  orderId ObjectId
+  storeId ObjectId
+  issueType String
+  description String
+  status String
+  adminResponse String
+  createdAt Date
+  updatedAt Date
+}
+
+Table FoodUserWallet {
+  id ObjectId [pk]
+  userId ObjectId
+  balance Number
+  referralEarnings Number
+  transactions Array
+  createdAt Date
+  updatedAt Date
+}
+
+Ref: User.id - EmployeeProfile.id
+Ref: User.id - CustomerProfile.id
+Ref: User.id - DeliveryProfile.id
+Ref: Role.id < User.id
+Ref: Role.id < RolePermission.id
+Ref: Permission.id < RolePermission.id
+Ref: User.id < FoodOrder.id
+Ref: FoodOrder.id < OrderItem.id
+Ref: FoodOrder.id < OrderStatusHistory.id
+Ref: FoodOrder.id - OrderRating.id
+Ref: FoodOrder.id - OrderDispatch.id
+Ref: FoodOrder.id - OrderPayment.id
+Ref: User.id < KitchenTask.id
+Ref: User.id < Payment.id
+Ref: User.id < Refund.id
+Ref: User.id < FoodNotification.id
+Ref: User.id < BroadcastNotification.id
+Ref: User.id < FoodUserWallet.id
+Table User {
+  id ObjectId [pk]
+  email String [unique, note: 'sparse']
+  mobile String [unique, not null]
+  password String
+  loginType String [note: 'enum: PASSWORD, OTP, GOOGLE, APPLE, default: OTP']
+  primaryRole ObjectId [ref: > Role.id]
+  emailVerified Boolean [default: false]
+  mobileVerified Boolean [default: false]
+  isActive Boolean [default: true]
+  isBlocked Boolean [default: false]
+  isDeleted Boolean [default: false]
+  failedLoginAttempts Number [default: 0]
+  lockUntil Date
+  lastLoginAt Date
+  createdAt Date
+  updatedAt Date
+}
+
+Table Profile {
+  id ObjectId [pk]
+  userId ObjectId [unique, not null, ref: - User.id]
+  firstName String
+  lastName String
+  profilePhoto String
+  gender String [note: 'enum: MALE, FEMALE, OTHER']
+  dob Date
+  phone String
+  alternatePhone String
+  addressLine1 String
+  addressLine2 String
+  city String
+  state String
+  country String
+  pincode String
+  language String
+  timezone String
+  createdAt Date
+  updatedAt Date
+}
+
+Table Role {
+  id ObjectId [pk]
+  code String [unique]
+  name String
+  description String
+  isSystemRole Boolean [default: true]
+  createdAt Date
+  updatedAt Date
+}
+
+Table UserRole {
+  id ObjectId [pk]
+  userId ObjectId [not null, ref: > User.id]
+  roleId ObjectId [not null, ref: > Role.id]
+  franchiseId ObjectId
+  storeId ObjectId
+  assignedBy ObjectId [ref: > User.id]
+  assignedAt Date [default: `Date.now`]
+  isPrimary Boolean [default: false]
+  status String [note: 'enum: ACTIVE, SUSPENDED, REMOVED, default: ACTIVE']
+  createdAt Date
+  updatedAt Date
+}
+
+Table RefreshToken {
+  id ObjectId [pk]
+  userId ObjectId [ref: > User.id]
+  token String
+  deviceId String
+  expiresAt Date
+  revoked Boolean [default: false]
+  createdAt Date
+  updatedAt Date
+}
+
+Table UserSession {
+  id ObjectId [pk]
+  userId ObjectId [ref: > User.id]
+  refreshTokenId ObjectId [ref: > RefreshToken.id]
+  activeRoleId ObjectId [ref: > Role.id]
+  franchiseId ObjectId
+  storeId ObjectId
+  device String
+  browser String
+  os String
+  ipAddress String
+  lastActivity Date
+  expiresAt Date
+  isActive Boolean [default: true]
+  createdAt Date
+  updatedAt Date
+}
+
+Table OtpVerification {
+  id ObjectId [pk]
+  mobile String
+  email String
+  otp String
+  purpose String [note: 'enum: LOGIN, REGISTER, RESET_PASSWORD, CHANGE_PHONE, CHANGE_EMAIL']
+  attempts Number [default: 0]
+  expiresAt Date
+  verified Boolean [default: false]
+  createdAt Date
+  updatedAt Date
+}
+
+Table LoginHistory {
+  id ObjectId [pk]
+  userId ObjectId [ref: > User.id]
+  roleId ObjectId [ref: > Role.id]
+  loginAt Date
+  logoutAt Date
+  ipAddress String
+  browser String
+  os String
+  device String
+  status String [note: 'enum: SUCCESS, FAILED, LOGOUT']
+  location String
+  createdAt Date
+  updatedAt Date
+}
+
+Table CustomerProfile {
+  id ObjectId [pk]
+  userId ObjectId [unique, ref: - User.id]
+  referralCode String
+  loyaltyTier String
+  walletId ObjectId
+  defaultAddressId ObjectId
+  createdAt Date
+  updatedAt Date
+}
+
+Table DeliveryProfile {
+  id ObjectId [pk]
+  userId ObjectId [unique, ref: - User.id]
+  vehicleType String
+  vehicleNumber String
+  drivingLicense String
+  aadhaarNumber String
+  currentStoreId ObjectId
+  isOnline Boolean [default: false]
+  createdAt Date
+  updatedAt Date
+}

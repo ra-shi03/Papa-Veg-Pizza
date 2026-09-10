@@ -1,0 +1,618 @@
+import React, { useState, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { X, User, Mail, Phone, Store, MapPin, Layers, Save, Lock, Clock, Hash, Loader2 } from "lucide-react"
+import apiClient from "../../../../../../services/api/axios"
+// Fetch dynamic data from API
+
+export default function AddFranchiseModal({ isOpen, onClose, onSave }) {
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    password: "",
+    franchiseName: "",
+    franchiseCode: "",
+    regionId: "",
+    zoneId: "",
+    territoryId: "",
+    type: "Single Store",
+    totalStores: 1,
+    status: "ACTIVE",
+    franchiseDuration: 3,
+    franchiseCost: "",
+    paidAmount: "",
+    dueAmount: "",
+    gstNumber: "",
+    address: ""
+  })
+
+  const [errors, setErrors] = useState({})
+  const [isLoading, setIsLoading] = useState(false)
+  
+  // Geography Data State
+  const [regions, setRegions] = useState([]);
+  const [zones, setZones] = useState([]);
+  const [territories, setTerritories] = useState([]);
+
+  useEffect(() => {
+    const fetchGeography = async () => {
+      try {
+        const [regRes, zonRes, terRes] = await Promise.all([
+          apiClient.get('/food/admin/regions'),
+          apiClient.get('/food/admin/zones'),
+          apiClient.get('/food/admin/territories')
+        ]);
+        setRegions((regRes.data.data || []).filter(region => region.isActive));
+        setZones((zonRes.data.data || []).filter(zone => zone.isActive));
+        setTerritories((terRes.data.data || []).filter(territory => territory.isActive));
+      } catch (err) {
+        console.error("Failed to load geography data", err);
+      }
+    };
+    fetchGeography();
+  }, []);
+
+  // Derived dependent dropdowns
+  const availableZones = zones.filter(z => z.regionId === formData.regionId);
+  const availableTerritories = territories.filter(t => t.zoneId === formData.zoneId);
+
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        name: "",
+        email: "",
+        phone: "",
+        password: "",
+        franchiseName: "",
+        franchiseCode: "",
+        regionId: "",
+        zoneId: "",
+        territoryId: "",
+        type: "Single Store",
+        totalStores: 1,
+        status: "ACTIVE",
+        franchiseDuration: 3,
+        franchiseCost: "",
+        paidAmount: "",
+        dueAmount: "",
+        gstNumber: "",
+        address: ""
+      })
+      setErrors({})
+    }
+  }, [isOpen])
+
+  const validate = () => {
+    const newErrors = {}
+    if (!formData.name.trim()) newErrors.name = "Name is required"
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required"
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = "Invalid email format"
+    }
+    if (!formData.phone.trim()) newErrors.phone = "Phone is required"
+    if (!formData.password.trim()) newErrors.password = "Password is required"
+    if (!formData.franchiseName.trim()) newErrors.franchiseName = "Franchise name is required"
+    if (!formData.franchiseCode.trim()) newErrors.franchiseCode = "Franchise code is required"
+    if (!formData.regionId) newErrors.regionId = "Region is required"
+    if (!formData.zoneId) newErrors.zoneId = "Zone is required"
+    if (!formData.territoryId) newErrors.territoryId = "Territory is required"
+    if (formData.totalStores < 1) newErrors.totalStores = "Must have at least 1 store"
+    if (!formData.franchiseDuration || Number(formData.franchiseDuration) < 1) {
+      newErrors.franchiseDuration = "Duration must be at least 1 year"
+    }
+    if (formData.franchiseCost !== "" && Number(formData.franchiseCost) < 0) {
+      newErrors.franchiseCost = "Cost cannot be negative"
+    }
+    if (formData.paidAmount !== "" && Number(formData.paidAmount) < 0) {
+      newErrors.paidAmount = "Paid amount cannot be negative"
+    }
+    if (formData.dueAmount !== "" && Number(formData.dueAmount) < 0) {
+      newErrors.dueAmount = "Due amount cannot be negative"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!validate()) return
+
+    try {
+      setIsLoading(true)
+      const response = await apiClient.post('/food/admin/franchises', formData)
+      
+      const newFranchise = response.data.data.franchise
+      
+      // Resolve names for the table display if needed for local state update
+      const region = regions.find(r => r.id === formData.regionId || r._id === formData.regionId)
+      const regionName = region?.name || ""
+      
+      const zone = zones.find(z => z.id === formData.zoneId || z._id === formData.zoneId)
+      const zoneName = zone?.name || ""
+      
+      const territory = territories.find(t => t.id === formData.territoryId || t._id === formData.territoryId)
+      const territoryName = territory?.name || ""
+
+      onSave({
+        ...formData,
+        id: newFranchise.franchiseCode || newFranchise._id,
+        _id: newFranchise._id,
+        city: territoryName,
+        state: regionName,
+        regionName: regionName,
+        zoneName: zoneName,
+        joinedDate: new Date(newFranchise.createdAt || new Date()).toLocaleDateString("en-US", {
+          month: "short",
+          day: "2-digit",
+          year: "numeric"
+        }),
+        revenue: 0,
+        totalManagers: 0
+      })
+      onClose()
+    } catch (error) {
+      console.error("Error creating franchise:", error)
+      const errorMessage = error.response?.data?.message || "Failed to create franchise"
+      setErrors({ ...errors, submit: errorMessage })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]"
+          />
+
+          <div className="fixed inset-0 flex items-center justify-center p-4 z-[105] overflow-y-auto pointer-events-none">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", duration: 0.4 }}
+              className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl p-3.5 pointer-events-auto flex flex-col max-h-[90vh]"
+            >
+              <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100 dark:border-zinc-800">
+                <div>
+                  <h3 className="text-base font-extrabold text-zinc-900 dark:text-zinc-50 leading-tight">
+                    Add Franchise Admin
+                  </h3>
+                  <p className="text-zinc-400 dark:text-zinc-500 font-semibold text-[10px] mt-0.5">
+                    Register a new franchise operator in the system.
+                  </p>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="p-1 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 transition-colors"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto pr-1 py-2.5 space-y-3 scrollbar-thin">
+                {errors.submit && (
+                  <div className="bg-rose-50 text-rose-500 text-xs p-2 rounded-lg mb-2">
+                    {errors.submit}
+                  </div>
+                )}
+                <div className="space-y-3">
+                  <span className="text-[9px] font-extrabold text-[var(--primary)] uppercase tracking-wider">
+                    Personal Details
+                  </span>
+                  
+                  <div>
+                    <label htmlFor="fullName" className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Full Name</label>
+                    <div className="relative">
+                      <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                      <input
+                        id="fullName"
+                        name="fullName"
+                        type="text"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="e.g. John Doe"
+                        className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
+                          errors.name ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
+                        }`}
+                      />
+                    </div>
+                    {errors.name && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.name}</p>}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="emailAddress" className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Email Address</label>
+                      <div className="relative">
+                        <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          id="emailAddress"
+                          name="emailAddress"
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          placeholder="e.g. john@example.com"
+                          className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
+                            errors.email ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
+                          }`}
+                        />
+                      </div>
+                      {errors.email && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.email}</p>}
+                    </div>
+
+                    <div>
+                      <label htmlFor="phoneNumber" className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Phone Number</label>
+                      <div className="relative">
+                        <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          id="phoneNumber"
+                          name="phoneNumber"
+                          type="text"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          placeholder="e.g. +1 234 567 890"
+                          className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
+                            errors.phone ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
+                          }`}
+                        />
+                      </div>
+                      {errors.phone && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.phone}</p>}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">GST Number</label>
+                      <div className="relative">
+                        <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          type="text"
+                          value={formData.gstNumber}
+                          onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value })}
+                          placeholder="e.g. 22AAAAA0000A1Z5"
+                          className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
+                            errors.gstNumber ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
+                          }`}
+                        />
+                      </div>
+                      {errors.gstNumber && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.gstNumber}</p>}
+                    </div>
+
+                    <div>
+                      <label htmlFor="fullAddress" className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Full Address</label>
+                      <div className="relative">
+                        <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          id="fullAddress"
+                          name="fullAddress"
+                          type="text"
+                          value={formData.address}
+                          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                          placeholder="e.g. 123 Main St, City"
+                          className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
+                            errors.address ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
+                          }`}
+                        />
+                      </div>
+                      {errors.address && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.address}</p>}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="password" className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Password</label>
+                    <div className="relative">
+                      <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                      <input
+                        id="password"
+                        name="password"
+                        type="password"
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        placeholder="Enter a strong password"
+                        className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
+                          errors.password ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
+                        }`}
+                      />
+                    </div>
+                    {errors.password && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.password}</p>}
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-2.5">
+                  <span className="text-[9px] font-extrabold text-[var(--primary)] uppercase tracking-wider">
+                    Franchise Configuration
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Franchise / Brand Name</label>
+                      <div className="relative">
+                        <Store size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          type="text"
+                          value={formData.franchiseName}
+                          onChange={(e) => setFormData({ ...formData, franchiseName: e.target.value })}
+                          placeholder="e.g. Papa Veg Centro"
+                          className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
+                            errors.franchiseName ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
+                          }`}
+                        />
+                      </div>
+                      {errors.franchiseName && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.franchiseName}</p>}
+                    </div>
+
+                    <div>
+                      <label htmlFor="franchiseCode" className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Franchise Code</label>
+                      <div className="relative">
+                        <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          id="franchiseCode"
+                          name="franchiseCode"
+                          type="text"
+                          value={formData.franchiseCode}
+                          onChange={(e) => setFormData({ ...formData, franchiseCode: e.target.value })}
+                          placeholder="e.g. FRAN-123"
+                          className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
+                            errors.franchiseCode ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
+                          }`}
+                        />
+                      </div>
+                      {errors.franchiseCode && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.franchiseCode}</p>}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    {/* Region, Zone, and Territory */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label htmlFor="region" className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Region</label>
+                        <select
+                          id="region"
+                          name="region"
+                          value={formData.regionId}
+                          onChange={(e) => setFormData({ ...formData, regionId: e.target.value, zoneId: "", territoryId: "" })}
+                          className={`w-full text-xs px-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all cursor-pointer ${
+                            errors.regionId ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
+                          }`}
+                        >
+                          <option value="">Select Region...</option>
+                          {regions.map((r) => (
+                            <option key={r.id} value={r.id}>{r.name}</option>
+                          ))}
+                        </select>
+                        {errors.regionId && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.regionId}</p>}
+                      </div>
+
+                      <div>
+                        <label htmlFor="zone" className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Zone</label>
+                        <select
+                          id="zone"
+                          name="zone"
+                          value={formData.zoneId}
+                          disabled={!formData.regionId}
+                          onChange={(e) => setFormData({ ...formData, zoneId: e.target.value, territoryId: "" })}
+                          className={`w-full text-xs px-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                            errors.zoneId ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
+                          }`}
+                        >
+                          <option value="">Select Zone...</option>
+                          {availableZones.map((z) => (
+                            <option key={z.id} value={z.id}>{z.name}</option>
+                          ))}
+                        </select>
+                        {errors.zoneId && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.zoneId}</p>}
+                      </div>
+
+                      <div>
+                        <label htmlFor="territory" className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Territory</label>
+                        <select
+                          id="territory"
+                          name="territory"
+                          value={formData.territoryId}
+                          disabled={!formData.zoneId}
+                          onChange={(e) => setFormData({ ...formData, territoryId: e.target.value })}
+                          className={`w-full text-xs px-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                            errors.territoryId ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
+                          }`}
+                        >
+                          <option value="">Select Territory...</option>
+                          {availableTerritories.map((t) => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                        {errors.territoryId && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.territoryId}</p>}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label htmlFor="franchiseType" className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Franchise Type</label>
+                      <select
+                        id="franchiseType"
+                        name="franchiseType"
+                        value={formData.type}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          setFormData({
+                            ...formData,
+                            type: val,
+                            totalStores: val === "Single Store" ? 1 : Math.max(formData.totalStores, 2)
+                          })
+                        }}
+                        className="w-full text-xs px-3 py-1.5 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all cursor-pointer"
+                      >
+                        <option>Single Store</option>
+                        <option>Multi Store</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Store Limit</label>
+                      <div className="relative">
+                        <Layers size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          type="number"
+                          min="1"
+                          disabled={formData.type === "Single Store"}
+                          value={formData.totalStores}
+                          onChange={(e) => setFormData({ ...formData, totalStores: parseInt(e.target.value) || 1 })}
+                          className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
+                            formData.type === "Single Store"
+                              ? "bg-zinc-100 dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800 cursor-not-allowed"
+                              : "bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800"
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="accountStatus" className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Account Status</label>
+                      <select
+                        id="accountStatus"
+                        name="accountStatus"
+                        value={formData.status}
+                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                        className="w-full text-xs px-3 py-1.5 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all cursor-pointer"
+                      >
+                        <option value="ACTIVE">ACTIVE</option>
+                        <option value="INACTIVE">INACTIVE</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="franchiseDuration" className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Franchise Duration (Years)</label>
+                      <div className="relative">
+                        <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          id="franchiseDuration"
+                          name="franchiseDuration"
+                          type="number"
+                          min="1"
+                          placeholder="e.g. 3"
+                          value={formData.franchiseDuration}
+                          onChange={(e) => setFormData({ ...formData, franchiseDuration: parseInt(e.target.value) || "" })}
+                          className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
+                            errors.franchiseDuration ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
+                          }`}
+                        />
+                      </div>
+                      {errors.franchiseDuration && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.franchiseDuration}</p>}
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Total Franchise Cost (₹)</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-zinc-400">₹</span>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="e.g. 500000"
+                          value={formData.franchiseCost}
+                          onChange={(e) => {
+                            const costVal = e.target.value
+                            const cost = parseFloat(costVal) || 0
+                            const paid = parseFloat(formData.paidAmount) || 0
+                            setFormData({
+                              ...formData,
+                              franchiseCost: costVal,
+                              dueAmount: Math.max(0, cost - paid).toString()
+                            })
+                          }}
+                          className={`w-full text-xs pl-7 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
+                            errors.franchiseCost ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
+                          }`}
+                        />
+                      </div>
+                      {errors.franchiseCost && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.franchiseCost}</p>}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Paid Amount (₹)</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-zinc-400">₹</span>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="e.g. 300000"
+                          value={formData.paidAmount}
+                          onChange={(e) => {
+                            const paidVal = e.target.value
+                            const cost = parseFloat(formData.franchiseCost) || 0
+                            const paid = parseFloat(paidVal) || 0
+                            setFormData({
+                              ...formData,
+                              paidAmount: paidVal,
+                              dueAmount: Math.max(0, cost - paid).toString()
+                            })
+                          }}
+                          className={`w-full text-xs pl-7 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
+                            errors.paidAmount ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
+                          }`}
+                        />
+                      </div>
+                      {errors.paidAmount && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.paidAmount}</p>}
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Due Amount (₹)</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-zinc-400">₹</span>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="e.g. 200000"
+                          value={formData.dueAmount}
+                          onChange={(e) => setFormData({ ...formData, dueAmount: e.target.value })}
+                          className={`w-full text-xs pl-7 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
+                            errors.dueAmount ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
+                          }`}
+                        />
+                      </div>
+                      {errors.dueAmount && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.dueAmount}</p>}
+                    </div>
+                  </div>
+                </div>
+              </form>
+
+              <div className="flex items-center justify-end gap-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 mt-1.5 z-10">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 font-bold text-xs text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={isLoading}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-[var(--primary)] hover:bg-[var(--primary)]/90 disabled:bg-[var(--primary)]/60 text-white rounded-lg text-xs font-bold shadow-md shadow-[var(--primary)]/20 transition-all hover:scale-[1.02] cursor-pointer disabled:cursor-not-allowed disabled:hover:scale-100"
+                >
+                  {isLoading ? (
+                    <Loader2 size={12} className="animate-spin stroke-[2.5]" />
+                  ) : (
+                    <Save size={12} className="stroke-[2.5]" />
+                  )}
+                  <span>{isLoading ? 'Creating...' : 'Create Franchise Admin'}</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        </>
+      )}
+    </AnimatePresence>
+  )
+}

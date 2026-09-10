@@ -1,0 +1,54 @@
+import { BrowserRouter, HashRouter } from 'react-router-dom'
+import { Toaster } from 'sonner'
+import { StrictMode } from 'react'
+import { Provider as ReduxProvider } from 'react-redux'
+import { store } from './store'
+import { UserNotificationProvider } from '../modules/Food/context/UserNotificationContext'
+import { DeliveryNotificationProvider } from '../modules/Food/context/DeliveryNotificationContext'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+})
+
+function shouldUseHashRouter() {
+  if (typeof window === 'undefined') return false
+
+  const protocol = String(window.location?.protocol || '').toLowerCase()
+  const userAgent = String(window.navigator?.userAgent || '').toLowerCase()
+
+  return (
+    Boolean(window.flutter_inappwebview) ||
+    Boolean(window.ReactNativeWebView) ||
+    protocol === 'file:' ||
+    userAgent.includes(' wv') ||
+    userAgent.includes('; wv')
+  )
+}
+
+export function AppProviders({ children }) {
+  const Router = shouldUseHashRouter() ? HashRouter : BrowserRouter
+
+  return (
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <ReduxProvider store={store}>
+          <Router>
+            <UserNotificationProvider>
+              <DeliveryNotificationProvider>
+                {children}
+                <Toaster position="top-center" richColors offset="80px" expand={true} />
+              </DeliveryNotificationProvider>
+            </UserNotificationProvider>
+          </Router>
+        </ReduxProvider>
+      </QueryClientProvider>
+    </StrictMode>
+  )
+}
+
