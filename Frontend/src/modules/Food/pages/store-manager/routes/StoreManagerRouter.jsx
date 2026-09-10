@@ -97,7 +97,7 @@ function PagePlaceholder({ title, description, allowedRoles }) {
 
       {/* Main Content Area */}
       <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-150 dark:border-zinc-800 shadow-sm min-h-[420px] flex flex-col items-center justify-center text-center">
-        <div className="w-16 h-16 bg-red-50 dark:bg-red-950/10 text-[var(--primary)] rounded-2xl flex items-center justify-center mb-4">
+        <div className="w-16 h-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-4">
           <Icons.Pizza size={32} />
         </div>
         <h3 className="text-lg font-black text-zinc-900 dark:text-white mb-2">{title} Dashboard</h3>

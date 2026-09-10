@@ -1,4 +1,5 @@
 import { FoodUser } from '../../../../core/users/user.model.js';
+import { Profile } from '../../../../core/users/models/profile.model.js';
 import { AuthError, ValidationError } from '../../../../core/auth/errors.js';
 import { uploadImageBuffer } from '../../../../services/cloudinary.service.js';
 
@@ -13,7 +14,8 @@ const parseIsoDateOrNull = (value) => {
 export const getCurrentUserProfile = async (userId) => {
     const user = await FoodUser.findById(userId).lean();
     if (!user) throw new AuthError('Profile not found');
-    return { user };
+    const profile = await Profile.findOne({ userId }).lean();
+    return { user, profile: profile || {} };
 };
 
 export const updateCurrentUserProfile = async (userId, body) => {
@@ -40,7 +42,33 @@ export const updateCurrentUserProfile = async (userId, body) => {
     if (ann !== undefined) user.anniversary = ann;
 
     await user.save();
-    return { user: user.toObject() };
+
+    // Upsert Profile
+    const profileUpdates = {};
+    const profileKeys = ['alternatePhone', 'addressLine1', 'addressLine2', 'city', 'state', 'country', 'pincode', 'language', 'timezone', 'preferences'];
+    for (const key of profileKeys) {
+        if (body[key] !== undefined) {
+            profileUpdates[key] = body[key];
+        }
+    }
+    // ensure gender/dob match if they were provided
+    if (body.gender !== undefined) profileUpdates.gender = String(body.gender || '').trim().toUpperCase();
+    if (dob !== undefined) profileUpdates.dob = dob;
+    if (body.name !== undefined) {
+        const parts = String(body.name || '').trim().split(' ');
+        profileUpdates.firstName = parts[0] || '';
+        profileUpdates.lastName = parts.slice(1).join(' ') || '';
+    }
+
+    let profile = await Profile.findOne({ userId });
+    if (!profile) {
+        profile = new Profile({ userId, ...profileUpdates });
+    } else {
+        Object.assign(profile, profileUpdates);
+    }
+    await profile.save();
+
+    return { user: user.toObject(), profile: profile.toObject() };
 };
 
 export const uploadCurrentUserProfileImage = async (userId, file) => {

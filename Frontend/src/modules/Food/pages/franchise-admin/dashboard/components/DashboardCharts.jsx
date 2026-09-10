@@ -6,13 +6,13 @@ export default function DashboardCharts({ revenueData, orderStatusData, loading 
   const [range, setRange] = useState("7days")
 
   const COLORS = {
-    confirmed: "#3b82f6",     // Blue
-    preparing: "#f59e0b",     // Amber
-    baking: "#ea580c",        // Orange
-    packed: "#a855f7",        // Purple
-    out_for_delivery: "#06b6d4", // Cyan
-    delivered: "#10b981",     // Emerald
-    cancelled: "#ef4444"      // Red
+    confirmed: "var(--primary)",
+    preparing: "var(--secondary)",
+    baking: "#ea580c",
+    packed: "#10b981",
+    out_for_delivery: "#06b6d4",
+    delivered: "#8b5cf6",
+    cancelled: "#ef4444"
   }
 
   const STATUS_LABELS = {

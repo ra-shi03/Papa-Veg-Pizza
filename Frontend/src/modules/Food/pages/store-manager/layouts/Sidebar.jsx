@@ -90,19 +90,13 @@ export default function Sidebar({ isOpen, onClose, role, isCollapsed = false, on
 
       {/* Sidebar Drawer */}
       <aside
-        id="store-operations-sidebar"
-        className={`fixed inset-y-0 left-0 z-[60] flex flex-col bg-white dark:bg-zinc-900 border-r border-zinc-150 dark:border-zinc-800 transition-all duration-300 ease-in-out lg:translate-x-0 ${
+        id="sidebar"
+        className={`fixed inset-y-0 left-0 z-[60] flex flex-col bg-white dark:bg-white border-r border-zinc-150 dark:border-zinc-200 transition-all duration-300 ease-in-out lg:translate-x-0 ${
           displayCollapsed ? "w-[72px]" : "w-[280px]"
         } ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
-        onMouseEnter={() => {
-          if (isCollapsed && window.matchMedia('(min-width: 1024px)').matches) setIsHovered(true)
-        }}
-        onMouseLeave={() => {
-          if (isCollapsed && window.matchMedia('(min-width: 1024px)').matches) setIsHovered(false)
-        }}
       >
         {/* Header / Logo section */}
-        <div className={`py-4 flex items-center justify-between border-b border-zinc-150 dark:border-zinc-800 ${displayCollapsed ? "justify-center px-2 flex-col gap-3" : "px-4"}`}>
+        <div className={`py-4 flex items-center justify-between border-b border-zinc-150 dark:border-zinc-200 ${displayCollapsed ? "justify-center px-2 flex-col gap-3" : "px-4"}`}>
           <div className="flex items-center gap-2.5 overflow-hidden">
             {logo ? (
               <img src={logo} alt="Logo" className="w-9 h-9 object-contain rounded-lg shrink-0 animate-fade-in" />
@@ -113,7 +107,8 @@ export default function Sidebar({ isOpen, onClose, role, isCollapsed = false, on
             )}
             {!displayCollapsed && (
               <div className="animate-fade-in whitespace-nowrap">
-                <p className="font-semibold text-black dark:text-white leading-tight text-sm">Papa Veg Pizza</p>
+                <p className="font-semibold text-black leading-tight text-sm">Papa Veg Admin</p>
+                <p className="text-[10px] text-black font-medium">Store Operations</p>
                 <span className="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded-full bg-[var(--primary)]/10 text-[var(--primary)] tracking-wide">
                   {getRoleDisplayName(role)}
                 </span>
@@ -126,7 +121,7 @@ export default function Sidebar({ isOpen, onClose, role, isCollapsed = false, on
               {/* Collapse Toggle Button */}
               <button
                 onClick={onToggleCollapse}
-                className="flex p-1 rounded-md text-zinc-400 hover:text-black dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
+                className="flex p-1 rounded-md text-zinc-400 hover:text-black hover:bg-zinc-100 transition-colors cursor-pointer shrink-0"
                 title={displayCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
               >
                 {displayCollapsed ? <Icons.ChevronRight size={16} /> : <Icons.ChevronLeft size={16} />}
@@ -134,7 +129,7 @@ export default function Sidebar({ isOpen, onClose, role, isCollapsed = false, on
 
               <button
                 onClick={onClose}
-                className={`p-1 rounded-md text-black dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 lg:hidden transition-colors shrink-0 ${displayCollapsed ? "hidden" : ""}`}
+                className={`p-1 rounded-md text-black hover:bg-zinc-100 lg:hidden transition-colors shrink-0 ${displayCollapsed ? "hidden" : ""}`}
               >
                 <Icons.X size={16} />
               </button>
@@ -142,8 +137,8 @@ export default function Sidebar({ isOpen, onClose, role, isCollapsed = false, on
         </div>
 
         {/* Search bar section */}
-        <div className="px-3 py-2 border-b border-zinc-100 dark:border-zinc-800">
-          <div className="relative flex items-center bg-zinc-50 dark:bg-zinc-950 rounded-lg px-2 py-1.5 border border-zinc-200 dark:border-zinc-800 focus-within:border-[var(--primary)] transition-all">
+        <div className="px-3 py-2 border-b border-zinc-150 dark:border-zinc-200">
+          <div className="relative flex items-center bg-zinc-50 dark:bg-zinc-100 rounded-lg px-2 py-1.5 border border-zinc-200 dark:border-zinc-300 focus-within:border-[var(--primary)] transition-all">
             <Icons.Search size={15} className="text-zinc-400 shrink-0 mx-auto" />
             {!displayCollapsed ? (
               <input
@@ -153,7 +148,7 @@ export default function Sidebar({ isOpen, onClose, role, isCollapsed = false, on
                 placeholder="Search menus..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="ml-2 w-full text-xs bg-transparent border-0 outline-none text-zinc-800 dark:text-zinc-100 placeholder-zinc-400"
+                className="ml-2 w-full text-xs bg-transparent border-0 outline-none text-black placeholder-zinc-500"
               />
             ) : (
               <button
@@ -166,7 +161,7 @@ export default function Sidebar({ isOpen, onClose, role, isCollapsed = false, on
         </div>
 
         {/* Scrollable menu content */}
-        <nav className="flex-1 overflow-y-auto px-2.5 py-4 space-y-2.5 scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-700">
+        <nav className="flex-1 overflow-y-auto px-2.5 py-4 space-y-2.5 scrollbar-thin scrollbar-thumb-zinc-200">
           {storeOperationsSidebarMenu
             .map((item) => {
               if (item.type === "link") {
@@ -203,14 +198,14 @@ export default function Sidebar({ isOpen, onClose, role, isCollapsed = false, on
                       displayCollapsed ? "justify-center px-0 py-2.5" : "gap-2 px-2.5 py-1.5"
                     } ${
                       isActive
-                        ? "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 border border-red-100 dark:border-red-900/30 shadow-sm"
-                        : "text-black dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-[var(--primary)]"
+                        ? "bg-primary/10 text-primary dark:bg-primary dark:text-primary-foreground shadow-sm"
+                        : "text-zinc-600 dark:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-100 hover:text-black dark:hover:text-black"
                     }`}
                   >
                     <RenderIcon
                       name={item.icon}
                       className={`shrink-0 transition-transform duration-300 ${
-                        isActive ? "text-red-655 dark:text-red-400" : "text-black dark:text-white group-hover:text-[var(--primary)]"
+                        isActive ? "text-primary dark:text-primary-foreground" : "text-zinc-500 group-hover:text-black"
                       }`}
                     />
                     {!displayCollapsed && <span className="leading-snug">{item.label}</span>}
@@ -226,11 +221,11 @@ export default function Sidebar({ isOpen, onClose, role, isCollapsed = false, on
                     {!displayCollapsed ? (
                       <button
                         onClick={() => toggleGroup(item.label)}
-                        className="w-full flex items-center justify-between px-3.5 py-1.5 text-[10px] font-bold text-black dark:text-white uppercase tracking-widest hover:opacity-80 transition-colors focus:outline-none"
+                        className="w-full flex items-center justify-between px-3.5 py-1.5 text-[10px] font-bold text-black uppercase tracking-widest hover:opacity-80 transition-colors focus:outline-none"
                       >
                         <span>{item.label}</span>
                         <span
-                          className={`transition-transform duration-200 text-black dark:text-white ${
+                          className={`transition-transform duration-200 text-black ${
                             isExpanded ? "rotate-180" : ""
                           }`}
                         >
@@ -240,7 +235,7 @@ export default function Sidebar({ isOpen, onClose, role, isCollapsed = false, on
                         </span>
                       </button>
                     ) : (
-                      <div className="h-px bg-zinc-150 dark:bg-zinc-800/80 my-2 mx-2" />
+                      <div className="h-px bg-zinc-150 dark:bg-zinc-200 my-2 mx-2" />
                     )}
 
                     {(isExpanded || displayCollapsed) && (
@@ -266,16 +261,14 @@ export default function Sidebar({ isOpen, onClose, role, isCollapsed = false, on
                                 displayCollapsed ? "justify-center px-0 py-2.5" : "gap-2 px-2.5 py-1.5"
                               } ${
                                 isSubActive
-                                  ? "bg-red-50 text-red-750 dark:bg-red-900/20 dark:text-red-400 border border-red-100 dark:border-red-900/30 shadow-sm"
-                                  : "text-zinc-650 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-850 hover:text-[var(--primary)]"
+                                  ? "bg-primary/10 text-primary dark:bg-primary dark:text-primary-foreground shadow-sm"
+                                  : "text-zinc-600 dark:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-100 hover:text-black dark:hover:text-black"
                               }`}
                             >
                               <RenderIcon
                                 name={subItem.icon}
                                 className={`shrink-0 transition-transform duration-300 ${
-                                  isSubActive
-                                    ? "text-red-600 dark:text-red-400"
-                                    : "text-zinc-500 dark:text-zinc-400 group-hover:text-[var(--primary)]"
+                                  isSubActive ? "text-primary dark:text-primary-foreground" : "text-zinc-500 group-hover:text-black"
                                 }`}
                               />
                               {!displayCollapsed && <span className="leading-snug">{displayLabel}</span>}
@@ -295,7 +288,7 @@ export default function Sidebar({ isOpen, onClose, role, isCollapsed = false, on
           <button
             onClick={handleLogout}
             title={displayCollapsed ? "Sign Out" : undefined}
-            className={`w-full flex items-center rounded-md text-xs font-bold text-rose-500 hover:bg-rose-50/50 dark:hover:bg-rose-950/20 border border-transparent text-left group ${
+            className={`w-full flex items-center rounded-md text-xs font-bold text-rose-500 hover:bg-rose-50 border border-transparent text-left group ${
               displayCollapsed ? "justify-center px-0 py-2.5" : "gap-2 px-2.5 py-1.5"
             }`}
           >
@@ -305,17 +298,17 @@ export default function Sidebar({ isOpen, onClose, role, isCollapsed = false, on
         </nav>
 
         {/* Footer info box */}
-        <div className="p-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
+        <div className="p-3 border-t border-zinc-150 dark:border-zinc-200 bg-zinc-50 dark:bg-zinc-50">
           {!displayCollapsed ? (
-            <div className="p-2.5 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-750 shadow-sm">
+            <div className="p-2.5 rounded-lg bg-white dark:bg-white border border-zinc-150 dark:border-zinc-200 shadow-sm">
               <div className="flex items-center gap-1.5 mb-1">
                 <span className="relative flex h-1.5 w-1.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                 </span>
-                <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">Store Connection: Live</span>
+                <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-500">System: 99% Online</span>
               </div>
-              <p className="text-[9px] text-black dark:text-white font-medium leading-normal">Node: PV-OPS-ACTIVE</p>
+              <p className="text-[9px] text-black font-medium leading-normal">Server Central-AP-1 Active</p>
             </div>
           ) : (
             <div className="flex justify-center py-1">

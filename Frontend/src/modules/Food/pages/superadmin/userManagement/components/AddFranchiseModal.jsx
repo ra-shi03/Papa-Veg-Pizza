@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, User, Mail, Phone, Store, MapPin, Layers, Save, Lock, Clock, Hash, Loader2 } from "lucide-react"
+import { X, User, Mail, Phone, Store, MapPin, Layers, Save, Lock, Clock, Hash, Loader2, LocateFixed } from "lucide-react"
 import apiClient from "../../../../../../services/api/axios"
 // Fetch dynamic data from API
 
@@ -23,6 +23,8 @@ export default function AddFranchiseModal({ isOpen, onClose, onSave }) {
     paidAmount: "",
     dueAmount: "",
     gstNumber: "",
+    panNumber: "",
+    pincode: "",
     address: ""
   })
 
@@ -76,6 +78,8 @@ export default function AddFranchiseModal({ isOpen, onClose, onSave }) {
         paidAmount: "",
         dueAmount: "",
         gstNumber: "",
+        panNumber: "",
+        pincode: "",
         address: ""
       })
       setErrors({})
@@ -114,6 +118,43 @@ export default function AddFranchiseModal({ isOpen, onClose, onSave }) {
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
+
+  const handleFetchLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser");
+      return;
+    }
+    
+    setIsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          const data = await res.json();
+          if (data && data.address) {
+            const addressString = data.display_name;
+            const fetchedPincode = data.address.postcode || "";
+            setFormData(prev => ({
+              ...prev,
+              address: addressString,
+              pincode: fetchedPincode
+            }));
+          }
+        } catch (error) {
+          console.error("Error fetching location:", error);
+          alert("Failed to fetch address from coordinates.");
+        } finally {
+          setIsLoading(false);
+        }
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+        alert("Unable to retrieve your location.");
+        setIsLoading(false);
+      }
+    );
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -287,9 +328,25 @@ export default function AddFranchiseModal({ isOpen, onClose, onSave }) {
                     </div>
 
                     <div>
-                      <label htmlFor="fullAddress" className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Full Address</label>
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">PAN Number</label>
                       <div className="relative">
-                        <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          type="text"
+                          value={formData.panNumber}
+                          onChange={(e) => setFormData({ ...formData, panNumber: e.target.value })}
+                          placeholder="e.g. ABCDE1234F"
+                          className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all border-zinc-200 dark:border-zinc-800`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                    <div className="sm:col-span-8">
+                      <label htmlFor="fullAddress" className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Full Address</label>
+                      <div className="relative flex items-center">
+                        <MapPin size={14} className="absolute left-3 text-zinc-400" />
                         <input
                           id="fullAddress"
                           name="fullAddress"
@@ -297,12 +354,35 @@ export default function AddFranchiseModal({ isOpen, onClose, onSave }) {
                           value={formData.address}
                           onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                           placeholder="e.g. 123 Main St, City"
-                          className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
+                          className={`w-full text-xs pl-8.5 pr-20 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
                             errors.address ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
                           }`}
                         />
+                        <button 
+                          type="button" 
+                          onClick={handleFetchLocation}
+                          disabled={isLoading}
+                          title="Fetch Location automatically"
+                          className="absolute right-1 text-[var(--primary)] hover:bg-[var(--primary)]/10 p-1.5 rounded transition-colors disabled:opacity-50"
+                        >
+                          {isLoading ? <Loader2 size={14} className="animate-spin" /> : <LocateFixed size={14} />}
+                        </button>
                       </div>
                       {errors.address && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.address}</p>}
+                    </div>
+                    
+                    <div className="sm:col-span-4">
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Pincode</label>
+                      <div className="relative">
+                        <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          type="text"
+                          value={formData.pincode}
+                          onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
+                          placeholder="e.g. 452010"
+                          className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all border-zinc-200 dark:border-zinc-800`}
+                        />
+                      </div>
                     </div>
                   </div>
 

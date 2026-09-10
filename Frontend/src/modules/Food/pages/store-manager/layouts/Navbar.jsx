@@ -7,6 +7,7 @@ import {
   AlertTriangle, ArrowRight, ClipboardList, ShieldAlert, Star
 } from "lucide-react"
 import { toast } from "sonner"
+import { useSystemTheme } from "@/shared/utils/themeSync"
 
 export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
   const navigate = useNavigate()
@@ -35,7 +36,7 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
   const [showActionsDropdown, setShowActionsDropdown] = useState(false)
 
   // Theme state
-  const [themeMode, setThemeMode] = useState("light")
+  const { themeMode } = useSystemTheme()
 
   // Session Data & Alerts
   const [userData, setUserData] = useState({ name: "Shubham Jamliya", email: "shubham.j@papaveg.com" })
@@ -81,10 +82,6 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
         setUserData(JSON.parse(localUser))
       } catch (_) {}
     }
-
-    // Set theme
-    const savedTheme = localStorage.getItem("appTheme") || "light"
-    setThemeMode(savedTheme)
   }, [])
 
   useEffect(() => {
@@ -105,13 +102,8 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
 
   const toggleTheme = () => {
     const nextTheme = themeMode === "light" ? "dark" : "light"
-    setThemeMode(nextTheme)
-    localStorage.setItem("appTheme", nextTheme)
-    if (nextTheme === "dark") {
-      document.documentElement.classList.add("dark")
-    } else {
-      document.documentElement.classList.remove("dark")
-    }
+    localStorage.setItem("sa_themeMode", nextTheme)
+    window.dispatchEvent(new Event("systemThemeChanged"))
     toast.success(`Theme mode: ${nextTheme}`)
   }
 
@@ -210,7 +202,7 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
               className="w-full pl-8.5 pr-8 py-1.5 text-xs bg-zinc-50 dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-xl text-zinc-800 dark:text-zinc-100 outline-none focus:border-zinc-300 dark:focus:border-zinc-700 transition-all font-semibold placeholder-zinc-400"
             />
             {searchVal && (
-              <button onClick={() => setSearchVal("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-405 hover:text-rose-500">
+              <button onClick={() => setSearchVal("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-405 hover:text-[var(--primary)]">
                 <X size={12} />
               </button>
             )}
@@ -231,7 +223,7 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
                 setShowProfileMenu(false)
                 setShowActionsDropdown(false)
               }}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-900/30 rounded-full text-[10px] font-extrabold shadow-sm hover:opacity-90 transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-[var(--primary)]/200/50 dark:border-amber-900/30 rounded-full text-[10px] font-extrabold shadow-sm hover:opacity-90 transition-all cursor-pointer"
             >
               <Shield size={11} className="stroke-[2.5]" />
               <span>Role: {roleLabels[role]}</span>
@@ -249,7 +241,7 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
                     onClick={() => handleRoleChange(rKey)}
                     className={`w-full text-left px-3 py-2 font-bold transition-colors flex items-center justify-between ${
                       role === rKey
-                        ? "text-[var(--primary)] bg-red-50/50 dark:bg-red-950/20"
+                        ? "text-[var(--primary)] bg-[var(--primary)]/10/50 dark:bg-[var(--primary)]/20"
                         : "text-zinc-650 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
                     }`}
                   >
@@ -369,7 +361,7 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
             >
               <Bell size={16} />
               {unreadCount > 0 && (
-                <span className="absolute top-0 right-0 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white dark:ring-slate-950"></span>
+                <span className="absolute top-0 right-0 w-2 h-2 bg-[var(--primary)] rounded-full ring-2 ring-white dark:ring-slate-950"></span>
               )}
             </button>
 
@@ -390,12 +382,12 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
                         setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, unread: false } : item))
                       }}
                       className={`p-2.5 rounded-xl border relative transition-colors cursor-pointer ${
-                        n.unread ? "bg-red-50/10 dark:bg-red-950/5 border-red-100/40 dark:border-red-950/20" : "bg-zinc-50/50 dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800"
+                        n.unread ? "bg-[var(--primary)]/10/10 dark:bg-red-950/5 border-red-100/40 dark:border-red-950/20" : "bg-zinc-50/50 dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800"
                       }`}
                     >
                       <div className="flex items-start gap-2">
                         {n.type === "order" && <Clock size={12} className="text-amber-500 mt-0.5 shrink-0" />}
-                        {n.type === "inventory" && <AlertTriangle size={12} className="text-red-500 mt-0.5 shrink-0" />}
+                        {n.type === "inventory" && <AlertTriangle size={12} className="text-[var(--primary)] mt-0.5 shrink-0" />}
                         {n.type === "delivery" && <Activity size={12} className="text-blue-500 mt-0.5 shrink-0" />}
                         
                         <div className="flex-1 min-w-0">
@@ -451,9 +443,9 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-left text-rose-500 transition-colors border-t border-zinc-100 dark:border-zinc-800 mt-1 pt-2"
+                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-left text-[var(--primary)] transition-colors border-t border-zinc-100 dark:border-zinc-800 mt-1 pt-2"
                 >
-                  <LogOut size={13} className="text-rose-500" />
+                  <LogOut size={13} className="text-[var(--primary)]" />
                   <span>Sign Out</span>
                 </button>
               </div>

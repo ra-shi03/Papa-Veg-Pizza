@@ -60,6 +60,10 @@ const Sparkline = ({ data, stroke, className = "w-full h-8 overflow-visible opac
   )
 }
 
+import { useSystemTheme } from "@/shared/utils/themeSync"
+import { adminAPI } from "@/services/api"
+import { toast } from "sonner"
+
 export default function SuperAdminDashboard() {
   // Navigation drawer and theme state
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -67,9 +71,7 @@ export default function SuperAdminDashboard() {
   const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem("sa_sidebar_collapsed") === "true")
 
   // Real-time Dynamic Color Theme Settings
-  const [primaryColor, setPrimaryColor] = useState(() => localStorage.getItem("sa_primary") || "#a43c12")
-  const [secondaryColor, setSecondaryColor] = useState(() => localStorage.getItem("sa_secondary") || "#ff7f50")
-  const [themeMode, setThemeMode] = useState(() => localStorage.getItem("sa_themeMode") || "light")
+  const { themeMode, primaryColor, secondaryColor } = useSystemTheme()
   const [showThemePanel, setShowThemePanel] = useState(false)
 
   // Predefined theme palettes
@@ -81,40 +83,58 @@ export default function SuperAdminDashboard() {
     { name: "Charcoal Steel", primary: "#374151", secondary: "#6b7280" }
   ]
 
-  // Apply colors dynamically to document style custom properties
-  useEffect(() => {
-    document.documentElement.style.setProperty("--sa-primary", primaryColor)
-    document.documentElement.style.setProperty("--sa-primary-hover", `${primaryColor}cc`)
-    document.documentElement.style.setProperty("--sa-secondary", secondaryColor)
-    document.documentElement.style.setProperty("--sa-secondary-hover", `${secondaryColor}cc`)
-    document.documentElement.style.setProperty("--primary", primaryColor)
-    document.documentElement.style.setProperty("--primary-hover", `${primaryColor}cc`)
-    document.documentElement.style.setProperty("--secondary", secondaryColor)
-    document.documentElement.style.setProperty("--secondary-hover", `${secondaryColor}cc`)
-    localStorage.setItem("sa_primary", primaryColor)
-    localStorage.setItem("sa_secondary", secondaryColor)
+  // Set colors dynamically to local storage and dispatch event
+  const handleColorChange = (newPrimary, newSecondary) => {
+    localStorage.setItem("sa_primary", newPrimary)
+    localStorage.setItem("sa_secondary", newSecondary)
     window.dispatchEvent(new Event("systemThemeChanged"))
-  }, [primaryColor, secondaryColor])
+  }
+
+  const [isSavingTheme, setIsSavingTheme] = useState(false);
+  const handleSaveThemeGlobally = async () => {
+    try {
+      setIsSavingTheme(true);
+      await adminAPI.updateBusinessSettings({
+        primaryColor: primaryColor,
+        secondaryColor: secondaryColor,
+        themeMode: localStorage.getItem("sa_themeMode") || "light",
+      });
+      // Update the cached food_business_settings with new colors.
+      // This is what all other panels read from on load.
+      try {
+        const existing = localStorage.getItem("food_business_settings");
+        const cached = existing ? JSON.parse(existing) : {};
+        cached.primaryColor = primaryColor;
+        cached.secondaryColor = secondaryColor;
+        cached.themeMode = localStorage.getItem("sa_themeMode") || "light";
+        localStorage.setItem("food_business_settings", JSON.stringify(cached));
+      } catch (e) {}
+
+      // Notify this tab's React tree to re-apply colors from the updated cache
+      window.dispatchEvent(new Event("systemThemeChanged"));
+      toast.success("Theme published successfully to all panels!");
+    } catch (error) {
+      console.error("Failed to save theme:", error);
+      toast.error("Failed to publish theme.");
+    } finally {
+      setIsSavingTheme(false);
+    }
+  }
 
   // Handle dark mode toggle
-  useEffect(() => {
-    if (themeMode === "dark") {
-      document.documentElement.classList.add("dark")
-    } else {
-      document.documentElement.classList.remove("dark")
-    }
-    localStorage.setItem("sa_themeMode", themeMode)
+  const handleThemeModeToggle = (mode) => {
+    localStorage.setItem("sa_themeMode", mode)
     window.dispatchEvent(new Event("systemThemeChanged"))
-  }, [themeMode])
+  }
 
   // KPI Bento stats state
   const [kpis, setKpis] = useState([
-    { title: "Net Revenue", val: "₹42.8L", growth: "+12%", up: true, icon: DollarSign, sparkData: [10, 15, 8, 22, 14, 28, 20], color: "text-rose-500 bg-rose-50 dark:bg-rose-950/20" },
-    { title: "Live Orders", val: "1,204", growth: "+8%", up: true, icon: ShoppingBag, sparkData: [5, 12, 15, 10, 22, 18, 25], color: "text-amber-500 bg-amber-50 dark:bg-amber-950/20" },
-    { title: "Active Riders", val: "342", growth: "-3%", up: false, icon: Truck, sparkData: [24, 22, 25, 20, 19, 18, 17], color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/20" },
-    { title: "New Users", val: "892", growth: "+18%", up: true, icon: Users, sparkData: [12, 18, 22, 19, 25, 30, 32], color: "text-blue-500 bg-blue-50 dark:bg-blue-950/20" },
-    { title: "Active Stores", val: "24", growth: "0%", up: true, icon: Store, sparkData: [24, 24, 24, 24, 24, 24, 24], color: "text-purple-500 bg-purple-50 dark:bg-purple-950/20" },
-    { title: "Comm. Earned", val: "₹6.4L", growth: "+4%", up: true, icon: Percent, sparkData: [8, 10, 14, 12, 16, 18, 20], color: "text-indigo-500 bg-indigo-50 dark:bg-indigo-950/20" }
+    { title: "Net Revenue", val: "₹42.8L", growth: "+12%", up: true, icon: DollarSign, sparkData: [10, 15, 8, 22, 14, 28, 20], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
+    { title: "Live Orders", val: "1,204", growth: "+8%", up: true, icon: ShoppingBag, sparkData: [5, 12, 15, 10, 22, 18, 25], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
+    { title: "Active Riders", val: "342", growth: "-3%", up: false, icon: Truck, sparkData: [24, 22, 25, 20, 19, 18, 17], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
+    { title: "New Users", val: "892", growth: "+18%", up: true, icon: Users, sparkData: [12, 18, 22, 19, 25, 30, 32], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
+    { title: "Active Stores", val: "24", growth: "0%", up: true, icon: Store, sparkData: [24, 24, 24, 24, 24, 24, 24], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
+    { title: "Comm. Earned", val: "₹6.4L", growth: "+4%", up: true, icon: Percent, sparkData: [8, 10, 14, 12, 16, 18, 20], color: "text-[var(--primary)] bg-[var(--primary)]/10" }
   ])
 
   // Recharts interactive state: Hourly vs Daily Sales Trend
@@ -322,7 +342,9 @@ export default function SuperAdminDashboard() {
                       <input
                         type="color"
                         value={primaryColor}
-                        onChange={(e) => setPrimaryColor(e.target.value)}
+                        onChange={(e) => {
+                          handleColorChange(e.target.value, secondaryColor);
+                        }}
                         className="w-8 h-8 rounded-lg overflow-hidden border-0 cursor-pointer shrink-0"
                       />
                     </div>
@@ -335,7 +357,7 @@ export default function SuperAdminDashboard() {
                       <input
                         type="color"
                         value={secondaryColor}
-                        onChange={(e) => setSecondaryColor(e.target.value)}
+                        onChange={(e) => handleColorChange(primaryColor, e.target.value)}
                         className="w-8 h-8 rounded-lg overflow-hidden border-0 cursor-pointer shrink-0"
                       />
                     </div>
@@ -348,7 +370,7 @@ export default function SuperAdminDashboard() {
                 <label className="text-xs font-bold text-zinc-500">Dark / Light Interface</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
-                    onClick={() => setThemeMode("light")}
+                    onClick={() => handleThemeModeToggle("light")}
                     className={`p-3 rounded-xl border text-xs font-bold text-center transition-all ${themeMode === "light"
                       ? "border-[var(--primary)] bg-[var(--primary)]/5 text-[var(--primary)]"
                       : "border-zinc-100 dark:border-zinc-800 text-zinc-500"
@@ -357,7 +379,7 @@ export default function SuperAdminDashboard() {
                     🌞 Light Mode
                   </button>
                   <button
-                    onClick={() => setThemeMode("dark")}
+                    onClick={() => handleThemeModeToggle("dark")}
                     className={`p-3 rounded-xl border text-xs font-bold text-center transition-all ${themeMode === "dark"
                       ? "border-[var(--primary)] bg-[var(--primary)]/5 text-[var(--primary)]"
                       : "border-zinc-100 dark:border-zinc-800 text-zinc-500"
@@ -369,6 +391,24 @@ export default function SuperAdminDashboard() {
                 <div className="pt-2 text-[10px] text-zinc-400 leading-normal">
                   *Colors will update layout indicators, active tags, and hover triggers dynamically via CSS root parameters.
                 </div>
+              </div>
+
+              {/* Publish Globally Button */}
+              <div className="pt-2">
+                <button
+                  onClick={handleSaveThemeGlobally}
+                  disabled={isSavingTheme}
+                  className="w-full py-3 rounded-xl bg-[var(--primary)] text-white font-bold text-sm shadow-md shadow-[var(--primary)]/20 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 flex justify-center items-center gap-2"
+                >
+                  {isSavingTheme ? (
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                  ) : (
+                    <span>🌍 Publish Theme to All Panels</span>
+                  )}
+                </button>
+                <p className="text-[9px] text-zinc-400 text-center mt-2">
+                  Applies the current colors to Franchise Admin and Store Operations instantly.
+                </p>
               </div>
 
             </div>

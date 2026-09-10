@@ -9,7 +9,7 @@ export default function KpiCards({ data, loading }) {
       trend: "+12.4%",
       up: true,
       icon: DollarSign,
-      color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/30",
+      color: "text-[var(--primary)] bg-[var(--primary)]/10 border-[var(--primary)]/20",
     },
     {
       title: "Today's Orders",
@@ -17,7 +17,7 @@ export default function KpiCards({ data, loading }) {
       trend: "+8.2%",
       up: true,
       icon: ShoppingBag,
-      color: "text-amber-500 bg-amber-50 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900/30",
+      color: "text-[var(--primary)] bg-[var(--primary)]/10 border-[var(--primary)]/20",
     },
     {
       title: "Active Stores",
@@ -25,7 +25,7 @@ export default function KpiCards({ data, loading }) {
       trend: "0.0%",
       up: true,
       icon: Store,
-      color: "text-blue-500 bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30",
+      color: "text-[var(--primary)] bg-[var(--primary)]/10 border-[var(--primary)]/20",
     },
     {
       title: "Online Riders",
@@ -33,7 +33,7 @@ export default function KpiCards({ data, loading }) {
       trend: "+4.1%",
       up: true,
       icon: Truck,
-      color: "text-indigo-500 bg-indigo-50 dark:bg-indigo-950/20 border-indigo-100 dark:border-indigo-900/30",
+      color: "text-[var(--primary)] bg-[var(--primary)]/10 border-[var(--primary)]/20",
     },
     {
       title: "Pending Refunds",
@@ -59,7 +59,7 @@ export default function KpiCards({ data, loading }) {
       trend: "+2.5%",
       up: true,
       icon: Scale,
-      color: "text-cyan-500 bg-cyan-50 dark:bg-cyan-950/20 border-cyan-100 dark:border-cyan-900/30",
+      color: "text-[var(--primary)] bg-[var(--primary)]/10 border-[var(--primary)]/20",
     },
     {
       title: "Cust. Satisfaction",
@@ -67,7 +67,7 @@ export default function KpiCards({ data, loading }) {
       trend: "Excellent",
       up: true,
       icon: Star,
-      color: "text-purple-500 bg-purple-50 dark:bg-purple-950/20 border-purple-100 dark:border-purple-900/30",
+      color: "text-[var(--primary)] bg-[var(--primary)]/10 border-[var(--primary)]/20",
     }
   ]
 

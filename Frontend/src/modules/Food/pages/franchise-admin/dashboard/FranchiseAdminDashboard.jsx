@@ -207,7 +207,7 @@ export default function FranchiseAdminDashboard() {
             <span>Range: {dateFilter === "custom" ? `${startDate} to ${endDate}` : dateFilter.toUpperCase()}</span>
           </div>
           {searchQuery && (
-            <div className="flex items-center gap-1 px-2.5 py-1 text-[10px] bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 text-rose-500 font-bold rounded-lg shadow-sm">
+            <div className="flex items-center gap-1 px-2.5 py-1 text-[10px] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20 border border-[var(--primary)]/30 dark:border-[var(--primary)]/20 text-[var(--primary)] font-bold rounded-lg shadow-sm">
               <Search size={12} className="shrink-0" />
               <span>Query: "{searchQuery}"</span>
             </div>

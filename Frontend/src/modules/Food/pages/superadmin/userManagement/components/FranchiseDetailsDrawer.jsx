@@ -182,6 +182,18 @@ export default function FranchiseDetailsDrawer({ isOpen, onClose, admin }) {
                             <MapPin size={14} />
                           </div>
                           <div>
+                            <p className="text-[9px] text-zinc-400 font-semibold">Pincode</p>
+                            <p className="text-[10px] font-bold text-zinc-800 dark:text-zinc-200 mt-0.5">
+                              {admin.pincode || "N/A"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-zinc-50 dark:bg-zinc-955 border border-zinc-100 dark:border-zinc-800 text-zinc-400 rounded-xl">
+                            <MapPin size={14} />
+                          </div>
+                          <div>
                             <p className="text-[9px] text-zinc-400 font-semibold">Region Information</p>
                             <p className="text-[10px] font-bold text-zinc-800 dark:text-zinc-200 mt-0.5">
                               {admin.zoneName ? `${admin.zoneName}, ${admin.regionName}` : "N/A"}
@@ -197,6 +209,18 @@ export default function FranchiseDetailsDrawer({ isOpen, onClose, admin }) {
                             <p className="text-[9px] text-zinc-400 font-semibold">GST Number</p>
                             <p className="text-[10px] font-bold text-zinc-800 dark:text-zinc-200 mt-0.5">
                               {admin.gstNumber || "N/A"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-zinc-50 dark:bg-zinc-955 border border-zinc-100 dark:border-zinc-800 text-zinc-400 rounded-xl">
+                            <ClipboardList size={14} />
+                          </div>
+                          <div>
+                            <p className="text-[9px] text-zinc-400 font-semibold">PAN Number</p>
+                            <p className="text-[10px] font-bold text-zinc-800 dark:text-zinc-200 mt-0.5">
+                              {admin.panNumber || "N/A"}
                             </p>
                           </div>
                         </div>
@@ -278,7 +302,7 @@ export default function FranchiseDetailsDrawer({ isOpen, onClose, admin }) {
                         <div className="p-2.5 bg-zinc-50 dark:bg-zinc-955 border border-zinc-100 dark:border-zinc-800 rounded-2xl">
                           <p className="text-[9px] text-zinc-400 font-semibold">Franchise Duration</p>
                           <p className="text-xs font-black text-zinc-800 dark:text-zinc-200 mt-1">
-                            {admin.franchiseDuration ? `${admin.franchiseDuration} Years` : "3 Years"}
+                            {admin.franchiseDuration ? `${admin.franchiseDuration} Years` : "—"}
                           </p>
                         </div>
 

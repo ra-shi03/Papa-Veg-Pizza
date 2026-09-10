@@ -154,35 +154,35 @@ export default function KpiCards({ storeId, refreshKey }) {
       value: `₹${salesVal.toLocaleString("en-IN")}`,
       subtext: `+${salesChange}% vs yesterday`,
       icon: TrendingUp,
-      color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/20"
+      color: "text-[var(--primary)] bg-[var(--primary)]/10"
     },
     {
       title: "Today's Orders",
       value: ordersVal,
       subtext: "Completed & processing",
       icon: ShoppingBag,
-      color: "text-[var(--primary)] bg-red-50 dark:bg-red-950/20"
+      color: "text-[var(--primary)] bg-[var(--primary)]/10"
     },
     {
       title: "Active Orders",
       value: activeVal,
       subtext: "Live in kitchen queue",
       icon: Flame,
-      color: "text-amber-500 bg-amber-50 dark:bg-amber-950/20"
+      color: "text-[var(--primary)] bg-[var(--primary)]/10"
     },
     {
       title: "Avg. Prep Time",
       value: `${prepVal} min`,
       subtext: "Target: under 15 min",
       icon: Clock,
-      color: "text-blue-500 bg-blue-50 dark:bg-blue-950/20"
+      color: "text-[var(--primary)] bg-[var(--primary)]/10"
     },
     {
       title: "Pending Deliveries",
       value: deliveryVal,
       subtext: "Awaiting rider dispatch",
       icon: Truck,
-      color: "text-purple-500 bg-purple-50 dark:bg-purple-950/20"
+      color: "text-[var(--primary)] bg-[var(--primary)]/10"
     },
     {
       title: "Low Stock Items",
@@ -198,14 +198,14 @@ export default function KpiCards({ storeId, refreshKey }) {
       value: staffVal,
       subtext: "Active in current shift",
       icon: Users,
-      color: "text-indigo-500 bg-indigo-50 dark:bg-indigo-950/20"
+      color: "text-[var(--primary)] bg-[var(--primary)]/10"
     },
     {
       title: "Customer Rating",
       value: `${ratingVal} / 5.0`,
       subtext: "Based on store reviews",
       icon: Star,
-      color: "text-amber-500 bg-amber-50 dark:bg-amber-950/20"
+      color: "text-[var(--primary)] bg-[var(--primary)]/10"
     }
   ]
 

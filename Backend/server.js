@@ -53,10 +53,6 @@ const startServer = async () => {
         // Cleanup legacy Superadmin
         await cleanupLegacySuperAdmin();
 
-        // Seed new RBAC roles and default Superadmin User
-        const { seedRolesData } = await import('./seed-roles.js');
-        await seedRolesData();
-
         // 2. Create HTTP server from Express app
         const httpServer = http.createServer(app);
 

@@ -1,6 +1,7 @@
 /**
  * Business Settings Utility
- * Handles loading and updating business settings (favicon, title, logo)
+ * Handles loading and applying business settings (colors, favicon, title, logo)
+ * Theme colors fetched from DB are applied globally across ALL panels.
  */
 
 import apiClient from "@food/api/axios";
@@ -19,8 +20,47 @@ let cachedSettings = (() => {
   }
 })();
 
-// Apply cached settings immediately on module load if they exist
+/**
+ * Apply theme colors from a settings object to CSS root variables.
+ * This is the SINGLE source of truth for color application — called on load and after updates.
+ */
+export const applyThemeColors = (settings) => {
+  if (!settings || typeof document === 'undefined') return;
+
+  const primary = settings.primaryColor;
+  const secondary = settings.secondaryColor;
+  const themeMode = settings.themeMode;
+
+  if (primary) {
+    document.documentElement.style.setProperty('--sa-primary', primary);
+    document.documentElement.style.setProperty('--sa-primary-hover', `${primary}cc`);
+    document.documentElement.style.setProperty('--primary', primary);
+    document.documentElement.style.setProperty('--primary-hover', `${primary}cc`);
+    // Keep localStorage in sync for SuperAdmin's own live preview
+    localStorage.setItem('sa_primary', primary);
+  }
+
+  if (secondary) {
+    document.documentElement.style.setProperty('--sa-secondary', secondary);
+    document.documentElement.style.setProperty('--sa-secondary-hover', `${secondary}cc`);
+    document.documentElement.style.setProperty('--secondary', secondary);
+    document.documentElement.style.setProperty('--secondary-hover', `${secondary}cc`);
+    localStorage.setItem('sa_secondary', secondary);
+  }
+
+  if (themeMode) {
+    if (themeMode === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('sa_themeMode', themeMode);
+  }
+};
+
+// Apply cached settings immediately on module load (before API call returns)
 if (cachedSettings) {
+  applyThemeColors(cachedSettings);
   setTimeout(() => {
     updateFavicon(cachedSettings.favicon?.url);
     updateTitle(cachedSettings.companyName);
@@ -31,11 +71,10 @@ let inFlightSettingsPromise = null;
 
 /**
  * Load business settings from backend (public endpoint - no auth required)
+ * Applies theme colors to CSS variables immediately on response.
  */
 export const loadBusinessSettings = async () => {
   try {
-    // If we have no cached settings, we MUST fetch
-    // If we have cached settings, we still try to fetch in background to ensure they are fresh
     const endpoint = API_ENDPOINTS.ADMIN.BUSINESS_SETTINGS_PUBLIC;
     if (!endpoint || (typeof endpoint === "string" && !endpoint.trim())) {
       return cachedSettings;
@@ -46,8 +85,6 @@ export const loadBusinessSettings = async () => {
     }
 
     inFlightSettingsPromise = (async () => {
-      // Use public endpoint that doesn't require authentication
-      // Use noCache to ensure we get fresh data from server this time
       const response = await publicGetOnce(endpoint, { noCache: true });
       const settings = response?.data?.data || response?.data;
 
@@ -57,8 +94,17 @@ export const loadBusinessSettings = async () => {
           localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
         } catch (e) { }
 
+        // Apply theme colors from DB to ALL CSS variables — this is the global fix
+        applyThemeColors(settings);
+
         updateFavicon(settings.favicon?.url);
         updateTitle(settings.companyName);
+
+        // Notify any mounted React components (e.g. sidebar, navbar) to re-read theme state
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("systemThemeChanged"));
+        }
+
         return settings;
       }
       return cachedSettings;
@@ -66,7 +112,6 @@ export const loadBusinessSettings = async () => {
 
     return await inFlightSettingsPromise;
   } catch (error) {
-    // Return cached if failed
     return cachedSettings;
   } finally {
     inFlightSettingsPromise = null;
@@ -79,7 +124,6 @@ export const loadBusinessSettings = async () => {
 export const updateFavicon = (url) => {
   if (!url || typeof document === 'undefined') return;
 
-  // Remove existing favicons
   const existingFavicons = document.querySelectorAll("link[rel*='icon']");
   existingFavicons.forEach(el => el.remove());
 
@@ -114,7 +158,7 @@ export const updateTitle = (companyName) => {
 };
 
 /**
- * Set cached settings manually (useful after update)
+ * Set cached settings manually (call after saving via Settings page)
  */
 export const setCachedSettings = (settings) => {
   if (settings) {
@@ -123,8 +167,13 @@ export const setCachedSettings = (settings) => {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     } catch (e) { }
 
+    applyThemeColors(settings);
     updateFavicon(settings.favicon?.url);
     updateTitle(settings.companyName);
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("systemThemeChanged"));
+    }
   }
 };
 
@@ -147,7 +196,6 @@ export const getCachedSettings = () => {
 
 /**
  * Get company name from business settings with fallback
- * @returns {string} Company name or default "Papa Veg Pizza Food"
  */
 export const getCompanyName = () => {
   const settings = getCachedSettings();
@@ -156,7 +204,6 @@ export const getCompanyName = () => {
 
 /**
  * Get company name asynchronously (loads if not cached)
- * @returns {Promise<string>} Company name or default "Papa Veg Pizza"
  */
 export const getCompanyNameAsync = async () => {
   try {

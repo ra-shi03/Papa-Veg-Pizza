@@ -9,6 +9,7 @@ import {
 import { adminAPI } from "@food/api"
 import { clearModuleAuth } from "@food/utils/auth"
 import { toast } from "sonner"
+import { useSystemTheme } from "@/shared/utils/themeSync"
 
 export default function Navbar({ onToggleSidebar }) {
   const navigate = useNavigate()
@@ -40,7 +41,7 @@ export default function Navbar({ onToggleSidebar }) {
   const [showActionsDropdown, setShowActionsDropdown] = useState(false)
 
   // Theme state
-  const [themeMode, setThemeMode] = useState("light")
+  const { themeMode } = useSystemTheme()
 
   // Modals visibility
   const [showAddStoreModal, setShowAddStoreModal] = useState(false)
@@ -101,10 +102,6 @@ export default function Navbar({ onToggleSidebar }) {
     if (savedSearches) {
       setRecentSearches(JSON.parse(savedSearches))
     }
-
-    const savedTheme = localStorage.getItem("sa_themeMode") || "light"
-    setThemeMode(savedTheme)
-    applyTheme(savedTheme)
 
     const defaultNotifications = [
       { id: 1, title: "Low Stock Alert", message: "Mozzarella Cheese is below 5kg threshold at Indore Central", time: "5m ago", type: "inventory", unread: true },
@@ -272,25 +269,9 @@ export default function Navbar({ onToggleSidebar }) {
     toast.success(`Date filter: ${customStart} to ${customEnd}`)
   }
 
-  const applyTheme = (mode) => {
-    if (mode === "dark") {
-      document.documentElement.classList.add("dark")
-    } else if (mode === "light") {
-      document.documentElement.classList.remove("dark")
-    } else {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
-      if (systemTheme === "dark") {
-        document.documentElement.classList.add("dark")
-      } else {
-        document.documentElement.classList.remove("dark")
-      }
-    }
-  }
-
   const handleThemeChange = (mode) => {
-    setThemeMode(mode)
     localStorage.setItem("sa_themeMode", mode)
-    applyTheme(mode)
+    window.dispatchEvent(new Event("systemThemeChanged"))
     toast.success(`Theme mode switched to ${mode}`)
   }
 
@@ -456,7 +437,7 @@ export default function Navbar({ onToggleSidebar }) {
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
               {searchVal ? (
-                <button onClick={() => setSearchVal("")} className="text-zinc-450 hover:text-rose-500">
+                <button onClick={() => setSearchVal("")} className="text-zinc-450 hover:text-[var(--primary)]">
                   <X size={12} />
                 </button>
               ) : (
@@ -475,7 +456,7 @@ export default function Navbar({ onToggleSidebar }) {
                   <div className="flex justify-between items-center pb-1.5 border-b border-zinc-100 dark:border-zinc-800 mb-1">
                     <span className="text-[9px] font-bold uppercase text-zinc-450 tracking-wider">Recent Searches</span>
                     {recentSearches.length > 0 && (
-                      <button onClick={() => { setRecentSearches([]); localStorage.removeItem("admin_recent_searches"); }} className="text-[9px] font-bold text-rose-500 hover:underline">Clear</button>
+                      <button onClick={() => { setRecentSearches([]); localStorage.removeItem("admin_recent_searches"); }} className="text-[9px] font-bold text-[var(--primary)] hover:underline">Clear</button>
                     )}
                   </div>
                   {recentSearches.length > 0 ? (
@@ -493,7 +474,7 @@ export default function Navbar({ onToggleSidebar }) {
                             setRecentSearches(updated)
                             localStorage.setItem("admin_recent_searches", JSON.stringify(updated))
                           }}
-                          className="text-zinc-400 hover:text-rose-500"
+                          className="text-zinc-400 hover:text-[var(--primary)]"
                         >
                           <Trash2 size={11} />
                         </button>
@@ -684,7 +665,7 @@ export default function Navbar({ onToggleSidebar }) {
             >
               <Bell size={17} />
               {unreadCount > 0 && (
-                <span className="absolute top-0 right-0 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white dark:ring-slate-950"></span>
+                <span className="absolute top-0 right-0 w-2 h-2 bg-[var(--primary)]/100 rounded-full ring-2 ring-white dark:ring-slate-950"></span>
               )}
             </button>
 
@@ -750,7 +731,7 @@ export default function Navbar({ onToggleSidebar }) {
                         </div>
                         <button 
                           onClick={(e) => { e.stopPropagation(); clearNotification(n.id); }}
-                          className="absolute right-1 top-1 p-0.5 text-zinc-350 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute right-1 top-1 p-0.5 text-zinc-350 hover:text-[var(--primary)] opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <X size={10} />
                         </button>
@@ -855,7 +836,7 @@ export default function Navbar({ onToggleSidebar }) {
                 <div className="border-t border-zinc-100 dark:border-zinc-800 my-1"></div>
                 <button
                   onClick={() => { setShowProfileMenu(false); setShowLogoutModal(true); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-left text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left text-[var(--primary)] hover:bg-[var(--primary)]/10 dark:hover:bg-rose-950/20"
                 >
                   <LogOut size={13} />
                   <span>Sign Out</span>
@@ -882,7 +863,7 @@ export default function Navbar({ onToggleSidebar }) {
                   Create Franchise Store
                 </h3>
               </div>
-              <button onClick={() => setShowAddStoreModal(false)} className="p-1 bg-zinc-100 dark:bg-zinc-800 rounded-full hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-950/20 transition-colors">
+              <button onClick={() => setShowAddStoreModal(false)} className="p-1 bg-zinc-100 dark:bg-zinc-800 rounded-full hover:bg-[var(--primary)]/10 hover:text-[var(--primary)] dark:hover:bg-rose-950/20 transition-colors">
                 <X size={12} />
               </button>
             </div>
@@ -980,7 +961,7 @@ export default function Navbar({ onToggleSidebar }) {
                   Broadcast Alert Notification
                 </h3>
               </div>
-              <button onClick={() => setShowBroadcastModal(false)} className="p-1 bg-zinc-100 dark:bg-zinc-800 rounded-full hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-950/20 transition-colors">
+              <button onClick={() => setShowBroadcastModal(false)} className="p-1 bg-zinc-100 dark:bg-zinc-800 rounded-full hover:bg-[var(--primary)]/10 hover:text-[var(--primary)] dark:hover:bg-rose-950/20 transition-colors">
                 <X size={12} />
               </button>
             </div>
@@ -1034,7 +1015,7 @@ export default function Navbar({ onToggleSidebar }) {
                       onClick={() => setBroadcastForm({ ...broadcastForm, priority: prio })}
                       className={`py-2 text-[10px] font-bold uppercase rounded-xl border text-center transition-all ${
                         broadcastForm.priority === prio
-                          ? prio === "high" ? "bg-rose-50 border-rose-300 text-rose-600 dark:bg-rose-955" : 
+                          ? prio === "high" ? "bg-[var(--primary)]/10 border-rose-300 text-[var(--primary)]-hover dark:bg-rose-955" : 
                             prio === "medium" ? "bg-amber-50 border-amber-300 text-amber-600 dark:bg-amber-955" : 
                             "bg-emerald-50 border-emerald-300 text-emerald-600 dark:bg-emerald-955"
                           : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-500"
@@ -1070,7 +1051,7 @@ export default function Navbar({ onToggleSidebar }) {
       {showLogoutModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-900 rounded-[2rem] border border-zinc-150 dark:border-zinc-800 max-w-sm w-full overflow-hidden shadow-2xl p-5 text-center animate-in zoom-in-95 duration-100">
-            <div className="w-10 h-10 rounded-full bg-rose-50 dark:bg-rose-950/20 text-rose-500 flex items-center justify-center mx-auto mb-3 border border-rose-100">
+            <div className="w-10 h-10 rounded-full bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20 text-[var(--primary)] flex items-center justify-center mx-auto mb-3 border border-[var(--primary)]/20">
               <LogOut size={16} className="ml-0.5" />
             </div>
             
@@ -1088,7 +1069,7 @@ export default function Navbar({ onToggleSidebar }) {
               </button>
               <button
                 onClick={handleConfirmLogout}
-                className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl"
+                className="flex-1 py-2.5 bg-[var(--primary)]/100 hover:bg-[var(--primary-hover)] text-white rounded-xl"
               >
                 Logout
               </button>
@@ -1108,7 +1089,7 @@ export default function Navbar({ onToggleSidebar }) {
                   Security Settings
                 </h3>
               </div>
-              <button onClick={() => setShowSecurityModal(false)} className="p-1 bg-zinc-100 dark:bg-zinc-800 rounded-full hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-950/20 transition-colors">
+              <button onClick={() => setShowSecurityModal(false)} className="p-1 bg-zinc-100 dark:bg-zinc-800 rounded-full hover:bg-[var(--primary)]/10 hover:text-[var(--primary)] dark:hover:bg-rose-950/20 transition-colors">
                 <X size={12} />
               </button>
             </div>
@@ -1141,7 +1122,7 @@ export default function Navbar({ onToggleSidebar }) {
                       <p className="font-bold text-[11px] text-zinc-800 dark:text-zinc-200">Windows PC • Bhopal</p>
                       <p className="text-[9px] text-zinc-400">Chrome Client • Last active 2 hrs ago</p>
                     </div>
-                    <button className="text-[9px] font-bold text-rose-500 hover:underline">REVOKE</button>
+                    <button className="text-[9px] font-bold text-[var(--primary)] hover:underline">REVOKE</button>
                   </div>
                 </div>
               </div>
@@ -1170,7 +1151,7 @@ export default function Navbar({ onToggleSidebar }) {
                   Administrative Audit Logs
                 </h3>
               </div>
-              <button onClick={() => setShowActivityModal(false)} className="p-1 bg-zinc-100 dark:bg-zinc-800 rounded-full hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-950/20 transition-colors">
+              <button onClick={() => setShowActivityModal(false)} className="p-1 bg-zinc-100 dark:bg-zinc-800 rounded-full hover:bg-[var(--primary)]/10 hover:text-[var(--primary)] dark:hover:bg-rose-950/20 transition-colors">
                 <X size={12} />
               </button>
             </div>

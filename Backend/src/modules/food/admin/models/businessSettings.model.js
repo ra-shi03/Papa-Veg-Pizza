@@ -22,7 +22,11 @@ const businessSettingsSchema = new mongoose.Schema(
         },
         supportEmail: { type: String, default: 'support@foodelo.com' },
         supportPhone: { type: String, default: '+91 1234567890' },
-        supportHours: { type: String, default: '24/7 Availability' }
+        supportHours: { type: String, default: '24/7 Availability' },
+        // Theme / branding colors set by Superadmin — applied across all panels
+        primaryColor: { type: String, default: '#a43c12' },
+        secondaryColor: { type: String, default: '#ff7f50' },
+        themeMode: { type: String, enum: ['light', 'dark'], default: 'light' }
     },
     { timestamps: true }
 );

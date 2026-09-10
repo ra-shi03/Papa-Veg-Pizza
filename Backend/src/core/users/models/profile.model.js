@@ -38,7 +38,16 @@ const profileSchema = new mongoose.Schema({
     country: String,
     pincode: String,
     language: String,
-    timezone: String
+    timezone: String,
+    preferences: {
+        theme: { type: String, enum: ["LIGHT", "DARK", "SYSTEM"], default: "LIGHT" },
+        notifications: {
+            email: { type: Boolean, default: true },
+            sms: { type: Boolean, default: false },
+            push: { type: Boolean, default: false }
+        },
+        currency: { type: String, default: "INR" }
+    }
 }, { 
     timestamps: true,
     collection: 'profiles'

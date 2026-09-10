@@ -24,7 +24,8 @@ import {
   CheckCircle2
 } from "lucide-react"
 import { toast } from "sonner"
-import { adminAPI } from "@food/api"
+import { adminAPI, userAPI } from "@food/api"
+import { useAuthStore } from "@/core/auth/auth.store"
 
 // Custom reusable components for clean UI architecture
 const Card = ({ children, className = "" }) => (
@@ -77,29 +78,42 @@ export default function AdminProfile() {
   const [activeTab, setActiveTab] = useState("personal")
   const [loading, setLoading] = useState(false)
 
+  const { user } = useAuthStore()
   // Profile Photo states
   const [profileImage, setProfileImage] = useState(() => localStorage.getItem("admin_profile_image") || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150")
   const [showPhotoModal, setShowPhotoModal] = useState(false)
   const [selectedPhotoFile, setSelectedPhotoFile] = useState(null)
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState("")
 
-  // Personal Information State (Simulated GET /api/franchise-admin/profile)
+  // Personal Information State
   const [personalInfo, setPersonalInfo] = useState({
-    firstName: "Rohan",
-    lastName: "Sharma",
-    email: "rohan.sharma@papavegpizza.in",
-    phone: "+91 98765 43210",
-    alternatePhone: "+91 91234 56789",
-    dob: "1991-08-15",
-    gender: "Male",
-    address: "Scheme No. 54, Near Vijay Nagar Square",
-    city: "Indore",
-    state: "Madhya Pradesh",
-    pincode: "452010"
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    alternatePhone: "",
+    dob: "",
+    gender: "",
+    address: "",
+    city: "",
+    state: "",
+    pincode: ""
   })
 
   // Editable temporary states
-  const [tempPersonalInfo, setTempPersonalInfo] = useState({ ...personalInfo })
+  const [tempPersonalInfo, setTempPersonalInfo] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    alternatePhone: "",
+    dob: "",
+    gender: "",
+    address: "",
+    city: "",
+    state: "",
+    pincode: ""
+  })
   const [personalErrors, setPersonalErrors] = useState({})
 
   // Security: Password state (Simulated PUT /api/franchise-admin/change-password)
@@ -117,27 +131,24 @@ export default function AdminProfile() {
     method: "email" // 'email' or 'sms'
   })
 
-  // Security: Sessions state (Simulated GET /api/franchise-admin/sessions)
-  const [sessions, setSessions] = useState([
-    { id: "sess-1", device: "Desktop (Windows 11)", browser: "Chrome", location: "Vijay Nagar, Indore", loginTime: "2026-06-23 10:24 AM", current: true },
-    { id: "sess-2", device: "Mobile (OnePlus 11)", browser: "Chrome Mobile", location: "Nipania, Indore", loginTime: "2026-06-22 09:15 PM", current: false },
-    { id: "sess-3", device: "Tablet (iPad Air)", browser: "Safari", location: "Bhopal, MP", loginTime: "2026-06-21 04:30 PM", current: false }
-  ])
+  // Security: Sessions state
+  const [sessions, setSessions] = useState([])
   const [showLogoutAllModal, setShowLogoutAllModal] = useState(false)
 
-  // Franchise Information state (Read-only GET /api/franchise/:id)
-  const franchiseInfo = {
-    name: "Papa Veg Pizza Indore",
-    code: "PVP-IND-09",
-    managerName: "Rohan Sharma",
-    gstNumber: "23AAAAA1111A1Z1",
-    panNumber: "ABCDE1234F",
-    registeredAddress: "102, Orbit Mall, Vijay Nagar, Indore, Madhya Pradesh - 452010",
-    region: "Central India (Madhya Pradesh)",
-    storeCount: 4,
-    subscriptionPlan: "Enterprise Pro Growth Plan",
-    expiryDate: "2027-12-31"
-  }
+  // Franchise Information state
+  const [franchiseInfo, setFranchiseInfo] = useState({
+    name: "",
+    code: "",
+    managerName: "",
+    gstNumber: "",
+    panNumber: "",
+    pincode: "",
+    registeredAddress: "",
+    region: "",
+    storeCount: 0,
+    subscriptionPlan: "",
+    expiryDate: ""
+  })
 
   // Preferences state (Simulated PUT /api/franchise-admin/preferences)
   const [preferences, setPreferences] = useState({
@@ -152,78 +163,82 @@ export default function AdminProfile() {
     currency: "INR (₹)"
   })
 
-  // Activity Logs state (Simulated GET /api/franchise-admin/activity-logs)
-  const initialLogs = [
-    { id: "log-1", date: "2026-06-23 12:45 PM", activity: "Logged In", ipAddress: "192.168.1.45", device: "Desktop / Chrome" },
-    { id: "log-2", date: "2026-06-23 11:20 AM", activity: "Created Coupon 'FREEPAN'", ipAddress: "192.168.1.45", device: "Desktop / Chrome" },
-    { id: "log-3", date: "2026-06-22 06:12 PM", activity: "Updated Profile Info", ipAddress: "192.168.1.45", device: "Desktop / Chrome" },
-    { id: "log-4", date: "2026-06-22 03:30 PM", activity: "Approved Purchase Request #PR-9920", ipAddress: "192.168.1.12", device: "Mobile / Chrome" },
-    { id: "log-5", date: "2026-06-21 02:15 PM", activity: "Changed Password", ipAddress: "192.168.1.45", device: "Desktop / Chrome" },
-    { id: "log-6", date: "2026-06-21 11:00 AM", activity: "Created Coupon 'INDORE50'", ipAddress: "10.0.0.98", device: "Tablet / Safari" },
-    { id: "log-7", date: "2026-06-20 04:45 PM", activity: "Approved Purchase Request #PR-9915", ipAddress: "192.168.1.45", device: "Desktop / Chrome" },
-    { id: "log-8", date: "2026-06-20 09:12 AM", activity: "Logged In", ipAddress: "192.168.1.45", device: "Desktop / Chrome" }
-  ]
-  const [logs, setLogs] = useState(initialLogs)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("")
-  const [dateFilter, setDateFilter] = useState("")
-  const [currentPage, setCurrentPage] = useState(1)
-  const logsPerPage = 4
 
-  // Apply debounce method in search bar (300ms)
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery)
-      setCurrentPage(1)
-    }, 300)
-    return () => clearTimeout(handler)
-  }, [searchQuery])
-
-  // Filter logs dynamically
-  const filteredLogs = logs.filter(log => {
-    const matchesSearch = log.activity.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-                          log.ipAddress.includes(debouncedSearchQuery) ||
-                          log.device.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
-    const matchesDate = dateFilter ? log.date.startsWith(dateFilter) : true
-    return matchesSearch && matchesDate
-  })
-
-  // Pagination bounds
-  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / logsPerPage))
-  const paginatedLogs = filteredLogs.slice((currentPage - 1) * logsPerPage, currentPage * logsPerPage)
 
   // Fetch true database values on mount
   useEffect(() => {
     const fetchAdminProfile = async () => {
       try {
         setLoading(true)
-        const response = await adminAPI.getAdminProfile()
-        const adminData = response?.data?.admin || response?.data?.data?.admin
+        const [profileRes, franchiseRes] = await Promise.all([
+          adminAPI.getAdminProfile(),
+          user?.franchiseId ? adminAPI.getFranchiseById(user.franchiseId) : Promise.resolve(null)
+        ])
+
+        const adminData = profileRes?.data?.admin || profileRes?.data?.data?.admin || profileRes?.data?.user
         if (adminData) {
-          const names = (adminData.name || "Rohan Sharma").split(" ")
+          const names = (adminData.name || "").split(" ")
           setPersonalInfo(prev => ({
             ...prev,
-            firstName: names[0] || prev.firstName,
-            lastName: names.slice(1).join(" ") || prev.lastName,
-            email: adminData.email || prev.email,
-            phone: adminData.phone || prev.phone
+            firstName: adminData.firstName || names[0] || "",
+            lastName: adminData.lastName || names.slice(1).join(" ") || "",
+            email: adminData.email || "",
+            phone: adminData.mobile || adminData.phone || "",
+            alternatePhone: adminData.alternatePhone || "",
+            dob: adminData.dob ? new Date(adminData.dob).toISOString().split('T')[0] : "",
+            gender: adminData.gender ? adminData.gender.charAt(0).toUpperCase() + adminData.gender.slice(1).toLowerCase() : "",
+            address: adminData.addressLine1 || "",
+            city: adminData.city || "",
+            state: adminData.state || "",
+            pincode: adminData.pincode || "",
+            createdAt: adminData.createdAt || ""
           }))
-          setTempPersonalInfo(prev => ({
-            ...prev,
-            firstName: names[0] || prev.firstName,
-            lastName: names.slice(1).join(" ") || prev.lastName,
-            email: adminData.email || prev.email,
-            phone: adminData.phone || prev.phone
-          }))
+
+          if (adminData.profileImage || adminData.profilePhoto) {
+            setProfileImage(adminData.profileImage || adminData.profilePhoto)
+          }
+
+          if (adminData.preferences) {
+             setPreferences(prev => ({
+               ...prev,
+               themeMode: () => adminData.preferences.theme?.toLowerCase() || localStorage.getItem("sa_themeMode") || "light",
+               notifications: {
+                 email: adminData.preferences.notifications?.email ?? true,
+                 sms: adminData.preferences.notifications?.sms ?? false,
+                 push: adminData.preferences.notifications?.push ?? false
+               },
+               currency: adminData.preferences.currency || "INR (₹)"
+             }))
+          }
+          if (adminData.language) setPreferences(p => ({ ...p, language: adminData.language }))
+          if (adminData.timezone) setPreferences(p => ({ ...p, timezone: adminData.timezone }))
         }
+
+        const fData = franchiseRes?.data?.data || franchiseRes?.data
+        if (fData) {
+          setFranchiseInfo({
+            name: fData.name || "-",
+            code: fData.franchiseCode || fData.code || "-",
+            managerName: fData.managerName || "-",
+            gstNumber: fData.gstNumber || "-",
+            panNumber: fData.panNumber || "-",
+            pincode: fData.pincode || "-",
+            registeredAddress: fData.address || "-",
+            region: fData.regionId || "-",
+            storeCount: fData.storeCount || 0,
+            subscriptionPlan: fData.subscriptionPlan || "Standard",
+            expiryDate: fData.expiryDate || "-"
+          })
+        }
+
       } catch (err) {
-        // Fall back gracefully to mock states
+        toast.error("Failed to fetch profile details")
       } finally {
         setLoading(false)
       }
     }
     fetchAdminProfile()
-  }, [])
+  }, [user?.franchiseId])
 
   // Sync temp state with actual profile state when tab changes
   useEffect(() => {
@@ -249,21 +264,22 @@ export default function AdminProfile() {
     try {
       setLoading(true)
       // Call actual patch API endpoint
-      await adminAPI.updateAdminProfile({
+      const payload = {
         name: `${tempPersonalInfo.firstName} ${tempPersonalInfo.lastName}`,
-        phone: tempPersonalInfo.phone
-      })
+        phone: tempPersonalInfo.phone,
+        alternatePhone: tempPersonalInfo.alternatePhone,
+        dateOfBirth: tempPersonalInfo.dob,
+        gender: tempPersonalInfo.gender,
+        addressLine1: tempPersonalInfo.address,
+        city: tempPersonalInfo.city,
+        state: tempPersonalInfo.state,
+        pincode: tempPersonalInfo.pincode
+      }
+      await adminAPI.updateAdminProfile(payload)
       setPersonalInfo({ ...tempPersonalInfo })
-      // Append Activity log
-      setLogs(prev => [
-        { id: `log-${Date.now()}`, date: new Date().toLocaleString("en-IN"), activity: "Updated Profile Info", ipAddress: "127.0.0.1", device: "Desktop / Chrome" },
-        ...prev
-      ])
       toast.success("Profile updated successfully")
     } catch (err) {
-      // Stub update fallback
-      setPersonalInfo({ ...tempPersonalInfo })
-      toast.success("Profile saved successfully (Offline mode)")
+      toast.error("Failed to update profile")
     } finally {
       setLoading(false)
     }
@@ -289,11 +305,6 @@ export default function AdminProfile() {
       setShowPasswordSuccess(true)
       setPasswordState({ currentPassword: "", newPassword: "", confirmPassword: "" })
       setPasswordErrors({})
-      // Append Activity log
-      setLogs(prev => [
-        { id: `log-${Date.now()}`, date: new Date().toLocaleString("en-IN"), activity: "Changed Password", ipAddress: "127.0.0.1", device: "Desktop / Chrome" },
-        ...prev
-      ])
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to update password. Check current password.")
     } finally {
@@ -361,21 +372,39 @@ export default function AdminProfile() {
     toast.success("Successfully logged out from all other sessions")
   }
 
-  // Preferences Change (PUT /api/franchise-admin/preferences)
-  const handleSavePreferences = () => {
-    // Theme toggle
-    const currentTheme = localStorage.getItem("sa_themeMode") || "light"
-    const targetTheme = preferences.themeMode === "dark" ? "dark" : "light"
-    if (currentTheme !== targetTheme) {
-      localStorage.setItem("sa_themeMode", targetTheme)
-      if (targetTheme === "dark") {
-        document.documentElement.classList.add("dark")
-      } else {
-        document.documentElement.classList.remove("dark")
+  // Preferences Change (PUT /api/user/profile)
+  const handleSavePreferences = async () => {
+    try {
+      setLoading(true)
+      const targetTheme = preferences.themeMode === "dark" ? "DARK" : "LIGHT"
+      const payload = {
+        language: preferences.language,
+        timezone: preferences.timezone,
+        preferences: {
+          theme: targetTheme,
+          notifications: preferences.notifications,
+          currency: preferences.currency
+        }
       }
-      window.dispatchEvent(new Event("adminNotificationsUpdated"))
+      await adminAPI.updateAdminProfile(payload)
+      
+      const currentTheme = localStorage.getItem("sa_themeMode") || "light"
+      const uiTheme = targetTheme.toLowerCase()
+      if (currentTheme !== uiTheme) {
+        localStorage.setItem("sa_themeMode", uiTheme)
+        if (uiTheme === "dark") {
+          document.documentElement.classList.add("dark")
+        } else {
+          document.documentElement.classList.remove("dark")
+        }
+        window.dispatchEvent(new Event("adminNotificationsUpdated"))
+      }
+      toast.success("Preferences saved successfully")
+    } catch (err) {
+      toast.error("Failed to save preferences")
+    } finally {
+      setLoading(false)
     }
-    toast.success("Preferences saved successfully")
   }
 
   return (
@@ -403,7 +432,7 @@ export default function AdminProfile() {
                 <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-zinc-100 dark:border-zinc-800 shadow-md">
                   <img
                     src={profileImage}
-                    alt="Rohan Sharma"
+                    alt={`${personalInfo.firstName || "Admin"} ${personalInfo.lastName || ""}`.trim()}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -441,7 +470,7 @@ export default function AdminProfile() {
                 </div>
                 <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-zinc-300">
                   <Clock size={13} className="opacity-60" />
-                  <span>Joined: {new Date("2026-01-10").toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}</span>
+                  <span>Joined: {personalInfo.createdAt ? new Date(personalInfo.createdAt).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }) : "-"}</span>
                 </div>
               </div>
 
@@ -466,8 +495,7 @@ export default function AdminProfile() {
                 { id: "personal", label: "Personal Information", icon: User },
                 { id: "security", label: "Security & Credentials", icon: Shield },
                 { id: "franchise", label: "Franchise Properties", icon: Landmark },
-                { id: "preferences", label: "Preferences", icon: Settings },
-                { id: "activity", label: "Activity Logs", icon: Activity }
+                { id: "preferences", label: "", icon: Settings, iconOnly: true }
               ].map((tab) => {
                 const Icon = tab.icon
                 return (
@@ -811,6 +839,7 @@ export default function AdminProfile() {
                         { label: "Owner / Director", value: franchiseInfo.managerName },
                         { label: "GST Number", value: franchiseInfo.gstNumber },
                         { label: "PAN Number", value: franchiseInfo.panNumber },
+                        { label: "Pincode", value: franchiseInfo.pincode },
                         { label: "Registered Region", value: franchiseInfo.region },
                         { label: "Active Stores Mapped", value: `${franchiseInfo.storeCount} Stores` },
                         { label: "Active Subscription Plan", value: franchiseInfo.subscriptionPlan },
@@ -956,122 +985,7 @@ export default function AdminProfile() {
                 </Card>
               )}
 
-              {/* 5. ACTIVITY LOGS TAB */}
-              {activeTab === "activity" && (
-                <Card>
-                  <div className="flex flex-col gap-4">
-                    
-                    {/* Title */}
-                    <div className="flex items-center gap-2 pb-2 border-b border-zinc-100 dark:border-zinc-800 mb-1">
-                      <Activity size={16} className="text-[var(--primary)]" />
-                      <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
-                        Franchise Security & Activity logs
-                      </h3>
-                    </div>
 
-                    {/* Filter panels */}
-                    <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-                      {/* Search box with debouncing */}
-                      <div className="relative w-full sm:max-w-xs">
-                        <Search size={14} className="absolute left-3 top-2.5 opacity-65" />
-                        <input
-                          type="text"
-                          placeholder="Search activities..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="w-full text-xs pl-9 pr-3 py-2 border border-zinc-200 dark:border-zinc-850 bg-zinc-50 dark:bg-zinc-950 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:border-[var(--primary)] transition-all"
-                        />
-                      </div>
-
-                      {/* Date filter */}
-                      <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
-                        <Calendar size={13} className="opacity-60" />
-                        <input
-                          type="date"
-                          value={dateFilter}
-                          onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}
-                          className="text-xs px-2.5 py-1.5 border border-zinc-200 dark:border-zinc-850 bg-zinc-50 dark:bg-zinc-950 text-slate-900 dark:text-white rounded-lg focus:outline-none"
-                        />
-                        {dateFilter && (
-                          <button
-                            onClick={() => setDateFilter("")}
-                            className="text-[10px] text-zinc-400 hover:text-zinc-650"
-                          >
-                            Clear
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Table */}
-                    <div className="overflow-x-auto w-full">
-                      <table className="w-full text-xs text-left">
-                        <thead className="bg-zinc-50 dark:bg-zinc-950 text-slate-700 dark:text-zinc-300 border-b border-zinc-100 dark:border-zinc-850">
-                          <tr>
-                            <th className="p-3 font-bold">Date & Time</th>
-                            <th className="p-3 font-bold">Activity log</th>
-                            <th className="p-3 font-bold">IP Address</th>
-                            <th className="p-3 font-bold">Device / Channel</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-zinc-100 dark:divide-zinc-850">
-                          {paginatedLogs.length > 0 ? (
-                            paginatedLogs.map((log) => (
-                              <tr key={log.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/40">
-                                <td className="p-3 font-semibold text-slate-500 dark:text-zinc-500 whitespace-nowrap">
-                                  {log.date}
-                                </td>
-                                <td className="p-3 font-bold text-slate-900 dark:text-white">
-                                  {log.activity}
-                                </td>
-                                <td className="p-3 font-mono font-medium text-slate-650 dark:text-zinc-400">
-                                  {log.ipAddress}
-                                </td>
-                                <td className="p-3 font-medium text-slate-600 dark:text-zinc-450">
-                                  {log.device}
-                                </td>
-                              </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td colSpan={4} className="p-6 text-center text-slate-400 font-semibold">
-                                No activity logs match current filters.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Pagination */}
-                    {totalPages > 1 && (
-                      <div className="flex justify-between items-center border-t border-zinc-100 dark:border-zinc-850 pt-3">
-                        <span className="text-[10px] text-zinc-400 font-bold">
-                          Page {currentPage} of {totalPages} • Total logs: {filteredLogs.length}
-                        </span>
-                        
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            disabled={currentPage === 1}
-                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                            className="p-1.5 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded disabled:opacity-40"
-                          >
-                            <ChevronLeft size={13} />
-                          </button>
-                          <button
-                            disabled={currentPage === totalPages}
-                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                            className="p-1.5 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded disabled:opacity-40"
-                          >
-                            <ChevronRight size={13} />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                  </div>
-                </Card>
-              )}
 
             </div>
 

@@ -538,14 +538,23 @@ export const getProfile = async (userId, role) => {
     const user = await User.findById(id).populate('primaryRole').lean();
     if (user) {
       const userProfile = await Profile.findOne({ userId: id }).lean();
+      
+      const activeUserRole = await UserRole.findOne({
+        userId: user._id,
+        roleId: user.primaryRole?._id,
+        status: 'ACTIVE'
+      }).lean();
+
       profile = {
         id: user._id,
         _id: user._id,
-        name: userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : "",
+        name: userProfile && userProfile.firstName ? `${userProfile.firstName} ${userProfile.lastName || ''}`.trim() : user.name || "",
         email: user.email,
         mobile: user.mobile,
         role: role,
-        // Any extra fields expected by frontend for admins
+        franchiseId: activeUserRole?.franchiseId?.toString() || null,
+        storeId: activeUserRole?.storeId?.toString() || null,
+        ...(userProfile || {})
       };
     }
   } else {
@@ -644,7 +653,7 @@ export const updateAdminProfile = async (userId, body) => {
   if (!userId) {
     throw new AuthError("Invalid token payload");
   }
-  const admin = await FoodAdmin.findById(userId);
+  const admin = await User.findById(userId);
   if (!admin) {
     throw new AuthError("Profile not found");
   }
@@ -657,7 +666,7 @@ export const updateAdminProfile = async (userId, body) => {
       throw new ValidationError("Email is required");
     }
     if (normalizedEmail !== admin.email) {
-      const duplicateAdmin = await FoodAdmin.findOne({
+      const duplicateAdmin = await User.findOne({
         _id: { $ne: admin._id },
         email: normalizedEmail,
       })
@@ -681,10 +690,38 @@ export const updateAdminProfile = async (userId, body) => {
   } else {
     admin.servicesAccess = ["food"];
   }
+
+  // Upsert Profile fields
+  const profileUpdates = {};
+  const profileKeys = ['alternatePhone', 'addressLine1', 'addressLine2', 'city', 'state', 'country', 'pincode', 'language', 'timezone', 'preferences'];
+  for (const key of profileKeys) {
+      if (body[key] !== undefined) {
+          profileUpdates[key] = body[key];
+      }
+  }
+  if (body.gender !== undefined) profileUpdates.gender = String(body.gender || '').trim().toUpperCase();
+  if (body.dateOfBirth !== undefined) {
+    const d = new Date(`${String(body.dateOfBirth)}T00:00:00.000Z`);
+    profileUpdates.dob = Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (body.name !== undefined) {
+      const parts = String(body.name || '').trim().split(' ');
+      profileUpdates.firstName = parts[0] || '';
+      profileUpdates.lastName = parts.slice(1).join(' ') || '';
+  }
+
+  let userProfile = await Profile.findOne({ userId });
+  if (!userProfile) {
+      userProfile = new Profile({ userId, ...profileUpdates });
+  } else {
+      Object.assign(userProfile, profileUpdates);
+  }
+  await userProfile.save();
+
   await admin.save();
   const profile = admin.toObject();
   delete profile.password;
-  return { user: profile };
+  return { user: { ...profile, ...userProfile.toObject() } };
 };
 
 /** Change admin password. Only for ADMIN role. */
@@ -696,7 +733,7 @@ export const changeAdminPassword = async (
   if (!userId) {
     throw new AuthError("Invalid token payload");
   }
-  const admin = await FoodAdmin.findById(userId);
+  const admin = await User.findById(userId);
   if (!admin) {
     throw new AuthError("Profile not found");
   }

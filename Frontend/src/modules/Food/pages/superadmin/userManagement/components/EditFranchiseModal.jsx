@@ -1,31 +1,9 @@
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, User, Mail, Phone, Store, MapPin, Layers, Save, Lock, Clock, Hash } from "lucide-react"
+import { X, User, Mail, Phone, Store, MapPin, Layers, Save, Lock, Clock, Hash, Loader2, LocateFixed } from "lucide-react"
 import apiClient from "../../../../../../services/api/axios"
 
-// Mock geography data (as requested, representing data from franchiseManagement folder)
-const MOCK_REGIONS = [
-  { id: "reg-1", name: "North India" },
-  { id: "reg-2", name: "West India" },
-  { id: "reg-3", name: "South India" },
-  { id: "reg-4", name: "Central India" }
-];
-
-const MOCK_ZONES = [
-  { id: "zn-1", name: "Delhi NCR Zone", regionId: "reg-1" },
-  { id: "zn-2", name: "Mumbai Zone", regionId: "reg-2" },
-  { id: "zn-3", name: "Pune Zone", regionId: "reg-2" },
-  { id: "zn-4", name: "Bengaluru Zone", regionId: "reg-3" },
-  { id: "zn-5", name: "Indore Zone", regionId: "reg-4" },
-  { id: "zn-6", name: "Bhopal Zone", regionId: "reg-4" }
-];
-
-const MOCK_TERRITORIES = [
-  { id: "ter-1", name: "CP & Connaught Place", zoneId: "zn-1" },
-  { id: "ter-2", name: "Bandra West Cluster", zoneId: "zn-2" },
-  { id: "ter-3", name: "Koramangala", zoneId: "zn-4" },
-  { id: "ter-4", name: "Vijay Nagar", zoneId: "zn-5" }
-];
+// Fetch dynamic data from API
 
 export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
   const [formData, setFormData] = useState({
@@ -44,23 +22,46 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
     franchiseDuration: 3,
     franchiseCost: "",
     paidAmount: "",
-    dueAmount: ""
+    dueAmount: "",
+    gstNumber: "",
+    panNumber: "",
+    pincode: "",
+    address: ""
   })
 
   const [errors, setErrors] = useState({})
+  const [isLoading, setIsLoading] = useState(false)
+
+  // Geography Data State
+  const [regions, setRegions] = useState([]);
+  const [zones, setZones] = useState([]);
+  const [territories, setTerritories] = useState([]);
+
+  useEffect(() => {
+    const fetchGeography = async () => {
+      try {
+        const [regRes, zonRes, terRes] = await Promise.all([
+          apiClient.get('/food/admin/regions'),
+          apiClient.get('/food/admin/zones'),
+          apiClient.get('/food/admin/territories')
+        ]);
+        setRegions((regRes.data.data || []).filter(region => region.isActive));
+        setZones((zonRes.data.data || []).filter(zone => zone.isActive));
+        setTerritories((terRes.data.data || []).filter(territory => territory.isActive));
+      } catch (err) {
+        console.error("Failed to load geography data", err);
+      }
+    };
+    fetchGeography();
+  }, []);
 
   // Derived dependent dropdowns
-  const availableZones = MOCK_ZONES.filter(z => z.regionId === formData.regionId);
-  const availableTerritories = MOCK_TERRITORIES.filter(t => t.zoneId === formData.zoneId);
+  const availableZones = zones.filter(z => z.regionId === formData.regionId);
+  const availableTerritories = territories.filter(t => t.zoneId === formData.zoneId);
 
   useEffect(() => {
     if (admin && isOpen) {
       
-      // Reverse map city and state back to region/territory for editing if available
-      const rId = MOCK_REGIONS.find(r => r.name === admin.state)?.id || ""
-      const tId = MOCK_TERRITORIES.find(t => t.name === admin.city)?.id || ""
-      const zId = MOCK_TERRITORIES.find(t => t.id === tId)?.zoneId || ""
-
       setFormData({
         name: admin.name || "",
         email: admin.email || "",
@@ -68,16 +69,20 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
         password: "",
         franchiseName: admin.franchiseName || "",
         franchiseCode: admin.franchiseCode || "",
-        regionId: rId,
-        zoneId: zId,
-        territoryId: tId,
+        regionId: admin.regionId || "",
+        zoneId: admin.zoneId || "",
+        territoryId: admin.territoryId || "",
         type: admin.type || "Single Store",
         totalStores: admin.totalStores || 1,
         status: admin.status || "ACTIVE",
         franchiseDuration: admin.franchiseDuration || 3,
         franchiseCost: admin.franchiseCost || "",
         paidAmount: admin.paidAmount || "",
-        dueAmount: admin.dueAmount || ""
+        dueAmount: admin.dueAmount || "",
+        gstNumber: admin.gstNumber || "",
+        panNumber: admin.panNumber || "",
+        pincode: admin.pincode || "",
+        address: admin.address || ""
       })
       setErrors({})
     }
@@ -115,14 +120,51 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
     return Object.keys(newErrors).length === 0
   }
 
+  const handleFetchLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser");
+      return;
+    }
+    
+    setIsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          const data = await res.json();
+          if (data && data.address) {
+            const addressString = data.display_name;
+            const fetchedPincode = data.address.postcode || "";
+            setFormData(prev => ({
+              ...prev,
+              address: addressString,
+              pincode: fetchedPincode
+            }));
+          }
+        } catch (error) {
+          console.error("Error fetching location:", error);
+          alert("Failed to fetch address from coordinates.");
+        } finally {
+          setIsLoading(false);
+        }
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+        alert("Unable to retrieve your location.");
+        setIsLoading(false);
+      }
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!validate()) return
 
     // Resolve names for the table display if needed
-    const regionName = MOCK_REGIONS.find(r => r.id === formData.regionId)?.name || ""
-    const zoneName = MOCK_ZONES.find(z => z.id === formData.zoneId)?.name || ""
-    const territoryName = MOCK_TERRITORIES.find(t => t.id === formData.territoryId)?.name || ""
+    const regionName = regions.find(r => r.id === formData.regionId || r._id === formData.regionId)?.name || ""
+    const zoneName = zones.find(z => z.id === formData.zoneId || z._id === formData.zoneId)?.name || ""
+    const territoryName = territories.find(t => t.id === formData.territoryId || t._id === formData.territoryId)?.name || ""
 
     try {
       const response = await apiClient.patch(`/food/admin/franchises/${admin._id}`, formData);
@@ -236,6 +278,83 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">GST Number</label>
+                      <div className="relative">
+                        <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          type="text"
+                          value={formData.gstNumber}
+                          onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value })}
+                          placeholder="e.g. 22AAAAA0000A1Z5"
+                          className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
+                            errors.gstNumber ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
+                          }`}
+                        />
+                      </div>
+                      {errors.gstNumber && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.gstNumber}</p>}
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">PAN Number</label>
+                      <div className="relative">
+                        <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          type="text"
+                          value={formData.panNumber}
+                          onChange={(e) => setFormData({ ...formData, panNumber: e.target.value })}
+                          placeholder="e.g. ABCDE1234F"
+                          className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all border-zinc-200 dark:border-zinc-800`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                    <div className="sm:col-span-8">
+                      <label htmlFor="fullAddress" className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Full Address</label>
+                      <div className="relative flex items-center">
+                        <MapPin size={14} className="absolute left-3 text-zinc-400" />
+                        <input
+                          id="fullAddress"
+                          name="fullAddress"
+                          type="text"
+                          value={formData.address}
+                          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                          placeholder="e.g. 123 Main St, City"
+                          className={`w-full text-xs pl-8.5 pr-10 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
+                            errors.address ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
+                          }`}
+                        />
+                        <button 
+                          type="button" 
+                          onClick={handleFetchLocation}
+                          disabled={isLoading}
+                          title="Fetch Location automatically"
+                          className="absolute right-1 text-[var(--primary)] hover:bg-[var(--primary)]/10 p-1.5 rounded transition-colors disabled:opacity-50"
+                        >
+                          {isLoading ? <Loader2 size={14} className="animate-spin" /> : <LocateFixed size={14} />}
+                        </button>
+                      </div>
+                      {errors.address && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.address}</p>}
+                    </div>
+                    
+                    <div className="sm:col-span-4">
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Pincode</label>
+                      <div className="relative">
+                        <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          type="text"
+                          value={formData.pincode}
+                          onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
+                          placeholder="e.g. 452010"
+                          className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all border-zinc-200 dark:border-zinc-800`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Password</label>
                     <div className="relative">
@@ -308,8 +427,8 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
                           }`}
                         >
                           <option value="">Select Region...</option>
-                          {MOCK_REGIONS.map((r) => (
-                            <option key={r.id} value={r.id}>{r.name}</option>
+                          {regions.map((r) => (
+                            <option key={r.id || r._id} value={r.id || r._id}>{r.name}</option>
                           ))}
                         </select>
                         {errors.regionId && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.regionId}</p>}
@@ -327,7 +446,7 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
                         >
                           <option value="">Select Zone...</option>
                           {availableZones.map((z) => (
-                            <option key={z.id} value={z.id}>{z.name}</option>
+                            <option key={z.id || z._id} value={z.id || z._id}>{z.name}</option>
                           ))}
                         </select>
                         {errors.zoneId && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.zoneId}</p>}
@@ -345,7 +464,7 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
                         >
                           <option value="">Select Territory...</option>
                           {availableTerritories.map((t) => (
-                            <option key={t.id} value={t.id}>{t.name}</option>
+                            <option key={t.id || t._id} value={t.id || t._id}>{t.name}</option>
                           ))}
                         </select>
                         {errors.territoryId && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.territoryId}</p>}

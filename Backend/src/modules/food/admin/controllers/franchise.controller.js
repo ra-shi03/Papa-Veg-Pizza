@@ -43,7 +43,9 @@ export const createFranchise = async (req, res) => {
                 paidAmount,
                 dueAmount,
                 gstNumber,
-                address
+                panNumber,
+                address,
+                pincode
             } = req.body;
 
             // ── Validation ─────────────────────────────────────────────────
@@ -116,7 +118,9 @@ export const createFranchise = async (req, res) => {
                 email: normalizedEmail,
                 phone: normalizedPhone,
                 gstNumber,
+                panNumber,
                 address,
+                pincode,
                 franchiseCode: normalizedCode,
                 regionId,
                 zoneId,
@@ -243,6 +247,22 @@ export const updateFranchise = async (req, res) => {
             delete updates.ownerUserId;
             delete updates.createdBy;
 
+            // Map frontend specific names to Franchise schema
+            if (updates.name !== undefined) {
+                updates.ownerName = updates.name;
+            }
+            if (updates.franchiseName !== undefined) {
+                updates.name = updates.franchiseName;
+                delete updates.franchiseName;
+            }
+
+            // Extract password to update User, prevent writing to Franchise
+            let passwordUpdate = null;
+            if (updates.password) {
+                passwordUpdate = updates.password;
+            }
+            delete updates.password;
+
             updatedFranchise = await FoodFranchise.findByIdAndUpdate(
                 id,
                 { $set: updates },
@@ -253,21 +273,51 @@ export const updateFranchise = async (req, res) => {
                 throw Object.assign(new Error('Franchise not found'), { statusCode: 404 });
             }
 
-            // Sync the franchise admin's User.isActive when franchise is toggled
-            if (updates.isActive !== undefined && updatedFranchise.ownerUserId) {
-                await User.updateOne(
-                    { _id: updatedFranchise.ownerUserId },
-                    { $set: { isActive: updates.isActive } },
-                    { session }
-                );
+            // Sync User and Profile records for the Franchise Admin
+            if (updatedFranchise.ownerUserId) {
+                const userId = updatedFranchise.ownerUserId;
+                
+                // 1. Update User (auth)
+                const userUpdates = {};
+                if (updates.email) userUpdates.email = String(updates.email).trim().toLowerCase();
+                if (updates.phone) userUpdates.mobile = String(updates.phone).trim();
+                if (updates.isActive !== undefined) userUpdates.isActive = updates.isActive;
+                
+                if (Object.keys(userUpdates).length > 0) {
+                    await User.updateOne({ _id: userId }, { $set: userUpdates }, { session });
+                }
 
-                // Also sync the UserRole status
-                const newRoleStatus = updates.isActive ? 'ACTIVE' : 'SUSPENDED';
-                await UserRole.updateMany(
-                    { franchiseId: id },
-                    { $set: { status: newRoleStatus } },
-                    { session }
-                );
+                // If password was updated, use save() to trigger bcrypt hash hook
+                if (passwordUpdate) {
+                    const userDoc = await User.findById(userId).session(session);
+                    if (userDoc) {
+                        userDoc.password = passwordUpdate;
+                        await userDoc.save({ session });
+                    }
+                }
+
+                // 2. Update Profile (personal data)
+                const profileUpdates = {};
+                if (updates.ownerName) {
+                    const nameParts = String(updates.ownerName || '').trim().split(/\s+/);
+                    profileUpdates.firstName = nameParts[0] || '';
+                    profileUpdates.lastName = nameParts.slice(1).join(' ') || '';
+                }
+                if (updates.phone) profileUpdates.phone = String(updates.phone).trim();
+                
+                if (Object.keys(profileUpdates).length > 0) {
+                    await Profile.updateOne({ userId }, { $set: profileUpdates }, { session });
+                }
+
+                // 3. Sync UserRole status if isActive changed
+                if (updates.isActive !== undefined) {
+                    const newRoleStatus = updates.isActive ? 'ACTIVE' : 'SUSPENDED';
+                    await UserRole.updateMany(
+                        { franchiseId: id },
+                        { $set: { status: newRoleStatus } },
+                        { session }
+                    );
+                }
             }
         });
 

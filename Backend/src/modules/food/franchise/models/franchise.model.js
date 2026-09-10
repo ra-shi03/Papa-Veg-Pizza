@@ -30,7 +30,17 @@ const franchiseSchema = new mongoose.Schema(
             trim: true,
             default: ''
         },
+        panNumber: {
+            type: String,
+            trim: true,
+            default: ''
+        },
         address: {
+            type: String,
+            trim: true,
+            default: ''
+        },
+        pincode: {
             type: String,
             trim: true,
             default: ''

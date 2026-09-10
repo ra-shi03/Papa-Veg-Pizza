@@ -48,26 +48,32 @@ export async function updateBusinessSettings(req, res, next) {
         const s_supportPhone = String(supportPhone || "").trim();
         const s_supportHours = String(supportHours || "").trim();
 
-        // Validation
-        if (!s_companyName || s_companyName.length < 2 || s_companyName.length > 50) {
-            return res.status(400).json({ success: false, message: 'Company name must be between 2 and 50 characters' });
+        // Validation - only validate if the field is explicitly provided in the payload
+        if (companyName !== undefined) {
+            if (!s_companyName || s_companyName.length < 2 || s_companyName.length > 50) {
+                return res.status(400).json({ success: false, message: 'Company name must be between 2 and 50 characters' });
+            }
         }
-        if (!s_email || s_email.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s_email)) {
-            return res.status(400).json({ success: false, message: 'Invalid email address (max 100 characters)' });
+        if (email !== undefined) {
+            if (!s_email || s_email.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s_email)) {
+                return res.status(400).json({ success: false, message: 'Invalid email address (max 100 characters)' });
+            }
         }
-        if (!s_phoneNumber || !/^\d{7,15}$/.test(s_phoneNumber)) {
-            return res.status(400).json({ success: false, message: 'Invalid phone number (7-15 digits required)' });
+        if (phoneNumber !== undefined) {
+            if (!s_phoneNumber || !/^\d{7,15}$/.test(s_phoneNumber)) {
+                return res.status(400).json({ success: false, message: 'Invalid phone number (7-15 digits required)' });
+            }
         }
-        if (s_address && s_address.length > 250) {
+        if (address !== undefined && s_address.length > 250) {
             return res.status(400).json({ success: false, message: 'Address is too long (max 250 characters)' });
         }
-        if (s_state && s_state.length > 50) {
+        if (state !== undefined && s_state.length > 50) {
             return res.status(400).json({ success: false, message: 'State name is too long (max 50 characters)' });
         }
-        if (s_pincode && !/^\d{4,10}$/.test(s_pincode)) {
+        if (pincode !== undefined && s_pincode && !/^\d{4,10}$/.test(s_pincode)) {
             return res.status(400).json({ success: false, message: 'Invalid pincode (4-10 digits required)' });
         }
-        if (s_supportEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s_supportEmail)) {
+        if (supportEmail !== undefined && s_supportEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s_supportEmail)) {
             return res.status(400).json({ success: false, message: 'Invalid support email address' });
         }
 
@@ -76,22 +82,25 @@ export async function updateBusinessSettings(req, res, next) {
             settings = new FoodBusinessSettings();
         }
 
-        if (s_companyName) settings.companyName = s_companyName;
-        if (s_email) settings.email = s_email;
-        if (phoneCountryCode || s_phoneNumber) {
+        if (companyName !== undefined) settings.companyName = s_companyName;
+        if (email !== undefined) settings.email = s_email;
+        if (phoneCountryCode !== undefined || phoneNumber !== undefined) {
             settings.phone = {
-                countryCode: String(phoneCountryCode || settings.phone?.countryCode || '+91').trim(),
-                number: s_phoneNumber || settings.phone?.number || ''
+                countryCode: phoneCountryCode !== undefined ? String(phoneCountryCode).trim() : settings.phone?.countryCode || '+91',
+                number: phoneNumber !== undefined ? s_phoneNumber : settings.phone?.number || ''
             };
         }
         if (address !== undefined) settings.address = s_address;
         if (state !== undefined) settings.state = s_state;
         if (pincode !== undefined) settings.pincode = s_pincode;
-        if (region) settings.region = String(region).trim();
-        
+        if (region !== undefined) settings.region = String(region).trim();
         if (supportEmail !== undefined) settings.supportEmail = s_supportEmail;
         if (supportPhone !== undefined) settings.supportPhone = s_supportPhone;
         if (supportHours !== undefined) settings.supportHours = s_supportHours;
+        if (data.primaryColor !== undefined) settings.primaryColor = data.primaryColor;
+        if (data.secondaryColor !== undefined) settings.secondaryColor = data.secondaryColor;
+        if (data.themeMode !== undefined) settings.themeMode = data.themeMode;
+        if (data.accentColor !== undefined) settings.accentColor = data.accentColor;
 
         // Handle file uploads
         if (req.files) {

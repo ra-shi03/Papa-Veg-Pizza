@@ -14,7 +14,25 @@ const schema = z.object({
     profileImage: z.string().max(2000).optional(),
     dateOfBirth: isoDate.optional(),
     anniversary: isoDate.optional(),
-    gender: genderEnum.optional()
+    gender: genderEnum.optional(),
+    alternatePhone: z.string().max(30).optional(),
+    addressLine1: z.string().max(300).optional(),
+    addressLine2: z.string().max(300).optional(),
+    city: z.string().max(100).optional(),
+    state: z.string().max(100).optional(),
+    country: z.string().max(100).optional(),
+    pincode: z.string().max(20).optional(),
+    language: z.string().max(50).optional(),
+    timezone: z.string().max(100).optional(),
+    preferences: z.object({
+        theme: z.enum(["LIGHT", "DARK", "SYSTEM"]).optional(),
+        notifications: z.object({
+            email: z.boolean().optional(),
+            sms: z.boolean().optional(),
+            push: z.boolean().optional()
+        }).optional(),
+        currency: z.string().max(10).optional()
+    }).optional()
 });
 
 export const validateUserProfileUpdateDto = (body) => {

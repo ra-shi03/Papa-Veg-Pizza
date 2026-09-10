@@ -151,6 +151,8 @@ export const notificationAPI = {
 
 /** Admin API - new backend only (GET /auth/me, PATCH /auth/admin/profile, POST /auth/admin/change-password) */
 export const adminAPI = {
+  getFranchises: (params = {}) => adminClient.get("/food/admin/franchises", { params }),
+  getFranchiseById: (id) => adminClient.get(`/food/admin/franchises/${id}`),
   getSidebarBadges: () =>
     adminClient.get("/food/admin/sidebar-badges"),
   getStores: (params = {}) => adminClient.get("/stores", { params }),
