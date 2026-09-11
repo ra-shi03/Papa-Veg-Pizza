@@ -7,7 +7,7 @@ import {
   AlertTriangle, ArrowRight, Smartphone
 } from "lucide-react"
 import { adminAPI } from "@food/api"
-import { clearModuleAuth } from "@food/utils/auth"
+import { clearModuleAuth, getModuleRefreshToken } from "@food/utils/auth"
 import { toast } from "sonner"
 import { useSystemTheme } from "@/shared/utils/themeSync"
 
@@ -52,9 +52,24 @@ export default function Navbar({ onToggleSidebar }) {
 
   // Session Data & Logs
   const [adminData, setAdminData] = useState(null)
+  const [franchiseData, setFranchiseData] = useState(null)
   const [notifications, setNotifications] = useState([])
   const [notificationTab, setNotificationTab] = useState("all") 
   const [newOrdersCount, setNewOrdersCount] = useState(4)
+
+  const handleConfirmLogout = async () => {
+    try {
+      const token = getModuleRefreshToken("franchise-admin")
+      if (token) {
+        await adminAPI.logout(token).catch(() => null)
+      }
+    } catch (err) {
+      console.error("Logout error", err)
+    } finally {
+      clearModuleAuth("franchise-admin")
+      navigate("/franchise-admin/login", { replace: true })
+    }
+  }
 
   // Store List
   const [storeList, setStoreList] = useState([
@@ -98,6 +113,30 @@ export default function Navbar({ onToggleSidebar }) {
       setAdminData({ name: "Shubham Jamliya", email: "shubham@papavegpizza.com" })
     }
 
+    const fetchFranchiseData = async () => {
+      try {
+        const response = await adminAPI.getMyFranchise()
+        if (response?.data?.data?.franchise) {
+          setFranchiseData(response.data.data.franchise)
+        }
+      } catch (err) {
+        console.error("Failed to fetch franchise data", err)
+      }
+    }
+    fetchFranchiseData()
+
+    const fetchStores = async () => {
+      try {
+        const response = await adminAPI.getStores()
+        if (response?.data?.data) {
+          setStoreList(response.data.data)
+        }
+      } catch (err) {
+        console.error("Failed to fetch stores data", err)
+      }
+    }
+    fetchStores()
+
     const savedSearches = localStorage.getItem("admin_recent_searches")
     if (savedSearches) {
       setRecentSearches(JSON.parse(savedSearches))
@@ -116,13 +155,6 @@ export default function Navbar({ onToggleSidebar }) {
     } else {
       setNotifications(defaultNotifications)
       localStorage.setItem("franchise_notifications", JSON.stringify(defaultNotifications))
-    }
-
-    const localStores = localStorage.getItem("franchise_stores")
-    if (localStores) {
-      setStoreList(JSON.parse(localStores))
-    } else {
-      localStorage.setItem("franchise_stores", JSON.stringify(storeList))
     }
   }, [])
 
@@ -369,9 +401,10 @@ export default function Navbar({ onToggleSidebar }) {
           <div className="flex items-center gap-3">
             <span 
               onClick={() => navigate("/franchise-admin/dashboard")}
-              className="text-xs font-black tracking-wider text-zinc-900 dark:text-white uppercase cursor-pointer select-none hover:text-[var(--primary)] transition-colors"
+              className="text-xs font-black tracking-wider text-zinc-900 dark:text-white uppercase cursor-pointer select-none hover:text-[var(--primary)] transition-colors truncate max-w-[150px]"
+              title={franchiseData?.name || "PAPA VEG PIZZA"}
             >
-              PAPA VEG PIZZA
+              {franchiseData?.name || "PAPA VEG PIZZA"}
             </span>
             <span className="text-[10px] text-zinc-300 dark:text-zinc-700">|</span>
             
@@ -387,7 +420,7 @@ export default function Navbar({ onToggleSidebar }) {
                 }}
                 className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors cursor-pointer"
               >
-                <span>{selectedStore === "All Stores" ? "Bhopal & Indore" : selectedStore}</span>
+                <span>{selectedStore}</span>
                 <ChevronDown size={10} className={`text-zinc-400 transition-transform duration-150 ${showStoreDropdown ? "rotate-180" : ""}`} />
               </button>
 
@@ -401,20 +434,22 @@ export default function Navbar({ onToggleSidebar }) {
                   >
                     All Stores
                   </button>
-                  {storeList.map((store) => (
+                  {storeList.map((store) => {
+                    const displayName = store.territoryId?.name || store.territory?.name || store.territoryName || store.name;
+                    return (
                     <button
-                      key={store.id}
+                      key={store.id || store._id}
                       onClick={() => {
-                        setSelectedStore(store.name)
+                        setSelectedStore(displayName)
                         setShowStoreDropdown(false)
                       }}
                       className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors ${
-                        selectedStore === store.name ? "text-[var(--primary)] bg-zinc-50 dark:bg-zinc-800/50" : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                        selectedStore === displayName ? "text-[var(--primary)] bg-zinc-50 dark:bg-zinc-800/50" : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800"
                       }`}
                     >
-                      {store.name}
+                      {displayName}
                     </button>
-                  ))}
+                  )})}
                 </div>
               )}
             </div>
@@ -422,100 +457,7 @@ export default function Navbar({ onToggleSidebar }) {
           </div>
         </div>
 
-        {/* MIDDLE SECTION: Clean Search Input */}
-        <div ref={searchRef} className="flex-1 max-w-[280px] mx-4 relative hidden md:block z-50">
-          <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-            <input
-              id="global-search-input"
-              type="text"
-              placeholder="Search..."
-              value={searchVal}
-              onChange={(e) => setSearchVal(e.target.value)}
-              onFocus={() => setShowRecent(true)}
-              className="w-full pl-8.5 pr-8 py-1.5 text-xs bg-zinc-50 dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-xl text-zinc-800 dark:text-zinc-100 outline-none focus:border-zinc-300 dark:focus:border-zinc-700 transition-all font-semibold placeholder-zinc-400"
-            />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
-              {searchVal ? (
-                <button onClick={() => setSearchVal("")} className="text-zinc-450 hover:text-[var(--primary)]">
-                  <X size={12} />
-                </button>
-              ) : (
-                <kbd className="hidden lg:inline-block text-[8px] font-bold text-zinc-400 dark:text-zinc-500 bg-zinc-200/40 dark:bg-zinc-800 px-1 py-0.5 rounded">
-                  ⌘K
-                </kbd>
-              )}
-            </div>
-          </div>
-
-          {/* Search Dropdown */}
-          {showRecent && (
-            <div className="absolute top-full left-0 w-full mt-1.5 bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-2xl shadow-xl p-2.5 z-50 max-h-[300px] overflow-y-auto scrollbar-thin">
-              {searchVal.trim() === "" ? (
-                <div>
-                  <div className="flex justify-between items-center pb-1.5 border-b border-zinc-100 dark:border-zinc-800 mb-1">
-                    <span className="text-[9px] font-bold uppercase text-zinc-450 tracking-wider">Recent Searches</span>
-                    {recentSearches.length > 0 && (
-                      <button onClick={() => { setRecentSearches([]); localStorage.removeItem("admin_recent_searches"); }} className="text-[9px] font-bold text-[var(--primary)] hover:underline">Clear</button>
-                    )}
-                  </div>
-                  {recentSearches.length > 0 ? (
-                    recentSearches.map((item, idx) => (
-                      <div
-                        key={idx}
-                        onClick={() => setSearchVal(item)}
-                        className="flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-semibold text-zinc-650 dark:text-zinc-350 hover:bg-zinc-50 dark:hover:bg-zinc-850 cursor-pointer transition-colors"
-                      >
-                        <span className="truncate">{item}</span>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            const updated = recentSearches.filter(s => s !== item)
-                            setRecentSearches(updated)
-                            localStorage.setItem("admin_recent_searches", JSON.stringify(updated))
-                          }}
-                          className="text-zinc-400 hover:text-[var(--primary)]"
-                        >
-                          <Trash2 size={11} />
-                        </button>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-4 text-zinc-400 text-xs">No recent searches</div>
-                  )}
-                </div>
-              ) : (
-                <div>
-                  <div className="pb-1.5 border-b border-zinc-100 dark:border-zinc-800 mb-1">
-                    <span className="text-[9px] font-bold uppercase text-zinc-450 tracking-wider">Results ({searchResults.length})</span>
-                  </div>
-                  {searchResults.length > 0 ? (
-                    <div className="space-y-1">
-                      {searchResults.map((item) => (
-                        <div
-                          key={item.id}
-                          onClick={() => {
-                            setShowRecent(false)
-                            navigate(item.route)
-                          }}
-                          className="flex items-center justify-between p-2 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-850/50 cursor-pointer text-xs"
-                        >
-                          <div className="min-w-0 pr-2">
-                            <p className="font-bold text-zinc-800 dark:text-zinc-200 truncate">{item.name}</p>
-                            <p className="text-[9px] text-zinc-400 uppercase font-semibold">{item.type} • {item.id}</p>
-                          </div>
-                          <span className="text-[9px] font-bold text-zinc-500">{item.status}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-4 text-zinc-400 text-xs">No results found</div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        {/* MIDDLE SECTION: Clean Search Input Removed */}
 
         {/* RIGHT SECTION: Simple Actions & Indicators */}
         <div className="flex items-center gap-3 shrink-0 text-xs font-bold text-zinc-650 dark:text-zinc-300">
@@ -601,55 +543,7 @@ export default function Navbar({ onToggleSidebar }) {
 
           <span className="text-zinc-200 dark:text-zinc-800">|</span>
 
-          {/* Minimal Quick Actions Trigger (Plain inline plus icon button) */}
-          <div className="relative">
-            <button
-              onClick={() => {
-                setShowActionsDropdown(!showActionsDropdown)
-                setShowStoreDropdown(false)
-                setShowDateDropdown(false)
-                setShowNotifications(false)
-                setShowProfileMenu(false)
-              }}
-              className="p-1 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-150 transition-colors cursor-pointer"
-              title="Quick Actions"
-            >
-              <Plus size={18} />
-            </button>
-
-            {showActionsDropdown && (
-              <div className="absolute right-0 mt-2 w-44 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 shadow-xl py-1.5 z-50 animate-in fade-in duration-100">
-                <button
-                  onClick={() => { setShowAddStoreModal(true); setShowActionsDropdown(false); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-left text-zinc-650 dark:text-zinc-300"
-                >
-                  <Store size={13} className="text-zinc-450" />
-                  <span>Add Store</span>
-                </button>
-                <button
-                  onClick={() => { navigate("/franchise-admin/coupons"); setShowActionsDropdown(false); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-left text-zinc-650 dark:text-zinc-300"
-                >
-                  <Megaphone size={13} className="text-zinc-450" />
-                  <span>Create Coupon</span>
-                </button>
-                <button
-                  onClick={() => { setShowBroadcastModal(true); setShowActionsDropdown(false); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-left text-zinc-650 dark:text-zinc-300"
-                >
-                  <Bell size={13} className="text-zinc-450" />
-                  <span>Broadcast Alert</span>
-                </button>
-                <button
-                  onClick={() => { navigate("/franchise-admin/reports"); setShowActionsDropdown(false); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-left text-zinc-650 dark:text-zinc-300 border-t border-zinc-100 dark:border-zinc-800 mt-1 pt-1"
-                >
-                  <BarChart3 size={13} className="text-zinc-450" />
-                  <span>Generate Report</span>
-                </button>
-              </div>
-            )}
-          </div>
+          {/* Minimal Quick Actions Trigger Removed */}
 
           {/* Notifications Trigger */}
           <div className="relative">
@@ -768,9 +662,11 @@ export default function Navbar({ onToggleSidebar }) {
                   />
                 ) : (
                   <span className="text-[10px] font-black text-zinc-700">
-                    {adminData?.name
-                      ? adminData.name.split(" ").map(n => n[0]).join("").toUpperCase().substring(0, 2)
-                      : "FA"}
+                    {franchiseData?.ownerName
+                      ? franchiseData.ownerName.split(" ").map(n => n[0]).join("").toUpperCase().substring(0, 2)
+                      : (adminData?.name
+                        ? adminData.name.split(" ").map(n => n[0]).join("").toUpperCase().substring(0, 2)
+                        : "FA")}
                   </span>
                 )}
               </div>
@@ -779,8 +675,8 @@ export default function Navbar({ onToggleSidebar }) {
             {showProfileMenu && (
               <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 shadow-xl py-1.5 z-50 animate-in fade-in duration-100 text-xs font-bold text-zinc-700 dark:text-zinc-300">
                 <div className="px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 mb-1.5">
-                  <p className="text-xs font-black text-zinc-900 dark:text-white leading-tight">{adminData?.name || "Shubham Jamliya"}</p>
-                  <p className="text-[9px] text-zinc-400 truncate mt-0.5">{adminData?.email || "shubham@papavegpizza.com"}</p>
+                  <p className="text-xs font-black text-zinc-900 dark:text-white leading-tight">{franchiseData?.ownerName || adminData?.name || "Shubham Jamliya"}</p>
+                  <p className="text-[9px] text-zinc-400 truncate mt-0.5">{franchiseData?.email || adminData?.email || "shubham@papavegpizza.com"}</p>
                 </div>
                 
                 {/* Theme Selector Inside Profile Dropdown */}
@@ -789,8 +685,7 @@ export default function Navbar({ onToggleSidebar }) {
                   <div className="flex gap-1 border border-zinc-200 dark:border-zinc-800 p-0.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 scale-90 origin-right">
                     {[
                       { id: "light", icon: <Sun size={10} /> },
-                      { id: "dark", icon: <Moon size={10} /> },
-                      { id: "system", icon: <Laptop size={10} /> }
+                      { id: "dark", icon: <Moon size={10} /> }
                     ].map(t => (
                       <button
                         key={t.id}
@@ -812,27 +707,7 @@ export default function Navbar({ onToggleSidebar }) {
                   <User size={13} className="text-zinc-450" />
                   <span>My Profile</span>
                 </button>
-                <button
-                  onClick={() => { setShowProfileMenu(false); navigate("/franchise-admin/dashboard/settings"); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-850 text-left text-zinc-650 dark:text-zinc-300"
-                >
-                  <SettingsIcon size={13} className="text-zinc-450" />
-                  <span>Settings</span>
-                </button>
-                <button
-                  onClick={() => { setShowProfileMenu(false); setShowSecurityModal(true); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-850 text-left text-zinc-650 dark:text-zinc-300"
-                >
-                  <Shield size={13} className="text-zinc-450" />
-                  <span>Security settings</span>
-                </button>
-                <button
-                  onClick={() => { setShowProfileMenu(false); setShowActivityModal(true); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-850 text-left text-zinc-650 dark:text-zinc-300"
-                >
-                  <Activity size={13} className="text-zinc-450" />
-                  <span>Activity Logs</span>
-                </button>
+                {/* Settings/Security options removed per user request */}
                 <div className="border-t border-zinc-100 dark:border-zinc-800 my-1"></div>
                 <button
                   onClick={() => { setShowProfileMenu(false); setShowLogoutModal(true); }}
@@ -852,200 +727,7 @@ export default function Navbar({ onToggleSidebar }) {
           MODALS & WORKFLOWS (Invisible in flow, loaded when active)
          ---------------------------------------------------- */}
 
-      {/* 1. ADD STORE MODAL */}
-      {showAddStoreModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-[2rem] border border-zinc-150 dark:border-zinc-800 max-w-md w-full overflow-hidden shadow-2xl animate-in zoom-in-95 duration-100 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-            <div className="px-6 py-4.5 bg-zinc-50 dark:bg-zinc-950 border-b border-zinc-100 dark:border-zinc-850 flex justify-between items-center">
-              <div>
-                <h3 className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <Store size={15} className="text-[var(--primary)]" />
-                  Create Franchise Store
-                </h3>
-              </div>
-              <button onClick={() => setShowAddStoreModal(false)} className="p-1 bg-zinc-100 dark:bg-zinc-800 rounded-full hover:bg-[var(--primary)]/10 hover:text-[var(--primary)] dark:hover:bg-rose-950/20 transition-colors">
-                <X size={12} />
-              </button>
-            </div>
-            
-            <form onSubmit={handleAddStoreSubmit} className="p-5 space-y-3.5">
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold uppercase text-zinc-500">Store Name *</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Papa Veg Pizza Indore Central"
-                  required
-                  value={storeForm.name}
-                  onChange={(e) => setStoreForm({ ...storeForm, name: e.target.value })}
-                  className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-xl text-zinc-800 dark:text-zinc-105 outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold uppercase text-zinc-500">Location City</label>
-                <select
-                  value={storeForm.location}
-                  onChange={(e) => setStoreForm({ ...storeForm, location: e.target.value })}
-                  className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-xl text-zinc-855 dark:text-zinc-300 outline-none"
-                >
-                  <option value="Indore">Indore</option>
-                  <option value="Bhopal">Bhopal</option>
-                  <option value="Ujjain">Ujjain</option>
-                  <option value="Gwalior">Gwalior</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold uppercase text-zinc-500">Full Address *</label>
-                <textarea
-                  placeholder="e.g. G-1, Golden Trade Center, Rajendra Nagar"
-                  required
-                  rows={2}
-                  value={storeForm.address}
-                  onChange={(e) => setStoreForm({ ...storeForm, address: e.target.value })}
-                  className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-xl text-zinc-800 dark:text-zinc-100 outline-none focus:ring-2 focus:ring-[var(--primary)]/20 resize-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold uppercase text-zinc-500">Store Manager *</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Ramesh Chandra"
-                  required
-                  value={storeForm.manager}
-                  onChange={(e) => setStoreForm({ ...storeForm, manager: e.target.value })}
-                  className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-955 border border-zinc-200 dark:border-zinc-850 rounded-xl text-zinc-800 dark:text-zinc-100 outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold uppercase text-zinc-500">Operating Hours</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 11:00 AM - 11:00 PM"
-                  value={storeForm.hours}
-                  onChange={(e) => setStoreForm({ ...storeForm, hours: e.target.value })}
-                  className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-955 border border-zinc-200 dark:border-zinc-850 rounded-xl text-zinc-800 dark:text-zinc-100 outline-none"
-                />
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddStoreModal(false)}
-                  className="flex-1 py-2.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold rounded-xl transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 bg-[var(--primary)] hover:opacity-90 text-white font-bold rounded-xl"
-                >
-                  Create Store
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 2. BROADCAST MODAL */}
-      {showBroadcastModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-[2rem] border border-zinc-150 dark:border-zinc-800 max-w-md w-full overflow-hidden shadow-2xl animate-in zoom-in-95 duration-100 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-            <div className="px-6 py-4.5 bg-zinc-50 dark:bg-zinc-955 border-b border-zinc-100 dark:border-zinc-855 flex justify-between items-center">
-              <div>
-                <h3 className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <Megaphone size={15} className="text-[var(--primary)]" />
-                  Broadcast Alert Notification
-                </h3>
-              </div>
-              <button onClick={() => setShowBroadcastModal(false)} className="p-1 bg-zinc-100 dark:bg-zinc-800 rounded-full hover:bg-[var(--primary)]/10 hover:text-[var(--primary)] dark:hover:bg-rose-950/20 transition-colors">
-                <X size={12} />
-              </button>
-            </div>
-            
-            <form onSubmit={handleBroadcastSubmit} className="p-5 space-y-3.5">
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold uppercase text-zinc-500">Alert Title *</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Critical stock delay"
-                  required
-                  value={broadcastForm.title}
-                  onChange={(e) => setBroadcastForm({ ...broadcastForm, title: e.target.value })}
-                  className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-xl text-zinc-800 dark:text-zinc-100 outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold uppercase text-zinc-500">Target Stores</label>
-                <select
-                  value={broadcastForm.targetStore}
-                  onChange={(e) => setBroadcastForm({ ...broadcastForm, targetStore: e.target.value })}
-                  className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-xl text-zinc-855 dark:text-zinc-300 outline-none"
-                >
-                  <option value="All Stores">All Stores</option>
-                  {storeList.map(s => (
-                    <option key={s.id} value={s.name}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold uppercase text-zinc-500">Broadcast message *</label>
-                <textarea
-                  placeholder="Type the message to broadcast to terminals..."
-                  required
-                  rows={3}
-                  value={broadcastForm.message}
-                  onChange={(e) => setBroadcastForm({ ...broadcastForm, message: e.target.value })}
-                  className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-xl text-zinc-800 dark:text-zinc-100 outline-none focus:ring-2 focus:ring-[var(--primary)]/20 resize-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold uppercase text-zinc-500">Alert Priority</label>
-                <div className="grid grid-cols-3 gap-2 mt-1">
-                  {["low", "medium", "high"].map((prio) => (
-                    <button
-                      key={prio}
-                      type="button"
-                      onClick={() => setBroadcastForm({ ...broadcastForm, priority: prio })}
-                      className={`py-2 text-[10px] font-bold uppercase rounded-xl border text-center transition-all ${
-                        broadcastForm.priority === prio
-                          ? prio === "high" ? "bg-[var(--primary)]/10 border-rose-300 text-[var(--primary)]-hover dark:bg-rose-955" : 
-                            prio === "medium" ? "bg-amber-50 border-amber-300 text-amber-600 dark:bg-amber-955" : 
-                            "bg-emerald-50 border-emerald-300 text-emerald-600 dark:bg-emerald-955"
-                          : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-500"
-                      }`}
-                    >
-                      {prio}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowBroadcastModal(false)}
-                  className="flex-1 py-2.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold rounded-xl transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 bg-[var(--primary)] hover:opacity-90 text-white font-bold rounded-xl"
-                >
-                  Broadcast
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Add Store & Broadcast modals removed per request */}
 
       {/* 3. LOGOUT CONFIRMATION MODAL */}
       {showLogoutModal && (
@@ -1078,125 +760,7 @@ export default function Navbar({ onToggleSidebar }) {
         </div>
       )}
 
-      {/* 4. SECURITY SETTINGS MODAL */}
-      {showSecurityModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-[2rem] border border-zinc-150 dark:border-zinc-800 max-w-md w-full overflow-hidden shadow-2xl animate-in zoom-in-95 duration-100 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-            <div className="px-6 py-4.5 bg-zinc-50 dark:bg-zinc-955 border-b border-zinc-100 dark:border-zinc-850 flex justify-between items-center">
-              <div>
-                <h3 className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <Shield size={15} className="text-[var(--primary)]" />
-                  Security Settings
-                </h3>
-              </div>
-              <button onClick={() => setShowSecurityModal(false)} className="p-1 bg-zinc-100 dark:bg-zinc-800 rounded-full hover:bg-[var(--primary)]/10 hover:text-[var(--primary)] dark:hover:bg-rose-950/20 transition-colors">
-                <X size={12} />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4">
-              <div className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-850 rounded-xl">
-                <div>
-                  <p className="font-bold text-zinc-900 dark:text-white text-xs">Two-Factor Authentication (2FA)</p>
-                  <p className="text-[9px] text-zinc-400 mt-0.5 leading-relaxed">Secure your administrative login with Authenticator OTP.</p>
-                </div>
-                <div className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" defaultChecked className="sr-only peer" />
-                  <div className="w-8 h-4 bg-zinc-200 dark:bg-zinc-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[var(--primary)]"></div>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-[9px] font-bold uppercase text-zinc-500 tracking-wider mb-1.5">Connected Devices</p>
-                <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
-                  <div className="flex items-center justify-between p-2 border border-zinc-100 dark:border-zinc-850 rounded-lg">
-                    <div>
-                      <p className="font-bold text-[11px] text-zinc-800 dark:text-zinc-200">iPhone 15 Pro • Indore</p>
-                      <p className="text-[9px] text-zinc-400">Vite Browser client • Active now</p>
-                    </div>
-                    <span className="text-[8px] bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20 dark:text-emerald-400 px-1.5 py-0.5 rounded font-bold border border-emerald-100 dark:border-emerald-900/30">THIS DEVICE</span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-2 border border-zinc-100 dark:border-zinc-850 rounded-lg">
-                    <div>
-                      <p className="font-bold text-[11px] text-zinc-800 dark:text-zinc-200">Windows PC • Bhopal</p>
-                      <p className="text-[9px] text-zinc-400">Chrome Client • Last active 2 hrs ago</p>
-                    </div>
-                    <button className="text-[9px] font-bold text-[var(--primary)] hover:underline">REVOKE</button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowSecurityModal(false)}
-                  className="flex-1 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold rounded-xl hover:bg-zinc-200 transition-all"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 5. ACTIVITY LOGS MODAL */}
-      {showActivityModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-[2rem] border border-zinc-150 dark:border-zinc-800 max-w-lg w-full overflow-hidden shadow-2xl animate-in zoom-in-95 duration-100 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-            <div className="px-6 py-4.5 bg-zinc-50 dark:bg-zinc-955 border-b border-zinc-100 dark:border-zinc-850 flex justify-between items-center">
-              <div>
-                <h3 className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <Activity size={15} className="text-[var(--primary)]" />
-                  Administrative Audit Logs
-                </h3>
-              </div>
-              <button onClick={() => setShowActivityModal(false)} className="p-1 bg-zinc-100 dark:bg-zinc-800 rounded-full hover:bg-[var(--primary)]/10 hover:text-[var(--primary)] dark:hover:bg-rose-950/20 transition-colors">
-                <X size={12} />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-3.5">
-              <div className="border border-zinc-100 dark:border-zinc-850 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-zinc-50 dark:bg-zinc-950 text-[9px] font-black uppercase text-zinc-400 tracking-wider border-b border-zinc-100 dark:border-zinc-850">
-                    <tr>
-                      <th className="px-3 py-2">Security Event</th>
-                      <th className="px-3 py-2">Store Node</th>
-                      <th className="px-3 py-2 text-right">Timestamp</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-850 text-zinc-650 dark:text-zinc-400 font-medium">
-                    {[
-                      { event: "Coupon Code Created (NEWYEAR50)", node: "Indore Central", time: "Just now" },
-                      { event: "Inventory Threshold Updated (Cheese)", node: "Indore Central", time: "15 mins ago" },
-                      { event: "Admin Login Approved", node: "Bhopal Zone", time: "1 hr ago" }
-                    ].map((log, idx) => (
-                      <tr key={idx} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-850/25 transition-colors">
-                        <td className="px-3 py-2 font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-1">
-                          <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
-                          {log.event}
-                        </td>
-                        <td className="px-3 py-2">{log.node}</td>
-                        <td className="px-3 py-2 text-right text-[9px] font-mono text-zinc-450">{log.time}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowActivityModal(false)}
-                  className="flex-1 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold rounded-xl hover:bg-zinc-200 transition-all text-center"
-                >
-                  Close Logs
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Activity and Security Modals removed per request */}
     </>
   )
 }

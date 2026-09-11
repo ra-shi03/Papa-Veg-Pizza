@@ -45,7 +45,7 @@ export default function FranchiseList() {
         const zones = zonRes.data.data || [];
 
         const data = franRes.data.data.map(f => {
-          const regionName = regions.find(r => r.id === f.regionId || r._id === f.regionId)?.name || f.regionId;
+          const regionName = typeof f.regionId === 'object' ? f.regionId?.name : (regions.find(r => r.id === f.regionId || r._id === f.regionId)?.name || f.regionId);
           const zoneName = zones.find(z => z.id === f.zoneId || z._id === f.zoneId)?.name || f.zoneId;
 
           return {
@@ -57,7 +57,7 @@ export default function FranchiseList() {
             franchiseName: f.name,
             city: f.city,
             state: f.state,
-            regionId: f.regionId,
+            regionId: typeof f.regionId === 'object' ? f.regionId?._id : f.regionId,
             zoneId: f.zoneId,
             regionName,
             zoneName,
@@ -71,6 +71,10 @@ export default function FranchiseList() {
             }),
             franchiseDuration: f.franchiseDuration,
             gstNumber: f.gstNumber,
+            panNumber: f.panNumber,
+            pincode: f.pincode,
+            territoryId: f.territoryId,
+            franchiseCode: f.franchiseCode,
             address: f.address,
             franchiseCost: f.franchiseCost,
             paidAmount: f.paidAmount,

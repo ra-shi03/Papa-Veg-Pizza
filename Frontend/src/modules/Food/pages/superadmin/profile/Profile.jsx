@@ -3,7 +3,7 @@ import { X, User, Mail, Shield, Camera, Loader2, Save } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getCurrentUser, setAuthData, getModuleToken, getModuleRefreshToken } from "@food/utils/auth";
 import { toast } from "sonner";
-// Import your API if there's an update profile endpoint, for now we will simulate or use adminAPI if available.
+import { adminAPI } from "@food/api";
 
 export default function Profile({ onClose }) {
   const [user, setUser] = useState(null);
@@ -16,16 +16,34 @@ export default function Profile({ onClose }) {
   });
 
   useEffect(() => {
-    // Fetch user from auth utils
-    const currentUser = getCurrentUser("admin");
-    if (currentUser) {
-      setUser(currentUser);
-      setFormData({
-        name: currentUser.name || "Global Manager",
-        email: currentUser.email || "manager@papaveg.com",
-        phone: currentUser.phone || "+91 9876543210",
-      });
-    }
+    const fetchProfile = async () => {
+      try {
+        const response = await adminAPI.getCurrentAdmin();
+        const currentUser = response?.data?.admin || response?.data?.user || response?.data?.data?.admin || response?.data?.data?.user;
+        if (currentUser) {
+          setUser(currentUser);
+          setFormData({
+            name: currentUser.name || "Global Manager",
+            email: currentUser.email || "manager@papaveg.com",
+            phone: currentUser.phone || "+91 9876543210",
+          });
+        } else {
+          // Fallback to local storage if API fails or returns null
+          const localUser = getCurrentUser("admin");
+          if (localUser) {
+            setUser(localUser);
+            setFormData({
+              name: localUser.name || "Global Manager",
+              email: localUser.email || "manager@papaveg.com",
+              phone: localUser.phone || "+91 9876543210",
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch admin profile:", err);
+      }
+    };
+    fetchProfile();
   }, []);
 
   const handleChange = (e) => {
@@ -38,10 +56,14 @@ export default function Profile({ onClose }) {
     setLoading(true);
 
     try {
-      // Simulate API call for now. If you have an endpoint, call it here.
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Call real API
+      const response = await adminAPI.updateAdminProfile({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone
+      });
       
-      const updatedUser = { ...user, ...formData };
+      const updatedUser = response?.data?.data || response?.data?.admin || response?.data?.user || { ...user, ...formData };
       const token = getModuleToken("admin");
       const refreshToken = getModuleRefreshToken("admin");
       

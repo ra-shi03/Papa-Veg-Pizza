@@ -2,7 +2,9 @@ import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, User, Mail, Phone, Store, MapPin, Layers, Save, Lock, Clock, Hash, Loader2, LocateFixed } from "lucide-react"
 import apiClient from "../../../../../../services/api/axios"
+import { useJsApiLoader } from "@react-google-maps/api"
 
+const libraries = ["places"];
 // Fetch dynamic data from API
 
 export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
@@ -26,11 +28,21 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
     gstNumber: "",
     panNumber: "",
     pincode: "",
-    address: ""
+    address: "",
+    city: "",
+    state: ""
   })
 
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
+  
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
+    libraries
+  })
+
+  const cityInputRef = React.useRef(null)
+  const stateInputRef = React.useRef(null)
 
   // Geography Data State
   const [regions, setRegions] = useState([]);
@@ -82,11 +94,55 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
         gstNumber: admin.gstNumber || "",
         panNumber: admin.panNumber || "",
         pincode: admin.pincode || "",
-        address: admin.address || ""
+        address: admin.address || "",
+        city: admin.city || "",
+        state: admin.state || ""
       })
       setErrors({})
     }
   }, [admin, isOpen])
+
+  useEffect(() => {
+    if (isLoaded && isOpen) {
+      let cityAutocomplete;
+      let stateAutocomplete;
+      
+      if (cityInputRef.current) {
+        cityAutocomplete = new window.google.maps.places.Autocomplete(cityInputRef.current, {
+          types: ['(cities)'],
+          componentRestrictions: { country: 'in' },
+          fields: ['address_components', 'name']
+        });
+        cityAutocomplete.addListener('place_changed', () => {
+          const place = cityAutocomplete.getPlace();
+          if (place && place.address_components) {
+            const cityInfo = place.name;
+            const stateInfo = place.address_components.find(c => c.types.includes('administrative_area_level_1'))?.long_name || "";
+            setFormData(prev => ({ ...prev, city: cityInfo, state: stateInfo }));
+          }
+        });
+      }
+
+      if (stateInputRef.current) {
+        stateAutocomplete = new window.google.maps.places.Autocomplete(stateInputRef.current, {
+          types: ['administrative_area_level_1'],
+          componentRestrictions: { country: 'in' },
+          fields: ['name']
+        });
+        stateAutocomplete.addListener('place_changed', () => {
+          const place = stateAutocomplete.getPlace();
+          if (place && place.name) {
+            setFormData(prev => ({ ...prev, state: place.name }));
+          }
+        });
+      }
+
+      return () => {
+        if (cityAutocomplete) window.google.maps.event.clearInstanceListeners(cityAutocomplete);
+        if (stateAutocomplete) window.google.maps.event.clearInstanceListeners(stateAutocomplete);
+      }
+    }
+  }, [isLoaded, isOpen])
 
   const validate = () => {
     const newErrors = {}
@@ -136,10 +192,14 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
           if (data && data.address) {
             const addressString = data.display_name;
             const fetchedPincode = data.address.postcode || "";
+            const fetchedCity = data.address.city || data.address.town || data.address.village || "";
+            const fetchedState = data.address.state || "";
             setFormData(prev => ({
               ...prev,
               address: addressString,
-              pincode: fetchedPincode
+              pincode: fetchedPincode,
+              city: fetchedCity,
+              state: fetchedState
             }));
           }
         } catch (error) {
@@ -171,8 +231,6 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
       onSave({
         ...admin,
         ...response.data.data,
-        city: territoryName,
-        state: regionName,
         name: formData.name, // Since the backend stores ownerName, make sure frontend displays correctly
       })
       onClose()
@@ -349,6 +407,37 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
                           value={formData.pincode}
                           onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
                           placeholder="e.g. 452010"
+                          className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all border-zinc-200 dark:border-zinc-800`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">City</label>
+                      <div className="relative">
+                        <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          type="text"
+                          ref={cityInputRef}
+                          value={formData.city}
+                          onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                          placeholder="e.g. Indore"
+                          className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all border-zinc-200 dark:border-zinc-800`}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">State</label>
+                      <div className="relative">
+                        <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          type="text"
+                          ref={stateInputRef}
+                          value={formData.state}
+                          onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                          placeholder="e.g. Madhya Pradesh"
                           className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all border-zinc-200 dark:border-zinc-800`}
                         />
                       </div>

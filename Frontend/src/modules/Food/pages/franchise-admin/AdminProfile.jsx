@@ -125,15 +125,6 @@ export default function AdminProfile() {
   const [passwordErrors, setPasswordErrors] = useState({})
   const [showPasswordSuccess, setShowPasswordSuccess] = useState(false)
 
-  // Security: Two-Factor Auth (Simulated PUT /api/franchise-admin/security)
-  const [twoFactor, setTwoFactor] = useState({
-    enabled: true,
-    method: "email" // 'email' or 'sms'
-  })
-
-  // Security: Sessions state
-  const [sessions, setSessions] = useState([])
-  const [showLogoutAllModal, setShowLogoutAllModal] = useState(false)
 
   // Franchise Information state — superadmin-controlled fields (read-only)
   const [franchiseInfo, setFranchiseInfo] = useState({
@@ -169,17 +160,9 @@ export default function AdminProfile() {
   })
   const [franchiseFieldsLoading, setFranchiseFieldsLoading] = useState(false)
 
-  // Preferences state (Simulated PUT /api/franchise-admin/preferences)
+  // Preferences state
   const [preferences, setPreferences] = useState({
-    themeMode: () => localStorage.getItem("sa_themeMode") || "light",
-    notifications: {
-      email: true,
-      sms: true,
-      push: false
-    },
-    language: "English",
-    timezone: "IST (UTC+05:30)",
-    currency: "INR (₹)"
+    themeMode: "light"
   })
 
 
@@ -221,20 +204,16 @@ export default function AdminProfile() {
             setProfileImage(adminData.profileImage || adminData.profilePhoto)
           }
 
-          if (adminData.preferences) {
-            setPreferences(prev => ({
-              ...prev,
-              themeMode: adminData.preferences.theme?.toLowerCase() || localStorage.getItem("sa_themeMode") || "light",
-              notifications: {
-                email: adminData.preferences.notifications?.email ?? true,
-                sms: adminData.preferences.notifications?.sms ?? false,
-                push: adminData.preferences.notifications?.push ?? false
-              },
-              currency: adminData.preferences.currency || "INR (₹)"
-            }))
+          if (adminData.preferences?.theme) {
+            const t = adminData.preferences.theme.toLowerCase()
+            setPreferences({ themeMode: t })
+            localStorage.setItem("sa_themeMode", t)
+            if (t === "dark") {
+              document.documentElement.classList.add("dark")
+            } else {
+              document.documentElement.classList.remove("dark")
+            }
           }
-          if (adminData.language) setPreferences(p => ({ ...p, language: adminData.language }))
-          if (adminData.timezone) setPreferences(p => ({ ...p, timezone: adminData.timezone }))
         }
 
         // ── Franchise Info from FoodFranchise document ──
@@ -253,7 +232,7 @@ export default function AdminProfile() {
             franchiseCost: fData.franchiseCost ?? 0,
             paidAmount: fData.paidAmount ?? 0,
             dueAmount: fData.dueAmount ?? 0,
-            region: fData.regionId || "",
+            region: [fData.regionName, fData.zoneName, fData.territoryName].filter(Boolean).join(" / ") || fData.regionId || "",
             isActive: fData.isActive ?? true,
             // Editable fields — stored directly on franchise document
             city: fData.city || "",
@@ -270,6 +249,21 @@ export default function AdminProfile() {
             pincode: fData.pincode || "",
             address: fData.address || ""
           })
+          
+          setPersonalInfo(prev => ({
+            ...prev,
+            city: prev.city || fData.city || "",
+            state: prev.state || fData.state || "",
+            pincode: prev.pincode || fData.pincode || "",
+            address: prev.address || fData.address || ""
+          }))
+          setTempPersonalInfo(prev => ({
+            ...prev,
+            city: prev.city || fData.city || "",
+            state: prev.state || fData.state || "",
+            pincode: prev.pincode || fData.pincode || "",
+            address: prev.address || fData.address || ""
+          }))
         }
 
       } catch (err) {
@@ -397,68 +391,31 @@ export default function AdminProfile() {
     toast.success("Profile photo removed")
   }
 
-  // Toggle Two-Factor Settings (PUT /api/franchise-admin/security)
-  const handleToggle2FA = () => {
-    setTwoFactor(prev => {
-      const next = { ...prev, enabled: !prev.enabled }
-      toast.info(`Two-Factor Authentication ${next.enabled ? "Enabled" : "Disabled"}`)
-      return next
-    })
-  }
+  // Toggle Theme (Immediately updates DOM, localStorage, and Backend)
+  const handleThemeToggle = async () => {
+    const newTheme = preferences.themeMode === "light" ? "dark" : "light";
+    
+    // 1. Optimistic UI update
+    setPreferences(prev => ({ ...prev, themeMode: newTheme }));
+    localStorage.setItem("sa_themeMode", newTheme);
+    if (newTheme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+    window.dispatchEvent(new Event("adminNotificationsUpdated"));
 
-  const handle2FAMethodChange = (method) => {
-    setTwoFactor(prev => {
-      const next = { ...prev, method }
-      toast.success(`Default OTP channel set to: ${method.toUpperCase()}`)
-      return next
-    })
-  }
-
-  // Session Management (DELETE /api/franchise-admin/sessions/:id)
-  const handleLogoutSession = (id) => {
-    setSessions(prev => prev.filter(s => s.id !== id))
-    toast.success("Logged out from device successfully")
-  }
-
-  // Bulk Logout Sessions (DELETE /api/franchise-admin/logout-all)
-  const handleLogoutAllSessions = () => {
-    setSessions(prev => prev.filter(s => s.current))
-    setShowLogoutAllModal(false)
-    toast.success("Successfully logged out from all other sessions")
-  }
-
-  // Preferences Change (PUT /api/user/profile)
-  const handleSavePreferences = async () => {
+    // 2. Persist to backend
     try {
-      setLoading(true)
-      const targetTheme = preferences.themeMode === "dark" ? "DARK" : "LIGHT"
       const payload = {
-        language: preferences.language,
-        timezone: preferences.timezone,
         preferences: {
-          theme: targetTheme,
-          notifications: preferences.notifications,
-          currency: preferences.currency
+          theme: newTheme.toUpperCase()
         }
       }
       await adminAPI.updateAdminProfile(payload)
-      
-      const currentTheme = localStorage.getItem("sa_themeMode") || "light"
-      const uiTheme = targetTheme.toLowerCase()
-      if (currentTheme !== uiTheme) {
-        localStorage.setItem("sa_themeMode", uiTheme)
-        if (uiTheme === "dark") {
-          document.documentElement.classList.add("dark")
-        } else {
-          document.documentElement.classList.remove("dark")
-        }
-        window.dispatchEvent(new Event("adminNotificationsUpdated"))
-      }
-      toast.success("Preferences saved successfully")
+      toast.success("Theme preference saved")
     } catch (err) {
-      toast.error("Failed to save preferences")
-    } finally {
-      setLoading(false)
+      toast.error("Failed to save theme preference")
     }
   }
 
@@ -739,139 +696,8 @@ export default function AdminProfile() {
                     </form>
                   </Card>
 
-                  {/* Two Factor Authentication Card */}
-                  <Card>
-                    <div className="flex flex-col gap-4">
-                      <div className="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800 mb-1">
-                        <div className="flex items-center gap-2">
-                          <Shield size={16} className="text-[var(--primary)]" />
-                          <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
-                            Two-Factor Authentication
-                          </h3>
-                        </div>
-                        
-                        {/* Toggle switch */}
-                        <button
-                          onClick={handleToggle2FA}
-                          className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors ${
-                            twoFactor.enabled ? "bg-[var(--primary)]" : "bg-zinc-300 dark:bg-zinc-700"
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                              twoFactor.enabled ? "translate-x-5.5" : "translate-x-1"
-                            }`}
-                          />
-                        </button>
-                      </div>
 
-                      <div className="flex flex-col gap-3">
-                        <p className="text-xs text-slate-600 dark:text-zinc-300 font-semibold">
-                          Secure your account login by requiring an OTP sent directly to your registered contact channel.
-                        </p>
-                        
-                        {twoFactor.enabled && (
-                          <div className="grid grid-cols-2 gap-3 mt-1 max-w-sm">
-                            <button
-                              onClick={() => handle2FAMethodChange("email")}
-                              className={`p-3 rounded-lg border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                                twoFactor.method === "email"
-                                  ? "border-[var(--primary)] bg-[var(--primary)]/5 text-[var(--primary)]"
-                                  : "border-zinc-200 dark:border-zinc-800 text-slate-500"
-                              }`}
-                            >
-                              <span>Email OTP</span>
-                              {twoFactor.method === "email" && <Check size={12} />}
-                            </button>
-                            <button
-                              onClick={() => handle2FAMethodChange("sms")}
-                              className={`p-3 rounded-lg border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                                twoFactor.method === "sms"
-                                  ? "border-[var(--primary)] bg-[var(--primary)]/5 text-[var(--primary)]"
-                                  : "border-zinc-200 dark:border-zinc-800 text-slate-500"
-                              }`}
-                            >
-                              <span>Mobile OTP</span>
-                              {twoFactor.method === "sms" && <Check size={12} />}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
 
-                  {/* Login Sessions Card */}
-                  <Card>
-                    <div className="flex flex-col gap-4">
-                      <div className="flex justify-between items-center pb-2 border-b border-zinc-100 dark:border-zinc-800 mb-1">
-                        <div className="flex items-center gap-2">
-                          <Laptop size={16} className="text-[var(--primary)]" />
-                          <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
-                            Active Login Sessions
-                          </h3>
-                        </div>
-                        <Button variant="danger" onClick={() => setShowLogoutAllModal(true)} className="py-1 px-2.5">
-                          Logout All Devices
-                        </Button>
-                      </div>
-
-                      <div className="overflow-x-auto w-full">
-                        <table className="w-full text-xs text-left">
-                          <thead className="bg-zinc-50 dark:bg-zinc-950 text-slate-700 dark:text-zinc-300 border-b border-zinc-100 dark:border-zinc-850">
-                            <tr>
-                              <th className="p-3 font-bold">Device</th>
-                              <th className="p-3 font-bold">Browser</th>
-                              <th className="p-3 font-bold">Location</th>
-                              <th className="p-3 font-bold">Login Time</th>
-                              <th className="p-3 font-bold">Status</th>
-                              <th className="p-3 font-bold text-center">Action</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-zinc-100 dark:divide-zinc-850">
-                            {sessions.map((session) => (
-                              <tr key={session.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/40">
-                                <td className="p-3 font-semibold text-slate-900 dark:text-white">
-                                  {session.device}
-                                </td>
-                                <td className="p-3 font-medium text-slate-600 dark:text-zinc-300">
-                                  {session.browser}
-                                </td>
-                                <td className="p-3 font-medium text-slate-650 dark:text-zinc-400">
-                                  {session.location}
-                                </td>
-                                <td className="p-3 font-semibold text-slate-500 dark:text-zinc-500">
-                                  {session.loginTime}
-                                </td>
-                                <td className="p-3">
-                                  {session.current ? (
-                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 animate-pulse">
-                                      Active
-                                    </span>
-                                  ) : (
-                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-slate-100 text-slate-500 dark:bg-zinc-800 dark:text-zinc-400">
-                                      Standby
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="p-3 text-center">
-                                  {session.current ? (
-                                    <span className="text-[10px] text-zinc-400 font-bold">Current Device</span>
-                                  ) : (
-                                    <button
-                                      onClick={() => handleLogoutSession(session.id)}
-                                      className="text-[10px] font-bold text-red-500 hover:text-red-700 active:scale-95 transition-all"
-                                    >
-                                      Logout Device
-                                    </button>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </Card>
 
                 </div>
               )}
@@ -900,7 +726,7 @@ export default function AdminProfile() {
                           { label: "GST Number", value: franchiseInfo.gstNumber || "—" },
                           { label: "PAN Number", value: franchiseInfo.panNumber || "—" },
                           { label: "Franchise Type", value: franchiseInfo.type || "—" },
-                          { label: "Registered Region / Zone", value: franchiseInfo.region || "—" },
+                          { label: "Registered Region / Zone / Territory", value: franchiseInfo.region || "—" },
                           { label: "Total Stores Mapped", value: `${franchiseInfo.totalStores ?? 0} Store(s)` },
                           { label: "Franchise Duration", value: franchiseInfo.franchiseDuration || "—" },
                           { label: "Franchise Cost", value: franchiseInfo.franchiseCost ? `₹${Number(franchiseInfo.franchiseCost).toLocaleString("en-IN")}` : "—" },
@@ -909,71 +735,13 @@ export default function AdminProfile() {
                         ].map((item, idx) => (
                           <div key={idx} className="flex flex-col gap-1 p-3 bg-zinc-50 dark:bg-zinc-950/40 rounded-lg border border-zinc-100 dark:border-zinc-850">
                             <span className="font-bold text-slate-450 dark:text-zinc-500 uppercase tracking-wider text-[9px]">{item.label}</span>
-                            <span className={`font-extrabold text-sm ${item.value === "—" ? "text-slate-400 dark:text-zinc-600" : "text-slate-900 dark:text-white"}`}>{item.value}</span>
+                            <span className={`font-normal text-sm ${item.value === "—" ? "text-slate-400 dark:text-zinc-600" : "text-slate-900 dark:text-white"}`}>{item.value}</span>
                           </div>
                         ))}
                       </div>
                     </div>
 
-                    {/* Editable section: city, state, pincode, HQ address */}
-                    <div className="border-t border-zinc-100 dark:border-zinc-800 pt-5">
-                      <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-3">
-                        Editable by You — Location Details
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <InputField
-                          label="City"
-                          id="fran-city"
-                          value={tempFranchiseFields.city}
-                          onChange={(e) => setTempFranchiseFields(p => ({ ...p, city: e.target.value }))}
-                          placeholder="e.g. Indore"
-                        />
-                        <InputField
-                          label="State"
-                          id="fran-state"
-                          value={tempFranchiseFields.state}
-                          onChange={(e) => setTempFranchiseFields(p => ({ ...p, state: e.target.value }))}
-                          placeholder="e.g. Madhya Pradesh"
-                        />
-                        <InputField
-                          label="Pincode"
-                          id="fran-pincode"
-                          value={tempFranchiseFields.pincode}
-                          onChange={(e) => setTempFranchiseFields(p => ({ ...p, pincode: e.target.value }))}
-                          placeholder="e.g. 452001"
-                        />
-                      </div>
-                      <div className="mt-4">
-                        <InputField
-                          label="Registered HQ Address"
-                          id="fran-address"
-                          value={tempFranchiseFields.address}
-                          onChange={(e) => setTempFranchiseFields(p => ({ ...p, address: e.target.value }))}
-                          placeholder="Full address of your franchise headquarters"
-                        />
-                      </div>
 
-                      <div className="flex justify-end gap-3 border-t border-zinc-100 dark:border-zinc-850 pt-4 mt-4">
-                        <Button
-                          variant="outline"
-                          onClick={() => setTempFranchiseFields({
-                            city: franchiseInfo.city,
-                            state: franchiseInfo.state,
-                            pincode: franchiseInfo.pincode,
-                            address: franchiseInfo.registeredAddress
-                          })}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          variant="primary"
-                          onClick={handleSaveFranchiseFields}
-                          disabled={franchiseFieldsLoading}
-                        >
-                          {franchiseFieldsLoading ? <Loader2 size={12} className="animate-spin" /> : "Save Location Details"}
-                        </Button>
-                      </div>
-                    </div>
                   </div>
                 </Card>
               )}
@@ -999,7 +767,7 @@ export default function AdminProfile() {
                       </div>
                       
                       <button
-                        onClick={() => setPreferences(prev => ({ ...prev, themeMode: prev.themeMode === "light" ? "dark" : "light" }))}
+                        onClick={handleThemeToggle}
                         className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors ${
                           preferences.themeMode === "dark" ? "bg-[var(--primary)]" : "bg-zinc-300 dark:bg-zinc-700"
                         }`}
@@ -1010,95 +778,6 @@ export default function AdminProfile() {
                           }`}
                         />
                       </button>
-                    </div>
-
-                    {/* Notifications preferences */}
-                    <div className="flex flex-col gap-3">
-                      <h4 className="font-bold text-xs text-slate-800 dark:text-zinc-200">
-                        System Alerts & Notifications channels
-                      </h4>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {[
-                          { id: "email", label: "Email Notifications" },
-                          { id: "sms", label: "SMS Notifications" },
-                          { id: "push", label: "Push Web Notifications" }
-                        ].map((notif) => (
-                          <label
-                            key={notif.id}
-                            className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-950/40 rounded-lg border border-zinc-100 dark:border-zinc-850 cursor-pointer hover:border-[var(--primary)]/30 transition-all select-none"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={preferences.notifications[notif.id]}
-                              onChange={(e) =>
-                                setPreferences({
-                                  ...preferences,
-                                  notifications: { ...preferences.notifications, [notif.id]: e.target.checked }
-                                })
-                              }
-                              className="w-4 h-4 text-[var(--primary)] border-zinc-300 rounded focus:ring-[var(--primary)]"
-                            />
-                            <span className="text-xs font-semibold text-slate-850 dark:text-zinc-200">{notif.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Regional Dropdowns */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      
-                      <div className="flex flex-col gap-1 w-full">
-                        <label htmlFor="language" className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-                          Default Language
-                        </label>
-                        <select
-                          id="language"
-                          value={preferences.language}
-                          onChange={(e) => setPreferences({ ...preferences, language: e.target.value })}
-                          className="text-sm px-3.5 py-2 border border-zinc-200 dark:border-zinc-850 rounded-lg bg-zinc-50 dark:bg-zinc-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                        >
-                          <option value="English">English</option>
-                          <option value="Hindi">Hindi (हिंदी)</option>
-                        </select>
-                      </div>
-
-                      <div className="flex flex-col gap-1 w-full">
-                        <label htmlFor="timezone" className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-                          System Timezone
-                        </label>
-                        <select
-                          id="timezone"
-                          value={preferences.timezone}
-                          onChange={(e) => setPreferences({ ...preferences, timezone: e.target.value })}
-                          className="text-sm px-3.5 py-2 border border-zinc-200 dark:border-zinc-850 rounded-lg bg-zinc-50 dark:bg-zinc-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                        >
-                          <option value="IST (UTC+05:30)">IST (UTC+05:30) • India</option>
-                          <option value="UTC (UTC+00:00)">UTC (UTC+00:00) • Global</option>
-                        </select>
-                      </div>
-
-                      <div className="flex flex-col gap-1 w-full">
-                        <label htmlFor="currency" className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-                          Default Currency
-                        </label>
-                        <select
-                          id="currency"
-                          value={preferences.currency}
-                          onChange={(e) => setPreferences({ ...preferences, currency: e.target.value })}
-                          className="text-sm px-3.5 py-2 border border-zinc-200 dark:border-zinc-850 rounded-lg bg-zinc-50 dark:bg-zinc-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                        >
-                          <option value="INR (₹)">INR (₹) • Rupee</option>
-                          <option value="USD ($)">USD ($) • Dollar</option>
-                        </select>
-                      </div>
-
-                    </div>
-
-                    <div className="flex justify-end pt-3 border-t border-zinc-100 dark:border-zinc-850 mt-2">
-                      <Button variant="primary" onClick={handleSavePreferences}>
-                        Save Preferences
-                      </Button>
                     </div>
 
                   </div>
@@ -1193,32 +872,7 @@ export default function AdminProfile() {
         </div>
       )}
 
-      {/* LOGOUT ALL DEVICES CONFIRMATION MODAL */}
-      {showLogoutAllModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-850 rounded-xl shadow-2xl max-w-sm w-full p-6 text-center animate-scale-up">
-            <div className="w-12 h-12 rounded-full bg-red-100 text-red-500 flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle size={24} className="stroke-[2.2]" />
-            </div>
 
-            <h3 className="font-extrabold text-sm text-slate-900 dark:text-white mb-2">
-              Logout from All Devices
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-zinc-400 mb-6">
-              Are you sure you want to logout from all devices? This will invalidate all active sessions except this current window.
-            </p>
-
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setShowLogoutAllModal(false)} className="flex-1">
-                Cancel
-              </Button>
-              <Button variant="danger" onClick={handleLogoutAllSessions} className="flex-1">
-                Logout All
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   )

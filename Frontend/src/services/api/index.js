@@ -260,9 +260,11 @@ export const adminAPI = {
   /** PATCH /auth/admin/profile. Body: name?, phone?, profileImage? */
   updateAdminProfile: (body) =>
     adminClient.patch("/auth/admin/profile", body ?? {}),
-  /** POST /auth/admin/change-password */
+  /** PATCH /auth/admin/change-password */
+  changeAdminPassword: (body) =>
+    adminClient.patch("/auth/admin/change-password", body),
   changePassword: (currentPassword, newPassword) =>
-    adminClient.post(
+    adminClient.patch(
       "/auth/admin/change-password",
       { currentPassword, newPassword }
     ),

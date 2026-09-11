@@ -57,6 +57,9 @@ const franchiseSchema = new mongoose.Schema(
         territoryId: { type: String, trim: true, default: '' },
         city: { type: String, trim: true, default: '' },
         state: { type: String, trim: true, default: '' },
+        gender: { type: String, trim: true, default: '' },
+        alternatePhone: { type: String, trim: true, default: '' },
+        dob: { type: Date, default: null },
         type: {
             type: String,
             enum: ['Single Store', 'Multi Store'],

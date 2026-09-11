@@ -5,6 +5,9 @@ import { Profile } from '../../../../core/users/models/profile.model.js';
 import { Role } from '../../../../core/roles/models/role.model.js';
 import { UserRole } from '../../../../core/roles/models/userRole.model.js';
 import { sendError, sendResponse } from '../../../../utils/response.js';
+import { FoodRegion } from '../models/region.model.js';
+import { FoodZone } from '../models/zone.model.js';
+import { FoodTerritory } from '../models/territory.model.js';
 
 // ─── Create Franchise + Franchise Admin ──────────────────────────────────────
 // This is the critical production-level flow. All 4 operations run inside
@@ -106,6 +109,10 @@ export const createFranchise = async (req, res) => {
                 firstName,
                 lastName,
                 phone: normalizedPhone,
+                addressLine1: address,
+                city,
+                state,
+                pincode,
                 country: 'India',
                 timezone: 'Asia/Kolkata',
                 language: 'en'
@@ -191,8 +198,25 @@ export const getFranchises = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
+        // Populate region names manually
+        const regions = await FoodRegion.find().lean();
+        const regionMap = {};
+        regions.forEach(r => {
+            regionMap[r._id.toString()] = r;
+        });
+
+        const mappedFranchises = franchises.map(f => {
+            if (f.regionId && regionMap[f.regionId]) {
+                f.regionId = regionMap[f.regionId];
+            } else if (f.regionId === 'reg-2') {
+                // Hardcoded fallback for 'reg-2' if it exists in DB without a valid region
+                f.regionId = { name: 'Region 2 (Fallback)', _id: 'reg-2' };
+            }
+            return f;
+        });
+
         // Frontend expects a flat array here
-        return sendResponse(res, 200, 'Franchises fetched successfully', franchises);
+        return sendResponse(res, 200, 'Franchises fetched successfully', mappedFranchises);
     } catch (error) {
         console.error('[getFranchises] Error:', error.message);
         return sendError(res, 500, 'Failed to fetch franchises', error.message);
@@ -242,6 +266,17 @@ export const getMyFranchise = async (req, res) => {
         if (!franchise) {
             return sendError(res, 404, 'No franchise linked to your account');
         }
+
+        // Fetch Region, Zone, Territory names
+        const [region, zone, territory] = await Promise.all([
+            franchise.regionId && mongoose.Types.ObjectId.isValid(franchise.regionId) ? FoodRegion.findById(franchise.regionId).lean() : null,
+            franchise.zoneId && mongoose.Types.ObjectId.isValid(franchise.zoneId) ? FoodZone.findById(franchise.zoneId).lean() : null,
+            franchise.territoryId && mongoose.Types.ObjectId.isValid(franchise.territoryId) ? FoodTerritory.findById(franchise.territoryId).lean() : null
+        ]);
+        
+        franchise.regionName = region ? region.name : '';
+        franchise.zoneName = zone ? zone.name : '';
+        franchise.territoryName = territory ? territory.name : '';
 
         // Merge profile data so one API call returns everything the profile page needs
         return sendResponse(res, 200, 'My franchise fetched successfully', {

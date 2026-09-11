@@ -194,6 +194,30 @@ export default function FranchiseDetailsDrawer({ isOpen, onClose, admin }) {
                             <MapPin size={14} />
                           </div>
                           <div>
+                            <p className="text-[9px] text-zinc-400 font-semibold">City</p>
+                            <p className="text-[10px] font-bold text-zinc-800 dark:text-zinc-200 mt-0.5">
+                              {admin.city || "N/A"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-zinc-50 dark:bg-zinc-955 border border-zinc-100 dark:border-zinc-800 text-zinc-400 rounded-xl">
+                            <MapPin size={14} />
+                          </div>
+                          <div>
+                            <p className="text-[9px] text-zinc-400 font-semibold">State</p>
+                            <p className="text-[10px] font-bold text-zinc-800 dark:text-zinc-200 mt-0.5">
+                              {admin.state || "N/A"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-zinc-50 dark:bg-zinc-955 border border-zinc-100 dark:border-zinc-800 text-zinc-400 rounded-xl">
+                            <MapPin size={14} />
+                          </div>
+                          <div>
                             <p className="text-[9px] text-zinc-400 font-semibold">Region Information</p>
                             <p className="text-[10px] font-bold text-zinc-800 dark:text-zinc-200 mt-0.5">
                               {admin.zoneName ? `${admin.zoneName}, ${admin.regionName}` : "N/A"}

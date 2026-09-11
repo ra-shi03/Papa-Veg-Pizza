@@ -8,6 +8,7 @@ import { FoodAdmin } from "../admin/admin.model.js";
 import { AdminResetOtp } from "../admin/adminResetOtp.model.js";
 
 import { FoodDeliveryPartner } from "../../modules/food/delivery/models/deliveryPartner.model.js";
+import { FoodFranchise } from "../../modules/food/franchise/models/franchise.model.js";
 import { FoodReferralSettings } from "../../modules/food/admin/models/referralSettings.model.js";
 import { FoodReferralLog } from "../../modules/food/admin/models/referralLog.model.js";
 import { createOrUpdateOtp, verifyOtp } from "../otp/otp.service.js";
@@ -717,6 +718,23 @@ export const updateAdminProfile = async (userId, body) => {
       Object.assign(userProfile, profileUpdates);
   }
   await userProfile.save();
+
+  // If the user has a franchise, update its address fields so superadmin sees it
+  const franchiseUpdates = {};
+  if (body.addressLine1 !== undefined) franchiseUpdates.address = body.addressLine1;
+  if (body.city !== undefined) franchiseUpdates.city = body.city;
+  if (body.state !== undefined) franchiseUpdates.state = body.state;
+  if (body.pincode !== undefined) franchiseUpdates.pincode = body.pincode;
+  if (body.alternatePhone !== undefined) franchiseUpdates.alternatePhone = body.alternatePhone;
+  if (body.gender !== undefined) franchiseUpdates.gender = body.gender;
+  if (body.dateOfBirth !== undefined) {
+    const d = new Date(`${String(body.dateOfBirth)}T00:00:00.000Z`);
+    franchiseUpdates.dob = Number.isNaN(d.getTime()) ? null : d;
+  }
+  
+  if (Object.keys(franchiseUpdates).length > 0) {
+      await FoodFranchise.updateOne({ ownerUserId: userId }, { $set: franchiseUpdates });
+  }
 
   await admin.save();
   const profile = admin.toObject();

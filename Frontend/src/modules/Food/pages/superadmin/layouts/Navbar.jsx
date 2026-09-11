@@ -1,23 +1,76 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { clearModuleAuth } from "@food/utils/auth"
-import { Menu, Bell, Store, ChevronDown, User, LogOut, Settings as SettingsIcon, AlertCircle } from "lucide-react"
+import { clearModuleAuth, getModuleRefreshToken } from "@food/utils/auth"
+import { Menu, Bell, Store, ChevronDown, User, LogOut, Settings as SettingsIcon, AlertCircle, X, Loader2, Save } from "lucide-react"
 import Profile from "../profile/Profile"
+import { adminAPI } from "@food/api"
+import { toast } from "sonner"
 
 export default function Navbar({ onToggleSidebar, isCollapsed }) {
   const navigate = useNavigate()
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
-  const [selectedStore, setSelectedStore] = useState("All Stores")
+  const [selectedFranchise, setSelectedFranchise] = useState("All Franchises")
   const [showStoreDropdown, setShowStoreDropdown] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
+  
+  const [franchises, setFranchises] = useState([])
+  const [passwordData, setPasswordData] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" })
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
 
-  const handleLogout = () => {
-    clearModuleAuth("superadmin")
-    navigate("/superadmin/login", { replace: true })
+  useEffect(() => {
+    const fetchFranchises = async () => {
+      try {
+        const response = await adminAPI.getFranchises()
+        if (response?.data?.data) {
+          setFranchises(response.data.data)
+        }
+      } catch (err) {
+        console.error("Failed to fetch franchises:", err)
+      }
+    }
+    fetchFranchises()
+  }, [])
+
+  const handleLogout = async () => {
+    try {
+      const token = getModuleRefreshToken("admin")
+      if (token) {
+        await adminAPI.logout(token).catch(() => null)
+      }
+    } catch (err) {
+      console.error("Logout error", err)
+    } finally {
+      clearModuleAuth("superadmin")
+      navigate("/superadmin/login", { replace: true })
+    }
   }
 
-  const stores = ["All Stores", "Indore Central", "Bhopal Zone", "Ujjain Branch", "Gwalior Hub"]
+  const handleChangePassword = async (e) => {
+    e.preventDefault()
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      return toast.error("Please fill in all fields")
+    }
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      return toast.error("Passwords do not match")
+    }
+    setIsChangingPassword(true)
+    try {
+      await adminAPI.changeAdminPassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+        confirmPassword: passwordData.confirmPassword
+      })
+      toast.success("Password updated successfully!")
+      setShowSettingsModal(false)
+      setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" })
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to update password")
+    } finally {
+      setIsChangingPassword(false)
+    }
+  }
   
   const notifications = [
     { id: 1, text: "Low stock: Cheese at Indore Central", time: "5m ago", type: "error" },
@@ -57,29 +110,43 @@ export default function Navbar({ onToggleSidebar, isCollapsed }) {
               setShowProfileMenu(false)
               setShowNotifications(false)
             }}
-            className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:border-zinc-200 text-[11px] font-semibold shadow-sm transition-all"
+            className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:border-zinc-200 text-[11px] font-semibold shadow-sm transition-all max-w-[150px] truncate"
           >
-            <Store size={13} className="text-zinc-400" />
-            <span>{selectedStore}</span>
-            <ChevronDown size={13} className={`text-zinc-400 transition-transform duration-200 ${showStoreDropdown ? "rotate-180" : ""}`} />
+            <Store size={13} className="text-zinc-400 shrink-0" />
+            <span className="truncate">{selectedFranchise}</span>
+            <ChevronDown size={13} className={`text-zinc-400 transition-transform duration-200 shrink-0 ${showStoreDropdown ? "rotate-180" : ""}`} />
           </button>
           
           {showStoreDropdown && (
-            <div className="absolute right-0 mt-2 w-48 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 shadow-xl py-1.5 z-50 animate-fade-down">
-              {stores.map((store) => (
+            <div className="absolute right-0 mt-2 w-48 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 shadow-xl py-1.5 z-50 animate-fade-down max-h-64 overflow-y-auto">
+              <button
+                onClick={() => {
+                  setSelectedFranchise("All Franchises")
+                  setShowStoreDropdown(false)
+                }}
+                className={`w-full text-left px-4 py-2 text-xs font-medium transition-colors ${
+                  selectedFranchise === "All Franchises"
+                    ? "text-[var(--primary)] bg-[var(--primary)]/5 font-semibold"
+                    : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-200"
+                }`}
+              >
+                All Franchises
+              </button>
+              {franchises.map((f) => (
                 <button
-                  key={store}
+                  key={f._id}
                   onClick={() => {
-                    setSelectedStore(store)
+                    setSelectedFranchise(f.name)
                     setShowStoreDropdown(false)
                   }}
                   className={`w-full text-left px-4 py-2 text-xs font-medium transition-colors ${
-                    selectedStore === store
+                    selectedFranchise === f.name
                       ? "text-[var(--primary)] bg-[var(--primary)]/5 font-semibold"
                       : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-200"
                   }`}
                 >
-                  {store}
+                  {f.name}
+                  {f.regionId && <span className="text-[10px] opacity-70 ml-1">({typeof f.regionId === "object" ? f.regionId.name : f.regionId})</span>}
                 </button>
               ))}
             </div>
@@ -158,7 +225,13 @@ export default function Navbar({ onToggleSidebar, isCollapsed }) {
                 <User size={14} className="text-zinc-400" />
                 <span>My Profile</span>
               </button>
-              <button className="w-full flex items-center gap-2.5 px-3.5 py-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
+              <button 
+                onClick={() => {
+                  setShowProfileMenu(false)
+                  setShowSettingsModal(true)
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+              >
                 <SettingsIcon size={14} className="text-zinc-400" />
                 <span>Settings</span>
               </button>
@@ -175,6 +248,60 @@ export default function Navbar({ onToggleSidebar, isCollapsed }) {
 
       {showProfileModal && (
         <Profile onClose={() => setShowProfileModal(false)} />
+      )}
+
+      {showSettingsModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowSettingsModal(false)} />
+          <div className="relative w-full max-w-sm bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 shadow-2xl rounded-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/50">
+              <h2 className="text-lg font-bold text-zinc-800 dark:text-zinc-100">Settings</h2>
+              <button onClick={() => setShowSettingsModal(false)} className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleChangePassword} className="p-6 space-y-4">
+              <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-100 mb-2">Change Password</h3>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Current Password</label>
+                <input
+                  type="password"
+                  value={passwordData.currentPassword}
+                  onChange={(e) => setPasswordData(p => ({ ...p, currentPassword: e.target.value }))}
+                  className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] transition-all"
+                  placeholder="Enter current password"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">New Password</label>
+                <input
+                  type="password"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData(p => ({ ...p, newPassword: e.target.value }))}
+                  className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] transition-all"
+                  placeholder="Enter new password"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Confirm Password</label>
+                <input
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData(p => ({ ...p, confirmPassword: e.target.value }))}
+                  className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] transition-all"
+                  placeholder="Confirm new password"
+                />
+              </div>
+              <div className="pt-4 flex gap-3">
+                <button type="button" onClick={() => setShowSettingsModal(false)} className="flex-1 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl font-semibold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all active:scale-[0.98]">Cancel</button>
+                <button type="submit" disabled={isChangingPassword} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[var(--primary)] text-white rounded-xl font-semibold shadow-lg shadow-[var(--primary)]/20 hover:bg-[var(--primary)]/90 transition-all active:scale-[0.98] disabled:opacity-70">
+                  {isChangingPassword ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </header>
   )
