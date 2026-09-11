@@ -28,6 +28,8 @@ router.delete('/notifications/broadcast/:id', notificationBroadcastController.de
 
 // ----- Franchises -----
 router.post('/franchises', franchiseController.createFranchise);
+router.get('/franchises/my-franchise', franchiseController.getMyFranchise);
+router.patch('/franchises/my-franchise', franchiseController.updateMyFranchise);
 router.get('/franchises', franchiseController.getFranchises);
 router.get('/franchises/:id', franchiseController.getFranchiseById);
 router.patch('/franchises/:id', franchiseController.updateFranchise);

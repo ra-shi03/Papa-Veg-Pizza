@@ -135,20 +135,39 @@ export default function AdminProfile() {
   const [sessions, setSessions] = useState([])
   const [showLogoutAllModal, setShowLogoutAllModal] = useState(false)
 
-  // Franchise Information state
+  // Franchise Information state — superadmin-controlled fields (read-only)
   const [franchiseInfo, setFranchiseInfo] = useState({
+    // From franchise document (set by superadmin)
     name: "",
+    ownerName: "",
     code: "",
-    managerName: "",
     gstNumber: "",
     panNumber: "",
+    type: "",
+    totalStores: 0,
+    franchiseDuration: "",
+    franchiseCost: 0,
+    paidAmount: 0,
+    dueAmount: 0,
+    region: "",
+    isActive: true,
+    // Editable by franchise admin
+    city: "",
+    state: "",
     pincode: "",
     registeredAddress: "",
-    region: "",
-    storeCount: 0,
     subscriptionPlan: "",
     expiryDate: ""
   })
+
+  // Editable franchise fields state (only city, state, pincode, address)
+  const [tempFranchiseFields, setTempFranchiseFields] = useState({
+    city: "",
+    state: "",
+    pincode: "",
+    address: ""
+  })
+  const [franchiseFieldsLoading, setFranchiseFieldsLoading] = useState(false)
 
   // Preferences state (Simulated PUT /api/franchise-admin/preferences)
   const [preferences, setPreferences] = useState({
@@ -165,21 +184,23 @@ export default function AdminProfile() {
 
 
 
-  // Fetch true database values on mount
+  // Fetch profile data from real API on mount
   useEffect(() => {
     const fetchAdminProfile = async () => {
       try {
         setLoading(true)
+
+        // Call both APIs in parallel: admin profile (personal info) and franchise data
         const [profileRes, franchiseRes] = await Promise.all([
           adminAPI.getAdminProfile(),
-          user?.franchiseId ? adminAPI.getFranchiseById(user.franchiseId) : Promise.resolve(null)
+          adminAPI.getMyFranchise().catch(() => null) // franchise admin only
         ])
 
+        // ── Personal Info from user/profile ──
         const adminData = profileRes?.data?.admin || profileRes?.data?.data?.admin || profileRes?.data?.user
         if (adminData) {
           const names = (adminData.name || "").split(" ")
-          setPersonalInfo(prev => ({
-            ...prev,
+          const personalData = {
             firstName: adminData.firstName || names[0] || "",
             lastName: adminData.lastName || names.slice(1).join(" ") || "",
             email: adminData.email || "",
@@ -187,66 +208,81 @@ export default function AdminProfile() {
             alternatePhone: adminData.alternatePhone || "",
             dob: adminData.dob ? new Date(adminData.dob).toISOString().split('T')[0] : "",
             gender: adminData.gender ? adminData.gender.charAt(0).toUpperCase() + adminData.gender.slice(1).toLowerCase() : "",
-            address: adminData.addressLine1 || "",
+            address: adminData.addressLine1 || adminData.address || "",
             city: adminData.city || "",
             state: adminData.state || "",
             pincode: adminData.pincode || "",
             createdAt: adminData.createdAt || ""
-          }))
+          }
+          setPersonalInfo(personalData)
+          setTempPersonalInfo(personalData)
 
           if (adminData.profileImage || adminData.profilePhoto) {
             setProfileImage(adminData.profileImage || adminData.profilePhoto)
           }
 
           if (adminData.preferences) {
-             setPreferences(prev => ({
-               ...prev,
-               themeMode: () => adminData.preferences.theme?.toLowerCase() || localStorage.getItem("sa_themeMode") || "light",
-               notifications: {
-                 email: adminData.preferences.notifications?.email ?? true,
-                 sms: adminData.preferences.notifications?.sms ?? false,
-                 push: adminData.preferences.notifications?.push ?? false
-               },
-               currency: adminData.preferences.currency || "INR (₹)"
-             }))
+            setPreferences(prev => ({
+              ...prev,
+              themeMode: adminData.preferences.theme?.toLowerCase() || localStorage.getItem("sa_themeMode") || "light",
+              notifications: {
+                email: adminData.preferences.notifications?.email ?? true,
+                sms: adminData.preferences.notifications?.sms ?? false,
+                push: adminData.preferences.notifications?.push ?? false
+              },
+              currency: adminData.preferences.currency || "INR (₹)"
+            }))
           }
           if (adminData.language) setPreferences(p => ({ ...p, language: adminData.language }))
           if (adminData.timezone) setPreferences(p => ({ ...p, timezone: adminData.timezone }))
         }
 
-        const fData = franchiseRes?.data?.data || franchiseRes?.data
+        // ── Franchise Info from FoodFranchise document ──
+        const fRes = franchiseRes?.data?.data || franchiseRes?.data
+        const fData = fRes?.franchise
         if (fData) {
-          setFranchiseInfo({
-            name: fData.name || "-",
-            code: fData.franchiseCode || fData.code || "-",
-            managerName: fData.managerName || "-",
-            gstNumber: fData.gstNumber || "-",
-            panNumber: fData.panNumber || "-",
-            pincode: fData.pincode || "-",
-            registeredAddress: fData.address || "-",
-            region: fData.regionId || "-",
-            storeCount: fData.storeCount || 0,
+          const merged = {
+            name: fData.name || "",
+            ownerName: fData.ownerName || "",
+            code: fData.franchiseCode || "",
+            gstNumber: fData.gstNumber || "",
+            panNumber: fData.panNumber || "",
+            type: fData.type || "Single Store",
+            totalStores: fData.totalStores ?? 0,
+            franchiseDuration: fData.franchiseDuration ? `${fData.franchiseDuration} Years` : "",
+            franchiseCost: fData.franchiseCost ?? 0,
+            paidAmount: fData.paidAmount ?? 0,
+            dueAmount: fData.dueAmount ?? 0,
+            region: fData.regionId || "",
+            isActive: fData.isActive ?? true,
+            // Editable fields — stored directly on franchise document
+            city: fData.city || "",
+            state: fData.state || "",
+            pincode: fData.pincode || "",
+            registeredAddress: fData.address || "",
             subscriptionPlan: fData.subscriptionPlan || "Standard",
-            expiryDate: fData.expiryDate || "-"
+            expiryDate: fData.expiryDate || ""
+          }
+          setFranchiseInfo(merged)
+          setTempFranchiseFields({
+            city: fData.city || "",
+            state: fData.state || "",
+            pincode: fData.pincode || "",
+            address: fData.address || ""
           })
         }
 
       } catch (err) {
+        console.error('Profile fetch error:', err)
         toast.error("Failed to fetch profile details")
       } finally {
         setLoading(false)
       }
     }
     fetchAdminProfile()
-  }, [user?.franchiseId])
+  }, [])
 
-  // Sync temp state with actual profile state when tab changes
-  useEffect(() => {
-    setTempPersonalInfo({ ...personalInfo })
-    setPersonalErrors({})
-  }, [activeTab, personalInfo])
-
-  // Save profile changes (PUT /api/franchise-admin/profile)
+  // Save personal profile changes (PATCH /auth/admin/profile)
   const handleSaveProfile = async (e) => {
     e.preventDefault()
     const errors = {}
@@ -263,7 +299,6 @@ export default function AdminProfile() {
 
     try {
       setLoading(true)
-      // Call actual patch API endpoint
       const payload = {
         name: `${tempPersonalInfo.firstName} ${tempPersonalInfo.lastName}`,
         phone: tempPersonalInfo.phone,
@@ -279,9 +314,29 @@ export default function AdminProfile() {
       setPersonalInfo({ ...tempPersonalInfo })
       toast.success("Profile updated successfully")
     } catch (err) {
-      toast.error("Failed to update profile")
+      toast.error(err.response?.data?.message || "Failed to update profile")
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Save editable franchise fields (city, state, pincode, address)
+  const handleSaveFranchiseFields = async () => {
+    try {
+      setFranchiseFieldsLoading(true)
+      await adminAPI.updateMyFranchise(tempFranchiseFields)
+      setFranchiseInfo(prev => ({
+        ...prev,
+        city: tempFranchiseFields.city,
+        state: tempFranchiseFields.state,
+        pincode: tempFranchiseFields.pincode,
+        registeredAddress: tempFranchiseFields.address
+      }))
+      toast.success("Franchise location details updated successfully")
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update franchise details")
+    } finally {
+      setFranchiseFieldsLoading(false)
     }
   }
 
@@ -832,33 +887,98 @@ export default function AdminProfile() {
                       </h3>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
-                      {[
-                        { label: "Franchise Name", value: franchiseInfo.name },
-                        { label: "Franchise Code", value: franchiseInfo.code },
-                        { label: "Owner / Director", value: franchiseInfo.managerName },
-                        { label: "GST Number", value: franchiseInfo.gstNumber },
-                        { label: "PAN Number", value: franchiseInfo.panNumber },
-                        { label: "Pincode", value: franchiseInfo.pincode },
-                        { label: "Registered Region", value: franchiseInfo.region },
-                        { label: "Active Stores Mapped", value: `${franchiseInfo.storeCount} Stores` },
-                        { label: "Active Subscription Plan", value: franchiseInfo.subscriptionPlan },
-                        { label: "Contract Expiry Date", value: new Date(franchiseInfo.expiryDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) }
-                      ].map((item, idx) => (
-                        <div key={idx} className="flex flex-col gap-1 p-3 bg-zinc-50 dark:bg-zinc-950/40 rounded-lg border border-zinc-100 dark:border-zinc-850">
-                          <span className="font-bold text-slate-450 dark:text-zinc-500 uppercase tracking-wider text-[9px]">{item.label}</span>
-                          <span className="font-extrabold text-slate-900 dark:text-white text-sm">{item.value}</span>
-                        </div>
-                      ))}
+                    {/* Read-only section: set by SuperAdmin */}
+                    <div className="mb-2">
+                      <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-3">
+                        Set by Super Admin — Read Only
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                        {[
+                          { label: "Franchise Name", value: franchiseInfo.name || "—" },
+                          { label: "Franchise Code", value: franchiseInfo.code || "—" },
+                          { label: "Owner / Director", value: franchiseInfo.ownerName || "—" },
+                          { label: "GST Number", value: franchiseInfo.gstNumber || "—" },
+                          { label: "PAN Number", value: franchiseInfo.panNumber || "—" },
+                          { label: "Franchise Type", value: franchiseInfo.type || "—" },
+                          { label: "Registered Region / Zone", value: franchiseInfo.region || "—" },
+                          { label: "Total Stores Mapped", value: `${franchiseInfo.totalStores ?? 0} Store(s)` },
+                          { label: "Franchise Duration", value: franchiseInfo.franchiseDuration || "—" },
+                          { label: "Franchise Cost", value: franchiseInfo.franchiseCost ? `₹${Number(franchiseInfo.franchiseCost).toLocaleString("en-IN")}` : "—" },
+                          { label: "Amount Paid", value: franchiseInfo.paidAmount ? `₹${Number(franchiseInfo.paidAmount).toLocaleString("en-IN")}` : "—" },
+                          { label: "Due Amount", value: franchiseInfo.dueAmount ? `₹${Number(franchiseInfo.dueAmount).toLocaleString("en-IN")}` : "₹0" },
+                        ].map((item, idx) => (
+                          <div key={idx} className="flex flex-col gap-1 p-3 bg-zinc-50 dark:bg-zinc-950/40 rounded-lg border border-zinc-100 dark:border-zinc-850">
+                            <span className="font-bold text-slate-450 dark:text-zinc-500 uppercase tracking-wider text-[9px]">{item.label}</span>
+                            <span className={`font-extrabold text-sm ${item.value === "—" ? "text-slate-400 dark:text-zinc-600" : "text-slate-900 dark:text-white"}`}>{item.value}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
-                    <div className="flex flex-col gap-1 p-3 bg-zinc-50 dark:bg-zinc-950/40 rounded-lg border border-zinc-100 dark:border-zinc-850 text-xs">
-                      <span className="font-bold text-slate-450 dark:text-zinc-500 uppercase tracking-wider text-[9px]">Registered HQ Address</span>
-                      <span className="font-extrabold text-slate-900 dark:text-white text-sm leading-relaxed">{franchiseInfo.registeredAddress}</span>
+                    {/* Editable section: city, state, pincode, HQ address */}
+                    <div className="border-t border-zinc-100 dark:border-zinc-800 pt-5">
+                      <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-3">
+                        Editable by You — Location Details
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <InputField
+                          label="City"
+                          id="fran-city"
+                          value={tempFranchiseFields.city}
+                          onChange={(e) => setTempFranchiseFields(p => ({ ...p, city: e.target.value }))}
+                          placeholder="e.g. Indore"
+                        />
+                        <InputField
+                          label="State"
+                          id="fran-state"
+                          value={tempFranchiseFields.state}
+                          onChange={(e) => setTempFranchiseFields(p => ({ ...p, state: e.target.value }))}
+                          placeholder="e.g. Madhya Pradesh"
+                        />
+                        <InputField
+                          label="Pincode"
+                          id="fran-pincode"
+                          value={tempFranchiseFields.pincode}
+                          onChange={(e) => setTempFranchiseFields(p => ({ ...p, pincode: e.target.value }))}
+                          placeholder="e.g. 452001"
+                        />
+                      </div>
+                      <div className="mt-4">
+                        <InputField
+                          label="Registered HQ Address"
+                          id="fran-address"
+                          value={tempFranchiseFields.address}
+                          onChange={(e) => setTempFranchiseFields(p => ({ ...p, address: e.target.value }))}
+                          placeholder="Full address of your franchise headquarters"
+                        />
+                      </div>
+
+                      <div className="flex justify-end gap-3 border-t border-zinc-100 dark:border-zinc-850 pt-4 mt-4">
+                        <Button
+                          variant="outline"
+                          onClick={() => setTempFranchiseFields({
+                            city: franchiseInfo.city,
+                            state: franchiseInfo.state,
+                            pincode: franchiseInfo.pincode,
+                            address: franchiseInfo.registeredAddress
+                          })}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          variant="primary"
+                          onClick={handleSaveFranchiseFields}
+                          disabled={franchiseFieldsLoading}
+                        >
+                          {franchiseFieldsLoading ? <Loader2 size={12} className="animate-spin" /> : "Save Location Details"}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </Card>
               )}
+
+
 
               {/* 4. PREFERENCES TAB */}
               {activeTab === "preferences" && (

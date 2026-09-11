@@ -222,6 +222,79 @@ export const getFranchiseById = async (req, res) => {
     }
 };
 
+// ─── Get My Franchise (Franchise Admin) ──────────────────────────────────────
+// The logged-in franchise admin calls this to get their own franchise data.
+// Lookup: FoodFranchise.ownerUserId === req.user._id
+export const getMyFranchise = async (req, res) => {
+    try {
+        // Auth middleware sets req.user.userId (from JWT decoded.userId)
+        const userId = req.user?.userId;
+        if (!userId) {
+            return sendError(res, 401, 'Not authenticated');
+        }
+
+        // Also fetch their profile for personal info fields
+        const [franchise, profile] = await Promise.all([
+            FoodFranchise.findOne({ ownerUserId: userId }).lean(),
+            Profile.findOne({ userId }).lean()
+        ]);
+
+        if (!franchise) {
+            return sendError(res, 404, 'No franchise linked to your account');
+        }
+
+        // Merge profile data so one API call returns everything the profile page needs
+        return sendResponse(res, 200, 'My franchise fetched successfully', {
+            franchise,
+            profile: profile || null
+        });
+    } catch (error) {
+        console.error('[getMyFranchise] Error:', error.message);
+        return sendError(res, 500, 'Failed to fetch franchise', error.message);
+    }
+};
+
+// ─── Update My Franchise Profile (Franchise Admin self-service) ──────────────
+// Allows the franchise admin to update their own profile fields (city, state, pincode, address)
+// Read-only fields (name, email, phone, gstNumber, franchiseCode, etc.) are managed by SuperAdmin only.
+export const updateMyFranchise = async (req, res) => {
+    try {
+        // Auth middleware sets req.user.userId (from JWT decoded.userId)
+        const userId = req.user?.userId;
+        if (!userId) {
+            return sendError(res, 401, 'Not authenticated');
+        }
+
+        const franchise = await FoodFranchise.findOne({ ownerUserId: userId });
+        if (!franchise) {
+            return sendError(res, 404, 'No franchise linked to your account');
+        }
+
+        // Only allow franchise admin to update their personal profile fields — not core business fields
+        const allowedProfileFields = ['city', 'state', 'pincode', 'address'];
+        const updates = {};
+        allowedProfileFields.forEach(field => {
+            if (req.body[field] !== undefined) {
+                updates[field] = String(req.body[field]).trim();
+            }
+        });
+
+        if (Object.keys(updates).length === 0) {
+            return sendError(res, 400, 'No valid fields provided for update');
+        }
+
+        Object.assign(franchise, updates);
+        await franchise.save();
+
+        return sendResponse(res, 200, 'Profile updated successfully', franchise.toObject());
+    } catch (error) {
+        console.error('[updateMyFranchise] Error:', error.message);
+        return sendError(res, 500, 'Failed to update franchise profile', error.message);
+    }
+};
+
+
+
 // ─── Update Franchise ────────────────────────────────────────────────────────
 export const updateFranchise = async (req, res) => {
     const session = await mongoose.startSession();

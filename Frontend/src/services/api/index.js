@@ -153,6 +153,10 @@ export const notificationAPI = {
 export const adminAPI = {
   getFranchises: (params = {}) => adminClient.get("/food/admin/franchises", { params }),
   getFranchiseById: (id) => adminClient.get(`/food/admin/franchises/${id}`),
+  // Franchise Admin self-service: get the franchise linked to the logged-in user
+  getMyFranchise: () => adminClient.get("/food/admin/franchises/my-franchise"),
+  // Franchise Admin self-service: update editable fields (city, state, pincode, address)
+  updateMyFranchise: (body) => adminClient.patch("/food/admin/franchises/my-franchise", body),
   getSidebarBadges: () =>
     adminClient.get("/food/admin/sidebar-badges"),
   getStores: (params = {}) => adminClient.get("/stores", { params }),
