@@ -24,15 +24,33 @@ export default function Sidebar({ isOpen, onClose, role, isCollapsed = false, on
   const displayCollapsed = isCollapsed
   
   // Set default expanded state for sections
-  const [expandedGroups, setExpandedGroups] = useState({
-    "Orders": true,
-    "Kitchen Operations": true,
-    "Delivery Operations": false,
-    "Inventory": false,
-    "Staff Management": false,
-    "Customers": false,
-    "Reports": false,
+  const [expandedGroups, setExpandedGroups] = useState(() => {
+    const initialState = {}
+    storeOperationsSidebarMenu.forEach(item => {
+      if (item.type === "section") {
+        initialState[item.label] = item.items.some(subItem => location.pathname === subItem.path)
+      }
+    })
+    return initialState
   })
+
+  useEffect(() => {
+    setExpandedGroups(prev => {
+      const newState = { ...prev }
+      let changed = false
+      storeOperationsSidebarMenu.forEach(item => {
+        if (item.type === "section") {
+          if (item.items.some(subItem => location.pathname === subItem.path)) {
+            if (!newState[item.label]) {
+              newState[item.label] = true
+              changed = true
+            }
+          }
+        }
+      })
+      return changed ? newState : prev
+    })
+  }, [location.pathname])
 
   const toggleGroup = (groupTitle) => {
     setExpandedGroups(prev => ({

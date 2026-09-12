@@ -92,9 +92,8 @@ export const getRegionById = async (req, res) => {
         
         const zonesCount = await FoodZone.countDocuments({ regionId: region._id });
         const franchisesCount = await FoodFranchise.countDocuments({ regionId: region._id.toString() });
-        const franchises = await FoodFranchise.find({ regionId: region._id.toString() }, '_id');
-        const franchiseIds = franchises.map(f => f._id);
-        const storesCount = await FoodStore.countDocuments({ franchiseId: { $in: franchiseIds } });
+        const franchises = await FoodFranchise.find({ regionId: region._id.toString() }, 'totalStores');
+        const storesCount = franchises.reduce((acc, f) => acc + (f.totalStores || 0), 0);
 
         const enrichedRegion = {
             ...region,
@@ -252,9 +251,8 @@ export const getZoneById = async (req, res) => {
         
         const territoriesCount = await FoodTerritory.countDocuments({ zoneId: zone._id });
         const franchisesCount = await FoodFranchise.countDocuments({ zoneId: zone._id.toString() });
-        const franchises = await FoodFranchise.find({ zoneId: zone._id.toString() }, '_id');
-        const franchiseIds = franchises.map(f => f._id);
-        const storesCount = await FoodStore.countDocuments({ franchiseId: { $in: franchiseIds } });
+        const franchises = await FoodFranchise.find({ zoneId: zone._id.toString() }, 'totalStores');
+        const storesCount = franchises.reduce((acc, f) => acc + (f.totalStores || 0), 0);
 
         const enrichedZone = {
             ...zone,

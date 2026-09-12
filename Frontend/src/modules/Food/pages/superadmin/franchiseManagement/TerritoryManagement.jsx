@@ -183,8 +183,8 @@ export default function TerritoryManagement() {
       t.assignedFranchiseName || "Unassigned",
       t.storesCount,
       `${t.deliveryRadiusKm} km`,
-      t.ordersToday,
-      `₹${t.revenueToday.toLocaleString()}`,
+      t.ordersToday || 0,
+      `₹${(t.revenueToday || 0).toLocaleString()}`,
       t.status,
       t.createdAt
     ]);
@@ -334,11 +334,9 @@ export default function TerritoryManagement() {
             <span>EXPORT PDF</span>
           </button>
           <button
-            onClick={() => {
-              console.log("Synchronizing territory boundaries...");
-            }}
+            onClick={() => window.location.reload()}
             className="p-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-black dark:text-zinc-100 rounded-lg hover:scale-[1.01] active:scale-95 transition-all cursor-pointer"
-            title="Refresh Data"
+            title="Refresh Page"
           >
             <RefreshCw size={13} />
           </button>

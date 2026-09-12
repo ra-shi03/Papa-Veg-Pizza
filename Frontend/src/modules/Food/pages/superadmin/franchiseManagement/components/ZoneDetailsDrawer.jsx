@@ -18,6 +18,8 @@ export default function ZoneDetailsDrawer({ isOpen, onClose, zone, onEdit, onAss
 
   useEffect(() => {
     if (isOpen && zone?.id) {
+      // Clear previous fetched data so it instantly reflects the updated `zone` prop
+      setFetchedZone(null);
       const fetchZone = async () => {
         setIsLoading(true);
         try {

@@ -63,26 +63,6 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
   }, [])
 
   const displayCollapsed = isCollapsed
-  const [expandedGroups, setExpandedGroups] = useState({
-    "Core Dashboard": true,
-    "User Management": true,
-    "Franchise Management": false,
-    "Product Management": false,
-    "Order System": false,
-    "Marketing": false,
-    "Financial": false,
-    "Analytics & Reports": false,
-    "CMS / Settings": false,
-    "Support": false,
-  })
-
-  const toggleGroup = (groupTitle) => {
-    setExpandedGroups(prev => ({
-      ...prev,
-      [groupTitle]: !prev[groupTitle]
-    }))
-  }
-
   const menuGroups = [
     {
       title: "Core Dashboard",
@@ -180,6 +160,39 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
       ]
     }
   ]
+
+  const [expandedGroups, setExpandedGroups] = useState(() => {
+    const initialState = {}
+    menuGroups.forEach(group => {
+      initialState[group.title] = group.items.some(item => item.name === activeItem)
+    })
+    return initialState
+  })
+
+  useEffect(() => {
+    setExpandedGroups(prev => {
+      const newState = { ...prev }
+      let changed = false
+      menuGroups.forEach(group => {
+        if (group.items.some(item => item.name === activeItem)) {
+          if (!newState[group.title]) {
+            newState[group.title] = true
+            changed = true
+          }
+        }
+      })
+      return changed ? newState : prev
+    })
+  }, [activeItem])
+
+  const toggleGroup = (groupTitle) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupTitle]: !prev[groupTitle]
+    }))
+  }
+
+
 
   return (
     <>

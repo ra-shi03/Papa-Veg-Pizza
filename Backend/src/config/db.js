@@ -3,12 +3,14 @@ import dns from 'dns';
 import { config } from './env.js';
 import { logger } from '../utils/logger.js';
 
-// Ensure Node.js DNS resolver has fallback public DNS servers for SRV queries (fixes ECONNREFUSED on Windows loopback DNS)
+// Always prepend public DNS servers (Google + Cloudflare) so that MongoDB SRV lookups
+// work regardless of the local DNS resolver (router IPv6, ISP DNS, VPN, etc.)
 try {
     const currentServers = dns.getServers();
-    if (currentServers.includes('127.0.0.1') || currentServers.includes('::1') || currentServers.length === 0) {
-        dns.setServers(['8.8.8.8', '1.1.1.1', ...currentServers]);
-    }
+    // Filter out any already-present public servers to avoid duplicates
+    const publicDns = ['8.8.8.8', '1.1.1.1'];
+    const merged = [...publicDns, ...currentServers.filter(s => !publicDns.includes(s))];
+    dns.setServers(merged);
 } catch (e) {
     // Ignore if DNS server configuration fails
 }

@@ -10,6 +10,8 @@ export default function RegionDetailsDrawer({ isOpen, onClose, region, onEdit })
 
   useEffect(() => {
     if (isOpen && region?.id) {
+      // Clear previous fetched data so it instantly reflects the updated `region` prop
+      setFetchedRegion(null);
       const fetchRegion = async () => {
         setIsLoading(true);
         try {

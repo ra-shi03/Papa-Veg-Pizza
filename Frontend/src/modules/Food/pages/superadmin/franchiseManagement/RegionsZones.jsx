@@ -199,11 +199,24 @@ export default function RegionsZones() {
   const handleEditRegionSubmit = async (regionData) => {
     try {
       const response = await apiClient.patch(`/food/admin/regions/${regionData.id}`, regionData);
-      setRegions((prev) => prev.map((r) => r.id === regionData.id ? {
-          ...r,
+      
+      const updatedRegion = {
           ...response.data.data,
           status: response.data.data.isActive ? 'Active' : 'Inactive'
+      };
+
+      setRegions((prev) => prev.map((r) => r.id === regionData.id ? {
+          ...r,
+          ...updatedRegion
       } : r));
+
+      if (selectedRegion?.id === regionData.id) {
+        setSelectedRegion((prev) => ({
+          ...prev,
+          ...updatedRegion
+        }));
+      }
+
       setIsEditRegionModalOpen(false);
       setEditRegionData(null);
     } catch(err) {
@@ -236,12 +249,25 @@ export default function RegionsZones() {
     try {
       const response = await apiClient.patch(`/food/admin/zones/${zoneData.id}`, zoneData);
       const parentRegion = regions.find(r => r.id === zoneData.regionId);
-      setZones((prev) => prev.map((z) => z.id === zoneData.id ? {
-          ...z,
+      
+      const updatedZone = {
           ...response.data.data,
           regionName: parentRegion ? parentRegion.name : 'Unknown',
           status: response.data.data.isActive ? 'Active' : 'Inactive'
+      };
+
+      setZones((prev) => prev.map((z) => z.id === zoneData.id ? {
+          ...z,
+          ...updatedZone
       } : z));
+
+      if (selectedZone?.id === zoneData.id) {
+        setSelectedZone((prev) => ({
+          ...prev,
+          ...updatedZone
+        }));
+      }
+
       setIsEditZoneModalOpen(false);
       setEditZoneData(null);
     } catch(err) {
@@ -353,11 +379,9 @@ export default function RegionsZones() {
             <span>EXPORT PDF</span>
           </button>
           <button
-            onClick={() => {
-              console.log("Synchronizing geographical hierarchies...");
-            }}
+            onClick={() => window.location.reload()}
             className="p-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-black dark:text-zinc-100 rounded-lg hover:scale-[1.01] active:scale-95 transition-all cursor-pointer"
-            title="Refresh Data"
+            title="Refresh Page"
           >
             <RefreshCw size={13} />
           </button>

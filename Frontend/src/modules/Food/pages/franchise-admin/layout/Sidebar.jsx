@@ -24,17 +24,33 @@ export default function Sidebar({ isOpen, onClose, isCollapsed = false, onToggle
   }, [])
 
   const displayCollapsed = isCollapsed
-  const [expandedGroups, setExpandedGroups] = useState({
-    "STORE MANAGEMENT": true,
-    "STAFF MANAGEMENT": true,
-    "ORDERS": true,
-    "PRODUCTS": false,
-    "INVENTORY": false,
-    "CUSTOMERS": false,
-    "FINANCE": false,
-    "MARKETING": false,
-    "REPORTS": false,
+  const [expandedGroups, setExpandedGroups] = useState(() => {
+    const initialState = {}
+    franchiseAdminSidebarMenu.forEach(item => {
+      if (item.type === "section") {
+        initialState[item.label] = item.items.some(subItem => location.pathname === subItem.path)
+      }
+    })
+    return initialState
   })
+
+  useEffect(() => {
+    setExpandedGroups(prev => {
+      const newState = { ...prev }
+      let changed = false
+      franchiseAdminSidebarMenu.forEach(item => {
+        if (item.type === "section") {
+          if (item.items.some(subItem => location.pathname === subItem.path)) {
+            if (!newState[item.label]) {
+              newState[item.label] = true
+              changed = true
+            }
+          }
+        }
+      })
+      return changed ? newState : prev
+    })
+  }, [location.pathname])
 
   const toggleGroup = (groupTitle) => {
     setExpandedGroups(prev => ({
