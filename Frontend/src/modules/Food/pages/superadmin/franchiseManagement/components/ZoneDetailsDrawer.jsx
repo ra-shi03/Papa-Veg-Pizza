@@ -10,7 +10,7 @@ export default function ZoneDetailsDrawer({ isOpen, onClose, zone, onEdit, onAss
   const [isLoading, setIsLoading] = useState(false);
 
   const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
+    id: "google-map-script",
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     libraries: LIBRARIES,
     version: "3.64"

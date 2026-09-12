@@ -38,13 +38,14 @@ export default function TerritoryDetails({
   const [postalSearch, setPostalSearch] = useState("");
 
   const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
+    id: "google-map-script",
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     libraries: LIBRARIES,
     version: "3.64"
   });
 
   const [detailedTerritory, setDetailedTerritory] = useState(null);
+  const [zoneCoordinates, setZoneCoordinates] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
   // Calculate polygon paths and map center
@@ -61,7 +62,17 @@ export default function TerritoryDetails({
         setIsLoading(true);
         try {
           const response = await apiClient.get(`/food/admin/territories/${territory.id}`);
-          setDetailedTerritory(response.data.data);
+          const detailed = response.data.data;
+          setDetailedTerritory(detailed);
+          
+          const zoneId = typeof detailed.zoneId === 'object' ? (detailed.zoneId._id || detailed.zoneId.id) : detailed.zoneId;
+          if (zoneId) {
+            const zonesRes = await apiClient.get('/food/admin/zones');
+            const currentZone = (zonesRes?.data?.data || []).find(z => (z.id || z._id) === zoneId);
+            if (currentZone && currentZone.coordinates) {
+              setZoneCoordinates(currentZone.coordinates);
+            }
+          }
         } catch (error) {
           console.error("Failed to fetch territory details", error);
         } finally {
@@ -251,20 +262,37 @@ export default function TerritoryDetails({
                 {isLoaded ? (
                   <GoogleMap
                     mapContainerStyle={{ width: '100%', height: '100%' }}
-                    center={mapCenter}
-                    zoom={polygonPaths.length > 0 ? 12 : 4}
-                    options={{ disableDefaultUI: true, gestureHandling: 'greedy' }}
+                    center={polygonPaths.length > 0 ? polygonPaths[0] : (zoneCoordinates && zoneCoordinates.length > 0 ? { lat: parseFloat(zoneCoordinates[0].latitude || zoneCoordinates[0][1]), lng: parseFloat(zoneCoordinates[0].longitude || zoneCoordinates[0][0]) } : mapCenter)}
+                    zoom={polygonPaths.length > 0 ? 12 : (zoneCoordinates && zoneCoordinates.length > 0 ? 10 : 4)}
+                    options={{ disableDefaultUI: true, gestureHandling: 'cooperative', zoomControl: true }}
                   >
+                    {zoneCoordinates && zoneCoordinates.length > 0 && (
+                      <Polygon
+                        paths={zoneCoordinates.map(c => ({ lat: parseFloat(c.latitude || c[1]), lng: parseFloat(c.longitude || c[0]) }))}
+                        options={{
+                          fillColor: "#9ca3af",
+                          fillOpacity: 0.2,
+                          strokeWeight: 2,
+                          strokeColor: "#9ca3af",
+                          clickable: false,
+                          editable: false,
+                          draggable: false,
+                          zIndex: 0,
+                        }}
+                      />
+                    )}
                     {polygonPaths.length > 0 && (
                       <Polygon
                         paths={polygonPaths}
                         options={{
                           fillColor: "var(--primary)",
-                          fillOpacity: 0.12,
+                          fillOpacity: 0.2,
+                          strokeWeight: 2,
                           strokeColor: "var(--primary)",
-                          strokeOpacity: 1,
-                          strokeWeight: 1.5,
                           clickable: false,
+                          editable: false,
+                          draggable: false,
+                          zIndex: 1,
                         }}
                       />
                     )}

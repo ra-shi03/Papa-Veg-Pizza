@@ -35,7 +35,7 @@ export const createFranchise = async (req, res) => {
                 franchiseCode,
                 regionId,
                 zoneId,
-                territoryId,
+
                 city,
                 state,
                 type,
@@ -131,7 +131,7 @@ export const createFranchise = async (req, res) => {
                 franchiseCode: normalizedCode,
                 regionId,
                 zoneId,
-                territoryId,
+
                 city,
                 state,
                 type,
@@ -198,11 +198,20 @@ export const getFranchises = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
-        // Populate region names manually
-        const regions = await FoodRegion.find().lean();
+        // Populate region and zone names manually
+        const [regions, zones] = await Promise.all([
+            FoodRegion.find().lean(),
+            FoodZone.find().lean()
+        ]);
+        
         const regionMap = {};
         regions.forEach(r => {
             regionMap[r._id.toString()] = r;
+        });
+
+        const zoneMap = {};
+        zones.forEach(z => {
+            zoneMap[z._id.toString()] = z;
         });
 
         const mappedFranchises = franchises.map(f => {
@@ -212,6 +221,11 @@ export const getFranchises = async (req, res) => {
                 // Hardcoded fallback for 'reg-2' if it exists in DB without a valid region
                 f.regionId = { name: 'Region 2 (Fallback)', _id: 'reg-2' };
             }
+            
+            if (f.zoneId && zoneMap[f.zoneId]) {
+                f.zoneId = zoneMap[f.zoneId];
+            }
+            
             return f;
         });
 
@@ -267,16 +281,14 @@ export const getMyFranchise = async (req, res) => {
             return sendError(res, 404, 'No franchise linked to your account');
         }
 
-        // Fetch Region, Zone, Territory names
-        const [region, zone, territory] = await Promise.all([
+        // Fetch Region, Zone names
+        const [region, zone] = await Promise.all([
             franchise.regionId && mongoose.Types.ObjectId.isValid(franchise.regionId) ? FoodRegion.findById(franchise.regionId).lean() : null,
-            franchise.zoneId && mongoose.Types.ObjectId.isValid(franchise.zoneId) ? FoodZone.findById(franchise.zoneId).lean() : null,
-            franchise.territoryId && mongoose.Types.ObjectId.isValid(franchise.territoryId) ? FoodTerritory.findById(franchise.territoryId).lean() : null
+            franchise.zoneId && mongoose.Types.ObjectId.isValid(franchise.zoneId) ? FoodZone.findById(franchise.zoneId).lean() : null
         ]);
         
         franchise.regionName = region ? region.name : '';
         franchise.zoneName = zone ? zone.name : '';
-        franchise.territoryName = territory ? territory.name : '';
 
         // Merge profile data so one API call returns everything the profile page needs
         return sendResponse(res, 200, 'My franchise fetched successfully', {

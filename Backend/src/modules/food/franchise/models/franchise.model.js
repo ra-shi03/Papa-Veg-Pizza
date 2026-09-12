@@ -54,7 +54,6 @@ const franchiseSchema = new mongoose.Schema(
         },
         regionId: { type: String, trim: true, default: '' },
         zoneId: { type: String, trim: true, default: '' },
-        territoryId: { type: String, trim: true, default: '' },
         city: { type: String, trim: true, default: '' },
         state: { type: String, trim: true, default: '' },
         gender: { type: String, trim: true, default: '' },

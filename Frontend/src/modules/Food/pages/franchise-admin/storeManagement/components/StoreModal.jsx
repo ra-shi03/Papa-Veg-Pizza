@@ -1,6 +1,38 @@
 import React, { useState, useEffect } from "react"
-import { Building2, MapPin, Settings, User, X, Check, ArrowRight, ArrowLeft } from "lucide-react"
+import { Building2, MapPin, Settings, User, X, Check, ArrowRight, ArrowLeft, Navigation } from "lucide-react"
+import { toast } from "sonner"
 import { adminAPI } from "@food/api"
+import apiClient from "@food/api/axios"
+import { GoogleMap, useJsApiLoader, Polygon, Marker, useGoogleMap } from "@react-google-maps/api"
+
+// Helper component to trigger bounds fitting when territory/zone changes
+function MapBoundsFitter({ territoryCoordinates, zoneCoordinates, hasTerritory }) {
+  const map = useGoogleMap();
+  useEffect(() => {
+    if (map && window.google) {
+      if (hasTerritory && territoryCoordinates.length > 0) {
+        const bounds = new window.google.maps.LatLngBounds();
+        territoryCoordinates.forEach(c => {
+          bounds.extend(new window.google.maps.LatLng(
+            parseFloat(c.latitude || c[1]), 
+            parseFloat(c.longitude || c[0])
+          ));
+        });
+        map.fitBounds(bounds);
+      } else if (!hasTerritory && zoneCoordinates && zoneCoordinates.length > 0) {
+        const bounds = new window.google.maps.LatLngBounds();
+        zoneCoordinates.forEach(c => {
+          bounds.extend(new window.google.maps.LatLng(
+            parseFloat(c.latitude || c[1]), 
+            parseFloat(c.longitude || c[0])
+          ));
+        });
+        map.fitBounds(bounds);
+      }
+    }
+  }, [map, territoryCoordinates, zoneCoordinates, hasTerritory]);
+  return null;
+}
 
 export default function StoreModal({ isOpen, onClose, onConfirm, store = null }) {
   const isEdit = !!store
@@ -11,17 +43,26 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
   // Form State
   const [storeName, setStoreName] = useState("")
   const [storeCode, setStoreCode] = useState("")
-  const [storeType, setStoreType] = useState("Regular")
+  const [storeType, setStoreType] = useState("DELIVERY_CARRYOUT")
+  const [fulfillmentModes, setFulfillmentModes] = useState(["Delivery", "Takeaway"])
   const [phone, setPhone] = useState("")
   const [email, setEmail] = useState("")
 
   // Address State
   const [addressLine1, setAddressLine1] = useState("")
-  const [city, setCity] = useState("")
-  const [state, setState] = useState("")
+  const [regionName, setRegionName] = useState("")
+  const [zoneName, setZoneName] = useState("")
+  const [territoryId, setTerritoryId] = useState("")
+  const [territories, setTerritories] = useState([])
   const [pincode, setPincode] = useState("")
   const [latitude, setLatitude] = useState(22.7196)
   const [longitude, setLongitude] = useState(75.8763)
+  const [zoneCoordinates, setZoneCoordinates] = useState([])
+
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
+  })
 
   // Manager & Capacity State
   const [managerId, setManagerId] = useState("")
@@ -42,16 +83,84 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
         .catch(() => setManagers([]))
         .finally(() => setLoadingManagers(false))
 
+      // Fetch Franchise context & Territories
+      Promise.allSettled([
+        adminAPI.getMyFranchise(),
+        apiClient.get('/food/admin/territories'),
+        apiClient.get('/food/admin/zones'),
+        apiClient.get('/food/admin/regions'),
+        adminAPI.getStores()
+      ]).then(([franchiseResult, territoriesResult, zonesResult, regionsResult, storesResult]) => {
+        const rawFranchiseData = franchiseResult.status === 'fulfilled' ? franchiseResult.value?.data?.data : null;
+        const franchise = rawFranchiseData?.franchise || rawFranchiseData;
+
+        const extractArray = (res) => {
+          if (res.status !== 'fulfilled') return [];
+          if (Array.isArray(res.value?.data?.data)) return res.value.data.data;
+          if (Array.isArray(res.value?.data)) return res.value.data;
+          return [];
+        };
+        
+        if (franchise) {
+          const franchiseZoneId = typeof franchise.zoneId === 'object' ? franchise.zoneId?._id || franchise.zoneId?.id : franchise.zoneId;
+          const franchiseRegionId = typeof franchise.regionId === 'object' ? franchise.regionId?._id || franchise.regionId?.id : franchise.regionId;
+          
+          const allZones = extractArray(zonesResult);
+          const allRegions = extractArray(regionsResult);
+          
+          const currentZone = allZones.find(z => (z.id || z._id) === franchiseZoneId);
+          const currentRegion = allRegions.find(r => (r.id || r._id) === franchiseRegionId);
+          
+          setRegionName(currentRegion?.name || franchise.regionId?.name || franchise.regionId || "Unknown");
+          setZoneName(currentZone?.name || franchise.zoneId?.name || franchise.zoneId || "Unknown");
+          
+          const allTerritories = extractArray(territoriesResult);
+          const existingStores = extractArray(storesResult);
+
+          
+          // Find territoryIds of existing stores (ignore the current store being edited)
+          const occupiedTerritoryIds = existingStores
+             .filter(s => s._id !== store?._id && s.id !== store?.id)
+             .map(s => s.territoryId || s.address?.territoryId)
+             .filter(Boolean);
+
+          console.log("Franchise Zone ID:", franchiseZoneId);
+          console.log("All Territories:", allTerritories);
+
+          const filtered = allTerritories.filter(t => {
+             const tZoneId = typeof t.zoneId === 'object' ? t.zoneId._id || t.zoneId.id : t.zoneId;
+             const isSameZone = String(tZoneId) === String(franchiseZoneId);
+             const isActive = t.status === "Active";
+             const tId = t.id || t._id;
+             const isNotOccupied = !occupiedTerritoryIds.includes(tId);
+             
+             // Debug log
+             console.log(`Territory ${t.name}: Zone Match=${isSameZone}(${tZoneId}), Active=${isActive}(${t.status}), NotOccupied=${isNotOccupied}`);
+             
+             return isSameZone && isActive && isNotOccupied;
+          });
+          
+          // If filtered is empty but there are territories, maybe just show them all for debugging
+          setTerritories(filtered.length > 0 ? filtered : allTerritories.map(t => ({...t, name: `[DEBUG] ${t.name} (Z:${t.zoneId} S:${t.status})`})));
+
+          if (currentZone && currentZone.coordinates) {
+             setZoneCoordinates(currentZone.coordinates);
+          } else {
+             setZoneCoordinates([]);
+          }
+        }
+      }).catch(console.error);
+
       if (store) {
         setStoreName(store.storeName || "")
         setStoreCode(store.storeCode || "")
-        setStoreType(store.storeType || "Regular")
+        setStoreType(store.storeType || "DELIVERY_CARRYOUT")
+        setFulfillmentModes(store.fulfillmentModes || ["Delivery", "Takeaway"])
         setPhone(store.phone || "")
         setEmail(store.email || "")
 
         setAddressLine1(store.address?.line1 || "")
-        setCity(store.address?.city || "")
-        setState(store.address?.state || "")
+        setTerritoryId(store.territoryId || store.address?.territoryId || "")
         setPincode(store.address?.pincode || "")
         setLatitude(store.address?.coordinates?.[1] || 22.7196)
         setLongitude(store.address?.coordinates?.[0] || 75.8763)
@@ -63,13 +172,13 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
       } else {
         setStoreName("")
         setStoreCode("")
-        setStoreType("Regular")
+        setStoreType("DELIVERY_CARRYOUT")
+        setFulfillmentModes(["Delivery", "Takeaway"])
         setPhone("")
         setEmail("")
 
         setAddressLine1("")
-        setCity("")
-        setState("")
+        setTerritoryId("")
         setPincode("")
         setLatitude(22.7196)
         setLongitude(75.8763)
@@ -84,18 +193,41 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
 
   if (!isOpen) return null
 
-  // Interactive Mock Map Click Handler
-  const handleMapClick = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-    
-    // Simulate latitude & longitude calculations based on Indore area bounds
-    const simulatedLat = (22.8 - (y / rect.height) * 0.15).toFixed(4)
-    const simulatedLng = (75.8 + (x / rect.width) * 0.15).toFixed(4)
-    
-    setLatitude(parseFloat(simulatedLat))
-    setLongitude(parseFloat(simulatedLng))
+  const handleFetchLocation = () => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setLatitude(position.coords.latitude)
+          setLongitude(position.coords.longitude)
+          
+          if (window.google && window.google.maps) {
+            const geocoder = new window.google.maps.Geocoder()
+            geocoder.geocode({ location: { lat: position.coords.latitude, lng: position.coords.longitude } }, (results, status) => {
+              if (status === "OK" && results[0]) {
+                const addressComponents = results[0].address_components
+                setAddressLine1(results[0].formatted_address)
+                
+                const pin = addressComponents.find(c => c.types.includes("postal_code"))
+                if (pin) setPincode(pin.long_name)
+              }
+            })
+          }
+        },
+        (error) => {
+          console.error("Error fetching location:", error)
+          alert("Unable to fetch location. Please ensure location permissions are granted.")
+        }
+      )
+    } else {
+      alert("Geolocation is not supported by your browser.")
+    }
+  }
+
+  const handleGoogleMapClick = (e) => {
+    if (e.latLng) {
+      setLatitude(e.latLng.lat())
+      setLongitude(e.latLng.lng())
+    }
   }
 
   const handleNext = () => {
@@ -105,8 +237,8 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
         return
       }
     } else if (step === 2) {
-      if (!addressLine1 || !city || !state || !pincode) {
-        alert("Please fill in all address details.")
+      if (!addressLine1 || !territoryId || !pincode) {
+        alert("Please fill in all address details, including territory.")
         return
       }
     }
@@ -128,15 +260,17 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
       storeName,
       storeCode,
       storeType,
+      fulfillmentModes,
       phone,
       email,
       address: {
         line1: addressLine1,
-        city,
-        state,
+        city: regionName, // Fallback mappings for old fields
+        state: zoneName,
         pincode,
         coordinates: [longitude, latitude]
       },
+      territoryId,
       managerId,
       maxOrdersHour,
       maxKitchenCapacity,
@@ -253,9 +387,10 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
                       onChange={(e) => setStoreType(e.target.value)}
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                     >
-                      <option value="Regular">Regular</option>
-                      <option value="Express">Express</option>
-                      <option value="Cloud Kitchen">Cloud Kitchen</option>
+                      <option value="DELIVERY_CARRYOUT">Delivery & Carryout</option>
+                      <option value="DINE_IN">Dine-In</option>
+                      <option value="EXPRESS">Express</option>
+                      <option value="KIOSK">Kiosk</option>
                     </select>
                   </div>
                   <div>
@@ -286,6 +421,33 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                   />
                 </div>
+
+                <div className="pt-2">
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
+                    Supported Orders (Fulfillment Modes) *
+                  </label>
+                  <div className="flex gap-6">
+                    {["Delivery", "Takeaway", "Dine-In"].map((mode) => (
+                      <label key={mode} className="flex items-center gap-2.5 cursor-pointer group">
+                        <input
+                          type="checkbox"
+                          checked={fulfillmentModes.includes(mode)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFulfillmentModes((prev) => [...prev, mode])
+                            } else {
+                              setFulfillmentModes((prev) => prev.filter((m) => m !== mode))
+                            }
+                          }}
+                          className="w-4.5 h-4.5 rounded border-slate-300 dark:border-slate-700 text-primary focus:ring-primary focus:ring-offset-0 bg-slate-50 dark:bg-slate-900 cursor-pointer transition-colors"
+                        />
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
+                          {mode}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -295,8 +457,16 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
                 {/* Form Fields */}
                 <div className="col-span-5 space-y-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
-                      Address Line 1 *
+                    <label className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                      <span>Address Line 1 *</span>
+                      <button
+                        type="button"
+                        onClick={handleFetchLocation}
+                        className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 font-bold bg-primary/10 px-2 py-0.5 rounded-full transition-colors"
+                      >
+                        <Navigation size={10} />
+                        Fetch Location
+                      </button>
                     </label>
                     <input
                       type="text"
@@ -311,30 +481,45 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
-                        City *
+                        Region *
                       </label>
                       <input
                         type="text"
-                        required
-                        placeholder="e.g. Indore"
-                        value={city}
-                        onChange={(e) => setCity(e.target.value)}
-                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+                        readOnly
+                        value={regionName}
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none opacity-80 cursor-not-allowed"
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
-                        State *
+                        Zone *
                       </label>
                       <input
                         type="text"
-                        required
-                        placeholder="Madhya Pradesh"
-                        value={state}
-                        onChange={(e) => setState(e.target.value)}
-                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+                        readOnly
+                        value={zoneName}
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none opacity-80 cursor-not-allowed"
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                      Territory *
+                    </label>
+                    <select
+                      required
+                      value={territoryId}
+                      onChange={(e) => setTerritoryId(e.target.value)}
+                      className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="">Select Territory</option>
+                      {territories.map((t) => (
+                        <option key={t.id || t._id} value={t.id || t._id}>
+                          {t.name || t.territoryName}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
@@ -363,48 +548,105 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
                   </div>
                 </div>
 
-                {/* Mock Interactive Map Picker */}
+                {/* Real Google Map Picker */}
                 <div className="col-span-7 flex flex-col">
                   <span className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
                     Click Map to Place Pin
                   </span>
-                  <div
-                    onClick={handleMapClick}
-                    className="relative flex-1 min-h-[220px] rounded-2xl border border-slate-250 dark:border-slate-800 bg-slate-900 overflow-hidden cursor-crosshair group select-none shadow-inner"
-                  >
-                    {/* SVG Mock Map Layout */}
-                    <svg className="w-full h-full opacity-30 stroke-slate-700 fill-none" viewBox="0 0 100 100">
-                      <path d="M 0 10 Q 30 15 50 30 T 100 20" strokeWidth="0.8" />
-                      <path d="M 10 0 Q 30 40 40 70 T 80 100" strokeWidth="0.8" />
-                      <path d="M 0 50 Q 50 60 70 50 T 100 80" strokeWidth="0.8" />
-                      <circle cx="50" cy="50" r="10" strokeWidth="0.4" strokeDasharray="2,2" />
-                      <circle cx="50" cy="50" r="25" strokeWidth="0.4" strokeDasharray="2,2" />
-                    </svg>
-
-                    {/* Central Grid Map Labels */}
-                    <div className="absolute inset-0 flex flex-col justify-between p-4 text-[10px] font-bold text-slate-600 dark:text-slate-500 pointer-events-none">
-                      <div className="flex justify-between">
-                        <span>Indore Central Grid</span>
-                        <span>Palasia Area</span>
+                  <div className="relative flex-1 min-h-[220px] rounded-2xl border border-slate-250 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 overflow-hidden shadow-inner">
+                    {isLoaded ? (
+                      (() => {
+                        const selectedTerritory = territories.find(t => (t.id || t._id) === territoryId)
+                        const territoryCoordinates = selectedTerritory?.coordinates || []
+                        const hasTerritory = territoryCoordinates.length > 0;
+                        
+                        // We need a tiny internal component to use the GoogleMap instance via useEffect if we aren't tracking it in parent state
+                        // Or we can just use the onLoad pattern with a ref
+                        
+                        return (
+                          <GoogleMap
+                            mapContainerStyle={{ width: '100%', height: '100%' }}
+                            center={{ lat: latitude, lng: longitude }}
+                            zoom={13}
+                            options={{ disableDefaultUI: true, gestureHandling: 'greedy', zoomControl: true }}
+                            onClick={handleGoogleMapClick}
+                            onLoad={(map) => {
+                              // Initial load bounds
+                              if (hasTerritory && window.google) {
+                                const bounds = new window.google.maps.LatLngBounds();
+                                territoryCoordinates.forEach(c => {
+                                  bounds.extend(new window.google.maps.LatLng(
+                                    parseFloat(c.latitude || c[1]), 
+                                    parseFloat(c.longitude || c[0])
+                                  ));
+                                });
+                                map.fitBounds(bounds);
+                              } else if (zoneCoordinates && zoneCoordinates.length > 0 && window.google) {
+                                const bounds = new window.google.maps.LatLngBounds();
+                                zoneCoordinates.forEach(c => {
+                                  bounds.extend(new window.google.maps.LatLng(
+                                    parseFloat(c.latitude || c[1]), 
+                                    parseFloat(c.longitude || c[0])
+                                  ));
+                                });
+                                map.fitBounds(bounds);
+                              }
+                              // Attach to window so we can trigger it from outside, or store it
+                              window.__storeModalMap = map;
+                            }}
+                          >
+                            {/* Hidden functional component to trigger bounds changes */}
+                            <MapBoundsFitter 
+                              territoryCoordinates={territoryCoordinates} 
+                              zoneCoordinates={zoneCoordinates} 
+                              hasTerritory={hasTerritory} 
+                            />
+                            {!hasTerritory && zoneCoordinates && zoneCoordinates.length > 0 && (
+                              <Polygon
+                                paths={zoneCoordinates.map(c => ({ lat: parseFloat(c.latitude || c[1]), lng: parseFloat(c.longitude || c[0]) }))}
+                                options={{
+                                  fillColor: "var(--primary)",
+                                  fillOpacity: 0.15,
+                                  strokeWeight: 2,
+                                  strokeColor: "var(--primary)",
+                                  clickable: false,
+                                  editable: false,
+                                  draggable: false,
+                                }}
+                              />
+                            )}
+                            {hasTerritory && (
+                              <Polygon
+                                paths={territoryCoordinates.map(c => ({ lat: parseFloat(c.latitude || c[1]), lng: parseFloat(c.longitude || c[0]) }))}
+                                options={{
+                                  fillColor: "#10b981",
+                                  fillOpacity: 0.25,
+                                  strokeWeight: 2,
+                                  strokeColor: "#059669",
+                                  clickable: false,
+                                  editable: false,
+                                  draggable: false,
+                                }}
+                              />
+                            )}
+                            <Marker 
+                              position={{ lat: latitude, lng: longitude }}
+                              draggable={true}
+                              onDragEnd={(e) => {
+                                if (e.latLng) {
+                                  setLatitude(e.latLng.lat())
+                                  setLongitude(e.latLng.lng())
+                                }
+                              }}
+                            />
+                          </GoogleMap>
+                        )
+                      })()
+                    ) : (
+                      <div className="flex items-center justify-center w-full h-full text-[10px] text-slate-500 font-bold">
+                        Loading Map...
                       </div>
-                      <div className="flex justify-between">
-                        <span>Vijay Nagar Sector</span>
-                        <span>Rajwada Block</span>
-                      </div>
-                    </div>
-
-                    {/* Draggable Red Marker */}
-                    <div
-                      className="absolute w-8 h-8 pointer-events-none transition-all duration-300 ease-out"
-                      style={{
-                        left: `${((longitude - 75.8) / 0.15) * 100}%`,
-                        top: `${((22.8 - latitude) / 0.15) * 100}%`,
-                        transform: "translate(-50%, -100%)"
-                      }}
-                    >
-                      <MapPin className="w-8 h-8 text-primary fill-red-500/30 filter drop-shadow animate-bounce" />
-                      <div className="w-2.5 h-1 bg-black/40 rounded-full mx-auto -mt-0.5 filter blur-xs" />
-                    </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -448,43 +690,7 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 pt-2">
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                        Max Orders Per Hour
-                      </label>
-                      <span className="text-xs font-bold text-primary">{maxOrdersHour} orders</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={10}
-                      max={150}
-                      step={5}
-                      value={maxOrdersHour}
-                      onChange={(e) => setMaxOrdersHour(parseInt(e.target.value))}
-                      className="w-full accent-primary bg-slate-100 dark:bg-slate-800 h-1.5 rounded-lg cursor-pointer"
-                    />
-                  </div>
 
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                        Max Kitchen Capacity
-                      </label>
-                      <span className="text-xs font-bold text-primary">{maxKitchenCapacity}% capacity</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={50}
-                      max={200}
-                      step={10}
-                      value={maxKitchenCapacity}
-                      onChange={(e) => setMaxKitchenCapacity(parseInt(e.target.value))}
-                      className="w-full accent-primary bg-slate-100 dark:bg-slate-800 h-1.5 rounded-lg cursor-pointer"
-                    />
-                  </div>
-                </div>
               </div>
             )}
 

@@ -420,42 +420,51 @@ export default function TerritoryManagement() {
       />
 
       {/* View Details Drawer */}
-      <TerritoryDetails
-        isOpen={isDetailsDrawerOpen}
-        onClose={() => setIsDetailsDrawerOpen(false)}
-        territory={selectedTerritory}
-        franchises={franchises}
-        onEdit={(t) => {
-          setIsDetailsDrawerOpen(false);
-          setEditTerritoryData(t);
-          setIsAddEditModalOpen(true);
-        }}
-        onStatusToggle={(t) => {
-          const nextStatus = t.status === "Active" ? "Inactive" : "Active";
-          triggerStatusChange(t, nextStatus);
-        }}
-      />
+      {isDetailsDrawerOpen && (
+        <TerritoryDetails
+          isOpen={isDetailsDrawerOpen}
+          onClose={() => setIsDetailsDrawerOpen(false)}
+          territory={selectedTerritory}
+          franchises={franchises}
+          onEdit={(t) => {
+            setIsDetailsDrawerOpen(false);
+            setEditTerritoryData(t);
+            setIsAddEditModalOpen(true);
+          }}
+          onStatusToggle={(t) => {
+            const nextStatus = t.status === "Active" ? "Inactive" : "Active";
+            triggerStatusChange(t, nextStatus);
+          }}
+        />
+      )}
 
       {/* Add Territory Wizard Modal */}
-      <AddTerritoryModal
-        isOpen={isAddEditModalOpen && !editTerritoryData}
-        onClose={() => setIsAddEditModalOpen(false)}
-        onSubmit={handleTerritorySubmit}
-        regions={regions}
-        zones={zones}
-        existingTerritories={territories}
-      />
+      {(isAddEditModalOpen && !editTerritoryData) && (
+        <AddTerritoryModal
+          isOpen={isAddEditModalOpen && !editTerritoryData}
+          onClose={() => setIsAddEditModalOpen(false)}
+          onSubmit={handleTerritorySubmit}
+          regions={regions}
+          zones={zones}
+          existingTerritories={territories}
+        />
+      )}
 
       {/* Edit Territory Wizard Modal */}
-      <EditTerritoryModal
-        isOpen={isAddEditModalOpen && !!editTerritoryData}
-        onClose={() => setIsAddEditModalOpen(false)}
-        onSubmit={handleTerritorySubmit}
-        regions={regions}
-        zones={zones}
-        existingTerritories={territories}
-        editTerritory={editTerritoryData}
-      />
+      {(isAddEditModalOpen && !!editTerritoryData) && (
+        <EditTerritoryModal
+          isOpen={isAddEditModalOpen && !!editTerritoryData}
+          onClose={() => {
+            setIsAddEditModalOpen(false);
+            setEditTerritoryData(null);
+          }}
+          onSubmit={handleTerritorySubmit}
+          regions={regions}
+          zones={zones}
+          existingTerritories={territories}
+          editTerritory={editTerritoryData}
+        />
+      )}
 
 
 

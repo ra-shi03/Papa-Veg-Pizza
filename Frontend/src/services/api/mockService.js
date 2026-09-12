@@ -611,6 +611,12 @@ const initialMockDeliveryTracking = [
 ];
 
 // Initialize Database Collections
+// One-time clear of mock stores to forcefully remove mock data for the user
+if (typeof localStorage !== "undefined" && !localStorage.getItem("mock_db_stores_cleared")) {
+  localStorage.removeItem("mock_db_stores");
+  localStorage.setItem("mock_db_stores_cleared", "true");
+}
+
 let db = {
   categories: getStorageItem("categories", initialCategories),
   restaurants: getStorageItem("restaurants", initialRestaurants),
@@ -2871,7 +2877,7 @@ export function handleMockRequest(config) {
       openNowCount: openNow,
       closedStoresCount: closedStores,
       averageRating: parseFloat(avgRating),
-      ordersToday: 1246
+      ordersToday: 0
     });
   }
 

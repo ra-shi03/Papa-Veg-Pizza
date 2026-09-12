@@ -146,7 +146,7 @@ export default function Navbar({ onToggleSidebar, isCollapsed }) {
                   }`}
                 >
                   {f.name}
-                  {f.regionId && <span className="text-[10px] opacity-70 ml-1">({typeof f.regionId === "object" ? f.regionId.name : f.regionId})</span>}
+                  {f.zoneId && <span className="text-[10px] opacity-70 ml-1">({typeof f.zoneId === "object" ? f.zoneId.name : f.zoneId})</span>}
                 </button>
               ))}
             </div>

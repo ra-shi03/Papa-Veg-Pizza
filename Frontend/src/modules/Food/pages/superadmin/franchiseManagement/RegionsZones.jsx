@@ -546,77 +546,91 @@ export default function RegionsZones() {
       )}
 
       {/* Region details drawer */}
-      <RegionDetailsDrawer
-        isOpen={isRegionDrawerOpen}
-        onClose={() => setIsRegionDrawerOpen(false)}
-        region={selectedRegion}
-        onEdit={(r) => {
-          setIsRegionDrawerOpen(false);
-          setEditRegionData(r);
-          setIsEditRegionModalOpen(true);
-        }}
-      />
+      {/* Modals & Drawers */}
+      {isRegionDrawerOpen && (
+        <RegionDetailsDrawer
+          isOpen={isRegionDrawerOpen}
+          onClose={() => setIsRegionDrawerOpen(false)}
+          region={selectedRegion}
+          onEdit={(r) => {
+            setIsRegionDrawerOpen(false);
+            setEditRegionData(r);
+            setIsEditRegionModalOpen(true);
+          }}
+        />
+      )}
 
-      {/* Zone details drawer */}
-      <ZoneDetailsDrawer
-        isOpen={isZoneDrawerOpen}
-        onClose={() => setIsZoneDrawerOpen(false)}
-        zone={selectedZone}
-        onEdit={(z) => {
-          setIsZoneDrawerOpen(false);
-          setEditZoneData(z);
-          setIsEditZoneModalOpen(true);
-        }}
-        onAssignTerritory={(z) => {
-          setIsZoneDrawerOpen(false);
-          setSelectedZone(z);
-          setIsAssignTerritoryOpen(true);
-        }}
-      />
+      {isZoneDrawerOpen && (
+        <ZoneDetailsDrawer
+          isOpen={isZoneDrawerOpen}
+          onClose={() => setIsZoneDrawerOpen(false)}
+          zone={selectedZone}
+          onEdit={(z) => {
+            setIsZoneDrawerOpen(false);
+            setEditZoneData(z);
+            setIsEditZoneModalOpen(true);
+          }}
+          onAssignTerritory={(z) => {
+            setIsZoneDrawerOpen(false);
+            setSelectedZone(z);
+            setIsAssignTerritoryOpen(true);
+          }}
+        />
+      )}
 
       {/* Add Region Modal */}
-      <AddRegionModal
-        isOpen={isRegionModalOpen}
-        onClose={() => setIsRegionModalOpen(false)}
-        onSubmit={handleAddRegionSubmit}
-        existingRegions={regions}
-      />
+      {isRegionModalOpen && (
+        <AddRegionModal
+          isOpen={isRegionModalOpen}
+          onClose={() => setIsRegionModalOpen(false)}
+          onSubmit={handleAddRegionSubmit}
+          existingRegions={regions}
+        />
+      )}
 
       {/* Edit Region Modal */}
-      <EditRegionModal
-        isOpen={isEditRegionModalOpen}
-        onClose={() => setIsEditRegionModalOpen(false)}
-        onSubmit={handleEditRegionSubmit}
-        existingRegions={regions}
-        editRegion={editRegionData}
-      />
+      {isEditRegionModalOpen && (
+        <EditRegionModal
+          isOpen={isEditRegionModalOpen}
+          onClose={() => setIsEditRegionModalOpen(false)}
+          onSubmit={handleEditRegionSubmit}
+          existingRegions={regions}
+          editRegion={editRegionData}
+        />
+      )}
 
       {/* Add Zone Modal */}
-      <AddZoneModal
-        isOpen={isZoneModalOpen}
-        onClose={() => setIsZoneModalOpen(false)}
-        onSubmit={handleAddZoneSubmit}
-        regions={regions}
-        existingZones={zones}
-      />
+      {isZoneModalOpen && (
+        <AddZoneModal
+          isOpen={isZoneModalOpen}
+          onClose={() => setIsZoneModalOpen(false)}
+          onSubmit={handleAddZoneSubmit}
+          regions={regions}
+          existingZones={zones}
+        />
+      )}
 
       {/* Edit Zone Modal */}
-      <EditZoneModal
-        isOpen={isEditZoneModalOpen}
-        onClose={() => setIsEditZoneModalOpen(false)}
-        onSubmit={handleEditZoneSubmit}
-        regions={regions}
-        existingZones={zones}
-        editZone={editZoneData}
-      />
+      {isEditZoneModalOpen && (
+        <EditZoneModal
+          isOpen={isEditZoneModalOpen}
+          onClose={() => setIsEditZoneModalOpen(false)}
+          onSubmit={handleEditZoneSubmit}
+          regions={regions}
+          existingZones={zones}
+          editZone={editZoneData}
+        />
+      )}
 
       {/* Assign Territory Modal */}
-      <AssignTerritoryModal
-        isOpen={isAssignTerritoryOpen}
-        onClose={() => setIsAssignTerritoryOpen(false)}
-        onSubmit={handleSaveAssignments}
-        zone={selectedZone}
-      />
+      {isAssignTerritoryOpen && (
+        <AssignTerritoryModal
+          isOpen={isAssignTerritoryOpen}
+          onClose={() => setIsAssignTerritoryOpen(false)}
+          onSubmit={handleSaveAssignments}
+          zone={selectedZone}
+        />
+      )}
 
       {/* Custom Archive Confirmation Alert Modal */}
       {isArchiveConfirmOpen && archiveTarget && (

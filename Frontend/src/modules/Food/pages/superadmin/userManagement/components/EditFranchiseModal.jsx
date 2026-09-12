@@ -17,7 +17,6 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
     franchiseCode: "",
     regionId: "",
     zoneId: "",
-    territoryId: "",
     type: "Single Store",
     totalStores: 1,
     status: "ACTIVE",
@@ -37,6 +36,7 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
   const [isLoading, setIsLoading] = useState(false)
   
   const { isLoaded } = useJsApiLoader({
+    id: "google-map-script",
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     libraries
   })
@@ -47,19 +47,16 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
   // Geography Data State
   const [regions, setRegions] = useState([]);
   const [zones, setZones] = useState([]);
-  const [territories, setTerritories] = useState([]);
 
   useEffect(() => {
     const fetchGeography = async () => {
       try {
-        const [regRes, zonRes, terRes] = await Promise.all([
+        const [regRes, zonRes] = await Promise.all([
           apiClient.get('/food/admin/regions'),
-          apiClient.get('/food/admin/zones'),
-          apiClient.get('/food/admin/territories')
+          apiClient.get('/food/admin/zones')
         ]);
         setRegions((regRes.data.data || []).filter(region => region.isActive));
         setZones((zonRes.data.data || []).filter(zone => zone.isActive));
-        setTerritories((terRes.data.data || []).filter(territory => territory.isActive));
       } catch (err) {
         console.error("Failed to load geography data", err);
       }
@@ -69,7 +66,6 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
 
   // Derived dependent dropdowns
   const availableZones = zones.filter(z => z.regionId === formData.regionId);
-  const availableTerritories = territories.filter(t => t.zoneId === formData.zoneId);
 
   useEffect(() => {
     if (admin && isOpen) {
@@ -83,7 +79,6 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
         franchiseCode: admin.franchiseCode || "",
         regionId: admin.regionId || "",
         zoneId: admin.zoneId || "",
-        territoryId: admin.territoryId || "",
         type: admin.type || "Single Store",
         totalStores: admin.totalStores || 1,
         status: admin.status || "ACTIVE",
@@ -157,7 +152,7 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
     if (!formData.franchiseCode.trim()) newErrors.franchiseCode = "Franchise code is required"
     if (!formData.regionId) newErrors.regionId = "Region is required"
     if (!formData.zoneId) newErrors.zoneId = "Zone is required"
-    if (!formData.territoryId) newErrors.territoryId = "Territory is required"
+
     if (formData.totalStores < 1) newErrors.totalStores = "Must have at least 1 store"
     if (!formData.franchiseDuration || Number(formData.franchiseDuration) < 1) {
       newErrors.franchiseDuration = "Duration must be at least 1 year"
@@ -224,7 +219,7 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
     // Resolve names for the table display if needed
     const regionName = regions.find(r => r.id === formData.regionId || r._id === formData.regionId)?.name || ""
     const zoneName = zones.find(z => z.id === formData.zoneId || z._id === formData.zoneId)?.name || ""
-    const territoryName = territories.find(t => t.id === formData.territoryId || t._id === formData.territoryId)?.name || ""
+
 
     try {
       const response = await apiClient.patch(`/food/admin/franchises/${admin._id}`, formData);
@@ -504,13 +499,13 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
                   </div>
 
                   <div className="grid grid-cols-1 gap-3">
-                    {/* Region, Zone, and Territory */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Region and Zone */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Region</label>
                         <select
                           value={formData.regionId}
-                          onChange={(e) => setFormData({ ...formData, regionId: e.target.value, zoneId: "", territoryId: "" })}
+                          onChange={(e) => setFormData({ ...formData, regionId: e.target.value, zoneId: "" })}
                           className={`w-full text-xs px-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all cursor-pointer ${
                             errors.regionId ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
                           }`}
@@ -528,7 +523,7 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
                         <select
                           value={formData.zoneId}
                           disabled={!formData.regionId}
-                          onChange={(e) => setFormData({ ...formData, zoneId: e.target.value, territoryId: "" })}
+                          onChange={(e) => setFormData({ ...formData, zoneId: e.target.value })}
                           className={`w-full text-xs px-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                             errors.zoneId ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
                           }`}
@@ -539,24 +534,6 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
                           ))}
                         </select>
                         {errors.zoneId && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.zoneId}</p>}
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Territory</label>
-                        <select
-                          value={formData.territoryId}
-                          disabled={!formData.zoneId}
-                          onChange={(e) => setFormData({ ...formData, territoryId: e.target.value })}
-                          className={`w-full text-xs px-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-                            errors.territoryId ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
-                          }`}
-                        >
-                          <option value="">Select Territory...</option>
-                          {availableTerritories.map((t) => (
-                            <option key={t.id || t._id} value={t.id || t._id}>{t.name}</option>
-                          ))}
-                        </select>
-                        {errors.territoryId && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.territoryId}</p>}
                       </div>
                     </div>
                   </div>

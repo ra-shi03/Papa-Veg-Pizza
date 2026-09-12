@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { X, Check, ArrowLeft, ArrowRight, Save, Landmark, AlertTriangle, Trash2 } from "lucide-react";
 import { GoogleMap, useJsApiLoader, Polygon } from "@react-google-maps/api";
+import { toast } from "sonner";
 
 const LIBRARIES = Object.freeze(['geometry', 'places']);
 
@@ -51,7 +52,7 @@ export default function AddTerritoryModal({
   }, [isOpen]);
 
   const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
+    id: "google-map-script",
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     libraries: LIBRARIES,
     version: "3.64"
@@ -78,11 +79,26 @@ export default function AddTerritoryModal({
   const onMapClick = useCallback((e) => {
     const lat = e.latLng.lat();
     const lng = e.latLng.lng();
+    
+    // Check zone boundaries
+    const selectedZone = zones?.find(z => (z.id || z._id) === formData.zoneId);
+    const selectedZoneCoordinates = selectedZone ? selectedZone.coordinates : [];
+    
+    if (selectedZoneCoordinates && selectedZoneCoordinates.length > 0 && window.google?.maps?.geometry) {
+      const zonePolygon = new window.google.maps.Polygon({
+        paths: selectedZoneCoordinates.map(c => ({ lat: parseFloat(c.latitude || c[1]), lng: parseFloat(c.longitude || c[0]) }))
+      });
+      if (!window.google.maps.geometry.poly.containsLocation(e.latLng, zonePolygon)) {
+        toast.error("Territory must be created within the selected Zone boundaries.");
+        return;
+      }
+    }
+
     setFormData(prev => ({
       ...prev,
       coordinates: [...prev.coordinates, { latitude: lat, longitude: lng }]
     }));
-  }, []);
+  }, [formData.zoneId, zones]);
 
   const onPolygonLoad = useCallback((polygon) => {
     polygonRef.current = polygon;
@@ -92,13 +108,36 @@ export default function AddTerritoryModal({
     if (polygonRef.current) {
       const path = polygonRef.current.getPath();
       const newCoords = [];
+      
+      const selectedZone = zones?.find(z => (z.id || z._id) === formData.zoneId);
+      const selectedZoneCoordinates = selectedZone ? selectedZone.coordinates : [];
+      let allValid = true;
+      let zonePolygon = null;
+
+      if (selectedZoneCoordinates && selectedZoneCoordinates.length > 0 && window.google?.maps?.geometry) {
+        zonePolygon = new window.google.maps.Polygon({
+          paths: selectedZoneCoordinates.map(c => ({ lat: parseFloat(c.latitude || c[1]), lng: parseFloat(c.longitude || c[0]) }))
+        });
+      }
+
       for (let i = 0; i < path.getLength(); i++) {
         const latLng = path.getAt(i);
+        if (zonePolygon && !window.google.maps.geometry.poly.containsLocation(latLng, zonePolygon)) {
+          allValid = false;
+        }
         newCoords.push({ latitude: latLng.lat(), longitude: latLng.lng() });
       }
+
+      if (!allValid) {
+        toast.error("All territory boundaries must remain inside the selected Zone.");
+        // Force a re-render to discard the invalid edit
+        setFormData(prev => ({ ...prev, coordinates: [...prev.coordinates] }));
+        return;
+      }
+
       setFormData(prev => ({ ...prev, coordinates: newCoords }));
     }
-  }, []);
+  }, [formData.zoneId, zones]);
 
   const clearPolygon = () => {
     if (polygonRef.current) {
@@ -240,6 +279,9 @@ export default function AddTerritoryModal({
 
 
   if (!isOpen) return null;
+
+  const selectedZone = zones?.find(z => (z.id || z._id) === formData.zoneId);
+  const selectedZoneCoordinates = selectedZone ? selectedZone.coordinates : [];
 
   return (
     <div className="fixed inset-0 bg-black/55 backdrop-blur-sm z-[70] flex items-center justify-center p-3 sm:p-4 lg:pl-[280px] select-none">
@@ -471,17 +513,32 @@ export default function AddTerritoryModal({
                   {isLoaded ? (
                     <GoogleMap
                       mapContainerStyle={{ width: '100%', height: '100%' }}
-                      center={formData.coordinates.length > 0 ? { lat: formData.coordinates[0].latitude, lng: formData.coordinates[0].longitude } : mapCenter}
-                      zoom={formData.coordinates.length > 0 ? 10 : mapZoom}
+                      center={formData.coordinates.length > 0 ? { lat: parseFloat(formData.coordinates[0].latitude), lng: parseFloat(formData.coordinates[0].longitude) } : (selectedZoneCoordinates && selectedZoneCoordinates.length > 0 ? { lat: parseFloat(selectedZoneCoordinates[0].latitude || selectedZoneCoordinates[0][1]), lng: parseFloat(selectedZoneCoordinates[0].longitude || selectedZoneCoordinates[0][0]) } : mapCenter)}
+                      zoom={formData.coordinates.length > 0 ? 10 : (selectedZoneCoordinates && selectedZoneCoordinates.length > 0 ? 10 : mapZoom)}
                       options={{ disableDefaultUI: true, gestureHandling: 'greedy', zoomControl: true }}
                       onClick={onMapClick}
                     >
+                      {selectedZoneCoordinates && selectedZoneCoordinates.length > 0 && (
+                        <Polygon
+                          paths={selectedZoneCoordinates.map(c => ({ lat: parseFloat(c.latitude || c[1]), lng: parseFloat(c.longitude || c[0]) }))}
+                          options={{
+                            fillColor: "#9ca3af", // gray-400
+                            fillOpacity: 0.2,
+                            strokeWeight: 2,
+                            strokeColor: "#9ca3af",
+                            clickable: false,
+                            editable: false,
+                            draggable: false,
+                            zIndex: 0,
+                          }}
+                        />
+                      )}
                       {formData.coordinates.length > 0 && (
                         <Polygon
                           onLoad={onPolygonLoad}
                           onMouseUp={onPolygonEdit}
                           onDragEnd={onPolygonEdit}
-                          paths={formData.coordinates.map(c => ({ lat: c.latitude, lng: c.longitude }))}
+                          paths={formData.coordinates.map(c => ({ lat: parseFloat(c.latitude), lng: parseFloat(c.longitude) }))}
                           options={{
                             fillColor: "var(--primary)",
                             fillOpacity: 0.2,

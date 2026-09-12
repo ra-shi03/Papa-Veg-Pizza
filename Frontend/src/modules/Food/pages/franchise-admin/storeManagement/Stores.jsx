@@ -154,32 +154,7 @@ export default function Stores() {
     fetchManagersList()
   }, [])
 
-  // 2. Real-Time Sync simulation (flashes values to orders, capacity, isOpen)
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setStores((prevStores) =>
-        prevStores.map((s) => {
-          if (s.status === "Active") {
-            // Randomly increment today's orders
-            const orderDelta = Math.random() > 0.6 ? Math.floor(Math.random() * 3) + 1 : 0
-            // Fluctuate kitchen capacity (within 35% - 95%)
-            const capDelta = Math.floor(Math.random() * 11) - 5 // -5% to +5%
-            let newCap = Math.max(30, Math.min(98, (s.currentCapacity || 50) + capDelta))
-            
-            return {
-              ...s,
-              totalOrders: (s.totalOrders || 0) + orderDelta,
-              currentCapacity: newCap,
-              updatedAt: new Date().toISOString()
-            }
-          }
-          return s
-        })
-      )
-    }, 8000)
 
-    return () => clearInterval(timer)
-  }, [])
 
   // Handle Sort Toggle
   const handleSort = (key) => {
@@ -331,12 +306,12 @@ export default function Stores() {
       {/* KPI DASHBOARD SECTION */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         {[
-          { label: "Total Stores", val: kpis?.totalStores, sub: "12 Stores", icon: Building2, color: "text-primary bg-primary/5" },
-          { label: "Active Stores", val: kpis?.activeStoresCount, sub: "10 Active", icon: Users, color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20" },
-          { label: "Open Now", val: kpis?.openNowCount, sub: "8 Stores", icon: Clock, color: "text-blue-600 bg-blue-50 dark:bg-blue-950/20" },
-          { label: "Closed Stores", val: kpis?.closedStoresCount, sub: "2 Stores", icon: Trash2, color: "text-red-600 bg-red-50 dark:bg-red-950/20" },
-          { label: "Avg Store Rating", val: kpis ? `${kpis.averageRating}★` : null, sub: "4.7★ Overall", icon: Star, color: "text-yellow-600 bg-yellow-50 dark:bg-yellow-950/20" },
-          { label: "Orders Today", val: kpis?.ordersToday, sub: "1,246 Orders", icon: TrendingUp, color: "text-purple-650 bg-purple-50 dark:bg-purple-950/20" }
+          { label: "Total Stores", val: kpis?.totalStores, sub: `${kpis?.totalStores ?? 0} Stores`, icon: Building2, color: "text-primary bg-primary/5" },
+          { label: "Active Stores", val: kpis?.activeStoresCount, sub: `${kpis?.activeStoresCount ?? 0} Active`, icon: Users, color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20" },
+          { label: "Open Now", val: kpis?.openNowCount, sub: `${kpis?.openNowCount ?? 0} Stores`, icon: Clock, color: "text-blue-600 bg-blue-50 dark:bg-blue-950/20" },
+          { label: "Closed Stores", val: kpis?.closedStoresCount, sub: `${kpis?.closedStoresCount ?? 0} Stores`, icon: Trash2, color: "text-red-600 bg-red-50 dark:bg-red-950/20" },
+          { label: "Avg Store Rating", val: kpis ? `${kpis.averageRating}★` : null, sub: `${kpis?.averageRating ?? 0}★ Overall`, icon: Star, color: "text-yellow-600 bg-yellow-50 dark:bg-yellow-950/20" },
+          { label: "Orders Today", val: kpis?.ordersToday, sub: `${kpis?.ordersToday?.toLocaleString("en-IN") ?? 0} Orders`, icon: TrendingUp, color: "text-purple-650 bg-purple-50 dark:bg-purple-950/20" }
         ].map((card, i) => (
           <div key={i} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-850 rounded-xl p-3 shadow-xs relative overflow-hidden flex flex-col justify-between min-h-[85px]">
             {loadingKpis ? (

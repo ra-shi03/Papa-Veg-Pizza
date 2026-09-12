@@ -46,7 +46,7 @@ export default function FranchiseList() {
 
         const data = franRes.data.data.map(f => {
           const regionName = typeof f.regionId === 'object' ? f.regionId?.name : (regions.find(r => r.id === f.regionId || r._id === f.regionId)?.name || f.regionId);
-          const zoneName = zones.find(z => z.id === f.zoneId || z._id === f.zoneId)?.name || f.zoneId;
+          const zoneName = typeof f.zoneId === 'object' ? f.zoneId?.name : (zones.find(z => z.id === f.zoneId || z._id === f.zoneId)?.name || f.zoneId);
 
           return {
             id: f.franchiseCode,
@@ -58,7 +58,7 @@ export default function FranchiseList() {
             city: f.city,
             state: f.state,
             regionId: typeof f.regionId === 'object' ? f.regionId?._id : f.regionId,
-            zoneId: f.zoneId,
+            zoneId: typeof f.zoneId === 'object' ? f.zoneId?._id : f.zoneId,
             regionName,
             zoneName,
             type: f.type,
@@ -491,46 +491,54 @@ export default function FranchiseList() {
       </div>
 
       {/* Franchise details Drawer Panel */}
-      <FranchiseDetailsDrawer
-        isOpen={isDrawerOpen}
-        onClose={() => {
-          setIsDrawerOpen(false)
-          setSelectedAdmin(null)
-        }}
-        admin={selectedAdmin}
-      />
+      {isDrawerOpen && (
+        <FranchiseDetailsDrawer
+          isOpen={isDrawerOpen}
+          onClose={() => {
+            setIsDrawerOpen(false)
+            setSelectedAdmin(null)
+          }}
+          admin={selectedAdmin}
+        />
+      )}
 
       {/* Add Modal Popup */}
-      <AddFranchiseModal
-        isOpen={isAddModalOpen}
-        onClose={() => {
-          setIsAddModalOpen(false)
-          setSelectedAdmin(null)
-        }}
-        onSave={handleSaveAdmin}
-      />
+      {isAddModalOpen && (
+        <AddFranchiseModal
+          isOpen={isAddModalOpen}
+          onClose={() => {
+            setIsAddModalOpen(false)
+            setSelectedAdmin(null)
+          }}
+          onSave={handleSaveAdmin}
+        />
+      )}
 
       {/* Edit Modal Popup */}
-      <EditFranchiseModal
-        isOpen={isEditModalOpen}
-        onClose={() => {
-          setIsEditModalOpen(false)
-          setSelectedAdmin(null)
-        }}
-        admin={selectedAdmin}
-        onSave={handleSaveAdmin}
-      />
+      {isEditModalOpen && (
+        <EditFranchiseModal
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false)
+            setSelectedAdmin(null)
+          }}
+          admin={selectedAdmin}
+          onSave={handleSaveAdmin}
+        />
+      )}
 
       {/* Delete confirmation Modal Popup */}
-      <SuspendFranchiseModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => {
-          setIsDeleteModalOpen(false)
-          setSelectedAdmin(null)
-        }}
-        admin={selectedAdmin}
-        onConfirm={handleDeleteAdmin}
-      />
+      {isDeleteModalOpen && (
+        <SuspendFranchiseModal
+          isOpen={isDeleteModalOpen}
+          onClose={() => {
+            setIsDeleteModalOpen(false)
+            setSelectedAdmin(null)
+          }}
+          admin={selectedAdmin}
+          onConfirm={handleDeleteAdmin}
+        />
+      )}
     </div>
   )
 }

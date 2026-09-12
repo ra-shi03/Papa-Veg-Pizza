@@ -213,17 +213,6 @@ export default function FranchiseDetailsDrawer({ isOpen, onClose, admin }) {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-zinc-50 dark:bg-zinc-955 border border-zinc-100 dark:border-zinc-800 text-zinc-400 rounded-xl">
-                            <MapPin size={14} />
-                          </div>
-                          <div>
-                            <p className="text-[9px] text-zinc-400 font-semibold">Region Information</p>
-                            <p className="text-[10px] font-bold text-zinc-800 dark:text-zinc-200 mt-0.5">
-                              {admin.zoneName ? `${admin.zoneName}, ${admin.regionName}` : "N/A"}
-                            </p>
-                          </div>
-                        </div>
 
                         <div className="flex items-center gap-3">
                           <div className="p-2 bg-zinc-50 dark:bg-zinc-955 border border-zinc-100 dark:border-zinc-800 text-zinc-400 rounded-xl">
@@ -316,6 +305,22 @@ export default function FranchiseDetailsDrawer({ isOpen, onClose, admin }) {
                             {admin.totalStores} {admin.totalStores === 1 ? "Store" : "Stores"}
                           </p>
                         </div>
+
+                        <div className="p-2.5 bg-zinc-50 dark:bg-zinc-955 border border-zinc-100 dark:border-zinc-800 rounded-2xl">
+                          <p className="text-[9px] text-zinc-400 font-semibold">Region</p>
+                          <p className="text-xs font-black text-zinc-800 dark:text-zinc-200 mt-1">
+                            {admin.regionName || "N/A"}
+                          </p>
+                        </div>
+
+                        <div className="p-2.5 bg-zinc-50 dark:bg-zinc-955 border border-zinc-100 dark:border-zinc-800 rounded-2xl">
+                          <p className="text-[9px] text-zinc-400 font-semibold">Zone</p>
+                          <p className="text-xs font-black text-zinc-800 dark:text-zinc-200 mt-1">
+                            {admin.zoneName || "N/A"}
+                          </p>
+                        </div>
+
+
                       </div>
 
                       <h4 className="text-[10px] font-extrabold text-[var(--primary)] uppercase tracking-wider pt-2">
