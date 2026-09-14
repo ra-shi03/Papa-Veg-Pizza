@@ -24,6 +24,8 @@ import {
   ArrowUpRight
 } from "lucide-react"
 import { adminAPI } from "@food/api"
+import { jsPDF } from "jspdf"
+import autoTable from "jspdf-autotable"
 
 // Import Sub-components
 import StoreDetailsDrawer from "./components/StoreDetailsDrawer"
@@ -43,8 +45,6 @@ export default function Stores() {
   const [kpis, setKpis] = useState(null)
   const [loadingKpis, setLoadingKpis] = useState(true)
 
-  // Managers for filter
-  const [managers, setManagers] = useState([])
 
   // Filters State
   const [searchVal, setSearchVal] = useState("")
@@ -52,7 +52,6 @@ export default function Stores() {
   const [statusFilter, setStatusFilter] = useState("All")
   const [typeFilter, setTypeFilter] = useState("All")
   const [openFilter, setOpenFilter] = useState("") // "" | "true" | "false"
-  const [managerFilter, setManagerFilter] = useState("All")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
 
@@ -96,21 +95,22 @@ export default function Stores() {
   const fetchKPIs = async () => {
     try {
       setLoadingKpis(true)
-      const res = await adminAPI.getStoresKPIs()
-      setKpis(res?.data?.data || null)
+      const [totalRes, activeRes, inactiveRes] = await Promise.all([
+        adminAPI.getStores({ limit: 1 }),
+        adminAPI.getStores({ limit: 1, status: "Active" }),
+        adminAPI.getStores({ limit: 1, status: "Inactive" })
+      ])
+      
+      setKpis({
+        totalStores: totalRes?.data?.data?.totalCount || 0,
+        activeStoresCount: activeRes?.data?.data?.totalCount || 0,
+        inactiveStoresCount: inactiveRes?.data?.data?.totalCount || 0
+      })
     } catch (_) {
       setError("Failed to fetch dashboard metrics.")
     } finally {
       setLoadingKpis(false)
     }
-  }
-
-  // Fetch Managers
-  const fetchManagersList = async () => {
-    try {
-      const res = await adminAPI.getStoreManagers()
-      setManagers(res?.data?.data || [])
-    } catch (_) {}
   }
 
   // Fetch Main Stores Table
@@ -125,10 +125,6 @@ export default function Stores() {
         search: debouncedSearch,
         status: statusFilter,
         type: typeFilter,
-        isOpen: openFilter || undefined,
-        manager: managerFilter !== "All" ? managerFilter : undefined,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
         sort: sortKey,
         order: sortOrder
       }
@@ -142,7 +138,7 @@ export default function Stores() {
     } finally {
       setLoading(false)
     }
-  }, [page, limit, debouncedSearch, statusFilter, typeFilter, openFilter, managerFilter, startDate, endDate, sortKey, sortOrder])
+  }, [page, limit, debouncedSearch, statusFilter, typeFilter, sortKey, sortOrder])
 
   // Initial and reactive fetch
   useEffect(() => {
@@ -151,7 +147,6 @@ export default function Stores() {
 
   useEffect(() => {
     fetchKPIs()
-    fetchManagersList()
   }, [])
 
 
@@ -165,23 +160,31 @@ export default function Stores() {
 
   // Handle Export Stores
   const handleExport = () => {
-    const headers = "Store ID,Store Name,Store Code,Type,Manager,City,Status,Open / Closed,Rating,Total Orders,Capacity\n"
-    const rows = stores
-      .map(
-        (s) =>
-          `"${s._id}","${s.storeName}","${s.storeCode}","${s.storeType}","${
-            managers.find((m) => m.id === s.managerId)?.name || "N/A"
-          }","${s.address?.city}","${s.status}","${s.isOpen ? "Open" : "Closed"}","${s.averageRating}","${s.totalOrders}","${s.currentCapacity}%"`
-      )
-      .join("\n")
+    const doc = new jsPDF()
+    doc.text("Stores Report", 14, 15)
 
-    const blob = new Blob([headers + rows], { type: "text/csv" })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.setAttribute("href", url)
-    a.setAttribute("download", `Stores_Report_${new Date().toISOString().split("T")[0]}.csv`)
-    a.click()
-    showToast("CSV report exported successfully.")
+    const tableColumn = ["Store Code", "Store Name", "Type", "City", "Status"]
+    const tableRows = []
+
+    stores.forEach((store) => {
+      const storeData = [
+        store.code || "N/A",
+        store.storeName || "N/A",
+        store.storeType || "N/A",
+        store.regionId?.name || store.city || "N/A",
+        store.isActive ? "Active" : "Inactive",
+      ]
+      tableRows.push(storeData)
+    })
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 20,
+    })
+
+    doc.save(`Stores_Report_${new Date().toISOString().split("T")[0]}.pdf`)
+    showToast("PDF report exported successfully.")
   }
 
   // Reset all Filters
@@ -189,10 +192,6 @@ export default function Stores() {
     setSearchVal("")
     setStatusFilter("All")
     setTypeFilter("All")
-    setOpenFilter("")
-    setManagerFilter("All")
-    setStartDate("")
-    setEndDate("")
     setPage(1)
   }
 
@@ -304,14 +303,11 @@ export default function Stores() {
       </div>
 
       {/* KPI DASHBOARD SECTION */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         {[
           { label: "Total Stores", val: kpis?.totalStores, sub: `${kpis?.totalStores ?? 0} Stores`, icon: Building2, color: "text-primary bg-primary/5" },
           { label: "Active Stores", val: kpis?.activeStoresCount, sub: `${kpis?.activeStoresCount ?? 0} Active`, icon: Users, color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20" },
-          { label: "Open Now", val: kpis?.openNowCount, sub: `${kpis?.openNowCount ?? 0} Stores`, icon: Clock, color: "text-blue-600 bg-blue-50 dark:bg-blue-950/20" },
-          { label: "Closed Stores", val: kpis?.closedStoresCount, sub: `${kpis?.closedStoresCount ?? 0} Stores`, icon: Trash2, color: "text-red-600 bg-red-50 dark:bg-red-950/20" },
-          { label: "Avg Store Rating", val: kpis ? `${kpis.averageRating}★` : null, sub: `${kpis?.averageRating ?? 0}★ Overall`, icon: Star, color: "text-yellow-600 bg-yellow-50 dark:bg-yellow-950/20" },
-          { label: "Orders Today", val: kpis?.ordersToday, sub: `${kpis?.ordersToday?.toLocaleString("en-IN") ?? 0} Orders`, icon: TrendingUp, color: "text-purple-650 bg-purple-50 dark:bg-purple-950/20" }
+          { label: "Inactive Stores", val: (kpis?.totalStores ?? 0) - (kpis?.activeStoresCount ?? 0), sub: `${(kpis?.totalStores ?? 0) - (kpis?.activeStoresCount ?? 0)} Inactive`, icon: Trash2, color: "text-red-600 bg-red-50 dark:bg-red-950/20" }
         ].map((card, i) => (
           <div key={i} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-850 rounded-xl p-3 shadow-xs relative overflow-hidden flex flex-col justify-between min-h-[85px]">
             {loadingKpis ? (
@@ -350,7 +346,7 @@ export default function Stores() {
             <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
             <input
               type="text"
-              placeholder="Search store name, code, city..."
+              placeholder="Search store name, code, region..."
               value={searchVal}
               onChange={(e) => setSearchVal(e.target.value)}
               className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-primary transition-all"
@@ -367,66 +363,22 @@ export default function Stores() {
               <option value="All">Status: All</option>
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
-              <option value="Closed">Closed</option>
             </select>
           </div>
 
           {/* Store Type Dropdown */}
-          <div className="w-[120px]">
+          <div className="w-[140px]">
             <select
               value={typeFilter}
               onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
               className="w-full px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs font-semibold focus:outline-none"
             >
               <option value="All">Type: All</option>
-              <option value="Regular">Regular</option>
-              <option value="Express">Express</option>
-              <option value="Cloud Kitchen">Cloud Kitchen</option>
+              <option value="DELIVERY_CARRYOUT">Delivery & Carryout</option>
+              <option value="DINE_IN">Dine-In</option>
+              <option value="EXPRESS">Express</option>
+              <option value="KIOSK">Kiosk</option>
             </select>
-          </div>
-
-          {/* Open Status Dropdown */}
-          <div className="w-[115px]">
-            <select
-              value={openFilter}
-              onChange={(e) => { setOpenFilter(e.target.value); setPage(1); }}
-              className="w-full px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs font-semibold focus:outline-none"
-            >
-              <option value="">Open Status</option>
-              <option value="true">Open</option>
-              <option value="false">Closed</option>
-            </select>
-          </div>
-
-          {/* Manager Dropdown */}
-          <div className="w-[130px]">
-            <select
-              value={managerFilter}
-              onChange={(e) => { setManagerFilter(e.target.value); setPage(1); }}
-              className="w-full px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs font-semibold focus:outline-none"
-            >
-              <option value="All">Manager: All</option>
-              {managers.map((m) => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Date Picker Input */}
-          <div className="flex items-center gap-1">
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-              className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-950 text-[10px] font-semibold focus:outline-none text-slate-500"
-            />
-            <span className="text-slate-400 text-xs">-</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-              className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-950 text-[10px] font-semibold focus:outline-none text-slate-500"
-            />
           </div>
 
           <button
@@ -488,7 +440,7 @@ export default function Stores() {
           </div>
         ) : (
           /* COMPACT STORES TABLE */
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-h-[300px]">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-950/50 border-b border-slate-100 dark:border-slate-850 text-[9px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider">
@@ -504,34 +456,11 @@ export default function Stores() {
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </div>
                   </th>
-                  <th className="px-2.5 py-2">Manager</th>
-                  <th className="px-2.5 py-2 cursor-pointer select-none" onClick={() => handleSort("city")}>
-                    <div className="flex items-center gap-1">
-                      City
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
-                  </th>
+                  <th className="px-2.5 py-2">Region</th>
+                  <th className="px-2.5 py-2">Zone</th>
+                  <th className="px-2.5 py-2">Territory</th>
                   <th className="px-2.5 py-2">Type</th>
                   <th className="px-2.5 py-2">Status</th>
-                  <th className="px-2.5 py-2">Open / Closed</th>
-                  <th className="px-2.5 py-2 cursor-pointer select-none" onClick={() => handleSort("averageRating")}>
-                    <div className="flex items-center gap-1">
-                      Rating
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
-                  </th>
-                  <th className="px-2.5 py-2 cursor-pointer select-none" onClick={() => handleSort("totalOrders")}>
-                    <div className="flex items-center gap-1">
-                      Orders Today
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
-                  </th>
-                  <th className="px-2.5 py-2 cursor-pointer select-none" onClick={() => handleSort("currentCapacity")}>
-                    <div className="flex items-center gap-1">
-                      Capacity
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
-                  </th>
                   <th className="px-2.5 py-2">Last Updated</th>
                   <th className="px-2.5 py-2 text-right">Actions</th>
                 </tr>
@@ -539,141 +468,48 @@ export default function Stores() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-850 text-[11px] text-slate-700 dark:text-slate-350">
                 {stores.map((store) => (
                   <tr key={store._id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20 group">
-                    <td className="px-2.5 py-2 font-semibold text-slate-900 dark:text-white">{store.storeCode}</td>
+                    <td className="px-2.5 py-2 font-semibold text-slate-900 dark:text-white">{store.code}</td>
                     <td className="px-2.5 py-2 font-bold text-primary">{store.storeName}</td>
-                    <td className="px-2.5 py-2 font-medium text-slate-655 dark:text-slate-300">
-                      {managers.find((m) => m.id === store.managerId)?.name || "Assign Manager"}
-                    </td>
-                    <td className="px-2.5 py-2 font-semibold">{store.address?.city || "N/A"}</td>
+                    <td className="px-2.5 py-2 font-semibold">{store.regionId?.name || store.city || "N/A"}</td>
+                    <td className="px-2.5 py-2 text-slate-500">{store.zoneId?.name || store.state || "N/A"}</td>
+                    <td className="px-2.5 py-2 text-slate-500">{store.territoryId?.name || "N/A"}</td>
                     <td className="px-2.5 py-2 text-slate-500">{store.storeType}</td>
                     <td className="px-2.5 py-2">
                       <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                        store.status === "Active"
+                        store.isActive
                           ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-650"
-                          : store.status === "Inactive"
-                            ? "bg-amber-50 dark:bg-amber-950/20 text-amber-650"
-                            : "bg-red-50 dark:bg-red-950/20 text-red-650"
+                          : "bg-red-50 dark:bg-red-950/20 text-red-650"
                       }`}>
-                        {store.status}
+                        {store.isActive ? "Active" : "Inactive"}
                       </span>
-                    </td>
-                    <td className="px-2.5 py-2">
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                        store.isOpen
-                          ? "bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400"
-                          : "bg-rose-100 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400"
-                      }`}>
-                        {store.isOpen ? "Open" : "Closed"}
-                      </span>
-                    </td>
-                    <td className="px-2.5 py-2">
-                      <div className="flex items-center gap-0.5 font-bold text-slate-800 dark:text-slate-200">
-                        <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                        <span>{store.averageRating || "5.0"}</span>
-                      </div>
-                    </td>
-                    <td className="px-2.5 py-2 font-bold text-slate-900 dark:text-white">
-                      {store.totalOrders ? store.totalOrders.toLocaleString("en-IN") : 0}
-                    </td>
-                    <td className="px-2.5 py-2">
-                      {/* Compact Capacity Progress Bar */}
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden shrink-0">
-                          <div
-                            className={`h-full rounded-full transition-all duration-500 ${
-                              store.currentCapacity > 85
-                                ? "bg-red-500"
-                                : store.currentCapacity > 60
-                                  ? "bg-amber-500"
-                                  : "bg-emerald-500"
-                            }`}
-                            style={{ width: `${store.currentCapacity || 0}%` }}
-                          />
-                        </div>
-                        <span className="font-bold text-[10px] text-slate-500">{store.currentCapacity || 0}%</span>
-                      </div>
                     </td>
                     <td className="px-2.5 py-2 text-slate-400">
                       {getRelativeTime(store.updatedAt || store.createdAt)}
                     </td>
-                    <td className="px-2.5 py-2 text-right relative">
-                      <button
-                        onClick={() => setActiveMenuId(activeMenuId === store._id ? null : store._id)}
-                        className="p-1 rounded-md text-slate-400 hover:text-slate-655 hover:bg-slate-55 dark:hover:bg-slate-900 transition-colors"
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
-
-                      {/* Floating Row Actions Popover */}
-                      {activeMenuId === store._id && (
-                        <>
-                          <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-                          <div className="absolute right-4 mt-1 w-44 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-xl shadow-xl z-20 overflow-hidden divide-y divide-slate-100 dark:divide-slate-850 text-left">
-                            <div className="py-1">
-                              <button
-                                onClick={() => { setSelectedStore(store); setDrawerTab("overview"); setIsDrawerOpen(true); setActiveMenuId(null); }}
-                                className="w-full px-4 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-850 flex items-center gap-1.5"
-                              >
-                                <Eye className="w-3.5 h-3.5 text-slate-400" />
-                                View Store
-                              </button>
-                              <button
-                                onClick={() => { setSelectedStore(store); setIsEditOpen(true); setActiveMenuId(null); }}
-                                className="w-full px-4 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-850 flex items-center gap-1.5"
-                              >
-                                <Settings className="w-3.5 h-3.5 text-slate-400" />
-                                Edit Store
-                              </button>
-                              <button
-                                onClick={() => { setSelectedStore(store); setIsStatusOpen(true); setActiveMenuId(null); }}
-                                className="w-full px-4 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-850 flex items-center gap-1.5"
-                              >
-                                <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
-                                Change Status
-                              </button>
-                            </div>
-                            <div className="py-1">
-                              <button
-                                onClick={() => { alert(`Manager details: ${managers.find((m) => m.id === store.managerId)?.name || "Not assigned"}\nPhone: ${store.phone}\nEmail: ${store.email}`); setActiveMenuId(null); }}
-                                className="w-full px-4 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-850 flex items-center gap-1.5"
-                              >
-                                <User className="w-3.5 h-3.5 text-slate-400" />
-                                View Manager
-                              </button>
-                              <button
-                                onClick={() => { setSelectedStore(store); setDrawerTab("orders"); setIsDrawerOpen(true); setActiveMenuId(null); }}
-                                className="w-full px-4 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-850 flex items-center gap-1.5"
-                              >
-                                <TrendingUp className="w-3.5 h-3.5 text-slate-400" />
-                                View Orders
-                              </button>
-                              <button
-                                onClick={() => { setSelectedStore(store); setIsHoursOpen(true); setActiveMenuId(null); }}
-                                className="w-full px-4 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-850 flex items-center gap-1.5"
-                              >
-                                <Clock className="w-3.5 h-3.5 text-slate-400" />
-                                Operating Hours
-                              </button>
-                              <button
-                                onClick={() => { setSelectedStore(store); setDrawerTab("performance"); setIsDrawerOpen(true); setActiveMenuId(null); }}
-                                className="w-full px-4 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-850 flex items-center gap-1.5"
-                              >
-                                <ArrowUpRight className="w-3.5 h-3.5 text-slate-400" />
-                                Performance
-                              </button>
-                            </div>
-                            <div className="py-1">
-                              <button
-                                onClick={() => { setSelectedStore(store); setIsDeleteOpen(true); setActiveMenuId(null); }}
-                                className="w-full px-4 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 flex items-center gap-1.5 font-semibold"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                                Delete Store
-                              </button>
-                            </div>
-                          </div>
-                        </>
-                      )}
+                    <td className="px-2.5 py-2 text-right">
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                          onClick={() => { setSelectedStore(store); setDrawerTab("overview"); setIsDrawerOpen(true); }}
+                          className="p-1.5 text-blue-600 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-md transition-colors"
+                          title="View"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => { setSelectedStore(store); setIsEditOpen(true); }}
+                          className="p-1.5 text-amber-600 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-md transition-colors"
+                          title="Edit"
+                        >
+                          <Settings className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => { setSelectedStore(store); setIsDeleteOpen(true); }}
+                          className="p-1.5 text-red-600 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-md transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

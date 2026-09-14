@@ -16,13 +16,20 @@ import PermissionsModal from "./components/PermissionsModal"
 import SuspendManagerModal from "./components/SuspendManagerModal"
 import DeleteManagerModal from "./components/DeleteManagerModal"
 
-// Import Mock Data
-import { initialManagers, initialStores, getDashboardStats } from "./mockManagersData"
+// Import Mock Data (Keeping initialStores temporarily if needed by other components, although managers are empty)
+import { initialStores } from "./mockManagersData"
 
 export default function StoreManagers() {
   // Main Data States
-  const [managers, setManagers] = useState(initialManagers)
-  const [kpis, setKpis] = useState(getDashboardStats(initialManagers))
+  const [managers, setManagers] = useState([])
+  const [kpis, setKpis] = useState({
+    totalManagers: 0,
+    activeManagers: 0,
+    onLeaveManagers: 0,
+    suspendedManagers: 0,
+    avgRating: "0.0",
+    ordersManagedToday: 0
+  })
   
   // Table state
   const [filteredManagers, setFilteredManagers] = useState([])
@@ -153,7 +160,14 @@ export default function StoreManagers() {
     const paginatedList = list.slice(startIndex, startIndex + limit)
 
     setFilteredManagers(paginatedList)
-    setKpis(getDashboardStats(managers))
+    setKpis({
+      totalManagers: managers.length,
+      activeManagers: managers.filter(m => m.status === 'Active').length,
+      onLeaveManagers: managers.filter(m => m.status === 'On Leave').length,
+      suspendedManagers: managers.filter(m => m.status === 'Suspended').length,
+      avgRating: "0.0",
+      ordersManagedToday: 0
+    })
     setLoading(false)
   }, [managers, debouncedSearch, statusFilter, storeFilter, experienceFilter, startDate, endDate, sortKey, sortOrder, page, limit])
 
@@ -161,33 +175,7 @@ export default function StoreManagers() {
     processData()
   }, [processData])
 
-  // Real-time WebSocket Simulator (Interval updates)
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const activeList = managers.filter((m) => m.status === "Active")
-      if (activeList.length === 0) return
-
-      const randomIndex = Math.floor(Math.random() * activeList.length)
-      const randomMgr = activeList[randomIndex]
-
-      // Random events
-      const eventType = Math.random() > 0.5 ? "performance_updated" : "store_assignment_changed"
-
-      if (eventType === "performance_updated") {
-        showToast(
-          `WebSocket: Performance rating updated for ${randomMgr.name}`,
-          "info"
-        )
-      } else {
-        showToast(
-          `WebSocket: Store audit sync completed for ${randomMgr.name}`,
-          "info"
-        )
-      }
-    }, 12000)
-
-    return () => clearInterval(timer)
-  }, [managers])
+  // Real-time WebSocket Simulator (Interval updates) - Removed
 
   // Sort helper
   const handleSort = (key) => {

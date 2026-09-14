@@ -14,8 +14,11 @@ import { requireRoles } from '../core/roles/role.middleware.js';
 import { getQueuesController } from '../controllers/admin.controller.js';
 import webhookRoutes from '../core/payments/routes/webhook.routes.js';
 import searchRoutes from '../modules/food/search/routes/search.routes.js';
+import franchiseStoreRoutes from '../modules/food/franchise/routes/store.routes.js';
 
 const router = express.Router();
+
+router.use('/v1/stores', franchiseStoreRoutes);
 
 router.get('/v1/health', (req, res) => {
     res.status(200).json({ status: 'UP', message: 'Server is healthy' });

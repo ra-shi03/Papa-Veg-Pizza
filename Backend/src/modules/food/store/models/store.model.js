@@ -55,20 +55,30 @@ const storeSchema = new mongoose.Schema(
         longitude: {
             type: Number
         },
-        managerId: {
+        storeType: {
+            type: String,
+            required: true,
+            default: 'DELIVERY_CARRYOUT'
+        },
+        fulfillmentModes: [{
+            type: String
+        }],
+        regionId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'FoodAdmin',
-            default: null
+            ref: 'FoodRegion'
+        },
+        zoneId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'FoodZone'
+        },
+        territoryId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'FoodTerritory'
         },
         isActive: {
             type: Boolean,
             default: true,
             index: true
-        },
-        createdBy: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'FoodAdmin',
-            default: null
         }
     },
     {

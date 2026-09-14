@@ -37,8 +37,6 @@ function MapBoundsFitter({ territoryCoordinates, zoneCoordinates, hasTerritory }
 export default function StoreModal({ isOpen, onClose, onConfirm, store = null }) {
   const isEdit = !!store
   const [step, setStep] = useState(1)
-  const [managers, setManagers] = useState([])
-  const [loadingManagers, setLoadingManagers] = useState(false)
 
   // Form State
   const [storeName, setStoreName] = useState("")
@@ -74,15 +72,6 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
     if (isOpen) {
       setStep(1)
       
-      // Fetch Managers for Step 3
-      setLoadingManagers(true)
-      adminAPI.getStoreManagers()
-        .then((res) => {
-          setManagers(res?.data?.data || [])
-        })
-        .catch(() => setManagers([]))
-        .finally(() => setLoadingManagers(false))
-
       // Fetch Franchise context & Territories
       Promise.allSettled([
         adminAPI.getMyFranchise(),
@@ -153,22 +142,26 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
 
       if (store) {
         setStoreName(store.storeName || "")
-        setStoreCode(store.storeCode || "")
+        setStoreCode(store.storeCode || store.code || "")
         setStoreType(store.storeType || "DELIVERY_CARRYOUT")
         setFulfillmentModes(store.fulfillmentModes || ["Delivery", "Takeaway"])
         setPhone(store.phone || "")
         setEmail(store.email || "")
 
-        setAddressLine1(store.address?.line1 || "")
-        setTerritoryId(store.territoryId || store.address?.territoryId || "")
-        setPincode(store.address?.pincode || "")
-        setLatitude(store.address?.coordinates?.[1] || 22.7196)
-        setLongitude(store.address?.coordinates?.[0] || 75.8763)
+        const addrLine1 = typeof store.address === 'object' ? store.address?.line1 : store.address;
+        setAddressLine1(addrLine1 || "")
+        
+        const terrId = store.territoryId?._id || store.territoryId?.id || store.territoryId || store.address?.territoryId || "";
+        setTerritoryId(terrId)
+        
+        setPincode(store.address?.pincode || store.pincode || "")
+        setLatitude(store.address?.coordinates?.[1] || store.latitude || 22.7196)
+        setLongitude(store.address?.coordinates?.[0] || store.longitude || 75.8763)
 
         setManagerId(store.managerId || "")
         setMaxOrdersHour(store.maxOrdersHour || 60)
         setMaxKitchenCapacity(store.maxKitchenCapacity || 100)
-        setStatus(store.status || "Active")
+        setStatus(store.isActive !== undefined ? (store.isActive ? "Active" : "Inactive") : (store.status || "Active"))
       } else {
         setStoreName("")
         setStoreCode("")
@@ -250,11 +243,12 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
   }
 
   const handleSubmit = (e) => {
-    e.preventDefault()
-    if (!managerId) {
-      alert("Please select a store manager.")
-      return
-    }
+    if (e) e.preventDefault()
+    
+    // Safety check
+    if (step < 3) return;
+
+    // Manager is now optional
 
     const payload = {
       storeName,
@@ -271,11 +265,7 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
         coordinates: [longitude, latitude]
       },
       territoryId,
-      managerId,
-      maxOrdersHour,
-      maxKitchenCapacity,
-      status,
-      currentCapacity: status === "Active" ? 25 : 0
+      status
     }
 
     onConfirm(payload)
@@ -296,6 +286,7 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
             </p>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
           >
@@ -341,7 +332,7 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
           </div>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form noValidate>
           {/* Steps Content */}
           <div className="px-6 py-5 max-h-[60vh] overflow-y-auto">
             
@@ -536,14 +527,14 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl text-center">
+                  <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl text-center overflow-hidden">
                     <div>
                       <span className="block text-[10px] font-bold text-slate-400 uppercase">Latitude</span>
-                      <span className="text-sm font-semibold text-slate-850 dark:text-slate-200">{latitude}</span>
+                      <span className="text-sm font-semibold text-slate-850 dark:text-slate-200">{Number(latitude).toFixed(6)}</span>
                     </div>
                     <div>
                       <span className="block text-[10px] font-bold text-slate-400 uppercase">Longitude</span>
-                      <span className="text-sm font-semibold text-slate-850 dark:text-slate-200">{longitude}</span>
+                      <span className="text-sm font-semibold text-slate-850 dark:text-slate-200">{Number(longitude).toFixed(6)}</span>
                     </div>
                   </div>
                 </div>
@@ -655,26 +646,7 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
             {/* STEP 3: Assign Manager, Capacity & Status */}
             {step === 3 && (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
-                      Assign Store Manager *
-                    </label>
-                    <select
-                      required
-                      value={managerId}
-                      onChange={(e) => setManagerId(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all disabled:opacity-50"
-                      disabled={loadingManagers}
-                    >
-                      <option value="">-- Choose Manager --</option>
-                      {managers.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name} ({m.phone})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
                       Initial Status
@@ -731,7 +703,8 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
                 </button>
               ) : (
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleSubmit}
                   className="px-5 py-2 text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl text-sm font-semibold shadow-md transition-all"
                 >
                   {isEdit ? "Save Changes" : "Create Store"}

@@ -1,15 +1,26 @@
 import React, { useState, useEffect } from "react"
 import { Shield, X, User, DollarSign, Upload, AlertCircle } from "lucide-react"
 import { initialStores } from "../mockManagersData"
+import { adminAPI } from "@food/api"
+import apiClient from "@food/api/axios"
 
 const PERMISSION_OPTIONS = [
-  { key: "view_orders", label: "View Orders" },
-  { key: "manage_kitchen", label: "Manage Kitchen" },
-  { key: "inventory_access", label: "Inventory Access" },
+  // Store Operations Modules
+  { key: "store_ops_orders", label: "Store Orders" },
+  { key: "store_ops_kitchen", label: "Kitchen Operations" },
+  { key: "store_ops_delivery", label: "Delivery Operations" },
+  
+  // Shared / Overlapping Modules
+  { key: "inventory_management", label: "Inventory Management" },
   { key: "staff_management", label: "Staff Management" },
-  { key: "reports_access", label: "Reports Access" },
-  { key: "promotions_access", label: "Promotions Access" },
-  { key: "refund_approval", label: "Refund Approval" }
+  { key: "customers_management", label: "Customers & Reviews" },
+  { key: "reports_analytics", label: "Reports & Analytics" },
+  
+  // Franchise Admin Modules
+  { key: "franchise_store_management", label: "Store Management" },
+  { key: "franchise_products", label: "Products & Pricing" },
+  { key: "franchise_finance", label: "Finance & Payouts" },
+  { key: "franchise_marketing", label: "Marketing & Campaigns" }
 ];
 
 export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manager }) {
@@ -32,6 +43,7 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
 
   const [errors, setErrors] = useState({})
   const [profilePreview, setProfilePreview] = useState("")
+  const [storesData, setStoresData] = useState([])
 
   useEffect(() => {
     if (isOpen) {
@@ -53,17 +65,16 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
         setProfilePreview(manager.profileImage || "")
       } else {
         // Add Mode
-        const generatedCode = `PVM-${Math.floor(100 + Math.random() * 900)}`
         setFormData({
           name: "",
           email: "",
           phone: "",
           password: "",
-          employeeCode: generatedCode,
+          employeeCode: "",
           joinedDate: new Date().toISOString().split("T")[0],
           status: "Active",
           storeId: "",
-          permissions: ["view_orders", "manage_kitchen"],
+          permissions: ["store_ops_orders", "store_ops_kitchen"],
           address: "",
           emergencyContact: "",
           salary: ""
@@ -71,6 +82,38 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
         setProfilePreview("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150&fm=webp")
       }
       setErrors({})
+      
+      // Fetch Stores and Territories
+      Promise.allSettled([
+        adminAPI.getStores(),
+        apiClient.get('/food/admin/territories')
+      ]).then(([storesRes, territoriesRes]) => {
+        const extractArray = (res) => {
+          if (res.status !== 'fulfilled') return [];
+          if (Array.isArray(res.value?.data?.data)) return res.value.data.data;
+          if (Array.isArray(res.value?.data)) return res.value.data;
+          return [];
+        };
+        
+        const stores = extractArray(storesRes);
+        const territories = extractArray(territoriesRes);
+        
+        const mappedStores = stores.map(store => {
+          let territoryName = "Unknown Territory";
+          const tId = store.territoryId || store.address?.territoryId;
+          if (tId) {
+            const territory = territories.find(t => String(t.id || t._id) === String(tId));
+            if (territory) territoryName = territory.name || territory.territoryName || "Unknown Territory";
+          }
+          return {
+            _id: store._id || store.id,
+            storeName: store.storeName,
+            territoryName
+          };
+        });
+        
+        setStoresData(mappedStores);
+      });
     }
   }, [isOpen, manager, isEditMode])
 
@@ -116,6 +159,9 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
     if (!isEditMode && !formData.password.trim()) {
       newErrors.password = "Password is required"
     }
+    if (!formData.employeeCode.trim()) {
+      newErrors.employeeCode = "Employee ID is required"
+    }
     if (!formData.storeId) {
       newErrors.storeId = "Store assignment is required"
     }
@@ -136,7 +182,8 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
     const payload = {
       ...formData,
       salary: parseFloat(formData.salary),
-      profileImage: profilePreview
+      profileImage: profilePreview,
+      profileImageFile: formData.profileImageFile // File object for the API service
     }
 
     onConfirm(payload)
@@ -189,27 +236,36 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
               {/* LEFT COLUMN: BASIC INFORMATION */}
               <div className="space-y-4">
                 <div className="border-b border-zinc-100 dark:border-zinc-800 pb-1.5 mb-2">
-                  <h4 className="text-[10px] font-black text-zinc-450 dark:text-zinc-500 uppercase tracking-widest">Section 1: Basic Information</h4>
+                  <h4 className="text-[10px] font-black text-zinc-450 dark:text-zinc-500 uppercase tracking-widest">Section 1: Personal Information</h4>
                 </div>
 
-                {/* Profile Avatar Upload Mock */}
+                {/* Profile Avatar Upload */}
                 <div className="flex items-center gap-4 p-3 bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-100 dark:border-zinc-850 rounded-xl">
                   <img
-                    src={profilePreview}
+                    src={profilePreview || "https://via.placeholder.com/150"}
                     alt="Preview"
                     className="w-16 h-16 rounded-xl object-cover border border-zinc-200 dark:border-zinc-800 shrink-0"
                   />
                   <div className="space-y-1">
                     <span className="block text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Profile Image</span>
                     <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={handleRandomAvatar}
-                        className="px-2.5 py-1.5 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 rounded-lg text-[10px] font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors flex items-center gap-1 cursor-pointer"
-                      >
+                      <label htmlFor="profile-upload" className="px-2.5 py-1.5 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 rounded-lg text-[10px] font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors flex items-center gap-1 cursor-pointer">
                         <Upload size={10} />
-                        Randomize webP
-                      </button>
+                        Upload Image
+                        <input 
+                          id="profile-upload"
+                          type="file" 
+                          accept="image/*"
+                          className="hidden" 
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const file = e.target.files[0];
+                              setFormData(prev => ({ ...prev, profileImageFile: file }));
+                              setProfilePreview(URL.createObjectURL(file));
+                            }
+                          }}
+                        />
+                      </label>
                     </div>
                   </div>
                 </div>
@@ -277,9 +333,11 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
                       name="employeeCode"
                       value={formData.employeeCode}
                       onChange={handleInputChange}
-                      className="w-full text-xs font-semibold px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-100 dark:bg-zinc-900 text-zinc-500 cursor-not-allowed focus:outline-none"
-                      readOnly
+                      disabled={isEditMode}
+                      className="w-full text-xs font-semibold px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                      placeholder="e.g. PVM-888"
                     />
+                    {errors.employeeCode && <p className="text-[9px] font-bold text-red-500">{errors.employeeCode}</p>}
                   </div>
 
                   <div className="space-y-1">
@@ -303,9 +361,33 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
                     className="w-full text-xs font-semibold px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 focus:outline-none"
                   >
                     <option value="Active">Active</option>
-                    <option value="On Leave">On Leave</option>
+                    <option value="Inactive">Inactive</option>
                     <option value="Suspended">Suspended</option>
                   </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Emergency Contact</label>
+                  <input
+                    type="text"
+                    name="emergencyContact"
+                    value={formData.emergencyContact}
+                    onChange={handleInputChange}
+                    className="w-full text-xs font-semibold px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 focus:outline-none"
+                    placeholder="Name (Relation) - Phone"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Residential Address</label>
+                  <textarea
+                    name="address"
+                    rows="2"
+                    value={formData.address}
+                    onChange={handleInputChange}
+                    className="w-full text-xs font-semibold px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 focus:outline-none"
+                    placeholder="Street, City, Pincode"
+                  />
                 </div>
 
               </div>
@@ -328,50 +410,31 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
                       className="w-full text-xs font-semibold px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 focus:outline-none"
                     >
                       <option value="">Choose store...</option>
-                      {initialStores.map((store) => (
-                        <option key={store._id} value={store._id}>
-                          {store.storeName} ({store.city})
-                        </option>
-                      ))}
+                      {storesData.length > 0 ? (
+                        storesData.map((store) => (
+                          <option key={store._id} value={store._id}>
+                            {store.storeName} ({store.territoryName})
+                          </option>
+                        ))
+                      ) : (
+                        initialStores.map((store) => (
+                          <option key={store._id} value={store._id}>
+                            {store.storeName} ({store.city})
+                          </option>
+                        ))
+                      )}
                     </select>
                     {errors.storeId && <p className="text-[9px] font-bold text-red-500">{errors.storeId}</p>}
                   </div>
                 </div>
 
-                {/* Section 3: Permissions */}
-                <div className="space-y-3">
-                  <div className="border-b border-zinc-100 dark:border-zinc-800 pb-1.5">
-                    <h4 className="text-[10px] font-black text-zinc-450 dark:text-zinc-500 uppercase tracking-widest">Section 3: Permissions Matrix</h4>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-100 dark:border-zinc-850 p-3.5 rounded-2xl max-h-[170px] overflow-y-auto scrollbar-thin">
-                    {PERMISSION_OPTIONS.map((opt) => {
-                      const isChecked = formData.permissions.includes(opt.key)
-                      return (
-                        <label
-                          key={opt.key}
-                          className="flex items-center gap-2 text-[10px] font-bold text-zinc-650 dark:text-zinc-350 cursor-pointer select-none py-1"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => handlePermissionToggle(opt.key)}
-                            className="w-3.5 h-3.5 accent-[var(--primary)] border-zinc-300 rounded"
-                          />
-                          <span>{opt.label}</span>
-                        </label>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                {/* Section 4: Personal & Financial */}
+                {/* Section 3: Financial Details */}
                 <div className="space-y-3.5">
                   <div className="border-b border-zinc-100 dark:border-zinc-800 pb-1.5">
-                    <h4 className="text-[10px] font-black text-zinc-450 dark:text-zinc-500 uppercase tracking-widest">Section 4: Personal Details</h4>
+                    <h4 className="text-[10px] font-black text-zinc-450 dark:text-zinc-500 uppercase tracking-widest">Section 3: Financial Details</h4>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Monthly Salary (INR)</label>
                       <div className="relative">
@@ -387,30 +450,6 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
                       </div>
                       {errors.salary && <p className="text-[9px] font-bold text-red-500">{errors.salary}</p>}
                     </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Emergency Contact</label>
-                      <input
-                        type="text"
-                        name="emergencyContact"
-                        value={formData.emergencyContact}
-                        onChange={handleInputChange}
-                        className="w-full text-xs font-semibold px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 focus:outline-none"
-                        placeholder="Name (Relation) - Phone"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Residential Address</label>
-                    <textarea
-                      name="address"
-                      rows="2"
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      className="w-full text-xs font-semibold px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 focus:outline-none"
-                      placeholder="Street, City, Pincode"
-                    />
                   </div>
                 </div>
 
