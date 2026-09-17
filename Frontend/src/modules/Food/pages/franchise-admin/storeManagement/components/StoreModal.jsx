@@ -184,6 +184,34 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
     }
   }, [store, isOpen])
 
+  useEffect(() => {
+    if (!isLoaded) return;
+    
+    // Only geocode if we have a reasonably complete pincode (6 digits in India)
+    if (pincode && pincode.length >= 6) {
+      const timeoutId = setTimeout(() => {
+        const geocoder = new window.google.maps.Geocoder();
+        const searchAddress = `${addressLine1 ? addressLine1 + ', ' : ''}${pincode}, India`;
+        
+        geocoder.geocode({ address: searchAddress }, (results, status) => {
+          if (status === "OK" && results && results[0]) {
+            const loc = results[0].geometry.location;
+            setLatitude(loc.lat());
+            setLongitude(loc.lng());
+            
+            // Pan map to new location
+            if (window.__storeModalMap) {
+              window.__storeModalMap.panTo(loc);
+              window.__storeModalMap.setZoom(15);
+            }
+          }
+        });
+      }, 1500); // 1.5s debounce
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [pincode, addressLine1, isLoaded]);
+
   if (!isOpen) return null
 
   const handleFetchLocation = () => {

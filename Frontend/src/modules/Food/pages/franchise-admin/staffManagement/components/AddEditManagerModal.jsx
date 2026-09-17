@@ -1,27 +1,9 @@
 import React, { useState, useEffect } from "react"
 import { Shield, X, User, DollarSign, Upload, AlertCircle } from "lucide-react"
-import { initialStores } from "../mockManagersData"
 import { adminAPI } from "@food/api"
 import apiClient from "@food/api/axios"
 
-const PERMISSION_OPTIONS = [
-  // Store Operations Modules
-  { key: "store_ops_orders", label: "Store Orders" },
-  { key: "store_ops_kitchen", label: "Kitchen Operations" },
-  { key: "store_ops_delivery", label: "Delivery Operations" },
-  
-  // Shared / Overlapping Modules
-  { key: "inventory_management", label: "Inventory Management" },
-  { key: "staff_management", label: "Staff Management" },
-  { key: "customers_management", label: "Customers & Reviews" },
-  { key: "reports_analytics", label: "Reports & Analytics" },
-  
-  // Franchise Admin Modules
-  { key: "franchise_store_management", label: "Store Management" },
-  { key: "franchise_products", label: "Products & Pricing" },
-  { key: "franchise_finance", label: "Finance & Payouts" },
-  { key: "franchise_marketing", label: "Marketing & Campaigns" }
-];
+// Removed PERMISSION_OPTIONS as it's no longer used
 
 export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manager }) {
   const isEditMode = !!manager
@@ -35,7 +17,6 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
     joinedDate: "",
     status: "Active",
     storeId: "",
-    permissions: [],
     address: "",
     emergencyContact: "",
     salary: ""
@@ -57,10 +38,9 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
           joinedDate: manager.joinedDate || "",
           status: manager.status || "Active",
           storeId: manager.storeId || "",
-          permissions: manager.permissions || [],
-          address: manager.personalDetails?.address || "",
-          emergencyContact: manager.personalDetails?.emergencyContact || "",
-          salary: manager.personalDetails?.salary || ""
+          address: manager.address || manager.personalDetails?.address || "",
+          emergencyContact: manager.emergencyContact || manager.personalDetails?.emergencyContact || "",
+          salary: manager.salary || manager.personalDetails?.salary || ""
         })
         setProfilePreview(manager.profileImage || "")
       } else {
@@ -74,7 +54,6 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
           joinedDate: new Date().toISOString().split("T")[0],
           status: "Active",
           storeId: "",
-          permissions: ["store_ops_orders", "store_ops_kitchen"],
           address: "",
           emergencyContact: "",
           salary: ""
@@ -128,16 +107,6 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
   const handleInputChange = (e) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const handlePermissionToggle = (key) => {
-    setFormData((prev) => {
-      const current = prev.permissions
-      const updated = current.includes(key)
-        ? current.filter((p) => p !== key)
-        : [...current, key]
-      return { ...prev, permissions: updated }
-    })
   }
 
   const handleRandomAvatar = () => {

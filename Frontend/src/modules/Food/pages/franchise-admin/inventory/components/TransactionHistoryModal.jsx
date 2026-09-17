@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { X, Calendar, Search, RefreshCw, ChevronLeft, ChevronRight, SlidersHorizontal, Download } from "lucide-react";
 import { useStockHistory, useStores } from "../hooks/useStock";
-import { jsPDF } from "jspdf";
-import "jspdf-autotable";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const TYPES = ["All", "Purchase", "Consumption", "Adjustment", "Waste", "Transfer", "Goods Received", "Expired", "Return"];
 const REASONS = ["All", "Damage", "Manual Correction", "Expired", "Transfer", "Waste", "Order Preparation", "New Stock Arrival"];
@@ -111,7 +111,7 @@ export default function TransactionHistoryModal({ isOpen, onClose }) {
       t.referenceId
     ]);
 
-    doc.autoTable({
+    autoTable(doc, {
       head: tableHeaders,
       body: tableRows,
       startY: 30,

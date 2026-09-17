@@ -173,6 +173,7 @@ export const adminAPI = {
   getStoreStaff: (storeId) => adminClient.get("/users", { params: { storeId } }),
   getStoreReviews: (storeId) => adminClient.get("/reviews", { params: { storeId } }),
   getStoreManagers: (params = {}) => adminClient.get("/store-managers", { params }),
+  getStoreManagerById: (id) => adminClient.get(`/store-managers/${id}`),
   createStoreManager: (body) => {
     const formData = new FormData();
     Object.keys(body).forEach((key) => {
@@ -209,6 +210,7 @@ export const adminAPI = {
   deleteStoreManager: (id) => adminClient.delete(`/store-managers/${id}`),
   getStoreApprovalsDashboard: () => adminClient.get("/store-approvals/dashboard"),
   getStoreApprovals: (params = {}) => adminClient.get("/store-approvals", { params }),
+  submitStoreApproval: (id) => adminClient.post(`/store-approvals/${id}/submit`),
   approveStoreApproval: (id, remarks) => adminClient.patch(`/store-approvals/${id}/approve`, { remarks }),
   rejectStoreApproval: (id, payload) => adminClient.patch(`/store-approvals/${id}/reject`, payload),
   getStoreApprovalAudit: (id) => adminClient.get(`/store-approvals/${id}/audit`),

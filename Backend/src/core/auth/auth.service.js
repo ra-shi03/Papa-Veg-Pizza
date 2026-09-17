@@ -284,6 +284,13 @@ export const verifyUserOtpAndLogin = async (
     expiresAt,
   });
 
+  // Limit active sessions (max 3 per user)
+  const tokens = await RefreshToken.find({ userId: user._id }).sort({ createdAt: -1 });
+  if (tokens.length > 3) {
+    const tokensToDelete = tokens.slice(3).map(t => t._id);
+    await RefreshToken.deleteMany({ _id: { $in: tokensToDelete } });
+  }
+
   return {
     token: accessToken,
     accessToken,
@@ -370,6 +377,13 @@ export const adminLogin = async ({ email, mobile, password } = {}, allowedRoles 
     tokenHash,
     expiresAt,
   });
+
+  // Limit active sessions (max 3 per user)
+  const tokens = await RefreshToken.find({ userId: user._id }).sort({ createdAt: -1 });
+  if (tokens.length > 3) {
+    const tokensToDelete = tokens.slice(3).map(t => t._id);
+    await RefreshToken.deleteMany({ _id: { $in: tokensToDelete } });
+  }
 
   user.lastLoginAt = new Date();
   await user.save();
@@ -471,20 +485,27 @@ export const verifyDeliveryOtpAndLogin = async (phone, otp, fcmToken, platform) 
     role: ROLES.DELIVERY_PARTNER,
   };
   const accessToken = signAccessToken(payload);
-  const refreshToken = signRefreshToken(payload);
+  const rawRefreshToken = signRefreshToken(payload);
+  const tokenHash = RefreshToken.hashToken(rawRefreshToken);
   const ttlMs = ms(config.jwtRefreshExpiresIn || "7d");
   const expiresAt = new Date(Date.now() + ttlMs);
-
   await RefreshToken.create({
     userId: deliveryPartner._id,
-    token: refreshToken,
+    tokenHash: tokenHash,
     expiresAt,
   });
+
+  // Limit active sessions (max 3 per user)
+  const tokens = await RefreshToken.find({ userId: deliveryPartner._id }).sort({ createdAt: -1 });
+  if (tokens.length > 3) {
+    const tokensToDelete = tokens.slice(3).map(t => t._id);
+    await RefreshToken.deleteMany({ _id: { $in: tokensToDelete } });
+  }
 
   return {
     token: accessToken,
     accessToken,
-    refreshToken,
+    refreshToken: rawRefreshToken,
     user: sanitizeDeliveryForAuthResponse(
       deliveryPartner?.toObject?.() || deliveryPartner,
     ),

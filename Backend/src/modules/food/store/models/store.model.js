@@ -79,6 +79,24 @@ const storeSchema = new mongoose.Schema(
             type: Boolean,
             default: true,
             index: true
+        },
+        approvalStatus: {
+            type: String,
+            enum: ['Draft', 'Pending', 'Approved', 'Rejected'],
+            default: 'Draft',
+            index: true
+        },
+        rejectionReason: {
+            type: String,
+            default: null
+        },
+        submittedAt: {
+            type: Date,
+            default: null
+        },
+        approvedAt: {
+            type: Date,
+            default: null
         }
     },
     {

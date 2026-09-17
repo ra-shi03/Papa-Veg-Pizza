@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useCallback } from "react"
 import {
   Search, Plus, Download, RefreshCw, MoreVertical, Star,
-  SlidersHorizontal, Trash2, Eye, Shield, Clock, Calendar,
+  SlidersHorizontal, Trash2, Eye, Shield, Clock, Calendar, Edit,
   ChevronLeft, ChevronRight, TrendingUp, ShoppingBag, Users,
   AlertCircle, Building2, ArrowUpRight, UserCheck, CalendarDays
 } from "lucide-react"
+import { adminAPI } from "../../../../../services/api"
+import jsPDF from "jspdf"
+import autoTable from "jspdf-autotable"
 
 // Import subcomponents
 import AddEditManagerModal from "./components/AddEditManagerModal"
@@ -16,19 +19,17 @@ import PermissionsModal from "./components/PermissionsModal"
 import SuspendManagerModal from "./components/SuspendManagerModal"
 import DeleteManagerModal from "./components/DeleteManagerModal"
 
-// Import Mock Data (Keeping initialStores temporarily if needed by other components, although managers are empty)
-import { initialStores } from "./mockManagersData"
+// Removed initialStores import since we are fetching from backend
 
 export default function StoreManagers() {
   // Main Data States
   const [managers, setManagers] = useState([])
+  const [stores, setStores] = useState([])
   const [kpis, setKpis] = useState({
     totalManagers: 0,
     activeManagers: 0,
     onLeaveManagers: 0,
-    suspendedManagers: 0,
-    avgRating: "0.0",
-    ordersManagedToday: 0
+    suspendedManagers: 0
   })
   
   // Table state
@@ -41,7 +42,6 @@ export default function StoreManagers() {
   const [debouncedSearch, setDebouncedSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("All")
   const [storeFilter, setStoreFilter] = useState("All")
-  const [experienceFilter, setExperienceFilter] = useState("All")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   
@@ -112,18 +112,6 @@ export default function StoreManagers() {
       list = list.filter((m) => m.storeId === storeFilter)
     }
 
-    // 4. Experience Filter
-    if (experienceFilter !== "All") {
-      list = list.filter((m) => {
-        const expNum = parseFloat(m.experience.split(" ")[0])
-        if (experienceFilter === "0-1 years") return expNum <= 1
-        if (experienceFilter === "1-3 years") return expNum > 1 && expNum <= 3
-        if (experienceFilter === "3-5 years") return expNum > 3 && expNum <= 5
-        if (experienceFilter === "5+ years") return expNum > 5
-        return true
-      })
-    }
-
     // 5. Date Joined Filter
     if (startDate) {
       list = list.filter((m) => m.joinedDate >= startDate)
@@ -144,8 +132,8 @@ export default function StoreManagers() {
       }
 
       if (sortKey === "store") {
-        const storeA = initialStores.find((s) => s._id === a.storeId)?.storeName || ""
-        const storeB = initialStores.find((s) => s._id === b.storeId)?.storeName || ""
+        const storeA = stores.find((s) => s._id === a.storeId)?.storeName || ""
+        const storeB = stores.find((s) => s._id === b.storeId)?.storeName || ""
         return sortOrder === "asc"
           ? storeA.localeCompare(storeB)
           : storeB.localeCompare(storeA)
@@ -162,32 +150,41 @@ export default function StoreManagers() {
     setFilteredManagers(paginatedList)
     setKpis({
       totalManagers: managers.length,
-      activeManagers: managers.filter(m => m.status === 'Active').length,
-      onLeaveManagers: managers.filter(m => m.status === 'On Leave').length,
-      suspendedManagers: managers.filter(m => m.status === 'Suspended').length,
-      avgRating: "0.0",
-      ordersManagedToday: 0
+      activeManagers: managers.filter(m => m.status === 'Active' || m.status === 'ACTIVE').length,
+      onLeaveManagers: managers.filter(m => m.status === 'On Leave' || m.status === 'ON_LEAVE').length,
+      suspendedManagers: managers.filter(m => m.status === 'Suspended' || m.status === 'SUSPENDED').length
     })
     setLoading(false)
-  }, [managers, debouncedSearch, statusFilter, storeFilter, experienceFilter, startDate, endDate, sortKey, sortOrder, page, limit])
+  }, [managers, debouncedSearch, statusFilter, storeFilter, startDate, endDate, sortKey, sortOrder, page, limit, stores])
 
-  const fetchManagers = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true)
-      const res = await adminAPI.getStoreManagers()
-      if (res?.data?.success) {
-        setManagers(res.data.data.map(m => ({ ...m, id: m._id })))
+      const [mgrRes, storeRes] = await Promise.all([
+        adminAPI.getStoreManagers(),
+        adminAPI.getStores()
+      ])
+      if (mgrRes?.data?.success) {
+        setManagers(mgrRes.data.data.map(m => ({ ...m, id: m._id })))
+      }
+      if (storeRes?.data?.success) {
+        let storesArray = []
+        const sData = storeRes.data.data
+        if (Array.isArray(sData)) storesArray = sData
+        else if (sData && Array.isArray(sData.stores)) storesArray = sData.stores
+        else if (Array.isArray(storeRes.data)) storesArray = storeRes.data
+        setStores(storesArray)
       }
     } catch (error) {
-      console.error("Failed to fetch managers:", error)
-      showToast("Failed to fetch managers", "error")
+      console.error("Failed to fetch data:", error)
+      showToast("Failed to fetch data", "error")
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchManagers()
+    fetchData()
   }, [])
 
   useEffect(() => {
@@ -203,31 +200,52 @@ export default function StoreManagers() {
     setSortOrder(isAsc ? "desc" : "asc")
   }
 
-  // Export CSV
-  const handleExportCSV = () => {
-    const headers = "Employee Code,Name,Email,Phone,Store Assignment,Joined Date,Status,Experience,Monthly Salary\n"
-    const rows = managers
-      .filter((m) => m.status !== "DELETED")
-      .map((m) => {
-        const store = initialStores.find((s) => s._id === m.storeId)?.storeName || "N/A"
-        return `"${m.employeeCode}","${m.name}","${m.email}","${m.phone}","${store}","${m.joinedDate}","${m.status}","${m.experience}","₹${m.personalDetails?.salary || 0}"`
-      })
-      .join("\n")
+  // Export PDF
+  const handleExportPDF = () => {
+    const doc = new jsPDF()
+    doc.text("Store Managers Report", 14, 15)
+    
+    const tableColumn = ["Employee ID", "Name", "Email", "Phone", "Store", "Joined", "Status", "Salary"]
+    const tableRows = []
 
-    const blob = new Blob([headers + rows], { type: "text/csv" })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.setAttribute("href", url)
-    a.setAttribute("download", `Store_Managers_${new Date().toISOString().split("T")[0]}.csv`)
-    a.click()
-    showToast("CSV report exported successfully.")
+    managers
+      .filter((m) => m.status !== "DELETED")
+      .forEach((m) => {
+        const store = stores.find((s) => s._id === m.storeId)?.storeName || "Not Assigned"
+        
+        // Safe extraction
+        const salary = m.salary || m.personalDetails?.salary || 0
+        const dateStr = m.joinedDate ? new Date(m.joinedDate).toLocaleDateString() : "N/A"
+
+        const rowData = [
+          m.employeeCode || "N/A",
+          m.name || "N/A",
+          m.email || "N/A",
+          m.phone || "N/A",
+          store,
+          dateStr,
+          m.status || "Unknown",
+          `Rs ${salary}`
+        ]
+        tableRows.push(rowData)
+      })
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 20,
+      theme: 'grid',
+      styles: { fontSize: 8 }
+    })
+
+    doc.save(`Store_Managers_${new Date().toISOString().split("T")[0]}.pdf`)
+    showToast("PDF report exported successfully.")
   }
 
   const handleResetFilters = () => {
     setSearchVal("")
     setStatusFilter("All")
     setStoreFilter("All")
-    setExperienceFilter("All")
     setStartDate("")
     setEndDate("")
     setPage(1)
@@ -243,14 +261,14 @@ export default function StoreManagers() {
         const res = await adminAPI.updateStoreManager(selectedManager.id, payload)
         if (res?.data?.success) {
           showToast("Store Manager Profile Updated Successfully")
-          fetchManagers()
+          fetchData()
         }
       } else {
         // Add mode
         const res = await adminAPI.createStoreManager(payload)
         if (res?.data?.success) {
           showToast("Store Manager Created Successfully")
-          fetchManagers()
+          fetchData()
         }
       }
       setIsAddEditOpen(false)
@@ -277,7 +295,7 @@ export default function StoreManagers() {
       const res = await adminAPI.updateStoreManager(managerId, { storeId: newStoreId })
       if (res?.data?.success) {
         showToast("Store assignment transfer completed successfully")
-        fetchManagers()
+        fetchData()
       }
     } catch (error) {
       showToast("Failed to assign store", "warning")
@@ -293,7 +311,7 @@ export default function StoreManagers() {
       const res = await adminAPI.updateStoreManager(managerId, { permissions: updatedPermissions })
       if (res?.data?.success) {
         showToast("Manager credentials updated successfully")
-        fetchManagers()
+        fetchData()
       }
     } catch (error) {
       showToast("Failed to update credentials", "warning")
@@ -309,7 +327,7 @@ export default function StoreManagers() {
       const res = await adminAPI.updateStoreManager(managerId, { status: "Suspended" })
       if (res?.data?.success) {
         showToast("Manager profile suspended immediately")
-        fetchManagers()
+        fetchData()
       }
     } catch (error) {
       showToast("Failed to suspend manager", "warning")
@@ -325,7 +343,7 @@ export default function StoreManagers() {
       const res = await adminAPI.deleteStoreManager(managerId)
       if (res?.data?.success) {
         showToast("Store Manager profile deleted", "warning")
-        fetchManagers()
+        fetchData()
       }
     } catch (error) {
       showToast("Failed to delete manager", "warning")
@@ -353,14 +371,14 @@ export default function StoreManagers() {
             Add Manager
           </button>
           <button
-            onClick={handleExportCSV}
+            onClick={handleExportPDF}
             className="flex items-center gap-1 px-3 py-2 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-950 rounded-xl text-xs font-bold transition-colors cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
-            Export CSV
+            Export PDF
           </button>
           <button
-            onClick={processData}
+            onClick={fetchData}
             className="p-2 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-950 rounded-xl transition-colors cursor-pointer"
             title="Refresh Grid"
           >
@@ -370,14 +388,12 @@ export default function StoreManagers() {
       </div>
 
       {/* KPI CARDS SECTION */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Total Managers", val: kpis.totalManagers, sub: "18 registered", icon: Users, color: "text-[var(--primary)] bg-[var(--primary)]/5" },
-          { label: "Active Managers", val: kpis.activeManagers, sub: "16 currently active", icon: UserCheck, color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20" },
-          { label: "On Leave", val: kpis.onLeaveManagers, sub: "1 on approved leave", icon: CalendarDays, color: "text-amber-600 bg-amber-50 dark:bg-amber-950/20" },
-          { label: "Suspended", val: kpis.suspendedManagers, sub: "1 profiles suspended", icon: Shield, color: "text-rose-600 bg-rose-50 dark:bg-rose-950/20" },
-          { label: "Avg Store Rating", val: `${kpis.avgRating} ★`, sub: "4.7 out of 5 stars", icon: Star, color: "text-yellow-600 bg-yellow-50 dark:bg-yellow-950/20" },
-          { label: "Orders Managed Today", val: kpis.ordersManagedToday, sub: "840 orders managed", icon: TrendingUp, color: "text-purple-650 bg-purple-50 dark:bg-purple-950/20" }
+          { label: "Total Managers", val: kpis.totalManagers, sub: "Registered", icon: Users, color: "text-[var(--primary)] bg-[var(--primary)]/5" },
+          { label: "Active Managers", val: kpis.activeManagers, sub: "Currently active", icon: UserCheck, color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20" },
+          { label: "On Leave", val: kpis.onLeaveManagers, sub: "On approved leave", icon: CalendarDays, color: "text-amber-600 bg-amber-50 dark:bg-amber-950/20" },
+          { label: "Suspended", val: kpis.suspendedManagers, sub: "Profiles suspended", icon: Shield, color: "text-rose-600 bg-rose-50 dark:bg-rose-950/20" }
         ].map((card, i) => (
           <div key={i} className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-850 rounded-xl p-3 shadow-xs relative overflow-hidden flex flex-col justify-between min-h-[85px] hover:scale-[1.02] transition-transform duration-300">
             <div>
@@ -436,24 +452,9 @@ export default function StoreManagers() {
               className="w-full px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs font-bold focus:outline-none"
             >
               <option value="All">Store Outlet: All</option>
-              {initialStores.map((s) => (
+              {stores.map((s) => (
                 <option key={s._id} value={s._id}>{s.storeName}</option>
               ))}
-            </select>
-          </div>
-
-          {/* Experience Filter */}
-          <div className="w-[130px]">
-            <select
-              value={experienceFilter}
-              onChange={(e) => { setExperienceFilter(e.target.value); setPage(1); }}
-              className="w-full px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs font-bold focus:outline-none"
-            >
-              <option value="All">Experience: All</option>
-              <option value="0-1 years">0-1 years</option>
-              <option value="1-3 years">1-3 years</option>
-              <option value="3-5 years">3-5 years</option>
-              <option value="5+ years">5+ years</option>
             </select>
           </div>
 
@@ -528,28 +529,24 @@ export default function StoreManagers() {
                   <th className="px-3 py-2.5">Profile</th>
                   <th className="px-3 py-2.5 cursor-pointer select-none" onClick={() => handleSort("employeeCode")}>Employee ID</th>
                   <th className="px-3 py-2.5 cursor-pointer select-none" onClick={() => handleSort("name")}>Manager Name</th>
-                  <th className="px-3 py-2.5 cursor-pointer select-none" onClick={() => handleSort("store")}>Assigned Store</th>
+                  <th className="px-3 py-2.5">Email</th>
                   <th className="px-3 py-2.5">Phone</th>
-                  <th className="px-3 py-2.5 text-center">Customer Rating</th>
-                  <th className="px-3 py-2.5 text-center">Orders Today</th>
+                  <th className="px-3 py-2.5 cursor-pointer select-none" onClick={() => handleSort("store")}>Assigned Store</th>
+                  <th className="px-3 py-2.5">Joined Date</th>
                   <th className="px-3 py-2.5">Status</th>
                   <th className="px-3 py-2.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-850 text-[11px] text-zinc-700 dark:text-zinc-350">
                 {filteredManagers.map((mgr) => {
-                  const store = initialStores.find((s) => s._id === mgr.storeId)
-                  
-                  // Mock rating and orders for display
-                  const seed = mgr.id.split("-")[1] || 1
-                  const displayRating = (4.2 + (seed % 9) * 0.1).toFixed(1)
-                  const displayOrders = 40 + (seed % 25)
+                  const store = stores.find((s) => s._id === mgr.storeId)
+                  const dateStr = mgr.joinedDate ? new Date(mgr.joinedDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "N/A"
 
                   return (
                     <tr key={mgr.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/25 group">
                       <td className="px-3 py-2">
                         <img
-                          src={mgr.profileImage}
+                          src={mgr.profileImage || "https://via.placeholder.com/150"}
                           alt={mgr.name}
                           className="w-7 h-7 rounded-lg object-cover border border-zinc-200 dark:border-zinc-800"
                         />
@@ -558,106 +555,45 @@ export default function StoreManagers() {
                       <td className="px-3 py-2 font-black text-[var(--primary)] cursor-pointer hover:underline" onClick={() => { setSelectedManager(mgr); setDrawerTab("profile"); setIsViewOpen(true); }}>
                         {mgr.name}
                       </td>
-                      <td className="px-3 py-2 font-semibold">{store ? store.storeName : <span className="text-zinc-400 italic">Not Assigned</span>}</td>
+                      <td className="px-3 py-2 font-semibold">{mgr.email}</td>
                       <td className="px-3 py-2 font-semibold">{mgr.phone}</td>
-                      <td className="px-3 py-2 text-center">
-                        <div className="flex items-center justify-center gap-0.5 font-black text-zinc-800 dark:text-zinc-250">
-                          <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                          <span>{displayRating}</span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 text-center font-bold text-zinc-900 dark:text-white">
-                        {displayOrders}
-                      </td>
+                      <td className="px-3 py-2 font-semibold">{store ? store.storeName : <span className="text-zinc-400 italic">Not Assigned</span>}</td>
+                      <td className="px-3 py-2 font-semibold text-zinc-500">{dateStr}</td>
                       <td className="px-3 py-2">
                         <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                          mgr.status === "Active"
+                          (mgr.status === "Active" || mgr.status === "ACTIVE")
                             ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-650"
-                            : mgr.status === "On Leave"
+                            : (mgr.status === "On Leave" || mgr.status === "ON_LEAVE")
                               ? "bg-amber-50 dark:bg-amber-950/20 text-amber-650"
                               : "bg-red-50 dark:bg-red-950/20 text-red-650"
                         }`}>
                           {mgr.status}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-right relative">
-                        <button
-                          onClick={() => setActiveMenuId(activeMenuId === mgr.id ? null : mgr.id)}
-                          className="p-1 rounded-md text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors cursor-pointer"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-
-                        {/* Floating actions */}
-                        {activeMenuId === mgr.id && (
-                          <>
-                            <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-                            <div className="absolute right-4 mt-1 w-44 bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-xl shadow-xl z-20 overflow-hidden divide-y divide-zinc-100 dark:divide-zinc-850 text-left">
-                              <div className="py-1">
-                                <button
-                                  onClick={() => { setSelectedManager(mgr); setDrawerTab("profile"); setIsViewOpen(true); setActiveMenuId(null); }}
-                                  className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
-                                >
-                                  <Eye className="w-3.5 h-3.5 text-zinc-400" />
-                                  View Details
-                                </button>
-                                <button
-                                  onClick={() => { setSelectedManager(mgr); setIsAddEditOpen(true); setActiveMenuId(null); }}
-                                  className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
-                                >
-                                  <Clock className="w-3.5 h-3.5 text-zinc-400" />
-                                  Edit Manager
-                                </button>
-                                <button
-                                  onClick={() => { setSelectedManager(mgr); setIsAssignStoreOpen(true); setActiveMenuId(null); }}
-                                  className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
-                                >
-                                  <Building2 className="w-3.5 h-3.5 text-zinc-400" />
-                                  Assign Store
-                                </button>
-                              </div>
-                              <div className="py-1">
-                                <button
-                                  onClick={() => { setSelectedManager(mgr); setIsAttendanceOpen(true); setActiveMenuId(null); }}
-                                  className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
-                                >
-                                  <Calendar className="w-3.5 h-3.5 text-zinc-400" />
-                                  Attendance Ledger
-                                </button>
-                                <button
-                                  onClick={() => { setSelectedManager(mgr); setIsPerformanceOpen(true); setActiveMenuId(null); }}
-                                  className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
-                                >
-                                  <TrendingUp className="w-3.5 h-3.5 text-zinc-400" />
-                                  Performance Stats
-                                </button>
-                                <button
-                                  onClick={() => { setSelectedManager(mgr); setIsPermissionsOpen(true); setActiveMenuId(null); }}
-                                  className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
-                                >
-                                  <Shield className="w-3.5 h-3.5 text-zinc-400" />
-                                  Permissions Matrix
-                                </button>
-                              </div>
-                              <div className="py-1">
-                                <button
-                                  onClick={() => { setSelectedManager(mgr); setIsSuspendOpen(true); setActiveMenuId(null); }}
-                                  className="w-full px-4 py-1.5 text-xs text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/20 flex items-center gap-1.5 font-semibold"
-                                >
-                                  <Shield className="w-3.5 h-3.5 text-amber-500" />
-                                  Suspend Manager
-                                </button>
-                                <button
-                                  onClick={() => { setSelectedManager(mgr); setIsDeleteOpen(true); setActiveMenuId(null); }}
-                                  className="w-full px-4 py-1.5 text-xs text-red-650 hover:bg-red-50 dark:hover:bg-red-950/20 flex items-center gap-1.5 font-semibold"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                                  Delete Profile
-                                </button>
-                              </div>
-                            </div>
-                          </>
-                        )}
+                      <td className="px-3 py-2">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => { setSelectedManager(mgr); setDrawerTab("profile"); setIsViewOpen(true); }}
+                            className="p-1.5 rounded-md text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors cursor-pointer"
+                            title="View"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => { setSelectedManager(mgr); setIsAddEditOpen(true); }}
+                            className="p-1.5 rounded-md text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950 transition-colors cursor-pointer"
+                            title="Edit"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => { setSelectedManager(mgr); setIsDeleteOpen(true); }}
+                            className="p-1.5 rounded-md text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950 transition-colors cursor-pointer"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -722,6 +658,7 @@ export default function StoreManagers() {
         onClose={() => { setIsViewOpen(false); setSelectedManager(null); }}
         manager={selectedManager}
         defaultTab={drawerTab}
+        stores={stores}
       />
 
       <AssignStoreModal
@@ -729,6 +666,7 @@ export default function StoreManagers() {
         onClose={() => { setIsAssignStoreOpen(false); setSelectedManager(null); }}
         onConfirm={handleAssignStoreConfirm}
         manager={selectedManager}
+        stores={stores}
       />
 
       <AttendanceModal
