@@ -88,26 +88,32 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
         adminAPI.getStores(),
         apiClient.get('/food/admin/territories')
       ]).then(([storesRes, territoriesRes]) => {
-        const extractArray = (res) => {
-          if (res.status !== 'fulfilled') return [];
-          if (Array.isArray(res.value?.data?.data)) return res.value.data.data;
-          if (Array.isArray(res.value?.data)) return res.value.data;
-          return [];
-        };
-        
-        const stores = extractArray(storesRes);
-        const territories = extractArray(territoriesRes);
+        let stores = [];
+        if (storesRes.status === 'fulfilled') {
+          const sData = storesRes.value?.data?.data;
+          if (Array.isArray(sData)) stores = sData;
+          else if (sData && Array.isArray(sData.stores)) stores = sData.stores;
+          else if (Array.isArray(storesRes.value?.data)) stores = storesRes.value.data;
+        }
+
+        let territories = [];
+        if (territoriesRes.status === 'fulfilled') {
+          const tData = territoriesRes.value?.data?.data;
+          if (Array.isArray(tData)) territories = tData;
+          else if (tData && Array.isArray(tData.territories)) territories = tData.territories;
+          else if (Array.isArray(territoriesRes.value?.data)) territories = territoriesRes.value.data;
+        }
         
         const mappedStores = stores.map(store => {
           let territoryName = "Unknown Territory";
-          const tId = store.territoryId || store.address?.territoryId;
+          const tId = store.territoryId?._id || store.territoryId?.id || store.territoryId || store.address?.territoryId;
           if (tId) {
             const territory = territories.find(t => String(t.id || t._id) === String(tId));
             if (territory) territoryName = territory.name || territory.territoryName || "Unknown Territory";
           }
           return {
-            _id: store._id || store.id,
-            storeName: store.storeName,
+            _id: store._id || store.id || store.code,
+            storeName: store.storeName || store.code,
             territoryName
           };
         });
@@ -392,7 +398,7 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
 
               </div>
 
-              {/* RIGHT COLUMN: STORE ASSIGNMENT & PERMISSIONS */}
+              {/* RIGHT COLUMN: STORE ASSIGNMENT */}
               <div className="space-y-6">
                 
                 {/* Section 2: Store Assignment */}
@@ -410,19 +416,11 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
                       className="w-full text-xs font-semibold px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 focus:outline-none"
                     >
                       <option value="">Choose store...</option>
-                      {storesData.length > 0 ? (
-                        storesData.map((store) => (
-                          <option key={store._id} value={store._id}>
-                            {store.storeName} ({store.territoryName})
-                          </option>
-                        ))
-                      ) : (
-                        initialStores.map((store) => (
-                          <option key={store._id} value={store._id}>
-                            {store.storeName} ({store.city})
-                          </option>
-                        ))
-                      )}
+                      {storesData.map((store) => (
+                        <option key={store._id} value={store._id}>
+                          {store.storeName} ({store.territoryName})
+                        </option>
+                      ))}
                     </select>
                     {errors.storeId && <p className="text-[9px] font-bold text-red-500">{errors.storeId}</p>}
                   </div>

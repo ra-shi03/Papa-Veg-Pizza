@@ -171,6 +171,25 @@ export default function StoreManagers() {
     setLoading(false)
   }, [managers, debouncedSearch, statusFilter, storeFilter, experienceFilter, startDate, endDate, sortKey, sortOrder, page, limit])
 
+  const fetchManagers = async () => {
+    try {
+      setLoading(true)
+      const res = await adminAPI.getStoreManagers()
+      if (res?.data?.success) {
+        setManagers(res.data.data.map(m => ({ ...m, id: m._id })))
+      }
+    } catch (error) {
+      console.error("Failed to fetch managers:", error)
+      showToast("Failed to fetch managers", "error")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchManagers()
+  }, [])
+
   useEffect(() => {
     processData()
   }, [processData])
@@ -217,91 +236,103 @@ export default function StoreManagers() {
   // MODAL/DRAWER CALLBACK IMPLEMENTATIONS
 
   // Add / Edit manager submit
-  const handleAddEditConfirm = (payload) => {
-    if (selectedManager) {
-      // Edit mode
-      setManagers((prev) =>
-        prev.map((m) =>
-          m.id === selectedManager.id
-            ? {
-                ...m,
-                ...payload,
-                personalDetails: {
-                  ...m.personalDetails,
-                  address: payload.address,
-                  emergencyContact: payload.emergencyContact,
-                  salary: payload.salary
-                }
-              }
-            : m
-        )
-      )
-      showToast("Store Manager Profile Updated Successfully")
-    } else {
-      // Add mode
-      const newMgr = {
-        id: `mgr-${Date.now()}`,
-        name: payload.name,
-        email: payload.email,
-        phone: payload.phone,
-        employeeCode: payload.employeeCode,
-        joinedDate: payload.joinedDate,
-        status: payload.status,
-        experience: "1.0 years", // Default start
-        storeId: payload.storeId,
-        profileImage: payload.profileImage,
-        permissions: payload.permissions,
-        personalDetails: {
-          address: payload.address,
-          emergencyContact: payload.emergencyContact,
-          salary: payload.salary
+  const handleAddEditConfirm = async (payload) => {
+    try {
+      if (selectedManager) {
+        // Edit mode
+        const res = await adminAPI.updateStoreManager(selectedManager.id, payload)
+        if (res?.data?.success) {
+          showToast("Store Manager Profile Updated Successfully")
+          fetchManagers()
+        }
+      } else {
+        // Add mode
+        const res = await adminAPI.createStoreManager(payload)
+        if (res?.data?.success) {
+          showToast("Store Manager Created Successfully")
+          fetchManagers()
         }
       }
-      setManagers((prev) => [newMgr, ...prev])
-      showToast("Store Manager Created Successfully")
+      setIsAddEditOpen(false)
+      setSelectedManager(null)
+    } catch (error) {
+      console.error("Error saving manager:", error)
+      let errorMsg = error.response?.data?.message || error.message || "Failed to save manager"
+      
+      // Provide user-friendly duplicate key errors
+      if (errorMsg.includes("E11000 duplicate key error")) {
+        if (errorMsg.includes("mobile")) errorMsg = "This phone number is already registered.";
+        else if (errorMsg.includes("email")) errorMsg = "This email is already registered.";
+        else if (errorMsg.includes("employeeCode")) errorMsg = "This Employee ID is already in use.";
+        else errorMsg = "A manager with these details already exists.";
+      }
+      
+      showToast(errorMsg, "warning")
     }
-    setIsAddEditOpen(false)
-    setSelectedManager(null)
   }
 
   // Assign store transfer submit
-  const handleAssignStoreConfirm = (managerId, newStoreId, reason) => {
-    setManagers((prev) =>
-      prev.map((m) => (m.id === managerId ? { ...m, storeId: newStoreId } : m))
-    )
-    showToast("Store assignment transfer completed successfully")
-    setIsAssignStoreOpen(false)
-    setSelectedManager(null)
+  const handleAssignStoreConfirm = async (managerId, newStoreId, reason) => {
+    try {
+      const res = await adminAPI.updateStoreManager(managerId, { storeId: newStoreId })
+      if (res?.data?.success) {
+        showToast("Store assignment transfer completed successfully")
+        fetchManagers()
+      }
+    } catch (error) {
+      showToast("Failed to assign store", "warning")
+    } finally {
+      setIsAssignStoreOpen(false)
+      setSelectedManager(null)
+    }
   }
 
   // Permissions credentials update
-  const handlePermissionsConfirm = (managerId, updatedPermissions) => {
-    setManagers((prev) =>
-      prev.map((m) => (m.id === managerId ? { ...m, permissions: updatedPermissions } : m))
-    )
-    showToast("Manager credentials updated successfully")
-    setIsPermissionsOpen(false)
-    setSelectedManager(null)
+  const handlePermissionsConfirm = async (managerId, updatedPermissions) => {
+    try {
+      const res = await adminAPI.updateStoreManager(managerId, { permissions: updatedPermissions })
+      if (res?.data?.success) {
+        showToast("Manager credentials updated successfully")
+        fetchManagers()
+      }
+    } catch (error) {
+      showToast("Failed to update credentials", "warning")
+    } finally {
+      setIsPermissionsOpen(false)
+      setSelectedManager(null)
+    }
   }
 
   // Suspension submit
-  const handleSuspendConfirm = (managerId, details) => {
-    setManagers((prev) =>
-      prev.map((m) => (m.id === managerId ? { ...m, status: "Suspended" } : m))
-    )
-    showToast("Manager profile suspended immediately")
-    setIsSuspendOpen(false)
-    setSelectedManager(null)
+  const handleSuspendConfirm = async (managerId, details) => {
+    try {
+      const res = await adminAPI.updateStoreManager(managerId, { status: "Suspended" })
+      if (res?.data?.success) {
+        showToast("Manager profile suspended immediately")
+        fetchManagers()
+      }
+    } catch (error) {
+      showToast("Failed to suspend manager", "warning")
+    } finally {
+      setIsSuspendOpen(false)
+      setSelectedManager(null)
+    }
   }
 
   // Soft Delete confirm
-  const handleDeleteConfirm = (managerId) => {
-    setManagers((prev) =>
-      prev.map((m) => (m.id === managerId ? { ...m, status: "DELETED" } : m))
-    )
-    showToast("Store Manager profile deleted", "warning")
-    setIsDeleteOpen(false)
-    setSelectedManager(null)
+  const handleDeleteConfirm = async (managerId) => {
+    try {
+      const res = await adminAPI.deleteStoreManager(managerId)
+      if (res?.data?.success) {
+        showToast("Store Manager profile deleted", "warning")
+        fetchManagers()
+      }
+    } catch (error) {
+      showToast("Failed to delete manager", "warning")
+    } finally {
+      setIsDeleteOpen(false)
+      setSelectedManager(null)
+    }
   }
 
   return (

@@ -7,6 +7,11 @@ const personalDetailsSchema = new mongoose.Schema({
 }, { _id: false });
 
 const storeManagerSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'FoodUser',
+    default: null,
+  },
   name: {
     type: String,
     required: [true, 'Name is required'],
@@ -39,10 +44,6 @@ const storeManagerSchema = new mongoose.Schema({
     enum: ['Active', 'On Leave', 'Suspended', 'DELETED'],
     default: 'Active',
   },
-  experience: {
-    type: String,
-    default: '0 years',
-  },
   storeId: {
     type: String, // Kept simple
     required: false,
@@ -52,9 +53,6 @@ const storeManagerSchema = new mongoose.Schema({
     type: String,
     default: 'https://via.placeholder.com/150',
   },
-  permissions: [{
-    type: String
-  }],
   personalDetails: {
     type: personalDetailsSchema,
     default: () => ({})

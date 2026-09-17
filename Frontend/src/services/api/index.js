@@ -172,7 +172,41 @@ export const adminAPI = {
   getStoreInventory: (storeId) => adminClient.get("/inventory", { params: { storeId } }),
   getStoreStaff: (storeId) => adminClient.get("/users", { params: { storeId } }),
   getStoreReviews: (storeId) => adminClient.get("/reviews", { params: { storeId } }),
-  getStoreManagers: () => adminClient.get("/users", { params: { role: "store_manager" } }),
+  getStoreManagers: (params = {}) => adminClient.get("/store-managers", { params }),
+  createStoreManager: (body) => {
+    const formData = new FormData();
+    Object.keys(body).forEach((key) => {
+      if (key === 'profileImageFile' && body[key]) {
+        formData.append('profileImageFile', body[key]);
+      } else if (key === 'personalDetails' || key === 'permissions') {
+        formData.append(key, JSON.stringify(body[key]));
+      } else if (key !== 'profileImageFile') {
+        formData.append(key, body[key]);
+      }
+    });
+    return adminClient.post("/store-managers", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+  updateStoreManager: (id, body) => {
+    if (body.profileImageFile) {
+      const formData = new FormData();
+      Object.keys(body).forEach((key) => {
+        if (key === 'profileImageFile') {
+          formData.append('profileImageFile', body[key]);
+        } else if (key === 'personalDetails' || key === 'permissions') {
+          formData.append(key, JSON.stringify(body[key]));
+        } else {
+          formData.append(key, body[key]);
+        }
+      });
+      return adminClient.patch(`/store-managers/${id}`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+    }
+    return adminClient.patch(`/store-managers/${id}`, body);
+  },
+  deleteStoreManager: (id) => adminClient.delete(`/store-managers/${id}`),
   getStoreApprovalsDashboard: () => adminClient.get("/store-approvals/dashboard"),
   getStoreApprovals: (params = {}) => adminClient.get("/store-approvals", { params }),
   approveStoreApproval: (id, remarks) => adminClient.patch(`/store-approvals/${id}/approve`, { remarks }),
