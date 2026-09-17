@@ -40,13 +40,13 @@ export default function ApproveModal({ isOpen, onClose, onConfirm, approval }) {
         <div className="relative w-full max-w-2xl bg-white dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-2xl overflow-hidden scale-in duration-200 flex flex-col max-h-[90vh]">
           
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-850 bg-emerald-50/50 dark:bg-emerald-950/10">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-850 bg-blue-50/50 dark:bg-blue-950/10">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-emerald-100 dark:bg-emerald-950/30 text-emerald-650 rounded-lg">
-                <Check className="w-4 h-4" />
+              <div className="p-1.5 bg-blue-100 dark:bg-blue-950/30 text-blue-650 rounded-lg">
+                <FileText className="w-4 h-4 text-blue-600" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Approve Store Application</h3>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Submit Store Application</h3>
                 <span className="text-[10px] text-slate-400 dark:text-slate-500">Request: {approval._id}</span>
               </div>
             </div>
@@ -179,9 +179,9 @@ export default function ApproveModal({ isOpen, onClose, onConfirm, approval }) {
             </button>
             <button
               onClick={() => setShowConfirm(true)}
-              className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md transition-all"
+              className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md transition-all"
             >
-              Approve Store
+              Submit Store
             </button>
           </div>
 
@@ -197,12 +197,12 @@ export default function ApproveModal({ isOpen, onClose, onConfirm, approval }) {
                 <AlertCircle className="w-5 h-5 animate-pulse" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white">Confirm Approval</h4>
-                <p className="text-xs text-slate-500 mt-0.5">Are you sure you want to approve this store?</p>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">Confirm Submission</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Submit this store for approval?</p>
               </div>
             </div>
             <p className="text-xs text-slate-450 leading-relaxed bg-slate-50 dark:bg-slate-900/30 p-2.5 rounded-lg border border-slate-100 dark:border-slate-850">
-              Approving this request will activate the store outlet configs. The store will immediately go live.
+              Submitting this request will forward it to the Superadmin for review. You can't modify the store details while it's pending.
             </p>
             <div className="flex justify-end gap-2.5 pt-2">
               <button
@@ -214,10 +214,10 @@ export default function ApproveModal({ isOpen, onClose, onConfirm, approval }) {
               </button>
               <button
                 onClick={handleSubmit}
-                className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm"
+                className="px-4 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm"
                 disabled={submitting}
               >
-                {submitting ? "Approving..." : "Yes, Approve"}
+                {submitting ? "Submitting..." : "Yes, Submit"}
               </button>
             </div>
           </div>

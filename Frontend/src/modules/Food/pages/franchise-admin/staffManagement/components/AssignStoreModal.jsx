@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { Building2, ArrowRight, X, Sparkles } from "lucide-react"
-import { initialStores } from "../mockManagersData"
 
-export default function AssignStoreModal({ isOpen, onClose, onConfirm, manager }) {
+export default function AssignStoreModal({ isOpen, onClose, onConfirm, manager, stores = [] }) {
   const [storeId, setStoreId] = useState("")
   const [reason, setReason] = useState("")
   const [errors, setErrors] = useState({})
@@ -17,8 +16,8 @@ export default function AssignStoreModal({ isOpen, onClose, onConfirm, manager }
 
   if (!isOpen || !manager) return null
 
-  const currentStore = initialStores.find((s) => s._id === manager.storeId)
-  const availableStores = initialStores.filter((s) => s._id !== manager.storeId)
+  const currentStore = stores.find((s) => s._id === manager.storeId)
+  const availableStores = stores.filter((s) => s._id !== manager.storeId)
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -87,10 +86,10 @@ export default function AssignStoreModal({ isOpen, onClose, onConfirm, manager }
             <div className="col-span-3 text-center p-2 rounded-xl bg-[var(--primary)]/5 border border-[var(--primary)]/10 text-[var(--primary)]">
               <span className="block text-[8px] font-bold uppercase tracking-wider mb-0.5 opacity-80">Target Assignment</span>
               <p className="text-[10px] font-extrabold truncate">
-                {storeId ? initialStores.find((s) => s._id === storeId)?.storeName : "Choose below..."}
+                {storeId ? stores.find((s) => s._id === storeId)?.storeName : "Choose below..."}
               </p>
               <span className="text-[8px] font-bold opacity-80">
-                {storeId ? initialStores.find((s) => s._id === storeId)?.city : "-"}
+                {storeId ? stores.find((s) => s._id === storeId)?.city : "-"}
               </span>
             </div>
           </div>

@@ -19,7 +19,7 @@ import { restaurantAPI, adminAPI } from "@food/api"
 import { isModuleAuthenticated } from "@food/utils/auth"
 import { flattenMenuItems, getMenuFromResponse } from "@food/utils/menuItems"
 import { calculateDistance, formatDistance } from "@food/utils/common"
-import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability"
+import { getRestaurantAvailabilityStatus } from "@food/utils/storeAvailability"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}

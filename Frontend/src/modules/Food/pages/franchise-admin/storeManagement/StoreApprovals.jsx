@@ -172,33 +172,18 @@ export default function StoreApprovals() {
     showToast("Exporting approvals spreadsheet... Download started.")
   }
 
-  // Handle Approve Confirm
-  const handleApproveConfirm = async (remarks) => {
+  // Handle Submit Confirm
+  const handleSubmitConfirm = async () => {
     if (!selectedApproval) return
     try {
-      await adminAPI.approveStoreApproval(selectedApproval._id, remarks)
-      showToast(`Store "${selectedApproval.storeName}" has been approved and activated!`, "success")
-      setIsApproveOpen(false)
+      await adminAPI.submitStoreApproval(selectedApproval._id)
+      showToast(`Store "${selectedApproval.storeName}" has been submitted for approval!`, "success")
+      setIsApproveOpen(false) // Using this state for the submit modal
       setSelectedApproval(null)
       fetchApprovals()
       fetchKPIs()
     } catch (_) {
-      showToast("Failed to approve the store. Please try again.", "error")
-    }
-  }
-
-  // Handle Reject Confirm
-  const handleRejectConfirm = async (payload) => {
-    if (!selectedApproval) return
-    try {
-      await adminAPI.rejectStoreApproval(selectedApproval._id, payload)
-      showToast(`Store application "${selectedApproval.storeName}" has been rejected.`, "success")
-      setIsRejectOpen(false)
-      setSelectedApproval(null)
-      fetchApprovals()
-      fetchKPIs()
-    } catch (_) {
-      showToast("Failed to reject the store application.", "error")
+      showToast("Failed to submit the store. Please try again.", "error")
     }
   }
 
@@ -248,7 +233,7 @@ export default function StoreApprovals() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">Store Approvals</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Review and approve newly submitted store applications.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Manage and submit your store approval requests.</p>
         </div>
         <div className="flex items-center gap-1.5">
           <button
@@ -271,10 +256,10 @@ export default function StoreApprovals() {
       {/* KPI METRIC CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Pending Approvals", val: kpis?.pendingApprovals, sub: "18 Requests", icon: FileCheck, color: "text-amber-600 bg-amber-50 dark:bg-amber-950/20" },
-          { label: "Approved Today", val: kpis?.approvedToday, sub: "7 Stores", icon: CheckCircle, color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20" },
-          { label: "Rejected Stores", val: kpis?.rejectedStores, sub: "4 Stores", icon: XCircle, color: "text-rose-600 bg-rose-50 dark:bg-rose-950/20" },
-          { label: "Average Approval Time", val: kpis ? `${kpis.avgApprovalTime} Hrs` : null, sub: "3.2 Hours avg", icon: Clock, color: "text-blue-600 bg-blue-50 dark:bg-blue-950/20" }
+          { label: "Draft Stores", val: kpis?.draftStores, sub: "Not submitted", icon: FileCheck, color: "text-slate-600 bg-slate-100 dark:bg-slate-900" },
+          { label: "Pending Approvals", val: kpis?.pendingApprovals, sub: "Waiting for review", icon: Clock, color: "text-amber-600 bg-amber-50 dark:bg-amber-950/20" },
+          { label: "Approved Stores", val: kpis?.approvedStores, sub: "Active", icon: CheckCircle, color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20" },
+          { label: "Rejected Stores", val: kpis?.rejectedStores, sub: "Requires attention", icon: XCircle, color: "text-rose-600 bg-rose-50 dark:bg-rose-950/20" }
         ].map((card, i) => (
           <div key={i} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-850 rounded-xl p-3 shadow-xs relative overflow-hidden flex flex-col justify-between min-h-[85px]">
             {loadingKpis ? (
@@ -328,6 +313,7 @@ export default function StoreApprovals() {
               className="w-full px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs font-semibold focus:outline-none"
             >
               <option value="All">Status: All</option>
+              <option value="Draft">Draft</option>
               <option value="Pending">Pending</option>
               <option value="Approved">Approved</option>
               <option value="Rejected">Rejected</option>
@@ -489,9 +475,11 @@ export default function StoreApprovals() {
                           ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-650"
                           : app.status === "Pending"
                             ? "bg-amber-50 dark:bg-amber-950/20 text-amber-650"
-                            : "bg-red-50 dark:bg-red-950/20 text-red-650"
+                            : app.status === "Draft"
+                              ? "bg-blue-50 dark:bg-blue-950/20 text-blue-650"
+                              : "bg-red-50 dark:bg-red-950/20 text-red-650"
                       }`}>
-                        {app.status}
+                        {app.status || "Draft"}
                       </span>
                     </td>
                     <td className="px-2.5 py-2 text-right relative">
@@ -516,23 +504,24 @@ export default function StoreApprovals() {
                                 View Application
                               </button>
                               
-                              {app.status === "Pending" && (
-                                <>
-                                  <button
-                                    onClick={() => { setSelectedApproval(app); setIsApproveOpen(true); setActiveMenuId(null); }}
-                                    className="w-full px-4 py-1.5 text-xs text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/10 flex items-center gap-1.5 font-semibold"
-                                  >
-                                    <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-                                    Approve Store
-                                  </button>
-                                  <button
-                                    onClick={() => { setSelectedApproval(app); setIsRejectOpen(true); setActiveMenuId(null); }}
-                                    className="w-full px-4 py-1.5 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-955/10 flex items-center gap-1.5 font-semibold"
-                                  >
-                                    <XCircle className="w-3.5 h-3.5 text-rose-500" />
-                                    Reject Store
-                                  </button>
-                                </>
+                              {app.status === "Draft" && (
+                                <button
+                                  onClick={() => { setSelectedApproval(app); setIsApproveOpen(true); setActiveMenuId(null); }}
+                                  className="w-full px-4 py-1.5 text-xs text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/10 flex items-center gap-1.5 font-semibold"
+                                >
+                                  <FileCheck className="w-3.5 h-3.5 text-blue-500" />
+                                  Submit for Approval
+                                </button>
+                              )}
+                              
+                              {app.status === "Rejected" && (
+                                <button
+                                  onClick={() => { setSelectedApproval(app); setIsRejectOpen(true); setActiveMenuId(null); }}
+                                  className="w-full px-4 py-1.5 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-955/10 flex items-center gap-1.5 font-semibold"
+                                >
+                                  <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
+                                  View Rejection Reason
+                                </button>
                               )}
                             </div>
                             
@@ -601,17 +590,11 @@ export default function StoreApprovals() {
       <ApproveModal
         isOpen={isApproveOpen}
         onClose={() => { setIsApproveOpen(false); setSelectedApproval(null); }}
-        onConfirm={handleApproveConfirm}
+        onConfirm={handleSubmitConfirm}
         approval={selectedApproval}
       />
 
-      {/* 3. REJECT MODAL */}
-      <RejectModal
-        isOpen={isRejectOpen}
-        onClose={() => { setIsRejectOpen(false); setSelectedApproval(null); }}
-        onConfirm={handleRejectConfirm}
-        approval={selectedApproval}
-      />
+
 
       {/* 4. CONTACT MANAGER POPUP */}
       <ContactManagerModal

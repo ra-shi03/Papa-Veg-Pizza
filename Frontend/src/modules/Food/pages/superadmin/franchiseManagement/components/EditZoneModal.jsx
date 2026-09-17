@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { X, Info, Trash2 } from "lucide-react";
-import { GoogleMap, useJsApiLoader, Polygon } from "@react-google-maps/api";
+import { GoogleMap, useJsApiLoader, Polygon, Marker } from "@react-google-maps/api";
 
 const LIBRARIES = Object.freeze(['geometry', 'places']);
 
@@ -13,6 +13,8 @@ export default function EditZoneModal({ isOpen, onClose, onSubmit, regions = [],
   const [error, setError] = useState("");
   const [mapCenter, setMapCenter] = useState({ lat: 20.5937, lng: 78.9629 });
   const [mapZoom, setMapZoom] = useState(4);
+  const [mapSearchInput, setMapSearchInput] = useState("");
+  const [searchMarker, setSearchMarker] = useState(null);
 
   const { isLoaded } = useJsApiLoader({
     id: "google-map-script",
@@ -36,6 +38,20 @@ export default function EditZoneModal({ isOpen, onClose, onSubmit, regions = [],
     }, 1200);
     return () => clearTimeout(timeoutId);
   }, [zoneName, isLoaded, coordinates.length]);
+
+  const handleMapSearch = () => {
+    if (!mapSearchInput.trim() || !window.google) return;
+    const geocoder = new window.google.maps.Geocoder();
+    geocoder.geocode({ address: mapSearchInput.trim() }, (results, status) => {
+      if (status === "OK" && results && results[0]) {
+        const loc = results[0].geometry.location;
+        const coords = { lat: loc.lat(), lng: loc.lng() };
+        setMapCenter(coords);
+        setMapZoom(13);
+        setSearchMarker(coords);
+      }
+    });
+  };
 
   const polygonRef = useRef(null);
 
@@ -242,14 +258,26 @@ export default function EditZoneModal({ isOpen, onClose, onSubmit, regions = [],
                 )}
               </div>
               <div className="flex-1 min-h-[250px] rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900 relative">
+                <div className="absolute top-2 left-2 right-12 z-[10]">
+                  <input
+                    type="text"
+                    value={mapSearchInput}
+                    onChange={(e) => setMapSearchInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleMapSearch())}
+                    placeholder="Search map location..."
+                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded shadow-md text-[11px] font-semibold text-black dark:text-zinc-100 outline-none focus:border-[var(--primary)]"
+                  />
+                </div>
                 {isLoaded ? (
                   <GoogleMap
                     mapContainerStyle={{ width: '100%', height: '100%' }}
-                    center={coordinates.length > 0 ? { lat: coordinates[0].latitude, lng: coordinates[0].longitude } : mapCenter}
-                    zoom={coordinates.length > 0 ? 10 : mapZoom}
+                    center={mapCenter || (coordinates.length > 0 ? { lat: parseFloat(coordinates[0].latitude), lng: parseFloat(coordinates[0].longitude) } : { lat: 20.5937, lng: 78.9629 })}                 zoom={coordinates.length > 0 ? 10 : mapZoom}
                     options={{ disableDefaultUI: true, gestureHandling: 'greedy', zoomControl: true }}
                     onClick={onMapClick}
                   >
+                    {searchMarker && (
+                      <Marker position={searchMarker} />
+                    )}
                     {coordinates.length > 0 && (
                       <Polygon
                         onLoad={onPolygonLoad}

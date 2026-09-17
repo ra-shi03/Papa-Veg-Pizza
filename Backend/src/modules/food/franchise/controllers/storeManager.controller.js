@@ -13,6 +13,13 @@ export const createStoreManager = async (req, res) => {
     if (req.file) {
       data.profileImage = await uploadImageBuffer(req.file.buffer, 'papa-veg/managers');
     }
+    // Validate store manager assignment
+    if (data.storeId) {
+      const existingManager = await StoreManager.findOne({ storeId: data.storeId, status: { $ne: 'DELETED' } });
+      if (existingManager) {
+        return res.status(400).json({ success: false, message: 'This store already has an assigned manager.' });
+      }
+    }
     
     // Parse nested objects if sent as flat strings from FormData
     if (typeof data.personalDetails === 'string') {
@@ -61,6 +68,13 @@ export const createStoreManager = async (req, res) => {
 
     // 5. Create StoreManager record
     data.userId = user._id;
+    if (data.address || data.emergencyContact || data.salary) {
+      data.personalDetails = {
+        address: data.address || data.personalDetails?.address || '',
+        emergencyContact: data.emergencyContact || data.personalDetails?.emergencyContact || '',
+        salary: Number(data.salary) || Number(data.personalDetails?.salary) || 0
+      };
+    }
     const storeManager = new StoreManager(data);
     const savedManager = await storeManager.save();
     
@@ -115,6 +129,14 @@ export const updateStoreManager = async (req, res) => {
     if (typeof data.permissions === 'string') {
         data.permissions = JSON.parse(data.permissions);
     }
+    
+    if (data.address || data.emergencyContact || data.salary) {
+      data.personalDetails = {
+        address: data.address || data.personalDetails?.address || '',
+        emergencyContact: data.emergencyContact || data.personalDetails?.emergencyContact || '',
+        salary: Number(data.salary) || Number(data.personalDetails?.salary) || 0
+      };
+    }
 
     const manager = await StoreManager.findByIdAndUpdate(req.params.id, data, {
       new: true,
@@ -129,8 +151,18 @@ export const updateStoreManager = async (req, res) => {
 
 export const deleteStoreManager = async (req, res) => {
   try {
-    const manager = await StoreManager.findByIdAndUpdate(req.params.id, { status: 'DELETED' }, { new: true });
+    const manager = await StoreManager.findById(req.params.id);
     if (!manager) return res.status(404).json({ success: false, message: 'Not found' });
+
+    // Hard Delete associated user records
+    if (manager.userId) {
+      await FoodUser.findByIdAndDelete(manager.userId);
+      await Profile.findOneAndDelete({ userId: manager.userId });
+      await UserRole.findOneAndDelete({ userId: manager.userId });
+    }
+    
+    await StoreManager.findByIdAndDelete(req.params.id);
+
     res.status(200).json({ success: true, data: {} });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

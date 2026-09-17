@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { X, Check, ArrowLeft, ArrowRight, Save, Landmark, AlertTriangle, Trash2 } from "lucide-react";
-import { GoogleMap, useJsApiLoader, Polygon } from "@react-google-maps/api";
+import { GoogleMap, useJsApiLoader, Polygon, Marker } from "@react-google-maps/api";
 import { toast } from "sonner";
 
 const LIBRARIES = Object.freeze(['geometry', 'places']);
@@ -33,6 +33,10 @@ export default function EditTerritoryModal({
   const [postalInput, setPostalInput] = useState("");
   const [mapCenter, setMapCenter] = useState(null);
   const [mapZoom, setMapZoom] = useState(null);
+  const [userMapCenter, setUserMapCenter] = useState(null);
+  const [userMapZoom, setUserMapZoom] = useState(null);
+  const [mapSearchInput, setMapSearchInput] = useState("");
+  const [searchMarker, setSearchMarker] = useState(null);
 
   // Pre-fill if editing
   useEffect(() => {
@@ -76,6 +80,20 @@ export default function EditTerritoryModal({
     }, 1200);
     return () => clearTimeout(timeoutId);
   }, [formData.name, isLoaded, formData.coordinates.length]);
+
+  const handleMapSearch = () => {
+    if (!mapSearchInput.trim() || !window.google) return;
+    const geocoder = new window.google.maps.Geocoder();
+    geocoder.geocode({ address: mapSearchInput.trim() }, (results, status) => {
+      if (status === "OK" && results && results[0]) {
+        const loc = results[0].geometry.location;
+        const coords = { lat: loc.lat(), lng: loc.lng() };
+        setUserMapCenter(coords);
+        setUserMapZoom(13);
+        setSearchMarker(coords);
+      }
+    });
+  };
 
   const polygonRef = useRef(null);
 
@@ -519,14 +537,27 @@ export default function EditTerritoryModal({
                 </div>
                 
                 <div className="h-64 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900 relative">
+                  <div className="absolute top-2 left-2 right-12 z-[10]">
+                    <input
+                      type="text"
+                      value={mapSearchInput}
+                      onChange={(e) => setMapSearchInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleMapSearch())}
+                      placeholder="Search map location..."
+                      className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded shadow-md text-[11px] font-semibold text-black dark:text-zinc-100 outline-none focus:border-[var(--primary)]"
+                    />
+                  </div>
                   {isLoaded ? (
                     <GoogleMap
                       mapContainerStyle={{ width: '100%', height: '100%' }}
-                      center={mapCenter || (formData.coordinates.length > 0 ? { lat: parseFloat(formData.coordinates[0].latitude), lng: parseFloat(formData.coordinates[0].longitude) } : (selectedZoneCoordinates && selectedZoneCoordinates.length > 0 ? { lat: parseFloat(selectedZoneCoordinates[0].latitude || selectedZoneCoordinates[0][1]), lng: parseFloat(selectedZoneCoordinates[0].longitude || selectedZoneCoordinates[0][0]) } : { lat: 20.5937, lng: 78.9629 }))}
-                      zoom={mapZoom || (formData.coordinates.length > 0 ? 12 : (selectedZoneCoordinates && selectedZoneCoordinates.length > 0 ? 10 : 4))}
+                      center={userMapCenter || mapCenter || (formData.coordinates.length > 0 ? { lat: parseFloat(formData.coordinates[0].latitude), lng: parseFloat(formData.coordinates[0].longitude) } : (selectedZoneCoordinates && selectedZoneCoordinates.length > 0 ? { lat: parseFloat(selectedZoneCoordinates[0].latitude || selectedZoneCoordinates[0][1]), lng: parseFloat(selectedZoneCoordinates[0].longitude || selectedZoneCoordinates[0][0]) } : { lat: 20.5937, lng: 78.9629 }))}
+                      zoom={userMapZoom || mapZoom || (formData.coordinates.length > 0 ? 12 : (selectedZoneCoordinates && selectedZoneCoordinates.length > 0 ? 10 : 4))}
                       options={{ disableDefaultUI: true, gestureHandling: 'greedy', zoomControl: true }}
                       onClick={onMapClick}
                     >
+                      {searchMarker && (
+                        <Marker position={searchMarker} />
+                      )}
                       {selectedZoneCoordinates && selectedZoneCoordinates.length > 0 && (
                         <Polygon
                           paths={selectedZoneCoordinates.map(c => ({ lat: parseFloat(c.latitude || c[1]), lng: parseFloat(c.longitude || c[0]) }))}
