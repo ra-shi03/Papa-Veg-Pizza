@@ -23,6 +23,7 @@ import { FoodDeliveryEmergencyHelp } from '../models/deliveryEmergencyHelp.model
 import { FoodReferralSettings } from '../models/referralSettings.model.js';
 import { FoodReferralLog } from '../models/referralLog.model.js';
 import { FoodSafetyEmergencyReport } from '../models/safetyEmergencyReport.model.js';
+import { StoreManager } from '../../franchise/models/storeManager.model.js';
 
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { FoodTransaction } from '../../orders/models/foodTransaction.model.js';
@@ -2142,10 +2143,26 @@ export async function getStoreReviews(query = {}) {
 
 export async function getStoreById(id) {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
-    return FoodStore.findById(id)
+    const store = await FoodStore.findById(id)
         .select('-__v')
-        .populate('zoneId', 'name zoneName serviceLocation isActive')
+        .populate('zoneId regionId territoryId', 'name zoneName serviceLocation isActive')
+        .populate('franchiseId', 'ownerName name companyName email phone')
         .lean();
+        
+    if (!store) return null;
+    
+    // Fetch manager details
+    const manager = await StoreManager.findOne({ storeId: store._id, status: { $ne: 'DELETED' } }).lean();
+    store.managerName = manager ? manager.name : 'Not Assigned';
+    store.managerPhone = manager ? manager.phone : '';
+    store.managerEmail = manager ? manager.email : '';
+    
+    store.franchiseOwnerName = store.franchiseId?.ownerName || 'Unknown';
+    store.franchiseName = store.franchiseId?.name || store.franchiseId?.companyName || 'Unknown';
+    store.franchiseEmail = store.franchiseId?.email || '';
+    store.franchisePhone = store.franchiseId?.phone || '';
+    
+    return store;
 }
 
 export async function getStoreAnalytics(storeId) {

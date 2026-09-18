@@ -4,13 +4,11 @@ import { XCircle } from "lucide-react";
 export default function RejectAppModal({ isOpen, onClose, selectedApp, onSubmit }) {
   const [rejectionReason, setRejectionReason] = useState("");
   const [rejectionNotes, setRejectionNotes] = useState("");
-  const [notifyReject, setNotifyReject] = useState(true);
 
   useEffect(() => {
     if (isOpen) {
       setRejectionReason("");
       setRejectionNotes("");
-      setNotifyReject(true);
     }
   }, [isOpen]);
 
@@ -21,7 +19,7 @@ export default function RejectAppModal({ isOpen, onClose, selectedApp, onSubmit 
     onSubmit({
       reason: rejectionReason,
       notes: rejectionNotes,
-      notify: notifyReject
+      notify: true
     });
   };
 
@@ -31,7 +29,7 @@ export default function RejectAppModal({ isOpen, onClose, selectedApp, onSubmit 
         <div className="p-4 border-b border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-900/40 flex justify-between items-center">
           <div>
             <h3 className="text-xs font-black uppercase tracking-wider text-black dark:text-zinc-100">Reject Application</h3>
-            <p className="text-[10px] font-bold text-rose-600 mt-0.5">{selectedApp?.id} - {selectedApp?.applicantName}</p>
+            <p className="text-[10px] font-bold text-rose-600 mt-0.5">{selectedApp?.code || selectedApp?._id || selectedApp?.id} - {selectedApp?.managerName || selectedApp?.applicantName}</p>
           </div>
           <button
             onClick={onClose}
@@ -69,18 +67,7 @@ export default function RejectAppModal({ isOpen, onClose, selectedApp, onSubmit 
             />
           </div>
 
-          <div className="flex items-center gap-2 pt-1 select-none">
-            <input
-              type="checkbox"
-              id="notify-reject"
-              checked={notifyReject}
-              onChange={(e) => setNotifyReject(e.target.checked)}
-              className="w-3.5 h-3.5 rounded text-rose-600 focus:ring-0 cursor-pointer"
-            />
-            <label htmlFor="notify-reject" className="text-xs font-bold text-black dark:text-zinc-200 cursor-pointer">
-              Notify Applicant via automated rejection email
-            </label>
-          </div>
+
         </div>
 
         <div className="p-4 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-900/40 flex justify-end gap-3">

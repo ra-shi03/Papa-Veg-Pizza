@@ -21,73 +21,46 @@ import {
 import { motion, AnimatePresence } from "framer-motion"
 import StoreManagerDetailsDrawer from "./StoreManagerDetailsDrawer"
 
+import { adminAPI } from "@food/api"
+
 // Initial Managers list to drive the interactive bento dashboard list
-const INITIAL_MANAGERS = [
-  {
-    id: "PV-882",
-    name: "Ravi Sharma",
-    email: "r.sharma@papaveg.com",
-    phone: "+91 98765 43210",
-    store: "Mumbai - Andheri West",
-    group: "Papa Veg Mumbai",
-    status: "Active",
-    avatar: ""
-  },
-  {
-    id: "PV-714",
-    name: "Rahul Verma",
-    email: "r.verma@papaveg.com",
-    phone: "+91 98765 43211",
-    store: "Delhi - Connaught Place",
-    group: "Papa Veg Delhi",
-    status: "On Leave",
-    avatar: ""
-  },
-  {
-    id: "PV-630",
-    name: "Suresh Kumar",
-    email: "s.kumar@papaveg.com",
-    phone: "+91 98765 43212",
-    store: "Pune - Koregaon Park",
-    group: "Papa Veg Pune",
-    status: "Suspended",
-    avatar: ""
-  },
-  {
-    id: "PV-904",
-    name: "Sanjay Gupta",
-    email: "s.gupta@papaveg.com",
-    phone: "+91 98765 43213",
-    store: "Bangalore - Indiranagar",
-    group: "Papa Veg Bangalore",
-    status: "Active",
-    avatar: ""
-  },
-  {
-    id: "PV-512",
-    name: "Vikram Singh",
-    email: "v.singh@papaveg.com",
-    phone: "+91 98765 43214",
-    store: "Chennai - T Nagar",
-    group: "Papa Veg Chennai",
-    status: "Active",
-    avatar: ""
-  },
-  {
-    id: "PV-384",
-    name: "Pooja Reddy",
-    email: "p.reddy@papaveg.com",
-    phone: "+91 98765 43215",
-    store: "Hyderabad - Banjara Hills",
-    group: "Papa Veg Hyderabad",
-    status: "Active",
-    avatar: ""
-  }
-]
+const INITIAL_MANAGERS = []
+
 
 export default function StoreManagers() {
   const navigate = useNavigate()
   const [managers, setManagers] = useState(INITIAL_MANAGERS)
+  const [loading, setLoading] = useState(true)
+
+  React.useEffect(() => {
+    const loadManagers = async () => {
+      try {
+        setLoading(true)
+        const res = await adminAPI.getStoreManagers()
+        const fetchedManagers = res?.data?.data || []
+        const mapped = fetchedManagers.map(m => ({
+          id: m.employeeCode || m._id,
+          name: m.name,
+          email: m.email,
+          phone: m.phone,
+          store: m.storeName || "Unassigned",
+          storeCode: m.storeCode || "N/A",
+          storeAddress: m.storeAddress || "N/A",
+          group: m.franchiseName || "N/A",
+          franchiseOwner: m.franchiseOwnerName || "N/A",
+          status: m.status,
+          avatar: m.profileImage || "",
+          raw: m
+        }))
+        setManagers(mapped)
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadManagers()
+  }, [])
 
   // Sorting state
   const [sortBy, setSortBy] = useState("Newest")
@@ -201,14 +174,21 @@ export default function StoreManagers() {
   }
 
   // Delete/Suspend confirmation commit
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!managerToDelete) return
-    setManagers(prev => prev.filter(m => m.id !== managerToDelete.id))
-    if (selectedManager && selectedManager.id === managerToDelete.id) {
-      setIsDrawerOpen(false)
+    try {
+      const response = await adminAPI.deleteStoreManager(managerToDelete.raw._id);
+      if (response.data.success) {
+        setManagers(prev => prev.filter(m => m.id !== managerToDelete.id))
+        if (selectedManager && selectedManager.id === managerToDelete.id) {
+          setIsDrawerOpen(false)
+        }
+        setShowDeleteModal(false)
+        setManagerToDelete(null)
+      }
+    } catch (error) {
+       console.error("Error deleting store manager:", error);
     }
-    setShowDeleteModal(false)
-    setManagerToDelete(null)
   }
 
   return (
@@ -357,41 +337,69 @@ export default function StoreManagers() {
                   <div className="flex items-start justify-between">
                     <div className="flex gap-2.5 min-w-0">
                       <div className="relative shrink-0">
-                        <div className="w-9 h-9 rounded-full bg-zinc-100 dark:bg-zinc-800 font-bold text-black dark:text-white opacity-80 flex items-center justify-center shadow-inner text-xs">
-                          {mgr.name.split(" ").map(n => n[0]).join("")}
-                        </div>
+                        {mgr.avatar ? (
+                          <img src={mgr.avatar} alt={mgr.name} className="w-9 h-9 rounded-full object-cover shadow-inner" />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-zinc-100 dark:bg-zinc-800 font-bold text-black dark:text-white opacity-80 flex items-center justify-center shadow-inner text-xs">
+                            {mgr.name.split(" ").map(n => n[0]).join("")}
+                          </div>
+                        )}
                         <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-zinc-900 ${isActive ? "bg-emerald-500" : isOnLeave ? "bg-amber-500" : "bg-rose-500"
                           }`} />
                       </div>
                       <div className="space-y-0.5 min-w-0">
-                        <h4 className="font-extrabold text-xs text-black dark:text-white group-hover:text-[var(--primary)] transition-colors truncate">
+                        <h4 className="font-extrabold text-xs text-black dark:text-white group-hover:text-[var(--primary)] transition-colors truncate block">
                           {mgr.name}
                         </h4>
-                        <p className="text-[10px] font-bold text-black dark:text-white opacity-60 truncate">{mgr.store}</p>
-                        <p className="text-[8px] font-black text-black dark:text-white opacity-55 uppercase tracking-widest">{mgr.group}</p>
+                        <span className="text-[9px] font-black text-black/50 dark:text-white/50 tracking-wider">
+                          ID: {mgr.id}
+                        </span>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <span className={`text-[8px] font-black px-1.5 py-0.2 rounded-full uppercase tracking-wider ${isActive
+                      <span className={`inline-flex items-center gap-1 text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider ${isActive
                         ? "bg-green-50 dark:bg-green-950/20 text-green-600"
                         : isOnLeave
                           ? "bg-amber-50 dark:bg-amber-950/20 text-amber-600"
                           : "bg-rose-50 dark:bg-rose-950/20 text-rose-600"
                         }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-green-500" : isOnLeave ? "bg-amber-500" : "bg-rose-500"}`} />
                         {mgr.status}
                       </span>
                     </div>
                   </div>
 
-                  <div className="mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-850/60 grid grid-cols-1 gap-1.5 text-black dark:text-white opacity-70">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Mail size={12} className="text-black dark:text-white opacity-60 flex-shrink-0" />
-                      <span className="text-[10px] truncate font-medium">{mgr.email}</span>
+                  <div className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-850/60 grid grid-cols-1 gap-2.5">
+                    {/* Franchise Details */}
+                    <div>
+                      <p className="text-[8px] text-zinc-400 dark:text-zinc-500 uppercase tracking-widest font-black mb-1">Franchise Details</p>
+                      <p className="text-[10px] font-semibold text-black dark:text-white truncate max-w-full">{mgr.group}</p>
+                      <p className="text-[9px] text-zinc-500 dark:text-zinc-400">Owner: {mgr.franchiseOwner}</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Phone size={12} className="text-black dark:text-white opacity-60 flex-shrink-0" />
-                      <span className="text-[10px] font-semibold">{mgr.phone}</span>
+
+                    {/* Store Assignment */}
+                    <div>
+                      <p className="text-[8px] text-zinc-400 dark:text-zinc-500 uppercase tracking-widest font-black mb-1">Store Assignment</p>
+                      <div className="flex flex-col gap-0.5 text-black dark:text-white">
+                        <div className="flex items-center gap-1">
+                          <Store size={12} className="text-black/50 dark:text-white/50 flex-shrink-0" />
+                          <span className="text-[10px] font-bold truncate max-w-full">{mgr.store}</span>
+                        </div>
+                        <span className="text-[9px] text-zinc-500 dark:text-zinc-400 font-mono">Code: {mgr.storeCode}</span>
+                        <span className="text-[9px] text-zinc-500 dark:text-zinc-400 truncate max-w-full" title={mgr.storeAddress}>{mgr.storeAddress}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-850/60 grid grid-cols-1 gap-1.5 text-black dark:text-white opacity-70">
+                    <div className="flex items-center gap-1 min-w-0">
+                      <Mail size={11} className="text-black/50 dark:text-white/50 flex-shrink-0" />
+                      <span className="text-[9.5px] truncate font-medium max-w-full">{mgr.email}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Phone size={11} className="text-black/50 dark:text-white/50 flex-shrink-0" />
+                      <span className="text-[9.5px] font-semibold">{mgr.phone}</span>
                     </div>
                   </div>
                 </div>
@@ -402,24 +410,17 @@ export default function StoreManagers() {
                       setSelectedManager(mgr)
                       setIsDrawerOpen(true)
                     }}
-                    className="p-1 rounded-md border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-850 text-black dark:text-white opacity-70 hover:opacity-100 hover:text-[var(--primary)] transition-all cursor-pointer"
+                    className="p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-black/50 dark:text-white/50 hover:text-[var(--primary)] transition-all cursor-pointer"
                     title="View Profile"
                   >
                     <Eye size={13} />
                   </button>
-                  {/* <button
-                    onClick={() => openAddEditModal(mgr)}
-                    className="p-1 rounded-md border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-855 text-black dark:text-white opacity-70 hover:opacity-100 hover:text-[var(--primary)] transition-all cursor-pointer"
-                    title="Edit Profile"
-                  >
-                    <Edit size={13} />
-                  </button> */}
                   <button
                     onClick={() => {
                       setManagerToDelete(mgr)
                       setShowDeleteModal(true)
                     }}
-                    className="p-1 rounded-md border border-rose-200/40 dark:border-rose-955 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-550 dark:text-rose-455 transition-all cursor-pointer"
+                    className="p-1 rounded-lg border border-rose-200/40 dark:border-rose-950 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-550 dark:text-rose-455 transition-all cursor-pointer"
                     title="Remove Manager"
                   >
                     <Trash2 size={13} />

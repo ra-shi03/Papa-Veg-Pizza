@@ -7,10 +7,10 @@ export default function FranchiseApprovalsData({
   onApprove,
   onReject,
   onRequestChanges,
-  onViewAudit,
   selectedApplicationIds = [],
   onToggleSelect,
   onToggleSelectAll,
+  onViewDocs,
 }) {
   const [isOpenFilters, setIsOpenFilters] = useState(false);
 
@@ -23,9 +23,7 @@ export default function FranchiseApprovalsData({
   const [filterCompany, setFilterCompany] = useState("");
   const [filterEmail, setFilterEmail] = useState("");
   const [filterPhone, setFilterPhone] = useState("");
-  const [filterRegion, setFilterRegion] = useState("");
-  const [filterZone, setFilterZone] = useState("");
-  const [filterTerritory, setFilterTerritory] = useState("");
+  const [filterFranchiseName, setFilterFranchiseName] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 
   // Debounce hook search query (400ms delay)
@@ -47,9 +45,7 @@ export default function FranchiseApprovalsData({
     setFilterCompany("");
     setFilterEmail("");
     setFilterPhone("");
-    setFilterRegion("");
-    setFilterZone("");
-    setFilterTerritory("");
+    setFilterFranchiseName("");
     setFilterStatus("");
   };
 
@@ -58,20 +54,18 @@ export default function FranchiseApprovalsData({
     // Global search query matching across ID, name, email, company, and phone
     const matchesSearch =
       !debouncedSearch ||
-      app.id.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      app.applicantName.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      app.companyName.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      app.email.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      app.phone.toLowerCase().includes(debouncedSearch.toLowerCase());
+      app._id?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      app.storeName?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      app.managerName?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      app.email?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      app.phone?.toLowerCase().includes(debouncedSearch.toLowerCase());
 
-    const matchesAppId = !filterAppId || app.id.toLowerCase().includes(filterAppId.toLowerCase());
-    const matchesName = !filterName || app.applicantName.toLowerCase().includes(filterName.toLowerCase());
-    const matchesCompany = !filterCompany || app.companyName.toLowerCase().includes(filterCompany.toLowerCase());
-    const matchesEmail = !filterEmail || app.email.toLowerCase().includes(filterEmail.toLowerCase());
-    const matchesPhone = !filterPhone || app.phone.toLowerCase().includes(filterPhone.toLowerCase());
-    const matchesRegion = !filterRegion || app.region.toLowerCase().includes(filterRegion.toLowerCase());
-    const matchesZone = !filterZone || app.zone.toLowerCase().includes(filterZone.toLowerCase());
-    const matchesTerritory = !filterTerritory || app.territory.toLowerCase().includes(filterTerritory.toLowerCase());
+    const matchesAppId = !filterAppId || app._id?.toLowerCase().includes(filterAppId.toLowerCase());
+    const matchesName = !filterName || app.managerName?.toLowerCase().includes(filterName.toLowerCase());
+    const matchesCompany = !filterCompany || app.storeName?.toLowerCase().includes(filterCompany.toLowerCase());
+    const matchesEmail = !filterEmail || app.email?.toLowerCase().includes(filterEmail.toLowerCase());
+    const matchesPhone = !filterPhone || app.phone?.toLowerCase().includes(filterPhone.toLowerCase());
+    const matchesFranchiseName = !filterFranchiseName || (app.franchiseName || "").toLowerCase().includes(filterFranchiseName.toLowerCase());
     const matchesStatus = !filterStatus || app.status === filterStatus;
 
     return (
@@ -81,14 +75,12 @@ export default function FranchiseApprovalsData({
       matchesCompany &&
       matchesEmail &&
       matchesPhone &&
-      matchesRegion &&
-      matchesZone &&
-      matchesTerritory &&
+      matchesFranchiseName &&
       matchesStatus
     );
   });
 
-  const isAllSelected = filteredApps.length > 0 && filteredApps.every((app) => selectedApplicationIds.includes(app.id));
+  const isAllSelected = filteredApps.length > 0 && filteredApps.every((app) => selectedApplicationIds.includes(app._id));
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -96,7 +88,7 @@ export default function FranchiseApprovalsData({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, filterAppId, filterName, filterCompany, filterEmail, filterPhone, filterRegion, filterZone, filterTerritory, filterStatus]);
+  }, [debouncedSearch, filterAppId, filterName, filterCompany, filterEmail, filterPhone, filterFranchiseName, filterStatus]);
 
   const totalPages = Math.ceil(filteredApps.length / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -182,17 +174,17 @@ export default function FranchiseApprovalsData({
               value={filterName}
               onChange={(e) => setFilterName(e.target.value)}
               className="mt-1 w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 rounded-md text-xs text-black dark:text-zinc-200 outline-none focus:border-[var(--primary)] font-semibold"
-              placeholder="e.g. Rajesh Kumar"
+              placeholder="e.g. Store Manager"
             />
           </div>
           <div>
-            <label className="text-[10px] font-bold text-black dark:text-zinc-300 uppercase tracking-wide">Company Name</label>
+            <label className="text-[10px] font-bold text-black dark:text-zinc-300 uppercase tracking-wide">Store Name</label>
             <input
               type="text"
               value={filterCompany}
               onChange={(e) => setFilterCompany(e.target.value)}
               className="mt-1 w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 rounded-md text-xs text-black dark:text-zinc-200 outline-none focus:border-[var(--primary)] font-semibold"
-              placeholder="e.g. RK Foods"
+              placeholder="e.g. Papa Veg Pizza"
             />
           </div>
           <div>
@@ -216,33 +208,13 @@ export default function FranchiseApprovalsData({
             />
           </div>
           <div>
-            <label className="text-[10px] font-bold text-black dark:text-zinc-300 uppercase tracking-wide">Requested Region</label>
+            <label className="text-[10px] font-bold text-black dark:text-zinc-300 uppercase tracking-wide">Franchise Name</label>
             <input
               type="text"
-              value={filterRegion}
-              onChange={(e) => setFilterRegion(e.target.value)}
+              value={filterFranchiseName}
+              onChange={(e) => setFilterFranchiseName(e.target.value)}
               className="mt-1 w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 rounded-md text-xs text-black dark:text-zinc-200 outline-none focus:border-[var(--primary)] font-semibold"
-              placeholder="e.g. North"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] font-bold text-black dark:text-zinc-300 uppercase tracking-wide">Requested Zone</label>
-            <input
-              type="text"
-              value={filterZone}
-              onChange={(e) => setFilterZone(e.target.value)}
-              className="mt-1 w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 rounded-md text-xs text-black dark:text-zinc-200 outline-none focus:border-[var(--primary)] font-semibold"
-              placeholder="e.g. Zone-A"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] font-bold text-black dark:text-zinc-300 uppercase tracking-wide">Requested Territory</label>
-            <input
-              type="text"
-              value={filterTerritory}
-              onChange={(e) => setFilterTerritory(e.target.value)}
-              className="mt-1 w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 rounded-md text-xs text-black dark:text-zinc-200 outline-none focus:border-[var(--primary)] font-semibold"
-              placeholder="e.g. Delhi-NCR"
+              placeholder="e.g. Papa Veg"
             />
           </div>
           <div>
@@ -286,7 +258,8 @@ export default function FranchiseApprovalsData({
               </th>
               <th className="px-4 py-3 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Application ID</th>
               <th className="px-4 py-3 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Applicant Name</th>
-              <th className="px-4 py-3 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Company Name</th>
+              <th className="px-4 py-3 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Store Name</th>
+              <th className="px-4 py-3 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Franchise Name</th>
               <th className="px-4 py-3 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Email</th>
               <th className="px-4 py-3 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Phone</th>
               <th className="px-4 py-3 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Region</th>
@@ -295,17 +268,16 @@ export default function FranchiseApprovalsData({
               <th className="px-4 py-3 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Submitted Date</th>
               <th className="px-4 py-3 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider text-center">Docs</th>
               <th className="px-4 py-3 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Status</th>
-              <th className="px-4 py-3 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Reviewer</th>
               <th className="px-4 py-3 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Last Updated</th>
               <th className="px-4 py-3 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider text-right sticky right-0 bg-zinc-50 dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-900 z-10">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-900">
             {paginatedApps.map((app) => {
-              const isSelected = selectedApplicationIds.includes(app.id);
+              const isSelected = selectedApplicationIds.includes(app._id);
               return (
                 <tr
-                  key={app.id}
+                  key={app._id}
                   className={`hover:bg-[var(--primary)]/5 dark:hover:bg-[var(--primary)]/10 transition-colors group cursor-pointer ${isSelected ? "bg-zinc-50 dark:bg-zinc-900/30" : ""
                     }`}
                   onClick={() => onRowClick && onRowClick(app)}
@@ -315,30 +287,30 @@ export default function FranchiseApprovalsData({
                       type="checkbox"
                       className="w-3.5 h-3.5 rounded border-zinc-300 dark:border-zinc-700 text-[var(--primary)] focus:ring-0 cursor-pointer"
                       checked={isSelected}
-                      onChange={() => onToggleSelect && onToggleSelect(app.id)}
+                      onChange={() => onToggleSelect && onToggleSelect(app._id)}
                     />
                   </td>
-                  <td className="px-4 py-3.5 font-mono text-xs text-[var(--primary)] font-bold">{app.id}</td>
-                  <td className="px-4 py-3.5 text-xs font-bold text-black dark:text-zinc-100">{app.applicantName}</td>
-                  <td className="px-4 py-3.5 text-xs font-semibold text-black dark:text-zinc-200">{app.companyName}</td>
+                  <td className="px-4 py-3.5 font-mono text-xs text-[var(--primary)] font-bold">{app.code || app._id}</td>
+                  <td className="px-4 py-3.5 text-xs font-bold text-black dark:text-zinc-100">{app.managerName}</td>
+                  <td className="px-4 py-3.5 text-xs font-semibold text-black dark:text-zinc-200">{app.storeName}</td>
+                  <td className="px-4 py-3.5 text-xs font-medium text-black dark:text-zinc-300">{app.franchiseName || "N/A"}</td>
                   <td className="px-4 py-3.5 text-xs font-medium text-black dark:text-zinc-200">{app.email}</td>
                   <td className="px-4 py-3.5 text-xs font-medium text-black dark:text-zinc-200">{app.phone}</td>
-                  <td className="px-4 py-3.5 text-xs font-semibold text-black dark:text-zinc-200">{app.region}</td>
-                  <td className="px-4 py-3.5 text-xs font-semibold text-black dark:text-zinc-200">{app.zone}</td>
-                  <td className="px-4 py-3.5 text-xs font-semibold text-black dark:text-zinc-200">{app.territory}</td>
-                  <td className="px-4 py-3.5 text-xs font-medium text-black dark:text-zinc-200">{app.submittedDate}</td>
+                  <td className="px-4 py-3.5 text-xs font-semibold text-black dark:text-zinc-200">{app.regionId?.name || "N/A"}</td>
+                  <td className="px-4 py-3.5 text-xs font-semibold text-black dark:text-zinc-200">{app.zoneId?.name || "N/A"}</td>
+                  <td className="px-4 py-3.5 text-xs font-semibold text-black dark:text-zinc-200">{app.territoryId?.name || "N/A"}</td>
+                  <td className="px-4 py-3.5 text-xs font-medium text-black dark:text-zinc-200">{new Date(app.createdAt).toLocaleDateString()}</td>
                   <td className="px-4 py-3.5 text-xs font-bold text-center text-black dark:text-zinc-100">
-                    <span className="bg-zinc-100 dark:bg-zinc-900 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-800">
-                      {app.documentsCount}
-                    </span>
+                    <button onClick={(e) => { e.stopPropagation(); onViewDocs && onViewDocs(app); }} className="bg-[var(--primary)] text-white px-2.5 py-1 rounded-md text-[10px] hover:bg-opacity-90">
+                      View ({app.documents?.length || 0})
+                    </button>
                   </td>
                   <td className="px-4 py-3.5">
                     <span className={`px-2.5 py-0.5 text-[9px] rounded font-bold uppercase ${getStatusBadge(app.status)}`}>
                       {app.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3.5 text-xs font-semibold text-black dark:text-zinc-200">{app.reviewer || "Not Assigned"}</td>
-                  <td className="px-4 py-3.5 text-xs font-medium text-black dark:text-zinc-200">{app.lastUpdated}</td>
+                  <td className="px-4 py-3.5 text-xs font-medium text-black dark:text-zinc-200">{new Date(app.updatedAt).toLocaleDateString()}</td>
 
                   {/* Contextual actions menu row (fixed right) */}
                   <td className="px-4 py-3.5 text-right sticky right-0 bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-900 z-10 group-hover:bg-zinc-50 dark:group-hover:bg-zinc-900 transition-colors" onClick={(e) => e.stopPropagation()}>
@@ -370,13 +342,6 @@ export default function FranchiseApprovalsData({
                         onClick={() => onReject && onReject(app)}
                       >
                         <XCircle size={14} />
-                      </button>
-                      <button
-                        className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors"
-                        title="View Audit History"
-                        onClick={() => onViewAudit && onViewAudit(app)}
-                      >
-                        <Clock size={14} />
                       </button>
                     </div>
                   </td>

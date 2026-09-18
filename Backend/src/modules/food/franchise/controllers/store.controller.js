@@ -1,11 +1,21 @@
 import { FoodStore } from '../../store/models/store.model.js';
 import { FoodFranchise } from '../models/franchise.model.js';
+import { StoreManager } from '../models/storeManager.model.js';
+import { FoodRegion } from '../../admin/models/region.model.js';
+import { FoodZone } from '../../admin/models/zone.model.js';
+import mongoose from 'mongoose';
 
 const formatStoreResponse = (store, fallbackOwnerName = 'Unknown') => {
   if (!store) return store;
   if (!store.regionId) delete store.regionId;
   if (!store.zoneId) delete store.zoneId;
-  store.createdBy = store.franchiseId?.ownerName || fallbackOwnerName;
+  store.franchiseOwnerName = store.franchiseId?.ownerName || fallbackOwnerName;
+  store.franchiseName = store.franchiseId?.name || store.franchiseId?.companyName || 'Unknown';
+  store.franchiseEmail = store.franchiseId?.email || '';
+  store.franchisePhone = store.franchiseId?.phone || '';
+  store.franchiseRegion = store.franchiseId?.regionId || '';
+  store.franchiseZone = store.franchiseId?.zoneId || '';
+  store.createdBy = store.franchiseOwnerName;
   store.franchiseId = store.franchiseId?._id || store.franchiseId;
   return store;
 };
@@ -66,7 +76,7 @@ export const createStore = async (req, res) => {
 export const getStores = async (req, res) => {
   try {
     const { status, city, search, type } = req.query;
-    let query = { status: { $ne: 'DELETED' } }; // Not sure if status exists at all in FoodStore, maybe fallback if it's there
+    let query = { status: { $ne: 'DELETED' }, approvalStatus: 'Approved' }; // Ensure only approved stores are fetched
     
     if (status && status !== 'All') {
       query.isActive = status === 'Active';
@@ -84,12 +94,19 @@ export const getStores = async (req, res) => {
 
     let stores = await FoodStore.find(query)
       .populate('regionId zoneId territoryId', 'name')
-      .populate('franchiseId', 'ownerName')
+      .populate('franchiseId', 'ownerName name companyName')
       .sort({ createdAt: -1 })
       .lean();
       
+    const storeIds = stores.map(s => s._id);
+    const managers = await StoreManager.find({ storeId: { $in: storeIds }, status: { $ne: 'DELETED' } }).lean();
+      
     const fallbackOwner = await getFallbackOwner(req);
-    stores = stores.map(s => formatStoreResponse(s, fallbackOwner));
+    stores = stores.map(s => {
+      const manager = managers.find(m => m.storeId?.toString() === s._id.toString());
+      s.managerName = manager ? manager.name : null;
+      return formatStoreResponse(s, fallbackOwner);
+    });
     
     res.status(200).json({ 
       success: true, 
@@ -105,11 +122,31 @@ export const getStores = async (req, res) => {
 
 export const getStoreById = async (req, res) => {
   try {
-    const store = await FoodStore.findById(req.params.id)
+    const query = req.params.id.match(/^[0-9a-fA-F]{24}$/) 
+      ? { _id: req.params.id } 
+      : { code: req.params.id };
+
+    const store = await FoodStore.findOne(query)
       .populate('regionId zoneId territoryId', 'name')
-      .populate('franchiseId', 'ownerName')
+      .populate('franchiseId', 'ownerName name companyName email phone regionId zoneId')
       .lean();
     if (!store) return res.status(404).json({ success: false, message: 'Store not found' });
+    
+    // Fetch manager details
+    const manager = await StoreManager.findOne({ storeId: store._id, status: { $ne: 'DELETED' } }).lean();
+    store.managerName = manager ? manager.name : 'Not Assigned';
+    store.managerPhone = manager ? manager.phone : '';
+    store.managerEmail = manager ? manager.email : '';
+    
+    // Convert franchise region and zone IDs to names
+    if (store.franchiseId?.regionId && mongoose.Types.ObjectId.isValid(store.franchiseId.regionId)) {
+       const region = await FoodRegion.findById(store.franchiseId.regionId).lean();
+       if (region) store.franchiseId.regionId = region.name || store.franchiseId.regionId;
+    }
+    if (store.franchiseId?.zoneId && mongoose.Types.ObjectId.isValid(store.franchiseId.zoneId)) {
+       const zone = await FoodZone.findById(store.franchiseId.zoneId).lean();
+       if (zone) store.franchiseId.zoneId = zone.name || zone.zoneName || store.franchiseId.zoneId;
+    }
     
     const fallbackOwner = await getFallbackOwner(req);
     res.status(200).json({ success: true, data: formatStoreResponse(store, fallbackOwner) });
@@ -144,7 +181,11 @@ export const updateStore = async (req, res) => {
       delete updateData.status;
     }
 
-    const store = await FoodStore.findByIdAndUpdate(req.params.id, updateData, {
+    const query = mongoose.Types.ObjectId.isValid(req.params.id) 
+      ? { _id: req.params.id }
+      : { code: req.params.id };
+
+    const store = await FoodStore.findOneAndUpdate(query, updateData, {
       new: true,
       runValidators: true,
     })
@@ -163,7 +204,10 @@ export const updateStore = async (req, res) => {
 export const deleteStore = async (req, res) => {
   try {
     // Hard delete
-    const store = await FoodStore.findByIdAndDelete(req.params.id);
+    const query = mongoose.Types.ObjectId.isValid(req.params.id) 
+      ? { _id: req.params.id }
+      : { code: req.params.id };
+    const store = await FoodStore.findOneAndDelete(query);
     if (!store) return res.status(404).json({ success: false, message: 'Store not found' });
     res.status(200).json({ success: true, data: {} });
   } catch (error) {

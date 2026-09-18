@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Search, Filter, MoreVertical, ChevronLeft, ChevronRight, Eye, Edit2, RotateCw, Trash2, ShieldAlert, BarChart2, Ban, CheckCircle } from "lucide-react";
+import { Search, Filter, MoreVertical, ChevronLeft, ChevronRight, Eye, Edit2, RotateCw, Trash2, ShieldAlert, BarChart2, Ban, CheckCircle, XCircle } from "lucide-react";
 
 export default function FranchiseStoresData({ 
   stores = [], 
@@ -10,7 +10,8 @@ export default function FranchiseStoresData({
   onReassignManager, 
   onChangeFranchise, 
   onViewAnalytics, 
-  onSuspendActivate 
+  onSuspendActivate,
+  onCloseStore
 }) {
   const [showFilters, setShowFilters] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -21,16 +22,11 @@ export default function FranchiseStoresData({
   const [filterFranchise, setFilterFranchise] = useState("");
   const [filterStoreName, setFilterStoreName] = useState("");
   const [filterStoreCode, setFilterStoreCode] = useState("");
-  const [filterStoreManager, setFilterStoreManager] = useState("");
-  const [filterCountry, setFilterCountry] = useState("India");
-  const [filterState, setFilterState] = useState("");
-  const [filterCity, setFilterCity] = useState("");
-  const [filterRegion, setFilterRegion] = useState("");
-  const [filterZone, setFilterZone] = useState("");
-  const [filterTerritory, setFilterTerritory] = useState("");
+  const [filterManager, setFilterManager] = useState("");
+  const [filterLocation, setFilterLocation] = useState("");
+  const [filterType, setFilterType] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
-  const [filterInventory, setFilterInventory] = useState("");
-  const [filterBusinessHours, setFilterBusinessHours] = useState("");
+  const [filterApproval, setFilterApproval] = useState("");
 
   // Debouncing effect for search
   useEffect(() => {
@@ -60,15 +56,11 @@ export default function FranchiseStoresData({
     setFilterFranchise("");
     setFilterStoreName("");
     setFilterStoreCode("");
-    setFilterStoreManager("");
-    setFilterState("");
-    setFilterCity("");
-    setFilterRegion("");
-    setFilterZone("");
-    setFilterTerritory("");
+    setFilterManager("");
+    setFilterLocation("");
+    setFilterType("");
     setFilterStatus("");
-    setFilterInventory("");
-    setFilterBusinessHours("");
+    setFilterApproval("");
     setSearchTerm("");
   };
 
@@ -79,23 +71,20 @@ export default function FranchiseStoresData({
         debouncedSearch === "" ||
         store.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
         store.id.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        store.owner.toLowerCase().includes(debouncedSearch.toLowerCase());
+        store.manager.toLowerCase().includes(debouncedSearch.toLowerCase());
 
       const matchFranchise = filterFranchise === "" || store.franchise.toLowerCase().includes(filterFranchise.toLowerCase());
       const matchStoreName = filterStoreName === "" || store.name.toLowerCase().includes(filterStoreName.toLowerCase());
       const matchStoreCode = filterStoreCode === "" || store.id.toLowerCase().includes(filterStoreCode.toLowerCase());
-      const matchManager = filterStoreManager === "" || store.owner.toLowerCase().includes(filterStoreManager.toLowerCase());
-      const matchState = filterState === "" || store.state.toLowerCase().includes(filterState.toLowerCase());
-      const matchCity = filterCity === "" || store.city.toLowerCase().includes(filterCity.toLowerCase());
-      const matchRegion = filterRegion === "" || store.region === filterRegion;
-      const matchZone = filterZone === "" || store.zone === filterZone;
-      const matchTerritory = filterTerritory === "" || store.territory.toLowerCase().includes(filterTerritory.toLowerCase());
+      const matchManager = filterManager === "" || store.manager.toLowerCase().includes(filterManager.toLowerCase());
+      const matchLocation = filterLocation === "" || store.location.toLowerCase().includes(filterLocation.toLowerCase());
+      const matchType = filterType === "" || store.type === filterType;
       const matchStatus = filterStatus === "" || store.status === filterStatus;
-      const matchInventory = filterInventory === "" || store.inventoryStatus === filterInventory;
+      const matchApproval = filterApproval === "" || store.approval === filterApproval;
 
-      return matchSearch && matchFranchise && matchStoreName && matchStoreCode && matchManager && matchState && matchCity && matchRegion && matchZone && matchTerritory && matchStatus && matchInventory;
+      return matchSearch && matchFranchise && matchStoreName && matchStoreCode && matchManager && matchLocation && matchType && matchStatus && matchApproval;
     });
-  }, [stores, debouncedSearch, filterFranchise, filterStoreName, filterStoreCode, filterStoreManager, filterState, filterCity, filterRegion, filterZone, filterTerritory, filterStatus, filterInventory]);
+  }, [stores, debouncedSearch, filterFranchise, filterStoreName, filterStoreCode, filterManager, filterLocation, filterType, filterStatus, filterApproval]);
 
   useEffect(() => {
     if (onFilteredStoresChange) {
@@ -175,86 +164,39 @@ export default function FranchiseStoresData({
               </div>
 
               <div className="space-y-1">
-                <label className="text-[9px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Store Manager</label>
+                <label className="text-[9px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Manager</label>
                 <input 
                   type="text" 
-                  value={filterStoreManager}
-                  onChange={(e) => setFilterStoreManager(e.target.value)}
+                  value={filterManager}
+                  onChange={(e) => setFilterManager(e.target.value)}
                   placeholder="e.g. Rahul"
                   className="w-full h-8 px-2 bg-white dark:bg-zinc-955 border border-zinc-250 dark:border-zinc-750 rounded-lg text-xs text-black dark:text-white outline-none"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[9px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Country</label>
+                <label className="text-[9px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Location</label>
                 <input 
                   type="text" 
-                  value={filterCountry}
-                  disabled
-                  className="w-full h-8 px-2 bg-zinc-100 dark:bg-zinc-850 text-zinc-400 border border-zinc-250 dark:border-zinc-750 rounded-lg text-xs outline-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">State</label>
-                <input 
-                  type="text" 
-                  value={filterState}
-                  onChange={(e) => setFilterState(e.target.value)}
-                  placeholder="e.g. Maharashtra"
-                  className="w-full h-8 px-2 bg-white dark:bg-zinc-955 border border-zinc-250 dark:border-zinc-750 rounded-lg text-xs text-black dark:text-white outline-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">City</label>
-                <input 
-                  type="text" 
-                  value={filterCity}
-                  onChange={(e) => setFilterCity(e.target.value)}
-                  placeholder="e.g. Mumbai"
-                  className="w-full h-8 px-2 bg-white dark:bg-zinc-955 border border-zinc-250 dark:border-zinc-750 rounded-lg text-xs text-black dark:text-white outline-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Region</label>
-                <select 
-                  className="w-full h-8 px-2 bg-white dark:bg-zinc-955 border border-zinc-250 dark:border-zinc-750 rounded-lg text-xs font-semibold text-black dark:text-white outline-none"
-                  value={filterRegion}
-                  onChange={(e) => setFilterRegion(e.target.value)}
-                >
-                  <option value="">All Regions</option>
-                  <option value="North India">North India</option>
-                  <option value="West India">West India</option>
-                  <option value="South India">South India</option>
-                  <option value="East India">East India</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Zone</label>
-                <select 
-                  className="w-full h-8 px-2 bg-white dark:bg-zinc-955 border border-zinc-250 dark:border-zinc-750 rounded-lg text-xs font-semibold text-black dark:text-white outline-none"
-                  value={filterZone}
-                  onChange={(e) => setFilterZone(e.target.value)}
-                >
-                  <option value="">All Zones</option>
-                  <option value="Zone A">Zone A</option>
-                  <option value="Zone B">Zone B</option>
-                  <option value="Zone C">Zone C</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Territory</label>
-                <input 
-                  type="text" 
-                  value={filterTerritory}
-                  onChange={(e) => setFilterTerritory(e.target.value)}
+                  value={filterLocation}
+                  onChange={(e) => setFilterLocation(e.target.value)}
                   placeholder="e.g. Connaught Place"
                   className="w-full h-8 px-2 bg-white dark:bg-zinc-955 border border-zinc-250 dark:border-zinc-750 rounded-lg text-xs text-black dark:text-white outline-none"
                 />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Type</label>
+                <select 
+                  className="w-full h-8 px-2 bg-white dark:bg-zinc-955 border border-zinc-250 dark:border-zinc-750 rounded-lg text-xs font-semibold text-black dark:text-white outline-none"
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                >
+                  <option value="">All Types</option>
+                  <option value="DINE_IN">DINE_IN</option>
+                  <option value="TAKEAWAY">TAKEAWAY</option>
+                  <option value="DELIVERY">DELIVERY</option>
+                </select>
               </div>
 
               <div className="space-y-1">
@@ -272,16 +214,16 @@ export default function FranchiseStoresData({
               </div>
 
               <div className="space-y-1">
-                <label className="text-[9px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Inventory Status</label>
+                <label className="text-[9px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Approval</label>
                 <select 
                   className="w-full h-8 px-2 bg-white dark:bg-zinc-955 border border-zinc-250 dark:border-zinc-750 rounded-lg text-xs font-semibold text-black dark:text-white outline-none"
-                  value={filterInventory}
-                  onChange={(e) => setFilterInventory(e.target.value)}
+                  value={filterApproval}
+                  onChange={(e) => setFilterApproval(e.target.value)}
                 >
-                  <option value="">All Stock Levels</option>
-                  <option value="Healthy">Healthy</option>
-                  <option value="Low Stock">Low Stock</option>
-                  <option value="Out of Stock">Out of Stock</option>
+                  <option value="">All</option>
+                  <option value="Approved">Approved</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Rejected">Rejected</option>
                 </select>
               </div>
             </div>
@@ -313,20 +255,16 @@ export default function FranchiseStoresData({
                 <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider w-8">
                   <input type="checkbox" className="rounded border-zinc-300 text-red-650 focus:ring-red-650" />
                 </th>
-                <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Store Code</th>
-                <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Store Name</th>
+                <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Store ID</th>
+                <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Store</th>
                 <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Franchise</th>
                 <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Manager</th>
-                <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Region</th>
-                <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Zone</th>
-                <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Territory</th>
-                <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Address</th>
-                <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Today's Orders</th>
-                <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Active Kitchen</th>
-                <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Inventory</th>
+                <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Location</th>
+                <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Type</th>
                 <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Status</th>
-                <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Created Date</th>
-                <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider text-right">Actions</th>
+                <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Approval</th>
+                <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider">Created</th>
+                <th className="px-3 py-2 text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 text-xs">
@@ -342,131 +280,59 @@ export default function FranchiseStoresData({
                   <td className="px-3 py-2.5 font-bold font-mono text-zinc-900 dark:text-zinc-100">{store.id}</td>
                   <td className="px-3 py-2.5 font-bold text-zinc-900 dark:text-zinc-100 group-hover:text-red-650 dark:group-hover:text-red-400 transition-colors">{store.name}</td>
                   <td className="px-3 py-2.5 text-black dark:text-zinc-300">{store.franchise}</td>
-                  <td className="px-3 py-2.5 font-semibold text-zinc-900 dark:text-zinc-100">{store.owner}</td>
-                  <td className="px-3 py-2.5 text-black dark:text-zinc-300">{store.region}</td>
-                  <td className="px-3 py-2.5 text-black dark:text-zinc-300">{store.zone}</td>
-                  <td className="px-3 py-2.5 text-black dark:text-zinc-300">{store.territory}</td>
+                  <td className="px-3 py-2.5 font-semibold text-zinc-900 dark:text-zinc-100">{store.manager}</td>
                   <td className="px-3 py-2.5 text-black dark:text-zinc-350 max-w-[150px] truncate">{store.location}</td>
-                  <td className="px-3 py-2.5 font-bold text-center text-zinc-900 dark:text-zinc-100">{store.ordersToday}</td>
-                  <td className="px-3 py-2.5 font-bold text-center text-zinc-900 dark:text-zinc-100">{store.activeKitchenOrders}</td>
-                  <td className="px-3 py-2.5">
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border inline-flex items-center gap-1 ${
-                      store.inventoryStatus === 'Healthy' 
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30' 
-                        : store.inventoryStatus === 'Low Stock' 
-                          ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30' 
-                          : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-455 dark:border-rose-900/30'
-                    }`}>
-                      <span className={`w-1 h-1 rounded-full ${
-                        store.inventoryStatus === 'Healthy' ? 'bg-emerald-500' :
-                        store.inventoryStatus === 'Low Stock' ? 'bg-amber-500' : 'bg-rose-500'
-                      }`}></span>
-                      {store.inventoryStatus}
-                    </span>
-                  </td>
+                  <td className="px-3 py-2.5 text-black dark:text-zinc-350">{store.type}</td>
                   <td className="px-3 py-2.5">
                     <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border inline-flex items-center gap-1 ${
                       store.status === 'Active' 
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30' 
-                        : store.status === 'Closed' 
+                        : store.status === 'Closed' || store.status === 'Pending'
                           ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30' 
                           : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-455 dark:border-rose-900/30'
                     }`}>
                       <span className={`w-1 h-1 rounded-full ${
                         store.status === 'Active' ? 'bg-emerald-500' :
-                        store.status === 'Closed' ? 'bg-amber-500' : 'bg-rose-500'
+                        store.status === 'Closed' || store.status === 'Pending' ? 'bg-amber-500' : 'bg-rose-500'
                       }`}></span>
                       {store.status}
                     </span>
                   </td>
+                  <td className="px-3 py-2.5 text-black dark:text-zinc-350">{store.approval}</td>
                   <td className="px-3 py-2.5 text-black dark:text-zinc-300 font-mono text-[10px]">{store.createdDate}</td>
                   
                   {/* Actions column */}
                   <td className="px-3 py-2.5 text-right relative" onClick={(e) => e.stopPropagation()}>
-                    <button 
-                      onClick={(e) => handleDropdownClick(e, store.id)}
-                      className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-black dark:text-zinc-350 rounded-lg transition-colors cursor-pointer"
-                    >
-                      <MoreVertical size={14} />
-                    </button>
-
-                    {/* Actions Dropdown */}
-                    {activeDropdownRow === store.id && (
-                      <div className="absolute right-3.5 top-9 w-40 bg-white dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-xl py-1 z-30 select-none animate-in fade-in slide-in-from-top-1 duration-150">
-                        <button
-                          onClick={() => {
-                            setActiveDropdownRow(null);
-                            onRowClick && onRowClick(store);
-                          }}
-                          className="w-full text-left px-3 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-850/50 text-[11px] font-bold text-black dark:text-zinc-200 flex items-center gap-1.5 transition-colors"
-                        >
-                          <Eye size={12} className="text-zinc-450" />
-                          <span>View Details</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            setActiveDropdownRow(null);
-                            onEdit && onEdit(store);
-                          }}
-                          className="w-full text-left px-3 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-850/50 text-[11px] font-bold text-black dark:text-zinc-200 flex items-center gap-1.5 transition-colors"
-                        >
-                          <Edit2 size={12} className="text-zinc-450" />
-                          <span>Edit Store</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            setActiveDropdownRow(null);
-                            onReassignManager && onReassignManager(store);
-                          }}
-                          className="w-full text-left px-3 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-850/50 text-[11px] font-bold text-black dark:text-zinc-200 flex items-center gap-1.5 transition-colors"
-                        >
-                          <RotateCw size={12} className="text-zinc-455" />
-                          <span>Reassign Manager</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            setActiveDropdownRow(null);
-                            onChangeFranchise && onChangeFranchise(store);
-                          }}
-                          className="w-full text-left px-3 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-850/50 text-[11px] font-bold text-black dark:text-zinc-200 flex items-center gap-1.5 transition-colors"
-                        >
-                          <Trash2 size={12} className="text-zinc-455" />
-                          <span>Change Franchise</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            setActiveDropdownRow(null);
-                            onViewAnalytics && onViewAnalytics(store);
-                          }}
-                          className="w-full text-left px-3 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-850/50 text-[11px] font-bold text-black dark:text-zinc-200 flex items-center gap-1.5 transition-colors"
-                        >
-                          <BarChart2 size={12} className="text-zinc-455" />
-                          <span>View Analytics</span>
-                        </button>
-                        <hr className="border-zinc-200 dark:border-zinc-800 my-1" />
-                        <button
-                          onClick={() => {
-                            setActiveDropdownRow(null);
-                            onSuspendActivate && onSuspendActivate(store);
-                          }}
-                          className={`w-full text-left px-3 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-850/50 text-[11px] font-bold flex items-center gap-1.5 transition-colors ${
-                            store.status === 'Active' ? 'text-rose-650' : 'text-emerald-600'
-                          }`}
-                        >
-                          {store.status === 'Active' ? (
-                            <>
-                              <Ban size={12} />
-                              <span>Suspend Store</span>
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle size={12} />
-                              <span>Activate Store</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button 
+                        onClick={() => onRowClick && onRowClick(store)}
+                        className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-black dark:text-zinc-350 rounded-lg transition-colors cursor-pointer"
+                        title="View complete store details"
+                      >
+                        <Eye size={14} />
+                      </button>
+                      <button 
+                        onClick={() => onSuspendActivate && onSuspendActivate(store, 'suspend')}
+                        className="p-1.5 hover:bg-amber-50 dark:hover:bg-amber-950/30 text-amber-550 rounded-lg transition-colors cursor-pointer"
+                        title="Temporarily suspend an active store"
+                      >
+                        <Ban size={14} />
+                      </button>
+                      <button 
+                        onClick={() => onSuspendActivate && onSuspendActivate(store, 'activate')}
+                        className="p-1.5 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-600 rounded-lg transition-colors cursor-pointer"
+                        title="Reactivate a suspended store"
+                      >
+                        <CheckCircle size={14} />
+                      </button>
+                      <button 
+                        onClick={() => onCloseStore && onCloseStore(store)}
+                        className="p-1.5 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-500 rounded-lg transition-colors cursor-pointer"
+                        title="Permanently close the store"
+                      >
+                        <XCircle size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

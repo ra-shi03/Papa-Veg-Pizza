@@ -31,7 +31,7 @@ export default function ReqChangeModal({ isOpen, onClose, selectedApp, onSubmit 
         <div className="p-4 border-b border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-900/40 flex justify-between items-center">
           <div>
             <h3 className="text-xs font-black uppercase tracking-wider text-black dark:text-zinc-100">Request Document Changes</h3>
-            <p className="text-[10px] font-bold text-purple-600 mt-0.5">{selectedApp?.id} - {selectedApp?.applicantName}</p>
+            <p className="text-[10px] font-bold text-purple-600 mt-0.5">{selectedApp?.code || selectedApp?._id || selectedApp?.id} - {selectedApp?.managerName || selectedApp?.applicantName}</p>
           </div>
           <button
             onClick={onClose}
