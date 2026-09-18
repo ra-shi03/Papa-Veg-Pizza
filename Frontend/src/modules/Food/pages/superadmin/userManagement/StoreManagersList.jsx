@@ -15,6 +15,7 @@ import {
   Save,
   Trash2,
   Ban,
+  CheckCircle,
   ClipboardList,
   Eye,
   Edit
@@ -22,73 +23,47 @@ import {
 import { motion, AnimatePresence } from "framer-motion"
 import StoreManagerDetailsDrawer from "./StoreManagerDetailsDrawer"
 
+import { adminAPI } from "@food/api"
+
 // Full Manager Database
-const INITIAL_MANAGERS = [
-  {
-    id: "PV-882",
-    name: "Ravi Sharma",
-    email: "r.sharma@papaveg.com",
-    phone: "+91 98765 43210",
-    store: "Mumbai - Andheri West",
-    group: "Papa Veg Mumbai",
-    status: "Active",
-    avatar: ""
-  },
-  {
-    id: "PV-714",
-    name: "Rahul Verma",
-    email: "r.verma@papaveg.com",
-    phone: "+91 98765 43211",
-    store: "Delhi - Connaught Place",
-    group: "Papa Veg Delhi",
-    status: "On Leave",
-    avatar: ""
-  },
-  {
-    id: "PV-630",
-    name: "Suresh Kumar",
-    email: "s.kumar@papaveg.com",
-    phone: "+91 98765 43212",
-    store: "Pune - Koregaon Park",
-    group: "Papa Veg Pune",
-    status: "Suspended",
-    avatar: ""
-  },
-  {
-    id: "PV-904",
-    name: "Sanjay Gupta",
-    email: "s.gupta@papaveg.com",
-    phone: "+91 98765 43213",
-    store: "Bangalore - Indiranagar",
-    group: "Papa Veg Bangalore",
-    status: "Active",
-    avatar: ""
-  },
-  {
-    id: "PV-512",
-    name: "Vikram Singh",
-    email: "v.singh@papaveg.com",
-    phone: "+91 98765 43214",
-    store: "Chennai - T Nagar",
-    group: "Papa Veg Chennai",
-    status: "Active",
-    avatar: ""
-  },
-  {
-    id: "PV-384",
-    name: "Pooja Reddy",
-    email: "p.reddy@papaveg.com",
-    phone: "+91 98765 43215",
-    store: "Hyderabad - Banjara Hills",
-    group: "Papa Veg Hyderabad",
-    status: "Active",
-    avatar: ""
-  }
-]
+const INITIAL_MANAGERS = []
+
 
 export default function StoreManagersList() {
   const navigate = useNavigate()
   const [managers, setManagers] = useState(INITIAL_MANAGERS)
+  const [loading, setLoading] = useState(true)
+
+  const loadManagers = async () => {
+    try {
+      setLoading(true)
+      const res = await adminAPI.getStoreManagers()
+      const fetchedManagers = res?.data?.data || []
+      const mapped = fetchedManagers.map(m => ({
+        id: m.employeeCode || m._id,
+        name: m.name,
+        email: m.email,
+        phone: m.phone,
+        store: m.storeName || "Unassigned",
+        storeCode: m.storeCode || "N/A",
+        storeAddress: m.storeAddress || "N/A",
+        group: m.franchiseName || "N/A",
+        franchiseOwner: m.franchiseOwnerName || "N/A",
+        status: m.status,
+        avatar: m.profileImage || "",
+        raw: m
+      }))
+      setManagers(mapped)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  React.useEffect(() => {
+    loadManagers()
+  }, [])
 
   // Local Search state for instant keystroke updates, debounced search query for heavy list updates
   const [localSearch, setLocalSearch] = useState("")
@@ -123,8 +98,16 @@ export default function StoreManagersList() {
   const [formErrors, setFormErrors] = useState({})
 
   // Dropdown list options
-  const franchiseOptions = ["All Franchises", "Papa Veg Mumbai", "Papa Veg Delhi", "Papa Veg Pune", "Papa Veg Bangalore", "Papa Veg Chennai", "Papa Veg Hyderabad"]
-  const storeOptions = ["All Stores", "Mumbai - Andheri West", "Delhi - Connaught Place", "Pune - Koregaon Park", "Bangalore - Indiranagar", "Chennai - T Nagar", "Hyderabad - Banjara Hills"]
+  const franchiseOptions = useMemo(() => {
+    const options = new Set(managers.map(m => m.group))
+    return ["All Franchises", ...Array.from(options)]
+  }, [managers])
+
+  const storeOptions = useMemo(() => {
+    const options = new Set(managers.map(m => m.store))
+    return ["All Stores", ...Array.from(options)]
+  }, [managers])
+
   const statusOptions = ["Any Status", "Active", "On Leave", "Suspended"]
 
   // 1. Debounce Search Bar Input
@@ -229,14 +212,35 @@ export default function StoreManagersList() {
     setShowAddEditModal(false)
   }
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!managerToDelete) return
-    setManagers((prev) => prev.filter((m) => m.id !== managerToDelete.id))
-    if (selectedManager && selectedManager.id === managerToDelete.id) {
-      setIsDrawerOpen(false)
+    try {
+      const response = await adminAPI.deleteStoreManager(managerToDelete.raw._id);
+      if (response.data.success) {
+        setManagers((prev) => prev.filter((m) => m.id !== managerToDelete.id))
+        if (selectedManager && selectedManager.id === managerToDelete.id) {
+          setIsDrawerOpen(false)
+        }
+        setShowDeleteModal(false)
+        setManagerToDelete(null)
+      }
+    } catch (error) {
+       console.error("Error deleting store manager:", error);
     }
-    setShowDeleteModal(false)
-    setManagerToDelete(null)
+  }
+
+  const handleToggleStatus = async (mgr, newStatus) => {
+    try {
+      setLoading(true)
+      const res = await adminAPI.updateStoreManager(mgr.raw._id, { status: newStatus });
+      if (res.data.success) {
+        await loadManagers();
+      }
+    } catch (error) {
+      console.error("Error toggling manager status:", error);
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -261,11 +265,11 @@ export default function StoreManagersList() {
           </div>
         </div>
         <button
-          onClick={() => openAddEditModal()}
-          className="bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white px-3.5 py-1.5 rounded-lg flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer font-bold text-[11px]"
+          onClick={() => loadManagers()}
+          className="bg-white hover:bg-zinc-50 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-black dark:text-white border border-zinc-200 dark:border-zinc-700 px-3.5 py-1.5 rounded-lg flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer font-bold text-[11px]"
         >
-          <Plus size={13} className="stroke-[3]" />
-          <span>Add New Manager</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-refresh-cw"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          <span>Refresh</span>
         </button>
       </div>
 
@@ -401,7 +405,7 @@ export default function StoreManagersList() {
               <thead>
                 <tr className="border-b border-zinc-150 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-950/20 text-[9px] font-black text-black/50 dark:text-white/50 uppercase tracking-widest select-none">
                   <th className="py-2 px-3">Manager</th>
-                  <th className="py-2 px-3">Franchise Group</th>
+                  <th className="py-2 px-3">Franchise Details</th>
                   <th className="py-2 px-3">Store Assignment</th>
                   <th className="py-2 px-3">Employment Status</th>
                   <th className="py-2 px-3">Contact Details</th>
@@ -426,9 +430,13 @@ export default function StoreManagersList() {
                       <td className="py-2 px-3">
                         <div className="flex items-center gap-2">
                           <div className="relative flex-shrink-0">
-                            <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 font-bold text-black dark:text-white flex items-center justify-center shadow-inner text-xs">
-                              {mgr.name.split(" ").map((n) => n[0]).join("")}
-                            </div>
+                            {mgr.avatar ? (
+                              <img src={mgr.avatar} alt={mgr.name} className="w-8 h-8 rounded-full object-cover shadow-inner" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 font-bold text-black dark:text-white flex items-center justify-center shadow-inner text-xs">
+                                {mgr.name.split(" ").map((n) => n[0]).join("")}
+                              </div>
+                            )}
                             <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-zinc-900 ${isActive ? "bg-emerald-500" : isOnLeave ? "bg-amber-500" : "bg-rose-500"
                               }`} />
                           </div>
@@ -443,19 +451,32 @@ export default function StoreManagersList() {
                         </div>
                       </td>
 
-                      {/* Franchise Group */}
+                      {/* Franchise Details */}
                       <td className="py-2 px-3">
-                        <span className="text-[10px] font-semibold text-black dark:text-white">
-                          {mgr.group}
-                        </span>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[10px] font-semibold text-black dark:text-white truncate max-w-[150px]">
+                            {mgr.group}
+                          </span>
+                          <span className="text-[9px] text-zinc-500 dark:text-zinc-400">
+                            Owner: {mgr.franchiseOwner}
+                          </span>
+                        </div>
                       </td>
 
                       {/* Store Assignment */}
                       <td className="py-2 px-3">
-                        <div className="flex items-center gap-1 text-black dark:text-white">
-                          <Store size={12} className="text-black/50 dark:text-white/50 flex-shrink-0" />
-                          <span className="text-[10px] font-semibold truncate max-w-[180px]">
-                            {mgr.store}
+                        <div className="flex flex-col gap-0.5 text-black dark:text-white">
+                          <div className="flex items-center gap-1">
+                            <Store size={12} className="text-black/50 dark:text-white/50 flex-shrink-0" />
+                            <span className="text-[10px] font-bold truncate max-w-[180px]">
+                              {mgr.store}
+                            </span>
+                          </div>
+                          <span className="text-[9px] text-zinc-500 dark:text-zinc-400 font-mono">
+                            Code: {mgr.storeCode}
+                          </span>
+                          <span className="text-[9px] text-zinc-500 dark:text-zinc-400 truncate max-w-[180px]" title={mgr.storeAddress}>
+                            {mgr.storeAddress}
                           </span>
                         </div>
                       </td>
@@ -500,13 +521,27 @@ export default function StoreManagersList() {
                           >
                             <Eye size={13} />
                           </button>
-                          <button
-                            onClick={() => openAddEditModal(mgr)}
-                            className="p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-black/50 dark:text-white/50 hover:text-[var(--primary)] transition-all cursor-pointer"
-                            title="Edit Profile"
-                          >
-                            <Edit size={13} />
-                          </button>
+                          
+                          {mgr.status === 'Active' && (
+                            <button
+                              onClick={() => handleToggleStatus(mgr, 'Suspended')}
+                              className="p-1 rounded-lg border border-amber-200/40 dark:border-amber-950 hover:bg-amber-50 dark:hover:bg-amber-950/30 text-amber-550 dark:text-amber-455 transition-all cursor-pointer"
+                              title="Suspend Manager"
+                            >
+                              <Ban size={13} className="text-amber-500" />
+                            </button>
+                          )}
+                          
+                          {mgr.status === 'Suspended' && (
+                            <button
+                              onClick={() => handleToggleStatus(mgr, 'Active')}
+                              className="p-1 rounded-lg border border-green-200/40 dark:border-green-950 hover:bg-green-50 dark:hover:bg-green-950/30 text-green-550 dark:text-green-455 transition-all cursor-pointer"
+                              title="Activate Manager"
+                            >
+                              <CheckCircle size={13} className="text-green-500" />
+                            </button>
+                          )}
+
                           <button
                             onClick={() => {
                               setManagerToDelete(mgr)

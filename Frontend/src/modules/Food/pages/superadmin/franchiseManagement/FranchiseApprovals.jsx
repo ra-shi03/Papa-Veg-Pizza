@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Download, RefreshCw, FileText, CheckCircle, XCircle, Clock, AlertTriangle, Play, HelpCircle, ArrowRight, Eye, RotateCw, ZoomIn, ZoomOut, UserCheck } from "lucide-react";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import { toast } from "sonner";
+import { adminAPI } from "@food/api";
 import FranchiseApprovalsData from "./FranchiseApprovalsData";
 import FranchiseApprovalsDetails from "./FranchiseApprovalsDetails";
 import RejectAppModal from "./RejectAppModal";
@@ -12,97 +12,19 @@ export default function FranchiseApprovals() {
   const [selectedApp, setSelectedApp] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedApplicationIds, setSelectedApplicationIds] = useState([]);
+  
+  const [activeTab, setActiveTab] = useState("All");
+  const TABS = ["All", "Pending", "Approved", "Rejected", "Changes Requested"];
 
-  // Mock initial applications state (representing MongoDB collections in the UI)
-  const [applications, setApplications] = useState([
-    {
-      id: "APP-2026-001",
-      applicantName: "Rajesh Kumar",
-      companyName: "RK Foods & Beverages",
-      email: "rajesh.kumar@rkfoods.in",
-      phone: "+91 98111 22333",
-      region: "North India",
-      zone: "Zone A",
-      territory: "Delhi-NCR",
-      submittedDate: "2026-05-12",
-      documentsCount: 4,
-      status: "Pending Review",
-      reviewer: "Amit Patel",
-      lastUpdated: "2026-05-13",
-      investment: "₹65,00,000",
-    },
-    {
-      id: "APP-2026-002",
-      applicantName: "Priya Sen",
-      companyName: "Sen Hospitality Group",
-      email: "priya@senhospitality.com",
-      phone: "+91 98222 33444",
-      region: "West India",
-      zone: "Zone B",
-      territory: "Mumbai-Thane",
-      submittedDate: "2026-05-13",
-      documentsCount: 4,
-      status: "Under Verification",
-      reviewer: "Rohan Deshmukh",
-      lastUpdated: "2026-05-15",
-      investment: "₹85,00,000",
-    },
-    {
-      id: "APP-2026-003",
-      applicantName: "Rohan Nair",
-      companyName: "Nair Foods Pvt Ltd",
-      email: "rohan@nairfoods.co.in",
-      phone: "+91 98333 44555",
-      region: "South India",
-      zone: "Zone C",
-      territory: "Bengaluru-East",
-      submittedDate: "2026-05-10",
-      documentsCount: 4,
-      status: "Approved",
-      reviewer: "Siddharth Rao",
-      lastUpdated: "2026-05-14",
-      investment: "₹75,00,000",
-    },
-    {
-      id: "APP-2026-004",
-      applicantName: "Deepika Vyas",
-      companyName: "Vyas Food Ventures",
-      email: "deepika@vyasfoods.com",
-      phone: "+91 98444 55666",
-      region: "Central India",
-      zone: "Zone D",
-      territory: "Indore-VijayNagar",
-      submittedDate: "2026-05-15",
-      documentsCount: 3,
-      status: "Changes Requested",
-      reviewer: "Nisha Sharma",
-      lastUpdated: "2026-05-16",
-      investment: "₹55,00,000",
-    },
-    {
-      id: "APP-2026-005",
-      applicantName: "Vikram Mehra",
-      companyName: "Mehra Kitchens",
-      email: "vikram@mehrakitchen.com",
-      phone: "+91 98555 66777",
-      region: "North India",
-      zone: "Zone A",
-      territory: "Lucknow-Hazratganj",
-      submittedDate: "2026-05-11",
-      documentsCount: 4,
-      status: "Rejected",
-      reviewer: "Amit Patel",
-      lastUpdated: "2026-05-16",
-      investment: "₹45,00,000",
-    },
-  ]);
+  const [applications, setApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [kpis, setKpis] = useState(null);
 
   // Modals Visibility
   const [isApproveWizardOpen, setIsApproveWizardOpen] = useState(false);
   const [isRejectOpen, setIsRejectOpen] = useState(false);
   const [isRequestChangesOpen, setIsRequestChangesOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [isAuditOpen, setIsAuditOpen] = useState(false);
 
   // Active document preview structure
   const [previewDoc, setPreviewDoc] = useState(null);
@@ -110,10 +32,30 @@ export default function FranchiseApprovals() {
   const [rotation, setRotation] = useState(0);
 
 
+  const [isDocsViewerOpen, setIsDocsViewerOpen] = useState(false);
+  const [selectedDocsStoreId, setSelectedDocsStoreId] = useState(null);
+  const [docsToView, setDocsToView] = useState([]);
 
+  // Fetch logic
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [resApps, resKpis] = await Promise.all([
+        adminAPI.getStoreApprovals({ page: 1, limit: 100 }),
+        adminAPI.getStoreApprovalsDashboard()
+      ]);
+      setApplications(resApps?.data?.data?.approvals || []);
+      setKpis(resApps?.data?.data?.kpis || resKpis?.data?.data || null);
+    } catch (error) {
+      console.error("Failed to fetch approvals:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-
-  // Handler for row select/check
+  React.useEffect(() => {
+    fetchData();
+  }, []); // Handler for row select/check
   const handleToggleSelect = (id) => {
     setSelectedApplicationIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
@@ -136,116 +78,15 @@ export default function FranchiseApprovals() {
     }
   };
 
-  // KPI calculations
-  const totalCount = applications.length;
-  const pendingCount = applications.filter((a) => a.status === "Pending Review").length;
-  const verificationCount = applications.filter((a) => a.status === "Under Verification").length;
-  const approvedCount = applications.filter((a) => a.status === "Approved").length;
-  const rejectedCount = applications.filter((a) => a.status === "Rejected").length;
-  const changesCount = applications.filter((a) => a.status === "Changes Requested").length;
-  const approvedMonthCount = 4; // Mock indicator
-  const avgApprovalTime = "4.8 Days";
+  const pendingCount = kpis?.pendingApprovals ?? applications.filter((a) => a.status === "Pending").length;
+  const draftCount = kpis?.draftStores ?? applications.filter((a) => a.status === "Draft").length;
+  const approvedCount = kpis?.approvedStores ?? applications.filter((a) => a.status === "Approved").length;
+  const rejectedCount = kpis?.rejectedStores ?? applications.filter((a) => a.status === "Rejected").length;
+  const totalCount = (draftCount + pendingCount + approvedCount + rejectedCount) || applications.length;
 
-  // Refresh
   const handleRefresh = () => {
-    // Simply reset checklist/selection and log a mockup reload
     setSelectedApplicationIds([]);
-    console.log("Reloading application records from MongoDB database...");
-  };
-
-  // CSV Exporter (Blob dynamic download)
-  const handleDownloadCSV = () => {
-    const headers = [
-      "Application ID",
-      "Applicant Name",
-      "Company Name",
-      "Email",
-      "Phone",
-      "Region",
-      "Zone",
-      "Territory",
-      "Submitted Date",
-      "Docs",
-      "Status",
-      "Reviewer",
-      "Last Updated",
-    ];
-
-    const rows = applications.map((app) => [
-      app.id,
-      app.applicantName,
-      app.companyName,
-      app.email,
-      app.phone,
-      app.region,
-      app.zone,
-      app.territory,
-      app.submittedDate,
-      app.documentsCount,
-      app.status,
-      app.reviewer,
-      app.lastUpdated,
-    ]);
-
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...rows.map((e) => e.map(val => `"${val}"`).join(","))].join("\n");
-    
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Franchise_Approvals_Report_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Landscape PDF Exporter (jsPDF & jsPDF-autotable integration)
-  const handleExportPDF = () => {
-    const doc = new jsPDF({ orientation: "landscape" });
-    
-    // Add Report title
-    doc.setFontSize(16);
-    doc.text("PAPA VEG PIZZA - FRANCHISE APPROVALS REPORT", 14, 15);
-    doc.setFontSize(10);
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 21);
-
-    const tableHeaders = [
-      "ID",
-      "Applicant",
-      "Company",
-      "Email",
-      "Phone",
-      "Region",
-      "Zone",
-      "Territory",
-      "Status",
-      "Reviewer",
-    ];
-
-    const tableRows = applications.map((app) => [
-      app.id,
-      app.applicantName,
-      app.companyName,
-      app.email,
-      app.phone,
-      app.region,
-      app.zone,
-      app.territory,
-      app.status,
-      app.reviewer || "Unassigned",
-    ]);
-
-    autoTable(doc, {
-      head: [tableHeaders],
-      body: tableRows,
-      startY: 28,
-      theme: "striped",
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [164, 60, 18] }, // Match primary dark brick red
-    });
-
-    doc.save(`Franchise_Approvals_Export_${new Date().toISOString().slice(0, 10)}.pdf`);
+    fetchData();
   };
 
   // Launch approve wizard
@@ -255,16 +96,31 @@ export default function FranchiseApprovals() {
   };
 
   // Submit approval
-  const handleWizardSubmit = (wizardData) => {
-    // Update local state to show Approved status
-    setApplications((prev) =>
-      prev.map((app) =>
-        app.id === selectedApp.id ? { ...app, status: "Approved", lastUpdated: new Date().toISOString().slice(0, 10) } : app
-      )
-    );
-    setIsApproveWizardOpen(false);
-    setIsDetailsOpen(false);
+  const handleWizardSubmit = async (wizardData) => {
+    try {
+      await adminAPI.approveStoreApproval(selectedApp._id, wizardData);
+      fetchData();
+      setIsApproveWizardOpen(false);
+      setIsDetailsOpen(false);
+    } catch (error) {
+      console.error(error);
+      alert("Failed to download file");
+    }
   };
+
+  const handleVerifyDocument = async (docId, currentStatus) => {
+    try {
+      const res = await adminAPI.toggleVerifyDocument(selectedDocsStoreId, docId);
+      const updatedStore = res.data.data;
+      toast.success(currentStatus ? 'Document marked as unverified' : 'Document verified successfully');
+      setDocsToView([...updatedStore.documents]);
+      fetchApprovals(); // refresh the background data
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update verification status');
+    }
+  };
+
+  const fetchApprovals = fetchData;
 
   // Launch Reject Form
   const handleRejectClick = (app) => {
@@ -272,14 +128,15 @@ export default function FranchiseApprovals() {
     setIsRejectOpen(true);
   };
 
-  const handleRejectSubmit = (data) => {
-    setApplications((prev) =>
-      prev.map((app) =>
-        app.id === selectedApp.id ? { ...app, status: "Rejected", lastUpdated: new Date().toISOString().slice(0, 10) } : app
-      )
-    );
-    setIsRejectOpen(false);
-    setIsDetailsOpen(false);
+  const handleRejectSubmit = async (data) => {
+    try {
+      await adminAPI.rejectStoreApproval(selectedApp._id, { reason: data.reason || "Rejected by Superadmin" });
+      fetchData();
+      setIsRejectOpen(false);
+      setIsDetailsOpen(false);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // Launch Request Changes Form
@@ -288,14 +145,19 @@ export default function FranchiseApprovals() {
     setIsRequestChangesOpen(true);
   };
 
-  const handleRequestChangesSubmit = (data) => {
-    setApplications((prev) =>
-      prev.map((app) =>
-        app.id === selectedApp.id ? { ...app, status: "Changes Requested", lastUpdated: new Date().toISOString().slice(0, 10) } : app
-      )
-    );
-    setIsRequestChangesOpen(false);
-    setIsDetailsOpen(false);
+  const handleRequestChangesSubmit = async (data) => {
+    try {
+      await adminAPI.requestChangesStoreApproval(selectedApp._id, {
+        instructions: data.instructions || "",
+        notes: data.notes || "",
+        deadline: data.deadline || null
+      });
+      fetchData();
+      setIsRequestChangesOpen(false);
+      setIsDetailsOpen(false);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // Launch Document Preview
@@ -306,10 +168,32 @@ export default function FranchiseApprovals() {
     setIsPreviewOpen(true);
   };
 
-  // Launch Audit timeline
-  const handleViewAuditClick = (app) => {
-    setSelectedApp(app);
-    setIsAuditOpen(true);
+  const handleViewDocsArray = (app) => {
+    if (app.documents && app.documents.length > 0) {
+      setDocsToView(app.documents);
+      setSelectedDocsStoreId(app._id || app.id);
+      setIsDocsViewerOpen(true);
+    } else {
+      alert("No documents uploaded for this application.");
+    }
+  };
+
+  const handleDownloadFile = async (url, filename) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = filename || "document";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      console.error("Download failed:", error);
+      window.open(url, "_blank");
+    }
   };
 
   return (
@@ -325,20 +209,6 @@ export default function FranchiseApprovals() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2 select-none">
-          <button
-            onClick={handleDownloadCSV}
-            className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-black dark:text-zinc-100 px-3 py-1.5 rounded-lg flex items-center justify-center gap-1.5 shadow-sm hover:scale-[1.01] active:scale-95 transition-all cursor-pointer font-bold text-[11px]"
-          >
-            <Download size={13} />
-            <span>DOWNLOAD CSV</span>
-          </button>
-          <button
-            onClick={handleExportPDF}
-            className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-black dark:text-zinc-100 px-3 py-1.5 rounded-lg flex items-center justify-center gap-1.5 shadow-sm hover:scale-[1.01] active:scale-95 transition-all cursor-pointer font-bold text-[11px]"
-          >
-            <FileText size={13} />
-            <span>EXPORT PDF</span>
-          </button>
           <button
             onClick={handleRefresh}
             className="p-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-black dark:text-zinc-100 rounded-lg hover:scale-[1.01] active:scale-95 transition-all cursor-pointer"
@@ -370,12 +240,12 @@ export default function FranchiseApprovals() {
           </div>
         </div>
 
-        {/* Under Verification */}
+        {/* Draft Review */}
         <div className="bg-white dark:bg-zinc-905 border border-zinc-250/50 dark:border-zinc-900 rounded-xl p-3 flex flex-col justify-between shadow-sm">
-          <span className="text-[9px] font-bold text-black/60 dark:text-zinc-400 uppercase tracking-wider block">Under Verification</span>
+          <span className="text-[9px] font-bold text-black/60 dark:text-zinc-400 uppercase tracking-wider block">Draft Stores</span>
           <div className="mt-2">
-            <h3 className="text-base font-black text-blue-600 dark:text-blue-400">{verificationCount}</h3>
-            <span className="text-[8px] font-bold text-blue-600/80">In Progress</span>
+            <h3 className="text-base font-black text-blue-600 dark:text-blue-400">{draftCount}</h3>
+            <span className="text-[8px] font-bold text-blue-600/80">Draft Mode</span>
           </div>
         </div>
 
@@ -397,38 +267,30 @@ export default function FranchiseApprovals() {
           </div>
         </div>
 
-        {/* Changes Requested */}
-        <div className="bg-white dark:bg-zinc-905 border border-zinc-250/50 dark:border-zinc-900 rounded-xl p-3 flex flex-col justify-between shadow-sm">
-          <span className="text-[9px] font-bold text-black/60 dark:text-zinc-400 uppercase tracking-wider block">Changes Requested</span>
-          <div className="mt-2">
-            <h3 className="text-base font-black text-purple-600 dark:text-purple-400">{changesCount}</h3>
-            <span className="text-[8px] font-bold text-purple-600/80">Draft Resubmissions</span>
-          </div>
-        </div>
+        {/* Mock cards removed to show only required real data */}
 
-        {/* Approved Month */}
-        <div className="bg-white dark:bg-zinc-905 border border-zinc-250/50 dark:border-zinc-900 rounded-xl p-3 flex flex-col justify-between shadow-sm">
-          <span className="text-[9px] font-bold text-black/60 dark:text-zinc-400 uppercase tracking-wider block">Approved Month</span>
-          <div className="mt-2">
-            <h3 className="text-base font-black text-black dark:text-zinc-100">{approvedMonthCount}</h3>
-            <span className="text-[8px] font-bold text-emerald-600">+12% vs Last Month</span>
-          </div>
-        </div>
+      </div>
 
-        {/* Avg Approval Time */}
-        <div className="bg-white dark:bg-zinc-905 border border-zinc-250/50 dark:border-zinc-900 rounded-xl p-3 flex flex-col justify-between shadow-sm">
-          <span className="text-[9px] font-bold text-black/60 dark:text-zinc-400 uppercase tracking-wider block">Avg Approval Time</span>
-          <div className="mt-2">
-            <h3 className="text-base font-black text-black dark:text-zinc-100">{avgApprovalTime}</h3>
-            <span className="text-[8px] font-bold text-zinc-500">Target: Under 5 Days</span>
-          </div>
-        </div>
-
+      {/* Tabs */}
+      <div className="flex border-b border-zinc-200 dark:border-zinc-800">
+        {TABS.map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 text-xs font-bold transition-all border-b-2 -mb-px ${
+              activeTab === tab
+                ? "border-red-650 text-red-650"
+                : "border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
       </div>
 
       {/* Main Grid Component for table and filters */}
       <FranchiseApprovalsData
-        applications={applications}
+        applications={applications.filter(app => activeTab === "All" || app.status === activeTab)}
         onRowClick={(app) => {
           setSelectedApp(app);
           setIsDetailsOpen(true);
@@ -436,10 +298,10 @@ export default function FranchiseApprovals() {
         onApprove={handleApproveClick}
         onReject={handleRejectClick}
         onRequestChanges={handleRequestChangesClick}
-        onViewAudit={handleViewAuditClick}
         selectedApplicationIds={selectedApplicationIds}
         onToggleSelect={handleToggleSelect}
         onToggleSelectAll={handleToggleSelectAll}
+        onViewDocs={handleViewDocsArray}
       />
 
       {/* Details Drawer */}
@@ -481,7 +343,7 @@ export default function FranchiseApprovals() {
 
       {/* Modal 4: Interactive Document Preview Modal */}
       {isPreviewOpen && previewDoc && (
-        <div className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[70] flex items-center justify-center p-4 lg:pl-[280px]" id="preview-modal">
+        <div className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[80] flex items-center justify-center p-4 lg:pl-[280px]" id="preview-modal">
           <div className="bg-white dark:bg-zinc-950 w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-900 animate-scaleUp">
             {/* Header with actions */}
             <div className="p-4 border-b border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-900/40 flex justify-between items-center">
@@ -548,102 +410,66 @@ export default function FranchiseApprovals() {
                 >
                   Open in New Tab
                 </a>
-                <a
-                  href={previewDoc.url}
-                  download
-                  className="px-3.5 py-1.5 bg-[var(--primary)] text-white rounded text-xs font-bold hover:brightness-110 shadow-sm transition-all"
+                <button
+                  onClick={() => handleDownloadFile(previewDoc.url, previewDoc.name)}
+                  className="px-3.5 py-1.5 bg-[var(--primary)] text-white rounded text-xs font-bold hover:brightness-110 shadow-sm transition-all cursor-pointer"
                 >
                   Download File
-                </a>
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal 5: Audit History Timeline Modal */}
-      {isAuditOpen && selectedApp && (
-        <div className="fixed inset-0 bg-black/55 backdrop-blur-sm z-[60] flex items-center justify-center p-4 lg:pl-[280px]" id="audit-modal">
-          <div className="bg-white dark:bg-zinc-950 w-full max-w-lg rounded-xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-900 animate-scaleUp">
-            <div className="p-4 border-b border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-900/40 flex justify-between items-center">
-              <div>
-                <h3 className="text-xs font-black uppercase tracking-wider text-black dark:text-zinc-100">Application Audit Timeline</h3>
-                <p className="text-[10px] font-bold text-[var(--primary)] mt-0.5">{selectedApp.id} - {selectedApp.companyName}</p>
-              </div>
+      {/* Modal: All Documents Viewer */}
+      {isDocsViewerOpen && (
+        <div className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[70] flex items-center justify-center p-4 lg:pl-[280px]">
+          <div className="bg-white dark:bg-zinc-950 w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-900 flex flex-col max-h-[80vh]">
+            <div className="p-4 border-b border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-900/40 flex justify-between items-center shrink-0">
+              <h3 className="text-sm font-black uppercase tracking-wider text-black dark:text-zinc-100">Uploaded Documents</h3>
               <button
-                onClick={() => setIsAuditOpen(false)}
+                onClick={() => setIsDocsViewerOpen(false)}
                 className="text-black dark:text-zinc-300 hover:text-[var(--primary)]"
               >
-                <XCircle size={18} />
+                <XCircle size={20} />
               </button>
             </div>
-
-            {/* Vertical timeline details */}
-            <div className="p-6 max-h-[60vh] overflow-y-auto scrollbar-thin space-y-5">
-              <div className="relative border-l-2 border-zinc-200 dark:border-zinc-800 pl-6 space-y-6">
-                
-                {/* Event 1 */}
-                <div className="relative">
-                  <div className="absolute -left-[31px] top-0.5 w-4.5 h-4.5 rounded-full bg-emerald-500 border-4 border-white dark:border-zinc-950 z-10" />
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-bold text-black/50 dark:text-zinc-400">12 May 2026 • 10:45 AM</span>
-                    <span className="text-xs font-bold text-black dark:text-zinc-100 mt-0.5">Application Submitted Successfully</span>
-                    <p className="text-[11px] font-semibold text-black/75 dark:text-zinc-300 mt-1">
-                      Applicant submitted business expansion proposal online. System verified GST & PAN formats.
-                    </p>
+            <div className="p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {docsToView.map((doc, idx) => (
+                <div key={idx} className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-900/50 flex flex-col gap-2">
+                  <div className="font-bold text-xs truncate" title={doc.type}>{doc.type}</div>
+                  <div className="text-[10px] text-zinc-500 truncate" title={doc.name}>{doc.name}</div>
+                  <div className="mt-auto flex justify-between items-center pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                    <button onClick={() => handlePreviewDocClick(doc)} className="text-[var(--primary)] text-xs font-bold hover:underline flex items-center gap-1">
+                      <Eye size={12}/> View
+                    </button>
+                    <div className="flex gap-2 items-center">
+                      <button 
+                        onClick={() => handleVerifyDocument(doc._id || doc.id, doc.isVerified)}
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-colors ${doc.isVerified ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/20' : 'bg-zinc-100 text-zinc-500 border-zinc-300 hover:bg-zinc-200 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-400'}`}
+                      >
+                        {doc.isVerified ? (
+                          <span className="flex items-center gap-1"><CheckCircle size={10} /> Verified</span>
+                        ) : 'Verify'}
+                      </button>
+                      <button
+                        onClick={() => handleDownloadFile(doc.url, doc.name)}
+                        className="text-zinc-500 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+                        title="Download"
+                      >
+                        <Download size={14} />
+                      </button>
+                    </div>
                   </div>
                 </div>
-
-                {/* Event 2 */}
-                <div className="relative">
-                  <div className="absolute -left-[31px] top-0.5 w-4.5 h-4.5 rounded-full bg-blue-500 border-4 border-white dark:border-zinc-950 z-10" />
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-bold text-black/50 dark:text-zinc-400">13 May 2026 • 02:15 PM</span>
-                    <span className="text-xs font-bold text-black dark:text-zinc-100 mt-0.5">Auditor Assignment Configured</span>
-                    <p className="text-[11px] font-semibold text-black/75 dark:text-zinc-300 mt-1">
-                      System automatically assigned Specialist <span className="font-bold">Amit Patel</span> to inspect financial and background records.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Event 3 */}
-                <div className="relative">
-                  <div className="absolute -left-[31px] top-0.5 w-4.5 h-4.5 rounded-full bg-purple-500 border-4 border-white dark:border-zinc-950 z-10" />
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-bold text-black/50 dark:text-zinc-400">14 May 2026 • 11:30 AM</span>
-                    <span className="text-xs font-bold text-black dark:text-zinc-100 mt-0.5">Financial Verification Complete</span>
-                    <p className="text-[11px] font-semibold text-black/75 dark:text-zinc-300 mt-1">
-                      Credit verification agency cleared company financials. Net worth verification confirmed.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Event 4 */}
-                <div className="relative">
-                  <div className="absolute -left-[31px] top-0.5 w-4.5 h-4.5 rounded-full bg-amber-500 border-4 border-white dark:border-zinc-950 z-10" />
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-bold text-black/50 dark:text-zinc-400">15 May 2026 • 05:00 PM</span>
-                    <span className="text-xs font-bold text-black dark:text-zinc-100 mt-0.5">Internal Review Comments Logged</span>
-                    <p className="text-[11px] font-semibold text-black/75 dark:text-zinc-300 mt-1">
-                      Review notes uploaded: "Applicant has deep experience with QSR, recommended for fast-track approval".
-                    </p>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-            <div className="p-4 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-900/40 flex justify-end">
-              <button
-                onClick={() => setIsAuditOpen(false)}
-                className="px-5 py-1.5 bg-zinc-200 dark:bg-zinc-800 text-black dark:text-zinc-200 rounded-lg text-xs font-bold hover:bg-zinc-300 transition-colors cursor-pointer"
-              >
-                Close Audit Logs
-              </button>
+              ))}
             </div>
           </div>
         </div>
       )}
+
+      {/* Removed Mock Audit Modal */}
 
     </div>
   );

@@ -26,11 +26,11 @@ import {
 } from "lucide-react"
 import { adminAPI } from "@food/api"
 
-// Import Sub-components
-import ApprovalDetailsDrawer from "./components/ApprovalDetailsDrawer"
 import ApproveModal from "./components/ApproveModal"
 import RejectModal from "./components/RejectModal"
 import ContactManagerModal from "./components/ContactManagerModal"
+import ViewFeedbackModal from "./components/ViewFeedbackModal"
+import StoreModal from "./components/StoreModal"
 
 export default function StoreApprovals() {
   // Lists & Loading State
@@ -47,7 +47,9 @@ export default function StoreApprovals() {
   const [searchVal, setSearchVal] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("All")
-  const [cityFilter, setCityFilter] = useState("All")
+  const [regionFilter, setRegionFilter] = useState("All")
+  const [zoneFilter, setZoneFilter] = useState("All")
+  const [territoryFilter, setTerritoryFilter] = useState("All")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
 
@@ -64,9 +66,9 @@ export default function StoreApprovals() {
   const [isApproveOpen, setIsApproveOpen] = useState(false)
   const [isRejectOpen, setIsRejectOpen] = useState(false)
   const [isContactOpen, setIsContactOpen] = useState(false)
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
+  const [isEditStoreOpen, setIsEditStoreOpen] = useState(false)
   const [selectedApproval, setSelectedApproval] = useState(null)
-  const [drawerTab, setDrawerTab] = useState("store")
 
   // Toast Notification Simulation State
   const [toast, setToast] = useState(null)
@@ -108,7 +110,6 @@ export default function StoreApprovals() {
         limit,
         search: debouncedSearch,
         status: statusFilter,
-        city: cityFilter === "All" ? "" : cityFilter,
         startDate,
         endDate,
         sort: sortKey,
@@ -124,7 +125,7 @@ export default function StoreApprovals() {
     } finally {
       setLoading(false)
     }
-  }, [page, limit, debouncedSearch, statusFilter, cityFilter, startDate, endDate, sortKey, sortOrder])
+  }, [page, limit, debouncedSearch, statusFilter, startDate, endDate, sortKey, sortOrder])
 
   // Initial trigger & updates
   useEffect(() => {
@@ -135,42 +136,34 @@ export default function StoreApprovals() {
     fetchKPIs()
   }, [fetchKPIs])
 
-  // WebSocket Live simulation (mock ticks every 12 seconds to fluctuate metrics)
-  useEffect(() => {
-    const wsInterval = setInterval(() => {
-      setKpis(prev => {
-        if (!prev) return null
-        // Randomly simulate a new incoming request
-        const rand = Math.random()
-        if (rand > 0.75) {
-          showToast("New store approval request received!", "info")
-          fetchApprovals()
-          return {
-            ...prev,
-            pendingApprovals: prev.pendingApprovals + 1
-          }
-        }
-        return prev
-      })
-    }, 15000)
-
-    return () => clearInterval(wsInterval)
-  }, [fetchApprovals])
+  // Removed WebSocket Live simulation that was mocking fake metrics
 
   // Reset Filters handler
   const handleResetFilters = () => {
     setSearchVal("")
     setStatusFilter("All")
-    setCityFilter("All")
+    setRegionFilter("All")
+    setZoneFilter("All")
+    setTerritoryFilter("All")
     setStartDate("")
     setEndDate("")
     setPage(1)
   }
 
-  // Handle Export report
-  const handleExport = () => {
-    showToast("Exporting approvals spreadsheet... Download started.")
-  }
+  // Derive unique values for dropdowns
+  const uniqueRegions = ["All", ...new Set(approvals.map(a => a.regionId?.name).filter(Boolean))]
+  const uniqueZones = ["All", ...new Set(approvals.map(a => a.zoneId?.name).filter(Boolean))]
+  const uniqueTerritories = ["All", ...new Set(approvals.map(a => a.territoryId?.name).filter(Boolean))]
+
+  // Apply frontend filters for region/zone/territory
+  const filteredApprovals = approvals.filter(app => {
+    let match = true;
+    if (regionFilter !== "All" && app.regionId?.name !== regionFilter) match = false;
+    if (zoneFilter !== "All" && app.zoneId?.name !== zoneFilter) match = false;
+    if (territoryFilter !== "All" && app.territoryId?.name !== territoryFilter) match = false;
+    return match;
+  });
+
 
   // Handle Submit Confirm
   const handleSubmitConfirm = async () => {
@@ -184,6 +177,20 @@ export default function StoreApprovals() {
       fetchKPIs()
     } catch (_) {
       showToast("Failed to submit the store. Please try again.", "error")
+    }
+  }
+
+  // Handle Edit Store Confirm
+  const handleStoreUpdate = async (payload) => {
+    if (!selectedApproval) return
+    try {
+      await adminAPI.updateStore(selectedApproval._id, payload)
+      showToast("Store updated successfully!", "success")
+      setIsEditStoreOpen(false)
+      setSelectedApproval(null)
+      fetchApprovals()
+    } catch (err) {
+      showToast("Failed to update store.", "error")
     }
   }
 
@@ -237,13 +244,6 @@ export default function StoreApprovals() {
         </div>
         <div className="flex items-center gap-1.5">
           <button
-            onClick={handleExport}
-            className="flex items-center gap-1 px-2.5 py-1.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 hover:bg-slate-55 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Export Report
-          </button>
-          <button
             onClick={() => { fetchApprovals(); fetchKPIs(); }}
             className="p-1.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 hover:bg-slate-55 rounded-lg transition-colors cursor-pointer"
             title="Refresh Grid"
@@ -254,10 +254,11 @@ export default function StoreApprovals() {
       </div>
 
       {/* KPI METRIC CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
           { label: "Draft Stores", val: kpis?.draftStores, sub: "Not submitted", icon: FileCheck, color: "text-slate-600 bg-slate-100 dark:bg-slate-900" },
           { label: "Pending Approvals", val: kpis?.pendingApprovals, sub: "Waiting for review", icon: Clock, color: "text-amber-600 bg-amber-50 dark:bg-amber-950/20" },
+          { label: "Changes Requested", val: kpis?.changesRequestedStores, sub: "Revisions needed", icon: AlertTriangle, color: "text-orange-600 bg-orange-50 dark:bg-orange-950/20" },
           { label: "Approved Stores", val: kpis?.approvedStores, sub: "Active", icon: CheckCircle, color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20" },
           { label: "Rejected Stores", val: kpis?.rejectedStores, sub: "Requires attention", icon: XCircle, color: "text-rose-600 bg-rose-50 dark:bg-rose-950/20" }
         ].map((card, i) => (
@@ -289,6 +290,23 @@ export default function StoreApprovals() {
         ))}
       </div>
 
+      {/* TABS FOR STATUS */}
+      <div className="flex border-b border-slate-200 dark:border-slate-800 mb-4 px-1">
+        {["All", "Draft", "Pending", "Approved", "Changes Requested", "Rejected"].map(tab => (
+          <button
+            key={tab}
+            onClick={() => { setStatusFilter(tab); setPage(1); }}
+            className={`px-4 py-2 text-xs font-bold transition-all border-b-2 -mb-px ${
+              statusFilter === tab
+                ? "border-red-650 text-red-650"
+                : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
       {/* FILTER BAR SECTION */}
       <div className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-850 rounded-xl p-3 shadow-xs space-y-3">
         <div className="flex flex-wrap items-center gap-2.5">
@@ -305,32 +323,43 @@ export default function StoreApprovals() {
             />
           </div>
 
-          {/* Status Dropdown */}
+
+          {/* Region Dropdown */}
           <div className="w-[115px]">
             <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+              value={regionFilter}
+              onChange={(e) => { setRegionFilter(e.target.value); setPage(1); }}
               className="w-full px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs font-semibold focus:outline-none"
             >
-              <option value="All">Status: All</option>
-              <option value="Draft">Draft</option>
-              <option value="Pending">Pending</option>
-              <option value="Approved">Approved</option>
-              <option value="Rejected">Rejected</option>
+              {uniqueRegions.map(r => (
+                <option key={r} value={r}>{r === "All" ? "Region: All" : r}</option>
+              ))}
             </select>
           </div>
 
-          {/* City Dropdown */}
+          {/* Zone Dropdown */}
           <div className="w-[115px]">
             <select
-              value={cityFilter}
-              onChange={(e) => { setCityFilter(e.target.value); setPage(1); }}
+              value={zoneFilter}
+              onChange={(e) => { setZoneFilter(e.target.value); setPage(1); }}
               className="w-full px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs font-semibold focus:outline-none"
             >
-              <option value="All">City: All</option>
-              <option value="Indore">Indore</option>
-              <option value="Bhopal">Bhopal</option>
-              <option value="Ujjain">Ujjain</option>
+              {uniqueZones.map(z => (
+                <option key={z} value={z}>{z === "All" ? "Zone: All" : z}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Territory Dropdown */}
+          <div className="w-[115px]">
+            <select
+              value={territoryFilter}
+              onChange={(e) => { setTerritoryFilter(e.target.value); setPage(1); }}
+              className="w-full px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs font-semibold focus:outline-none"
+            >
+              {uniqueTerritories.map(t => (
+                <option key={t} value={t}>{t === "All" ? "Territory: All" : t}</option>
+              ))}
             </select>
           </div>
 
@@ -401,7 +430,7 @@ export default function StoreApprovals() {
               Retry Load
             </button>
           </div>
-        ) : approvals.length === 0 ? (
+        ) : filteredApprovals.length === 0 ? (
           /* EMPTY STATE */
           <div className="py-16 text-center space-y-4">
             <div className="w-24 h-24 mx-auto bg-slate-50 dark:bg-slate-950 rounded-full flex items-center justify-center border text-primary opacity-70">
@@ -424,9 +453,9 @@ export default function StoreApprovals() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-950/50 border-b border-slate-100 dark:border-slate-850 text-[9px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider">
-                  <th className="px-2.5 py-2 cursor-pointer select-none" onClick={() => handleSort("_id")}>
+                  <th className="px-2.5 py-2 cursor-pointer select-none" onClick={() => handleSort("code")}>
                     <div className="flex items-center gap-1">
-                      Request ID
+                      Store ID
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </div>
                   </th>
@@ -437,12 +466,9 @@ export default function StoreApprovals() {
                     </div>
                   </th>
                   <th className="px-2.5 py-2">Manager</th>
-                  <th className="px-2.5 py-2 cursor-pointer select-none" onClick={() => handleSort("city")}>
-                    <div className="flex items-center gap-1">
-                      City
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
-                  </th>
+                  <th className="px-2.5 py-2">Region</th>
+                  <th className="px-2.5 py-2">Zone</th>
+                  <th className="px-2.5 py-2">Territory</th>
                   <th className="px-2.5 py-2 cursor-pointer select-none" onClick={() => handleSort("createdAt")}>
                     <div className="flex items-center gap-1">
                       Submitted Date
@@ -455,14 +481,16 @@ export default function StoreApprovals() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-850 text-[11px] text-slate-700 dark:text-slate-350">
-                {approvals.map((app) => (
+                {filteredApprovals.map((app) => (
                   <tr key={app._id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20 group">
-                    <td className="px-2.5 py-2 font-semibold text-slate-900 dark:text-white">{app._id}</td>
+                    <td className="px-2.5 py-2 font-semibold text-slate-900 dark:text-white">{app.code || app._id}</td>
                     <td className="px-2.5 py-2 font-bold text-primary">{app.storeName}</td>
                     <td className="px-2.5 py-2 font-medium text-slate-655 dark:text-slate-300">
                       {app.managerName}
                     </td>
-                    <td className="px-2.5 py-2 font-semibold">{app.address?.city || "N/A"}</td>
+                    <td className="px-2.5 py-2 font-semibold">{app.regionId?.name || "N/A"}</td>
+                    <td className="px-2.5 py-2 font-semibold">{app.zoneId?.name || "N/A"}</td>
+                    <td className="px-2.5 py-2 font-semibold">{app.territoryId?.name || "N/A"}</td>
                     <td className="px-2.5 py-2 text-slate-500">
                       {getRelativeTime(app.createdAt)}
                     </td>
@@ -477,73 +505,44 @@ export default function StoreApprovals() {
                             ? "bg-amber-50 dark:bg-amber-950/20 text-amber-650"
                             : app.status === "Draft"
                               ? "bg-blue-50 dark:bg-blue-950/20 text-blue-650"
-                              : "bg-red-50 dark:bg-red-950/20 text-red-650"
+                              : app.status === "Changes Requested"
+                                ? "bg-purple-50 dark:bg-purple-950/20 text-purple-650"
+                                : "bg-red-50 dark:bg-red-950/20 text-red-650"
                       }`}>
                         {app.status || "Draft"}
                       </span>
                     </td>
-                    <td className="px-2.5 py-2 text-right relative">
-                      <button
-                        onClick={() => setActiveMenuId(activeMenuId === app._id ? null : app._id)}
-                        className="p-1 rounded-md text-slate-400 hover:text-slate-655 hover:bg-slate-55 dark:hover:bg-slate-900 transition-colors"
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
+                    <td className="px-2.5 py-2 text-right">
+                      <div className="flex justify-end gap-1.5">
+                        {(app.status === "Draft" || app.status === "Changes Requested") && (
+                          <button
+                            onClick={() => { setSelectedApproval(app); setIsApproveOpen(true); }}
+                            className="p-1.5 text-blue-600 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-md transition-colors"
+                            title="Submit for Approval"
+                          >
+                            <FileCheck className="w-3.5 h-3.5" />
+                          </button>
+                        )}
 
-                      {/* Floating Row Actions Popover */}
-                      {activeMenuId === app._id && (
-                        <>
-                          <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-                          <div className="absolute right-4 mt-1 w-44 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-xl shadow-xl z-25 overflow-hidden divide-y divide-slate-100 dark:divide-slate-850 text-left">
-                            <div className="py-1">
-                              <button
-                                onClick={() => { setSelectedApproval(app); setDrawerTab("store"); setIsDrawerOpen(true); setActiveMenuId(null); }}
-                                className="w-full px-4 py-1.5 text-xs text-slate-700 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-850 flex items-center gap-1.5"
-                              >
-                                <Eye className="w-3.5 h-3.5 text-slate-400" />
-                                View Application
-                              </button>
-                              
-                              {app.status === "Draft" && (
-                                <button
-                                  onClick={() => { setSelectedApproval(app); setIsApproveOpen(true); setActiveMenuId(null); }}
-                                  className="w-full px-4 py-1.5 text-xs text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/10 flex items-center gap-1.5 font-semibold"
-                                >
-                                  <FileCheck className="w-3.5 h-3.5 text-blue-500" />
-                                  Submit for Approval
-                                </button>
-                              )}
-                              
-                              {app.status === "Rejected" && (
-                                <button
-                                  onClick={() => { setSelectedApproval(app); setIsRejectOpen(true); setActiveMenuId(null); }}
-                                  className="w-full px-4 py-1.5 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-955/10 flex items-center gap-1.5 font-semibold"
-                                >
-                                  <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
-                                  View Rejection Reason
-                                </button>
-                              )}
-                            </div>
-                            
-                            <div className="py-1">
-                              <button
-                                onClick={() => { handleDownloadAllDocs(app._id, app.storeName); setActiveMenuId(null); }}
-                                className="w-full px-4 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-855 flex items-center gap-1.5"
-                              >
-                                <Download className="w-3.5 h-3.5 text-slate-400" />
-                                Download Zip
-                              </button>
-                              <button
-                                onClick={() => { setSelectedApproval(app); setIsContactOpen(true); setActiveMenuId(null); }}
-                                className="w-full px-4 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-55 dark:hover:bg-slate-855 flex items-center gap-1.5"
-                              >
-                                <User className="w-3.5 h-3.5 text-slate-400" />
-                                Contact Manager
-                              </button>
-                            </div>
-                          </div>
-                        </>
-                      )}
+                        
+                        {(app.status === "Rejected" || app.status === "Changes Requested") && (
+                          <button
+                            onClick={() => { setSelectedApproval(app); setIsFeedbackOpen(true); }}
+                            className="p-1.5 text-rose-600 bg-rose-50 dark:bg-rose-900/20 hover:bg-rose-100 dark:hover:bg-rose-900/40 rounded-md transition-colors"
+                            title="View Feedback Details"
+                          >
+                            <AlertCircle className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => { setSelectedApproval(app); setIsContactOpen(true); }}
+                          className="p-1.5 text-amber-600 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-md transition-colors"
+                          title="Contact Manager"
+                        >
+                          <User className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -579,13 +578,6 @@ export default function StoreApprovals() {
         )}
       </div>
 
-      {/* 1. APPLICATION DETAILS DRAWER */}
-      <ApprovalDetailsDrawer
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        approval={selectedApproval}
-      />
-
       {/* 2. APPROVE MODAL */}
       <ApproveModal
         isOpen={isApproveOpen}
@@ -601,6 +593,21 @@ export default function StoreApprovals() {
         isOpen={isContactOpen}
         onClose={() => { setIsContactOpen(false); setSelectedApproval(null); }}
         manager={selectedApproval ? { name: selectedApproval.managerName, phone: selectedApproval.phone, email: selectedApproval.email } : null}
+      />
+
+      {/* 5. VIEW FEEDBACK MODAL */}
+      <ViewFeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => { setIsFeedbackOpen(false); setSelectedApproval(null); }}
+        approval={selectedApproval}
+      />
+
+      {/* 6. EDIT STORE MODAL */}
+      <StoreModal
+        isOpen={isEditStoreOpen}
+        onClose={() => { setIsEditStoreOpen(false); setSelectedApproval(null); }}
+        store={selectedApproval}
+        onConfirm={handleStoreUpdate}
       />
 
       {/* Toast Notification Banner */}

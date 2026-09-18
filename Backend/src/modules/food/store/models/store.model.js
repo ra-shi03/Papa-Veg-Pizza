@@ -82,12 +82,28 @@ const storeSchema = new mongoose.Schema(
         },
         approvalStatus: {
             type: String,
-            enum: ['Draft', 'Pending', 'Approved', 'Rejected'],
+            enum: ['Draft', 'Pending', 'Approved', 'Rejected', 'Changes Requested'],
             default: 'Draft',
             index: true
         },
         rejectionReason: {
             type: String,
+            default: null
+        },
+        rejectionNotes: {
+            type: String,
+            default: null
+        },
+        changesInstructions: {
+            type: String,
+            default: null
+        },
+        changesNotes: {
+            type: String,
+            default: null
+        },
+        changesDeadline: {
+            type: Date,
             default: null
         },
         submittedAt: {
@@ -97,7 +113,14 @@ const storeSchema = new mongoose.Schema(
         approvedAt: {
             type: Date,
             default: null
-        }
+        },
+        documents: [{
+            type: { type: String, required: true },
+            name: { type: String, required: true },
+            url: { type: String, required: true },
+            isVerified: { type: Boolean, default: false },
+            uploadedAt: { type: Date, default: Date.now }
+        }]
     },
     {
         collection: 'food_stores',
