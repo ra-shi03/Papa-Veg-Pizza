@@ -97,6 +97,7 @@ export default function SecurityTab() {
       const res = await profileApi.changePassword({
         currentPassword: passwordState.currentPassword,
         newPassword: passwordState.newPassword,
+        confirmPassword: passwordState.confirmPassword,
       });
 
       if (res.success) {

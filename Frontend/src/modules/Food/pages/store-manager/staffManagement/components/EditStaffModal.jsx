@@ -70,18 +70,21 @@ export default function EditStaffModal({ isOpen, onClose, staffId }) {
   // Populate data when loaded
   useEffect(() => {
     if (staff && isOpen) {
-      setValue("fullName", staff.fullName);
+      setValue("fullName", staff.name || staff.fullName);
       setValue("email", staff.email);
       setValue("phone", staff.phone);
-      setValue("role", staff.role);
-      setValue("experience", staff.experience);
-      setValue("salaryType", staff.salaryType);
-      setValue("salary", staff.salary);
-      setValue("joiningDate", staff.joiningDate);
-      setValue("emergencyContact", staff.emergencyContact);
+      setValue("role", staff.role || "Pizza Maker");
+      setValue("experience", staff.personalDetails?.experience ?? staff.experience ?? 0);
+      setValue("salaryType", staff.personalDetails?.salaryType || staff.salaryType || "Monthly");
+      setValue("salary", staff.personalDetails?.salary ?? staff.salary ?? "");
+      
+      const jDate = staff.joinedDate || staff.joiningDate;
+      setValue("joiningDate", jDate ? new Date(jDate).toISOString().split('T')[0] : "");
+      
+      setValue("emergencyContact", staff.personalDetails?.emergencyContact || staff.emergencyContact || "");
       
       setProfileImage(staff.profileImage || "");
-      setSelectedSkills(staff.skills || []);
+      setSelectedSkills(staff.personalDetails?.skills || staff.skills || []);
       setImageError("");
     }
   }, [staff, isOpen, setValue]);

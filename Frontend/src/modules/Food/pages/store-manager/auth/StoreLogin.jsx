@@ -63,7 +63,7 @@ export default function StoreLogin() {
       const storeUser = { ...rawUser, role: role.replace(/-/g, "_") }
 
       // Store Auth Details for the store module
-      setAuthData("store", accessToken, storeUser, refreshToken)
+      setAuthData("admin", accessToken, storeUser, refreshToken)
       
       // Store the specific role context
       localStorage.setItem("store_role", storeUser.role)
@@ -72,7 +72,7 @@ export default function StoreLogin() {
       toast.success(`Signed in as ${storeUser.name || 'Store Operations'}`)
 
       // Role-based routing
-      navigate("/store", { replace: true })
+      navigate("/store-operations/dashboard", { replace: true })
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || "Login failed. Check your credentials."
       toast.error(msg)

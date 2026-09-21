@@ -289,11 +289,19 @@ export const approveStoreApproval = async (req, res) => {
       }
 
       // 4. Create UserRole mapping
-      await UserRole.findOneAndUpdate(
-        { userId: user._id, storeId: store._id },
-        { roleId: role._id, isPrimary: true },
-        { upsert: true, new: true }
-      );
+      let userRole = await UserRole.findOne({ userId: user._id, storeId: store._id });
+      if (!userRole) {
+        const hasPrimary = await UserRole.exists({ userId: user._id, isPrimary: true, status: 'ACTIVE' });
+        await UserRole.create({
+          userId: user._id,
+          storeId: store._id,
+          roleId: role._id,
+          isPrimary: !hasPrimary
+        });
+      } else {
+        userRole.roleId = role._id;
+        await userRole.save();
+      }
 
       // 5. Create StoreManager record
       const existingManager = await StoreManager.findOne({ storeId: store._id, status: { $ne: 'DELETED' } });

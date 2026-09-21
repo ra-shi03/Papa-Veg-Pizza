@@ -129,7 +129,8 @@ export default function Navbar({ onToggleSidebar }) {
       try {
         const response = await adminAPI.getStores()
         if (response?.data?.data) {
-          setStoreList(response.data.data)
+          const storesData = response.data.data.stores || (Array.isArray(response.data.data) ? response.data.data : []);
+          if (storesData.length > 0) setStoreList(storesData);
         }
       } catch (err) {
         console.error("Failed to fetch stores data", err)
@@ -435,7 +436,7 @@ export default function Navbar({ onToggleSidebar }) {
                     All Stores
                   </button>
                   {storeList.map((store) => {
-                    const displayName = store.territoryId?.name || store.territory?.name || store.territoryName || store.name;
+                    const displayName = store.territoryId?.name || store.territory?.name || store.territoryName || store.storeName || store.name;
                     return (
                     <button
                       key={store.id || store._id}

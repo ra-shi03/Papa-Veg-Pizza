@@ -61,9 +61,9 @@ export default function Sidebar({ isOpen, onClose, role, isCollapsed = false, on
 
   const handleLogout = async () => {
     try {
-      localStorage.removeItem("store_accessToken")
-      localStorage.removeItem("store_authenticated")
-      localStorage.removeItem("store_user")
+      localStorage.removeItem("admin_accessToken")
+      localStorage.removeItem("admin_refreshToken")
+      localStorage.removeItem("admin_user")
       localStorage.removeItem("store_role")
       window.dispatchEvent(new Event("storeAuthChanged"))
       navigate("/store-operation/login", { replace: true })

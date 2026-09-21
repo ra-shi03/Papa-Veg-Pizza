@@ -15,7 +15,8 @@ import {
     updateAdminProfileController,
     changeAdminPasswordController,
     requestAdminForgotPasswordOtpController,
-    resetAdminPasswordWithOtpController
+    resetAdminPasswordWithOtpController,
+    updatePersonalProfileController
 } from './auth.controller.js';
 import { authMiddleware, requireAdmin } from './auth.middleware.js';
 import { authRateLimiter } from '../../middleware/rateLimit.js';
@@ -50,11 +51,14 @@ router.post('/admin/forgot-password/reset', authRateLimiter, resetAdminPasswordW
 // Refresh token
 router.post('/refresh-token', refreshTokenController);
 
+import { getStoreManagerProfileWork } from '../../modules/food/admin/controllers/admin.controller.js';
+
 // Logout (invalidates refresh token)
 router.post('/logout', logoutController);
 
 // Authenticated user profile (requires Bearer token)
 router.get('/me', authMiddleware, getMeController);
+router.put('/profile/personal', authMiddleware, updatePersonalProfileController);
 
 // Admin-only: profile update & change password (Bearer + ADMIN role)
 router.patch('/admin/profile', authMiddleware, requireAdmin, updateAdminProfileController);

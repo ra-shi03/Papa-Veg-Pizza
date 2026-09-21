@@ -21,6 +21,9 @@ router.get('/business-settings/public', businessSettingsController.getBusinessSe
 
 router.use(requireAdmin);
 
+// ----- Profile / Work -----
+router.get('/profile/work', adminController.getStoreManagerProfileWork);
+
 // ----- Broadcast Notifications -----
 router.post('/notifications/broadcast', notificationBroadcastController.createBroadcastNotificationController);
 router.get('/notifications/broadcast', notificationBroadcastController.getBroadcastNotificationsController);

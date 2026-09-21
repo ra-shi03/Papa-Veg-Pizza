@@ -113,6 +113,16 @@ export async function getStoreComplaints(req, res, next) {
     }
 }
 
+export async function getStoreManagerProfileWork(req, res, next) {
+    try {
+        const userId = req.user.userId;
+        const data = await adminService.getStoreManagerProfileWork(userId);
+        res.status(200).json({ success: true, message: 'Profile work fetched successfully', data });
+    } catch (error) {
+        next(error);
+    }
+}
+
 export async function globalSearch(req, res, next) {
     try {
         const { query } = req.query;

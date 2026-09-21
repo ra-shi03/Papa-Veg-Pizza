@@ -62,7 +62,7 @@ export default function DeleteStaffDialog({ isOpen, onClose, staffId }) {
           <button
             onClick={handleDelete}
             disabled={deleteStaffMutation.isPending}
-            className="px-6 py-2.5 bg-red-655 hover:bg-red-700 text-white font-bold rounded-full text-xs active:scale-95 transition-all cursor-pointer shadow-md hover:shadow-lg disabled:opacity-50"
+            className="px-6 py-2.5 bg-[#d30f0f] text-white font-bold rounded-full text-xs active:scale-95 transition-all cursor-pointer shadow-md disabled:opacity-50"
           >
             {deleteStaffMutation.isPending ? "Deleting..." : "Delete Staff"}
           </button>

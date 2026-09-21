@@ -24,7 +24,8 @@ export default function ProfileHeader({
   };
 
   const getRoleBadgeColor = (role) => {
-    switch (role) {
+    const normalizedRole = String(role || "").toLowerCase().replace("-", "_");
+    switch (normalizedRole) {
       case "store_manager":
         return "bg-rose-50 text-rose-700 border-rose-250 dark:bg-rose-950/20 dark:text-rose-450 dark:border-rose-900/30";
       case "kitchen_supervisor":
@@ -36,14 +37,16 @@ export default function ProfileHeader({
   };
 
   const getRoleLabel = (role) => {
-    switch (role) {
+    const normalizedRole = String(role || "").toLowerCase().replace("-", "_");
+    switch (normalizedRole) {
       case "store_manager":
         return "Store Manager";
       case "kitchen_supervisor":
         return "Kitchen Supervisor";
       case "kitchen_staff":
-      default:
         return "Kitchen Staff";
+      default:
+        return role ? role.replace(/_/g, ' ').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : "Store Staff";
     }
   };
 
@@ -69,6 +72,26 @@ export default function ProfileHeader({
       </div>
     );
   }
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    try {
+      const date = new Date(dateString);
+      return isNaN(date.getTime()) ? dateString : date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const formatDateTime = (dateString) => {
+    if (!dateString) return "N/A";
+    try {
+      const date = new Date(dateString);
+      return isNaN(date.getTime()) ? dateString : date.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return dateString;
+    }
+  };
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-2xl p-5 flex flex-col md:flex-row gap-6 items-start md:items-center shadow-sm">
@@ -146,7 +169,7 @@ export default function ProfileHeader({
           </div>
           <div className="flex items-center gap-1.5">
             <Calendar size={12} className="text-slate-450" />
-            <span>Joining Date: <strong className="text-slate-800 dark:text-zinc-200">{user?.joiningDate || "N/A"}</strong></span>
+            <span>Joining Date: <strong className="text-slate-800 dark:text-zinc-200">{formatDate(user?.joiningDate)}</strong></span>
           </div>
           <div className="flex items-center gap-1.5">
             <Shield size={12} className="text-slate-450" />
@@ -154,7 +177,7 @@ export default function ProfileHeader({
           </div>
           <div className="flex items-center gap-1.5">
             <Clock size={12} className="text-slate-450" />
-            <span>Last Login: <strong className="text-slate-800 dark:text-zinc-200">{user?.lastLogin || "N/A"}</strong></span>
+            <span>Last Login: <strong className="text-slate-800 dark:text-zinc-200">{formatDateTime(user?.lastLogin)}</strong></span>
           </div>
         </div>
       </div>

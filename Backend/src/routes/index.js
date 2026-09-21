@@ -17,12 +17,14 @@ import searchRoutes from '../modules/food/search/routes/search.routes.js';
 import franchiseStoreRoutes from '../modules/food/franchise/routes/store.routes.js';
 import franchiseStoreManagerRoutes from '../modules/food/franchise/routes/storeManager.routes.js';
 import franchiseStoreApprovalRoutes from '../modules/food/franchise/routes/storeApproval.routes.js';
+import kitchenStaffRoutes from '../modules/food/store/routes/kitchenStaff.routes.js';
 
 const router = express.Router();
 
 router.use('/v1/stores', franchiseStoreRoutes);
 router.use('/v1/store-managers', franchiseStoreManagerRoutes);
 router.use('/v1/store-approvals', franchiseStoreApprovalRoutes);
+router.use('/v1/food/store/staff', kitchenStaffRoutes);
 
 router.get('/v1/health', (req, res) => {
     res.status(200).json({ status: 'UP', message: 'Server is healthy' });
