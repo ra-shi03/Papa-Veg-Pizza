@@ -251,7 +251,7 @@ function getModuleFromUrl(url = "") {
   const u = typeof url === "string" ? url : (url?.url || "");
   if (!u) return "user";
   const normalized = u.toLowerCase();
-  if (normalized.includes("/admin/") || normalized.includes("/food/admin/")) return "admin";
+  if (normalized.includes("/admin/") || normalized.includes("/food/admin/") || normalized.includes("/store/") || normalized.includes("/food/store/")) return "admin";
   if (normalized.includes("/food/delivery") || normalized.includes("/delivery/")) return "delivery";
   if (normalized.includes("/food/restaurant/") || normalized.includes("/restaurant/")) return "restaurant";
   return "user";

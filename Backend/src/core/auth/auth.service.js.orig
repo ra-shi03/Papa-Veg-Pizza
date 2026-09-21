@@ -360,49 +360,11 @@ export const adminLogin = async ({ email, mobile, password } = {}, allowedRoles 
     status: 'ACTIVE'
   }).lean();
 
-  let storeId = activeUserRole?.storeId?.toString() || null;
-  let franchiseId = activeUserRole?.franchiseId?.toString() || null;
-  let storeName = null;
-  let storeCode = null;
-
-  if (role === 'STORE_MANAGER' || user.primaryRole?.code === 'STORE_MANAGER') {
-    const storeManager = await StoreManager.findOne({ userId: user._id }).lean();
-    if (storeManager) {
-      if (storeManager.storeId && !storeId) storeId = storeManager.storeId.toString();
-      if (storeManager.franchiseId && !franchiseId) franchiseId = storeManager.franchiseId.toString();
-      if (storeManager.storeName) storeName = storeManager.storeName;
-    }
-  }
-
-  if (storeId && !storeName) {
-    try {
-      const storeDoc = await FoodStore.findById(storeId).lean();
-      if (storeDoc) {
-        storeName = storeDoc.storeName || storeDoc.name || null;
-        if (!storeCode) storeCode = storeDoc.code || null;
-      }
-    } catch (e) {
-      // ignore
-    }
-  }
-
-  let franchiseName = null;
-  if (franchiseId) {
-    try {
-      const franchiseDoc = await FoodFranchise.findById(franchiseId).lean();
-      if (franchiseDoc) {
-        franchiseName = franchiseDoc.name || franchiseDoc.companyName || null;
-      }
-    } catch (e) {
-      // ignore
-    }
-  }
-
   const jwtPayload = {
     userId:      user._id.toString(),
     role,
-    franchiseId,
-    storeId,
+    franchiseId: activeUserRole?.franchiseId?.toString() || null,
+    storeId:     activeUserRole?.storeId?.toString()     || null,
   };
 
   const accessToken     = signAccessToken(jwtPayload);
@@ -433,15 +395,12 @@ export const adminLogin = async ({ email, mobile, password } = {}, allowedRoles 
   const userResponse = {
     id:          user._id,
     _id:         user._id,
-    name:        profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() : user.name || "",
+    name:        profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() : "",
     email:       user.email,
     mobile:      user.mobile,
     role,
     franchiseId: jwtPayload.franchiseId,
-    franchiseName,
     storeId:     jwtPayload.storeId,
-    storeName,
-    storeCode,
   };
 
   return { accessToken, refreshToken: rawRefreshToken, user: userResponse };
@@ -621,7 +580,6 @@ export const getProfile = async (userId, role) => {
              if (storeDoc) {
                  storeName = storeDoc.storeName;
                  storeDetails = {
-                     storeCode: storeDoc.code || null,
                      address: storeDoc.address || null,
                      openingTime: storeDoc.open || null,
                      closingTime: storeDoc.closingTime || null,
@@ -630,7 +588,6 @@ export const getProfile = async (userId, role) => {
                      const franchiseDoc = await FoodFranchise.findById(storeDoc.franchiseId).lean();
                      if (franchiseDoc) {
                          reportingManager = franchiseDoc.ownerName;
-                         storeDetails.franchiseName = franchiseDoc.name || franchiseDoc.companyName || null;
                      }
                  }
              }
@@ -644,13 +601,11 @@ export const getProfile = async (userId, role) => {
         email: user.email,
         mobile: user.mobile,
         role: role,
-        franchiseId: storeManagerData?.franchiseId?.toString() || activeUserRole?.franchiseId?.toString() || null,
-        storeId: storeManagerData?.storeId?.toString() || activeUserRole?.storeId?.toString() || null,
-        storeCode: storeDetails?.storeCode || null,
-        storeName: storeName || storeManagerData?.storeName || null,
-        franchiseName: storeDetails?.franchiseName || null,
+        franchiseId: activeUserRole?.franchiseId?.toString() || null,
+        storeId: activeUserRole?.storeId?.toString() || null,
         employeeCode: storeManagerData?.employeeCode || null,
         joinedDate: storeManagerData?.joinedDate || null,
+        storeName: storeName || storeManagerData?.storeName || null,
         reportingManager: reportingManager || storeManagerData?.reportingManager || null,
         lastLoginAt: storeManagerData?.lastLoginAt || user.lastLoginAt || null,
         status: storeManagerData?.status || "Active",
@@ -1023,34 +978,4 @@ export const refreshAccessToken = async (token) => {
   });
 
   return { accessToken: newAccessToken, refreshToken: token };
-};
-
-export const updatePersonalProfile = async (userId, updateData) => {
-  const user = await User.findById(userId).populate("primaryRole");
-  if (!user) throw new AuthError("User not found");
-
-  // Update user model core fields (email/phone mapping)
-  if (updateData.email) user.email = updateData.email;
-  if (updateData.phone) { user.mobile = updateData.phone; user.phone = updateData.phone; }
-  if (updateData.fullName) user.name = updateData.fullName;
-  await user.save();
-
-  const roleCode = user.primaryRole?.code;
-  if (roleCode === "STORE_MANAGER") {
-    const storeManager = await StoreManager.findOne({ userId });
-    if (storeManager) {
-      if (!storeManager.personalDetails) storeManager.personalDetails = {};
-      if (updateData.gender) storeManager.personalDetails.gender = updateData.gender;
-      if (updateData.dateOfBirth) storeManager.personalDetails.dateOfBirth = updateData.dateOfBirth;
-      if (updateData.address) storeManager.personalDetails.address = updateData.address;
-      if (updateData.emergencyContact) {
-         storeManager.personalDetails.emergencyContactName = updateData.emergencyContact.name;
-         storeManager.personalDetails.emergencyContact = updateData.emergencyContact.phone;
-         storeManager.personalDetails.emergencyContactRelation = updateData.emergencyContact.relation;
-      }
-      storeManager.markModified('personalDetails');
-      await storeManager.save();
-    }
-  }
-  return { success: true, message: "Profile updated successfully", data: updateData };
 };

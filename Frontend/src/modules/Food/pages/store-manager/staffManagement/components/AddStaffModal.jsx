@@ -158,11 +158,6 @@ export default function AddStaffModal({ isOpen, onClose }) {
     }
   };
 
-  const randomizeWebP = () => {
-    const randomId = Math.floor(Math.random() * 70) + 1;
-    setProfileImage(`https://i.pravatar.cc/150?img=${randomId}`);
-  };
-
   const toggleSkill = (skill) => {
     setSelectedSkills((prev) =>
       prev.includes(skill)
@@ -266,11 +261,11 @@ export default function AddStaffModal({ isOpen, onClose }) {
                   </span>
                   <button
                     type="button"
-                    onClick={randomizeWebP}
+                    onClick={() => fileInputRef.current?.click()}
                     className="px-3 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 font-bold rounded-xl text-[11px] hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-95 transition-all flex items-center gap-1 cursor-pointer shadow-sm"
                   >
                     <Upload size={11} className="text-zinc-500" />
-                    Randomize webP
+                    Upload Photo
                   </button>
                   <input
                     type="file"

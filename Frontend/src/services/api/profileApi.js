@@ -4,7 +4,7 @@
  * for stand-alone mock environments or incomplete backend APIs.
  */
 
-import apiClient from "./axios";
+import apiClient, { adminClient } from "./axios.js";
 
 // Helper to simulate network latency
 const sleep = (ms = 400) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -131,7 +131,7 @@ export const profileApi = {
   // PUT /api/profile/personal
   updatePersonalInfo: async (personalInfo) => {
     try {
-      const res = await apiClient.put("/profile/personal", personalInfo);
+      const res = await adminClient.put("/food/auth/profile/personal", personalInfo);
       return res.data;
     } catch (err) {
       await sleep(800);
@@ -151,29 +151,7 @@ export const profileApi = {
     }
   },
 
-  // GET /api/profile/work
-  getWorkInfo: async () => {
-    try {
-      const res = await apiClient.get("/profile/work");
-      return res.data;
-    } catch (err) {
-      await sleep(400);
-      const data = getLocalData();
-      return {
-        success: true,
-        data: {
-          employeeId: data.user.employeeId,
-          designation: data.user.designation,
-          roleName: data.user.role === "store_manager" ? "Store Manager" : data.user.role === "kitchen_supervisor" ? "Kitchen Supervisor" : "Kitchen Staff",
-          storeName: data.user.storeName,
-          reportingManager: data.user.reportingManager,
-          employmentStatus: data.user.status,
-          joiningDate: data.user.joiningDate,
-          store: data.store,
-        },
-      };
-    }
-  },
+
 
   // GET /api/profile/permissions
   getPermissions: async () => {
@@ -276,12 +254,10 @@ export const profileApi = {
   // PUT /api/profile/change-password
   changePassword: async (passwordData) => {
     try {
-      const res = await apiClient.put("/profile/change-password", passwordData);
+      const res = await adminClient.patch("/food/auth/admin/change-password", passwordData);
       return res.data;
     } catch (err) {
-      await sleep(900);
-      // Simulate success
-      return { success: true, message: "Password updated successfully." };
+      return { success: false, message: err?.response?.data?.message || err.message || "Password update failed." };
     }
   },
 

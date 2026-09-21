@@ -8,6 +8,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { useSystemTheme } from "@/shared/utils/themeSync"
+import { adminAPI } from "@food/api"
 
 export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
   const navigate = useNavigate()
@@ -30,7 +31,7 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
   // Dropdown UI toggles
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
-  const [selectedStore, setSelectedStore] = useState("Store #104 (Vijay Nagar)")
+  const [selectedStore, setSelectedStore] = useState("")
   const [showStoreDropdown, setShowStoreDropdown] = useState(false)
   const [showRoleDropdown, setShowRoleDropdown] = useState(false)
   const [showActionsDropdown, setShowActionsDropdown] = useState(false)
@@ -39,12 +40,13 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
   const { themeMode } = useSystemTheme()
 
   // Session Data & Alerts
-  const [userData, setUserData] = useState({ name: "Shubham Jamliya", email: "shubham.j@papaveg.com" })
+  const [userData, setUserData] = useState({ name: "Loading...", email: "Loading..." })
+  const [franchiseData, setFranchiseData] = useState(null)
+  const [storeData, setStoreData] = useState(null)
   const [notifications, setNotifications] = useState([
     { id: 1, title: "Order PV-729 Delayed", message: "Cheese Veg Pizza is in preparation for over 18 mins", time: "2m ago", type: "order", unread: true },
     { id: 2, title: "Low Ingredient Stock", message: "Capsicum inventory is below 2.5kg threshold", time: "10m ago", type: "inventory", unread: true },
     { id: 3, title: "Rider Unassigned", message: "Order PV-732 ready for delivery but no rider assigned", time: "25m ago", type: "delivery", unread: true },
-    { id: 4, title: "New Stock Request Approved", message: "10kg Paneer request approved by Franchise Admin", time: "1h ago", type: "inventory", unread: false }
   ])
 
   const storeList = [
@@ -56,7 +58,7 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
   const dateLabels = {
     today: "Today",
     yesterday: "Yesterday",
-    week: "Last 7 Days",
+    week: "This Week",
     month: "This Month"
   }
 
@@ -69,19 +71,45 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
   }
 
   useEffect(() => {
-    // Load local storage searches
     const savedSearches = localStorage.getItem("store_recent_searches")
     if (savedSearches) {
-      setRecentSearches(JSON.parse(savedSearches))
+      try { setRecentSearches(JSON.parse(savedSearches)) } catch (_) {}
     }
 
-    // Read user from localStorage if it exists
-    const localUser = localStorage.getItem("store_user")
+    // Immediately seed from cached local session
+    const localUser = localStorage.getItem("admin_user")
     if (localUser) {
       try {
-        setUserData(JSON.parse(localUser))
+        const parsed = JSON.parse(localUser)
+        setUserData({
+          name: parsed.fullName || parsed.name || "Store Manager",
+          email: parsed.email || "No Email"
+        })
+        if (parsed.storeName) {
+          setStoreData({ _id: parsed.storeId, name: parsed.storeName, code: parsed.storeCode })
+        }
+        if (parsed.franchiseName) {
+          setFranchiseData({ name: parsed.franchiseName })
+        }
       } catch (_) {}
     }
+
+    // Always fetch fresh authoritative data from /auth/me
+    adminAPI.getAdminProfile().then(res => {
+      const user = res?.data?.data?.admin || res?.data?.admin || res?.data?.data?.user || res?.data?.user;
+      if (!user) return;
+      setUserData({
+        name: user.name || user.fullName || "Store Manager",
+        email: user.email || "No Email"
+      });
+      if (user.storeName) {
+        setStoreData({ _id: user.storeId, name: user.storeName, code: user.storeCode })
+      }
+      if (user.franchiseName) {
+        setFranchiseData({ name: user.franchiseName })
+      }
+    }).catch(() => {});
+
   }, [])
 
   useEffect(() => {
@@ -100,19 +128,28 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
     toast.success(`Date filter: ${dateLabels[filter]}`)
   }
 
-  const toggleTheme = () => {
-    const nextTheme = themeMode === "light" ? "dark" : "light"
-    localStorage.setItem("sa_themeMode", nextTheme)
+  const toggleTheme = (mode) => {
+    localStorage.setItem("sa_themeMode", mode)
     window.dispatchEvent(new Event("systemThemeChanged"))
-    toast.success(`Theme mode: ${nextTheme}`)
+    toast.success(`Theme mode: ${mode}`)
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem("store_accessToken")
-    localStorage.removeItem("store_authenticated")
-    localStorage.removeItem("store_user")
-    localStorage.removeItem("store_role")
-    navigate("/store-operation/login", { replace: true })
+  const handleLogout = async () => {
+    try {
+      const refreshToken = localStorage.getItem("admin_refreshToken");
+      if (refreshToken) {
+        await adminAPI.logout(refreshToken);
+      }
+    } catch (error) {
+      console.error("Logout API failed", error);
+    } finally {
+      localStorage.removeItem("admin_accessToken")
+      localStorage.removeItem("admin_refreshToken")
+      localStorage.removeItem("admin_authenticated")
+      localStorage.removeItem("admin_user")
+      localStorage.removeItem("admin_role")
+      navigate("/store-operation/login", { replace: true })
+    }
   }
 
   const markAllRead = () => {
@@ -147,7 +184,7 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
               onClick={() => navigate("/store-operations/dashboard")}
               className="text-xs font-black tracking-wider text-zinc-900 dark:text-white uppercase cursor-pointer select-none hover:text-[var(--primary)] transition-colors hidden sm:inline"
             >
-              PAPA VEG OPS
+              {franchiseData?.name || "PAPA VEG OPS"}
             </span>
             <span className="text-zinc-300 dark:text-zinc-700 hidden sm:inline">|</span>
             
@@ -164,7 +201,12 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
                 }}
                 className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors cursor-pointer"
               >
-                <span>{selectedStore}</span>
+                <span>
+                  {storeData
+                    ? `Store #${storeData.code || selectedStore} (${storeData.storeName || storeData.name || ''})`
+                    : selectedStore
+                  }
+                </span>
                 <ChevronDown size={10} className={`text-zinc-400 transition-transform duration-150 ${showStoreDropdown ? "rotate-180" : ""}`} />
               </button>
 
@@ -189,123 +231,14 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
           </div>
         </div>
 
-        {/* MIDDLE SECTION: Search Bar */}
-        <div ref={searchRef} className="flex-1 max-w-[240px] mx-4 relative hidden md:block z-50">
-          <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-            <input
-              type="text"
-              placeholder="Search active orders..."
-              value={searchVal}
-              onChange={(e) => setSearchVal(e.target.value)}
-              onFocus={() => setShowRecent(true)}
-              className="w-full pl-8.5 pr-8 py-1.5 text-xs bg-zinc-50 dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-xl text-zinc-800 dark:text-zinc-100 outline-none focus:border-zinc-300 dark:focus:border-zinc-700 transition-all font-semibold placeholder-zinc-400"
-            />
-            {searchVal && (
-              <button onClick={() => setSearchVal("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-405 hover:text-[var(--primary)]">
-                <X size={12} />
-              </button>
-            )}
-          </div>
-        </div>
+        {/* MIDDLE SECTION: Search Bar Removed */}
 
         {/* RIGHT SECTION: Quick Actions, Role Switcher, Alerts & User Profile */}
         <div className="flex items-center gap-3 shrink-0 text-xs font-bold text-zinc-650 dark:text-zinc-300">
           
-          {/* PREMIUM DEMO ROLE SWITCHER */}
-          <div className="relative">
-            <button
-              onClick={() => {
-                setShowRoleDropdown(!showRoleDropdown)
-                setShowStoreDropdown(false)
-                setShowDateDropdown(false)
-                setShowNotifications(false)
-                setShowProfileMenu(false)
-                setShowActionsDropdown(false)
-              }}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-[var(--primary)]/200/50 dark:border-amber-900/30 rounded-full text-[10px] font-extrabold shadow-sm hover:opacity-90 transition-all cursor-pointer"
-            >
-              <Shield size={11} className="stroke-[2.5]" />
-              <span>Role: {roleLabels[role]}</span>
-              <ChevronDown size={8} />
-            </button>
+          {/* PREMIUM DEMO ROLE SWITCHER REMOVED */}
 
-            {showRoleDropdown && (
-              <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 shadow-xl py-1.5 z-50 animate-in fade-in duration-100 text-xs">
-                <div className="px-3 py-1 text-[8px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest border-b border-zinc-100 dark:border-zinc-800 mb-1">
-                  Switch Demo Role
-                </div>
-                {Object.keys(roleLabels).map((rKey) => (
-                  <button
-                    key={rKey}
-                    onClick={() => handleRoleChange(rKey)}
-                    className={`w-full text-left px-3 py-2 font-bold transition-colors flex items-center justify-between ${
-                      role === rKey
-                        ? "text-[var(--primary)] bg-[var(--primary)]/10/50 dark:bg-[var(--primary)]/20"
-                        : "text-zinc-650 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                    }`}
-                  >
-                    <span>{roleLabels[rKey]}</span>
-                    {role === rKey && <Check size={12} className="stroke-[3]" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Quick Actions (only for manager & supervisor) */}
-          {role !== "kitchen_staff" && (
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setShowActionsDropdown(!showActionsDropdown)
-                  setShowStoreDropdown(false)
-                  setShowDateDropdown(false)
-                  setShowNotifications(false)
-                  setShowProfileMenu(false)
-                  setShowRoleDropdown(false)
-                }}
-                className="p-1 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors cursor-pointer"
-                title="Quick Action"
-              >
-                <Plus size={18} />
-              </button>
-
-              {showActionsDropdown && (
-                <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 shadow-xl py-1.5 z-50 animate-in fade-in duration-100">
-                  <button
-                    onClick={() => { setShowActionsDropdown(false); toast.success("Stock request initiated"); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-left text-zinc-650 dark:text-zinc-350"
-                  >
-                    <ClipboardList size={13} className="text-zinc-450" />
-                    <span>New Stock Request</span>
-                  </button>
-                  <button
-                    onClick={() => { setShowActionsDropdown(false); toast.success("Shortage report raised"); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-left text-zinc-650 dark:text-zinc-350"
-                  >
-                    <ShieldAlert size={13} className="text-zinc-450" />
-                    <span>Report Shortage</span>
-                  </button>
-                  <button
-                    onClick={() => { setShowActionsDropdown(false); toast.success("Waste logged"); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-left text-zinc-650 dark:text-zinc-350"
-                  >
-                    <Trash2 size={13} className="text-zinc-450" />
-                    <span>Log Waste Item</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Theme Toggle */}
-          <button
-            onClick={toggleTheme}
-            className="p-1 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors cursor-pointer"
-          >
-            {themeMode === "light" ? <Moon size={16} /> : <Sun size={16} />}
-          </button>
+          {/* Quick Actions & Theme Toggle Removed */}
 
           {/* Date Filter */}
           <div className="relative">
@@ -433,6 +366,27 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
                 <div className="px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 mb-1.5">
                   <p className="font-extrabold text-zinc-800 dark:text-white truncate">{userData.name}</p>
                   <p className="text-[9px] text-zinc-400 font-semibold truncate mt-0.5">{userData.email}</p>
+                </div>
+                
+                {/* Theme Selector Inside Profile Dropdown */}
+                <div className="px-3 py-1 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-850">
+                  <span className="text-zinc-500 font-semibold text-[11px]">Theme</span>
+                  <div className="flex gap-1 border border-zinc-200 dark:border-zinc-800 p-0.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 scale-90 origin-right">
+                    {[
+                      { id: "light", icon: <Sun size={10} /> },
+                      { id: "dark", icon: <Moon size={10} /> }
+                    ].map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => toggleTheme(t.id)}
+                        className={`p-1 rounded-md transition-colors ${
+                          themeMode === t.id ? "bg-[var(--primary)] text-white" : "text-zinc-405 hover:text-zinc-700 dark:hover:text-zinc-300"
+                        }`}
+                      >
+                        {t.icon}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <button
                   onClick={() => { setShowProfileMenu(false); navigate("/store-operations/profile"); }}

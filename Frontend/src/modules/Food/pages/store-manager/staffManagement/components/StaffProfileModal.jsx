@@ -168,12 +168,12 @@ export default function StaffProfileModal({ isOpen, onClose, staffId }) {
                 {staff.profileImage ? (
                   <img
                     src={staff.profileImage}
-                    alt={staff.fullName}
+                    alt={staff.name || staff.fullName}
                     className="w-full h-full object-cover"
                   />
                 ) : (
                   <div className="text-xl font-black text-primary">
-                    {getInitials(staff.fullName)}
+                    {getInitials(staff.name || staff.fullName)}
                   </div>
                 )}
               </div>
@@ -182,7 +182,7 @@ export default function StaffProfileModal({ isOpen, onClose, staffId }) {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
                     <h3 className="text-lg font-black tracking-tight text-slate-900 dark:text-white">
-                      {staff.fullName}
+                      {staff.name || staff.fullName}
                     </h3>
                     <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mt-0.5">
                       Emp ID: {staff.employeeCode}
@@ -190,8 +190,8 @@ export default function StaffProfileModal({ isOpen, onClose, staffId }) {
                   </div>
 
                   <div className="flex flex-wrap justify-center sm:justify-start gap-1.5 self-center">
-                    <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${getRoleBadgeColor(staff.role)}`}>
-                      {staff.role}
+                    <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${getRoleBadgeColor(staff.role || "Kitchen Staff")}`}>
+                      {staff.role || "Kitchen Staff"}
                     </span>
                     <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border capitalize ${getStatusBadgeColor(staff.status)}`}>
                       {staff.status}
@@ -210,11 +210,11 @@ export default function StaffProfileModal({ isOpen, onClose, staffId }) {
                   </p>
                   <p className="flex items-center gap-1.5 justify-center sm:justify-start">
                     <Calendar size={12} className="text-zinc-400" />
-                    <span>Joined: {new Date(staff.joiningDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                    <span>Joined: {new Date(staff.joinedDate || staff.joiningDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
                   </p>
                   <p className="flex items-center gap-1.5 justify-center sm:justify-start">
                     <ShieldAlert size={12} className="text-zinc-400 shrink-0" />
-                    <span className="truncate" title={staff.emergencyContact}>Emerg: {staff.emergencyContact}</span>
+                    <span className="truncate" title={staff.personalDetails?.emergencyContact || staff.emergencyContact}>Emerg: {staff.personalDetails?.emergencyContact || staff.emergencyContact || "N/A"}</span>
                   </p>
                 </div>
               </div>
@@ -228,20 +228,42 @@ export default function StaffProfileModal({ isOpen, onClose, staffId }) {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="p-3 bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-100 dark:border-zinc-850 rounded-xl">
                   <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Experience</p>
-                  <p className="text-sm font-black text-slate-800 dark:text-white mt-0.5">{staff.experience} Years</p>
+                  <p className="text-sm font-black text-slate-800 dark:text-white mt-0.5">{staff.personalDetails?.experience ?? staff.experience ?? 0} Years</p>
                 </div>
                 <div className="p-3 bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-100 dark:border-zinc-850 rounded-xl">
                   <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Current Shift</p>
-                  <p className="text-sm font-black text-slate-800 dark:text-white mt-0.5">{staff.shiftId || "Unassigned"}</p>
+                  <p className="text-sm font-black text-slate-800 dark:text-white mt-0.5">{staff.personalDetails?.shiftType || staff.shiftId || "Unassigned"}</p>
                 </div>
                 <div className="p-3 bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-100 dark:border-zinc-850 rounded-xl">
                   <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Salary Type</p>
-                  <p className="text-sm font-black text-slate-800 dark:text-white mt-0.5">{staff.salaryType}</p>
+                  <p className="text-sm font-black text-slate-800 dark:text-white mt-0.5">{staff.personalDetails?.salaryType || staff.salaryType || "Monthly"}</p>
                 </div>
                 <div className="p-3 bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-100 dark:border-zinc-850 rounded-xl">
                   <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Salary</p>
                   <p className="text-sm font-black text-slate-800 dark:text-white mt-0.5">
-                    ₹{staff.salary?.toLocaleString("en-IN")}{staff.salaryType === "Hourly" ? "/hr" : ""}
+                    ₹{(staff.personalDetails?.salary ?? staff.salary ?? 0).toLocaleString("en-IN")}{(staff.personalDetails?.salaryType || staff.salaryType) === "Hourly" ? "/hr" : ""}
+                  </p>
+                </div>
+                
+                {/* New details: Address, Timings, Working Days */}
+                <div className="col-span-2 sm:col-span-4 p-3 bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-100 dark:border-zinc-850 rounded-xl flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                  <div>
+                    <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Shift Timing</p>
+                    <p className="text-sm font-black text-slate-800 dark:text-white mt-0.5">
+                      {staff.personalDetails?.startTime || "08:00 AM"} - {staff.personalDetails?.endTime || "04:00 PM"}
+                    </p>
+                  </div>
+                  <div className="sm:text-right">
+                    <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Working Days</p>
+                    <p className="text-[10px] font-bold text-slate-600 dark:text-zinc-300 mt-0.5">
+                      {(staff.personalDetails?.weeklyWorkingDays || []).join(", ") || "Mon - Sat"}
+                    </p>
+                  </div>
+                </div>
+                <div className="col-span-2 sm:col-span-4 p-3 bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-100 dark:border-zinc-850 rounded-xl">
+                  <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Address</p>
+                  <p className="text-xs font-semibold text-slate-600 dark:text-zinc-300 mt-0.5">
+                    {staff.personalDetails?.address || "No address provided"}
                   </p>
                 </div>
               </div>
@@ -250,8 +272,8 @@ export default function StaffProfileModal({ isOpen, onClose, staffId }) {
               <div className="flex items-start gap-2 pt-1.5">
                 <span className="text-[10px] font-black text-slate-700 dark:text-zinc-300 uppercase tracking-wider pt-1 shrink-0">Skills:</span>
                 <div className="flex flex-wrap gap-1.5">
-                  {staff.skills && staff.skills.length > 0 ? (
-                    staff.skills.map((skill) => (
+                  {(staff.personalDetails?.skills || staff.skills || []).length > 0 ? (
+                    (staff.personalDetails?.skills || staff.skills).map((skill) => (
                       <span
                         key={skill}
                         className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-205 dark:border-zinc-800/40"
@@ -266,80 +288,7 @@ export default function StaffProfileModal({ isOpen, onClose, staffId }) {
               </div>
             </section>
 
-            {/* SECTION 3: PERFORMANCE STATS */}
-            <section className="space-y-2.5">
-              <h4 className="text-[11px] font-black text-zinc-400 uppercase tracking-widest flex items-center gap-1">
-                <Trophy size={12} className="text-amber-500" /> Performance Statistics
-              </h4>
-              
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                <div className="p-3 bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-100 dark:border-zinc-850 rounded-xl flex flex-col justify-between">
-                  <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Orders Prepared</p>
-                  <p className="text-lg font-black text-slate-800 dark:text-white mt-1">
-                    {staff.stats?.ordersCompleted || 0}
-                  </p>
-                </div>
-                
-                <div className="p-3 bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-100 dark:border-zinc-850 rounded-xl flex flex-col justify-between">
-                  <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Avg Prep Speed</p>
-                  <p className="text-lg font-black text-slate-800 dark:text-white mt-1">
-                    {staff.stats?.avgPrepTime || "--"} <span className="text-[10px] font-extrabold text-zinc-400">mins</span>
-                  </p>
-                </div>
 
-                <div className="p-3 bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-100 dark:border-zinc-850 rounded-xl flex flex-col justify-between">
-                  <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Delayed Orders</p>
-                  <p className="text-lg font-black text-red-650 mt-1">
-                    {staff.stats?.delayedOrders || 0}
-                  </p>
-                </div>
-
-                {/* Radial gauges */}
-                <CircularProgress 
-                  value={staff.stats?.attendance || 100} 
-                  label="Attendance" 
-                  color="text-emerald-500"
-                />
-
-                <CircularProgress 
-                  value={staff.performanceScore || 0} 
-                  label="Perf. Rating" 
-                  color="text-primary"
-                />
-              </div>
-            </section>
-
-            {/* SECTION 4: RECENT ACTIVITIES */}
-            <section className="space-y-2.5 pt-1.5">
-              <h4 className="text-[11px] font-black text-zinc-400 uppercase tracking-widest flex items-center gap-1">
-                <History size={12} /> Recent Activities
-              </h4>
-              
-              <div className="bg-zinc-50/50 dark:bg-zinc-950/10 border border-zinc-150 dark:border-zinc-850 p-4 rounded-2xl max-h-[160px] overflow-y-auto scrollbar-thin">
-                {staff.activities && staff.activities.length > 0 ? (
-                  <div className="relative border-l border-zinc-200 dark:border-zinc-800 pl-4 ml-2.5 space-y-3.5">
-                    {staff.activities.map((act) => (
-                      <div key={act.id} className="relative text-xs">
-                        {/* Dot indicator */}
-                        <span className="absolute -left-[23px] top-0.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-0.5 rounded-full z-10 flex items-center justify-center">
-                          {getActivityIcon(act.type, act.status)}
-                        </span>
-                        
-                        <div className="flex justify-between items-start gap-4">
-                          <p className="font-bold text-slate-800 dark:text-zinc-200">{act.title}</p>
-                          <span className="text-[10px] font-extrabold text-zinc-400 dark:text-zinc-650 shrink-0">{act.time}</span>
-                        </div>
-                        <p className="text-[10px] text-zinc-400 font-semibold uppercase mt-0.5 tracking-wider">{act.type}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-xs font-semibold text-zinc-400">
-                    No recent activities logged for this staff member.
-                  </div>
-                )}
-              </div>
-            </section>
 
             {/* Close Button */}
             <div className="flex items-center justify-end pt-3 border-t border-zinc-150 dark:border-zinc-850">

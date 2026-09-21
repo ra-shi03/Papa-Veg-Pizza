@@ -1,0 +1,36 @@
+--- src/core/auth/auth.service.js
++++ src/core/auth/auth.service.js
+@@ -628,6 +628,34 @@
+   }
+ };
+ 
++export const updatePersonalProfile = async (userId, updateData) => {
++  const user = await User.findById(userId).populate("primaryRole").lean();
++  if (!user) throw new AuthError("User not found");
++
++  // Update user model core fields (email/phone mapping)
++  if (updateData.email) await User.findByIdAndUpdate(userId, { email: updateData.email });
++  if (updateData.phone) await User.findByIdAndUpdate(userId, { mobile: updateData.phone, phone: updateData.phone });
++  if (updateData.fullName) await User.findByIdAndUpdate(userId, { name: updateData.fullName });
++
++  const roleCode = user.primaryRole?.code;
++  if (roleCode === "STORE_MANAGER") {
++    const storeManager = await StoreManager.findOne({ userId });
++    if (storeManager) {
++      if (!storeManager.personalDetails) storeManager.personalDetails = {};
++      if (updateData.gender) storeManager.personalDetails.gender = updateData.gender;
++      if (updateData.dateOfBirth) storeManager.personalDetails.dateOfBirth = updateData.dateOfBirth;
++      if (updateData.address) storeManager.personalDetails.address = updateData.address;
++      if (updateData.emergencyContact) {
++         storeManager.personalDetails.emergencyContactName = updateData.emergencyContact.name;
++         storeManager.personalDetails.emergencyContact = updateData.emergencyContact.phone;
++         storeManager.personalDetails.emergencyContactRelation = updateData.emergencyContact.relation;
++      }
++      await storeManager.save();
++    }
++  }
++  return { success: true, message: "Profile updated successfully" };
++};
++
+ export const getActiveDeliveryPartnerProfile = async (id, includeDocs = false) => {
+   const partner = await FoodDeliveryPartner.findById(id).lean();

@@ -40,6 +40,7 @@ export const createStoreManager = async (req, res) => {
       email: data.email,
       mobile: data.phone,
       password: hashedPassword,
+      loginType: 'PASSWORD',
       primaryRole: role._id,
       isActive: data.status === 'Active'
     });

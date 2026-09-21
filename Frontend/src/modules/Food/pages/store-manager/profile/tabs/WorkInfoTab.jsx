@@ -2,54 +2,15 @@ import React, { useState, useEffect } from "react";
 import { Briefcase, Store, Shield, Calendar, User, Clock, MapPin, Loader2 } from "lucide-react";
 import { profileApi } from "@food/api";
 
-export default function WorkInfoTab() {
-  const [loading, setLoading] = useState(true);
-  const [workData, setWorkData] = useState(null);
-
-  useEffect(() => {
-    const fetchWorkData = async () => {
-      try {
-        setLoading(true);
-        const res = await profileApi.getWorkInfo();
-        if (res.success) {
-          setWorkData(res.data);
-        }
-      } catch (err) {
-        console.error("Failed to load work information", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchWorkData();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="space-y-4 animate-pulse">
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-2xl p-5 space-y-4">
-          <div className="h-4 w-32 bg-zinc-200 dark:bg-zinc-800 rounded-md" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="h-10 bg-zinc-150 dark:bg-zinc-850 rounded-lg" />
-            ))}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-2xl p-5 space-y-4">
-          <div className="h-4 w-32 bg-zinc-200 dark:bg-zinc-800 rounded-md" />
-          <div className="h-16 bg-zinc-150 dark:bg-zinc-850 rounded-lg" />
-        </div>
-      </div>
-    );
-  }
-
+export default function WorkInfoTab({ user, store }) {
   const items = [
-    { label: "Employee ID", value: workData?.employeeId, icon: Shield },
-    { label: "Designation", value: workData?.designation, icon: Briefcase },
-    { label: "Role Permission Group", value: workData?.roleName, icon: User },
-    { label: "Primary Store Assignment", value: workData?.storeName, icon: Store },
-    { label: "Reporting Manager", value: workData?.reportingManager, icon: User },
-    { label: "Employment Status", value: workData?.employmentStatus, icon: Clock, badge: true },
-    { label: "Joining Date", value: workData?.joiningDate, icon: Calendar },
+    { label: "Employee ID", value: user?.employeeId, icon: Shield },
+    { label: "Designation", value: user?.designation, icon: Briefcase },
+    { label: "Role Permission Group", value: user?.role === "store_manager" ? "Store Manager" : "Employee", icon: User },
+    { label: "Primary Store Assignment", value: user?.storeName, icon: Store },
+    { label: "Reporting Manager", value: user?.reportingManager, icon: User },
+    { label: "Employment Status", value: user?.status, icon: Clock, badge: true },
+    { label: "Joining Date", value: user?.joiningDate, icon: Calendar },
   ];
 
   return (
@@ -109,11 +70,11 @@ export default function WorkInfoTab() {
           <div className="space-y-3 flex-1">
             <div>
               <h3 className="text-sm font-bold text-slate-800 dark:text-zinc-200">
-                {workData?.store?.name || "Papa Veg Pizza"}
+                {store?.name || "Papa Veg Pizza"}
               </h3>
               <p className="text-xs font-semibold text-slate-500 dark:text-zinc-400 flex items-center gap-1 mt-1 leading-normal">
                 <MapPin size={12} className="shrink-0 text-slate-400" />
-                <span>{workData?.store?.address || "N/A"}</span>
+                <span>{store?.address || "N/A"}</span>
               </p>
             </div>
 
@@ -124,7 +85,7 @@ export default function WorkInfoTab() {
                 </span>
                 <p className="text-xs font-semibold text-slate-800 dark:text-zinc-200 flex items-center gap-1">
                   <Clock size={11} className="text-[var(--primary)]" />
-                  <span>{workData?.store?.openingTime || "11 AM"} - {workData?.store?.closingTime || "11 PM"}</span>
+                  <span>{store?.openingTime || "11 AM"} - {store?.closingTime || "11 PM"}</span>
                 </p>
               </div>
 
@@ -134,7 +95,7 @@ export default function WorkInfoTab() {
                 </span>
                 <p className="text-xs font-semibold text-slate-800 dark:text-zinc-200 flex items-center gap-1">
                   <User size={11} className="text-[var(--secondary)]" />
-                  <span>{workData?.store?.managerName || "N/A"}</span>
+                  <span>{store?.managerName || "N/A"}</span>
                 </p>
               </div>
             </div>

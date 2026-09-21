@@ -11,6 +11,7 @@ import {
   changeAdminPassword,
   requestAdminForgotPasswordOtp,
   resetAdminPasswordWithOtp,
+  updatePersonalProfile,
 } from "./auth.service.js";
 import { validateUserOtpRequestDto } from "../../dtos/auth/userOtpRequest.dto.js";
 import { validateUserOtpVerifyDto } from "../../dtos/auth/userOtpVerify.dto.js";
@@ -209,6 +210,16 @@ export const resetAdminPasswordWithOtpController = async (req, res, next) => {
     return sendResponse(res, 200, "Password reset successfully", {
       success: true,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updatePersonalProfileController = async (req, res, next) => {
+  try {
+    const { userId } = req.user;
+    const result = await updatePersonalProfile(userId, req.body);
+    return sendResponse(res, 200, "Profile updated successfully", result.data);
   } catch (error) {
     next(error);
   }

@@ -44,6 +44,26 @@ const userRoleSchema = new mongoose.Schema({
     collection: 'userRoles'
 });
 
+// ─── Middleware ───────────────────────────────────────────────────────────────
+// Enforce business rule: A user can only have one primary role at a time
+userRoleSchema.pre('save', async function(next) {
+    if (this.isPrimary) {
+        // If this role is being saved as primary, unset isPrimary on all other active roles for this user
+        await this.constructor.updateMany(
+            { userId: this.userId, _id: { $ne: this._id } },
+            { $set: { isPrimary: false } }
+        );
+        
+        // Also sync this to the User's primaryRole field for quick access
+        const User = mongoose.model('User');
+        await User.updateOne(
+            { _id: this.userId },
+            { $set: { primaryRole: this.roleId } }
+        );
+    }
+    next();
+});
+
 // ─── Production Indexes ───────────────────────────────────────────────────────
 // Compound unique index: prevents duplicate role assignments for the same
 // user + role + franchise + store combination (the source of truth for authorization)

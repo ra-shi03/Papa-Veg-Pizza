@@ -24,6 +24,8 @@ import { FoodReferralSettings } from '../models/referralSettings.model.js';
 import { FoodReferralLog } from '../models/referralLog.model.js';
 import { FoodSafetyEmergencyReport } from '../models/safetyEmergencyReport.model.js';
 import { StoreManager } from '../../franchise/models/storeManager.model.js';
+import { UserRole } from '../../../../core/roles/models/userRole.model.js';
+import { Profile } from '../../../../core/users/models/profile.model.js';
 
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { FoodTransaction } from '../../orders/models/foodTransaction.model.js';
@@ -113,6 +115,81 @@ const validateOpeningClosingTimes = (openingTime, closingTime) => {
         throw new ValidationError('Closing time cannot be less than opening time');
     }
 };
+
+export async function getStoreManagerProfileWork(userId) {
+    const userRole = await UserRole.findOne({ userId, isPrimary: true, status: 'ACTIVE' }).populate('roleId').lean();
+    const profile = await Profile.findOne({ userId }).lean();
+    
+    // Find store manager record. A user might be a manager in multiple stores, but we want the one for their primary store.
+    let storeManager = null;
+    let store = null;
+    let franchiseAdminName = "N/A";
+
+    if (userRole && userRole.storeId) {
+        storeManager = await StoreManager.findOne({ userId, storeId: userRole.storeId, status: { $ne: 'DELETED' } }).lean();
+        const FoodStore = mongoose.model('FoodStore');
+        store = await FoodStore.findById(userRole.storeId).select('storeName code address email phone open closingTime franchiseId').lean();
+        
+        if (store && store.franchiseId) {
+            const FoodFranchise = mongoose.model('FoodFranchise');
+            const franchise = await FoodFranchise.findById(store.franchiseId).select('ownerName').lean();
+            if (franchise && franchise.ownerName) {
+                franchiseAdminName = franchise.ownerName;
+            }
+        }
+    } else {
+        // Fallback if no primary store found in userRole, just get any active store manager record for this user
+        storeManager = await StoreManager.findOne({ userId, status: { $ne: 'DELETED' } }).lean();
+        if (storeManager && storeManager.storeId) {
+            const FoodStore = mongoose.model('FoodStore');
+            store = await FoodStore.findById(storeManager.storeId).select('storeName code address email phone open closingTime franchiseId').lean();
+            
+            if (store && store.franchiseId) {
+                const FoodFranchise = mongoose.model('FoodFranchise');
+                const franchise = await FoodFranchise.findById(store.franchiseId).select('ownerName').lean();
+                if (franchise && franchise.ownerName) {
+                    franchiseAdminName = franchise.ownerName;
+                }
+            }
+        }
+    }
+
+    const User = mongoose.model('User');
+    const user = await User.findById(userId).select('name email phone profileImage lastLoginAt').lean();
+
+    return {
+        user: {
+            fullName: user?.name || "Not Specified",
+            email: user?.email || "Not Specified",
+            phone: user?.phone || "Not Specified",
+            profileImage: user?.profileImage || null,
+            employeeId: storeManager?.employeeCode || "Not Specified",
+            designation: "Store Operations Manager",
+            role: userRole?.roleId?.name || "Store Manager",
+            storeName: store?.storeName || "Not Assigned",
+            reportingManager: franchiseAdminName,
+            status: storeManager?.status || "Active",
+            joiningDate: storeManager?.joinedDate || null,
+            lastLogin: user?.lastLoginAt || null,
+            // Profile fields for Personal Info
+            gender: profile?.gender || "Not Specified",
+            dateOfBirth: profile?.dateOfBirth || "Not Specified",
+            address: storeManager?.personalDetails?.address || profile?.addressLine1 || "Not Specified",
+            emergencyContact: {
+                name: profile?.emergencyContactName || "Not Specified",
+                phone: profile?.emergencyContactPhone || storeManager?.personalDetails?.emergencyContact || "Not Specified",
+                relation: profile?.emergencyContactRelation || "Not Specified"
+            }
+        },
+        store: store ? {
+            name: store.storeName,
+            address: store.address || "N/A",
+            openingTime: store.open || "11 AM",
+            closingTime: store.closingTime || "11 PM",
+            managerName: storeManager?.name || "N/A"
+        } : null
+    };
+}
 
 export async function getStoreComplaints(query = {}) {
     const limit = Math.min(Math.max(parseInt(query.limit, 10) || 50, 1), 500);
