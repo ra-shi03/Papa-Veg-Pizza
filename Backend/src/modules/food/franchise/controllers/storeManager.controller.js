@@ -59,17 +59,31 @@ export const createStoreManager = async (req, res) => {
     });
 
     // 4. Create UserRole mapping (optional but recommended for RBAC)
+    let franchiseId = null;
     if (data.storeId) {
+      try {
+        const FoodStore = mongoose.model('FoodStore');
+        const store = await FoodStore.findById(data.storeId).lean();
+        if (store && store.franchiseId) {
+          franchiseId = store.franchiseId;
+        }
+      } catch (e) {
+        // ignore if not found
+      }
+      
       await UserRole.create({
         userId: user._id,
         roleId: role._id,
         storeId: data.storeId,
-        isPrimary: true
+        franchiseId: franchiseId,
+        isPrimary: true,
+        status: 'ACTIVE'
       });
     }
 
     // 5. Create StoreManager record
     data.userId = user._id;
+    data.role = data.role || 'Store Manager';
     if (data.address || data.emergencyContact || data.salary) {
       data.personalDetails = {
         address: data.address || data.personalDetails?.address || '',
@@ -186,6 +200,25 @@ export const updateStoreManager = async (req, res) => {
       await FoodUser.findByIdAndUpdate(manager.userId, {
         isActive: data.status === 'Active'
       });
+    }
+
+    // Sync UserRole if storeId was updated
+    if (data.storeId && manager.userId) {
+      let franchiseId = null;
+      try {
+        const FoodStore = mongoose.model('FoodStore');
+        const store = await FoodStore.findById(data.storeId).lean();
+        if (store && store.franchiseId) {
+          franchiseId = store.franchiseId;
+        }
+      } catch (e) {
+        // ignore
+      }
+      
+      await UserRole.findOneAndUpdate(
+        { userId: manager.userId, isPrimary: true },
+        { $set: { storeId: data.storeId, franchiseId: franchiseId } }
+      );
     }
 
     res.status(200).json({ success: true, data: manager });

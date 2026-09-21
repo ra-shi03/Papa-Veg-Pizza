@@ -30,10 +30,7 @@ export const requestUserOtpController = async (req, res, next) => {
   try {
     const { phone } = validateUserOtpRequestDto(req.body);
     const result = await requestUserOtp(phone);
-    return sendResponse(res, 200, "OTP sent successfully", {
-      phone,
-      ...result,
-    });
+    return sendResponse(res, 200, "OTP sent successfully", { phone, ...result });
   } catch (error) {
     next(error);
   }
@@ -41,17 +38,8 @@ export const requestUserOtpController = async (req, res, next) => {
 
 export const verifyUserOtpController = async (req, res, next) => {
   try {
-    const { phone, otp, ref, fcmToken, platform, name } = validateUserOtpVerifyDto(
-      req.body,
-    );
-    const result = await verifyUserOtpAndLogin(
-      phone,
-      otp,
-      ref,
-      fcmToken,
-      platform,
-      name,
-    );
+    const { phone, otp, ref, fcmToken, platform, name } = validateUserOtpVerifyDto(req.body);
+    const result = await verifyUserOtpAndLogin(phone, otp, ref, fcmToken, platform, name);
     return sendResponse(res, 200, "Login successful", result);
   } catch (error) {
     next(error);
@@ -71,7 +59,7 @@ export const adminLoginController = async (req, res, next) => {
 export const superAdminLoginController = async (req, res, next) => {
   try {
     const payload = validateAdminLoginDto(req.body);
-    const result = await adminLogin(payload, ['superadmin']);
+    const result = await adminLogin(payload, ["superadmin"]);
     return sendResponse(res, 200, "Super Admin Login successful", result);
   } catch (error) {
     next(error);
@@ -81,7 +69,7 @@ export const superAdminLoginController = async (req, res, next) => {
 export const franchiseAdminLoginController = async (req, res, next) => {
   try {
     const payload = validateAdminLoginDto(req.body);
-    const result = await adminLogin(payload, ['franchise-admin']);
+    const result = await adminLogin(payload, ["franchise-admin"]);
     return sendResponse(res, 200, "Franchise Admin Login successful", result);
   } catch (error) {
     next(error);
@@ -91,7 +79,7 @@ export const franchiseAdminLoginController = async (req, res, next) => {
 export const storeLoginController = async (req, res, next) => {
   try {
     const payload = validateAdminLoginDto(req.body);
-    const result = await adminLogin(payload, ['store-manager', 'kitchen-supervisor', 'kitchen-staff']);
+    const result = await adminLogin(payload, ["store-manager", "kitchen-supervisor", "kitchen-staff"]);
     return sendResponse(res, 200, "Store Login successful", result);
   } catch (error) {
     next(error);
@@ -112,10 +100,7 @@ export const requestDeliveryOtpController = async (req, res, next) => {
   try {
     const { phone } = validateDeliveryOtpRequestDto(req.body);
     const result = await requestDeliveryOtp(phone);
-    return sendResponse(res, 200, "OTP sent successfully", {
-      phone,
-      ...result,
-    });
+    return sendResponse(res, 200, "OTP sent successfully", { phone, ...result });
   } catch (error) {
     next(error);
   }
@@ -146,10 +131,11 @@ export const logoutController = async (req, res, next) => {
   }
 };
 
+// Pass storeId from JWT so getProfile can resolve storeName without a StoreManager lookup failure
 export const getMeController = async (req, res, next) => {
   try {
-    const { userId, role } = req.user;
-    const result = await getProfile(userId, role);
+    const { userId, role, storeId } = req.user;
+    const result = await getProfile(userId, role, storeId || null);
     return sendResponse(res, 200, "Profile retrieved successfully", result);
   } catch (error) {
     next(error);
@@ -170,32 +156,19 @@ export const updateAdminProfileController = async (req, res, next) => {
 export const changeAdminPasswordController = async (req, res, next) => {
   try {
     const { userId } = req.user;
-    const { currentPassword, newPassword } = validateAdminChangePasswordDto(
-      req.body,
-    );
+    const { currentPassword, newPassword } = validateAdminChangePasswordDto(req.body);
     await changeAdminPassword(userId, currentPassword, newPassword);
-    return sendResponse(res, 200, "Password changed successfully", {
-      success: true,
-    });
+    return sendResponse(res, 200, "Password changed successfully", { success: true });
   } catch (error) {
     next(error);
   }
 };
 
-export const requestAdminForgotPasswordOtpController = async (
-  req,
-  res,
-  next,
-) => {
+export const requestAdminForgotPasswordOtpController = async (req, res, next) => {
   try {
     const { email } = validateAdminForgotPasswordRequestDto(req.body);
     const result = await requestAdminForgotPasswordOtp(email);
-    return sendResponse(
-      res,
-      200,
-      result.message || "OTP sent successfully",
-      result,
-    );
+    return sendResponse(res, 200, result.message || "OTP sent successfully", result);
   } catch (error) {
     next(error);
   }
@@ -203,13 +176,9 @@ export const requestAdminForgotPasswordOtpController = async (
 
 export const resetAdminPasswordWithOtpController = async (req, res, next) => {
   try {
-    const { email, otp, newPassword } = validateAdminForgotPasswordResetDto(
-      req.body,
-    );
+    const { email, otp, newPassword } = validateAdminForgotPasswordResetDto(req.body);
     await resetAdminPasswordWithOtp(email, otp, newPassword);
-    return sendResponse(res, 200, "Password reset successfully", {
-      success: true,
-    });
+    return sendResponse(res, 200, "Password reset successfully", { success: true });
   } catch (error) {
     next(error);
   }
