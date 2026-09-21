@@ -115,6 +115,15 @@ export const createKitchenStaff = async (req, res) => {
       isPrimary: true,
       status: 'ACTIVE',
     }], { session });
+    
+    // Resolve reporting manager name
+    let reportingManagerName = null;
+    if (callerUserId) {
+        const callerManager = await StoreManager.findOne({ userId: callerUserId }).session(session).lean();
+        if (callerManager) {
+            reportingManagerName = callerManager.name;
+        }
+    }
 
     // Step 4: Create StoreManager/Staff operational record
     const employeeCode = employeeId || `PVK-${Date.now().toString().slice(-6)}`;
@@ -130,6 +139,7 @@ export const createKitchenStaff = async (req, res) => {
       joinedDate: joiningDate ? new Date(joiningDate) : new Date(),
       status: status || 'Active',
       profileImage: profileImage || '',
+      reportingManager: reportingManagerName,
       personalDetails: {
         address: address || '',
         emergencyContact: emergencyContact || '',
@@ -193,7 +203,33 @@ export const getKitchenStaff = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    return res.status(200).json({ success: true, data: staff });
+    // Attach store and franchise names
+    let storeName = null;
+    let franchiseName = null;
+    try {
+      const FoodStore = mongoose.model('FoodStore');
+      const store = await FoodStore.findById(callerStoreId).lean();
+      if (store) {
+        storeName = store.storeName || store.name;
+        if (store.franchiseId) {
+          const FoodFranchise = mongoose.model('FoodFranchise');
+          const franchise = await FoodFranchise.findById(store.franchiseId).lean();
+          if (franchise) {
+            franchiseName = franchise.name || franchise.companyName;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching store/franchise names:', e);
+    }
+
+    const enhancedStaff = staff.map(s => ({
+      ...s,
+      storeName: storeName || s.storeName,
+      franchiseName: franchiseName || s.franchiseName
+    }));
+
+    return res.status(200).json({ success: true, data: enhancedStaff });
   } catch (err) {
     console.error('[getKitchenStaff]', err);
     return res.status(500).json({ success: false, message: err.message });
@@ -222,6 +258,24 @@ export const getKitchenStaffById = async (req, res) => {
     if (staff.userId) {
       const user = await FoodUser.findById(staff.userId).select('email mobile').lean();
       if (user) { staff.userEmail = user.email; staff.userMobile = user.mobile; }
+    }
+
+    // Attach store and franchise names
+    try {
+      const FoodStore = mongoose.model('FoodStore');
+      const store = await FoodStore.findById(staff.storeId).lean();
+      if (store) {
+        staff.storeName = store.storeName || store.name || staff.storeName;
+        if (store.franchiseId) {
+          const FoodFranchise = mongoose.model('FoodFranchise');
+          const franchise = await FoodFranchise.findById(store.franchiseId).lean();
+          if (franchise) {
+            staff.franchiseName = franchise.name || franchise.companyName || staff.franchiseName;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching store/franchise names:', e);
     }
 
     return res.status(200).json({ success: true, data: staff });

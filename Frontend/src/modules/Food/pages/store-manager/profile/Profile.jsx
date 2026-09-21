@@ -72,6 +72,7 @@ export default function Profile({ forcedRole }) {
              designation: "Store Operations Manager",
              role: adminData.role || currentRole || "store_manager",
              storeName: adminData.storeName || "Assigned Store Hub",
+             storeAddress: adminData.storeAddress || null,
              joiningDate: adminData.joinedDate ? new Date(adminData.joinedDate).toLocaleDateString() : "N/A",
              status: adminData.status || "Active",
              lastLogin: adminData.lastLoginAt ? new Date(adminData.lastLoginAt).toLocaleString() : "N/A",
@@ -85,7 +86,7 @@ export default function Profile({ forcedRole }) {
            },
            store: { 
              name: adminData.storeName || "Papa Veg Pizza", 
-             address: adminData.storeDetails?.address || "N/A", 
+             address: adminData.storeAddress || adminData.storeDetails?.address || "N/A", 
              openingTime: adminData.storeDetails?.openingTime || "11 AM", 
              closingTime: adminData.storeDetails?.closingTime || "11 PM", 
              managerName: adminData.name 
@@ -261,7 +262,7 @@ export default function Profile({ forcedRole }) {
             </span>
           </div>
 
-          <div className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 gap-1 scrollbar-thin">
+          <div className="flex flex-wrap lg:flex-col gap-2 lg:gap-1 pb-2 lg:pb-0">
             {visibleTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -269,10 +270,10 @@ export default function Profile({ forcedRole }) {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[10px] font-bold text-left transition-all shrink-0 lg:shrink whitespace-nowrap lg:whitespace-normal active:scale-[0.98] ${
+                  className={`w-auto lg:w-full flex items-center justify-center lg:justify-start gap-2.5 px-3 py-2 rounded-xl text-[10px] font-bold transition-all shrink-0 lg:shrink whitespace-nowrap active:scale-[0.98] ${
                     isActive
                       ? "bg-[var(--primary)] text-white shadow-sm"
-                      : "text-slate-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-950/40 hover:text-slate-800 dark:hover:text-zinc-200"
+                      : "text-slate-600 dark:text-zinc-400 bg-zinc-50/50 dark:bg-zinc-950/30 border border-zinc-150 dark:border-zinc-850 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-slate-800 dark:hover:text-zinc-200"
                   }`}
                 >
                   <Icon size={12} className={isActive ? "text-white" : "text-slate-400"} />

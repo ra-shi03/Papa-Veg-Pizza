@@ -423,7 +423,7 @@ export default function KitchenStaff() {
         ) : (
           <>
             {/* Desktop Table View */}
-            <div className="hidden lg:block overflow-x-auto">
+            <div className="overflow-x-auto">
               <table className="w-full border-collapse text-left">
                 <thead>
                   <tr className="bg-zinc-50/70 dark:bg-zinc-950/40 border-b border-zinc-150 dark:border-zinc-850 text-[10px] font-black text-zinc-400 uppercase tracking-widest whitespace-nowrap">
@@ -564,7 +564,7 @@ export default function KitchenStaff() {
             </div>
 
             {/* Mobile/Tablet Card-Based View */}
-            <div className="block lg:hidden divide-y divide-zinc-100 dark:divide-zinc-850 p-4 space-y-4">
+            <div className="hidden divide-y divide-zinc-100 dark:divide-zinc-850 p-4 space-y-4">
               {filteredStaffList.map((staff) => (
                 <div key={staff._id} className="pt-4 first:pt-0 space-y-3">
                   <div className="flex items-start justify-between gap-3">

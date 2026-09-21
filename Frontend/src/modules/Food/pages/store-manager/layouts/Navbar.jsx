@@ -85,28 +85,44 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
           name: parsed.fullName || parsed.name || "Store Manager",
           email: parsed.email || "No Email"
         })
-        if (parsed.storeName) {
-          setStoreData({ _id: parsed.storeId, name: parsed.storeName, code: parsed.storeCode })
+        // Always set storeData if any store info exists
+        const sName = parsed.storeName || parsed.store?.name || null;
+        const sId   = parsed.storeId   || parsed.store?._id  || null;
+        const sCode = parsed.storeCode || parsed.store?.code || null;
+        if (sName || sId) {
+          setStoreData({ _id: sId, name: sName, code: sCode })
         }
-        if (parsed.franchiseName) {
-          setFranchiseData({ name: parsed.franchiseName })
+        const fName = parsed.franchiseName || parsed.storeDetails?.franchiseName || parsed.franchise?.name || null;
+        if (fName) {
+          setFranchiseData({ name: fName })
         }
       } catch (_) {}
     }
 
     // Always fetch fresh authoritative data from /auth/me
     adminAPI.getAdminProfile().then(res => {
-      const user = res?.data?.data?.admin || res?.data?.admin || res?.data?.data?.user || res?.data?.user;
+      // The getAdminProfile wraps the result, so try multiple paths
+      const user =
+        res?.data?.data?.user ??
+        res?.data?.user ??
+        res?.data?.data?.admin ??
+        res?.data?.admin ??
+        res;
       if (!user) return;
       setUserData({
         name: user.name || user.fullName || "Store Manager",
         email: user.email || "No Email"
       });
-      if (user.storeName) {
-        setStoreData({ _id: user.storeId, name: user.storeName, code: user.storeCode })
+      // storeName comes directly on the user object from /auth/me
+      const sName = user.storeName || user.storeDetails?.name || user.store?.name || null;
+      const sId   = user.storeId   || user.store?._id  || null;
+      const sCode = user.storeCode || user.storeDetails?.storeCode || user.store?.code || null;
+      if (sName || sId) {
+        setStoreData({ _id: sId, name: sName, code: sCode })
       }
-      if (user.franchiseName) {
-        setFranchiseData({ name: user.franchiseName })
+      const fName = user.franchiseName || user.storeDetails?.franchiseName || user.franchise?.name || null;
+      if (fName) {
+        setFranchiseData({ name: fName })
       }
     }).catch(() => {});
 
@@ -180,16 +196,23 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
           </button>
           
           <div className="flex items-center gap-3">
-            <span 
+            {/* Brand / Store Name — RBAC: staff manager & kitchen supervisor see only store name */}
+            <span
               onClick={() => navigate("/store-operations/dashboard")}
               className="text-xs font-black tracking-wider text-zinc-900 dark:text-white uppercase cursor-pointer select-none hover:text-[var(--primary)] transition-colors hidden sm:inline"
             >
-              {franchiseData?.name || "PAPA VEG OPS"}
+              {(role === "kitchen_staff" || role === "kitchen_supervisor" || role === "store_manager")
+                ? (storeData?.name || "")
+                : (franchiseData?.name || "PAPA VEG OPS")}
             </span>
-            <span className="text-zinc-300 dark:text-zinc-700 hidden sm:inline">|</span>
-            
-            {/* Store Selector */}
-            <div className="relative">
+
+            {/* Separator + Store Switcher — hidden for store_manager & kitchen_supervisor */}
+            {role !== "kitchen_staff" && role !== "kitchen_supervisor" && (
+              <>
+                <span className="text-zinc-300 dark:text-zinc-700 hidden sm:inline">|</span>
+                
+                {/* Store Selector */}
+                <div className="relative">
               <button
                 onClick={() => {
                   setShowStoreDropdown(!showStoreDropdown)
@@ -228,6 +251,8 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
                 </div>
               )}
             </div>
+            </>
+          )}
           </div>
         </div>
 

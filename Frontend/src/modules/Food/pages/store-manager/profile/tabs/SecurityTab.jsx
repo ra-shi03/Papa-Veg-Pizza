@@ -17,40 +17,6 @@ export default function SecurityTab() {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordErrors, setPasswordErrors] = useState({});
 
-  // Active Sessions States
-  const [sessions, setSessions] = useState([]);
-  const [sessionsLoading, setSessionsLoading] = useState(true);
-  const [terminatingId, setTerminatingId] = useState(null);
-  const [globalLoading, setGlobalLoading] = useState(false);
-
-  // Modals States
-  const [confirmModal, setConfirmModal] = useState({
-    show: false,
-    type: "", // 'other' or 'all'
-    title: "",
-    message: "",
-  });
-
-  const fetchSessions = async () => {
-    try {
-      setSessionsLoading(true);
-      const res = await profileApi.getProfile();
-      if (res) {
-        const rootData = res.data || res;
-        const sessionsList = rootData?.activeSessions || rootData?.data?.activeSessions || [];
-        setSessions(Array.isArray(sessionsList) ? sessionsList : []);
-      }
-    } catch (err) {
-      console.error("Failed to load active sessions", err);
-    } finally {
-      setSessionsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchSessions();
-  }, []);
-
   const handlePasswordChange = (e) => {
     const { name, value } = e.target;
     setPasswordState((prev) => ({
@@ -117,75 +83,6 @@ export default function SecurityTab() {
     }
   };
 
-  // Terminate individual session
-  const handleTerminateSession = async (id) => {
-    try {
-      setTerminatingId(id);
-      const res = await profileApi.deleteSession(id);
-      if (res.success) {
-        toast.success("Session terminated.");
-        setSessions((prev) => prev.filter((s) => s.id !== id));
-      } else {
-        toast.error("Failed to terminate session.");
-      }
-    } catch (err) {
-      toast.error("Error terminating session.");
-    } finally {
-      setTerminatingId(null);
-    }
-  };
-
-  // Global Session Terminations
-  const triggerGlobalLogout = (type) => {
-    if (type === "other") {
-      setConfirmModal({
-        show: true,
-        type: "other",
-        title: "Terminate Other Sessions?",
-        message: "This will log out your account from all other browsers, mobile devices, and active locations except this device. Do you wish to continue?",
-      });
-    } else if (type === "all") {
-      setConfirmModal({
-        show: true,
-        type: "all",
-        title: "Terminate All Sessions?",
-        message: "This will log you out of all devices including this current active browser dashboard. You will need to log back in. Do you wish to continue?",
-      });
-    }
-  };
-
-  const handleConfirmGlobalLogout = async () => {
-    const logoutType = confirmModal.type;
-    setConfirmModal((prev) => ({ ...prev, show: false }));
-    
-    try {
-      setGlobalLoading(true);
-      if (logoutType === "other") {
-        const res = await profileApi.logoutOtherSessions();
-        if (res.success) {
-          toast.success("Other sessions terminated successfully.");
-          setSessions((prev) => prev.filter((s) => s.current));
-        } else {
-          toast.error("Action failed.");
-        }
-      } else if (logoutType === "all") {
-        const res = await profileApi.logoutAllSessions();
-        if (res.success) {
-          toast.success("All sessions terminated. Logging out...");
-          setTimeout(() => {
-            // Trigger login redirect
-            window.location.reload();
-          }, 1500);
-        } else {
-          toast.error("Action failed.");
-        }
-      }
-    } catch (err) {
-      toast.error("An error occurred during global logout.");
-    } finally {
-      setGlobalLoading(false);
-    }
-  };
 
   const inputClass = (fieldName) => `
     w-full text-xs font-semibold pl-3 pr-10 py-2 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition-all
@@ -303,94 +200,7 @@ export default function SecurityTab() {
         </form>
       </div>
 
-      {/* SECTION 2: ACTIVE SESSIONS */}
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-2xl p-5 shadow-sm space-y-4">
-        
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-3">
-          <div className="flex items-center gap-2">
-            <ShieldCheck size={16} className="text-[var(--secondary)]" />
-            <h2 className="text-sm font-black tracking-tight text-slate-900 dark:text-white uppercase">
-              Active Security Sessions
-            </h2>
-          </div>
-          
-          {/* Global logs terminations */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => triggerGlobalLogout("other")}
-              disabled={sessionsLoading || globalLoading || sessions.length <= 1}
-              className="text-[10px] font-bold px-3 py-1.5 rounded-lg border border-zinc-250 dark:border-zinc-700 text-slate-700 dark:text-zinc-350 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50 active:scale-[0.98] transition-all"
-            >
-              Logout Other Devices
-            </button>
-            <button
-              onClick={() => triggerGlobalLogout("all")}
-              disabled={sessionsLoading || globalLoading || sessions.length === 0}
-              className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-red-650 hover:bg-red-700 text-white shadow-sm disabled:opacity-50 active:scale-[0.98] transition-all flex items-center gap-1"
-            >
-              <Trash2 size={11} />
-              <span>Logout All Devices</span>
-            </button>
-          </div>
-        </div>
-
-        {sessionsLoading ? (
-          <div className="space-y-2 animate-pulse">
-            {[1, 2].map((i) => (
-              <div key={i} className="h-16 bg-zinc-100 dark:bg-zinc-850 rounded-xl" />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {sessions.map((sess) => (
-              <SessionCard
-                key={sess.id}
-                session={sess}
-                onTerminate={handleTerminateSession}
-                terminatingId={terminatingId}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* CONFIRMATION OVERLAY MODAL */}
-      {confirmModal.show && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/45 dark:bg-zinc-950/60 backdrop-blur-sm animate-fade">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-3xl p-6 shadow-xl max-w-sm w-full space-y-4 animate-scale">
-            <div className="flex gap-3 items-start">
-              <div className="p-2 rounded-2xl bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-450 border border-rose-100 dark:border-rose-900/30 flex items-center justify-center shrink-0">
-                <ShieldAlert size={20} className="stroke-[2.5]" />
-              </div>
-              <div className="space-y-1 min-w-0">
-                <h3 className="text-sm font-black text-slate-900 dark:text-white">
-                  {confirmModal.title}
-                </h3>
-                <p className="text-[10px] font-semibold text-slate-500 dark:text-zinc-400 leading-normal">
-                  {confirmModal.message}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-50 dark:border-zinc-800/60">
-              <button
-                type="button"
-                onClick={() => setConfirmModal((prev) => ({ ...prev, show: false }))}
-                className="text-[10px] font-bold px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmGlobalLogout}
-                className="text-[10px] font-bold px-4 py-2 rounded-lg bg-red-600 hover:bg-red-750 text-white shadow-sm transition-all"
-              >
-                Confirm Terminate
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Active sessions and confirm modal removed */}
     </div>
   );
 }

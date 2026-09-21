@@ -70,11 +70,11 @@ export default function WorkInfoTab({ user, store }) {
           <div className="space-y-3 flex-1">
             <div>
               <h3 className="text-sm font-bold text-slate-800 dark:text-zinc-200">
-                {store?.name || "Papa Veg Pizza"}
+                {store?.name || user?.storeName || "Papa Veg Pizza"}
               </h3>
               <p className="text-xs font-semibold text-slate-500 dark:text-zinc-400 flex items-center gap-1 mt-1 leading-normal">
                 <MapPin size={12} className="shrink-0 text-slate-400" />
-                <span>{store?.address || "N/A"}</span>
+                <span>{store?.address || user?.storeAddress || "N/A"}</span>
               </p>
             </div>
 

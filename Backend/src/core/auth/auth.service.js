@@ -365,15 +365,24 @@ export const adminLogin = async ({ email, mobile, password } = {}, allowedRoles 
   let storeName = null;
   let storeCode = null;
 
-  if (role === 'STORE_MANAGER' || user.primaryRole?.code === 'STORE_MANAGER') {
-    const storeManager = await StoreManager.findOne({ userId: user._id }).lean();
-    if (storeManager) {
-      if (storeManager.storeId && !storeId) storeId = storeManager.storeId.toString();
-      if (storeManager.franchiseId && !franchiseId) franchiseId = storeManager.franchiseId.toString();
-      if (storeManager.storeName) storeName = storeManager.storeName;
+  // Normalize role to UPPER_SNAKE_CASE (handles kitchen-staff, KITCHEN_STAFF, kitchen_staff etc.)
+  const normalizedLoginRole = role ? role.toUpperCase().replace(/-/g, '_') : '';
+  const normalizedPrimaryCode = user.primaryRole?.code ? user.primaryRole.code.toUpperCase().replace(/-/g, '_') : '';
+
+  if (['STORE_MANAGER', 'KITCHEN_STAFF', 'KITCHEN_SUPERVISOR'].includes(normalizedLoginRole) ||
+      ['STORE_MANAGER', 'KITCHEN_STAFF', 'KITCHEN_SUPERVISOR'].includes(normalizedPrimaryCode)) {
+    // Try userId first, then email (FoodUser vs User collection mismatch)
+    const staffRecord = await StoreManager.findOne({
+      $or: [{ userId: user._id }, { email: user.email }]
+    }).lean();
+    if (staffRecord) {
+      if (staffRecord.storeId && !storeId) storeId = staffRecord.storeId.toString();
+      if (staffRecord.franchiseId && !franchiseId) franchiseId = staffRecord.franchiseId.toString();
+      if (staffRecord.storeName) storeName = staffRecord.storeName;
     }
   }
 
+  // If storeId is available (from UserRole or StoreManager), always fetch fresh store name
   if (storeId && !storeName) {
     try {
       const storeDoc = await FoodStore.findById(storeId).lean();
@@ -592,7 +601,7 @@ export const logout = async (refreshToken, fcmToken, platform) => {
   return { invalidated: deleted.deletedCount > 0 };
 };
 
-export const getProfile = async (userId, role) => {
+export const getProfile = async (userId, role, jwtStoreId = null) => {
   if (!userId || !role) {
     throw new AuthError("Invalid token payload");
   }
@@ -604,59 +613,97 @@ export const getProfile = async (userId, role) => {
     if (user) {
       const userProfile = await Profile.findOne({ userId: id }).lean();
       
+      // Query UserRole without roleId restriction (primaryRole may be null for kitchen staff)
       const activeUserRole = await UserRole.findOne({
         userId: user._id,
-        roleId: user.primaryRole?._id,
         status: 'ACTIVE'
       }).lean();
 
       let storeManagerData = null;
       let storeName = null;
-      let reportingManager = null;
-      let storeDetails = null;
-      if (role === 'STORE_MANAGER' || user.primaryRole?.code === 'STORE_MANAGER') {
-          storeManagerData = await StoreManager.findOne({ userId: user._id, status: { $ne: 'DELETED' } }).lean();
-          if (storeManagerData && storeManagerData.storeId) {
-             const storeDoc = await FoodStore.findById(storeManagerData.storeId).lean();
+      let storeCode = null;
+      let franchiseName = null;
+      let reportingManagerName = null;
+      let fId = null;
+      let resolvedStoreId = null;
+      let resolvedFranchiseId = null;
+      let storeAddress = null;
+
+      const normalizedRole = role ? role.toUpperCase().replace(/-/g, '_') : '';
+      const normalizedPrimaryRole = user.primaryRole?.code ? user.primaryRole.code.toUpperCase().replace(/-/g, '_') : '';
+      const STORE_ROLES = ['STORE_MANAGER', 'KITCHEN_STAFF', 'KITCHEN_SUPERVISOR'];
+
+      if (STORE_ROLES.includes(normalizedRole) || STORE_ROLES.includes(normalizedPrimaryRole)) {
+          // Try by userId or email
+          storeManagerData = await StoreManager.findOne({
+            $or: [{ userId: user._id }, { email: user.email }],
+            status: { $ne: 'DELETED' }
+          }).lean();
+
+          // Resolve IDs (prioritize DB over JWT to prevent stale tokens)
+          resolvedStoreId = storeManagerData?.storeId?.toString() || activeUserRole?.storeId?.toString() || jwtStoreId || null;
+          resolvedFranchiseId = storeManagerData?.franchiseId?.toString() || activeUserRole?.franchiseId?.toString() || null;
+          
+          reportingManagerName = storeManagerData?.reportingManager || null;
+          let storeDoc = null;
+
+          if (resolvedStoreId) {
+             storeDoc = await FoodStore.findById(resolvedStoreId).lean();
              if (storeDoc) {
-                 storeName = storeDoc.storeName;
-                 storeDetails = {
-                     storeCode: storeDoc.code || null,
-                     address: storeDoc.address || null,
-                     openingTime: storeDoc.open || null,
-                     closingTime: storeDoc.closingTime || null,
-                 };
-                 if (storeDoc.franchiseId) {
-                     const franchiseDoc = await FoodFranchise.findById(storeDoc.franchiseId).lean();
-                     if (franchiseDoc) {
-                         reportingManager = franchiseDoc.ownerName;
-                         storeDetails.franchiseName = franchiseDoc.name || franchiseDoc.companyName || null;
-                     }
+                 storeName = storeDoc.storeName || storeDoc.name || null;
+                 storeCode = storeDoc.code || null;
+                 storeAddress = storeDoc.address || null;
+             }
+
+             // Get Store Manager as reporting manager and fallback for storeName if needed
+             if (!reportingManagerName || !storeName) {
+                 const manager = await StoreManager.findOne({
+                     storeId: resolvedStoreId,
+                     $or: [
+                        { role: { $in: ['STORE_MANAGER', 'store-manager', 'Store Manager'] } },
+                        { role: { $exists: false } },
+                        { role: null }
+                     ]
+                 }).lean();
+                 if (manager) {
+                     if (!reportingManagerName) reportingManagerName = manager.name;
+                     if (!storeName) storeName = manager.storeName || manager.storeName;
+                     // Also grab franchiseName if manager has it (just in case)
+                     if (!franchiseName && manager.franchiseName) franchiseName = manager.franchiseName;
                  }
+             }
+          }
+
+          fId = storeDoc?.franchiseId || resolvedFranchiseId;
+          if (fId) {
+             const franchiseDoc = await FoodFranchise.findById(fId).lean();
+             if (franchiseDoc) {
+                 franchiseName = franchiseDoc.name || franchiseDoc.companyName || franchiseName;
              }
           }
       }
 
       profile = {
         id: user._id,
-        _id: user._id,
         name: userProfile && userProfile.firstName ? `${userProfile.firstName} ${userProfile.lastName || ''}`.trim() : user.name || "",
         email: user.email,
         mobile: user.mobile,
         role: role,
-        franchiseId: storeManagerData?.franchiseId?.toString() || activeUserRole?.franchiseId?.toString() || null,
-        storeId: storeManagerData?.storeId?.toString() || activeUserRole?.storeId?.toString() || null,
-        storeCode: storeDetails?.storeCode || null,
+        franchiseId: fId?.toString() || resolvedFranchiseId || null,
+        storeId: resolvedStoreId || null,
+        storeCode: storeCode,
         storeName: storeName || storeManagerData?.storeName || null,
-        franchiseName: storeDetails?.franchiseName || null,
+        storeAddress: storeAddress || storeManagerData?.storeAddress || null,
+        franchiseName: franchiseName,
         employeeCode: storeManagerData?.employeeCode || null,
         joinedDate: storeManagerData?.joinedDate || null,
-        reportingManager: reportingManager || storeManagerData?.reportingManager || null,
+        reportingManager: reportingManagerName,
         lastLoginAt: storeManagerData?.lastLoginAt || user.lastLoginAt || null,
         status: storeManagerData?.status || "Active",
         personalDetails: storeManagerData?.personalDetails || userProfile?.personalDetails || null,
-        storeDetails: storeDetails || null,
-        ...(userProfile || {}),
+        preferences: userProfile?.preferences || null,
+        createdAt: userProfile?.createdAt || user.createdAt || null,
+        updatedAt: userProfile?.updatedAt || user.updatedAt || null,
         profileImage: storeManagerData?.profileImage || userProfile?.profileImage || user.profileImage || null,
       };
     }
@@ -1035,9 +1082,8 @@ export const updatePersonalProfile = async (userId, updateData) => {
   if (updateData.fullName) user.name = updateData.fullName;
   await user.save();
 
-  const roleCode = user.primaryRole?.code;
-  if (roleCode === "STORE_MANAGER") {
-    const storeManager = await StoreManager.findOne({ userId });
+  // Update StoreManager / Staff operational record if it exists
+  const storeManager = await StoreManager.findOne({ userId });
     if (storeManager) {
       if (!storeManager.personalDetails) storeManager.personalDetails = {};
       if (updateData.gender) storeManager.personalDetails.gender = updateData.gender;
@@ -1050,7 +1096,6 @@ export const updatePersonalProfile = async (userId, updateData) => {
       }
       storeManager.markModified('personalDetails');
       await storeManager.save();
-    }
   }
   return { success: true, message: "Profile updated successfully", data: updateData };
 };
