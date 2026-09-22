@@ -12,6 +12,12 @@
   line-height: 1.5;
   font-weight: 400;
 
+  --primary-gray: #34373C;
+  --secondary-off-white: #F8F6F2;
+  --accent-red: #ED2F35;
+  --muted-gray: #62666D;
+  --border-gray: #D4D2CF;
+
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

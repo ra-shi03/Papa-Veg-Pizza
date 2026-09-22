@@ -18,6 +18,7 @@ import franchiseStoreRoutes from '../modules/food/franchise/routes/store.routes.
 import franchiseStoreManagerRoutes from '../modules/food/franchise/routes/storeManager.routes.js';
 import franchiseStoreApprovalRoutes from '../modules/food/franchise/routes/storeApproval.routes.js';
 import kitchenStaffRoutes from '../modules/food/store/routes/kitchenStaff.routes.js';
+import settingsRoutes from '../modules/food/settings/routes/settings.routes.js';
 
 const router = express.Router();
 
@@ -55,5 +56,7 @@ router.use('/v1/fcm-tokens', fcmRoutes);
 router.use('/fcm-tokens', fcmRoutes);
 
 router.get('/v1/admin/queues', authMiddleware, requireRoles('ADMIN'), getQueuesController);
+
+router.use('/v1/settings', settingsRoutes);
 
 export default router;

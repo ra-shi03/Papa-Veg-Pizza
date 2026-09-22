@@ -1,142 +1,137 @@
-import React, { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
-import { useLocationStore } from "@food/store/locationStore"
-import logoNew from "@/assets/logo1.png"
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useLocationStore } from "@food/store/locationStore";
+import axiosInstance from "@/services/api/axios";
+import logoNew from "@/assets/logo1.png";
+import pizzaImg from "@/assets/hero-pizza.png";
+import pizzaIcon from "@/assets/pizza-icon.png";
 
 export default function WelcomeScreen() {
-  const navigate = useNavigate()
-  const { clearLocation } = useLocationStore()
+  const navigate = useNavigate();
+  const { clearLocation } = useLocationStore();
+  const [logoUrl, setLogoUrl] = useState(() => localStorage.getItem("sa_logo") || logoNew);
+  const [config, setConfig] = useState(null);
 
-  const [logoUrl, setLogoUrl] = useState(() => localStorage.getItem("sa_logo") || logoNew)
-
-  // Load Google Fonts dynamically on mount
   useEffect(() => {
-    const linkFonts = document.createElement("link")
-    linkFonts.href = "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Inter:wght@400;600;700&display=swap"
-    linkFonts.rel = "stylesheet"
-    document.head.appendChild(linkFonts)
-
+    const linkFonts = document.createElement("link");
+    linkFonts.href = "https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap";
+    linkFonts.rel = "stylesheet";
+    document.head.appendChild(linkFonts);
+    
     const handleBrandingSync = () => {
-      setLogoUrl(localStorage.getItem("sa_logo") || logoNew)
-    }
-    window.addEventListener("systemThemeChanged", handleBrandingSync)
+      setLogoUrl(localStorage.getItem("sa_logo") || logoNew);
+    };
+    window.addEventListener("systemThemeChanged", handleBrandingSync);
+
+    // Fetch dynamic config
+    axiosInstance.get('/settings/welcome')
+      .then(res => {
+        if (res.data?.data) {
+          setConfig(res.data.data);
+        }
+      })
+      .catch(err => console.error("Failed to load welcome screen config", err));
 
     return () => {
-      document.head.removeChild(linkFonts)
-      window.removeEventListener("systemThemeChanged", handleBrandingSync)
-    }
-  }, [])
+      document.head.removeChild(linkFonts);
+      window.removeEventListener("systemThemeChanged", handleBrandingSync);
+    };
+  }, []);
 
   const handleSignIn = () => {
-    localStorage.setItem("papa_veg_welcome_shown", "true")
-    navigate("/user/auth/login")
-  }
+    localStorage.setItem("papa_veg_welcome_shown", "true");
+    navigate("/user/auth/login");
+  };
 
   const handleContinueAsGuest = () => {
-    localStorage.setItem("papa_veg_welcome_shown", "true")
-    localStorage.removeItem("user_authenticated")
-    localStorage.removeItem("currentUser")
-    localStorage.removeItem("user_user")
-    localStorage.removeItem("userProfile")
-    localStorage.removeItem("appzeto_user_profile")
-    localStorage.removeItem("user_accessToken")
-    localStorage.removeItem("user_refreshToken")
-    localStorage.removeItem("tempPhone")
-    localStorage.removeItem("user_temp_phone")
-    clearLocation()
-    navigate("/food/user")
-  }
+    localStorage.setItem("papa_veg_welcome_shown", "true");
+    localStorage.removeItem("user_authenticated");
+    localStorage.removeItem("currentUser");
+    localStorage.removeItem("user_user");
+    localStorage.removeItem("userProfile");
+    localStorage.removeItem("appzeto_user_profile");
+    localStorage.removeItem("user_accessToken");
+    localStorage.removeItem("user_refreshToken");
+    localStorage.removeItem("tempPhone");
+    localStorage.removeItem("user_temp_phone");
+    clearLocation();
+    navigate("/food/user");
+  };
+
+  const displayLogoUrl = config?.logoUrl || logoUrl;
+  const displayMediaUrl = config?.heroMediaUrl || pizzaImg;
+  const displayMediaType = config?.heroMediaUrl ? config?.heroMediaType : 'image';
+  
+  const heading = config?.heading || 'WELCOME TO';
+  const subheading = config?.subheading || 'Papa Veg Pizza';
+  const description = config?.description || 'Taste the magic of our signature wood-fired crusts, loaded with organic, farm-fresh ingredients!';
+  const primaryBtn = config?.primaryButtonText || 'SIGN IN TO UNLOCK OFFERS';
+  const secondaryBtn = config?.secondaryButtonText || 'CONTINUE AS GUEST';
 
   return (
-    <div className="min-h-screen bg-[#080808] flex justify-center">
-      <div className="w-full max-w-md min-h-screen bg-[#111111] text-[#e5e2e1] flex flex-col font-sans overflow-x-hidden relative select-none shadow-2xl border-x border-zinc-800/40">
-        <style dangerouslySetInnerHTML={{
-          __html: `
-          .welcome-glass {
-            background: rgba(20, 20, 20, 0.75) !important;
-            backdrop-filter: blur(25px) !important;
-            border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
-          }
-          .hero-gradient {
-            background: linear-gradient(to bottom, rgba(17, 17, 17, 0) 40%, rgba(17, 17, 17, 0.95) 90%, #111111 100%) !important;
-          }
-          .animate-zoom {
-            animation: zoomSlow 25s infinite alternate ease-in-out;
-          }
-          @keyframes zoomSlow {
-            0% { transform: scale(1); }
-            100% { transform: scale(1.12); }
-          }
-          `
-        }} />
+    <div className="w-full h-[100dvh] flex justify-center items-center p-6 bg-[#eeeae5] text-[var(--primary-gray)] font-['Poppins',sans-serif] overflow-hidden max-[700px]:p-0">
+      <div className="w-full max-w-[760px] h-full relative overflow-hidden bg-[var(--secondary-off-white)] rounded-[34px] shadow-[0_30px_70px_rgba(0,0,0,0.12),0_10px_30px_rgba(0,0,0,0.06)] max-[700px]:rounded-none max-[700px]:shadow-none flex flex-col">
+        
+        {/* Decorative shapes */}
+        <div className="absolute z-0 pointer-events-none w-[170px] h-[150px] top-0 left-0 bg-[var(--accent-red)] rounded-br-[100%] max-[700px]:w-[100px] max-[700px]:h-[90px]"></div>
+        <div className="absolute z-0 pointer-events-none w-[150px] h-[120px] top-0 right-0 bg-[#d8d6d2] rounded-bl-[100%] max-[700px]:w-[90px] max-[700px]:h-[75px]"></div>
+        <div className="absolute z-0 pointer-events-none w-[140px] h-[120px] bottom-0 left-0 bg-[var(--accent-red)] rounded-tr-[100%] max-[700px]:w-[90px] max-[700px]:h-[80px]"></div>
+        <div className="absolute z-0 pointer-events-none w-[100px] h-[140px] right-[-25px] top-[52%] bg-[var(--accent-red)] rounded-l-[100%] max-[700px]:w-[65px] max-[700px]:h-[90px]"></div>
 
-        {/* Hero Banner Section */}
-        <div className="relative w-full h-[55vh] sm:h-[60vh] md:h-[65vh] overflow-hidden">
-          {/* Background Zooming Image */}
-          <img
-            src="https://images.unsplash.com/photo-1513104890138-7c749659a591?w=1200&auto=format&fit=crop&q=80"
-            alt="Premium Papa Veg Pizza"
-            className="w-full h-full object-cover animate-zoom"
-          />
-          {/* Shadow overlays and gradients */}
-          <div className="absolute inset-0 hero-gradient" />
-
-          {/* Floating Brand Badge */}
-          <div className="absolute top-8 left-0 right-0 flex justify-center z-10">
-            <div className="flex items-center gap-2.5 bg-black/45 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/10 shadow-lg">
-              <img
-                src={logoUrl}
-                alt="Papa Veg Pizza Logo"
-                className="w-9 h-9 object-contain"
-              />
-              <span
-                className="text-lg font-black tracking-tight text-white uppercase"
-                style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-              >
-                Papa Veg Pizza
-              </span>
-            </div>
+        {/* Brand & Hero */}
+        <div className="relative z-10 flex flex-col justify-center items-center pt-[3vh] max-[700px]:pt-[20px] shrink-0 flex-1 min-h-0 w-full">
+          <img src={displayLogoUrl} alt="App Logo" className="w-[90px] h-[90px] object-contain max-[700px]:w-[70px] max-[700px]:h-[70px] shrink-0" />
+          
+          <div className="relative z-[2] w-full h-full max-h-[45vh] flex justify-center items-center mt-auto overflow-hidden -translate-y-[3vh] max-[700px]:-translate-y-[15px]">
+            {displayMediaType === 'video' ? (
+              <video src={displayMediaUrl} className="w-full h-full object-cover mix-blend-multiply" autoPlay loop muted playsInline />
+            ) : (
+              <img src={displayMediaUrl} alt="Hero Media" className="w-full h-full object-cover mix-blend-multiply" />
+            )}
           </div>
         </div>
 
-        {/* Welcome Section Bottom Sheet Card */}
-        <div className="flex-1 flex flex-col justify-end welcome-glass px-6 pt-6 pb-12 -mt-8 z-20 relative max-w-md mx-auto w-full">
-          <div className="text-center space-y-4 mb-10">
-            <h1
-              className="text-[32px] font-extrabold leading-tight text-white tracking-tight"
-              style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-            >
-              Welcome to <br />
-              <span className="text-[#E53935]">Papa Veg Pizza 🍕</span>
-            </h1>
-            <p className="text-sm opacity-70 leading-relaxed font-medium px-4">
-              Taste the magic of our signature wood-fired crusts, loaded with organic, farm-fresh ingredients!
-            </p>
+        {/* Content */}
+        <main className="relative z-10 px-[70px] pt-0 pb-[4vh] shrink-0 max-[700px]:px-[28px] max-[700px]:pb-[3vh]">
+          <div className="flex items-center gap-[12px] text-[18px] font-bold tracking-[5px] text-[var(--muted-gray)] max-[700px]:text-[13px] max-[700px]:tracking-[3px] uppercase">
+            <span className="block w-[65px] h-[7px] bg-[var(--accent-red)] rounded-[100px] max-[700px]:w-[45px] max-[700px]:h-[5px]"></span>
+            {heading}
           </div>
 
-          {/* Buttons Panel */}
-          <div className="space-y-4 w-full">
-            <button
-              onClick={handleSignIn}
-              className="w-full h-14 bg-[#E53935] hover:bg-red-700 text-white font-extrabold rounded-2xl text-sm uppercase tracking-wider transition-all shadow-[0_4px_20px_rgba(229,57,53,0.3)] active:scale-[0.98] cursor-pointer border-0 outline-none flex items-center justify-center gap-2"
-            >
-              Sign In to Unlock Offers
+          <h1 className="mt-[12px] text-[clamp(32px,5vw,52px)] max-[700px]:text-[clamp(28px,10vw,40px)] leading-[0.95] tracking-[-2px] max-[700px]:tracking-[-1px] font-extrabold text-[var(--primary-gray)] m-0">
+            {subheading.split(' ').map((word, i, arr) => (
+              <React.Fragment key={i}>
+                {i === arr.length - 1 ? (
+                  <span className="inline-flex items-center gap-[12px]">
+                    <span className="text-[var(--accent-red)]">{word}</span>
+                    <img src={pizzaIcon} alt="" className="w-[60px] h-[60px] max-[700px]:w-[40px] max-[700px]:h-[40px] rotate-[15deg] object-contain -translate-y-[4px]" />
+                  </span>
+                ) : (
+                  <>{word} {i === arr.length - 2 ? <br /> : ''}</>
+                )}
+              </React.Fragment>
+            ))}
+          </h1>
+
+          <p className="max-w-[650px] mt-[20px] max-[700px]:mt-[16px] text-[18px] max-[700px]:text-[14px] leading-[1.5] max-[700px]:leading-[1.5] font-medium text-[var(--muted-gray)] mb-0">
+            {description}
+          </p>
+
+          {/* CTA */}
+          <div className="flex flex-col gap-[14px] mt-[4vh]">
+            <button onClick={handleSignIn} className="w-full min-h-[64px] border-none rounded-[100px] flex items-center justify-center text-white bg-[var(--accent-red)] shadow-[0_12px_25px_rgba(237,47,53,0.25)] font-inherit text-[16px] max-[700px]:text-[14px] font-extrabold tracking-[1px] max-[700px]:tracking-[0.7px] cursor-pointer transition-all duration-[250ms] ease hover:bg-[#d9252b] hover:-translate-y-[3px] hover:shadow-[0_18px_30px_rgba(237,47,53,0.30)] p-0 uppercase">
+              <span>{primaryBtn}</span>
             </button>
 
-            <button
-              onClick={handleContinueAsGuest}
-              className="w-full h-14 bg-white/5 hover:bg-white/10 text-white font-extrabold rounded-2xl text-sm uppercase tracking-wider transition-all border border-white/12 active:scale-[0.98] cursor-pointer outline-none flex items-center justify-center"
-            >
-              Continue as Guest
+            <button onClick={handleContinueAsGuest} className="w-full min-h-[64px] bg-transparent border-2 border-solid border-[var(--border-gray)] rounded-[100px] text-[var(--primary-gray)] font-inherit text-[16px] max-[700px]:text-[14px] font-extrabold tracking-[1px] max-[700px]:tracking-[0.7px] cursor-pointer transition-all duration-[250ms] ease hover:bg-[#efede9] hover:-translate-y-[2px] hover:border-[#bbb9b5] p-0 uppercase">
+              {secondaryBtn}
             </button>
           </div>
+        </main>
 
-          {/* Premium footer tagline */}
-          <div className="text-center mt-8 opacity-45 text-[10px] font-bold uppercase tracking-widest">
-            100% Pure Vegetarian Quality Assured
-          </div>
-        </div>
+        {/* Bottom decoration */}
+        <img src={pizzaIcon} alt="" className="absolute right-[-15px] bottom-[-20px] w-[130px] h-[130px] object-contain opacity-[0.06] -rotate-[25deg] pointer-events-none" />
       </div>
     </div>
-  )
+  );
 }
