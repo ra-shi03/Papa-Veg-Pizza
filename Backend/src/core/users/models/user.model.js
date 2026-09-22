@@ -75,20 +75,9 @@ userSchema.index({ mobile: 1, isDeleted: 1 }, { name: 'idx_mobile_active' });
 userSchema.index({ primaryRole: 1, isActive: 1, isDeleted: 1 }, { name: 'idx_role_active' });
 userSchema.index({ isActive: 1, isDeleted: 1 });
 
-// ─── Password Hashing ─────────────────────────────────────────────────────────
 userSchema.pre('save', async function (next) {
-    // Allow migration script to bypass hashing when copying already-hashed passwords
-    if (this.$locals?.skipPasswordHash) return next();
-    if (!this.isModified('password') || !this.password) {
-        return next();
-    }
-    try {
-        const salt = await bcrypt.genSalt(12); // 12 rounds for production
-        this.password = await bcrypt.hash(this.password, salt);
-        return next();
-    } catch (err) {
-        return next(err);
-    }
+    // Password hashing has been moved to controllers to prevent double-hashing issues.
+    return next();
 });
 
 userSchema.methods.comparePassword = async function (candidatePassword) {

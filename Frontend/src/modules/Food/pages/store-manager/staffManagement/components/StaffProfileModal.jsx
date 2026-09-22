@@ -75,6 +75,29 @@ const CircularProgress = ({ value, label = "", suffix = "%", size = 70, strokeWi
 export default function StaffProfileModal({ isOpen, onClose, staffId }) {
   const { data: staff, isLoading } = useStaffDetails(staffId);
 
+  // Track sidebar collapsed state to correctly offset the modal
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(() => {
+    return localStorage.getItem("store_sidebar_collapsed") === "true";
+  });
+
+  React.useEffect(() => {
+    const handleCollapse = (e) => {
+      if (e && e.detail !== undefined) {
+        setSidebarCollapsed(e.detail);
+      } else {
+        setSidebarCollapsed(localStorage.getItem("store_sidebar_collapsed") === "true");
+      }
+    };
+
+    window.addEventListener("sidebarCollapseChanged", handleCollapse);
+    window.addEventListener("click", handleCollapse);
+
+    return () => {
+      window.removeEventListener("sidebarCollapseChanged", handleCollapse);
+      window.removeEventListener("click", handleCollapse);
+    };
+  }, []);
+
   // Fallback initial letters for Avatar
   const getInitials = (name) => {
     if (!name) return "ST";
@@ -129,9 +152,39 @@ export default function StaffProfileModal({ isOpen, onClose, staffId }) {
     }
   };
 
+  const dialogContentClass = `
+    bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 overflow-y-auto max-h-[90vh] scrollbar-thin
+    transition-all duration-300 ease-in-out z-[100] w-[calc(100vw-2rem)]
+  `;
+
+  const dialogOverlayClass = `
+    transition-all duration-300 ease-in-out z-[99]
+  `;
+
+  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
+  
+  const contentStyle = {
+    maxWidth: "42rem", // max-w-2xl
+    ...(isDesktop && {
+      left: sidebarCollapsed ? "calc(50% + 36px)" : "calc(50% + 140px)",
+      width: sidebarCollapsed ? "calc(100vw - 72px - 2rem)" : "calc(100vw - 280px - 2rem)"
+    })
+  };
+
+  const overlayStyle = {
+    ...(isDesktop && {
+      left: sidebarCollapsed ? "72px" : "280px"
+    })
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="max-w-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 overflow-y-auto max-h-[90vh] scrollbar-thin">
+      <DialogContent 
+        className={dialogContentClass}
+        style={contentStyle}
+        overlayClassName={dialogOverlayClass}
+        overlayStyle={overlayStyle}
+      >
         <DialogHeader className="border-b border-zinc-150 dark:border-zinc-800 pb-3 pr-8">
           <DialogTitle className="text-xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
             <User size={20} className="text-primary" />

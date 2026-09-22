@@ -189,26 +189,38 @@ export default function AddStaffModal({ isOpen, onClose }) {
   };
 
   const dialogContentClass = `
-    max-w-4xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 overflow-y-auto max-h-[92vh] scrollbar-thin
-    transition-all duration-300 ease-in-out
-    ${sidebarCollapsed 
-      ? "lg:left-[calc(50%+36px)] lg:-translate-x-1/2" 
-      : "lg:left-[calc(50%+140px)] lg:-translate-x-1/2"
-    }
+    bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 overflow-y-auto max-h-[92vh] scrollbar-thin
+    transition-all duration-300 ease-in-out z-[100] w-[calc(100vw-2rem)]
   `;
 
   const dialogOverlayClass = `
-    transition-all duration-300 ease-in-out
-    ${sidebarCollapsed 
-      ? "lg:left-[72px] lg:w-[calc(100vw-72px)]" 
-      : "lg:left-[280px] lg:w-[calc(100vw-280px)]"
-    }
+    transition-all duration-300 ease-in-out z-[99]
   `;
+
+  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
+  
+  // We simply shift the center ('left' property) by half the sidebar width, 
+  // and limit the width so it mathematically cannot overlap the sidebar.
+  // Radix UI's default '-translate-x-1/2' will perfectly center it based on this new left position.
+  const contentStyle = {
+    maxWidth: "56rem", // 4xl
+    ...(isDesktop && {
+      left: sidebarCollapsed ? "calc(50% + 36px)" : "calc(50% + 140px)",
+      width: sidebarCollapsed ? "calc(100vw - 72px - 2rem)" : "calc(100vw - 280px - 2rem)"
+    })
+  };
+
+  const overlayStyle = {
+    ...(isDesktop && {
+      left: sidebarCollapsed ? "72px" : "280px"
+    })
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={(val) => !val && onClose()}>
       <DialogContent 
         className={dialogContentClass}
+        style={contentStyle}
         overlayClassName={dialogOverlayClass}
       >
         <DialogHeader className="border-b border-zinc-150 dark:border-zinc-800 pb-3 pr-8 flex flex-row items-center gap-2">

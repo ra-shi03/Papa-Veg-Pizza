@@ -75,7 +75,7 @@ export const createKitchenStaff = async (req, res) => {
       roleDoc = roleDoc[0];
     }
 
-    // Hash password (User model pre-save hook also hashes, but we hash explicitly for safety)
+    // Hash password since the model no longer auto-hashes
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // Step 1: Create User record
@@ -89,9 +89,6 @@ export const createKitchenStaff = async (req, res) => {
       mobileVerified: true,
       isActive: (status || 'Active') === 'Active',
     }], { session });
-
-    // Use $locals to skip double-hashing in the model pre-save hook
-    newUser.$locals = { skipPasswordHash: true };
 
     // Step 2: Create Profile record
     const nameParts = fullName.trim().split(' ');
@@ -188,7 +185,12 @@ export const getKitchenStaff = async (req, res) => {
     }
 
     const { search, status } = req.query;
-    const query = { storeId: callerStoreId, status: { $ne: 'DELETED' } };
+    const query = { 
+      storeId: callerStoreId, 
+      status: { $ne: 'DELETED' },
+      userId: { $ne: req.user.userId } // Exclude the Store Manager themselves
+    }; 
+    console.log("getKitchenStaff Query:", query);
 
     if (status && status !== 'All') query.status = status;
     if (search) {

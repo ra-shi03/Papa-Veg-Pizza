@@ -911,7 +911,12 @@ export const changeAdminPassword = async (
   if (!newPassword || String(newPassword).length < 6) {
     throw new ValidationError("New password must be at least 6 characters");
   }
-  admin.password = newPassword;
+
+  const bcrypt = await import('bcryptjs');
+  const salt = await bcrypt.default.genSalt(12);
+  const hashedPassword = await bcrypt.default.hash(newPassword, salt);
+  
+  admin.password = hashedPassword;
   await admin.save();
 
   try {
