@@ -55,6 +55,7 @@ const FranchiseTicket = lazy(() => import("../support/FranchiseTicket"))
 const SupportRequests = lazy(() => import("../support/SupportRequests"))
 const FeedbackAndReview = lazy(() => import("../support/FeedbackAndReview"))
 const CustomerComplaints = lazy(() => import("../support/CustomerComplaints"))
+const WelcomePage = lazy(() => import("../user-app/WelcomePage"))
 
 // Shared layout shell for user management pages to inherit Sidebar and Navbar
 function SuperAdminLayout() {
@@ -155,6 +156,8 @@ function SuperAdminLayout() {
     activeItem = "Customer Complaints"
   } else if (location.pathname.includes("/feedback-reviews")) {
     activeItem = "Feedback & Reviews"
+  } else if (location.pathname.includes("/user-app/welcome-page")) {
+    activeItem = "Welcome Page"
   }
 
   const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem("sa_sidebar_collapsed") === "true")
@@ -262,6 +265,7 @@ export default function SuperAdminRouter() {
             <Route path="/support-requests" element={<SupportRequests />} />
             <Route path="/customer-complaints" element={<CustomerComplaints />} />
             <Route path="/feedback-reviews" element={<FeedbackAndReview />} />
+            <Route path="/user-app/welcome-page" element={<WelcomePage />} />
           </Route>
         </Route>
 

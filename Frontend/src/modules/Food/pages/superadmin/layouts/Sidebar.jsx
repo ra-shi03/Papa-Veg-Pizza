@@ -43,7 +43,8 @@ import {
   ShieldAlert,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Smartphone
 } from "lucide-react"
 
 export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, isCollapsed = false, onToggleCollapse }) {
@@ -157,6 +158,12 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
         { name: "Franchise Tickets", icon: Ticket },
         { name: "Support Requests", icon: LifeBuoy },
         { name: "Feedback & Reviews", icon: Star }
+      ]
+    },
+    {
+      title: "User App",
+      items: [
+        { name: "Welcome Page", icon: Smartphone }
       ]
     }
   ]
@@ -410,6 +417,8 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
                                 navigate("/food/superadmin/kitchen-staff")
                               } else if (item.name === "Roles & Permissions") {
                                 navigate("/food/superadmin/roles-permissions")
+                              } else if (item.name === "Welcome Page") {
+                                navigate("/food/superadmin/user-app/welcome-page")
                               }
                               // On mobile, close sidebar when clicking a menu item
                               if (window.innerWidth < 1024) {
