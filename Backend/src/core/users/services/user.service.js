@@ -22,11 +22,15 @@ export const createStaffUser = async (staffData) => {
         if (!role) throw new Error(`Role ${staffData.roleCode} not found in database.`);
 
         // 3. Create the Base User (Auth details)
-        // Ensure your pre-save hook in user.model.js hashes the password
+        // Explicitly hash the password since the model no longer auto-hashes
+        const bcrypt = await import('bcryptjs');
+        const salt = await bcrypt.default.genSalt(12);
+        const hashedPassword = await bcrypt.default.hash(staffData.password, salt);
+
         const newUser = new User({
             email: staffData.email,
             mobile: staffData.mobile,
-            password: staffData.password, 
+            password: hashedPassword, 
             primaryRole: role._id,
             loginType: 'PASSWORD'
         });
