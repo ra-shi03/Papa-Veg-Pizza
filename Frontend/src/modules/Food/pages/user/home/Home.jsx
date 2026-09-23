@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { motion, AnimatePresence, useInView } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import DeliveryMapModal from "@food/components/user/DeliveryMapModal"
 import DeliveryOrCollectionModal from "@food/components/user/DeliveryOrCollectionModal"
 import TakeawayMapModal from "@food/components/user/TakeawayMapModal"
@@ -9,88 +9,19 @@ import OrderDetailsFlow from "@food/pages/user/orders/OrderDetailsFlow"
 import { useLocationStore } from "@food/store/locationStore"
 import { useLocationGuard } from "@food/hooks/useLocationGuard"
 import logoNew from "@/assets/logo1.png"
-const PRODUCTS = [
-  {
-    id: "margherita-supreme",
-    title: "Margherita Supreme",
-    price: 299,
-    rating: 4.9,
-    description: "Buffalo mozzarella, San Marzano tomatoes, fresh basil.",
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuBluz4eCNAilJO6yR3_OFzJkONQMKo9XRScol5o2w_wqSUPMQDImok1wr4UrTbZd0tDM7eicy98AOUq9ORUm23pi_z6uJuyeKQ3_tMtGkycxVZqFNywk1nb7d0RmEboytoVC-L__LD3BvG4JNTz3ZyFOnr8AyX-1ztogKmbBa3797PAAs2KoxmP2fFsZ_kMnaS2D-lsv6J0g5sQojmKXNF9d470loeENjh89lAF_TJu4TG-lB2oxnC2s56TPYL6h1CjXGleROU_bDPc",
-    category: "pizza"
-  },
-  {
-    id: "farmhouse-delight",
-    title: "Farmhouse Delight",
-    price: 349,
-    rating: 4.8,
-    description: "Mushrooms, onions, peppers, and sweet corn.",
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuA6Rib9mlrsig1haXvSfhY1zS2NGAIwUFig_-dDDTjQXBRJ_hdwzvKhvSs4X_KczL-USNdycC0vnIVox-Oyrmt5zbOdPneq43yDpJwEWYB3CSCU5gL7rFmEitcAS-QChuUXgeCi6WJcn32uqxZfLupJCZNO4YVg04lB8Y1JIsHt8L0bgON_2RuBMVL02rBMhN5haheBGgLGmqbDG4wUP7bqztn0gWQKQQedaHRRZ14BMbnbI7P9oZaCYPYkXEol9_8DJ3BLamRCaUpO",
-    category: "pizza"
-  }
-]
+import { PRODUCTS, DEALS } from "./HomeData"
+import { InCarModal } from "./components/InCarModal"
+import { HomeStyles } from "./components/HomeStyles"
+import { HomeHeader } from "./components/HomeHeader"
+import { OrderMethods } from "./components/OrderMethods"
+import { HomeSections } from "./components/HomeSections"
 
-const DEALS = [
-  {
-    id: "deal-bogo",
-    badge: "Bestseller",
-    title: "BOGO: Any Medium Pizza",
-    description: "Buy 1 Get 1 Free on all medium signature pizzas.",
-    badgeColor: "bg-primary text-on-primary"
-  },
-  {
-    id: "deal-feast",
-    badge: "Value",
-    title: "Family Feast Combo",
-    description: "2 Large Pizzas + Garlic Bread + 2L Coke.",
-    badgeColor: "bg-tertiary text-on-tertiary"
-  },
-  {
-    id: "deal-student",
-    badge: "Hot",
-    title: "Student Special",
-    description: "Flat 25% Off on presenting valid student ID.",
-    badgeColor: "bg-primary-container text-on-primary-container"
-  }
-]
-
-const cardVariants = {
-  hidden: {
-    opacity: 0,
-    y: 40,
-    clipPath: "inset(100% 0% 0% 0% round 16px)",
-    scale: 1.0
-  },
-  visible: (index) => ({
-    opacity: 1,
-    y: 0,
-    clipPath: "inset(-30px -30px -30px -30px round 16px)",
-    scale: 1.0,
-    transition: {
-      default: { duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: index * 0.08 },
-      scale: { duration: 0.25, ease: "easeOut" }
-    }
-  }),
-  selected: (index) => ({
-    opacity: 1,
-    y: 0,
-    clipPath: "inset(-30px -30px -30px -30px round 16px)",
-    scale: 1.08,
-    transition: {
-      default: { duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: index * 0.08 },
-      scale: { duration: 0.25, ease: "easeOut", delay: 0 }
-    }
-  })
-}
 
 export default function Home() {
   const navigate = useNavigate()
   const { isModalOpen, closeLocationModal, confirmLocation, locationConfirmed } = useLocationStore()
   const checkLocation = useLocationGuard()
-  const cardsRef = useRef(null)
-  const isCardsInView = useInView(cardsRef, { once: false, amount: 0.05 })
   const dealsRef = useRef(null)
-  const isDealsInView = useInView(dealsRef, { once: false, amount: 0.05 })
   const [activeDeal, setActiveDeal] = useState(null)
 
   // Dynamic Banners State
@@ -629,226 +560,9 @@ export default function Home() {
 
   return (
     <div className={`min-h-screen flex justify-center transition-colors duration-300 ${isDarkMode ? "bg-[#0a0a0a]" : "bg-gray-100"}`}>
-      <div className={`page-wrapper w-full max-w-md min-h-screen font-body-md text-body-md overflow-x-hidden pb-32 relative shadow-2xl border-x ${isDarkMode ? "border-zinc-800/40" : "border-gray-200/50"
+      <div className={`page-wrapper w-full max-w-md min-h-screen pb-32 relative shadow-2xl border-x ${isDarkMode ? "border-zinc-800/40" : "border-gray-200/50"
         }`}>
-        {/* Dynamic CSS Styling Injector to guarantee exact alignment */}
-        <style dangerouslySetInnerHTML={{
-          __html: `
-        .page-wrapper {
-          background: ${isDarkMode ? "#111111" : "radial-gradient(circle at top left, #FFF4F3 0%, #FAF9F6 40%, #F5F5F7 80%, #FAF9F6 100%)"} !important;
-          color: ${isDarkMode ? "#e5e2e1" : "#1c1b1b"} !important;
-        }
-        .glass-card {
-          background: ${isDarkMode ? "rgba(255, 255, 255, 0.05)" : "rgba(250, 249, 246, 0.75)"} !important;
-          backdrop-filter: blur(24px) !important;
-          border: 1px solid ${isDarkMode ? "rgba(255, 255, 255, 0.08)" : "rgba(229, 57, 53, 0.06)"} !important;
-          box-shadow: ${isDarkMode ? "none" : "0 8px 24px -4px rgba(229, 57, 53, 0.04), 0 4px 12px -2px rgba(0, 0, 0, 0.01)"} !important;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        }
-        .glass-card:hover {
-          box-shadow: ${isDarkMode ? "0 4px 20px rgba(0,0,0,0.3)" : "0 12px 25px -4px rgba(229, 57, 53, 0.06), 0 6px 12px -2px rgba(0, 0, 0, 0.01)"} !important;
-        }
-        .service-glass-card {
-          background: ${isDarkMode ? "rgba(255, 255, 255, 0.05)" : "rgba(250, 249, 246, 0.75)"} !important;
-          backdrop-filter: blur(24px) !important;
-          border: 1px solid ${isDarkMode ? "rgba(255, 255, 255, 0.08)" : "rgba(229, 57, 53, 0.06)"} !important;
-          box-shadow: ${isDarkMode ? "none" : "0 8px 24px -4px rgba(229, 57, 53, 0.04), 0 4px 12px -2px rgba(0, 0, 0, 0.01)"} !important;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        }
-        .hide-scrollbar::-webkit-scrollbar { display: none !important; }
-        .hide-scrollbar { -ms-overflow-style: none !important; scrollbar-width: none !important; }
-        .active-nav-glow { box-shadow: 0 0 15px rgba(229, 57, 53, 0.3) !important; }
-        .carousel-track { transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important; }
-        
-        /* Font Families */
-        .font-headline-lg-mobile, .font-headline-lg, .font-display-lg {
-          font-family: 'Plus Jakarta Sans', sans-serif !important;
-        }
-        .font-body-md, .font-label-sm, .font-price-xl {
-          font-family: 'Inter', sans-serif !important;
-        }
-        
-        /* Font Sizes & Sizing Styles */
-        .text-headline-lg-mobile {
-          font-size: 28px !important;
-          line-height: 34px !important;
-          font-weight: 800 !important;
-          letter-spacing: -0.02em !important;
-        }
-        .text-headline-lg {
-          font-size: 32px !important;
-          line-height: 40px !important;
-          letter-spacing: -0.01em !important;
-          font-weight: 800 !important;
-        }
-        .text-display-lg {
-          font-size: 40px !important;
-          line-height: 48px !important;
-          letter-spacing: -0.02em !important;
-          font-weight: 800 !important;
-        }
-        .text-body-md {
-          font-size: 16px !important;
-          line-height: 24px !important;
-          font-weight: 400 !important;
-        }
-        .text-label-sm {
-          font-size: 12px !important;
-          line-height: 16px !important;
-          letter-spacing: 0.05em !important;
-          font-weight: 600 !important;
-        }
-        .text-price-xl {
-          font-size: 24px !important;
-          line-height: 24px !important;
-          letter-spacing: -0.01em !important;
-          font-weight: 700 !important;
-        }
-        .px-margin-mobile {
-          padding-left: 20px !important;
-          padding-right: 20px !important;
-        }
-        .p-margin-mobile {
-          padding: 20px !important;
-        }
-        .right-margin-mobile {
-          right: 20px !important;
-        }
-        .gap-gutter {
-          gap: 16px !important;
-        }
-        .space-y-lg > :not([hidden]) ~ :not([hidden]) {
-          margin-top: 18px !important;
-        }
-        .p-md {
-          padding: 16px !important;
-        }
-        .p-lg {
-          padding: 24px !important;
-        }
-        .gap-xs {
-          gap: 8px !important;
-        }
-        .gap-sm {
-          gap: 12px !important;
-        }
-        .mb-xs {
-          margin-bottom: 8px !important;
-        }
-        .mb-md {
-          margin-bottom: 16px !important;
-        }
-        .bg-surface\/80 {
-          background-color: ${isDarkMode ? "rgba(19, 19, 19, 0.8)" : "rgba(250, 249, 246, 0.82)"} !important;
-          backdrop-filter: blur(20px) !important;
-        }
-        .bg-surface {
-          background-color: ${isDarkMode ? "#131313" : "#FAF9F6"} !important;
-        }
-        .text-primary {
-          color: #E53935 !important;
-        }
-        .bg-primary {
-          background-color: #E53935 !important;
-        }
-        .text-secondary {
-          color: #FF6B35 !important;
-        }
-        .bg-secondary {
-          background-color: #FF6B35 !important;
-        }
-        .bg-tertiary {
-          background-color: #3ce36a !important;
-        }
-        .text-tertiary {
-          color: #3ce36a !important;
-        }
-        .text-on-primary {
-          color: #ffffff !important;
-        }
-        .text-on-secondary {
-          color: #ffffff !important;
-        }
-        .text-on-tertiary {
-          color: #000000 !important;
-        }
-        .bg-primary-container {
-          background-color: #ff544c !important;
-        }
-        .text-on-primary-container {
-          color: #5c0005 !important;
-        }
-        .text-on-surface-variant {
-          color: ${isDarkMode ? "#e4beb9" : "#4b5563"} !important;
-        }
-        .border-primary\/20 {
-          border-color: ${isDarkMode ? "rgba(229, 57, 53, 0.2)" : "rgba(229, 57, 53, 0.1)"} !important;
-        }
-        .border-primary {
-          border-color: #E53935 !important;
-        }
-        .border-white\/10 {
-          border-color: ${isDarkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(229, 57, 53, 0.08)"} !important;
-        }
-        .border-white\/12 {
-          border-color: ${isDarkMode ? "rgba(255, 255, 255, 0.12)" : "rgba(229, 57, 53, 0.1)"} !important;
-        }
-        .bg-white\/5 {
-          background-color: ${isDarkMode ? "rgba(255, 255, 255, 0.05)" : "rgba(229, 57, 53, 0.03)"} !important;
-        }
-        .text-white\/70 {
-          color: ${isDarkMode ? "rgba(255, 255, 255, 0.7)" : "rgba(19, 19, 19, 0.7)"} !important;
-        }
-        .text-white\/50 {
-          color: ${isDarkMode ? "rgba(255, 255, 255, 0.5)" : "rgba(19, 19, 19, 0.5)"} !important;
-        }
-        .bg-black\/40 {
-          background-color: ${isDarkMode ? "rgba(0, 0, 0, 0.4)" : "rgba(255, 255, 255, 0.5)"} !important;
-        }
-        .perspective-1000 {
-          perspective: 1000px !important;
-          -webkit-perspective: 1000px !important;
-        }
-        .preserve-3d {
-          transform-style: preserve-3d !important;
-          -webkit-transform-style: preserve-3d !important;
-        }
-        .backface-hidden {
-          backface-visibility: hidden !important;
-          -webkit-backface-visibility: hidden !important;
-        }
-        .btn-3d-primary {
-          border-bottom: 2px solid #b71c1c !important;
-          transition: all 0.1s ease !important;
-        }
-        .btn-3d-primary:active {
-          border-bottom-width: 0px !important;
-          transform: translateY(2px) !important;
-          box-shadow: 0 1px 2px rgba(0,0,0,0.08) !important;
-        }
-        .hover-glow {
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        }
-        .hover-glow:hover {
-          box-shadow: ${isDarkMode
-              ? "0 8px 24px -4px rgba(229, 57, 53, 0.15), 0 4px 10px -2px rgba(229, 57, 53, 0.08)"
-              : "0 12px 25px -4px rgba(229, 57, 53, 0.08), 0 8px 12px -2px rgba(0, 0, 0, 0.02)"} !important;
-          border-color: ${isDarkMode ? "rgba(229, 57, 53, 0.2)" : "rgba(229, 57, 53, 0.1)"} !important;
-        }
-        .service-card {
-          border-bottom: 4px solid ${isDarkMode ? "#27272a" : "#e4e4e7"} !important;
-          box-shadow: ${isDarkMode
-              ? "none"
-              : "0 8px 16px -4px rgba(0, 0, 0, 0.06), 0 4px 8px -2px rgba(0, 0, 0, 0.02)"} !important;
-        }
-        .service-card.active-service-card {
-          border-bottom: 4px solid #b71c1c !important;
-          box-shadow: ${isDarkMode
-              ? "0 12px 25px rgba(229, 57, 53, 0.2)"
-              : "0 12px 25px -4px rgba(229, 57, 53, 0.22), 0 6px 12px -2px rgba(229, 57, 53, 0.1)"} !important;
-        }
-        `
-        }} />
+        <HomeStyles isDarkMode={isDarkMode} />
 
         {/* Custom Toast Alert */}
         {toast.visible && (
@@ -858,35 +572,16 @@ export default function Home() {
         )}
 
         {/* TopAppBar */}
-        <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 bg-surface/80 backdrop-blur-xl dark:bg-surface/80 border-b border-zinc-200/60 dark:border-zinc-800/60 shadow-[0_2px_12px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)] h-16 flex items-center justify-between px-margin-mobile">
-          <div className="w-10"></div>
-          <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center justify-center">
-            <img
-              src={logoUrl}
-              alt="Papa Veg Pizza Logo"
-              className="h-14 md:h-16 w-auto object-contain transition-transform duration-300 hover:scale-105"
-            />
-          </div>
-          <button
-            onClick={() => {
-              navigate("/user/notifications")
-              triggerToast("Opening Notifications")
-            }}
-            className="w-10 h-10 flex items-center justify-center text-primary dark:text-primary hover:opacity-85 transition-all active:scale-90 cursor-pointer bg-transparent border-0 outline-none"
-            title="Notifications"
-          >
-            <span className="material-symbols-outlined text-[24px]">notifications</span>
-          </button>
-        </header>
+        <HomeHeader deliveryAddress={deliveryAddress} />
 
         {/* Main Content */}
-        <main className="mt-16 space-y-lg">
+        <main className="space-y-lg mt-2">
           {/* Hero Banner Carousel */}
           <motion.section
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
-            className="relative h-[190px] mx-5 overflow-hidden rounded-2xl shadow-lg border border-black/5 dark:border-white/5"
+            className="relative h-[260px] mx-2 overflow-hidden rounded-[24px] shadow-lg border border-black/5 dark:border-white/5"
           >
             <div className="carousel-track flex h-full" style={{ transform: `translateX(-${activeSlide * 100}%)` }}>
               {banners.map((b) => (
@@ -923,20 +618,6 @@ export default function Home() {
             </div>
           </motion.section>
 
-          {/* Welcome Greeting */}
-          {userName && (
-            <div className="px-margin-mobile pt-2 pb-1 space-y-1">
-              <h2 className={`font-headline-lg-mobile text-2xl font-black tracking-tight leading-tight ${isDarkMode ? "text-white" : "text-[#131313]"}`}>
-                Welcome back {(() => {
-                  const firstName = userName.trim().split(/\s+/)[0];
-                  return firstName ? firstName.charAt(0).toUpperCase() + firstName.slice(1) : "";
-                })()}! 🍕
-              </h2>
-              <p className={`text-xs leading-normal ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
-                Select Delivery or Takeaway to see local deals
-              </p>
-            </div>
-          )}
 
           {/* Order Details Flow (Confirmation Bar) */}
           {locationConfirmed && activeService === "delivery" && (
@@ -950,294 +631,31 @@ export default function Home() {
           )}
 
           {/* Delivery/Takeaway Toggle */}
-          <section ref={cardsRef} className="px-margin-mobile grid grid-cols-2 gap-4">
-            {orderMethods.filter(m => m.enabled).map((service, index) => {
-              const isSelected = activeService === service.id
-              return (
-                <motion.div
-                  key={service.id}
-                  variants={cardVariants}
-                  custom={index}
-                  initial="hidden"
-                  animate={!isCardsInView ? "hidden" : isSelected ? "selected" : "visible"}
-                  onClick={() => {
-                    if (service.id === "delivery") {
-                      setShowMapModal(true)
-                    } else if (service.id === "takeaway") {
-                      setShowStoreModal(true)
-                    } else if (service.id === "incar") {
-                      setShowCarModal(true)
-                    } else if (service.id === "train") {
-                      setShowTrainModal(true)
-                    } else {
-                      setActiveService(service.id)
-                      localStorage.setItem("activeService", service.id)
-                      triggerToast(`Switched to ${service.label}`)
-                    }
-                  }}
-                  className={`w-full h-[96px] rounded-xl p-2.5 flex flex-col items-center justify-center gap-1 border transition-all duration-300 cursor-pointer select-none ${isSelected
-                    ? "border-[#E53935]/40 shadow-lg shadow-[#E53935]/5 active-service-card"
-                    : "border-black/5 dark:border-white/5"
-                    } service-glass-card service-card`}
-                >
-                  <div className={`rounded-full flex items-center justify-center transition-all duration-300 ${isSelected
-                    ? "bg-[#E53935] text-white shadow-md shadow-[#E53935]/20 w-11 h-11"
-                    : "bg-[#131313]/5 dark:bg-white/5 text-on-surface-variant w-9 h-9"
-                    }`}>
-                    <span className={`material-symbols-outlined transition-all duration-300 ${isSelected ? "text-[26px]" : "text-[20px]"}`}>{service.icon}</span>
-                  </div>
-                  <span className={`font-label-sm uppercase tracking-wider text-[9px] ${isSelected ? "text-[#E53935] font-extrabold" : "opacity-75 font-semibold"
-                    }`}>
-                    {service.label}
-                  </span>
-                </motion.div>
-              )
-            })}
-          </section>
+          <OrderMethods
+            orderMethods={orderMethods}
+            activeService={activeService}
+            setActiveService={setActiveService}
+            setShowMapModal={setShowMapModal}
+            setShowStoreModal={setShowStoreModal}
+            setShowCarModal={setShowCarModal}
+            setShowTrainModal={setShowTrainModal}
+            triggerToast={triggerToast}
+            isDarkMode={isDarkMode}
+          />
 
-          {/* Hot Deals Section */}
-          <section>
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.05 }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-              className="px-margin-mobile flex justify-between items-end mb-md"
-            >
-              <h3 className={`font-headline-lg-mobile ${isDarkMode ? "text-white" : "text-[#131313]"}`}>Hot Deals</h3>
-              <button
-                onClick={() => {
-                  checkLocation(() => {
-                    navigate("/user/deals");
-                    triggerToast("Opening hot deals...");
-                  });
-                }}
-                className="text-primary font-label-sm flex items-center gap-1 cursor-pointer hover:opacity-80 bg-transparent border-0 outline-none"
-              >
-                View Deals
-              </button>
-            </motion.div>
-            <div ref={dealsRef} className="flex overflow-x-auto hide-scrollbar gap-4 px-margin-mobile pb-3 pt-1">
-              {deals.map((deal, index) => {
-                const badgeColorClass =
-                  deal.badge === "Bestseller"
-                    ? "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20"
-                    : deal.badge === "Value"
-                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                      : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                
-                const isClaimed = activeDeal === deal.id
-                const isCouponCode = deal.title && /^[A-Z0-9_-]+$/.test(deal.title)
-
-                return (
-                  <motion.div
-                    key={deal.id}
-                    variants={cardVariants}
-                    custom={index}
-                    initial="hidden"
-                    animate={!isDealsInView ? "hidden" : activeDeal === deal.id ? "selected" : "visible"}
-                    onClick={() => {
-                      setActiveDeal(deal.id)
-                      checkLocation(() => {
-                        triggerToast("Deal claimed successfully!");
-                      });
-                    }}
-                    className={`min-w-[165px] max-w-[165px] rounded-2xl flex flex-col justify-between h-[175px] border transition-all duration-300 cursor-pointer select-none relative overflow-hidden ${
-                      isClaimed
-                        ? "border-[#E53935]/45 shadow-md shadow-[#E53935]/8 dark:shadow-[#E53935]/4"
-                        : "border-zinc-200/60 dark:border-zinc-800/40 hover:border-zinc-300 dark:hover:border-zinc-700"
-                    } ${
-                      isDarkMode 
-                        ? "bg-gradient-to-b from-zinc-900/90 to-zinc-950/95" 
-                        : "bg-gradient-to-b from-white to-zinc-50/80"
-                    }`}
-                  >
-                    {/* Top Section */}
-                    <div className="p-3 pt-3 flex flex-col flex-1 justify-start">
-                      <div className="flex flex-col items-start gap-1">
-                        <div className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${badgeColorClass}`}>
-                          {deal.badge}
-                        </div>
-                        
-                        {isCouponCode ? (
-                          <div className="font-mono text-[11px] font-extrabold tracking-widest text-[#E53935] dark:text-[#ff5252] bg-[#E53935]/5 dark:bg-[#ff5252]/10 border border-dashed border-[#E53935]/20 dark:border-[#ff5252]/30 px-2 py-0.5 rounded mt-1 text-center select-all">
-                            {deal.title}
-                          </div>
-                        ) : (
-                          <h4 className={`font-sans text-[11px] font-extrabold leading-tight line-clamp-2 mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
-                            {deal.title}
-                          </h4>
-                        )}
-                        
-                        <p className={`text-[10px] leading-snug line-clamp-2 mt-1.5 opacity-75 ${isDarkMode ? "text-zinc-400" : "text-zinc-500"}`}>
-                          {deal.description}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Ticket Tear Line & Cutouts */}
-                    <div className="relative w-full flex items-center justify-between py-1 z-10">
-                      {/* Left Cutout */}
-                      <div className="absolute -left-[7px] w-3 h-3 rounded-full bg-[#FAF9F6] dark:bg-[#111111] border-r border-zinc-200/60 dark:border-zinc-800/40 z-10"></div>
-                      {/* Right Cutout */}
-                      <div className="absolute -right-[7px] w-3 h-3 rounded-full bg-[#FAF9F6] dark:bg-[#111111] border-l border-zinc-200/60 dark:border-zinc-800/40 z-10"></div>
-                      {/* Dashed Line */}
-                      <div className="w-full border-t border-dashed border-zinc-200/80 dark:border-zinc-800/80 z-0"></div>
-                    </div>
-
-                    {/* Bottom Section */}
-                    <div className="p-3 pt-1">
-                      {isClaimed ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                          }}
-                          className="w-full h-8 bg-emerald-600 dark:bg-emerald-600 text-white rounded-lg font-bold text-[9px] tracking-wider uppercase flex items-center justify-center gap-1 transition-all duration-300 cursor-default"
-                        >
-                          Claimed ✓
-                        </button>
-                      ) : (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveDeal(deal.id);
-                            checkLocation(() => {
-                              triggerToast("Deal claimed successfully!");
-                            });
-                          }}
-                          className="w-full h-8 bg-primary text-on-primary rounded-lg font-bold text-[9px] tracking-wider uppercase cursor-pointer hover:bg-red-700 transition-colors btn-3d-primary flex items-center justify-center"
-                        >
-                          Claim Deal
-                        </button>
-                      )}
-                    </div>
-                  </motion.div>
-                )
-              })}
-            </div>
-          </section>
-
-          {/* Menu Categories */}
-          <section>
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.05 }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-              className="px-margin-mobile flex justify-between items-end mb-md"
-            >
-              <h3 className={`font-headline-lg-mobile ${isDarkMode ? "text-white" : "text-[#131313]"}`}>Menus</h3>
-              <button
-                onClick={() => {
-                  navigate("/user/menu")
-                  triggerToast("Opening Menu List...")
-                }}
-                className="text-primary font-label-sm flex items-center gap-1 cursor-pointer hover:opacity-80 bg-transparent border-0 outline-none"
-              >
-                View Menu
-              </button>
-            </motion.div>
-            <div className="flex overflow-x-auto hide-scrollbar gap-sm px-margin-mobile pb-2">
-              {categories.map((cat, index) => {
-                const isSelected = activeCategory === cat.id
-                const isLeft = index % 2 === 0
-                return (
-                  <motion.div
-                    key={cat.id}
-                    initial={{ opacity: 0, x: isLeft ? -40 : 40 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true, amount: 0.05 }}
-                    transition={{ duration: 0.5, type: "spring", stiffness: 120, damping: 14 }}
-                    onClick={() => {
-                      navigate("/user/menu", { state: { category: cat.id } })
-                      triggerToast(`Opening Menu - ${cat.label}`)
-                    }}
-                    whileHover={{ scale: 1.08 }}
-                    className="flex flex-col items-center gap-xs min-w-[70px] cursor-pointer group"
-                  >
-                    <motion.div
-                      whileHover={{ rotate: 5 }}
-                      className={`w-16 h-16 rounded-full glass-card flex items-center justify-center transition-all duration-300 ${isSelected
-                        ? "bg-primary text-white shadow-lg shadow-primary/30 scale-105 border-transparent"
-                        : "text-on-surface-variant hover:border-primary/30 hover:scale-105"
-                        }`}
-                    >
-                      <span className="material-symbols-outlined">{cat.icon}</span>
-                    </motion.div>
-                    <span className={`font-label-sm transition-colors duration-300 ${isSelected ? "text-primary font-bold" : "opacity-60 group-hover:text-primary"}`}>{cat.label}</span>
-                  </motion.div>
-                )
-              })}
-            </div>
-          </section>
-
-          {/* Most Loved Pizzas */}
-          <section>
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.05 }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-              className="px-margin-mobile mb-md"
-            >
-              <h3 className={`font-headline-lg-mobile ${isDarkMode ? "text-white" : "text-[#131313]"}`}>Most Loved</h3>
-            </motion.div>
-            <div className="flex overflow-x-auto hide-scrollbar gap-gutter px-margin-mobile pb-4">
-              {products.map((product, index) => {
-                const isFav = favorites.includes(product.id)
-                const isLeft = index % 2 === 0
-                return (
-                  <motion.div
-                    key={product.id}
-                    initial={{ opacity: 0, x: isLeft ? -60 : 60 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true, amount: 0.05 }}
-                    transition={{ duration: 0.6, type: "spring", stiffness: 100, damping: 15 }}
-                    whileHover={{ scale: 1.03, y: -4 }}
-                    className="min-w-[195px] max-w-[195px] glass-card rounded-2xl overflow-hidden group relative hover-glow flex flex-col justify-between"
-                  >
-                    <div className="relative h-28 overflow-hidden bg-zinc-900">
-                      <img
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                        alt={product.title}
-                        src={product.image}
-                      />
-                      <button
-                        onClick={() => toggleFavorite(product.id)}
-                        className="absolute top-2 right-2 bg-black/40 backdrop-blur-md rounded-full p-1.5 text-primary cursor-pointer active:scale-90 transition-transform flex items-center justify-center border-0 outline-none"
-                      >
-                        <span className="material-symbols-outlined text-xs fill" style={{ fontVariationSettings: ` 'FILL' ${isFav ? 1 : 0} `, fontSize: "14px" }}>
-                          favorite
-                        </span>
-                      </button>
-                    </div>
-                    <div className="p-3 space-y-1.5 flex flex-col justify-between flex-1">
-                      <div>
-                        <div className="flex justify-between items-start gap-1">
-                          <h4 className={`font-sans text-[11px] font-bold leading-tight line-clamp-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>{product.title}</h4>
-                          <div className="flex items-center gap-0.5 text-secondary shrink-0">
-                            <span className="material-symbols-outlined text-[10px] fill" style={{ fontVariationSettings: " 'FILL' 1 " }}>star</span>
-                            <span className="text-[9px] font-bold">{product.rating}</span>
-                          </div>
-                        </div>
-                        <p className={`text-[10px] leading-normal line-clamp-1 mt-0.5 ${isDarkMode ? "text-zinc-400" : "text-zinc-500"}`}>{product.description}</p>
-                      </div>
-                      <div className="flex items-center justify-between pt-1">
-                        <span className="text-sm font-bold text-primary">₹{product.price}</span>
-                        <button
-                          onClick={() => checkLocation(() => addToCart(product.id))}
-                          className="h-7 px-3.5 bg-primary text-on-primary rounded-full font-bold active:scale-95 hover:bg-red-700 transition-all cursor-pointer btn-3d-primary text-[10px] uppercase tracking-wide flex items-center justify-center"
-                        >
-                          Add
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-                )
-              })}
-            </div>
-          </section>
-
+          <HomeSections
+            deals={deals}
+            categories={categories}
+            products={products}
+            activeCategory={activeCategory}
+            favorites={favorites}
+            isDarkMode={isDarkMode}
+            checkLocation={checkLocation}
+            triggerToast={triggerToast}
+            toggleFavorite={toggleFavorite}
+            addToCart={addToCart}
+            dealsRef={dealsRef}
+          />
           {/* Fresh Ingredients */}
           <motion.section
             initial={{ opacity: 0, x: -50 }}
@@ -1372,62 +790,14 @@ export default function Home() {
         />
 
         {/* In-Car Details Modal */}
-        {showCarModal && (
-          <div className="fixed inset-0 z-55 flex items-center justify-center p-5 bg-black/60 backdrop-blur-sm dark">
-            <div className="w-full max-w-sm glass-card rounded-3xl p-6 space-y-4 text-left">
-              <div className="flex justify-between items-center">
-                <h3 className="font-headline-lg-mobile text-lg text-white">In-Car Dining</h3>
-                <button
-                  onClick={() => setShowCarModal(false)}
-                  className="material-symbols-outlined text-white/50 hover:text-white cursor-pointer bg-transparent border-0 outline-none"
-                >
-                  close
-                </button>
-              </div>
-              <p className="text-xs opacity-60 leading-relaxed text-white">
-                Please enter your car number or vehicle registration details so we can deliver your hot pizza straight to your window:
-              </p>
-
-              {/* Input field */}
-              <div className="space-y-1.5">
-                <span className="text-[10px] uppercase opacity-50 font-bold tracking-wider text-white">Car Number</span>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="e.g. DL 3C AB 1234"
-                    value={carNumber}
-                    onChange={(e) => setCarNumber(e.target.value)}
-                    className="w-full h-11 bg-white/5 border border-white/10 rounded-xl px-4 text-xs font-bold text-white outline-none"
-                  />
-                  <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-white/50 text-sm">
-                    directions_car
-                  </span>
-                </div>
-              </div>
-
-              {/* Confirm button */}
-              <button
-                onClick={() => {
-                  const cleanCar = carNumber.trim()
-                  if (!cleanCar) {
-                    triggerToast("Please enter a valid car number")
-                    return
-                  }
-                  setCarNumber(cleanCar)
-                  confirmLocation({
-                    address: cleanCar,
-                    serviceType: "incar"
-                  })
-                  setShowCarModal(false)
-                  triggerToast("Car details confirmed!")
-                }}
-                className="w-full h-11 bg-primary text-on-primary font-bold rounded-xl text-xs uppercase cursor-pointer border-0 shadow-lg active:scale-95 transition-all"
-              >
-                Confirm Vehicle
-              </button>
-            </div>
-          </div>
-        )}
+        <InCarModal
+          showCarModal={showCarModal}
+          setShowCarModal={setShowCarModal}
+          carNumber={carNumber}
+          setCarNumber={setCarNumber}
+          confirmLocation={confirmLocation}
+          triggerToast={triggerToast}
+        />
 
         {/* Deliver on Train Modal */}
         <DeliverOnTrainModal

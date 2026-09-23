@@ -4,6 +4,7 @@ import { ProfileProvider } from "@food/context/ProfileContext"
 import LocationPrompt from "./LocationPrompt"
 import { CartProvider } from "@food/context/CartContext"
 import { OrdersProvider } from "@food/context/OrdersContext"
+import "@food/pages/user/userTheme.css"
 const debugLog = (...args) => { }
 const debugWarn = (...args) => { }
 const debugError = (...args) => { }
@@ -136,7 +137,7 @@ export default function UserLayout() {
   const isUnder250 = normalizedPath === "/under-250" || normalizedPath === "/user/under-250"
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] dark:bg-[#0a0a0a] transition-colors duration-200">
+    <div className="user-app-theme min-h-screen transition-colors duration-200" style={{ background: 'var(--secondary-off-white)', color: 'var(--primary-gray)' }}>
       <CartProvider>
         <ProfileProvider>
           <OrdersProvider>
