@@ -1,0 +1,198 @@
+/* ============================================================
+   User App Theme — Single Source of Truth
+   All user-facing pages inherit these variables & utilities.
+   ============================================================ */
+
+/* ---------- CSS Variables + Poppins Font ------------------- */
+.user-app-theme {
+  font-family: 'Poppins', sans-serif;
+  --primary-gray:        #34373C;
+  --secondary-off-white: #F8F6F2;
+  --accent-red:          #ED2F35;
+  --muted-gray:          #62666D;
+  --border-gray:         #D4D2CF;
+}
+
+/* Dark mode overrides */
+.dark .user-app-theme {
+  --primary-gray:        #F8F6F2;
+  --secondary-off-white: #131313;
+  --accent-red:          #ED2F35;
+  --muted-gray:          #a1a1aa;
+  --border-gray:         rgba(255, 255, 255, 0.10);
+}
+
+/* ---------- Page Wrapper ------------------------------------ */
+.user-app-theme.page-wrapper,
+.user-app-theme .page-wrapper {
+  background: var(--secondary-off-white);
+  color:      var(--primary-gray);
+  font-family: 'Poppins', sans-serif;
+}
+
+/* ---------- Scrollbar hide ---------------------------------- */
+.user-app-theme .hide-scrollbar::-webkit-scrollbar { display: none; }
+.user-app-theme .hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ---------- Carousel --------------------------------------- */
+.user-app-theme .carousel-track {
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ---------- Glass Card ------------------------------------- */
+.user-app-theme .glass-card {
+  background:      rgba(255, 255, 255, 0.80);
+  backdrop-filter: blur(24px);
+  border:          1px solid rgba(212, 210, 207, 0.5);
+  box-shadow:      0 4px 16px rgba(0,0,0,0.05);
+  transition:      all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.dark .user-app-theme .glass-card {
+  background: rgba(255, 255, 255, 0.05);
+  border:     1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+.user-app-theme .glass-card:hover {
+  box-shadow: 0 12px 28px rgba(0,0,0,0.08);
+}
+.dark .user-app-theme .glass-card:hover {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+/* ---------- Neomorphic ------------------------------------ */
+.user-app-theme .neo-3d {
+  background:  var(--secondary-off-white);
+  box-shadow:  5px 5px 10px rgba(0,0,0,0.06), -5px -5px 10px rgba(255,255,255,0.9);
+  border:      none;
+}
+.dark .user-app-theme .neo-3d {
+  box-shadow: 5px 5px 10px rgba(0,0,0,0.2), -5px -5px 10px rgba(255,255,255,0.02);
+}
+.user-app-theme .neo-3d:active {
+  box-shadow: inset 3px 3px 6px rgba(0,0,0,0.06), inset -3px -3px 6px rgba(255,255,255,0.9);
+}
+.dark .user-app-theme .neo-3d:active {
+  box-shadow: inset 3px 3px 6px rgba(0,0,0,0.2), inset -3px -3px 6px rgba(255,255,255,0.02);
+}
+.user-app-theme .neo-3d-inset {
+  background:  var(--secondary-off-white);
+  box-shadow:  inset 4px 4px 8px rgba(0,0,0,0.05), inset -4px -4px 8px rgba(255,255,255,0.9);
+  border:      none;
+}
+.dark .user-app-theme .neo-3d-inset {
+  box-shadow: inset 4px 4px 8px rgba(0,0,0,0.3), inset -4px -4px 8px rgba(255,255,255,0.03);
+}
+.user-app-theme .neo-3d-inset:focus {
+  box-shadow: inset 5px 5px 10px rgba(0,0,0,0.06), inset -5px -5px 10px rgba(255,255,255,1);
+  outline: none;
+}
+.dark .user-app-theme .neo-3d-inset:focus {
+  box-shadow: inset 5px 5px 10px rgba(0,0,0,0.3), inset -5px -5px 10px rgba(255,255,255,0.05);
+}
+
+/* ---------- Service Cards (Order Method Cards) ------------- */
+.user-app-theme .order-method-card {
+  background:    #ffffff;
+  border:        1px solid var(--border-gray);
+  border-radius: 14px;
+  transition:    all 0.2s ease;
+  cursor:        pointer;
+}
+.dark .user-app-theme .order-method-card {
+  background: rgba(255,255,255,0.06);
+  border:     1px solid rgba(255,255,255,0.10);
+}
+.user-app-theme .order-method-card:active {
+  transform: scale(0.97);
+}
+.user-app-theme .order-method-card.active {
+  border-color: var(--accent-red);
+  background:   rgba(237, 47, 53, 0.04);
+}
+.dark .user-app-theme .order-method-card.active {
+  background: rgba(237, 47, 53, 0.12);
+}
+
+/* ---------- Spacing Utilities ----------------------------- */
+.user-app-theme .px-margin-mobile { padding-left: 20px; padding-right: 20px; }
+.user-app-theme .p-margin-mobile  { padding: 20px; }
+.user-app-theme .right-margin-mobile { right: 20px; }
+.user-app-theme .gap-gutter        { gap: 16px; }
+.user-app-theme .gap-xs            { gap: 8px; }
+.user-app-theme .gap-sm            { gap: 12px; }
+.user-app-theme .mb-xs             { margin-bottom: 8px; }
+.user-app-theme .mb-md             { margin-bottom: 16px; }
+.user-app-theme .p-md              { padding: 16px; }
+.user-app-theme .p-lg              { padding: 24px; }
+.user-app-theme .space-y-lg > :not([hidden]) ~ :not([hidden]) { margin-top: 20px; }
+
+/* ---------- Font Utilities -------------------------------- */
+.user-app-theme .font-headline-lg-mobile,
+.user-app-theme .font-headline-lg,
+.user-app-theme .font-display-lg {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+}
+.user-app-theme .font-body-md,
+.user-app-theme .font-label-sm,
+.user-app-theme .font-price-xl {
+  font-family: 'Poppins', sans-serif;
+}
+
+/* ---------- Color Utilities ------------------------------- */
+.user-app-theme .text-primary       { color: var(--accent-red); }
+.user-app-theme .bg-primary         { background-color: var(--accent-red); }
+.user-app-theme .border-primary     { border-color: var(--accent-red); }
+.user-app-theme .text-on-primary    { color: #ffffff; }
+.user-app-theme .text-muted         { color: var(--muted-gray); }
+.user-app-theme .text-on-surface-variant { color: var(--muted-gray); }
+.dark .user-app-theme .text-on-surface-variant { color: #e4beb9; }
+
+/* ---------- Button 3D Primary ----------------------------- */
+.user-app-theme .btn-3d-primary {
+  border-bottom: 2px solid #b71c1c;
+  transition: all 0.1s ease;
+}
+.user-app-theme .btn-3d-primary:active {
+  border-bottom-width: 0;
+  transform: translateY(2px);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+
+/* ---------- Hover Glow ------------------------------------ */
+.user-app-theme .hover-glow {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.user-app-theme .hover-glow:hover {
+  box-shadow:   0 12px 28px rgba(237,47,53,0.10);
+  border-color: rgba(237,47,53,0.18);
+}
+.dark .user-app-theme .hover-glow:hover {
+  box-shadow:   0 8px 24px rgba(237,47,53,0.18);
+  border-color: rgba(237,47,53,0.25);
+}
+
+/* ---------- Active Nav Glow ------------------------------- */
+.user-app-theme .active-nav-glow {
+  box-shadow: 0 0 15px rgba(237, 47, 53, 0.3);
+}
+
+/* ---------- Header Sticky Behaviour ----------------------- */
+.user-app-theme .home-header-topbar {
+  background:    var(--secondary-off-white);
+  border-bottom: 1px solid var(--border-gray);
+}
+.user-app-theme .home-header-searchbar {
+  position:   sticky;
+  top:        0;
+  z-index:    50;
+  background: var(--secondary-off-white);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.user-app-theme .home-header-searchbar.is-stuck {
+  box-shadow:    none;
+  border-bottom: none;
+}

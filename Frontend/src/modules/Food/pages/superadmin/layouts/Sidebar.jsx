@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useSystemTheme } from "@/shared/utils/themeSync"
 import {
+  Home,
   LayoutDashboard,
   Users,
   UserCheck,
@@ -44,8 +45,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Smartphone
-} from "lucide-react"
+  Smartphone } from "lucide-react"
 
 export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, isCollapsed = false, onToggleCollapse }) {
   const navigate = useNavigate()
@@ -163,7 +163,8 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
     {
       title: "User App",
       items: [
-        { name: "Welcome Page", icon: Smartphone }
+        { name: "Welcome Page", icon: Smartphone },
+        { name: "Home Page", icon: Home }
       ]
     }
   ]
@@ -419,6 +420,8 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
                                 navigate("/food/superadmin/roles-permissions")
                               } else if (item.name === "Welcome Page") {
                                 navigate("/food/superadmin/user-app/welcome-page")
+                              } else if (item.name === "Home Page") {
+                                navigate("/food/superadmin/user-app/home-page")
                               }
                               // On mobile, close sidebar when clicking a menu item
                               if (window.innerWidth < 1024) {
