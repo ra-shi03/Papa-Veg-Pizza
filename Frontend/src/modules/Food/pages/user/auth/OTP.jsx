@@ -6,10 +6,11 @@ import { Input } from "@food/components/ui/input"
 import { Button } from "@food/components/ui/button"
 import { authAPI, userAPI } from "@food/api"
 import { setAuthData as setUserAuthData } from "@food/utils/auth"
+import { motion } from "framer-motion"
 
 export default function OTP() {
   const navigate = useNavigate()
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]) // exactly 6 digits
+  const [otp, setOtp] = useState(["1", "2", "3", "4"]) // By default OTP is 1234
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
@@ -89,14 +90,14 @@ export default function OTP() {
     setOtp(newOtp)
     setError("")
 
-    // Auto-focus next input (6 boxes)
-    if (value && index < 5) {
+    // Auto-focus next input (4 boxes)
+    if (value && index < 3) {
       inputRefs.current[index + 1]?.focus()
     }
 
-    // Auto-submit when all 6 digits are entered
-    if (!showNameInput && newOtp.slice(0, 6).every((digit) => digit !== "")) {
-      handleVerify(newOtp.slice(0, 6).join(""))
+    // Auto-submit when all 4 digits are entered
+    if (!showNameInput && newOtp.slice(0, 4).every((digit) => digit !== "")) {
+      handleVerify(newOtp.slice(0, 4).join(""))
     }
   }
 
@@ -116,16 +117,16 @@ export default function OTP() {
     if (e.key === "v" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
       navigator.clipboard.readText().then((text) => {
-        const digits = text.replace(/\D/g, "").slice(0, 6).split("")
+        const digits = text.replace(/\D/g, "").slice(0, 4).split("")
         const newOtp = [...otp]
         digits.forEach((digit, i) => {
-          if (i < 6) newOtp[i] = digit
+          if (i < 4) newOtp[i] = digit
         })
         setOtp(newOtp)
-        if (!showNameInput && digits.length === 6) {
-          handleVerify(newOtp.slice(0, 6).join(""))
+        if (!showNameInput && digits.length === 4) {
+          handleVerify(newOtp.slice(0, 4).join(""))
         } else {
-          inputRefs.current[Math.min(digits.length, 5)]?.focus()
+          inputRefs.current[Math.min(digits.length, 3)]?.focus()
         }
       })
     }
@@ -134,16 +135,16 @@ export default function OTP() {
   const handlePaste = (e) => {
     e.preventDefault()
     const pastedData = e.clipboardData.getData("text")
-    const digits = pastedData.replace(/\D/g, "").slice(0, 6).split("")
+    const digits = pastedData.replace(/\D/g, "").slice(0, 4).split("")
     const newOtp = [...otp]
     digits.forEach((digit, i) => {
-      if (i < 6) newOtp[i] = digit
+      if (i < 4) newOtp[i] = digit
     })
     setOtp(newOtp)
-    if (!showNameInput && digits.length === 6) {
-      handleVerify(newOtp.slice(0, 6).join(""))
+    if (!showNameInput && digits.length === 4) {
+      handleVerify(newOtp.slice(0, 4).join(""))
     } else {
-      inputRefs.current[Math.min(digits.length, 5)]?.focus()
+      inputRefs.current[Math.min(digits.length, 3)]?.focus()
     }
   }
 
@@ -152,9 +153,9 @@ export default function OTP() {
     if (submittingRef.current) return
 
     const code = (otpValue || otp.join("")).replace(/\D/g, "")
-    const code6 = code.slice(0, 6)
-    if (code6.length !== 6 && code6.length !== 4) {
-      setError("OTP must be exactly 6 digits")
+    const code4 = code.slice(0, 4)
+    if (code4.length !== 4) {
+      setError("OTP must be exactly 4 digits")
       return
     }
 
@@ -162,98 +163,40 @@ export default function OTP() {
     setIsLoading(true)
     setError("")
 
-    setTimeout(() => {
-      try {
-        const storedAuth = sessionStorage.getItem("userAuthData")
-        const authDataParsed = storedAuth ? JSON.parse(storedAuth) : null
-        const verifiedPhone = authDataParsed?.phone || contactInfo
+    try {
+      const storedAuth = sessionStorage.getItem("userAuthData")
+      const authDataParsed = storedAuth ? JSON.parse(storedAuth) : null
+      const mobileNumber = authDataParsed?.phone || contactInfo
 
-        // Check localStorage for users list
-        const mobileNumber = verifiedPhone
-        const users = JSON.parse(localStorage.getItem("users")) || []
-        const completedProfiles = JSON.parse(localStorage.getItem("completed_profiles") || "{}")
-        const cleanMobile = mobileNumber.replace(/\D/g, "").slice(-10)
+      const response = await authAPI.verifyOTP(mobileNumber, code4)
+      const data = response?.data?.data || response?.data || {}
+      const user = data.user || data
+      const token = data.accessToken || data.token
+      const refreshToken = data.refreshToken || "dummy_refresh_token"
+
+      if (user && token) {
+        // Save current user session
+        setUserAuthData("user", token, user, refreshToken)
+        sessionStorage.removeItem("userAuthData")
+        window.dispatchEvent(new Event("userAuthChanged"))
+
+        setSuccess(true)
         
-        let existingUser = users.find(
-            user => user.phone === mobileNumber
-        )
-        
-        // Also support fuzzy search to be robust against slight format mismatches
-        if (!existingUser) {
-          existingUser = users.find(user => {
-            const cleanUserPhone = String(user.phone || user.mobile || "").replace(/\D/g, "").slice(-10)
-            return cleanUserPhone === cleanMobile
-          })
-        }
-
-        // Backward compatibility: check completed_profiles dictionary
-        if (!existingUser) {
-          const profileByCleanPhone = completedProfiles[cleanMobile]
-          const profileByFullPhone = completedProfiles[mobileNumber]
-          existingUser = profileByCleanPhone || profileByFullPhone
-
-          if (existingUser) {
-            // Migrate legacy profile to users array
-            users.push(existingUser)
-            localStorage.setItem("users", JSON.stringify(users))
-          }
-        }
-
-        if (existingUser) {
-          // Save current user session
-          localStorage.setItem(
-              "currentUser",
-              JSON.stringify(existingUser)
-          )
-          
-          // Compatibility with existing app state
-          localStorage.setItem("user_user", JSON.stringify(existingUser))
-          localStorage.setItem("userProfile", JSON.stringify(existingUser))
-          setUserAuthData("user", "dummy_access_token", existingUser, "dummy_refresh_token")
-          localStorage.setItem("user_authenticated", "true")
-          sessionStorage.removeItem("userAuthData")
-          window.dispatchEvent(new Event("userAuthChanged"))
-
-          setSuccess(true)
-          setIsLoading(false)
-          submittingRef.current = false
-
-          // Navigate to Home Page
+        // Navigate based on whether the profile is complete (e.g. has a name)
+        if (user.name && user.name.trim() !== "") {
           navigate("/food/user")
         } else {
-          // Save temporary phone number
-          localStorage.setItem(
-              "tempPhone",
-              mobileNumber
-          )
-          
-          // Compatibility with existing app state and allowing MyProfile access
-          localStorage.setItem("user_temp_phone", mobileNumber)
-          const dummyUser = {
-            id: "user_dummy_" + Date.now(),
-            name: "",
-            phone: mobileNumber,
-            email: "",
-            profileCompleted: false
-          }
-          setUserAuthData("user", "dummy_access_token", dummyUser, "dummy_refresh_token")
-          localStorage.setItem("user_authenticated", "true")
-          sessionStorage.removeItem("userAuthData")
-          window.dispatchEvent(new Event("userAuthChanged"))
-
-          setSuccess(true)
-          setIsLoading(false)
-          submittingRef.current = false
-
-          // Navigate to Create Profile Page
           navigate("/user/profile/create", { state: { phone: mobileNumber } })
         }
-      } catch (err) {
-        setError("Simulation failed. Please try again.")
-        setIsLoading(false)
-        submittingRef.current = false
+      } else {
+        throw new Error("Invalid response from server")
       }
-    }, 1500)
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || "Failed to verify OTP. Please try again.")
+    } finally {
+      setIsLoading(false)
+      submittingRef.current = false
+    }
   }
 
   const handleSubmitName = async () => {
@@ -352,60 +295,42 @@ export default function OTP() {
   }
 
   return (
-    <AnimatedPage className="min-h-screen bg-white dark:bg-[#111111] flex flex-col">
-      {/* Custom Header matching the screenshot */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200/80 bg-white dark:bg-[#111111] h-14">
-        <button
-          onClick={() => navigate("/user/auth/login")}
-          className="p-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-full transition-colors cursor-pointer bg-transparent border-0"
-          aria-label="Go back"
-        >
-          <ArrowLeft className="h-5 w-5 text-black dark:text-white" />
-        </button>
-        
-        {/* Centered Styled Logo */}
-        <div className="flex items-center gap-1.5 pr-8 mx-auto">
-          {/* Styled Logo Icon (Red Triangle) */}
-          <div 
-            className="w-0 h-0 border-l-[11px] border-l-transparent border-r-[11px] border-r-transparent border-b-[18px] border-b-[#E53935]" 
-            style={{ transform: 'skewX(-10deg)' }}
-          />
-          {/* Brand text styled like Pizza Hut */}
-          <span className="font-sans text-lg font-black italic tracking-tight text-[#E53935]">
-            Papa Veg Pizza
-          </span>
-        </div>
-      </div>
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ type: "spring", stiffness: 300, damping: 24 }}
+      className="bg-white p-8 rounded-[2rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] border border-gray-100 relative overflow-hidden"
+    >
+          {/* Decorative corner accent */}
+          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-[#ef4444] to-transparent opacity-10 rounded-bl-[4rem] pointer-events-none"></div>
 
-      <main className="flex-1 flex flex-col justify-start p-6 mt-8 max-w-sm mx-auto w-full space-y-4">
-        {/* Message */}
-        <div className="text-left space-y-1">
-          <h2 className="text-2xl font-black text-black dark:text-white leading-tight tracking-tight">
-            {showNameInput ? "Help us know you better" : "Enter code"}
-          </h2>
-          
-          {!showNameInput && (
-            <div className="text-xs text-slate-800 dark:text-slate-200 space-y-1">
-              <p>
-                We sent a code to <strong className="font-extrabold text-black dark:text-white">{contactInfo}</strong>
+          {/* Title */}
+          <div className="mb-2">
+            <h2 className="text-3xl font-black text-gray-900 text-left tracking-tight leading-tight">
+              {showNameInput ? "Almost there!" : "Verify OTP"}
+            </h2>
+          </div>
+
+          <div className="mb-8">
+            {!showNameInput && (
+              <p className="text-sm text-left leading-relaxed text-gray-500 font-medium">
+                We sent a 6-digit code to <br/>
+                <strong className="text-gray-900 font-bold">{contactInfo}</strong>
               </p>
-              <p className="text-slate-500 dark:text-slate-400">
-                Please enter the code to login
+            )}
+            
+            {showNameInput && (
+              <p className="text-sm text-left leading-relaxed text-gray-500 font-medium">
+                We're excited to have you join us! Please tell us your full name to get started.
               </p>
-            </div>
-          )}
-          
-          {showNameInput && (
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              We're excited to have you join us! Please tell us your full name to get started.
-            </p>
-          )}
-        </div>
+            )}
+          </div>
 
         {/* OTP Input Fields */}
         {!showNameInput && (
           <div className="space-y-6">
-            <div className="flex justify-between gap-1.5 max-w-[320px]">
+            <div className="flex justify-between gap-2 w-full">
               {otp.map((digit, index) => (
                 <input
                   key={index}
@@ -419,18 +344,32 @@ export default function OTP() {
                   onKeyDown={(e) => handleKeyDown(index, e)}
                   onPaste={index === 0 ? handlePaste : undefined}
                   disabled={isLoading}
-                  aria-label={`OTP digit ${index + 1} of 6`}
-                  className="w-10 h-11 text-center text-lg font-black border border-slate-300 dark:border-slate-700 rounded-lg focus:border-[#E53935] focus:ring-1 focus:ring-[#E53935] bg-white dark:bg-[#1a1a1a] text-black dark:text-white transition-all outline-none"
+                  aria-label={`OTP digit ${index + 1} of 4`}
+                  className="w-10 h-12 sm:w-12 sm:h-14 flex-shrink min-w-0 text-center text-lg sm:text-xl font-black border border-gray-200 rounded-xl focus:border-[var(--accent-red)] focus:ring-1 focus:ring-[var(--accent-red)] bg-transparent text-gray-900 transition-all outline-none"
                 />
               ))}
             </div>
 
             {error && (
-              <div className="flex items-center justify-center gap-1.5 text-xs text-red-500 bg-red-50 dark:bg-red-900/10 py-2 rounded-lg">
+              <div className="flex items-center justify-center gap-1.5 text-xs text-[var(--accent-red)] bg-red-50 py-2 rounded-lg mt-4">
                 <AlertCircle className="h-3.5 w-3.5" />
                 <span>{error}</span>
               </div>
             )}
+
+            {/* Verify Button */}
+            <motion.button
+              type="button"
+              onClick={() => handleVerify()}
+              disabled={isLoading || otp.some(digit => digit === "")}
+              whileTap={{ scale: otp.every(digit => digit !== "") ? 0.97 : 1 }}
+              className="w-full h-14 bg-[var(--accent-red)] text-white font-bold rounded-2xl text-[16px] tracking-wide cursor-pointer transition-all border-0 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-80"
+            >
+              Verify OTP
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5 ml-1">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+              </svg>
+            </motion.button>
 
             {/* Resend Section */}
             <div className="text-center">
@@ -489,11 +428,10 @@ export default function OTP() {
 
         {/* Verification Loading Spinner */}
         {isLoading && !showNameInput && (
-          <div className="flex justify-center pt-2">
-            <Loader2 className="h-6 w-6 text-[#E53935] animate-spin" />
+          <div className="flex justify-center pt-2 mt-4">
+            <Loader2 className="h-6 w-6 text-[var(--accent-red)] animate-spin" />
           </div>
         )}
-      </main>
-    </AnimatedPage>
+    </motion.div>
   )
 }

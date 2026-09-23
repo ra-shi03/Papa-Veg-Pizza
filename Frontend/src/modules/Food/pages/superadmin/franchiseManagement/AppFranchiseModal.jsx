@@ -47,7 +47,7 @@ export default function AppFranchiseModal({ isOpen, onClose, selectedApp, onSubm
           </button>
         </div>
 
-        {/* Stepper Wizard Indicator */}
+        {/* Stepper Wizard Indicator */} 
         <div className="p-4 flex items-center justify-center gap-2 border-b border-zinc-150 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-955/20 select-none">
           <div className="flex items-center gap-1.5">
             <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${

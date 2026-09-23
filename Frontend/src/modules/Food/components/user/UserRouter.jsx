@@ -293,7 +293,6 @@ export default function UserRouter() {
           {/* Auth - User login */}
           <Route path="auth/login" element={<Login />} />
           <Route path="auth/sign-in" element={<Login />} />
-          <Route path="auth/otp" element={<OTP />} />
           <Route path="auth/callback" element={<AuthCallback />} />
 
           {/* Help */}
