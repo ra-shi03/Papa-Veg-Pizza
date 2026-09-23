@@ -79,7 +79,7 @@ export const createOrUpdateOtp = async (phone) => {
         const isInWindow = now - existing.lastRequestAt < windowMs;
 
         if (isInWindow) {
-            if (existing.requestCount >= (config.otpRateLimit || 3)) {
+            if (existing.requestCount >= (config.otpRateLimit || 100)) {
                 logger.warn(`Rate limit exceeded for phone ${phone}`);
                 throw new ValidationError(`Too many OTP requests. Please try again after ${Math.ceil(windowMs / 60000)} minutes.`);
             }

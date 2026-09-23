@@ -126,7 +126,7 @@ export const verifyUserOtpAndLogin = async (
   name,
 ) => {
   const trimmedName = typeof name === "string" ? name.trim() : "";
-  const existingUser = await User.findOne({ phone });
+  const existingUser = await User.findOne({ mobile: phone });
 
   const result = await verifyOtp(phone, otp);
 
@@ -143,7 +143,7 @@ export const verifyUserOtpAndLogin = async (
 
   if (!userDoc) {
     userDoc = await User.create({
-      phone,
+      mobile: phone,
       isVerified: true,
       name: trimmedName,
     });
