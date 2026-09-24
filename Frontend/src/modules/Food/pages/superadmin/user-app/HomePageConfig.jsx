@@ -1,16 +1,33 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Upload, Trash2, Image as ImageIcon, Video, Loader2 } from 'lucide-react';
+import { Save, Upload, Trash2, Image as ImageIcon, Video, Loader2, Plus, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminClient } from '../../../../../services/api/axios';
 import apiClient from '../../../../../services/api/axios';
+import { uploadAPI } from '../../../../../services/api';
 
 export default function HomePageConfig() {
   const [deliveryMinutes, setDeliveryMinutes] = useState(30);
   const [banners, setBanners] = useState([]);
+  const [deals, setDeals] = useState([]);
+  const [isDealsModalOpen, setIsDealsModalOpen] = useState(false);
+  const [editingDeal, setEditingDeal] = useState(null);
+  const [dealForm, setDealForm] = useState({ id: '', title: '', description: '', badge: '', image: '', size: 'Medium' });
+  
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingDealImage, setIsUploadingDealImage] = useState(false);
+  const defaultMethods = [
+    { id: "delivery", label: "Delivery", icon: "moped", enabled: true },
+    { id: "dinein", label: "Dine-In", icon: "restaurant", enabled: true },
+    { id: "takeaway", label: "Takeaway", icon: "store", enabled: true },
+    { id: "incar", label: "In-Car", icon: "directions_car", enabled: true },
+    { id: "train", label: "Delivery on Train", icon: "train", enabled: true }
+  ];
+
+  const [orderMethods, setOrderMethods] = useState(defaultMethods);
   const fileInputRef = useRef(null);
+  const dealImageInputRef = useRef(null);
 
   useEffect(() => {
     fetchConfig();
@@ -19,6 +36,19 @@ export default function HomePageConfig() {
   const fetchConfig = async () => {
     setIsLoading(true);
     try {
+      const storedMethods = localStorage.getItem("pvp_order_methods");
+      if (storedMethods) {
+        try {
+          const parsed = JSON.parse(storedMethods);
+          // Merge to ensure new options like Dine-In are added even if old localStorage exists
+          const merged = defaultMethods.map(def => {
+            const found = parsed.find(p => p.id === def.id);
+            return found ? found : def;
+          });
+          setOrderMethods(merged);
+        } catch(e) {}
+      }
+
       let response;
       try {
         response = await adminClient.get('/settings/home-page');
@@ -33,6 +63,14 @@ export default function HomePageConfig() {
         }
         if (Array.isArray(data.banners)) {
           setBanners(data.banners);
+        }
+        if (Array.isArray(data.deals)) {
+          setDeals(data.deals);
+        }
+        // If API has orderMethods and we didn't find them in localStorage, use API's
+        if (data.orderMethods && !storedMethods) {
+           setOrderMethods(data.orderMethods);
+           localStorage.setItem("pvp_order_methods", JSON.stringify(data.orderMethods));
         }
       }
     } catch (err) {
@@ -134,6 +172,121 @@ export default function HomePageConfig() {
     } catch (err) {
       console.error('Banner deletion failed:', err);
       toast.error('Failed to delete banner');
+    }
+  };
+
+  const handleOpenDealModal = (deal = null) => {
+    if (deal) {
+      setEditingDeal(deal);
+      setDealForm(deal);
+    } else {
+      setEditingDeal(null);
+      setDealForm({ id: `deal-${Date.now()}`, title: '', description: '', badge: '', image: '', size: 'Medium' });
+    }
+    setIsDealsModalOpen(true);
+  };
+
+  const handleDealImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+      toast.error('Only image and video files are supported.');
+      return;
+    }
+    setIsUploadingDealImage(true);
+    try {
+      const res = await uploadAPI.uploadMedia(file);
+      const url = res?.data?.data?.url || res?.data?.url;
+      if (url) {
+        setDealForm(prev => ({ ...prev, image: url }));
+        toast.success('Image uploaded successfully!');
+      } else {
+        toast.error('Failed to get uploaded image URL');
+      }
+    } catch (err) {
+      toast.error('Failed to upload image');
+    } finally {
+      setIsUploadingDealImage(false);
+      if (dealImageInputRef.current) dealImageInputRef.current.value = '';
+    }
+  };
+
+  const handleSaveDeal = async () => {
+    if (!dealForm.title || !dealForm.description) {
+      toast.error("Title and description are required.");
+      return;
+    }
+    
+    let updatedDeals;
+    if (editingDeal) {
+      updatedDeals = deals.map(d => d.id === dealForm.id ? dealForm : d);
+    } else {
+      updatedDeals = [...deals, dealForm];
+    }
+    
+    setDeals(updatedDeals);
+    setIsDealsModalOpen(false);
+    
+    try {
+      const payload = { deals: updatedDeals };
+      let res;
+      try {
+        res = await adminClient.post('/settings/home-page', payload);
+      } catch {
+        res = await adminClient.put('/settings/home-page', payload);
+      }
+      const updated = res?.data?.data || payload;
+      try {
+        localStorage.setItem('pvp_home_config', JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent('homePageConfigUpdated', { detail: updated }));
+      } catch (_) {}
+      toast.success('Deals updated successfully!');
+    } catch(err) {
+      toast.error('Failed to save deals');
+    }
+  };
+
+  const handleDeleteDeal = async (id) => {
+    if (!confirm('Delete this deal?')) return;
+    const updatedDeals = deals.filter(d => d.id !== id);
+    setDeals(updatedDeals);
+    
+    try {
+      const payload = { deals: updatedDeals };
+      let res;
+      try {
+        res = await adminClient.post('/settings/home-page', payload);
+      } catch {
+        res = await adminClient.put('/settings/home-page', payload);
+      }
+      const updated = res?.data?.data || payload;
+      try {
+        localStorage.setItem('pvp_home_config', JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent('homePageConfigUpdated', { detail: updated }));
+      } catch (_) {}
+      toast.success('Deal deleted!');
+    } catch(err) {
+      toast.error('Failed to delete deal');
+    }
+  };
+
+  const handleToggleOrderMethod = (id) => {
+    const updatedMethods = orderMethods.map(m => 
+      m.id === id ? { ...m, enabled: !m.enabled } : m
+    );
+    setOrderMethods(updatedMethods);
+    
+    // Save to localStorage and dispatch event for real-time user app update
+    try {
+      localStorage.setItem('pvp_order_methods', JSON.stringify(updatedMethods));
+      window.dispatchEvent(new CustomEvent('pvp_order_methods_changed', { detail: updatedMethods }));
+      toast.success('Order method updated successfully!');
+      
+      // Optionally sync to backend if supported by your home-page settings schema
+      adminClient.put('/settings/home-page', { orderMethods: updatedMethods }).catch(e => console.warn('Failed to sync order methods to backend', e));
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update order method');
     }
   };
 
@@ -258,6 +411,188 @@ export default function HomePageConfig() {
           )}
         </div>
       </section>
+
+      {/* Order Methods Section */}
+      <section className="space-y-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+        <div>
+          <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+            Order Methods
+          </h2>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+            Enable or disable specific order methods in the user app. Disabled methods will be hidden.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {orderMethods.map((method) => (
+            <div key={method.id} className="flex items-center justify-between p-4 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-900 shadow-sm">
+              <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{method.label}</span>
+              <button
+                onClick={() => handleToggleOrderMethod(method.id)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                  method.enabled ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-700'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    method.enabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+      {/* Deals / Combos Section */}
+      <section className="space-y-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+              Hot Deals / Combos
+            </h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+              Manage the dynamic deal cards shown on the user home page.
+            </p>
+          </div>
+          <button
+            onClick={() => handleOpenDealModal()}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium rounded-md hover:opacity-90 transition-opacity text-sm"
+          >
+            <Plus className="w-4 h-4" /> Add Deal
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {deals.length === 0 ? (
+            <div className="col-span-full py-8 text-center rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">
+              <p className="text-zinc-500 dark:text-zinc-400 font-medium text-sm">No deals added yet.</p>
+            </div>
+          ) : (
+            deals.map((deal) => (
+              <div key={deal.id} className="relative group border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden bg-white dark:bg-zinc-900 shadow-sm flex flex-col">
+                <div className="h-32 bg-zinc-100 dark:bg-zinc-800 relative">
+                  {deal.image && (
+                    <img src={deal.image} alt={deal.title} className="w-full h-full object-cover" />
+                  )}
+                  {deal.badge && (
+                    <span className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded">
+                      {deal.badge}
+                    </span>
+                  )}
+                </div>
+                <div className="p-3 flex-1 flex flex-col">
+                  <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100 line-clamp-1">{deal.title}</h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 mt-1 flex-1">{deal.description}</p>
+                </div>
+                
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <button onClick={() => handleOpenDealModal(deal)} className="p-2 bg-white text-zinc-900 rounded-full hover:bg-zinc-200">
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => handleDeleteDeal(deal.id)} className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      {/* Deal Modal */}
+      {isDealsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl max-w-md w-full p-6 shadow-xl border border-zinc-200 dark:border-zinc-800">
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-4">
+              {editingDeal ? 'Edit Deal' : 'Add Deal'}
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Title</label>
+                <input
+                  type="text"
+                  value={dealForm.title}
+                  onChange={e => setDealForm({ ...dealForm, title: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+                  placeholder="e.g. BOGO: Any Medium Pizza"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Description</label>
+                <textarea
+                  value={dealForm.description}
+                  onChange={e => setDealForm({ ...dealForm, description: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+                  rows="2"
+                  placeholder="e.g. Buy 1 Get 1 Free on all medium signature pizzas."
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Badge Text</label>
+                  <input
+                    type="text"
+                    value={dealForm.badge}
+                    onChange={e => setDealForm({ ...dealForm, badge: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+                    placeholder="e.g. Bestseller"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Size</label>
+                  <input
+                    type="text"
+                    value={dealForm.size || ''}
+                    onChange={e => setDealForm({ ...dealForm, size: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+                    placeholder="e.g. Medium"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Image URL</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={dealForm.image}
+                      onChange={e => setDealForm({ ...dealForm, image: e.target.value })}
+                      className="flex-1 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+                      placeholder="https://..."
+                    />
+                    <input
+                      type="file"
+                      ref={dealImageInputRef}
+                      onChange={handleDealImageUpload}
+                      accept="image/*,video/*"
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => dealImageInputRef.current?.click()}
+                      disabled={isUploadingDealImage}
+                      className="px-3 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-md hover:bg-zinc-300 dark:hover:bg-zinc-600 text-sm font-medium flex items-center gap-1 transition-colors"
+                    >
+                      {isUploadingDealImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                      Upload
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setIsDealsModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveDeal}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:opacity-90"
+              >
+                Save Deal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

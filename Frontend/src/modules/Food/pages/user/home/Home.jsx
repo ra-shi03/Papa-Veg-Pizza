@@ -66,6 +66,16 @@ export default function Home() {
   // Dynamic Deals State
   const [deals, setDeals] = useState(() => {
     try {
+      const homeConfig = localStorage.getItem("pvp_home_config")
+      if (homeConfig) {
+        const parsed = JSON.parse(homeConfig)
+        if (parsed.deals && Array.isArray(parsed.deals) && parsed.deals.length > 0) {
+          return parsed.deals
+        }
+      }
+    } catch (e) {}
+
+    try {
       const local = localStorage.getItem("franchise_admin_coupons")
       if (local) {
         const parsed = JSON.parse(local).filter(c => c.status === "active")
@@ -102,6 +112,7 @@ export default function Home() {
   const [orderMethods, setOrderMethods] = useState(() => {
     const defaultMethods = [
       { id: "delivery", label: "Delivery", icon: "moped", enabled: true },
+      { id: "dinein", label: "Dine-In", icon: "restaurant", enabled: true },
       { id: "takeaway", label: "Takeaway", icon: "store", enabled: true },
       { id: "incar", label: "In-Car", icon: "directions_car", enabled: true },
       { id: "train", label: "Delivery on Train", icon: "train", enabled: true }
@@ -109,7 +120,11 @@ export default function Home() {
     try {
       const stored = localStorage.getItem("pvp_order_methods");
       if (stored) {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        return defaultMethods.map(def => {
+          const found = parsed.find(p => p.id === def.id);
+          return found ? found : def;
+        });
       }
     } catch (e) {}
     return defaultMethods;
@@ -294,8 +309,11 @@ export default function Home() {
             setDeliveryLabel(data.deliveryTimeLabel)
           }
           localStorage.setItem("pvp_home_config", JSON.stringify(data))
-          if (Array.isArray(data.banners) && data.banners.length > 0) {
-            setBanners(data.banners)
+          if (Array.isArray(data.banners)) {
+            setBanners(data.banners.length > 0 ? data.banners : [])
+          }
+          if (Array.isArray(data.deals)) {
+            setDeals(data.deals.length > 0 ? data.deals : [])
           }
         }
       } catch (err) {
@@ -314,8 +332,11 @@ export default function Home() {
         if (updated.deliveryTimeLabel) {
           setDeliveryLabel(updated.deliveryTimeLabel)
         }
-        if (Array.isArray(updated.banners) && updated.banners.length > 0) {
-          setBanners(updated.banners)
+        if (Array.isArray(updated.banners)) {
+          setBanners(updated.banners.length > 0 ? updated.banners : [])
+        }
+        if (Array.isArray(updated.deals)) {
+          setDeals(updated.deals.length > 0 ? updated.deals : [])
         }
       } else {
         fetchHomeConfig()
@@ -415,6 +436,17 @@ export default function Home() {
     const handleDealsSync = () => {
       let list = []
       try {
+        const homeConfig = localStorage.getItem("pvp_home_config")
+        if (homeConfig) {
+          const parsed = JSON.parse(homeConfig)
+          if (parsed.deals && Array.isArray(parsed.deals) && parsed.deals.length > 0) {
+            setDeals(parsed.deals)
+            return
+          }
+        }
+      } catch (e) {}
+
+      try {
         const local = localStorage.getItem("franchise_admin_coupons")
         if (local) {
           const parsed = JSON.parse(local).filter(c => c.status === "active")
@@ -455,7 +487,19 @@ export default function Home() {
       try {
         const stored = localStorage.getItem("pvp_order_methods")
         if (stored) {
-          setOrderMethods(JSON.parse(stored))
+          const parsed = JSON.parse(stored);
+          const defaultMethods = [
+            { id: "delivery", label: "Delivery", icon: "moped", enabled: true },
+            { id: "dinein", label: "Dine-In", icon: "restaurant", enabled: true },
+            { id: "takeaway", label: "Takeaway", icon: "store", enabled: true },
+            { id: "incar", label: "In-Car", icon: "directions_car", enabled: true },
+            { id: "train", label: "Delivery on Train", icon: "train", enabled: true }
+          ];
+          const merged = defaultMethods.map(def => {
+            const found = parsed.find(p => p.id === def.id);
+            return found ? found : def;
+          });
+          setOrderMethods(merged);
         }
       } catch (e) {}
     }
@@ -628,7 +672,7 @@ export default function Home() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
-            className="relative h-[260px] mx-2 overflow-hidden rounded-[24px] shadow-lg border border-black/5 dark:border-white/5"
+            className="relative h-[260px] mx-[20px] overflow-hidden rounded-[24px] shadow-lg border border-black/5 dark:border-white/5"
           >
             <div className="carousel-track flex h-full" style={{ transform: `translateX(-${activeSlide * 100}%)` }}>
               {banners.map((b, idx) => (
