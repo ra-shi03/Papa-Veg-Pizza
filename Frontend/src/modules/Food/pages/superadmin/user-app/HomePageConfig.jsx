@@ -12,7 +12,12 @@ export default function HomePageConfig() {
   const [isDealsModalOpen, setIsDealsModalOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState(null);
   const [dealForm, setDealForm] = useState({ id: '', title: '', description: '', badge: '', image: '', size: 'Medium' });
+  const [menus, setMenus] = useState([]);
+  const [isMenusModalOpen, setIsMenusModalOpen] = useState(false);
+  const [editingMenu, setEditingMenu] = useState(null);
+  const [menuForm, setMenuForm] = useState({ id: '', label: '', icon: '' });
   
+  const [activeTab, setActiveTab] = useState('deals');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -28,6 +33,8 @@ export default function HomePageConfig() {
   const [orderMethods, setOrderMethods] = useState(defaultMethods);
   const fileInputRef = useRef(null);
   const dealImageInputRef = useRef(null);
+  const menuImageInputRef = useRef(null);
+  const [isUploadingMenuImage, setIsUploadingMenuImage] = useState(false);
 
   useEffect(() => {
     fetchConfig();
@@ -66,6 +73,9 @@ export default function HomePageConfig() {
         }
         if (Array.isArray(data.deals)) {
           setDeals(data.deals);
+        }
+        if (Array.isArray(data.menus)) {
+          setMenus(data.menus);
         }
         // If API has orderMethods and we didn't find them in localStorage, use API's
         if (data.orderMethods && !storedMethods) {
@@ -211,6 +221,118 @@ export default function HomePageConfig() {
     }
   };
 
+
+
+  const handleMenuImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Only image files are supported.');
+      return;
+    }
+    setIsUploadingMenuImage(true);
+    try {
+      const res = await uploadAPI.uploadMedia(file);
+      const url = res?.data?.data?.url || res?.data?.url;
+      if (url) {
+        setMenuForm(prev => ({ ...prev, icon: url }));
+        toast.error('Image uploaded successfully!');
+      } else {
+        toast.error('Failed to get uploaded image URL');
+      }
+    } catch (err) {
+      toast.error('Failed to upload image');
+    } finally {
+      setIsUploadingMenuImage(false);
+      if (menuImageInputRef.current) menuImageInputRef.current.value = '';
+    }
+  };
+
+  const handleOpenMenuModal = (menu = null) => {
+    if (menu) {
+      setEditingMenu(menu);
+      setMenuForm(menu);
+    } else {
+      setEditingMenu(null);
+      setMenuForm({ id: '', label: '', icon: '' });
+    }
+    setIsMenusModalOpen(true);
+  };
+
+  const handleSaveMenu = async () => {
+    if (!menuForm.label || !menuForm.icon) {
+      toast.error('Please fill all required fields');
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      const newMenu = {
+        ...menuForm,
+        id: editingMenu ? editingMenu.id : 'menu-' + Date.now()
+      };
+      
+      let updatedMenus;
+      if (editingMenu) {
+        updatedMenus = menus.map(m => m.id === editingMenu.id ? newMenu : m);
+      } else {
+        updatedMenus = [...menus, newMenu];
+      }
+      
+      const payload = { menus: updatedMenus };
+      let res;
+      try {
+        res = await adminClient.post('/settings/home-page', payload);
+      } catch {
+        res = await adminClient.put('/settings/home-page', payload);
+      }
+      
+      const updated = res?.data?.data || payload;
+      setMenus(updated.menus || updatedMenus);
+      
+      try {
+        localStorage.setItem('pvp_home_config', JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent('homePageConfigUpdated', { detail: updated }));
+      } catch (_) {}
+      
+      toast.success(editingMenu ? 'Menu updated!' : 'Menu added!');
+      setIsMenusModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to save menu');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteMenu = async (id) => {
+    if (!confirm('Are you sure you want to delete this menu?')) return;
+    
+    try {
+      const updatedMenus = menus.filter(m => m.id !== id);
+      const payload = { menus: updatedMenus };
+      let res;
+      try {
+        res = await adminClient.post('/settings/home-page', payload);
+      } catch {
+        res = await adminClient.put('/settings/home-page', payload);
+      }
+      
+      const updated = res?.data?.data || payload;
+      setMenus(updated.menus || updatedMenus);
+      
+      try {
+        localStorage.setItem('pvp_home_config', JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent('homePageConfigUpdated', { detail: updated }));
+      } catch (_) {}
+      
+      toast.success('Menu deleted!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to delete menu');
+    }
+  };
+
   const handleSaveDeal = async () => {
     if (!dealForm.title || !dealForm.description) {
       toast.error("Title and description are required.");
@@ -291,7 +413,32 @@ export default function HomePageConfig() {
   };
 
   return (
-    <div className="p-4 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 max-w-4xl mx-auto">
+
+      {/* Tabs Navigation */}
+      <div className="flex space-x-6 border-b border-zinc-200 dark:border-zinc-800 mb-6 overflow-x-auto hide-scrollbar">
+        <button
+          onClick={() => setActiveTab('general')}
+          className={`pb-3 text-sm font-semibold transition-colors whitespace-nowrap ${activeTab === 'general' ? 'border-b-2 border-primary text-primary' : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'}`}
+        >
+          General Settings
+        </button>
+        <button
+          onClick={() => setActiveTab('deals')}
+          className={`pb-3 text-sm font-semibold transition-colors whitespace-nowrap ${activeTab === 'deals' ? 'border-b-2 border-primary text-primary' : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'}`}
+        >
+          Hot Deals
+        </button>
+        <button
+          onClick={() => setActiveTab('menus')}
+          className={`pb-3 text-sm font-semibold transition-colors whitespace-nowrap ${activeTab === 'menus' ? 'border-b-2 border-primary text-primary' : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'}`}
+        >
+          Menus
+        </button>
+      </div>
+
+      {activeTab === 'general' && (
+        <div className="space-y-6">
       {/* Delivery Time Section */}
       <section className="space-y-3">
         <div>
@@ -443,7 +590,12 @@ export default function HomePageConfig() {
         </div>
       </section>
       {/* Deals / Combos Section */}
-      <section className="space-y-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+              </div>
+      )}
+
+      {activeTab === 'deals' && (
+        <div className="space-y-6">
+<section className="space-y-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
@@ -497,6 +649,134 @@ export default function HomePageConfig() {
           )}
         </div>
       </section>
+
+
+              </div>
+      )}
+
+      {activeTab === 'menus' && (
+        <div className="space-y-6">
+{/* Menus Section */}
+      <section className="space-y-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+              Menus
+            </h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+              Manage the dynamic menus shown on the user home page.
+            </p>
+          </div>
+          <button
+            onClick={() => handleOpenMenuModal()}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium rounded-md hover:opacity-90 transition-opacity text-sm"
+          >
+            <Plus className="w-4 h-4" /> Add Menu
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {menus.length === 0 ? (
+            <div className="col-span-full py-8 text-center rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">
+              <p className="text-zinc-500 dark:text-zinc-400 font-medium text-sm">No menus added yet.</p>
+            </div>
+          ) : (
+            menus.map((menu) => (
+              <div key={menu.id} className="relative group border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden bg-white dark:bg-zinc-900 shadow-sm flex items-center p-4">
+                <div className="flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full w-12 h-12 mr-4 overflow-hidden shrink-0">
+                  {menu.icon && (menu.icon.startsWith('http') || menu.icon.startsWith('data:')) ? (
+                    <img src={menu.icon} alt={menu.label} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="material-symbols-outlined">{menu.icon}</span>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100">{menu.label}</h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{menu.icon}</p>
+                </div>
+                
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <button onClick={() => handleOpenMenuModal(menu)} className="p-2 bg-white text-zinc-900 rounded-full hover:bg-zinc-200">
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => handleDeleteMenu(menu.id)} className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+              </div>
+      )}
+
+{/* Menus Modal */}
+      {isMenusModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl max-w-md w-full p-6 shadow-xl border border-zinc-200 dark:border-zinc-800">
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-4">
+              {editingMenu ? 'Edit Menu' : 'Add Menu'}
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Label</label>
+                <input
+                  type="text"
+                  value={menuForm.label}
+                  onChange={e => setMenuForm({ ...menuForm, label: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+                  placeholder="e.g. Pizza"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Image URL</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={menuForm.icon}
+                    onChange={e => setMenuForm({ ...menuForm, icon: e.target.value })}
+                    className="flex-1 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+                    placeholder="https://..."
+                  />
+                  <input
+                    type="file"
+                    ref={menuImageInputRef}
+                    onChange={handleMenuImageUpload}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => menuImageInputRef.current?.click()}
+                    disabled={isUploadingMenuImage}
+                    className="px-3 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-md hover:bg-zinc-300 dark:hover:bg-zinc-600 text-sm font-medium flex items-center gap-1 transition-colors"
+                  >
+                    {isUploadingMenuImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    Upload
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setIsMenusModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 rounded-md transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveMenu}
+                disabled={isSaving}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-md flex items-center gap-2 transition-colors disabled:opacity-50"
+              >
+                {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isSaving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Deal Modal */}
       {isDealsModalOpen && (
