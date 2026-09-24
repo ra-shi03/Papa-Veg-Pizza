@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-export function HomeHeader({ deliveryAddress }) {
+export function HomeHeader({ deliveryAddress, deliveryTime = 30, deliveryLabel = 'mins' }) {
   const navigate = useNavigate();
 
   return (
@@ -11,9 +11,9 @@ export function HomeHeader({ deliveryAddress }) {
         className="w-full px-4 pt-4 pb-3 flex items-center justify-between"
         style={{ background: 'var(--secondary-off-white)' }}
       >
-        {/* Left: 30-min bubble + delivery address */}
+        {/* Left: dynamic delivery time bubble + delivery address */}
         <div className="flex items-center gap-3 flex-1 overflow-hidden">
-          {/* 30-min neumorphic circle */}
+          {/* Neumorphic circle with dynamic minutes */}
           <div
             className="shrink-0 flex flex-col items-center justify-center rounded-full"
             style={{
@@ -24,10 +24,10 @@ export function HomeHeader({ deliveryAddress }) {
             }}
           >
             <span style={{ fontSize: 15, fontWeight: 900, color: 'var(--primary-gray)', fontFamily: 'Poppins,sans-serif', lineHeight: 1 }}>
-              30
+              {deliveryTime ?? 30}
             </span>
             <span style={{ fontSize: 8, fontWeight: 700, color: 'var(--muted-gray)', fontFamily: 'Poppins,sans-serif', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>
-              mins
+              {deliveryLabel || 'mins'}
             </span>
           </div>
 
