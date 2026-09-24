@@ -1,20 +1,18 @@
 import React, { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import DeliveryMapModal from "@food/components/user/DeliveryMapModal"
-import DeliveryOrCollectionModal from "@food/components/user/DeliveryOrCollectionModal"
-import TakeawayMapModal from "@food/components/user/TakeawayMapModal"
-import DeliverOnTrainModal from "@food/components/user/DeliverOnTrainModal"
+import { HomeModals } from "./components/HomeModals"
 import OrderDetailsFlow from "@food/pages/user/orders/OrderDetailsFlow"
 import { useLocationStore } from "@food/store/locationStore"
 import { useLocationGuard } from "@food/hooks/useLocationGuard"
 import logoNew from "@/assets/logo1.png"
 import { PRODUCTS, DEALS } from "./HomeData"
-import { InCarModal } from "./components/InCarModal"
 import { HomeStyles } from "./components/HomeStyles"
 import { HomeHeader } from "./components/HomeHeader"
 import { OrderMethods } from "./components/OrderMethods"
 import { HomeSections } from "./components/HomeSections"
+import { BottomNavBar } from "./components/BottomNavBar"
+import apiClient from "@/services/api/axios"
 
 
 export default function Home() {
@@ -24,27 +22,32 @@ export default function Home() {
   const dealsRef = useRef(null)
   const [activeDeal, setActiveDeal] = useState(null)
 
+  // Dynamic Home Page Config (delivery time set by superadmin)
+  const [deliveryTime, setDeliveryTime] = useState(() => {
+    try {
+      const stored = localStorage.getItem("pvp_home_config")
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (parsed?.deliveryTimeMinutes) return parsed.deliveryTimeMinutes
+      }
+    } catch (_) {}
+    return 30
+  })
+  const [deliveryLabel, setDeliveryLabel] = useState(() => {
+    try {
+      const stored = localStorage.getItem("pvp_home_config")
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (parsed?.deliveryTimeLabel) return parsed.deliveryTimeLabel
+      }
+    } catch (_) {}
+    return "mins"
+  })
+
   // Dynamic Banners State
-  const [banners, setBanners] = useState(() => {
-    try {
-      const local = localStorage.getItem("franchise_admin_banners")
-      if (local) {
-        const parsed = JSON.parse(local).filter(b => b.status === "active")
-        if (parsed.length > 0) return parsed
-      }
-    } catch (e) {}
-
-    try {
-      const superadmin = localStorage.getItem("pvp_banners")
-      if (superadmin) {
-        const parsed = JSON.parse(superadmin).filter(b => b.isActive)
-        if (parsed.length > 0) return parsed
-      }
-    } catch (e) {}
-
-    return [
-      {
-        _id: "ban-01",
+  const [banners, setBanners] = useState([
+    {
+      _id: "ban-01",
         title: "Paneer Volcano",
         image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCAJ1H7kfpIOVMST01cGdHOPK9zctqfPYuepo56-9Xt8VrjDotL945EWt6kVO8vNRM6ZK05zTPtpbInlC7BZrM6lBerNPa7UpA5DOzn1haf6-X4-TAanChNFzPI_Z6swWdt8jQnNq15ghwIv45L3x3XQnOvikSqpnRcI0TTf4czhHBPzZ-TfCC56kA2jx9m7t4XshJq08a_j1JyJAAyLP-ZS-8LGBejGgSyxcu3_N-t3KtKJjAOXBRaK9jKvwOU8KYa0JFB0wV1eQk2",
         subtitle: "New Arrival",
@@ -58,7 +61,7 @@ export default function Home() {
         bannerType: "Homepage Banner"
       }
     ]
-  })
+  )
 
   // Dynamic Deals State
   const [deals, setDeals] = useState(() => {
@@ -277,6 +280,57 @@ export default function Home() {
     }
   }, [isModalOpen])
 
+  // Fetch dynamic home page settings (delivery time) from API
+  useEffect(() => {
+    const fetchHomeConfig = async () => {
+      try {
+        const res = await apiClient.get("/settings/home-page")
+        const data = res?.data?.data
+        if (data) {
+          if (typeof data.deliveryTimeMinutes === "number") {
+            setDeliveryTime(data.deliveryTimeMinutes)
+          }
+          if (data.deliveryTimeLabel) {
+            setDeliveryLabel(data.deliveryTimeLabel)
+          }
+          localStorage.setItem("pvp_home_config", JSON.stringify(data))
+          if (Array.isArray(data.banners) && data.banners.length > 0) {
+            setBanners(data.banners)
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to load home page dynamic config:", err)
+      }
+    }
+
+    fetchHomeConfig()
+
+    const handleConfigUpdate = (e) => {
+      const updated = e?.detail
+      if (updated) {
+        if (typeof updated.deliveryTimeMinutes === "number") {
+          setDeliveryTime(updated.deliveryTimeMinutes)
+        }
+        if (updated.deliveryTimeLabel) {
+          setDeliveryLabel(updated.deliveryTimeLabel)
+        }
+        if (Array.isArray(updated.banners) && updated.banners.length > 0) {
+          setBanners(updated.banners)
+        }
+      } else {
+        fetchHomeConfig()
+      }
+    }
+
+    window.addEventListener("homePageConfigUpdated", handleConfigUpdate)
+    window.addEventListener("storage", handleConfigUpdate)
+
+    return () => {
+      window.removeEventListener("homePageConfigUpdated", handleConfigUpdate)
+      window.removeEventListener("storage", handleConfigUpdate)
+    }
+  }, [])
+
   // Save and Restore Scroll Position
   useEffect(() => {
     const savedScroll = sessionStorage.getItem("homeScrollPosition")
@@ -346,26 +400,15 @@ export default function Home() {
 
   // Sync States dynamically from events/localStorage updates
   useEffect(() => {
-    const handleBannersSync = () => {
-      let list = []
+    const handleBannersSync = async () => {
       try {
-        const local = localStorage.getItem("franchise_admin_banners")
-        if (local) {
-          list = JSON.parse(local).filter(b => b.status === "active")
+        const res = await apiClient.get("/settings/home-page")
+        const data = res?.data?.data
+        if (data && Array.isArray(data.banners) && data.banners.length > 0) {
+          setBanners(data.banners)
         }
-      } catch (e) {}
-
-      if (list.length === 0) {
-        try {
-          const superadmin = localStorage.getItem("pvp_banners")
-          if (superadmin) {
-            list = JSON.parse(superadmin).filter(b => b.isActive)
-          }
-        } catch (e) {}
-      }
-
-      if (list.length > 0) {
-        setBanners(list)
+      } catch (err) {
+        console.warn("Failed to sync banners from API:", err)
       }
     }
 
@@ -572,7 +615,11 @@ export default function Home() {
         )}
 
         {/* TopAppBar */}
-        <HomeHeader deliveryAddress={deliveryAddress} />
+        <HomeHeader
+          deliveryAddress={deliveryAddress}
+          deliveryTime={deliveryTime}
+          deliveryLabel={deliveryLabel}
+        />
 
         {/* Main Content */}
         <main className="space-y-lg mt-2">
@@ -584,29 +631,37 @@ export default function Home() {
             className="relative h-[260px] mx-2 overflow-hidden rounded-[24px] shadow-lg border border-black/5 dark:border-white/5"
           >
             <div className="carousel-track flex h-full" style={{ transform: `translateX(-${activeSlide * 100}%)` }}>
-              {banners.map((b) => (
+              {banners.map((b, idx) => (
                 <div 
-                  key={b._id} 
+                  key={b._id || b.publicId || idx} 
                   className="min-w-full h-full relative group cursor-pointer"
                   onClick={() => handleBannerClick(b)}
                 >
-                  <img className="w-full h-full object-cover" alt={b.title} src={b.mobileImageUrl || b.imageUrl || b.image || b.bannerUrl} />
-                  {/* Deeper gradient overlay to guarantee readability */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-transparent flex flex-col justify-end p-5">
-                    {(b.bannerType || b.subtitle) && (
-                      <span className="bg-[#E53935] text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-md w-fit mb-1.5 shadow-sm">
-                        {b.bannerType || "Offer"}
-                      </span>
-                    )}
-                    <h2 className="font-headline-lg-mobile text-white text-base font-black leading-tight" style={{ textShadow: "0 2px 4px rgba(0,0,0,0.8)" }}>
-                      {b.title}
-                    </h2>
-                    {b.subtitle && (
-                      <p className="text-zinc-200 text-[10px] font-medium mt-1 leading-snug line-clamp-2 max-w-[85%]" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>
-                        {b.subtitle}
-                      </p>
-                    )}
-                  </div>
+                  {b.resourceType === 'video' ? (
+                    <video className="w-full h-full object-cover bg-zinc-100 dark:bg-zinc-900" src={b.url} autoPlay loop muted playsInline />
+                  ) : (
+                    <img className="w-full h-full object-cover bg-zinc-100 dark:bg-zinc-900" alt={b.title || 'Banner'} src={b.url || b.mobileImageUrl || b.imageUrl || b.image || b.bannerUrl} />
+                  )}
+                  {/* Text overlay (only shown if title/subtitle exist) */}
+                  {(b.title || b.subtitle) && (
+                    <div className="absolute inset-0 flex flex-col justify-end p-5 pointer-events-none">
+                      {b.bannerType && (
+                        <span className="bg-[#E53935] text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-md w-fit mb-1.5 shadow-sm">
+                          {b.bannerType}
+                        </span>
+                      )}
+                      {b.title && (
+                        <h2 className="font-headline-lg-mobile text-white text-base font-black leading-tight" style={{ textShadow: "0 2px 4px rgba(0,0,0,0.8)" }}>
+                          {b.title}
+                        </h2>
+                      )}
+                      {b.subtitle && (
+                        <p className="text-zinc-200 text-[10px] font-medium mt-1 leading-snug line-clamp-2 max-w-[85%]" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>
+                          {b.subtitle}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -681,128 +736,38 @@ export default function Home() {
           </motion.section>
         </main>
 
-        {/* Floating Action Button */}
-        {totalCartCount > 0 && locationConfirmed && (
-          <div className="fixed bottom-28 left-1/2 -translate-x-1/2 w-full max-w-md pointer-events-none z-45">
-            <button
-              onClick={() => {
-                navigate("/user/cart")
-                triggerToast("Opening your cart...")
-              }}
-              className="absolute right-4 bottom-0 pointer-events-auto w-14 h-14 bg-primary text-on-primary rounded-full shadow-[0_0_20px_rgba(229,57,53,0.4)] flex items-center justify-center active:scale-95 transition-transform cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[28px]">shopping_basket</span>
-              <div className="absolute -top-1 -right-1 w-6 h-6 bg-white text-on-primary-container rounded-full text-[10px] font-bold flex items-center justify-center border border-primary animate-bounce">
-                {totalCartCount}
-              </div>
-            </button>
-          </div>
-        )}
+        {/* BottomNavBar & Floating Cart */}
+        <BottomNavBar
+          navigate={navigate}
+          triggerToast={triggerToast}
+          totalCartCount={totalCartCount}
+          locationConfirmed={locationConfirmed}
+        />
 
-        {/* BottomNavBar */}
-        <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[360px] z-50 rounded-full bg-[#FAF9F6]/90 dark:bg-zinc-950/95 backdrop-blur-xl border border-black/5 dark:border-white/5 shadow-[0_16px_36px_rgba(0,0,0,0.15)] flex justify-around items-center h-[68px] px-2 m-0">
-          <button
-            onClick={() => {
-              if (window.location.pathname === "/user" || window.location.pathname === "/user/") {
-                window.scrollTo({ top: 0, behavior: "smooth" })
-              } else {
-                navigate("/user")
-              }
-              triggerToast("Opening Home")
-            }}
-            className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none group"
-          >
-            <div className="w-14 h-8 rounded-full flex items-center justify-center mb-0.5 transition-all duration-300 bg-[#E53935]/10 text-[#E53935] dark:bg-[#E53935]/20">
-              <span className="material-symbols-outlined text-[22px] fill" style={{ fontVariationSettings: " 'FILL' 1 " }}>home</span>
-            </div>
-            <span className="text-[10px] font-bold tracking-wide text-[#E53935]">Home</span>
-          </button>
-          <button
-            onClick={() => {
-              navigate("/user/menu")
-              triggerToast("Opening Menu")
-            }}
-            className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none group"
-          >
-            <div className="w-14 h-8 rounded-full flex items-center justify-center mb-0.5 transition-all duration-300 bg-transparent text-zinc-500 dark:text-zinc-400 group-hover:bg-black/5 dark:group-hover:bg-white/5">
-              <span className="material-symbols-outlined text-[22px]">restaurant_menu</span>
-            </div>
-            <span className="text-[10px] font-semibold tracking-wide text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-800 dark:group-hover:text-zinc-200">Menu</span>
-          </button>
-          <button
-            onClick={() => {
-              navigate("/user/account")
-              triggerToast("Opening Account")
-            }}
-            className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none group"
-          >
-            <div className="w-14 h-8 rounded-full flex items-center justify-center mb-0.5 transition-all duration-300 bg-transparent text-zinc-500 dark:text-zinc-400 group-hover:bg-black/5 dark:group-hover:bg-white/5">
-              <span className="material-symbols-outlined text-[22px]">person</span>
-            </div>
-            <span className="text-[10px] font-semibold tracking-wide text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-800 dark:group-hover:text-zinc-200">Account</span>
-          </button>
-        </nav>
-
-        {/* Delivery Map Modal Selector */}
-        <DeliveryMapModal
-          show={showMapModal}
-          onClose={() => setShowMapModal(false)}
+        {/* Modals Container */}
+        <HomeModals
+          showMapModal={showMapModal}
+          setShowMapModal={setShowMapModal}
           deliveryAddress={deliveryAddress}
           setDeliveryAddress={setDeliveryAddress}
           setActiveService={setActiveService}
           triggerToast={triggerToast}
           isDarkMode={isDarkMode}
-        />
-
-        {/* Delivery or Collection Selection Modal */}
-        <DeliveryOrCollectionModal
-          show={showServiceSelector}
-          onClose={() => {
-            setShowServiceSelector(false)
-            if (isModalOpen) closeLocationModal()
-          }}
-          onSelect={(id) => {
-            if (id === "delivery") {
-              if (!deliveryAddress) {
-                setDeliveryAddress("Joshi Colony, Bk Sindhi Colony, Indore, Indore")
-              }
-              setShowMapModal(true)
-            } else if (id === "takeaway") {
-              setShowStoreModal(true)
-            } else if (id === "incar") {
-              setShowCarModal(true)
-            } else if (id === "train") {
-              setShowTrainModal(true)
-            }
-          }}
-          isDarkMode={isDarkMode}
-        />
-        {/* Takeaway Map Modal Selector */}
-        <TakeawayMapModal
-          show={showStoreModal}
-          onClose={() => setShowStoreModal(false)}
+          showServiceSelector={showServiceSelector}
+          setShowServiceSelector={setShowServiceSelector}
+          isModalOpen={isModalOpen}
+          closeLocationModal={closeLocationModal}
+          setShowStoreModal={setShowStoreModal}
+          showStoreModal={showStoreModal}
+          setShowCarModal={setShowCarModal}
+          showCarModal={showCarModal}
+          setShowTrainModal={setShowTrainModal}
+          showTrainModal={showTrainModal}
           takeawayHut={takeawayHut}
           setTakeawayHut={setTakeawayHut}
-          setActiveService={setActiveService}
-          triggerToast={triggerToast}
-          isDarkMode={isDarkMode}
-          confirmedAddress={deliveryAddress}
-        />
-
-        {/* In-Car Details Modal */}
-        <InCarModal
-          showCarModal={showCarModal}
-          setShowCarModal={setShowCarModal}
           carNumber={carNumber}
           setCarNumber={setCarNumber}
           confirmLocation={confirmLocation}
-          triggerToast={triggerToast}
-        />
-
-        {/* Deliver on Train Modal */}
-        <DeliverOnTrainModal
-          show={showTrainModal}
-          onClose={() => setShowTrainModal(false)}
         />
       </div>
     </div>
