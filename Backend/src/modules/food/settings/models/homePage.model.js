@@ -39,6 +39,13 @@ const homePageSchema = new mongoose.Schema(
                 icon: { type: String },
                 enabled: { type: Boolean, default: true }
             }
+        ],
+        menus: [
+            {
+                id: { type: String, required: true },
+                label: { type: String, required: true },
+                icon: { type: String, required: true }
+            }
         ]
     },
     {

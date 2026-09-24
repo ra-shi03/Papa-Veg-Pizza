@@ -332,18 +332,35 @@ export function HomeSections({
                 style={{ minWidth: 70, cursor: 'pointer' }}
               >
                 <div
-                  className="glass-card flex items-center justify-center transition-all duration-300"
+                  className="flex items-center justify-center transition-all duration-300"
                   style={{
                     width: 60, height: 60, borderRadius: '50%',
-                    background: isSelected ? 'var(--accent-red)' : undefined
+                    background: isSelected ? 'var(--accent-red)' : (isDarkMode ? '#121212' : '#F9F9FB'),
+                    boxShadow: isSelected
+                      ? (isDarkMode ? 'inset 4px 4px 8px rgba(0,0,0,0.6), inset -4px -4px 8px rgba(255,255,255,0.1)' : 'inset 4px 4px 8px rgba(0,0,0,0.2), inset -4px -4px 8px rgba(255,255,255,0.4)')
+                      : (isDarkMode ? '4px 4px 10px rgba(0,0,0,0.6), -4px -4px 10px rgba(255,255,255,0.05)' : '4px 4px 10px rgba(0, 0, 0, 0.08), -4px -4px 10px rgba(255, 255, 255, 1)'),
+                    border: isSelected ? 'none' : (isDarkMode ? '1px solid rgba(255,255,255,0.02)' : '1px solid rgba(255,255,255,0.5)')
                   }}
                 >
-                  <span
-                    className="material-symbols-outlined"
-                    style={{ color: isSelected ? '#fff' : 'var(--accent-red)' }}
-                  >
-                    {cat.icon}
-                  </span>
+                  {cat.icon && (cat.icon.startsWith('http') || cat.icon.startsWith('data:')) ? (
+                    <img 
+                      src={cat.icon} 
+                      alt={cat.label} 
+                      className="w-full h-full object-cover rounded-full" 
+                      style={{ 
+                        opacity: isSelected ? 0.9 : 1, 
+                        filter: isSelected ? 'brightness(1.1)' : 'none',
+                        padding: '4px' // Adding slight padding so it doesn't touch edges
+                      }}
+                    />
+                  ) : (
+                    <span
+                      className="material-symbols-outlined"
+                      style={{ color: isSelected ? '#fff' : 'var(--accent-red)' }}
+                    >
+                      {cat.icon}
+                    </span>
+                  )}
                 </div>
                 <span
                   style={{

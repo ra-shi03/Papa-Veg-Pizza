@@ -143,6 +143,17 @@ export default function Home() {
       { id: "desserts", label: "Desserts", icon: "icecream" },
       { id: "drinks", label: "Drinks", icon: "local_drink" }
     ];
+
+    try {
+      const homeConfig = localStorage.getItem("pvp_home_config");
+      if (homeConfig) {
+        const parsed = JSON.parse(homeConfig);
+        if (parsed.menus && Array.isArray(parsed.menus) && parsed.menus.length > 0) {
+          return parsed.menus;
+        }
+      }
+    } catch(e) {}
+
     try {
       const stored = localStorage.getItem("pvp_categories");
       if (stored) {
@@ -315,6 +326,9 @@ export default function Home() {
           if (Array.isArray(data.deals)) {
             setDeals(data.deals.length > 0 ? data.deals : [])
           }
+          if (Array.isArray(data.menus)) {
+            setCategories(data.menus.length > 0 ? data.menus : [])
+          }
         }
       } catch (err) {
         console.warn("Failed to load home page dynamic config:", err)
@@ -337,6 +351,9 @@ export default function Home() {
         }
         if (Array.isArray(updated.deals)) {
           setDeals(updated.deals.length > 0 ? updated.deals : [])
+        }
+        if (Array.isArray(updated.menus)) {
+          setCategories(updated.menus.length > 0 ? updated.menus : [])
         }
       } else {
         fetchHomeConfig()
@@ -755,29 +772,6 @@ export default function Home() {
             addToCart={addToCart}
             dealsRef={dealsRef}
           />
-          {/* Fresh Ingredients */}
-          <motion.section
-            initial={{ opacity: 0, x: -50 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, amount: 0.05 }}
-            transition={{ duration: 0.6, type: "spring", stiffness: 90, damping: 15 }}
-            className="px-margin-mobile"
-          >
-            <div className={`rounded-3xl p-lg flex items-center justify-between overflow-hidden relative border ${isDarkMode
-              ? "glass-card"
-              : "bg-gradient-to-br from-[#FFF5F4] to-[#FFF0EF] border-[#E53935]/15 shadow-md shadow-[#E53935]/4"
-              }`}>
-              <div className="z-10 relative">
-                <h3 className={`font-headline-lg-mobile mb-xs ${isDarkMode ? "text-white" : "text-[#131313]"}`}>Fresh Every Day</h3>
-                <p className={`text-sm opacity-70 max-w-[180px] leading-relaxed ${isDarkMode ? "text-white" : "text-[#131313]"}`}>We use only organic, farm-fresh ingredients for every slice.</p>
-              </div>
-              <img
-                className="w-24 h-24 object-contain absolute -right-2 top-1/2 -translate-y-1/2 rotate-12 opacity-80"
-                alt="Artistic composition of fresh pizza ingredients"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuD1OEevU-AMD-LJYtmmUO8f5cPZOOwP27nnnprt609tr-eBMiasAVzva-eAXdhfwQY7tK7Xgg5R0BHy0w-eGZW9kVqF3dGZDXkS_2vyUl8J6qH8acyu16XScqO6ZrPCmGXSfO6c_8ekCjNHuv7n4dGgaCqasfj8IGqDCofCk882RgeDO5By7o4YueW5s1bJXaOjmYQ9JscQ9bIlNkTfdR0xZz2KfAENhcrnWxlgDy9acrKF6ZMgVxRZJqeZOUz2NJRDxMhXqdJ7nJOk"
-              />
-            </div>
-          </motion.section>
         </main>
 
         {/* BottomNavBar & Floating Cart */}
