@@ -25,12 +25,17 @@ function DealCard({ deal, onClaimDeal, isDarkMode }) {
       }}
     >
       {/* Image area */}
-      <div style={{ position: 'relative', height: 130, overflow: 'hidden', background: '#e0dedd' }}>
+      <div style={{ position: 'relative', height: 130, background: '#34373C' }}>
         {deal.image && (
           <img
             src={deal.image}
             alt={deal.title}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              objectFit: 'contain',
+              padding: '6px 0px 14px 0px' 
+            }}
           />
         )}
         {/* Gradient so badge reads clearly */}
@@ -69,8 +74,8 @@ function DealCard({ deal, onClaimDeal, isDarkMode }) {
           </div>
         )}
         {/* Wave separator */}
-        <div style={{ position: 'absolute', bottom: -1, left: 0, width: '100%' }}>
-          <svg viewBox="0 0 400 20" preserveAspectRatio="none" style={{ width: '100%', height: 18, display: 'block', fill: cardBg }}>
+        <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', transform: 'translateY(1px)' }}>
+          <svg viewBox="0 0 400 20" preserveAspectRatio="none" style={{ width: '100%', height: 20, display: 'block', fill: cardBg }}>
             <path d="M0,20 C100,0 300,0 400,20 L400,20 L0,20 Z" />
           </svg>
         </div>
@@ -142,7 +147,7 @@ function DealCard({ deal, onClaimDeal, isDarkMode }) {
               </div>
               <div>
                 <p style={{ fontSize: 8.5, color: descColor, fontFamily: 'Poppins,sans-serif', margin: 0, lineHeight: 1 }}>Size</p>
-                <p style={{ fontSize: 10, color: titleColor, fontWeight: 600, fontFamily: 'Poppins,sans-serif', margin: 0, lineHeight: 1.2 }}>Medium</p>
+                <p style={{ fontSize: 10, color: titleColor, fontWeight: 600, fontFamily: 'Poppins,sans-serif', margin: 0, lineHeight: 1.2 }}>{deal.size || 'Medium'}</p>
               </div>
             </div>
 

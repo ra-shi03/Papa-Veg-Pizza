@@ -21,6 +21,24 @@ const homePageSchema = new mongoose.Schema(
                 resourceType: { type: String, enum: ['image', 'video'], default: 'image' },
                 uploadedAt: { type: Date, default: Date.now }
             }
+        ],
+        deals: [
+            {
+                id: { type: String, required: true },
+                title: { type: String, required: true },
+                description: { type: String, required: true },
+                badge: { type: String },
+                image: { type: String },
+                size: { type: String }
+            }
+        ],
+        orderMethods: [
+            {
+                id: { type: String, required: true },
+                label: { type: String, required: true },
+                icon: { type: String },
+                enabled: { type: Boolean, default: true }
+            }
         ]
     },
     {

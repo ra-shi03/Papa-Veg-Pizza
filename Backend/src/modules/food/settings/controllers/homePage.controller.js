@@ -31,6 +31,8 @@ export const createOrUpdateHomePageConfig = async (req, res, next) => {
         } else {
             if (deliveryTimeMinutes !== undefined) config.deliveryTimeMinutes = Number(deliveryTimeMinutes);
             if (deliveryTimeLabel !== undefined) config.deliveryTimeLabel = deliveryTimeLabel;
+            if (req.body.deals !== undefined) config.deals = req.body.deals;
+            if (req.body.orderMethods !== undefined) config.orderMethods = req.body.orderMethods;
             await config.save();
         }
         return sendResponse(res, 201, 'Home page configuration created/updated successfully', config);
@@ -55,6 +57,8 @@ export const updateHomePageConfig = async (req, res, next) => {
         } else {
             if (deliveryTimeMinutes !== undefined) config.deliveryTimeMinutes = Number(deliveryTimeMinutes);
             if (deliveryTimeLabel !== undefined) config.deliveryTimeLabel = deliveryTimeLabel;
+            if (req.body.deals !== undefined) config.deals = req.body.deals;
+            if (req.body.orderMethods !== undefined) config.orderMethods = req.body.orderMethods;
             await config.save();
         }
         return sendResponse(res, 200, 'Home page configuration updated successfully', config);

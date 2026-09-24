@@ -8,7 +8,7 @@ export function HomeHeader({ deliveryAddress, deliveryTime = 30, deliveryLabel =
     <>
       {/* ── TOP BAR — scrolls away with the page ────────────────────────── */}
       <div
-        className="w-full px-4 pt-4 pb-3 flex items-center justify-between"
+        className="w-full px-margin-mobile pt-4 pb-3 flex items-center justify-between"
         style={{ background: 'var(--secondary-off-white)' }}
       >
         {/* Left: dynamic delivery time bubble + delivery address */}
@@ -97,12 +97,14 @@ export function HomeHeader({ deliveryAddress, deliveryTime = 30, deliveryLabel =
           2. clip does NOT create a new scroll context, so sticky is respected
       */}
       <div
+        className="px-margin-mobile"
         style={{
           position: 'sticky',
           top: 0,
           zIndex: 50,
           background: 'var(--secondary-off-white)',
-          padding: '8px 16px 12px'
+          paddingTop: 8,
+          paddingBottom: 12
         }}
       >
         <div className="relative w-full">

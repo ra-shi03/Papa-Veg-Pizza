@@ -33,16 +33,16 @@ export function OrderMethods({
   };
 
   return (
-    <section className="px-margin-mobile">
+    <section>
       {/* Subtitle */}
-      <p style={{ fontSize: 12, color: 'var(--muted-gray)', fontFamily: 'Poppins,sans-serif', marginBottom: 12 }}>
+      <p className="px-margin-mobile" style={{ fontSize: 12, color: 'var(--muted-gray)', fontFamily: 'Poppins,sans-serif', marginBottom: 12 }}>
         Select Delivery or Takeaway to see local deals
       </p>
 
       {/* Always flex — 2 cards take full width, extras scroll right */}
       <div
         className="hide-scrollbar"
-        style={{ display: 'flex', gap: 12, overflowX: 'auto' }}
+        style={{ display: 'flex', gap: 12, overflowX: 'auto', padding: '0 20px' }}
       >
         {enabled.map((service, index) => {
           const isSelected = activeService === service.id;
