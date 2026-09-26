@@ -3045,6 +3045,17 @@ export async function rejectStoreAddon(addonId, reason) {
 }
 
 // ----- Foods (separate collection) -----
+export async function getFoodById(id) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new Error('Invalid Food ID');
+    }
+    const food = await FoodItem.findById(id);
+    if (!food) {
+        throw new Error('Food item not found');
+    }
+    return food;
+}
+
 export async function getFoods(query) {
     const limit = Math.min(Math.max(parseInt(query.limit, 10) || 100, 1), 1000);
     const page = Math.max(parseInt(query.page, 10) || 1, 1);
@@ -3074,7 +3085,7 @@ export async function getFoods(query) {
         FoodItem.countDocuments(filter)
     ]);
 
-    const storeIds = Array.from(new Set(list.map((f) => String(f.storeId)).filter(Boolean)));
+    const storeIds = Array.from(new Set(list.map((f) => f.storeId ? String(f.storeId) : null).filter(id => id && id !== 'undefined')));
     const stores = storeIds.length
         ? await FoodStore.find({ _id: { $in: storeIds } }).select('storeName').lean()
         : [];

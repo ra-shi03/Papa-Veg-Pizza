@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { adminClient } from "@/services/api/axios";
 import { Plus, Package, CheckCircle, AlertTriangle, Ban, TrendingUp, RefreshCw, X } from "lucide-react";
 import StatsCards from "./StatsCards";
 import ProductsData from "./ProductsData";
@@ -23,17 +24,37 @@ export default function ProductsManagement() {
   // Toast / Alert banner state
   const [alert, setAlert] = useState(null);
 
-  // Statistical counters (reactive simulation)
   const [stats, setStats] = useState({
-    totalProducts: 1284,
-    activeProducts: 1210,
-    draftProducts: 53,
-    archivedProducts: 21,
-    vegProducts: 1150,
-    customizableProducts: 840,
-    outOfStockProducts: 8,
-    addedThisMonth: 74
+    totalProducts: 0,
+    activeProducts: 0,
+    draftProducts: 0,
+    archivedProducts: 0,
+    vegProducts: 0,
+    customizableProducts: 0,
+    outOfStockProducts: 0,
+    addedThisMonth: 0
   });
+
+  React.useEffect(() => {
+    const calculateStats = () => {
+      const stored = localStorage.getItem("pvp_products_v2");
+      const list = stored ? JSON.parse(stored) : [];
+      setStats({
+        totalProducts: list.length,
+        activeProducts: list.filter(p => p.status === "Active").length,
+        draftProducts: list.filter(p => p.status === "Draft").length,
+        archivedProducts: list.filter(p => p.status === "Archived").length,
+        vegProducts: list.filter(p => p.vegType === "veg" || p.vegType === "Vegan").length,
+        customizableProducts: list.filter(p => p.isCustomizable).length,
+        outOfStockProducts: list.filter(p => p.availability === "Out Of Stock").length,
+        addedThisMonth: list.length // Simplification since there's no real date tracking in mock
+      });
+    };
+
+    calculateStats();
+    window.addEventListener("pvp_products_changed_v2", calculateStats);
+    return () => window.removeEventListener("pvp_products_changed_v2", calculateStats);
+  }, []);
 
   const triggerAlert = (message, type = "success") => {
     setAlert({ message, type });
@@ -41,15 +62,42 @@ export default function ProductsManagement() {
   };
 
   // Row operation handlers
-  const handleViewProduct = (product) => {
-    setSelectedProduct(product);
-    setIsDetailOpen(true);
+  const handleViewProduct = async (product) => {
+    try {
+      const id = product._id || product.id;
+      if (id && !String(id).startsWith("PP-V-")) {
+        const res = await adminClient.get(`/food/admin/products/${id}`);
+        setSelectedProduct(res.data.data);
+      } else {
+        setSelectedProduct(product);
+      }
+      setIsDetailOpen(true);
+    } catch (err) {
+      console.error(err);
+      // Fallback if API fails
+      setSelectedProduct(product);
+      setIsDetailOpen(true);
+    }
   };
 
-  const handleEditProduct = (product) => {
-    setSelectedProduct(product);
-    setFormMode("edit");
-    setIsFormOpen(true);
+  const handleEditProduct = async (product) => {
+    try {
+      const id = product._id || product.id;
+      if (id && !String(id).startsWith("PP-V-")) {
+        const res = await adminClient.get(`/food/admin/products/${id}`);
+        setSelectedProduct(res.data.data);
+      } else {
+        setSelectedProduct(product);
+      }
+      setFormMode("edit");
+      setIsFormOpen(true);
+    } catch (err) {
+      console.error(err);
+      // Fallback
+      setSelectedProduct(product);
+      setFormMode("edit");
+      setIsFormOpen(true);
+    }
   };
 
   const handleCloneRequest = (product) => {
@@ -77,11 +125,11 @@ export default function ProductsManagement() {
 
   const handleConfirmArchive = (product) => {
     try {
-      const stored = localStorage.getItem("pvp_products");
+      const stored = localStorage.getItem("pvp_products_v2");
       let list = stored ? JSON.parse(stored) : [];
       list = list.map(p => p.id === product.id ? { ...p, status: "Archived" } : p);
-      localStorage.setItem("pvp_products", JSON.stringify(list));
-      window.dispatchEvent(new Event("pvp_products_changed"));
+      localStorage.setItem("pvp_products_v2", JSON.stringify(list));
+      window.dispatchEvent(new Event("pvp_products_changed_v2"));
     } catch (e) {}
     // Update local stats and status
     triggerAlert(`Product "${product.name}" has been successfully archived.`, "warning");
@@ -92,27 +140,46 @@ export default function ProductsManagement() {
     }));
   };
 
-  const handleConfirmDelete = (product) => {
+  const handleConfirmDelete = async (product) => {
     try {
-      const stored = localStorage.getItem("pvp_products");
+      if (product._id) {
+        await adminClient.delete(`/food/admin/products/${product._id}`);
+      }
+      
+      // Keep local sync for table for now
+      const stored = localStorage.getItem("pvp_products_v2");
       let list = stored ? JSON.parse(stored) : [];
-      list = list.filter(p => p.id !== product.id);
-      localStorage.setItem("pvp_products", JSON.stringify(list));
-      window.dispatchEvent(new Event("pvp_products_changed"));
-    } catch (e) {}
-    triggerAlert(`Product "${product.name}" (SKU: ${product.id}) soft-deleted successfully.`, "error");
-    setStats((prev) => ({
-      ...prev,
-      totalProducts: prev.totalProducts - 1,
-      activeProducts: product.status === "Active" ? prev.activeProducts - 1 : prev.activeProducts,
-      draftProducts: product.status === "Draft" ? prev.draftProducts - 1 : prev.draftProducts,
-      archivedProducts: product.status === "Archived" ? prev.archivedProducts - 1 : prev.archivedProducts
-    }));
+      list = list.filter(p => p.id !== product.id && p._id !== product._id);
+      localStorage.setItem("pvp_products_v2", JSON.stringify(list));
+      window.dispatchEvent(new Event("pvp_products_changed_v2"));
+      
+      triggerAlert(`Product "${product.name}" soft-deleted successfully.`, "error");
+      setIsDeleteModalOpen(false);
+      setStats((prev) => ({
+        ...prev,
+        totalProducts: prev.totalProducts - 1,
+        activeProducts: product.status === "Active" ? prev.activeProducts - 1 : prev.activeProducts,
+        draftProducts: product.status === "Draft" ? prev.draftProducts - 1 : prev.draftProducts,
+        archivedProducts: product.status === "Archived" ? prev.archivedProducts - 1 : prev.archivedProducts
+      }));
+    } catch (e) {
+      console.error(e);
+      triggerAlert("Failed to delete product via API.", "error");
+    }
   };
 
-  const handleSaveProduct = (formData, mode) => {
+  const handleSaveProduct = async (formData, mode) => {
     try {
-      const stored = localStorage.getItem("pvp_products");
+      if (mode === "add" || mode === "clone") {
+        await adminClient.post('/food/admin/products', formData);
+        triggerAlert(`New product "${formData.name}" added to catalog successfully!`, "success");
+      } else if (mode === "edit") {
+        await adminClient.patch(`/food/admin/products/${formData._id || formData.id}`, formData);
+        triggerAlert(`Product configurations updated for "${formData.name}".`, "success");
+      }
+      
+      // Update local storage so the table updates for now
+      const stored = localStorage.getItem("pvp_products_v2");
       let list = stored ? JSON.parse(stored) : [];
       if (mode === "add" || mode === "clone") {
         const newProd = {
@@ -122,21 +189,16 @@ export default function ProductsManagement() {
           createdBy: "Admin Shubh"
         };
         list.push(newProd);
-        triggerAlert(`New product "${formData.name}" added to catalog successfully!`, "success");
-        setStats((prev) => ({
-          ...prev,
-          totalProducts: prev.totalProducts + 1,
-          activeProducts: formData.status === "Active" ? prev.activeProducts + 1 : prev.activeProducts,
-          draftProducts: formData.status === "Draft" ? prev.draftProducts + 1 : prev.draftProducts,
-          addedThisMonth: prev.addedThisMonth + 1
-        }));
       } else if (mode === "edit") {
-        list = list.map(p => p.id === formData.id ? { ...p, ...formData, lastUpdated: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) } : p);
-        triggerAlert(`Product configurations updated for "${formData.name}".`, "success");
+        list = list.map(p => (p.id === formData.id || p._id === formData._id) ? { ...p, ...formData, lastUpdated: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) } : p);
       }
-      localStorage.setItem("pvp_products", JSON.stringify(list));
-      window.dispatchEvent(new Event("pvp_products_changed"));
-    } catch (e) {}
+      localStorage.setItem("pvp_products_v2", JSON.stringify(list));
+      window.dispatchEvent(new Event("pvp_products_changed_v2"));
+      setIsFormOpen(false);
+    } catch (e) {
+      console.error(e);
+      triggerAlert("Failed to save product via API.", "error");
+    }
   };
 
   // Bulk operation actions

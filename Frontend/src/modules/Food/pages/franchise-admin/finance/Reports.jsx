@@ -22,7 +22,8 @@ import ScheduleDetailsDrawer from "./components/ScheduleDetailsDrawer";
 import DeleteConfirmationModal from "./components/DeleteConfirmationModal";
 import dayjs from "dayjs";
 import { toast } from "sonner";
-import emptyReportsWebp from "../../../../../assets/empty_reports.webp";
+// Replaced missing webp with remote placeholder
+const emptyReportsWebp = "https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=500&auto=format&fit=crop";
 
 const { TabPane } = Tabs;
 

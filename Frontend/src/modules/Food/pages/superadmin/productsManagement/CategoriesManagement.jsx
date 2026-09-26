@@ -1,300 +1,352 @@
-import React, { useState } from "react";
-import { Plus, FolderTree, CheckCircle, Ban, Eye, EyeOff, Folder, AlertTriangle, RefreshCw, X } from "lucide-react";
-import CategoriesData from "./CategoriesData";
-import CategoriesDetail from "./CategoriesDetail";
-import AddCategory from "./AddCategory";
-import DuplicateCategoryModal from "./DuplicateCategoryModal";
-import DeleteCategoryModal from "./DeleteCategoryModal";
+import React, { useState, useEffect, useRef } from 'react';
+import { Trash2, Loader2, Plus, Edit, Upload, Eye, X } from 'lucide-react';
+import { toast } from 'sonner';
+import apiClient, { adminClient } from '@/services/api/axios';
+import { uploadAPI } from '@/services/api';
 
 export default function CategoriesManagement() {
-  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [menus, setMenus] = useState([]);
+  const [isMenusModalOpen, setIsMenusModalOpen] = useState(false);
+  const [editingMenu, setEditingMenu] = useState(null);
+  const [menuForm, setMenuForm] = useState({ id: '', label: '', icon: '', type: 'Category', status: 'Active' });
+  
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [viewCategory, setViewCategory] = useState(null);
+  const [isLoadingView, setIsLoadingView] = useState(false);
+  
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  const menuImageInputRef = useRef(null);
+  const [isUploadingMenuImage, setIsUploadingMenuImage] = useState(false);
 
-  // Drawer / Modals visibility states
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [formMode, setFormMode] = useState("add"); // "add", "edit"
+  useEffect(() => {
+    fetchCategoryProducts();
+  }, []);
 
-  const [isDuplicateOpen, setIsDuplicateOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-
-  // Toast notifications
-  const [alert, setAlert] = useState(null);
-
-  // Dynamic Categories Stats counter
-  const [stats, setStats] = useState({
-    totalCategories: 24,
-    activeCategories: 18,
-    inactiveCategories: 6,
-    visibleCategories: 20,
-    hiddenCategories: 4,
-    parentCategories: 5,
-    subCategories: 19,
-    emptyCategories: 2 // Categories with no products
-  });
-
-  const triggerAlert = (message, type = "success") => {
-    setAlert({ message, type });
-    setTimeout(() => setAlert(null), 4000);
-  };
-
-  // Row operations callbacks
-  const handleViewCategory = (category) => {
-    setSelectedCategory(category);
-    setIsDetailOpen(true);
-  };
-
-  const handleEditCategory = (category) => {
-    setSelectedCategory(category);
-    setFormMode("edit");
-    setIsFormOpen(true);
-  };
-
-  const handleDuplicateRequest = (category) => {
-    setSelectedCategory(category);
-    setIsDuplicateOpen(true);
-  };
-
-  const handleDeleteRequest = (category) => {
-    setSelectedCategory(category);
-    setIsDeleteOpen(true);
-  };
-
-  // Confirmation Handlers
-  const handleConfirmDuplicate = (category, options) => {
+  const fetchCategoryProducts = async () => {
+    setIsLoading(true);
     try {
-      const stored = localStorage.getItem("pvp_categories");
-      const list = stored ? JSON.parse(stored) : [];
-      const newCat = {
-        ...category,
-        id: `CAT-${Math.floor(Math.random() * 900) + 100}`,
-        name: `${category.name} (Copy)`,
-        slug: `${category.slug}-copy`,
-        lastUpdated: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-      };
-      list.push(newCat);
-      localStorage.setItem("pvp_categories", JSON.stringify(list));
-      window.dispatchEvent(new Event("pvp_categories_changed"));
-    } catch (e) {}
-
-    triggerAlert(`Category "${category.name}" replicated successfully!`, "success");
-    setStats((prev) => ({
-      ...prev,
-      totalCategories: prev.totalCategories + 1,
-      subCategories: category.parent !== "—" ? prev.subCategories + 1 : prev.subCategories,
-      parentCategories: category.parent === "—" ? prev.parentCategories + 1 : prev.parentCategories
-    }));
-  };
-
-  const handleConfirmDelete = (category) => {
-    try {
-      const stored = localStorage.getItem("pvp_categories");
-      let list = stored ? JSON.parse(stored) : [];
-      list = list.filter(c => c.id !== category.id);
-      localStorage.setItem("pvp_categories", JSON.stringify(list));
-      window.dispatchEvent(new Event("pvp_categories_changed"));
-    } catch (e) {}
-
-    triggerAlert(`Category "${category.name}" soft-deleted from catalog.`, "error");
-    setStats((prev) => ({
-      ...prev,
-      totalCategories: prev.totalCategories - 1,
-      activeCategories: category.status === "Active" ? prev.activeCategories - 1 : prev.activeCategories,
-      inactiveCategories: category.status === "Inactive" ? prev.inactiveCategories - 1 : prev.inactiveCategories,
-      visibleCategories: category.isVisible ? prev.visibleCategories - 1 : prev.visibleCategories,
-      hiddenCategories: !category.isVisible ? prev.hiddenCategories - 1 : prev.hiddenCategories
-    }));
-  };
-
-  const handleSaveCategory = (formData, mode) => {
-    try {
-      const stored = localStorage.getItem("pvp_categories");
-      let list = stored ? JSON.parse(stored) : [];
-      if (mode === "add") {
-        const newCat = {
-          ...formData,
-          id: formData.id || `CAT-${Math.floor(Math.random() * 900) + 100}`,
-          productsCount: 0,
-          lastUpdated: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-        };
-        list.push(newCat);
-        triggerAlert(`Category "${formData.name}" added successfully!`, "success");
-        setStats((prev) => ({
-          ...prev,
-          totalCategories: prev.totalCategories + 1,
-          activeCategories: formData.status === "Active" ? prev.activeCategories + 1 : prev.activeCategories,
-          inactiveCategories: formData.status === "Inactive" ? prev.inactiveCategories + 1 : prev.inactiveCategories,
-          visibleCategories: formData.isVisible ? prev.visibleCategories + 1 : prev.visibleCategories,
-          hiddenCategories: !formData.isVisible ? prev.hiddenCategories + 1 : prev.hiddenCategories
-        }));
-      } else if (mode === "edit") {
-        list = list.map(c => c.id === formData.id ? { ...c, ...formData, lastUpdated: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) } : c);
-        triggerAlert(`Category configurations updated for "${formData.name}".`, "success");
+      const response = await adminClient.get('/food/admin/category-products');
+      if (response?.data?.data) {
+        // Map _id to id for frontend compatibility
+        const mapped = response.data.data.map(item => ({ ...item, id: item._id || item.id }));
+        setMenus(mapped);
       }
-      localStorage.setItem("pvp_categories", JSON.stringify(list));
-      window.dispatchEvent(new Event("pvp_categories_changed"));
-    } catch (e) {}
+    } catch (err) {
+      console.error('Failed to load category products:', err);
+      toast.error('Failed to fetch categories');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Bulk actions operations
-  const handleBulkAction = (action, categoryIds) => {
-    triggerAlert(`Bulk action "${action}" completed successfully on ${categoryIds.length} categories.`, "success");
+  const handleMenuImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Only image files are supported.');
+      return;
+    }
+    setIsUploadingMenuImage(true);
+    try {
+      const res = await uploadAPI.uploadMedia(file);
+      const url = res?.data?.data?.url || res?.data?.url;
+      if (url) {
+        setMenuForm(prev => ({ ...prev, icon: url }));
+        toast.success('Image uploaded successfully!');
+      } else {
+        toast.error('Failed to get uploaded image URL');
+      }
+    } catch (err) {
+      toast.error('Failed to upload image');
+    } finally {
+      setIsUploadingMenuImage(false);
+      if (menuImageInputRef.current) menuImageInputRef.current.value = '';
+    }
   };
 
-  const refreshCatalog = () => {
-    triggerAlert("Catalog channel structures synchronized.", "success");
+  const handleOpenMenuModal = (menu = null) => {
+    if (menu) {
+      setEditingMenu(menu);
+      setMenuForm(menu);
+    } else {
+      setEditingMenu(null);
+      setMenuForm({ id: '', label: '', icon: '', type: 'Category', status: 'Active' });
+    }
+    setIsMenusModalOpen(true);
   };
 
-  // Stats Card template structure
-  const statsList = [
-    { title: "Total Categories", value: stats.totalCategories, icon: FolderTree, color: "text-orange-500 bg-orange-50 dark:bg-orange-950/20 border-orange-100 dark:border-orange-900/30" },
-    { title: "Active Categories", value: stats.activeCategories, icon: CheckCircle, color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/30" },
-    { title: "Inactive Categories", value: stats.inactiveCategories, icon: Ban, color: "text-red-500 bg-red-50 dark:bg-red-950/20 border-red-100 dark:border-red-900/30" },
-    { title: "Visible in App", value: stats.visibleCategories, icon: Eye, color: "text-indigo-500 bg-indigo-50 dark:bg-indigo-950/20 border-indigo-100 dark:border-indigo-900/30" },
-    { title: "Hidden in App", value: stats.hiddenCategories, icon: EyeOff, color: "text-zinc-550 bg-zinc-50 dark:bg-zinc-900/40 border-zinc-150 dark:border-zinc-800" },
-    { title: "Parent Categories", value: stats.parentCategories, icon: Folder, color: "text-blue-500 bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30" },
-    { title: "Subcategories", value: stats.subCategories, icon: FolderTree, color: "text-purple-500 bg-purple-50 dark:bg-purple-950/20 border-purple-100 dark:border-purple-900/30" },
-    { title: "No Products", value: stats.emptyCategories, icon: AlertTriangle, color: "text-amber-500 bg-amber-50 dark:bg-amber-955/20 border-amber-105 dark:border-amber-900/30" }
-  ];
+  const handleViewMenu = async (id) => {
+    setIsViewModalOpen(true);
+    setIsLoadingView(true);
+    try {
+      const res = await adminClient.get(`/food/admin/category-products/${id}`);
+      if (res?.data?.data) {
+        const item = res.data.data;
+        setViewCategory({ ...item, id: item._id || item.id });
+      }
+    } catch (err) {
+      toast.error('Failed to load category details');
+    } finally {
+      setIsLoadingView(false);
+    }
+  };
+
+  const handleSaveMenu = async () => {
+    if (!menuForm.label) {
+      toast.error('Please provide a label');
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      let res;
+      if (editingMenu) {
+        res = await adminClient.patch(`/food/admin/category-products/${editingMenu.id}`, menuForm);
+      } else {
+        res = await adminClient.post('/food/admin/category-products', menuForm);
+      }
+      
+      if (res?.data?.success) {
+        toast.success(editingMenu ? 'Category updated!' : 'Category added!');
+        setIsMenusModalOpen(false);
+        fetchCategoryProducts();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to save category');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteMenu = async (id) => {
+    if (!confirm('Are you sure you want to delete this category?')) return;
+    
+    try {
+      await adminClient.delete(`/food/admin/category-products/${id}`);
+      toast.success('Category deleted!');
+      fetchCategoryProducts();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to delete category');
+    }
+  };
 
   return (
-    <div className="p-3 md:p-4 pb-12 max-w-7xl mx-auto bg-zinc-50 dark:bg-zinc-950 min-h-screen w-full space-y-4">
-      
-      {/* Toast Alert Banner */}
-      {alert && (
-        <div className={`fixed top-4 right-4 z-[90] p-3 rounded-lg border shadow-xl flex items-center justify-between gap-3 text-xs font-bold animate-in fade-in slide-in-from-top-4 duration-300 ${
-          alert.type === "success"
-            ? "bg-emerald-50 dark:bg-emerald-950/90 text-emerald-800 dark:text-emerald-450 border-emerald-500/20"
-            : "bg-rose-50 dark:bg-rose-955/90 text-rose-800 dark:text-rose-400 border-rose-500/20"
-        }`}>
-          <div className="flex items-center gap-2">
-            {alert.type === "success" ? (
-              <CheckCircle size={14} className="text-emerald-500" />
-            ) : (
-              <AlertTriangle size={14} className="text-rose-500" />
-            )}
-            <span>{alert.message}</span>
+    <div className="p-4 max-w-7xl mx-auto min-h-screen">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+            Categories Directory
+          </h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+            Manage the dynamic menus (categories) shown on the user app home page.
+          </p>
+        </div>
+        <button
+          onClick={() => handleOpenMenuModal()}
+          className="flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] text-white font-medium rounded-lg hover:bg-[var(--primary)]/90 transition-colors text-sm shadow-sm"
+        >
+          <Plus className="w-4 h-4 stroke-[3]" /> ADD CATEGORY
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {isLoading ? (
+          <div className="col-span-full py-12 text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto text-[var(--primary)]" />
+            <p className="text-zinc-500 mt-2">Loading categories...</p>
           </div>
-          <button onClick={() => setAlert(null)} className="p-0.5 hover:bg-black/5 dark:hover:bg-white/10 rounded">
-            <X size={12} />
-          </button>
+        ) : menus.length === 0 ? (
+          <div className="col-span-full py-16 text-center rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 bg-white/50 dark:bg-zinc-900/50">
+            <p className="text-zinc-500 dark:text-zinc-400 font-medium">No categories added yet.</p>
+            <button onClick={() => handleOpenMenuModal()} className="mt-4 text-[var(--primary)] hover:underline text-sm font-semibold">
+              Add your first category
+            </button>
+          </div>
+        ) : (
+          menus.map((menu) => (
+            <div key={menu.id} className="relative group border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm flex flex-col p-5 hover:shadow-md transition-all">
+              <div className="flex flex-col items-center text-center">
+                <div className="flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full w-20 h-20 mb-4 overflow-hidden shrink-0 shadow-inner">
+                  {menu.icon && (menu.icon.startsWith('http') || menu.icon.startsWith('data:')) ? (
+                    <img src={menu.icon} alt={menu.label} className="w-full h-full object-cover p-2" />
+                  ) : (
+                    <span className="material-symbols-outlined text-3xl text-[var(--primary)]">{menu.icon}</span>
+                  )}
+                </div>
+                <h3 className="font-bold text-lg text-zinc-900 dark:text-zinc-100">{menu.label}</h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 truncate w-full px-2" title={menu.icon}>{menu.icon}</p>
+              </div>
+              
+              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 backdrop-blur-sm">
+                <button onClick={() => handleViewMenu(menu.id)} className="p-2.5 bg-white text-zinc-900 rounded-full hover:bg-zinc-200 shadow-sm transition-transform hover:scale-110">
+                  <Eye className="w-5 h-5" />
+                </button>
+                <button onClick={() => handleOpenMenuModal(menu)} className="p-2.5 bg-white text-zinc-900 rounded-full hover:bg-zinc-200 shadow-sm transition-transform hover:scale-110">
+                  <Edit className="w-5 h-5" />
+                </button>
+                <button onClick={() => handleDeleteMenu(menu.id)} className="p-2.5 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-sm transition-transform hover:scale-110">
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Menus Modal */}
+      {isMenusModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl max-w-md w-full p-6 shadow-xl border border-zinc-200 dark:border-zinc-800">
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-5">
+              {editingMenu ? 'Edit Category' : 'Add Category'}
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">Label</label>
+                <input
+                  type="text"
+                  value={menuForm.label}
+                  onChange={e => setMenuForm({ ...menuForm, label: e.target.value })}
+                  className="w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/50 dark:bg-zinc-800 dark:border-zinc-700 transition-shadow"
+                  placeholder="e.g. Pizza"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">Image / Icon URL</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={menuForm.icon}
+                    onChange={e => setMenuForm({ ...menuForm, icon: e.target.value })}
+                    className="flex-1 px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/50 dark:bg-zinc-800 dark:border-zinc-700 transition-shadow"
+                    placeholder="https://... or Material Icon Name"
+                  />
+                  <input
+                    type="file"
+                    ref={menuImageInputRef}
+                    onChange={handleMenuImageUpload}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => menuImageInputRef.current?.click()}
+                    disabled={isUploadingMenuImage}
+                    className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 text-sm font-semibold flex items-center gap-2 transition-colors shrink-0"
+                  >
+                    {isUploadingMenuImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    Upload
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">Status</label>
+                <select
+                  value={menuForm.status || 'Active'}
+                  onChange={e => setMenuForm({ ...menuForm, status: e.target.value })}
+                  className="w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/50 dark:bg-zinc-800 dark:border-zinc-700 transition-shadow"
+                >
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-8">
+              <button
+                onClick={() => setIsMenusModalOpen(false)}
+                className="px-5 py-2.5 text-sm font-semibold text-zinc-600 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveMenu}
+                disabled={isSaving}
+                className="px-5 py-2.5 text-sm font-semibold text-white bg-[var(--primary)] hover:bg-[var(--primary)]/90 rounded-lg flex items-center gap-2 transition-all shadow-sm active:scale-95 disabled:opacity-70 disabled:pointer-events-none"
+              >
+                {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isSaving ? 'Saving...' : 'Save Category'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Header and Breadcrumb */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3 pt-2 select-none">
-        <div className="space-y-0.5">
-          <h1 className="text-base md:text-lg font-bold text-black dark:text-white leading-tight">
-            Categories Directory
-          </h1>
-          <p className="text-[10px] font-semibold text-zinc-550 dark:text-zinc-400">
-            Define menu levels, parent-child linkages, app priority display values, and SEO listings.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 self-start sm:self-center">
-          <button
-            onClick={refreshCatalog}
-            className="p-2 border border-zinc-250 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-lg text-zinc-550 dark:text-zinc-400 transition-colors shadow-sm"
-            title="Refresh Directory"
-          >
-            <RefreshCw size={12} />
-          </button>
-
-          <button
-            onClick={() => {
-              setSelectedCategory(null);
-              setFormMode("add");
-              setIsFormOpen(true);
-            }}
-            className="bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white px-3.5 py-1.5 rounded-lg flex items-center justify-center gap-1.5 shadow-md hover:scale-[1.02] active:scale-95 transition-all cursor-pointer font-bold text-[11px]"
-          >
-            <Plus size={14} className="stroke-[3]" />
-            <span>ADD CATEGORY</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 8 Statistics Cards */}
-      <section className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2.5 select-none">
-        {statsList.map((card, idx) => {
-          const Icon = card.icon;
-          return (
-            <div
-              key={idx}
-              className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 p-2.5 rounded-lg flex flex-col justify-between hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 shadow-sm"
-            >
-              <div className="flex items-center justify-between gap-1.5">
-                <span className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider truncate">
-                  {card.title}
-                </span>
-                <div className={`p-1 rounded-md border ${card.color} shrink-0`}>
-                  <Icon size={12} className="stroke-[2.5]" />
+      {/* View Modal */}
+      {isViewModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl max-w-md w-full p-6 shadow-xl border border-zinc-200 dark:border-zinc-800">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
+                Category Details
+              </h3>
+              <button onClick={() => setIsViewModalOpen(false)} className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            {isLoadingView ? (
+              <div className="py-12 text-center">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto text-[var(--primary)]" />
+                <p className="text-zinc-500 mt-2">Loading details...</p>
+              </div>
+            ) : viewCategory ? (
+              <div className="space-y-6">
+                <div className="flex flex-col items-center">
+                  <div className="flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full w-24 h-24 mb-4 overflow-hidden shrink-0 shadow-inner">
+                    {viewCategory.icon && (viewCategory.icon.startsWith('http') || viewCategory.icon.startsWith('data:')) ? (
+                      <img src={viewCategory.icon} alt={viewCategory.label || viewCategory.name} className="w-full h-full object-cover p-2" />
+                    ) : (
+                      <span className="material-symbols-outlined text-4xl text-[var(--primary)]">{viewCategory.icon}</span>
+                    )}
+                  </div>
+                  <h4 className="font-bold text-xl text-zinc-900 dark:text-zinc-100">{viewCategory.label || viewCategory.name}</h4>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1 break-all px-4 text-center">{viewCategory.icon}</p>
+                </div>
+                
+                <div className="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-lg space-y-3">
+                  <div className="flex justify-between border-b border-zinc-200 dark:border-zinc-700 pb-2">
+                    <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">ID</span>
+                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{viewCategory.id}</span>
+                  </div>
+                  {viewCategory.description && (
+                    <div className="flex flex-col border-b border-zinc-200 dark:border-zinc-700 pb-2">
+                      <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">Description</span>
+                      <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{viewCategory.description}</span>
+                    </div>
+                  )}
+                  {viewCategory.type && (
+                    <div className="flex justify-between border-b border-zinc-200 dark:border-zinc-700 pb-2">
+                      <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Type</span>
+                      <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{viewCategory.type}</span>
+                    </div>
+                  )}
+                  {viewCategory.status && (
+                    <div className="flex justify-between border-b border-zinc-200 dark:border-zinc-700 pb-2">
+                      <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Status</span>
+                      <span className={`text-sm font-bold ${viewCategory.status === 'Active' ? 'text-green-500' : 'text-red-500'}`}>{viewCategory.status}</span>
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="flex items-baseline justify-between mt-2">
-                <span className="text-sm font-black text-black dark:text-white leading-none">
-                  {card.value}
-                </span>
+            ) : (
+              <div className="py-8 text-center text-zinc-500">
+                Could not load details.
               </div>
+            )}
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setIsViewModalOpen(false)}
+                className="px-5 py-2.5 text-sm font-semibold text-white bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-all"
+              >
+                Close
+              </button>
             </div>
-          );
-        })}
-      </section>
-
-      {/* Categories Data Table & Toolbar */}
-      <CategoriesData
-        onViewCategory={handleViewCategory}
-        onEditCategory={handleEditCategory}
-        onDuplicateCategory={handleDuplicateRequest}
-        onDeleteCategory={handleDeleteRequest}
-        onBulkAction={handleBulkAction}
-      />
-
-      {/* Category Details Drawer */}
-      <CategoriesDetail
-        isOpen={isDetailOpen}
-        onClose={() => {
-          setIsDetailOpen(false);
-          setSelectedCategory(null);
-        }}
-        category={selectedCategory}
-        onEditClick={handleEditCategory}
-      />
-
-      {/* Add / Edit Form Drawer */}
-      <AddCategory
-        isOpen={isFormOpen}
-        onClose={() => {
-          setIsFormOpen(false);
-          setSelectedCategory(null);
-        }}
-        category={selectedCategory}
-        mode={formMode}
-        onSave={handleSaveCategory}
-      />
-
-      {/* Duplication Confirmation Modal */}
-      <DuplicateCategoryModal
-        isOpen={isDuplicateOpen}
-        onClose={() => {
-          setIsDuplicateOpen(false);
-          setSelectedCategory(null);
-        }}
-        category={selectedCategory}
-        onConfirm={handleConfirmDuplicate}
-      />
-
-      {/* Delete / Dependency Warning Modal */}
-      <DeleteCategoryModal
-        isOpen={isDeleteOpen}
-        onClose={() => {
-          setIsDeleteOpen(false);
-          setSelectedCategory(null);
-        }}
-        category={selectedCategory}
-        onConfirm={handleConfirmDelete}
-      />
-
+          </div>
+        </div>
+      )}
     </div>
   );
 }

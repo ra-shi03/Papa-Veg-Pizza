@@ -15,7 +15,7 @@ import {
   Map,
   MapPin,
   Pizza,
-  Grid,
+  Grid, Layers,
   Sparkles,
   Gift,
   ClipboardList,
@@ -96,6 +96,7 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
       items: [
         { name: "Products", icon: Pizza },
         { name: "Categories", icon: Grid },
+        { name: "Sections", icon: Layers },
         { name: "Add-ons / Toppings", icon: Sparkles },
         { name: "Combos & Deals", icon: Gift },
         { name: "Global Pricing", icon: DollarSign }
@@ -126,7 +127,7 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
         { name: "Coupons", icon: Ticket },
         { name: "Campaigns", icon: Megaphone },
         { name: "Push Notifications", icon: Bell },
-        { name: "Banners", icon: Image },
+
         { name: "Loyalty Program", icon: Trophy }
       ]
     },
@@ -344,6 +345,8 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
                                 navigate("/food/superadmin/products")
                               } else if (item.name === "Categories") {
                                 navigate("/food/superadmin/categories")
+                              } else if (item.name === "Sections") {
+                                navigate("/food/superadmin/sections")
                               } else if (item.name === "Add-ons / Toppings") {
                                 navigate("/food/superadmin/addons")
                               } else if (item.name === "Combos & Deals") {
@@ -364,8 +367,6 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
                                 navigate("/food/superadmin/campaigns")
                               } else if (item.name === "Push Notifications") {
                                 navigate("/food/superadmin/push-notifications")
-                              } else if (item.name === "Banners") {
-                                navigate("/food/superadmin/banners")
                               } else if (item.name === "Loyalty Program") {
                                 navigate("/food/superadmin/loyalty")
                               } else if (item.name === "Tax Reports") {

@@ -12,6 +12,7 @@ const foodSchema = new mongoose.Schema(
     {
         storeId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodStore', required: true, index: true },
         categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodCategory', index: true },
+        sectionId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductSection', index: true },
         categoryName: { type: String, trim: true, default: '' },
         name: { type: String, required: true, trim: true, index: true },
         description: { type: String, trim: true, default: '' },
