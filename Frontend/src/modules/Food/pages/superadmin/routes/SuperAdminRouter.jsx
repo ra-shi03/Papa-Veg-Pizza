@@ -22,6 +22,7 @@ const KitchenStaffManagement = lazy(() => import("../userManagement/KitchenStaff
 const RolesPermissionManagement = lazy(() => import("../userManagement/RolesPermissionManagement"))
 const ProductsManagement = lazy(() => import("../productsManagement/ProductsManagement"))
 const CategoriesManagement = lazy(() => import("../productsManagement/CategoriesManagement"))
+const SectionsManagement = lazy(() => import("../productsManagement/SectionsManagement"))
 const Addons = lazy(() => import("../productsManagement/Addons"))
 const ComboDeals = lazy(() => import("../productsManagement/ComboDeals"))
 const GlobalPrice = lazy(() => import("../productsManagement/GlobalPrice"))
@@ -33,7 +34,7 @@ const Disputes = lazy(() => import("../orderManagement/Disputes"))
 const CouponsManagement = lazy(() => import("../marketing/CouponsManagement"))
 const Campaign = lazy(() => import("../marketing/Campaign"))
 const PushNotification = lazy(() => import("../marketing/PushNotification"))
-const Banners = lazy(() => import("../marketing/Banners"))
+
 const LoyaltyProgram = lazy(() => import("../marketing/LoyaltyProgram"))
 const TaxReports = lazy(() => import("../financial/TaxReports"))
 const TransactionManagement = lazy(() => import("../financial/TransactionManagement"))
@@ -92,6 +93,8 @@ function SuperAdminLayout() {
     activeItem = "Products"
   } else if (location.pathname.includes("/categories")) {
     activeItem = "Categories"
+  } else if (location.pathname.includes("/sections")) {
+    activeItem = "Sections"
   } else if (location.pathname.includes("/addons")) {
     activeItem = "Add-ons / Toppings"
   } else if (location.pathname.includes("/combos-deals")) {
@@ -113,8 +116,6 @@ function SuperAdminLayout() {
     activeItem = "Campaigns"
   } else if (location.pathname.includes("/push-notifications")) {
     activeItem = "Push Notifications"
-  } else if (location.pathname.includes("/banners-promotions")) {
-    activeItem = "Banners / Promotions"
   } else if (location.pathname.includes("/loyalty")) {
     activeItem = "Loyalty Program"
   } else if (location.pathname.includes("/tax-reports")) {
@@ -235,6 +236,7 @@ export default function SuperAdminRouter() {
             <Route path="/roles-permissions" element={<RolesPermissionManagement />} />
             <Route path="/products" element={<ProductsManagement />} />
             <Route path="/categories" element={<CategoriesManagement />} />
+            <Route path="/sections" element={<SectionsManagement />} />
             <Route path="/addons" element={<Addons />} />
             <Route path="/combos-deals" element={<ComboDeals />} />
             <Route path="/global-pricing" element={<GlobalPrice />} />
@@ -246,7 +248,7 @@ export default function SuperAdminRouter() {
             <Route path="/coupons" element={<CouponsManagement />} />
             <Route path="/campaigns" element={<Campaign />} />
             <Route path="/push-notifications" element={<PushNotification />} />
-            <Route path="/banners" element={<Banners />} />
+
             <Route path="/loyalty" element={<LoyaltyProgram />} />
             <Route path="/tax-reports" element={<TaxReports />} />
             <Route path="/transactions" element={<TransactionManagement />} />

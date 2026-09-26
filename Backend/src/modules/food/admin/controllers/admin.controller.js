@@ -459,6 +459,18 @@ export async function getFoods(req, res, next) {
     }
 }
 
+export async function getFoodById(req, res, next) {
+    try {
+        const data = await adminService.getFoodById(req.params.id);
+        res.status(200).json(data);
+    } catch (error) {
+        if (error.message === 'Invalid Food ID' || error.message === 'Food item not found') {
+            return res.status(404).json({ success: false, error: error.message });
+        }
+        next(error);
+    }
+}
+
 export async function createFood(req, res, next) {
     try {
         const created = await adminService.createFood(req.body || {});

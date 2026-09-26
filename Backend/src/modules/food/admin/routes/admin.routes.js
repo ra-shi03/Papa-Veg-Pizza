@@ -9,6 +9,10 @@ import * as feedbackExperienceController from '../controllers/feedbackExperience
 import * as notificationBroadcastController from '../controllers/notificationBroadcast.controller.js';
 import * as franchiseController from '../controllers/franchise.controller.js';
 import * as geographyController from '../controllers/geography.controller.js';
+import * as categoryProductController from '../controllers/categoryProduct.controller.js';
+import * as productSectionController from '../controllers/productSection.controller.js';
+import * as productController from '../controllers/product.controller.js';
+import * as addonController from '../controllers/addon.controller.js';
 
 import * as orderController from '../../orders/controllers/order.controller.js';
 import { getAdminPageController, upsertAdminPageController } from '../controllers/pageContent.controller.js';
@@ -18,6 +22,9 @@ const router = express.Router();
 
 // ----- Public Business Settings (No Admin Required) -----
 router.get('/business-settings/public', businessSettingsController.getBusinessSettings);
+
+// ----- Public Category Products -----
+router.get('/category-products/categories', categoryProductController.getCategoryProducts);
 
 router.use(requireAdmin);
 
@@ -94,10 +101,39 @@ router.get('/categories', adminController.getCategories);
 router.post('/categories', adminController.createCategory);
 router.patch('/categories/:id', adminController.updateCategory);
 router.delete('/categories/:id', adminController.deleteCategory);
+
+// ----- Addons -----
+router.get('/addons', addonController.getAddons);
+router.post('/addons', addonController.createAddon);
+router.patch('/addons/:id', addonController.updateAddon);
+router.delete('/addons/:id', addonController.deleteAddon);
 router.patch('/categories/:id/toggle', adminController.toggleCategoryStatus);
 router.patch('/categories/:id/approve', adminController.approveCategory);
 router.patch('/categories/:id/reject', adminController.rejectCategory);
 router.patch('/categories/:id/make-global', adminController.makeCategoryGlobal);
+
+// ----- Category Products -----
+router.get('/category-products', categoryProductController.getCategoryProducts);
+router.get('/category-products/:id', categoryProductController.getCategoryProductById);
+router.post('/category-products', categoryProductController.createCategoryProduct);
+router.patch('/category-products/:id', categoryProductController.updateCategoryProduct);
+router.delete('/category-products/:id', categoryProductController.deleteCategoryProduct);
+
+// ----- Product Sections -----
+router.get('/sections', productSectionController.getSections);
+router.get('/sections/:id', productSectionController.getSectionById);
+router.post('/sections', productSectionController.createSection);
+router.patch('/sections/:id', productSectionController.updateSection);
+router.delete('/sections/:id', productSectionController.deleteSection);
+
+
+// ----- Product Sections -----
+router.get('/sections', productSectionController.getSections);
+router.get('/sections/:id', productSectionController.getSectionById);
+router.post('/sections', productSectionController.createSection);
+router.patch('/sections/:id', productSectionController.updateSection);
+router.delete('/sections/:id', productSectionController.deleteSection);
+
 
 // ----- Store Add-ons Approval -----
 router.get('/addons', addonsApprovalController.getStoreAddons);
@@ -113,9 +149,17 @@ router.patch('/foods/:id/approve', foodApprovalController.approveFoodItemControl
 router.patch('/foods/:id/reject', foodApprovalController.rejectFoodItemController);
 
 router.get('/foods', adminController.getFoods);
+router.get('/foods/:id', adminController.getFoodById);
 router.post('/foods', adminController.createFood);
 router.patch('/foods/:id', adminController.updateFood);
 router.delete('/foods/:id', adminController.deleteFood);
+
+// NEW Schema endpoints
+router.get('/products', productController.getProducts);
+router.get('/products/:id', productController.getProductById);
+router.post('/products', productController.createProduct);
+router.patch('/products/:id', productController.updateProduct);
+router.delete('/products/:id', productController.deleteProduct);
 
 // ----- Offers & Coupons -----
 router.get('/offers', adminController.getAllOffers);

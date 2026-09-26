@@ -149,7 +149,7 @@ export default function UserLayout() {
                   {showBottomNav && <DesktopNavbar showLogo={!isUnder250} />}
                 </div> */}
                 <LocationPrompt />
-                <main className={showBottomNav ? "md:pt-40" : ""}>
+                <main>
                   <Outlet />
                 </main>
                 {showMobileBottomNav && <BottomNavigation />}

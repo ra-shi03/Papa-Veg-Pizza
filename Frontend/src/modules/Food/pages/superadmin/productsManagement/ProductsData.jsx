@@ -23,6 +23,7 @@ import {
   Sliders,
   DollarSign
 } from "lucide-react";
+import { adminClient } from "@/services/api/axios";
 
 export default function ProductsData({
   onViewProduct,
@@ -39,14 +40,9 @@ export default function ProductsData({
   // Filter states
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [skuSearch, setSkuSearch] = useState("");
-  const [debouncedSku, setDebouncedSku] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
-  const [vegFilter, setVegFilter] = useState("All");
+  const [sectionFilter, setSectionFilter] = useState("All Sections");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [availabilityFilter, setAvailabilityFilter] = useState("All");
-  const [franchiseFilter, setFranchiseFilter] = useState("All Franchises");
-  const [storeFilter, setStoreFilter] = useState("All Stores");
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
 
   // Sorting
@@ -56,174 +52,43 @@ export default function ProductsData({
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // Mock Products list mapped to MongoDB collection schema
-  const getStoredProducts = () => {
-    const data = localStorage.getItem("pvp_products");
-    const defaultProds = [
-      {
-        id: "PP-V-001",
-        name: "Paneer Tikka Supreme",
-        category: "Signature Pizzas",
-        price: "₹399",
-        stock: 45,
-        vegType: "veg",
-        productType: "variants",
-        preparationTime: 15,
-        calories: 340,
-        sizes: ["Regular", "Medium", "Large"],
-        availability: "In Stock",
-        status: "Active",
-        lastUpdated: "14 Jun 2026",
-        createdBy: "Admin Shubh",
-        image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?fm=webp&fit=crop&w=100&q=80"
-      },
-      {
-        id: "PP-V-002",
-        name: "Veg Supreme Delight",
-        category: "Classic Pizzas",
-        price: "₹299",
-        stock: 120,
-        vegType: "veg",
-        productType: "variants",
-        preparationTime: 12,
-        calories: 310,
-        sizes: ["Regular", "Medium", "Large"],
-        availability: "In Stock",
-        status: "Active",
-        lastUpdated: "12 Jun 2026",
-        createdBy: "Admin Shubh",
-        image: "https://images.unsplash.com/photo-1571066811602-71683a3f680d?fm=webp&fit=crop&w=100&q=80"
-      },
-      {
-        id: "PP-V-003",
-        name: "Tandoori Veggie Blast",
-        category: "Signature Pizzas",
-        price: "₹449",
-        stock: 5,
-        vegType: "veg",
-        productType: "variants",
-        preparationTime: 18,
-        calories: 380,
-        sizes: ["Regular", "Medium", "Large"],
-        availability: "Low Stock",
-        status: "Active",
-        lastUpdated: "15 Jun 2026",
-        createdBy: "Manager Amit",
-        image: "https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?fm=webp&fit=crop&w=100&q=80"
-      },
-      {
-        id: "PP-V-004",
-        name: "Cheese Burst Margherita",
-        category: "Classic Pizzas",
-        price: "₹349",
-        stock: 65,
-        vegType: "veg",
-        productType: "variants",
-        preparationTime: 10,
-        calories: 410,
-        sizes: ["Regular", "Medium", "Large"],
-        availability: "In Stock",
-        status: "Active",
-        lastUpdated: "11 Jun 2026",
-        createdBy: "Admin Shubh",
-        image: "https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?fm=webp&fit=crop&w=100&q=80"
-      },
-      {
-        id: "PP-V-005",
-        name: "Spicy Capsicum & Corn",
-        category: "Classic Pizzas",
-        price: "₹249",
-        stock: 0,
-        vegType: "veg",
-        productType: "simple",
-        preparationTime: 12,
-        calories: 280,
-        sizes: ["Regular"],
-        availability: "Out of Stock",
-        status: "Draft",
-        lastUpdated: "10 Jun 2026",
-        createdBy: "Admin Shubh",
-        image: "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?fm=webp&fit=crop&w=100&q=80"
-      },
-      {
-        id: "PP-V-006",
-        name: "Garlic Breadsticks",
-        category: "Sides & Bread",
-        price: "₹149",
-        stock: 140,
-        vegType: "veg",
-        productType: "simple",
-        preparationTime: 8,
-        calories: 220,
-        sizes: ["Regular"],
-        availability: "In Stock",
-        status: "Active",
-        lastUpdated: "08 Jun 2026",
-        createdBy: "Admin Shubh",
-        image: "https://images.unsplash.com/photo-1544982503-9f984c14501a?fm=webp&fit=crop&w=100&q=80"
-      },
-      {
-        id: "PP-V-007",
-        name: "Chocolate Lava Cake",
-        category: "Desserts & Sweets",
-        price: "₹99",
-        stock: 180,
-        vegType: "vegan",
-        productType: "simple",
-        preparationTime: 5,
-        calories: 290,
-        sizes: ["Regular"],
-        availability: "In Stock",
-        status: "Active",
-        lastUpdated: "05 Jun 2026",
-        createdBy: "Manager Amit",
-        image: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?fm=webp&fit=crop&w=100&q=80"
-      },
-      {
-        id: "PP-V-008",
-        name: "Cold Pepsi 500ml",
-        category: "Beverages",
-        price: "₹60",
-        stock: 22,
-        vegType: "vegan",
-        productType: "simple",
-        preparationTime: 2,
-        calories: 150,
-        sizes: ["500ml"],
-        availability: "In Stock",
-        status: "Archived",
-        lastUpdated: "01 Jun 2026",
-        createdBy: "Admin Shubh",
-        image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?fm=webp&fit=crop&w=100&q=80"
-      }
-    ];
-    if (!data) {
-      localStorage.setItem("pvp_products", JSON.stringify(defaultProds));
-      return defaultProds;
-    }
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchProducts = async () => {
     try {
-      return JSON.parse(data);
-    } catch (e) {
-      return defaultProds;
+      setLoading(true);
+      const res = await adminClient.get("/food/admin/products");
+      if (res?.data?.data) {
+        // Backend might return products in res.data.data.foods or just res.data.data
+        const fetchedProducts = Array.isArray(res.data.data) ? res.data.data : (res.data.data.foods || []);
+        
+        // Map _id to id for the table rendering and filter logic
+        const normalizedProducts = fetchedProducts.map(p => ({
+          ...p,
+          id: p._id || p.id,
+          lastUpdated: p.lastUpdated || (p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : "N/A"),
+          price: p.price != null ? String(p.price) : "0", // ensure price is a string for the sort function
+          status: p.status || "Active",
+          availability: p.availability || "In Stock",
+        }));
+        setProducts(normalizedProducts);
+      }
+    } catch (err) {
+      console.error("Failed to fetch products", err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const [products, setProducts] = useState(getStoredProducts);
-
-  // Sync state whenever localStorage changes outside this component
   useEffect(() => {
+    fetchProducts();
     const handleSync = () => {
-      setProducts(getStoredProducts());
+      fetchProducts();
     };
-    window.addEventListener("pvp_products_changed", handleSync);
-    return () => window.removeEventListener("pvp_products_changed", handleSync);
+    window.addEventListener("pvp_products_changed_v2", handleSync);
+    return () => window.removeEventListener("pvp_products_changed_v2", handleSync);
   }, []);
-
-  // Write changes to localStorage and dispatch event
-  useEffect(() => {
-    localStorage.setItem("pvp_products", JSON.stringify(products));
-    window.dispatchEvent(new Event("pvp_products_changed"));
-  }, [products]);
 
   // Debouncing search term inputs (500ms delay)
   useEffect(() => {
@@ -233,12 +98,7 @@ export default function ProductsData({
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSku(skuSearch);
-    }, 500);
-    return () => clearTimeout(handler);
-  }, [skuSearch]);
+
 
   // Handle outside click to close active row action menus
   useEffect(() => {
@@ -252,29 +112,23 @@ export default function ProductsData({
     setCurrentPage(1);
   }, [
     debouncedSearch,
-    debouncedSku,
     categoryFilter,
-    vegFilter,
+    sectionFilter,
     statusFilter,
-    availabilityFilter,
-    franchiseFilter,
-    storeFilter,
     dateRange
   ]);
 
   // Filter logic
   const filteredProducts = products.filter((p) => {
     const matchesSearch = p.name.toLowerCase().includes(debouncedSearch.toLowerCase());
-    const matchesSku = p.id.toLowerCase().includes(debouncedSku.toLowerCase());
-    const matchesCategory = categoryFilter === "All Categories" || p.category === categoryFilter;
     
-    let matchesVeg = true;
-    if (vegFilter === "Veg") matchesVeg = p.vegType === "veg";
-    else if (vegFilter === "Vegan") matchesVeg = p.vegType === "vegan";
-    else if (vegFilter === "Non-Veg") matchesVeg = p.vegType === "non-veg";
+    const catName = p.categoryId?.label || p.category || '-';
+    const matchesCategory = categoryFilter === "All Categories" || catName === categoryFilter;
+    
+    const secName = p.sectionId?.name || p.section || '-';
+    const matchesSection = sectionFilter === "All Sections" || secName === sectionFilter;
 
     const matchesStatus = statusFilter === "All" || p.status === statusFilter;
-    const matchesAvailability = availabilityFilter === "All" || p.availability === availabilityFilter;
 
     // Date range picker simulation
     let matchesDate = true;
@@ -287,14 +141,15 @@ export default function ProductsData({
 
     return (
       matchesSearch &&
-      matchesSku &&
       matchesCategory &&
-      matchesVeg &&
+      matchesSection &&
       matchesStatus &&
-      matchesAvailability &&
       matchesDate
     );
   });
+
+  const uniqueCategories = [...new Set(products.map(p => p.categoryId?.label || p.category || '-').filter(c => c !== '-'))];
+  const uniqueSections = [...new Set(products.map(p => p.sectionId?.name || p.section || '-').filter(s => s !== '-'))];
 
   // Sort logic
   const handleSort = (key) => {
@@ -405,17 +260,6 @@ export default function ProductsData({
                 className="w-full h-8 pl-8 pr-3 border border-zinc-200 dark:border-zinc-850 bg-zinc-50 dark:bg-zinc-950 text-xs font-semibold rounded-lg focus:outline-none focus:border-[var(--primary)] transition-all text-black dark:text-white"
               />
             </div>
-            
-            <div className="relative w-44">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" size={14} />
-              <input
-                type="text"
-                placeholder="SKU..."
-                value={skuSearch}
-                onChange={(e) => setSkuSearch(e.target.value)}
-                className="w-full h-8 pl-8 pr-3 border border-zinc-200 dark:border-zinc-850 bg-zinc-50 dark:bg-zinc-950 text-xs font-semibold rounded-lg focus:outline-none focus:border-[var(--primary)] transition-all text-black dark:text-white"
-              />
-            </div>
 
             <button
               onClick={() => setShowFilters(!showFilters)}
@@ -441,7 +285,7 @@ export default function ProductsData({
 
         {/* Expandable detailed Filters */}
         {showFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3.5 pt-3 border-t border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-top-2 duration-250 select-none">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5 pt-3 border-t border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-top-2 duration-250 select-none">
             <div className="flex flex-col gap-1">
               <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Category</label>
               <select
@@ -450,39 +294,19 @@ export default function ProductsData({
                 className="w-full h-8 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs font-semibold outline-none focus:border-[var(--primary)] transition-all text-black dark:text-white"
               >
                 <option>All Categories</option>
-                <option>Signature Pizzas</option>
-                <option>Classic Pizzas</option>
-                <option>Sides & Bread</option>
-                <option>Beverages</option>
-                <option>Desserts & Sweets</option>
+                {uniqueCategories.map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Veg Classification</label>
+              <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Section</label>
               <select
-                value={vegFilter}
-                onChange={(e) => setVegFilter(e.target.value)}
+                value={sectionFilter}
+                onChange={(e) => setSectionFilter(e.target.value)}
                 className="w-full h-8 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs font-semibold outline-none focus:border-[var(--primary)] transition-all text-black dark:text-white"
               >
-                <option>All</option>
-                <option>Veg</option>
-                <option>Vegan</option>
-                <option>Non-Veg</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Availability</label>
-              <select
-                value={availabilityFilter}
-                onChange={(e) => setAvailabilityFilter(e.target.value)}
-                className="w-full h-8 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs font-semibold outline-none focus:border-[var(--primary)] transition-all text-black dark:text-white"
-              >
-                <option>All</option>
-                <option>In Stock</option>
-                <option>Low Stock</option>
-                <option>Out of Stock</option>
+                <option>All Sections</option>
+                {uniqueSections.map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
 
@@ -501,50 +325,36 @@ export default function ProductsData({
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Franchise & Stores</label>
-              <div className="flex gap-1.5">
-                <select
-                  value={franchiseFilter}
-                  onChange={(e) => setFranchiseFilter(e.target.value)}
-                  className="w-1/2 h-8 px-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-[10px] font-semibold outline-none focus:border-[var(--primary)] text-black dark:text-white"
-                >
-                  <option>All Franchises</option>
-                  <option>Indore Central</option>
-                  <option>Bhopal Zone</option>
-                  <option>Ujjain Branch</option>
-                </select>
-                <select
-                  value={storeFilter}
-                  onChange={(e) => setStoreFilter(e.target.value)}
-                  className="w-1/2 h-8 px-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-[10px] font-semibold outline-none focus:border-[var(--primary)] text-black dark:text-white"
-                >
-                  <option>All Stores</option>
-                  <option>Scheme 54</option>
-                  <option>Vijay Nagar</option>
-                  <option>MP Nagar</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1 justify-end">
-              <div className="flex items-center gap-1.5 justify-end">
+              <div className="flex items-center justify-between">
+                <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Updated Date</label>
                 <button
                   type="button"
                   onClick={() => {
                     setCategoryFilter("All Categories");
-                    setVegFilter("All");
+                    setSectionFilter("All Sections");
                     setStatusFilter("All");
-                    setAvailabilityFilter("All");
-                    setFranchiseFilter("All Franchises");
-                    setStoreFilter("All Stores");
                     setSearchTerm("");
-                    setSkuSearch("");
                     setDateRange({ start: "", end: "" });
                   }}
-                  className="flex items-center gap-1 px-3 py-1.5 h-8 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-[10px] font-bold rounded-lg transition-colors text-zinc-650 dark:text-zinc-300"
+                  className="flex items-center gap-1 text-[10px] font-bold text-[var(--primary)] hover:opacity-80 transition-colors"
                 >
-                  <RotateCcw size={10} /> Reset
+                  <RefreshCw size={10} /> Reset
                 </button>
+              </div>
+              <div className="flex items-center gap-1">
+                <input
+                  type="date"
+                  value={dateRange.start}
+                  onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                  className="w-1/2 h-8 px-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-[10px] font-semibold outline-none focus:border-[var(--primary)] text-black dark:text-white"
+                />
+                <span className="text-zinc-400 text-xs">-</span>
+                <input
+                  type="date"
+                  value={dateRange.end}
+                  onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                  className="w-1/2 h-8 px-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-[10px] font-semibold outline-none focus:border-[var(--primary)] text-black dark:text-white"
+                />
               </div>
             </div>
           </div>
@@ -584,7 +394,7 @@ export default function ProductsData({
       {/* Products Table */}
       <section className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden select-none">
         <div className="overflow-x-auto w-full relative">
-          <table className="w-full border-collapse text-left text-xs min-w-[1200px]">
+          <table className="w-full border-collapse text-left text-xs min-w-[900px]">
             {/* Sticky Header */}
             <thead className="bg-zinc-50 dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-850 text-zinc-500 font-bold uppercase sticky top-0 z-30">
               <tr>
@@ -596,33 +406,23 @@ export default function ProductsData({
                     className="w-4 h-4 rounded border-zinc-300 text-[var(--primary)] focus:ring-[var(--primary)]/20 cursor-pointer"
                   />
                 </th>
-                <th className="px-3 py-2.5 w-16">Image</th>
+                <th className="px-3 py-2.5 w-16 text-center">Image</th>
                 <th className="px-3 py-2.5 cursor-pointer hover:text-[var(--primary)]" onClick={() => handleSort("name")}>
                   Product Name
-                </th>
-                <th className="px-3 py-2.5 cursor-pointer hover:text-[var(--primary)] font-mono" onClick={() => handleSort("id")}>
-                  SKU
                 </th>
                 <th className="px-3 py-2.5 cursor-pointer hover:text-[var(--primary)]" onClick={() => handleSort("category")}>
                   Category
                 </th>
-                <th className="px-3 py-2.5 text-right cursor-pointer hover:text-[var(--primary)]" onClick={() => handleSort("price")}>
-                  Base Price
+                <th className="px-3 py-2.5 cursor-pointer hover:text-[var(--primary)]" onClick={() => handleSort("section")}>
+                  Section
                 </th>
-                <th className="px-3 py-2.5">Sizes</th>
-                <th className="px-3 py-2.5 text-center cursor-pointer hover:text-[var(--primary)]" onClick={() => handleSort("preparationTime")}>
-                  Prep Time
+                <th className="px-3 py-2.5">
+                  Prices
                 </th>
-                <th className="px-3 py-2.5 text-center cursor-pointer hover:text-[var(--primary)]" onClick={() => handleSort("calories")}>
-                  Calories
-                </th>
-                <th className="px-3 py-2.5 text-center">Veg Type</th>
-                <th className="px-3 py-2.5 text-center">Availability</th>
                 <th className="px-3 py-2.5 text-center">Status</th>
-                <th className="px-3 py-2.5 cursor-pointer hover:text-[var(--primary)] text-center" onClick={() => handleSort("lastUpdated")}>
-                  Last Updated
+                <th className="px-3 py-2.5 text-center cursor-pointer hover:text-[var(--primary)]" onClick={() => handleSort("createdAt")}>
+                  Created Date
                 </th>
-                <th className="px-3 py-2.5">Created By</th>
                 <th className="px-3 py-2.5 text-right sticky right-0 bg-zinc-50 dark:bg-zinc-950 shadow-l z-30 w-24">Actions</th>
               </tr>
             </thead>
@@ -648,7 +448,7 @@ export default function ProductsData({
                         className="w-4 h-4 rounded border-zinc-300 text-[var(--primary)] focus:ring-[var(--primary)]/20 cursor-pointer"
                       />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 flex justify-center">
                       <div className="w-10 h-10 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 shrink-0">
                         <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
                       </div>
@@ -661,80 +461,46 @@ export default function ProductsData({
                         <span className="font-bold text-zinc-900 dark:text-zinc-100 truncate">{p.name}</span>
                       </div>
                     </td>
-                    <td className="px-3 py-2 font-mono text-[10px] text-zinc-500">{p.id}</td>
-                    <td className="px-3 py-2 text-zinc-650 dark:text-zinc-300 font-semibold">{p.category}</td>
-                    <td className="px-3 py-2 text-right font-black text-zinc-900 dark:text-zinc-100">{p.price}</td>
+                    <td className="px-3 py-2 text-zinc-650 dark:text-zinc-300 font-semibold">{p.categoryId?.label || p.category || '-'}</td>
+                    <td className="px-3 py-2 text-zinc-650 dark:text-zinc-300 font-semibold">{p.sectionId?.name || p.section || '-'}</td>
                     <td className="px-3 py-2">
-                      <div className="flex flex-wrap gap-1 w-[110px]">
-                        {p.sizes.map((sz, i) => (
-                          <span key={i} className="text-[8px] bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-1 py-0.2 rounded font-bold">
-                            {sz}
+                      <div className="flex flex-col gap-0.5">
+                        {(p.sizes || []).map((sz, i) => (
+                          <span key={i} className="text-[10px] text-zinc-600 dark:text-zinc-400 font-medium">
+                            {sz.size}: <span className="font-bold text-zinc-900 dark:text-zinc-100">₹{sz.price}</span>
                           </span>
                         ))}
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-center text-zinc-700 dark:text-zinc-300 font-semibold">{p.preparationTime}m</td>
-                    <td className="px-3 py-2 text-center text-zinc-550 dark:text-zinc-400">{p.calories}</td>
-                    <td className="px-3 py-2 text-center font-bold uppercase text-[9px] text-zinc-500">{p.vegType}</td>
-                    <td className="px-3 py-2 text-center">{getAvailabilityBadge(p.availability)}</td>
                     <td className="px-3 py-2 text-center">{getStatusBadge(p.status)}</td>
-                    <td className="px-3 py-2 text-center text-zinc-500 font-medium">{p.lastUpdated}</td>
-                    <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400 font-semibold">{p.createdBy}</td>
+                    <td className="px-3 py-2 text-center text-zinc-500 font-medium text-[10px]">
+                      {p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-GB') : p.lastUpdated}
+                    </td>
                     
-                    {/* Row Actions Menu */}
-                    <td className={`px-3 py-2 text-right sticky right-0 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-850 shadow-l transition-colors ${
-                      activeDropdown === p.id ? "z-20" : "z-10"
-                    }`}>
-                      <div className="relative inline-block text-left">
+                    {/* Row Actions */}
+                    <td className="px-3 py-2 text-right sticky right-0 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-850 shadow-l transition-colors z-10">
+                      <div className="flex items-center justify-end gap-2">
                         <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveDropdown((prev) => (prev === p.id ? null : p.id));
-                          }}
-                          className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 hover:text-black dark:hover:text-white transition-colors"
+                          onClick={() => onViewProduct?.(p)}
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                          title="View Details"
                         >
-                          <MoreVertical size={14} />
+                          <Eye size={16} />
                         </button>
-
-                        {activeDropdown === p.id && (
-                          <div className="absolute right-0 bottom-full md:bottom-auto md:top-full mt-1 w-44 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl z-50 overflow-hidden divide-y divide-zinc-100 dark:divide-zinc-850 animate-in fade-in slide-in-from-top-1">
-                            <div className="py-1">
-                              <button
-                                onClick={() => onViewProduct?.(p)}
-                                className="w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-2 transition-colors"
-                              >
-                                <Eye size={12} className="text-zinc-400" /> View details
-                              </button>
-                              <button
-                                onClick={() => onEditProduct?.(p)}
-                                className="w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-2 transition-colors"
-                              >
-                                <Edit size={12} className="text-zinc-400" /> Edit Product
-                              </button>
-                              <button
-                                onClick={() => onCloneProduct?.(p)}
-                                className="w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-2 transition-colors"
-                              >
-                                <Copy size={12} className="text-zinc-400" /> Clone Product
-                              </button>
-                            </div>
-                            <div className="py-1">
-                              <button
-                                onClick={() => onArchiveProduct?.(p)}
-                                className="w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-2 transition-colors"
-                              >
-                                <Archive size={12} className="text-zinc-400" /> Archive
-                              </button>
-                              <button
-                                onClick={() => onDeleteProduct?.(p)}
-                                className="w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold text-red-500 flex items-center gap-2 transition-colors"
-                              >
-                                <Trash2 size={12} className="text-red-400" /> Delete Soft
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                        <button
+                          onClick={() => onEditProduct?.(p)}
+                          className="p-1.5 text-zinc-500 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                          title="Edit Product"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          onClick={() => onDeleteProduct?.(p)}
+                          className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                          title="Delete Product"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -742,7 +508,7 @@ export default function ProductsData({
               })}
               {sortedProducts.length === 0 && (
                 <tr>
-                  <td colSpan={15} className="py-8 text-center text-zinc-500 font-bold text-xs">
+                  <td colSpan={9} className="py-8 text-center text-zinc-500 font-bold text-xs">
                     No products found matching the criteria.
                   </td>
                 </tr>

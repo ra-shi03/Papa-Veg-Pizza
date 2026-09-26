@@ -30,7 +30,7 @@ export default function Home() {
         const parsed = JSON.parse(stored)
         if (parsed?.deliveryTimeMinutes) return parsed.deliveryTimeMinutes
       }
-    } catch (_) {}
+    } catch (_) { }
     return 30
   })
   const [deliveryLabel, setDeliveryLabel] = useState(() => {
@@ -40,7 +40,7 @@ export default function Home() {
         const parsed = JSON.parse(stored)
         if (parsed?.deliveryTimeLabel) return parsed.deliveryTimeLabel
       }
-    } catch (_) {}
+    } catch (_) { }
     return "mins"
   })
 
@@ -48,19 +48,19 @@ export default function Home() {
   const [banners, setBanners] = useState([
     {
       _id: "ban-01",
-        title: "Paneer Volcano",
-        image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCAJ1H7kfpIOVMST01cGdHOPK9zctqfPYuepo56-9Xt8VrjDotL945EWt6kVO8vNRM6ZK05zTPtpbInlC7BZrM6lBerNPa7UpA5DOzn1haf6-X4-TAanChNFzPI_Z6swWdt8jQnNq15ghwIv45L3x3XQnOvikSqpnRcI0TTf4czhHBPzZ-TfCC56kA2jx9m7t4XshJq08a_j1JyJAAyLP-ZS-8LGBejGgSyxcu3_N-t3KtKJjAOXBRaK9jKvwOU8KYa0JFB0wV1eQk2",
-        subtitle: "New Arrival",
-        bannerType: "Homepage Banner"
-      },
-      {
-        _id: "ban-02",
-        title: "BOGO: Double Joy",
-        image: "https://lh3.googleusercontent.com/aida-public/AB6AXuDhuBxF93NgpKNex48f17LImalRGfdBdZZqdLlNVab_K797rBPt0Qh41WKGhgBUY6BX_bguMlz7KB3zhPf89Rb5oW64QUft3d_e82SxwKnTaFUsozTWPHo6vjRJCZN72RrObT3u1FDquXmxIKDfadJDBh5XbyhXZ_DIZSk9oFll3KyAH08_2eo65-hOmzFFodulfl8DgB-vAiO7mZrjtsLHVOxzjYiVoALoG-MuCzQKaQPFXhiXSdpE_9bap7jwEFN7pqFbEtDXGEui",
-        subtitle: "Limited Offer",
-        bannerType: "Homepage Banner"
-      }
-    ]
+      title: "Paneer Volcano",
+      image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCAJ1H7kfpIOVMST01cGdHOPK9zctqfPYuepo56-9Xt8VrjDotL945EWt6kVO8vNRM6ZK05zTPtpbInlC7BZrM6lBerNPa7UpA5DOzn1haf6-X4-TAanChNFzPI_Z6swWdt8jQnNq15ghwIv45L3x3XQnOvikSqpnRcI0TTf4czhHBPzZ-TfCC56kA2jx9m7t4XshJq08a_j1JyJAAyLP-ZS-8LGBejGgSyxcu3_N-t3KtKJjAOXBRaK9jKvwOU8KYa0JFB0wV1eQk2",
+      subtitle: "New Arrival",
+      bannerType: "Homepage Banner"
+    },
+    {
+      _id: "ban-02",
+      title: "BOGO: Double Joy",
+      image: "https://lh3.googleusercontent.com/aida-public/AB6AXuDhuBxF93NgpKNex48f17LImalRGfdBdZZqdLlNVab_K797rBPt0Qh41WKGhgBUY6BX_bguMlz7KB3zhPf89Rb5oW64QUft3d_e82SxwKnTaFUsozTWPHo6vjRJCZN72RrObT3u1FDquXmxIKDfadJDBh5XbyhXZ_DIZSk9oFll3KyAH08_2eo65-hOmzFFodulfl8DgB-vAiO7mZrjtsLHVOxzjYiVoALoG-MuCzQKaQPFXhiXSdpE_9bap7jwEFN7pqFbEtDXGEui",
+      subtitle: "Limited Offer",
+      bannerType: "Homepage Banner"
+    }
+  ]
   )
 
   // Dynamic Deals State
@@ -73,7 +73,7 @@ export default function Home() {
           return parsed.deals
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     try {
       const local = localStorage.getItem("franchise_admin_coupons")
@@ -88,7 +88,7 @@ export default function Home() {
           }))
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     try {
       const superadmin = localStorage.getItem("pvp_coupons")
@@ -103,7 +103,7 @@ export default function Home() {
           }))
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     return DEALS
   })
@@ -126,7 +126,7 @@ export default function Home() {
           return found ? found : def;
         });
       }
-    } catch (e) {}
+    } catch (e) { }
     return defaultMethods;
   });
 
@@ -134,81 +134,10 @@ export default function Home() {
   const [logoUrl, setLogoUrl] = useState(() => localStorage.getItem("sa_logo") || logoNew)
 
   // Dynamic Categories State
-  const [categories, setCategories] = useState(() => {
-    const defaultCats = [
-      { id: "pizza", label: "Pizza", icon: "local_pizza" },
-      { id: "burger", label: "Burger", icon: "lunch_dining" },
-      { id: "bread", label: "Bread", icon: "bakery_dining" },
-      { id: "pasta", label: "Pasta", icon: "dinner_dining" },
-      { id: "desserts", label: "Desserts", icon: "icecream" },
-      { id: "drinks", label: "Drinks", icon: "local_drink" }
-    ];
-
-    try {
-      const homeConfig = localStorage.getItem("pvp_home_config");
-      if (homeConfig) {
-        const parsed = JSON.parse(homeConfig);
-        if (parsed.menus && Array.isArray(parsed.menus) && parsed.menus.length > 0) {
-          return parsed.menus;
-        }
-      }
-    } catch(e) {}
-
-    try {
-      const stored = localStorage.getItem("pvp_categories");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.length > 0) {
-          return parsed.filter(c => c.status === "Active").map(c => {
-            const lower = c.name.toLowerCase();
-            let icon = "local_pizza";
-            if (lower.includes("burger")) icon = "lunch_dining";
-            else if (lower.includes("bread") || lower.includes("side")) icon = "bakery_dining";
-            else if (lower.includes("pasta")) icon = "dinner_dining";
-            else if (lower.includes("dessert") || lower.includes("sweet")) icon = "icecream";
-            else if (lower.includes("drink") || lower.includes("beverage")) icon = "local_drink";
-            return {
-              id: c.slug || c.name.toLowerCase().replace(/\s+/g, "-"),
-              label: c.name,
-              icon
-            };
-          });
-        }
-      }
-    } catch (e) {}
-    return defaultCats;
-  });
+  const [categories, setCategories] = useState([]);
 
   // Dynamic Products State
-  const [products, setProducts] = useState(() => {
-    const defaultProds = PRODUCTS;
-    try {
-      const stored = localStorage.getItem("pvp_products");
-      if (stored) {
-        const parsed = JSON.parse(stored).filter(p => p.status === "Active");
-        if (parsed.length > 0) {
-          const mapped = parsed.map(p => ({
-            id: p.id || `prod-${p.name.toLowerCase().replace(/\s+/g, "-")}`,
-            title: p.name,
-            price: typeof p.price === 'string' ? parseInt(p.price.replace(/[^\d]/g, ""), 10) || 299 : p.price || 299,
-            rating: p.rating || 4.5,
-            description: p.description || `${p.name} prepared fresh with premium toppings.`,
-            image: p.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=80",
-            category: p.category
-          }));
-          const merged = [...defaultProds];
-          mapped.forEach(mp => {
-            if (!merged.some(dp => dp.title.toLowerCase() === mp.title.toLowerCase())) {
-              merged.push(mp);
-            }
-          });
-          return merged;
-        }
-      }
-    } catch (e) {}
-    return defaultProds;
-  });
-
+  const [products, setProducts] = useState([]);
   // App States
   const [userName, setUserName] = useState(() => {
     try {
@@ -326,16 +255,48 @@ export default function Home() {
           if (Array.isArray(data.deals)) {
             setDeals(data.deals.length > 0 ? data.deals : [])
           }
-          if (Array.isArray(data.menus)) {
-            setCategories(data.menus.length > 0 ? data.menus : [])
-          }
         }
       } catch (err) {
         console.warn("Failed to load home page dynamic config:", err)
       }
     }
 
+    const fetchCategoryProducts = async () => {
+      try {
+        const res = await apiClient.get('/food/admin/category-products/categories');
+        if (res?.data?.data) {
+          const items = res.data.data.filter(item => item.status === 'Active');
+
+          const fetchedCategories = items
+            .filter(item => item.type === 'Category')
+            .map(c => ({
+              id: c._id || c.id,
+              label: c.label,
+              icon: c.icon || 'local_pizza'
+            }));
+
+          const fetchedProducts = items
+            .filter(item => item.type === 'Product')
+            .map(p => ({
+              id: p._id || p.id,
+              title: p.label,
+              price: 299, // Fallback if no price field
+              rating: 4.5,
+              description: p.description,
+              image: p.icon || "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500",
+              category: 'pizza' // Fallback
+            }));
+
+          if (fetchedCategories.length > 0) setCategories(fetchedCategories);
+          if (fetchedProducts.length > 0) setProducts(fetchedProducts);
+        }
+      } catch (err) {
+        console.warn("Failed to load category products:", err);
+      }
+    }
+
     fetchHomeConfig()
+    fetchCategoryProducts()
 
     const handleConfigUpdate = (e) => {
       const updated = e?.detail
@@ -351,9 +312,6 @@ export default function Home() {
         }
         if (Array.isArray(updated.deals)) {
           setDeals(updated.deals.length > 0 ? updated.deals : [])
-        }
-        if (Array.isArray(updated.menus)) {
-          setCategories(updated.menus.length > 0 ? updated.menus : [])
         }
       } else {
         fetchHomeConfig()
@@ -461,7 +419,7 @@ export default function Home() {
             return
           }
         }
-      } catch (e) {}
+      } catch (e) { }
 
       try {
         const local = localStorage.getItem("franchise_admin_coupons")
@@ -476,7 +434,7 @@ export default function Home() {
             }))
           }
         }
-      } catch (e) {}
+      } catch (e) { }
 
       if (list.length === 0) {
         try {
@@ -492,7 +450,7 @@ export default function Home() {
               }))
             }
           }
-        } catch (e) {}
+        } catch (e) { }
       }
 
       if (list.length > 0) {
@@ -518,7 +476,7 @@ export default function Home() {
           });
           setOrderMethods(merged);
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     const handleBrandingSync = () => {
@@ -547,12 +505,12 @@ export default function Home() {
             }))
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     const handleProductsSync = () => {
       try {
-        const stored = localStorage.getItem("pvp_products")
+        const stored = localStorage.getItem("pvp_products_v2")
         if (stored) {
           const parsed = JSON.parse(stored).filter(p => p.status === "Active")
           if (parsed.length > 0) {
@@ -574,7 +532,7 @@ export default function Home() {
             setProducts(merged)
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     window.addEventListener("franchise_banners_changed", handleBannersSync)
@@ -585,7 +543,7 @@ export default function Home() {
     window.addEventListener("systemThemeChanged", handleOrderMethodsSync)
     window.addEventListener("systemThemeChanged", handleBrandingSync)
     window.addEventListener("pvp_categories_changed", handleCategoriesSync)
-    window.addEventListener("pvp_products_changed", handleProductsSync)
+    window.addEventListener("pvp_products_changed_v2", handleProductsSync)
 
     return () => {
       window.removeEventListener("franchise_banners_changed", handleBannersSync)
@@ -596,7 +554,7 @@ export default function Home() {
       window.removeEventListener("systemThemeChanged", handleOrderMethodsSync)
       window.removeEventListener("systemThemeChanged", handleBrandingSync)
       window.removeEventListener("pvp_categories_changed", handleCategoriesSync)
-      window.removeEventListener("pvp_products_changed", handleProductsSync)
+      window.removeEventListener("pvp_products_changed_v2", handleProductsSync)
     }
   }, [])
 
@@ -693,8 +651,8 @@ export default function Home() {
           >
             <div className="carousel-track flex h-full" style={{ transform: `translateX(-${activeSlide * 100}%)` }}>
               {banners.map((b, idx) => (
-                <div 
-                  key={b._id || b.publicId || idx} 
+                <div
+                  key={b._id || b.publicId || idx}
                   className="min-w-full h-full relative group cursor-pointer"
                   onClick={() => handleBannerClick(b)}
                 >

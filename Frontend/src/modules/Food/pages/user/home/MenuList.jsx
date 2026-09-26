@@ -222,7 +222,7 @@ export default function MenuList() {
   // Dynamic Products Map State
   const [productsMap, setProductsMap] = useState(() => {
     try {
-      const stored = localStorage.getItem("pvp_products");
+      const stored = localStorage.getItem("pvp_products_v2");
       if (stored) {
         const parsed = JSON.parse(stored).filter(p => p.status === "Active");
         if (parsed.length > 0) {
@@ -254,7 +254,7 @@ export default function MenuList() {
   useEffect(() => {
     const handleProductsSync = () => {
       try {
-        const stored = localStorage.getItem("pvp_products");
+        const stored = localStorage.getItem("pvp_products_v2");
         if (stored) {
           const parsed = JSON.parse(stored).filter(p => p.status === "Active");
           if (parsed.length > 0) {
@@ -281,8 +281,8 @@ export default function MenuList() {
         }
       } catch (e) {}
     };
-    window.addEventListener("pvp_products_changed", handleProductsSync);
-    return () => window.removeEventListener("pvp_products_changed", handleProductsSync);
+    window.addEventListener("pvp_products_changed_v2", handleProductsSync);
+    return () => window.removeEventListener("pvp_products_changed_v2", handleProductsSync);
   }, []);
 
   // Dynamic Toppings State
