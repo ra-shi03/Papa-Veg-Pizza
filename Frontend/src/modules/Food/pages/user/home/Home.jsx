@@ -135,6 +135,7 @@ export default function Home() {
 
   // Dynamic Categories State
   const [categories, setCategories] = useState([]);
+  const [sections, setSections] = useState([]);
 
   // Dynamic Products State
   const [products, setProducts] = useState([]);
@@ -263,32 +264,41 @@ export default function Home() {
 
     const fetchCategoryProducts = async () => {
       try {
-        const res = await apiClient.get('/food/admin/category-products/categories');
+        const res = await apiClient.get('/food/admin/menu/public');
         if (res?.data?.data) {
-          const items = res.data.data.filter(item => item.status === 'Active');
-
-          const fetchedCategories = items
-            .filter(item => item.type === 'Category')
-            .map(c => ({
+          const { categories: cats, sections: secs, products: prods } = res.data.data;
+          
+          if (cats && cats.length > 0) {
+            const parsedCats = cats.map(c => ({
               id: c._id || c.id,
-              label: c.label,
-              icon: c.icon || 'local_pizza'
+              label: c.label || c.name,
+              icon: c.icon || c.image || 'local_pizza'
             }));
+            setCategories(parsedCats);
+            setActiveCategory(prev => prev === "pizza" ? parsedCats[0].id : prev);
+          }
+          
+          if (secs && secs.length > 0) {
+            setSections(secs.map(s => ({
+              id: s._id || s.id,
+              categoryId: s.categoryId,
+              name: s.name,
+              slug: s.slug
+            })));
+          }
 
-          const fetchedProducts = items
-            .filter(item => item.type === 'Product')
-            .map(p => ({
+          if (prods && prods.length > 0) {
+            setProducts(prods.map(p => ({
               id: p._id || p.id,
-              title: p.label,
-              price: 299, // Fallback if no price field
+              title: p.name,
+              price: p.price || 299,
               rating: 4.5,
-              description: p.description,
-              image: p.icon || "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500",
-              category: 'pizza' // Fallback
-            }));
-
-          if (fetchedCategories.length > 0) setCategories(fetchedCategories);
-          if (fetchedProducts.length > 0) setProducts(fetchedProducts);
+              description: p.shortDescription || p.description,
+              image: p.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500",
+              categoryId: typeof p.categoryId === 'object' ? p.categoryId?._id : p.categoryId,
+              sectionId: typeof p.sectionId === 'object' ? p.sectionId?._id : p.sectionId
+            })));
+          }
         }
       } catch (err) {
         console.warn("Failed to load category products:", err);
@@ -720,6 +730,7 @@ export default function Home() {
           <HomeSections
             deals={deals}
             categories={categories}
+            sections={sections}
             products={products}
             activeCategory={activeCategory}
             favorites={favorites}

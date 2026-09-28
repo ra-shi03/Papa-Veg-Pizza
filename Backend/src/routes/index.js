@@ -10,6 +10,7 @@ import fcmRoutes from '../core/notifications/fcm.routes.js';
 import notificationRoutes from '../core/notifications/notification.routes.js';
 import { authMiddleware } from '../core/auth/auth.middleware.js';
 import * as businessSettingsController from '../modules/food/admin/controllers/businessSettings.controller.js';
+import * as productController from '../modules/food/admin/controllers/product.controller.js';
 import { requireRoles } from '../core/roles/role.middleware.js';
 import { getQueuesController } from '../controllers/admin.controller.js';
 import webhookRoutes from '../core/payments/routes/webhook.routes.js';
@@ -44,6 +45,9 @@ router.use('/v1/uploads', uploadRoutes);
 
 // Mark business-settings/public as truly public
 router.get('/v1/food/admin/business-settings/public', businessSettingsController.getBusinessSettings);
+
+// Public menu route
+router.get('/v1/food/admin/menu/public', productController.getPublicMenu);
 
 router.use('/v1/food/admin', authMiddleware, requireRoles('ADMIN'), storeAdminRoutes);
 router.use('/v1/food/user', authMiddleware, requireRoles('USER'), userRoutes);
