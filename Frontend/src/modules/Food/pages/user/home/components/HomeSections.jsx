@@ -360,6 +360,7 @@ function MealForOneCard({ meal, isDarkMode, checkLocation, addToCart, triggerToa
 export function HomeSections({
   deals,
   categories,
+  sections,
   products,
   activeCategory,
   favorites,
@@ -491,28 +492,28 @@ export function HomeSections({
                   className="flex items-center justify-center transition-all duration-300"
                   style={{
                     width: 60, height: 60, borderRadius: '50%',
-                    background: isSelected ? 'var(--accent-red)' : (isDarkMode ? '#121212' : '#F9F9FB'),
-                    boxShadow: isSelected
-                      ? (isDarkMode ? 'inset 4px 4px 8px rgba(0,0,0,0.6), inset -4px -4px 8px rgba(255,255,255,0.1)' : 'inset 4px 4px 8px rgba(0,0,0,0.2), inset -4px -4px 8px rgba(255,255,255,0.4)')
-                      : (isDarkMode ? '4px 4px 10px rgba(0,0,0,0.6), -4px -4px 10px rgba(255,255,255,0.05)' : '4px 4px 10px rgba(0, 0, 0, 0.08), -4px -4px 10px rgba(255, 255, 255, 1)'),
-                    border: isSelected ? 'none' : (isDarkMode ? '1px solid rgba(255,255,255,0.02)' : '1px solid rgba(255,255,255,0.5)')
+                    background: isDarkMode ? '#121212' : '#F9F9FB',
+                    boxShadow: isDarkMode 
+                      ? '4px 4px 10px rgba(0,0,0,0.6), -4px -4px 10px rgba(255,255,255,0.05)' 
+                      : '4px 4px 10px rgba(0, 0, 0, 0.08), -4px -4px 10px rgba(255, 255, 255, 1)',
+                    border: isDarkMode ? '1px solid rgba(255,255,255,0.02)' : '1px solid rgba(255,255,255,0.5)'
                   }}
                 >
                   {cat.icon && (cat.icon.startsWith('http') || cat.icon.startsWith('data:')) ? (
                     <img 
                       src={cat.icon} 
                       alt={cat.label} 
-                      className="w-full h-full object-cover rounded-full" 
+                      className="w-full h-full object-contain" 
                       style={{ 
-                        opacity: isSelected ? 0.9 : 1, 
-                        filter: isSelected ? 'brightness(1.1)' : 'none',
-                        padding: '4px' // Adding slight padding so it doesn't touch edges
+                        padding: '12px', // More padding so the image sits nicely inside the circle
+                        transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+                        transition: 'transform 0.3s ease'
                       }}
                     />
                   ) : (
                     <span
                       className="material-symbols-outlined"
-                      style={{ color: isSelected ? '#fff' : 'var(--accent-red)' }}
+                      style={{ color: 'var(--accent-red)' }}
                     >
                       {cat.icon}
                     </span>
@@ -521,8 +522,8 @@ export function HomeSections({
                 <span
                   style={{
                     fontSize: 11, fontFamily: 'Poppins,sans-serif',
-                    fontWeight: isSelected ? 700 : 500,
-                    color: isSelected ? 'var(--accent-red)' : 'var(--muted-gray)'
+                    fontWeight: 500,
+                    color: 'var(--muted-gray)'
                   }}
                 >
                   {cat.label ? cat.label.charAt(0).toUpperCase() + cat.label.slice(1).toLowerCase() : ''}
@@ -617,18 +618,23 @@ export function HomeSections({
         </div>
       </section>
 
-      {/* ── Most Loved ────────────────────────────────────────────────── */}
-      <section>
-        <div className="px-margin-mobile mb-md">
-          <h3
-            className="font-headline-lg-mobile"
-            style={{ color: isDarkMode ? '#fff' : 'var(--primary-gray)' }}
-          >
-            Most Loved
-          </h3>
-        </div>
-        <div className="flex overflow-x-auto hide-scrollbar gap-gutter px-margin-mobile pb-4">
-          {products.map((product) => {
+      {/* ── Dynamic Menu Hierarchy (Category -> Section -> Product) ── */}
+      {sections?.filter(sec => sec.categoryId === activeCategory).map(section => {
+        const sectionProducts = products.filter(p => p.sectionId === section.id);
+        if (sectionProducts.length === 0) return null;
+        
+        return (
+          <section key={section.id} className="mt-8">
+            <div className="px-margin-mobile mb-md">
+              <h3
+                className="font-headline-lg-mobile"
+                style={{ color: isDarkMode ? '#fff' : 'var(--primary-gray)' }}
+              >
+                {section.name}
+              </h3>
+            </div>
+            <div className="flex overflow-x-auto hide-scrollbar gap-gutter px-margin-mobile pb-4">
+              {sectionProducts.map((product) => {
             const isFav = favorites.includes(product.id);
             return (
               <div
@@ -732,9 +738,11 @@ export function HomeSections({
                 </div>
               </div>
             );
-          })}
-        </div>
-      </section>
+              })}
+            </div>
+          </section>
+        );
+      })}
     </>
   );
 }

@@ -2,6 +2,8 @@ import { Product } from '../models/product.model.js';
 import { Addon } from '../models/addon.model.js';
 import { FoodFranchise } from '../../franchise/models/franchise.model.js';
 import { FoodStore } from '../../store/models/store.model.js';
+import { CategoryProduct } from '../models/categoryProduct.model.js';
+import { ProductSection } from '../models/productSection.model.js';
 import mongoose from 'mongoose';
 
 export async function getProducts(req, res, next) {
@@ -12,6 +14,31 @@ export async function getProducts(req, res, next) {
             .sort({ createdAt: -1 });
             
         res.status(200).json({ success: true, data: products });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function getPublicMenu(req, res, next) {
+    try {
+        const categories = await CategoryProduct.find({ type: 'Category', status: 'Active' }).sort({ order: 1 });
+        const sections = await ProductSection.find({ status: 'Active' }).sort({ sortOrder: 1 });
+        const products = await Product.find({ status: 'Active' })
+            .populate('categoryId', 'name')
+            .populate('sectionId', 'name')
+            .sort({ createdAt: -1 });
+
+        // Transform them back to the format Home.jsx expects temporarily, or return as is.
+        // The old Home.jsx expects res.data.data to be an array of items, but we should let Home.jsx 
+        // handle the new format if we are to integrate the 3-level menu hierarchy!
+        res.status(200).json({ 
+            success: true, 
+            data: {
+                categories,
+                sections,
+                products
+            } 
+        });
     } catch (error) {
         next(error);
     }
