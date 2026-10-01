@@ -18,7 +18,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     ViteImageOptimizer({
-      // Uses sharp under the hood with sensible defaults for all image formats
+      exclude: /(quicky-spicy-logo|offerimage|collectionspagebanner|loginbanner|bikelogo|logo\.png)/,
     })
   ],
   resolve: {
