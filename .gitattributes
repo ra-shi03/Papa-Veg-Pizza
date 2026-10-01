@@ -1,0 +1,12 @@
+# Treat binary files properly to prevent line-ending (CRLF) corruption
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.mp3 binary
+*.pdf binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
