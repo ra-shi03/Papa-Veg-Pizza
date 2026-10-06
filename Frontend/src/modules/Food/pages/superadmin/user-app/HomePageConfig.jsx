@@ -7,6 +7,7 @@ import { uploadAPI } from '../../../../../services/api';
 
 export default function HomePageConfig() {
   const [deliveryMinutes, setDeliveryMinutes] = useState(30);
+  const [promoText, setPromoText] = useState('LOWEST PRICES ONLY ON APP | FREE DELIVERY ABOVE ₹99');
   const [banners, setBanners] = useState([]);
   const [deals, setDeals] = useState([]);
   const [isDealsModalOpen, setIsDealsModalOpen] = useState(false);
@@ -77,6 +78,9 @@ export default function HomePageConfig() {
         if (typeof data.deliveryTimeMinutes === 'number') {
           setDeliveryMinutes(data.deliveryTimeMinutes);
         }
+        if (data.promoText) {
+          setPromoText(data.promoText);
+        }
         if (Array.isArray(data.banners)) {
           setBanners(data.banners);
         }
@@ -131,7 +135,8 @@ export default function HomePageConfig() {
     setIsSaving(true);
     const payload = {
       deliveryTimeMinutes: minutes,
-      deliveryTimeLabel: 'mins'
+      deliveryTimeLabel: 'mins',
+      promoText: promoText
     };
 
     try {
@@ -149,7 +154,7 @@ export default function HomePageConfig() {
         window.dispatchEvent(new CustomEvent('homePageConfigUpdated', { detail: updated }));
       } catch (_) {}
 
-      toast.success(`Delivery time updated to ${minutes} mins!`);
+      toast.success(`Settings updated successfully!`);
     } catch (err) {
       console.error('Save failed:', err);
       toast.error('Failed to save delivery time');
@@ -385,25 +390,43 @@ export default function HomePageConfig() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <input
-            type="number"
-            min="1"
-            max="180"
-            value={deliveryMinutes}
-            onChange={(e) => setDeliveryMinutes(e.target.value === '' ? '' : Number(e.target.value))}
-            className="w-24 px-3 py-1.5 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-            placeholder="Mins"
-            disabled={isLoading}
-          />
-          <button
-            onClick={handleSaveDeliveryTime}
-            disabled={isSaving || isLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm font-medium"
-          >
-            <Save className="w-3.5 h-3.5" />
-            {isSaving ? 'Saving...' : 'Save'}
-          </button>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 w-32">Delivery Time:</span>
+            <input
+              type="number"
+              min="1"
+              max="180"
+              value={deliveryMinutes}
+              onChange={(e) => setDeliveryMinutes(e.target.value === '' ? '' : Number(e.target.value))}
+              className="w-24 px-3 py-1.5 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              placeholder="Mins"
+              disabled={isLoading}
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 w-32">Promo Text:</span>
+            <input
+              type="text"
+              value={promoText}
+              onChange={(e) => setPromoText(e.target.value)}
+              className="flex-1 px-3 py-1.5 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              placeholder="e.g. LOWEST PRICES ONLY ON APP | FREE DELIVERY ABOVE ₹99"
+              disabled={isLoading}
+            />
+          </div>
+
+          <div className="pt-2">
+            <button
+              onClick={handleSaveDeliveryTime}
+              disabled={isSaving || isLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm font-medium"
+            >
+              <Save className="w-3.5 h-3.5" />
+              {isSaving ? 'Saving...' : 'Save Settings'}
+            </button>
+          </div>
         </div>
       </section>
 

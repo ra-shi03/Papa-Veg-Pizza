@@ -14,6 +14,11 @@ const homePageSchema = new mongoose.Schema(
             default: 'mins',
             trim: true
         },
+        promoText: {
+            type: String,
+            default: 'LOWEST PRICES ONLY ON APP | FREE DELIVERY ABOVE ₹99',
+            trim: true
+        },
         banners: [
             {
                 url: { type: String, required: true },

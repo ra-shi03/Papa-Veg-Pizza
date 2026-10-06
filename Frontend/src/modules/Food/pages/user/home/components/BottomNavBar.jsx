@@ -8,26 +8,36 @@ export function BottomNavBar({
 }) {
   return (
     <>
-      {/* Floating Action Cart Button */}
-      {totalCartCount > 0 && locationConfirmed && (
-        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 w-full max-w-md pointer-events-none z-45">
-          <button
-            onClick={() => {
-              navigate("/user/cart");
-              triggerToast("Opening your cart...");
-            }}
-            className="absolute right-4 bottom-0 pointer-events-auto w-14 h-14 bg-primary text-on-primary rounded-full shadow-[0_0_20px_rgba(229,57,53,0.4)] flex items-center justify-center active:scale-95 transition-transform cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[28px]">shopping_basket</span>
-            <div className="absolute -top-1 -right-1 w-6 h-6 bg-white text-on-primary-container rounded-full text-[10px] font-bold flex items-center justify-center border border-primary animate-bounce">
-              {totalCartCount}
-            </div>
-          </button>
-        </div>
-      )}
+      {/* ── Domino's Style Full-Width Bottom Nav Bar ── */}
+      <nav 
+        className="fixed bottom-0 left-0 w-full z-50 bg-[#FFFFFF] dark:bg-[#121212] border-t border-black/5 dark:border-white/5 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] flex justify-around items-center px-1 pb-safe"
+        style={{ height: 64 }}
+      >
+        {/* Menu (Slice) */}
+        <button
+          onClick={() => {
+            navigate("/user/menu");
+            triggerToast("Opening Menu");
+          }}
+          className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none w-16 pt-1"
+        >
+          <span className="material-symbols-outlined text-[24px] text-zinc-500 dark:text-zinc-400">local_pizza</span>
+          <span className="text-[10px] font-semibold tracking-wide text-zinc-500 dark:text-zinc-400 mt-1">Menu</span>
+        </button>
 
-      {/* Floating Navigation Bar */}
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[360px] z-50 rounded-full bg-[#FAF9F6]/90 dark:bg-zinc-950/95 backdrop-blur-xl border border-black/5 dark:border-white/5 shadow-[0_16px_36px_rgba(0,0,0,0.15)] flex justify-around items-center h-[68px] px-2 m-0">
+        {/* Deals (Combos) */}
+        <button
+          onClick={() => {
+            navigate("/user/deals");
+            triggerToast("Opening Deals");
+          }}
+          className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none w-16 pt-1"
+        >
+          <span className="material-symbols-outlined text-[24px] text-zinc-500 dark:text-zinc-400">local_activity</span>
+          <span className="text-[10px] font-semibold tracking-wide text-zinc-500 dark:text-zinc-400 mt-1">Deals</span>
+        </button>
+
+        {/* Home (Center Logo equivalent) */}
         <button
           onClick={() => {
             if (window.location.pathname === "/user" || window.location.pathname === "/user/") {
@@ -37,38 +47,43 @@ export function BottomNavBar({
             }
             triggerToast("Opening Home");
           }}
-          className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none group"
+          className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none relative -mt-4 w-16"
         >
-          <div className="w-14 h-8 rounded-full flex items-center justify-center mb-0.5 transition-all duration-300 bg-[#E53935]/10 text-[#E53935] dark:bg-[#E53935]/20">
-            <span className="material-symbols-outlined text-[22px] fill" style={{ fontVariationSettings: " 'FILL' 1 " }}>home</span>
+          <div className="w-[52px] h-[52px] rounded-full flex items-center justify-center bg-[#FFFFFF] dark:bg-zinc-900 shadow-[0_-2px_10px_rgba(0,0,0,0.06)] text-[var(--accent-red)] z-10 relative border-t border-black/5 dark:border-white/5">
+            <div className="w-[44px] h-[44px] rounded-full flex items-center justify-center bg-[#EEECEA] dark:bg-zinc-800">
+               <span className="material-symbols-outlined text-[28px] fill" style={{ fontVariationSettings: " 'FILL' 1 " }}>home</span>
+            </div>
           </div>
-          <span className="text-[10px] font-bold tracking-wide text-[#E53935]">Home</span>
+          <span className="text-[10px] font-bold tracking-wide text-[var(--accent-red)] mt-0.5">Home</span>
         </button>
 
+        {/* Cart / Reorder */}
         <button
           onClick={() => {
-            navigate("/user/menu");
-            triggerToast("Opening Menu");
+            navigate("/user/cart");
+            triggerToast("Opening Cart");
           }}
-          className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none group"
+          className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none w-16 relative pt-1"
         >
-          <div className="w-14 h-8 rounded-full flex items-center justify-center mb-0.5 transition-all duration-300 bg-transparent text-zinc-500 dark:text-zinc-400 group-hover:bg-black/5 dark:group-hover:bg-white/5">
-            <span className="material-symbols-outlined text-[22px]">restaurant_menu</span>
-          </div>
-          <span className="text-[10px] font-semibold tracking-wide text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-800 dark:group-hover:text-zinc-200">Menu</span>
+          <span className="material-symbols-outlined text-[24px] text-zinc-500 dark:text-zinc-400">shopping_bag</span>
+          {totalCartCount > 0 && locationConfirmed && (
+             <div className="absolute top-0 right-[14px] w-[18px] h-[18px] bg-[var(--accent-red)] text-white rounded-full text-[9px] font-bold flex items-center justify-center border-2 border-white dark:border-[#121212]">
+                {totalCartCount}
+             </div>
+          )}
+          <span className="text-[10px] font-semibold tracking-wide text-zinc-500 dark:text-zinc-400 mt-1">Cart</span>
         </button>
 
+        {/* Account / Rewards */}
         <button
           onClick={() => {
             navigate("/user/account");
             triggerToast("Opening Account");
           }}
-          className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none group"
+          className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none w-16 pt-1"
         >
-          <div className="w-14 h-8 rounded-full flex items-center justify-center mb-0.5 transition-all duration-300 bg-transparent text-zinc-500 dark:text-zinc-400 group-hover:bg-black/5 dark:group-hover:bg-white/5">
-            <span className="material-symbols-outlined text-[22px]">person</span>
-          </div>
-          <span className="text-[10px] font-semibold tracking-wide text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-800 dark:group-hover:text-zinc-200">Account</span>
+          <span className="material-symbols-outlined text-[24px] text-zinc-500 dark:text-zinc-400">star</span>
+          <span className="text-[10px] font-semibold tracking-wide text-zinc-500 dark:text-zinc-400 mt-1">Account</span>
         </button>
       </nav>
     </>

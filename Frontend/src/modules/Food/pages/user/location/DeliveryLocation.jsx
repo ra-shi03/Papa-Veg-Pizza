@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, MapPin, Bike, ShoppingBag, Utensils, Train, ChevronRight, Car } from 'lucide-react';
 import { useLocationStore } from '@food/store/locationStore';
 import { locationAPI } from '@/services/api/location';
@@ -7,10 +7,11 @@ import apiClient from '@/services/api/axios';
 
 export default function DeliveryLocation() {
   const navigate = useNavigate();
+  const location = useLocation();
   const locationState = useLocationStore((state) => state);
   const currentAddress = locationState.address || "Regal Circle, South Tukoganj";
 
-  const [activeService, setActiveService] = useState('delivery');
+  const [activeService, setActiveService] = useState(location.state?.activeService || 'delivery');
   const [nearbyStores, setNearbyStores] = useState([]);
   const [isLoadingStores, setIsLoadingStores] = useState(false);
   const [pnr, setPnr] = useState('');

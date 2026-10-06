@@ -456,9 +456,9 @@ export function HomeSections({
         <div className="px-margin-mobile flex justify-between items-end mb-md">
           <h3
             className="font-headline-lg-mobile"
-            style={{ color: isDarkMode ? '#fff' : 'var(--primary-gray)' }}
+            style={{ color: isDarkMode ? '#fff' : 'var(--primary-gray)', fontSize: '20px' }}
           >
-            Menus
+            What are you craving for?
           </h3>
           <button
             onClick={() => {
@@ -531,6 +531,26 @@ export function HomeSections({
               </div>
             );
           })}
+        </div>
+
+        {/* Promo Banner (Domino's style) */}
+        <div className="px-margin-mobile mt-4 mb-2">
+          <div 
+            className="flex items-center gap-3 p-3 rounded-xl border border-black/5 dark:border-white/5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+            style={{ background: isDarkMode ? '#1a1a1a' : '#ffffff', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}
+          >
+            <div className="w-11 h-11 shrink-0 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
+              <img src="https://cdn-icons-png.flaticon.com/512/2830/2830305.png" alt="Delivery" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+            </div>
+            <div className="flex flex-col min-w-0 flex-1">
+              <span style={{ fontSize: 13, fontWeight: 700, color: isDarkMode ? '#f5f5f5' : 'var(--primary-gray)', fontFamily: 'Poppins,sans-serif', lineHeight: 1.2 }}>
+                Lowest Prices on App & Free Delivery
+              </span>
+              <span className="truncate" style={{ fontSize: 11, fontWeight: 500, color: 'var(--muted-gray)', fontFamily: 'Poppins,sans-serif', marginTop: 3 }}>
+                Add items worth ₹99 to get FREE delivery!
+              </span>
+            </div>
+          </div>
         </div>
       </section>
 
