@@ -2,6 +2,7 @@ import express from 'express';
 import {
     requestUserOtpController,
     verifyUserOtpController,
+    verifyTruecallerController,
     adminLoginController,
     superAdminLoginController,
     franchiseAdminLoginController,
@@ -29,6 +30,7 @@ const router = express.Router();
 router.post('/user/request-otp', authRateLimiter, requestUserOtpController);
 router.post('/user/send-otp', authRateLimiter, requestUserOtpController);
 router.post('/user/verify-otp', authRateLimiter, verifyUserOtpController);
+router.post('/user/verify-truecaller', authRateLimiter, verifyTruecallerController);
 
 
 // Delivery partner OTP login

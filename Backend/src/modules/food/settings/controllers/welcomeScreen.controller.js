@@ -19,7 +19,12 @@ export const updateWelcomeScreenConfig = async (req, res, next) => {
         if (!config) {
             config = await WelcomeScreen.create(req.body);
         } else {
-            Object.assign(config, req.body);
+            // Mongoose sometimes drops array assignments via Object.assign, so we set it explicitly
+            const { posters, _id, __v, createdAt, updatedAt, ...rest } = req.body;
+            Object.assign(config, rest);
+            if (posters !== undefined) {
+                config.posters = posters;
+            }
             await config.save();
         }
         return sendResponse(res, 200, 'Configuration updated successfully', config);

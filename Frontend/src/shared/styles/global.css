@@ -12,7 +12,7 @@
 
   --primary-gray: #34373C;
   --secondary-off-white: #F8F6F2;
-  --accent-red: #ED2F35;
+  --accent-red: #EE3A43;
   --muted-gray: #62666D;
   --border-gray: #D4D2CF;
 
@@ -91,6 +91,10 @@
   --font-poppins: var(--font-poppins);
   --font-outfit: var(--font-outfit);
   --font-inter: var(--font-inter);
+  
+  --color-red-500: #EE3A43;
+  --color-red-600: #EE3A43;
+  --color-red-700: #d32d36;
 }
 
 .dark {

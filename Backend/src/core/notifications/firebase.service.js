@@ -14,6 +14,7 @@ const FCM_SEND_URL = (projectId) =>
     `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/messages:send`;
 const OWNER_MODELS = {
     USER: FoodUser,
+    CUSTOMER: FoodUser,
     STORE: FoodStore,
     DELIVERY_PARTNER: FoodDeliveryPartner,
     ADMIN: FoodAdmin

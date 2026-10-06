@@ -13,7 +13,7 @@ export default function Support() {
 
   const [isDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem("appTheme")
-    return savedTheme ? savedTheme === "dark" : true
+    return savedTheme ? savedTheme === "dark" : false
   })
 
   const issuesList = [

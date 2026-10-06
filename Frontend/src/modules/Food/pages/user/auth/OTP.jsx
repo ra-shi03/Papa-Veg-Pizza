@@ -6,7 +6,7 @@ import { Input } from "@food/components/ui/input"
 import { Button } from "@food/components/ui/button"
 import { authAPI, userAPI } from "@food/api"
 import { setAuthData as setUserAuthData } from "@food/utils/auth"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 
 export default function OTP() {
   const navigate = useNavigate()
@@ -182,11 +182,11 @@ export default function OTP() {
 
         setSuccess(true)
         
-        // Navigate based on whether the profile is complete (e.g. has a name)
-        if (user.name && user.name.trim() !== "") {
-          navigate("/food/user")
+        // Navigate based on whether the profile is complete
+        if (data.nextStep === "HOME" || data.profile?.profileCompleted) {
+          navigate("/user/location/setup")
         } else {
-          navigate("/user/profile/create", { state: { phone: mobileNumber } })
+          navigate("/user/location/setup", { state: { phone: mobileNumber } })
         }
       } else {
         throw new Error("Invalid response from server")
@@ -238,7 +238,7 @@ export default function OTP() {
 
       setSuccess(true)
       setTimeout(() => {
-        navigate("/food/user")
+        navigate("/user/location/setup")
       }, 500)
     } catch (err) {
       const message =

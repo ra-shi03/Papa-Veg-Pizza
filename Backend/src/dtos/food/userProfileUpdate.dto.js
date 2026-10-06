@@ -8,31 +8,31 @@ const isoDate = z
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (expected YYYY-MM-DD)');
 
 const schema = z.object({
-    name: z.string().max(200).optional(),
-    email: z.string().email().max(200).optional(),
-    phone: z.string().max(30).optional(),
-    profileImage: z.string().max(2000).optional(),
-    dateOfBirth: isoDate.optional(),
-    anniversary: isoDate.optional(),
-    gender: genderEnum.optional(),
-    alternatePhone: z.string().max(30).optional(),
-    addressLine1: z.string().max(300).optional(),
-    addressLine2: z.string().max(300).optional(),
-    city: z.string().max(100).optional(),
-    state: z.string().max(100).optional(),
-    country: z.string().max(100).optional(),
-    pincode: z.string().max(20).optional(),
-    language: z.string().max(50).optional(),
-    timezone: z.string().max(100).optional(),
+    name: z.string().max(200).nullable().optional(),
+    email: z.string().email().max(200).nullable().optional(),
+    phone: z.string().max(30).nullable().optional(),
+    profileImage: z.string().max(2000).nullable().optional(),
+    dateOfBirth: isoDate.nullable().optional(),
+    anniversary: isoDate.nullable().optional(),
+    gender: genderEnum.nullable().optional(),
+    alternatePhone: z.string().max(30).nullable().optional(),
+    addressLine1: z.string().max(300).nullable().optional(),
+    addressLine2: z.string().max(300).nullable().optional(),
+    city: z.string().max(100).nullable().optional(),
+    state: z.string().max(100).nullable().optional(),
+    country: z.string().max(100).nullable().optional(),
+    pincode: z.string().max(20).nullable().optional(),
+    language: z.string().max(50).nullable().optional(),
+    timezone: z.string().max(100).nullable().optional(),
     preferences: z.object({
-        theme: z.enum(["LIGHT", "DARK", "SYSTEM"]).optional(),
+        theme: z.enum(["LIGHT", "DARK", "SYSTEM"]).nullable().optional(),
         notifications: z.object({
-            email: z.boolean().optional(),
-            sms: z.boolean().optional(),
-            push: z.boolean().optional()
-        }).optional(),
-        currency: z.string().max(10).optional()
-    }).optional()
+            email: z.boolean().nullable().optional(),
+            sms: z.boolean().nullable().optional(),
+            push: z.boolean().nullable().optional()
+        }).nullable().optional(),
+        currency: z.string().max(10).nullable().optional()
+    }).nullable().optional()
 });
 
 export const validateUserProfileUpdateDto = (body) => {

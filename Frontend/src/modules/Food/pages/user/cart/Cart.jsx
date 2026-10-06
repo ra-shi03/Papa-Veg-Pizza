@@ -138,7 +138,7 @@ export default function Cart() {
   const [showTaxDetails, setShowTaxDetails] = useState(false)
   const [isDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem("appTheme")
-    return savedTheme ? savedTheme === "dark" : true
+    return savedTheme ? savedTheme === "dark" : false
   })
 
   // Resolve Cart items from userCart localStorage on mount

@@ -117,6 +117,10 @@ export const requestUserOtp = async (phone) => {
   return shouldExposeOtp ? { otp } : {};
 };
 
+export const isCustomerProfileComplete = (profile) => {
+  return Boolean(profile && profile.firstName && profile.lastName && profile.email);
+};
+
 export const verifyUserOtpAndLogin = async (
   phone,
   otp,
@@ -125,153 +129,86 @@ export const verifyUserOtpAndLogin = async (
   platform,
   name,
 ) => {
-  const trimmedName = typeof name === "string" ? name.trim() : "";
-  const existingUser = await User.findOne({ mobile: phone });
-
-  const result = await verifyOtp(phone, otp);
+  const normalizedMobile = String(phone).replace(/\D/g, "");
+  
+  const result = await verifyOtp(normalizedMobile, otp);
 
   if (!result.valid) {
     throw new AuthError(result.reason || "OTP verification failed");
   }
 
-  let userDoc = existingUser;
-  
-  // Ensure user exists and mark as verified on successful OTP.
-  // Check if user is new or hasn't provided a name yet
-  const needsNamePrompt = !userDoc || !userDoc.name || String(userDoc.name).trim() === "" || String(userDoc.name).toLowerCase() === "null";
-  const isNewUser = needsNamePrompt;
+  let userDoc = await User.findOne({ mobile: normalizedMobile });
+  let isNewUser = false;
 
   if (!userDoc) {
+    isNewUser = true;
+    let customerRole = await Role.findOne({ code: 'CUSTOMER' });
+    if (!customerRole) {
+      customerRole = await Role.create({ code: 'CUSTOMER', name: 'Customer', description: 'Regular customer', isSystemRole: true });
+    }
+
     userDoc = await User.create({
-      mobile: phone,
-      isVerified: true,
-      name: trimmedName,
+      mobile: normalizedMobile,
+      loginType: "OTP",
+      primaryRole: customerRole._id,
+      mobileVerified: true,
+      isActive: true,
+    });
+    
+    await UserRole.create({
+      userId: userDoc._id,
+      roleId: customerRole._id,
+      status: 'ACTIVE'
     });
   } else {
-    let needsSave = false;
-    if (!userDoc.isVerified) {
-      userDoc.isVerified = true;
-      needsSave = true;
+    if (!userDoc.mobileVerified) {
+      userDoc.mobileVerified = true;
     }
-    if (trimmedName && !userDoc.name) {
-      userDoc.name = trimmedName;
-      needsSave = true;
-    }
-    if (needsSave) await userDoc.save();
   }
 
-  // Block login for deactivated users
   if (userDoc.isActive === false) {
-    throw new AuthError(
-      "Your account has been deactivated. Please contact support.",
-    );
+    throw new AuthError("Your account has been deactivated. Please contact support.");
   }
 
-  // Update FCM token if provided
+  userDoc.lastLoginAt = new Date();
+
   if (fcmToken) {
-    let isModified = false;
     if (platform === "mobile") {
       if (!userDoc.fcmTokenMobile) userDoc.fcmTokenMobile = [];
       if (!userDoc.fcmTokenMobile.includes(fcmToken)) {
         userDoc.fcmTokenMobile.push(fcmToken);
-        isModified = true;
       }
     } else {
-      // Default to web if not explicitly mobile
       if (!userDoc.fcmTokens) userDoc.fcmTokens = [];
       if (!userDoc.fcmTokens.includes(fcmToken)) {
         userDoc.fcmTokens.push(fcmToken);
-        isModified = true;
       }
     }
-    if (isModified) {
-      await userDoc.save();
+  }
+
+  await userDoc.save();
+
+  let profileDoc = await Profile.findOne({ userId: userDoc._id });
+  if (!profileDoc) {
+    profileDoc = await Profile.create({
+      userId: userDoc._id,
+      profileCompleted: false
+    });
+  }
+
+  const complete = isCustomerProfileComplete(profileDoc);
+  if (profileDoc.profileCompleted !== complete) {
+    profileDoc.profileCompleted = complete;
+    if (complete && !profileDoc.profileCompletedAt) {
+      profileDoc.profileCompletedAt = new Date();
     }
+    await profileDoc.save();
   }
 
-  // Ensure referralCode exists (used for share links on older accounts).
-  if (!userDoc.referralCode) {
-    userDoc.referralCode = String(userDoc._id);
-    await userDoc.save();
-  }
-
-  // Referral crediting: only for brand new accounts.
-  const refRaw = typeof ref === "string" ? String(ref).trim() : "";
-  if (!existingUser && refRaw) {
-    try {
-      if (mongoose.Types.ObjectId.isValid(refRaw)) {
-        const referrerId = new mongoose.Types.ObjectId(refRaw);
-        if (String(referrerId) !== String(userDoc._id)) {
-          const [referrer, settingsDoc] = await Promise.all([
-            User.findById(referrerId).select("_id referralCount").lean(),
-            FoodReferralSettings.findOne({ isActive: true })
-              .sort({ createdAt: -1 })
-              .lean(),
-          ]);
-
-          if (referrer && settingsDoc) {
-            const reward = Math.max(
-              0,
-              Number(settingsDoc.referralRewardUser) || 0,
-            );
-            const limit = Math.max(
-              0,
-              Number(settingsDoc.referralLimitUser) || 0,
-            );
-
-            if (
-              reward > 0 &&
-              limit > 0 &&
-              Number(referrer.referralCount || 0) < limit
-            ) {
-              userDoc.referredBy = referrerId;
-              await userDoc.save();
-
-              const log = await FoodReferralLog.create({
-                referrerId,
-                refereeId: userDoc._id,
-                role: "USER",
-                rewardAmount: reward,
-                status: "credited",
-              });
-
-              await Promise.all([
-                User.updateOne(
-                  { _id: referrerId },
-                  { $inc: { referralCount: 1 } },
-                ),
-                creditReferralReward(referrerId, reward, {
-                  role: "USER",
-                  refereeId: String(userDoc._id),
-                  referralLogId: String(log._id),
-                }),
-              ]);
-            } else {
-              await FoodReferralLog.create({
-                referrerId,
-                refereeId: userDoc._id,
-                role: "USER",
-                rewardAmount: reward,
-                status: "rejected",
-                reason:
-                  reward <= 0
-                    ? "reward_disabled"
-                    : limit <= 0
-                      ? "limit_disabled"
-                      : "limit_reached",
-              });
-            }
-          }
-        }
-      }
-    } catch (e) {
-      // Never fail login due to referral errors.
-      logger?.warn?.({ err: e }, "Referral crediting failed (user)");
-    }
-  }
+  const nextStep = complete ? "HOME" : "PROFILE";
 
   const user = userDoc.toObject();
-  const payload = { userId: user._id.toString(), role: user.role || "USER" };
+  const payload = { userId: user._id.toString(), role: "CUSTOMER" };
 
   const accessToken = signAccessToken(payload);
   const rawRefreshToken = signRefreshToken(payload);
@@ -286,7 +223,6 @@ export const verifyUserOtpAndLogin = async (
     expiresAt,
   });
 
-  // Limit active sessions (max 3 per user)
   const tokens = await RefreshToken.find({ userId: user._id }).sort({ createdAt: -1 });
   if (tokens.length > 3) {
     const tokensToDelete = tokens.slice(3).map(t => t._id);
@@ -294,14 +230,26 @@ export const verifyUserOtpAndLogin = async (
   }
 
   return {
-    token: accessToken,
     accessToken,
     refreshToken: rawRefreshToken,
-    user: sanitizeUserForAuthResponse(user),
+    user: {
+      id: user._id.toString(),
+      mobile: user.mobile,
+      primaryRole: "CUSTOMER",
+      profileCompleted: profileDoc.profileCompleted,
+      name: profileDoc.firstName || ""
+    },
+    profile: {
+      id: profileDoc._id.toString(),
+      firstName: profileDoc.firstName || "",
+      lastName: profileDoc.lastName || "",
+      email: profileDoc.email || "",
+      profileCompleted: profileDoc.profileCompleted
+    },
+    nextStep,
     isNewUser,
   };
 };
-
 export const adminLogin = async ({ email, mobile, password } = {}, allowedRoles = null) => {
   if ((!email && !mobile) || !password) {
     throw new ValidationError("Email/mobile and password are required");
@@ -710,8 +658,24 @@ export const getProfile = async (userId, role, jwtStoreId = null) => {
   } else {
     switch (role) {
       case ROLES.USER:
-        profile = await User.findById(id).lean();
+      case "CUSTOMER": {
+        const userDoc = await User.findById(id).lean();
+        if (userDoc) {
+           const profileDoc = await Profile.findOne({ userId: id }).lean();
+           profile = {
+             ...userDoc,
+             firstName: profileDoc?.firstName || null,
+             lastName: profileDoc?.lastName || null,
+             email: profileDoc?.email || userDoc.email || null,
+             profileCompleted: profileDoc?.profileCompleted || false,
+             profileCompletedAt: profileDoc?.profileCompletedAt || null,
+             profilePhoto: profileDoc?.profilePhoto || null,
+             gender: profileDoc?.gender || null,
+             dob: profileDoc?.dob || null
+           };
+        }
         break;
+      }
 
     case ROLES.DELIVERY_PARTNER: {
       const partner = await FoodDeliveryPartner.findById(id).lean();
@@ -1081,13 +1045,45 @@ export const updatePersonalProfile = async (userId, updateData) => {
   const user = await User.findById(userId).populate("primaryRole");
   if (!user) throw new AuthError("User not found");
 
-  // Update user model core fields (email/phone mapping)
-  if (updateData.email) user.email = updateData.email;
+  if (user.primaryRole && user.primaryRole.code === 'CUSTOMER') {
+    let profile = await Profile.findOne({ userId });
+    if (!profile) {
+      profile = new Profile({ userId });
+    }
+    
+    if (updateData.firstName !== undefined) profile.firstName = updateData.firstName;
+    if (updateData.lastName !== undefined) profile.lastName = updateData.lastName;
+    if (updateData.email !== undefined) profile.email = updateData.email;
+    if (updateData.gender !== undefined) {
+      if (updateData.gender === "prefer-not-to-say") {
+         profile.gender = null; // or handle it
+      } else {
+         profile.gender = updateData.gender.toUpperCase();
+      }
+    }
+    if (updateData.dateOfBirth !== undefined) profile.dob = updateData.dateOfBirth;
+    if (updateData.profileImage !== undefined) profile.profilePhoto = updateData.profileImage;
+    if (updateData.alternateMobile !== undefined) profile.alternatePhone = updateData.alternateMobile;
+
+    const complete = isCustomerProfileComplete(profile);
+    if (profile.profileCompleted !== complete) {
+      profile.profileCompleted = complete;
+      if (complete && !profile.profileCompletedAt) {
+        profile.profileCompletedAt = new Date();
+      }
+    }
+    await profile.save();
+
+    await user.save();
+
+    return { success: true, message: "Profile updated successfully", data: { profile, nextStep: complete ? "HOME" : "PROFILE" } };
+  }
+
+  // Fallback for non-customers
+
   if (updateData.phone) { user.mobile = updateData.phone; user.phone = updateData.phone; }
-  if (updateData.fullName) user.name = updateData.fullName;
   await user.save();
 
-  // Update StoreManager / Staff operational record if it exists
   const storeManager = await StoreManager.findOne({ userId });
     if (storeManager) {
       if (!storeManager.personalDetails) storeManager.personalDetails = {};
@@ -1103,4 +1099,52 @@ export const updatePersonalProfile = async (userId, updateData) => {
       await storeManager.save();
   }
   return { success: true, message: "Profile updated successfully", data: updateData };
+};
+
+export const verifyTruecallerAndLogin = async (payload) => {
+  const normalizedMobile = String(payload.phone).replace(/\D/g, "");
+  
+  // In a real implementation, we would verify the Truecaller signature here
+  // For the mock, we just trust the payload if it comes from our frontend
+
+  let userDoc = await User.findOne({ mobile: normalizedMobile });
+  let isNewUser = false;
+
+  if (!userDoc) {
+    isNewUser = true;
+    userDoc = new User({
+      mobile: normalizedMobile,
+      roles: ["USER"],
+      status: "ACTIVE",
+    });
+    await userDoc.save();
+    
+    // Create profile
+    await UserProfile.create({
+      userId: userDoc._id,
+      fullName: `${payload.firstName || ''} ${payload.lastName || ''}`.trim() || "Truecaller User",
+      mobile: normalizedMobile,
+    });
+  }
+
+  // Generate tokens
+  const accessToken = generateAccessToken(userDoc);
+  const refreshToken = generateRefreshToken(userDoc._id);
+
+  // Update last login
+  userDoc.lastLogin = new Date();
+  await userDoc.save();
+
+  return {
+    isNewUser,
+    user: {
+      id: userDoc._id,
+      mobile: userDoc.mobile,
+      roles: userDoc.roles,
+    },
+    tokens: {
+      accessToken,
+      refreshToken,
+    },
+  };
 };

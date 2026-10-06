@@ -125,6 +125,11 @@ console.error = (...args) => {
     (errorStr.includes('WebSocket connection to') && errorStr.includes('socket.io') && errorStr.includes('failed'))
   ) return
 
+  if (
+    errorStr.includes('FCM web registration failed') ||
+    errorStr.includes('VersionError: The requested version (1) is less than the existing version')
+  ) return
+
   originalError.apply(console, args)
 }
 

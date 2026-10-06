@@ -2,14 +2,12 @@ import React, { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { HomeModals } from "./components/HomeModals"
-import OrderDetailsFlow from "@food/pages/user/orders/OrderDetailsFlow"
 import { useLocationStore } from "@food/store/locationStore"
 import { useLocationGuard } from "@food/hooks/useLocationGuard"
 import logoNew from "@/assets/logo1.png"
 import { PRODUCTS, DEALS } from "./HomeData"
 import { HomeStyles } from "./components/HomeStyles"
 import { HomeHeader } from "./components/HomeHeader"
-import { OrderMethods } from "./components/OrderMethods"
 import { HomeSections } from "./components/HomeSections"
 import { BottomNavBar } from "./components/BottomNavBar"
 import apiClient from "@/services/api/axios"
@@ -108,27 +106,7 @@ export default function Home() {
     return DEALS
   })
 
-  // Dynamic Order Methods State
-  const [orderMethods, setOrderMethods] = useState(() => {
-    const defaultMethods = [
-      { id: "delivery", label: "Delivery", icon: "moped", enabled: true },
-      { id: "dinein", label: "Dine-In", icon: "restaurant", enabled: true },
-      { id: "takeaway", label: "Takeaway", icon: "store", enabled: true },
-      { id: "incar", label: "In-Car", icon: "directions_car", enabled: true },
-      { id: "train", label: "Delivery on Train", icon: "train", enabled: true }
-    ];
-    try {
-      const stored = localStorage.getItem("pvp_order_methods");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        return defaultMethods.map(def => {
-          const found = parsed.find(p => p.id === def.id);
-          return found ? found : def;
-        });
-      }
-    } catch (e) { }
-    return defaultMethods;
-  });
+  // Removed orderMethods state
 
   // Dynamic Logo State
   const [logoUrl, setLogoUrl] = useState(() => localStorage.getItem("sa_logo") || logoNew)
@@ -161,7 +139,7 @@ export default function Home() {
   })
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem("appTheme")
-    return savedTheme ? savedTheme === "dark" : true
+    return savedTheme ? savedTheme === "dark" : false
   })
   useEffect(() => {
     const root = document.documentElement
@@ -176,32 +154,17 @@ export default function Home() {
 
   const [activeSlide, setActiveSlide] = useState(0)
 
-  // Map & Store Modal States
-  const [showMapModal, setShowMapModal] = useState(false)
-  const [showServiceSelector, setShowServiceSelector] = useState(false)
-  const [showStoreModal, setShowStoreModal] = useState(false)
-  const [showCarModal, setShowCarModal] = useState(false)
-  const [showTrainModal, setShowTrainModal] = useState(false)
+  // Modal states removed
   const [deliveryAddress, setDeliveryAddress] = useState(() => {
     return locationConfirmed ? (localStorage.getItem("deliveryAddress") || "") : ""
-  })
-  const [takeawayHut, setTakeawayHut] = useState(() => {
-    return locationConfirmed ? (localStorage.getItem("takeawayHut") || "") : ""
-  })
-  const [carNumber, setCarNumber] = useState(() => {
-    return locationConfirmed ? (localStorage.getItem("carNumber") || "") : ""
   })
 
   // Sync local location state with global location confirmation changes
   useEffect(() => {
     if (locationConfirmed) {
       setDeliveryAddress(localStorage.getItem("deliveryAddress") || "")
-      setTakeawayHut(localStorage.getItem("takeawayHut") || "")
-      setCarNumber(localStorage.getItem("carNumber") || "")
     } else {
       setDeliveryAddress("")
-      setTakeawayHut("")
-      setCarNumber("")
     }
   }, [locationConfirmed])
 
@@ -215,26 +178,15 @@ export default function Home() {
         if (storedUser.name) {
           setUserName(storedUser.name)
         }
-        if (!storedUser.profileCompleted) {
-          navigate("/user/profile/create", { replace: true })
-          return
-        }
       } catch (e) {
         console.error("Failed to parse user profile status", e)
       }
     } else if (!welcomeShown) {
-      navigate("/welcome")
+      navigate("/food/user/welcome")
     }
   }, [navigate])
 
-  // Sync global location modal open state with local modal trigger
-  useEffect(() => {
-    if (isModalOpen) {
-      setShowServiceSelector(true)
-    } else {
-      setShowServiceSelector(false)
-    }
-  }, [isModalOpen])
+  // Removed sync global location modal
 
   // Fetch dynamic home page settings (delivery time) from API
   useEffect(() => {
@@ -468,26 +420,7 @@ export default function Home() {
       }
     }
 
-    const handleOrderMethodsSync = () => {
-      try {
-        const stored = localStorage.getItem("pvp_order_methods")
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          const defaultMethods = [
-            { id: "delivery", label: "Delivery", icon: "moped", enabled: true },
-            { id: "dinein", label: "Dine-In", icon: "restaurant", enabled: true },
-            { id: "takeaway", label: "Takeaway", icon: "store", enabled: true },
-            { id: "incar", label: "In-Car", icon: "directions_car", enabled: true },
-            { id: "train", label: "Delivery on Train", icon: "train", enabled: true }
-          ];
-          const merged = defaultMethods.map(def => {
-            const found = parsed.find(p => p.id === def.id);
-            return found ? found : def;
-          });
-          setOrderMethods(merged);
-        }
-      } catch (e) { }
-    }
+    // handleOrderMethodsSync removed
 
     const handleBrandingSync = () => {
       setLogoUrl(localStorage.getItem("sa_logo") || logoNew)
@@ -549,8 +482,6 @@ export default function Home() {
     window.addEventListener("pvp_banners_changed", handleBannersSync)
     window.addEventListener("franchise_coupons_changed", handleDealsSync)
     window.addEventListener("pvp_coupons_changed", handleDealsSync)
-    window.addEventListener("pvp_order_methods_changed", handleOrderMethodsSync)
-    window.addEventListener("systemThemeChanged", handleOrderMethodsSync)
     window.addEventListener("systemThemeChanged", handleBrandingSync)
     window.addEventListener("pvp_categories_changed", handleCategoriesSync)
     window.addEventListener("pvp_products_changed_v2", handleProductsSync)
@@ -560,8 +491,6 @@ export default function Home() {
       window.removeEventListener("pvp_banners_changed", handleBannersSync)
       window.removeEventListener("franchise_coupons_changed", handleDealsSync)
       window.removeEventListener("pvp_coupons_changed", handleDealsSync)
-      window.removeEventListener("pvp_order_methods_changed", handleOrderMethodsSync)
-      window.removeEventListener("systemThemeChanged", handleOrderMethodsSync)
       window.removeEventListener("systemThemeChanged", handleBrandingSync)
       window.removeEventListener("pvp_categories_changed", handleCategoriesSync)
       window.removeEventListener("pvp_products_changed_v2", handleProductsSync)
@@ -703,29 +632,7 @@ export default function Home() {
           </motion.section>
 
 
-          {/* Order Details Flow (Confirmation Bar) */}
-          {locationConfirmed && activeService === "delivery" && (
-            <OrderDetailsFlow
-              confirmedAddress={deliveryAddress}
-              onOpenMap={() => setShowMapModal(true)}
-              onClearCart={() => setCart({})}
-              isDarkMode={isDarkMode}
-              triggerToast={triggerToast}
-            />
-          )}
-
-          {/* Delivery/Takeaway Toggle */}
-          <OrderMethods
-            orderMethods={orderMethods}
-            activeService={activeService}
-            setActiveService={setActiveService}
-            setShowMapModal={setShowMapModal}
-            setShowStoreModal={setShowStoreModal}
-            setShowCarModal={setShowCarModal}
-            setShowTrainModal={setShowTrainModal}
-            triggerToast={triggerToast}
-            isDarkMode={isDarkMode}
-          />
+          {/* OrderMethods Component Removed */}
 
           <HomeSections
             deals={deals}
@@ -751,31 +658,7 @@ export default function Home() {
           locationConfirmed={locationConfirmed}
         />
 
-        {/* Modals Container */}
-        <HomeModals
-          showMapModal={showMapModal}
-          setShowMapModal={setShowMapModal}
-          deliveryAddress={deliveryAddress}
-          setDeliveryAddress={setDeliveryAddress}
-          setActiveService={setActiveService}
-          triggerToast={triggerToast}
-          isDarkMode={isDarkMode}
-          showServiceSelector={showServiceSelector}
-          setShowServiceSelector={setShowServiceSelector}
-          isModalOpen={isModalOpen}
-          closeLocationModal={closeLocationModal}
-          setShowStoreModal={setShowStoreModal}
-          showStoreModal={showStoreModal}
-          setShowCarModal={setShowCarModal}
-          showCarModal={showCarModal}
-          setShowTrainModal={setShowTrainModal}
-          showTrainModal={showTrainModal}
-          takeawayHut={takeawayHut}
-          setTakeawayHut={setTakeawayHut}
-          carNumber={carNumber}
-          setCarNumber={setCarNumber}
-          confirmLocation={confirmLocation}
-        />
+        {/* HomeModals Component Removed */}
       </div>
     </div>
   )

@@ -39,7 +39,19 @@ const homePageSchema = new mongoose.Schema(
                 icon: { type: String },
                 enabled: { type: Boolean, default: true }
             }
-        ]
+        ],
+        trainConfig: {
+            bannerTitle: { type: String, default: 'Pizza On Your Seat' },
+            bannerSubtitle: { type: String, default: 'We will deliver your favourite Pizza right on your train seat while you travel.' },
+            formTitle: { type: String, default: 'Enter PNR to get started' },
+            terms: [{ type: String }],
+            faqs: [
+                {
+                    question: { type: String },
+                    answer: { type: String }
+                }
+            ]
+        }
     },
     {
         collection: 'food_home_page_settings',

@@ -1,137 +1,135 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useLocationStore } from "@food/store/locationStore";
 import axiosInstance from "@/services/api/axios";
-import logoNew from "@/assets/logo1.png";
-import pizzaImg from "@/assets/hero-pizza.png";
-import pizzaIcon from "@/assets/pizza-icon.png";
 
 export default function WelcomeScreen() {
   const navigate = useNavigate();
-  const { clearLocation } = useLocationStore();
-  const [logoUrl, setLogoUrl] = useState(() => localStorage.getItem("sa_logo") || logoNew);
+  
   const [config, setConfig] = useState(null);
+  const [activePoster, setActivePoster] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  const timerRef = useRef(null);
+  const currentIndexRef = useRef(0);
+
+  // Navigate forward based on auth state
+  const handleProceed = () => {
+    // Save the index ONLY when proceeding, avoiding React Strict Mode double-increments
+    localStorage.setItem("lastShownPosterIndex", currentIndexRef.current.toString());
+    localStorage.setItem("papa_veg_welcome_shown", "true");
+    
+    const isAuthenticated = localStorage.getItem("user_authenticated") === "true";
+    if (isAuthenticated) {
+      navigate("/food/user", { replace: true });
+    } else {
+      navigate("/user/auth/login", { replace: true });
+    }
+  };
 
   useEffect(() => {
-    const linkFonts = document.createElement("link");
-    linkFonts.href = "https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap";
-    linkFonts.rel = "stylesheet";
-    document.head.appendChild(linkFonts);
-    
-    const handleBrandingSync = () => {
-      setLogoUrl(localStorage.getItem("sa_logo") || logoNew);
-    };
-    window.addEventListener("systemThemeChanged", handleBrandingSync);
-
-    // Fetch dynamic config
-    axiosInstance.get('/settings/welcome')
-      .then(res => {
-        if (res.data?.data) {
-          setConfig(res.data.data);
+    const fetchConfig = async () => {
+      try {
+        const res = await axiosInstance.get('/settings/welcome');
+        const data = res.data?.data;
+        
+        if (!data) {
+          handleProceed();
+          return;
         }
-      })
-      .catch(err => console.error("Failed to load welcome screen config", err));
 
-    return () => {
-      document.head.removeChild(linkFonts);
-      window.removeEventListener("systemThemeChanged", handleBrandingSync);
+        setConfig(data);
+        
+        const now = new Date();
+        let validPosters = data.posters
+          ?.filter(p => p.isActive)
+          ?.filter(p => !p.startDate || new Date(p.startDate) <= now)
+          ?.filter(p => !p.endDate || new Date(p.endDate) >= now)
+          ?.sort((a, b) => (a.order || 0) - (b.order || 0)) || [];
+
+        // Fallback to legacy hero image if no dynamic posters exist
+        if (validPosters.length === 0) {
+          if (data.heroMediaUrl) {
+            validPosters = [{
+              id: "fallback",
+              imageUrl: data.heroMediaUrl,
+              order: 0,
+              isActive: true
+            }];
+          } else {
+            handleProceed();
+            return;
+          }
+        }
+
+        // Determine which poster to show based on last stored index
+        let lastIndex = parseInt(localStorage.getItem("lastShownPosterIndex"), 10);
+        if (isNaN(lastIndex)) lastIndex = -1;
+        
+        let nextIndex = lastIndex + 1;
+        if (nextIndex >= validPosters.length) nextIndex = 0;
+        
+        currentIndexRef.current = nextIndex;
+        setActivePoster(validPosters[nextIndex]);
+        setLoading(false);
+      } catch (err) {
+        console.error("Failed to load welcome screen config", err);
+        handleProceed(); // Skip on network error
+      }
     };
+
+    fetchConfig();
   }, []);
 
-  const handleSignIn = () => {
-    localStorage.setItem("papa_veg_welcome_shown", "true");
-    navigate("/user/auth/login");
+  useEffect(() => {
+    if (!activePoster || loading) return;
+
+    const durationSeconds = config?.posterDurationSeconds || 10;
+    const durationMs = durationSeconds * 1000;
+
+    timerRef.current = setTimeout(() => {
+      handleProceed();
+    }, durationMs);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [activePoster, loading, config]);
+
+  const handlePosterClick = () => {
+    if (activePoster?.deepLink) {
+      window.location.href = activePoster.deepLink;
+    } else {
+      handleProceed();
+    }
   };
 
-  const handleContinueAsGuest = () => {
-    localStorage.setItem("papa_veg_welcome_shown", "true");
-    localStorage.removeItem("user_authenticated");
-    localStorage.removeItem("currentUser");
-    localStorage.removeItem("user_user");
-    localStorage.removeItem("userProfile");
-    localStorage.removeItem("appzeto_user_profile");
-    localStorage.removeItem("user_accessToken");
-    localStorage.removeItem("user_refreshToken");
-    localStorage.removeItem("tempPhone");
-    localStorage.removeItem("user_temp_phone");
-    clearLocation();
-    navigate("/food/user");
-  };
-
-  const displayLogoUrl = config?.logoUrl || logoUrl;
-  const displayMediaUrl = config?.heroMediaUrl || pizzaImg;
-  const displayMediaType = config?.heroMediaUrl ? config?.heroMediaType : 'image';
-  
-  const heading = config?.heading || 'WELCOME TO';
-  const subheading = config?.subheading || 'Papa Veg Pizza';
-  const description = config?.description || 'Taste the magic of our signature wood-fired crusts, loaded with organic, farm-fresh ingredients!';
-  const primaryBtn = config?.primaryButtonText || 'SIGN IN TO UNLOCK OFFERS';
-  const secondaryBtn = config?.secondaryButtonText || 'CONTINUE AS GUEST';
+  if (loading || !activePoster) {
+    return <div className="w-full h-[100dvh] bg-black"></div>;
+  }
 
   return (
-    <div className="w-full h-[100dvh] flex justify-center items-center p-6 bg-[#eeeae5] text-[var(--primary-gray)] font-['Poppins',sans-serif] overflow-hidden max-[700px]:p-0">
-      <div className="w-full max-w-[760px] h-full relative overflow-hidden bg-[var(--secondary-off-white)] rounded-[34px] shadow-[0_30px_70px_rgba(0,0,0,0.12),0_10px_30px_rgba(0,0,0,0.06)] max-[700px]:rounded-none max-[700px]:shadow-none flex flex-col">
-        
-        {/* Decorative shapes */}
-        <div className="absolute z-0 pointer-events-none w-[170px] h-[150px] top-0 left-0 bg-[var(--accent-red)] rounded-br-[100%] max-[700px]:w-[100px] max-[700px]:h-[90px]"></div>
-        <div className="absolute z-0 pointer-events-none w-[150px] h-[120px] top-0 right-0 bg-[#d8d6d2] rounded-bl-[100%] max-[700px]:w-[90px] max-[700px]:h-[75px]"></div>
-        <div className="absolute z-0 pointer-events-none w-[140px] h-[120px] bottom-0 left-0 bg-[var(--accent-red)] rounded-tr-[100%] max-[700px]:w-[90px] max-[700px]:h-[80px]"></div>
-        <div className="absolute z-0 pointer-events-none w-[100px] h-[140px] right-[-25px] top-[52%] bg-[var(--accent-red)] rounded-l-[100%] max-[700px]:w-[65px] max-[700px]:h-[90px]"></div>
+    <div className="relative w-full h-[100dvh] bg-black overflow-hidden select-none">
+      {/* Skip Button */}
+      {config?.enableSkipButton !== false && (
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            handleProceed();
+          }}
+          className="absolute top-12 right-6 z-20 px-5 py-2 bg-black/40 hover:bg-black/60 backdrop-blur-md text-white text-sm font-semibold rounded-full uppercase tracking-wider border border-white/20 transition-all cursor-pointer"
+        >
+          Skip
+        </button>
+      )}
 
-        {/* Brand & Hero */}
-        <div className="relative z-10 flex flex-col justify-center items-center pt-[3vh] max-[700px]:pt-[20px] shrink-0 flex-1 min-h-0 w-full">
-          <img src={displayLogoUrl} alt="App Logo" className="w-[90px] h-[90px] object-contain max-[700px]:w-[70px] max-[700px]:h-[70px] shrink-0" />
-          
-          <div className="relative z-[2] w-full h-full max-h-[45vh] flex justify-center items-center mt-auto overflow-hidden -translate-y-[3vh] max-[700px]:-translate-y-[15px]">
-            {displayMediaType === 'video' ? (
-              <video src={displayMediaUrl} className="w-full h-full object-cover mix-blend-multiply" autoPlay loop muted playsInline />
-            ) : (
-              <img src={displayMediaUrl} alt="Hero Media" className="w-full h-full object-cover mix-blend-multiply" />
-            )}
-          </div>
-        </div>
-
-        {/* Content */}
-        <main className="relative z-10 px-[70px] pt-0 pb-[4vh] shrink-0 max-[700px]:px-[28px] max-[700px]:pb-[3vh]">
-          <div className="flex items-center gap-[12px] text-[18px] font-bold tracking-[5px] text-[var(--muted-gray)] max-[700px]:text-[13px] max-[700px]:tracking-[3px] uppercase">
-            <span className="block w-[65px] h-[7px] bg-[var(--accent-red)] rounded-[100px] max-[700px]:w-[45px] max-[700px]:h-[5px]"></span>
-            {heading}
-          </div>
-
-          <h1 className="mt-[12px] text-[clamp(32px,5vw,52px)] max-[700px]:text-[clamp(28px,10vw,40px)] leading-[0.95] tracking-[-2px] max-[700px]:tracking-[-1px] font-extrabold text-[var(--primary-gray)] m-0">
-            {subheading.split(' ').map((word, i, arr) => (
-              <React.Fragment key={i}>
-                {i === arr.length - 1 ? (
-                  <span className="inline-flex items-center gap-[12px]">
-                    <span className="text-[var(--accent-red)]">{word}</span>
-                    <img src={pizzaIcon} alt="" className="w-[60px] h-[60px] max-[700px]:w-[40px] max-[700px]:h-[40px] rotate-[15deg] object-contain -translate-y-[4px]" />
-                  </span>
-                ) : (
-                  <>{word} {i === arr.length - 2 ? <br /> : ''}</>
-                )}
-              </React.Fragment>
-            ))}
-          </h1>
-
-          <p className="max-w-[650px] mt-[20px] max-[700px]:mt-[16px] text-[18px] max-[700px]:text-[14px] leading-[1.5] max-[700px]:leading-[1.5] font-medium text-[var(--muted-gray)] mb-0">
-            {description}
-          </p>
-
-          {/* CTA */}
-          <div className="flex flex-col gap-[14px] mt-[4vh]">
-            <button onClick={handleSignIn} className="w-full min-h-[64px] border-none rounded-[100px] flex items-center justify-center text-white bg-[var(--accent-red)] shadow-[0_12px_25px_rgba(237,47,53,0.25)] font-inherit text-[16px] max-[700px]:text-[14px] font-extrabold tracking-[1px] max-[700px]:tracking-[0.7px] cursor-pointer transition-all duration-[250ms] ease hover:bg-[#d9252b] hover:-translate-y-[3px] hover:shadow-[0_18px_30px_rgba(237,47,53,0.30)] p-0 uppercase">
-              <span>{primaryBtn}</span>
-            </button>
-
-            <button onClick={handleContinueAsGuest} className="w-full min-h-[64px] bg-transparent border-2 border-solid border-[var(--border-gray)] rounded-[100px] text-[var(--primary-gray)] font-inherit text-[16px] max-[700px]:text-[14px] font-extrabold tracking-[1px] max-[700px]:tracking-[0.7px] cursor-pointer transition-all duration-[250ms] ease hover:bg-[#efede9] hover:-translate-y-[2px] hover:border-[#bbb9b5] p-0 uppercase">
-              {secondaryBtn}
-            </button>
-          </div>
-        </main>
-
-        {/* Bottom decoration */}
-        <img src={pizzaIcon} alt="" className="absolute right-[-15px] bottom-[-20px] w-[130px] h-[130px] object-contain opacity-[0.06] -rotate-[25deg] pointer-events-none" />
-      </div>
+      {/* Poster Image */}
+      <img 
+        src={activePoster.imageUrl} 
+        alt="Promo"
+        className="w-full h-full object-cover cursor-pointer"
+        onClick={handlePosterClick}
+        onError={() => handleProceed()}
+      />
     </div>
   );
 }
