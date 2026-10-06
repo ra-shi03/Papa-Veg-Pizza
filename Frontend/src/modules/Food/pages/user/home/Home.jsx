@@ -53,6 +53,17 @@ export default function Home() {
     return "LOWEST PRICES ONLY ON APP | FREE DELIVERY ABOVE ₹99"
   })
 
+  const [cravingHeading, setCravingHeading] = useState(() => {
+    try {
+      const stored = localStorage.getItem("pvp_home_config")
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (parsed?.cravingHeading) return parsed.cravingHeading
+      }
+    } catch (_) { }
+    return "What are you craving for?"
+  })
+
   // Dynamic Banners State
   const [banners, setBanners] = useState([
     {
@@ -215,6 +226,9 @@ export default function Home() {
           if (data.promoText) {
             setPromoText(data.promoText)
           }
+          if (data.cravingHeading) {
+            setCravingHeading(data.cravingHeading)
+          }
           localStorage.setItem("pvp_home_config", JSON.stringify(data))
           if (Array.isArray(data.banners)) {
             setBanners(data.banners.length > 0 ? data.banners : [])
@@ -285,6 +299,9 @@ export default function Home() {
         }
         if (updated.promoText) {
           setPromoText(updated.promoText)
+        }
+        if (updated.cravingHeading) {
+          setCravingHeading(updated.cravingHeading)
         }
         if (Array.isArray(updated.banners)) {
           setBanners(updated.banners.length > 0 ? updated.banners : [])
@@ -656,6 +673,41 @@ export default function Home() {
               {promoText}
             </div>
           </div>
+
+          {/* What are you craving for section */}
+          {categories && categories.length > 0 && (
+            <div className="pt-4 pb-2 pl-4 !mt-0">
+              <h3 className="font-bold text-zinc-900 text-[16px] mb-4 font-headline-sm-mobile">
+                {cravingHeading}
+              </h3>
+              <div className="grid grid-cols-3 gap-x-4 gap-y-6 pb-2 pr-4">
+                {categories.map(cat => (
+                  <div 
+                    key={cat.id} 
+                    className="flex flex-col items-center gap-2 shrink-0 cursor-pointer active:scale-95 transition-transform"
+                    onClick={() => {
+                       setActiveCategory(cat.id);
+                    }}
+                  >
+                    <div className="w-[104px] h-[104px] sm:w-[116px] sm:h-[116px] rounded-full border border-zinc-200 shadow-sm flex items-center justify-center p-1 bg-white mx-auto">
+                      <div className="w-full h-full rounded-full overflow-hidden bg-zinc-100 flex items-center justify-center relative">
+                        {cat.icon && cat.icon.startsWith('http') ? (
+                          <img src={cat.icon} alt={cat.label} className="w-full h-full object-cover absolute inset-0 scale-[1.15]" />
+                        ) : (
+                          <span className="material-symbols-outlined text-zinc-400 text-4xl">
+                            {cat.icon || 'fastfood'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-[13px] font-bold text-zinc-700 text-center w-full truncate">
+                      {cat.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* OrderMethods Component Removed */}
 
