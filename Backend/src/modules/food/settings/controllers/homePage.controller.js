@@ -31,6 +31,7 @@ export const createOrUpdateHomePageConfig = async (req, res, next) => {
         } else {
             if (deliveryTimeMinutes !== undefined) config.deliveryTimeMinutes = Number(deliveryTimeMinutes);
             if (deliveryTimeLabel !== undefined) config.deliveryTimeLabel = deliveryTimeLabel;
+            if (req.body.promoText !== undefined) config.promoText = req.body.promoText;
             if (req.body.deals !== undefined) config.deals = req.body.deals;
             if (req.body.orderMethods !== undefined) config.orderMethods = req.body.orderMethods;
             if (req.body.trainConfig !== undefined) config.trainConfig = req.body.trainConfig;
@@ -58,6 +59,7 @@ export const updateHomePageConfig = async (req, res, next) => {
         } else {
             if (deliveryTimeMinutes !== undefined) config.deliveryTimeMinutes = Number(deliveryTimeMinutes);
             if (deliveryTimeLabel !== undefined) config.deliveryTimeLabel = deliveryTimeLabel;
+            if (req.body.promoText !== undefined) config.promoText = req.body.promoText;
             if (req.body.deals !== undefined) config.deals = req.body.deals;
             if (req.body.orderMethods !== undefined) config.orderMethods = req.body.orderMethods;
             if (req.body.trainConfig !== undefined) config.trainConfig = req.body.trainConfig;

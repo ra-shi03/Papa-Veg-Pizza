@@ -42,6 +42,17 @@ export default function Home() {
     return "mins"
   })
 
+  const [promoText, setPromoText] = useState(() => {
+    try {
+      const stored = localStorage.getItem("pvp_home_config")
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (parsed?.promoText) return parsed.promoText
+      }
+    } catch (_) { }
+    return "LOWEST PRICES ONLY ON APP | FREE DELIVERY ABOVE ₹99"
+  })
+
   // Dynamic Banners State
   const [banners, setBanners] = useState([
     {
@@ -201,6 +212,9 @@ export default function Home() {
           if (data.deliveryTimeLabel) {
             setDeliveryLabel(data.deliveryTimeLabel)
           }
+          if (data.promoText) {
+            setPromoText(data.promoText)
+          }
           localStorage.setItem("pvp_home_config", JSON.stringify(data))
           if (Array.isArray(data.banners)) {
             setBanners(data.banners.length > 0 ? data.banners : [])
@@ -268,6 +282,9 @@ export default function Home() {
         }
         if (updated.deliveryTimeLabel) {
           setDeliveryLabel(updated.deliveryTimeLabel)
+        }
+        if (updated.promoText) {
+          setPromoText(updated.promoText)
         }
         if (Array.isArray(updated.banners)) {
           setBanners(updated.banners.length > 0 ? updated.banners : [])
@@ -577,60 +594,68 @@ export default function Home() {
           deliveryAddress={deliveryAddress}
           deliveryTime={deliveryTime}
           deliveryLabel={deliveryLabel}
+          categories={categories}
         />
 
         {/* Main Content */}
-        <main className="space-y-lg mt-2">
-          {/* Hero Banner Carousel */}
-          <motion.section
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
-            className="relative h-[260px] mx-[20px] overflow-hidden rounded-[24px] shadow-lg border border-black/5 dark:border-white/5"
-          >
-            <div className="carousel-track flex h-full" style={{ transform: `translateX(-${activeSlide * 100}%)` }}>
-              {banners.map((b, idx) => (
-                <div
-                  key={b._id || b.publicId || idx}
-                  className="min-w-full h-full relative group cursor-pointer"
-                  onClick={() => handleBannerClick(b)}
-                >
-                  {b.resourceType === 'video' ? (
-                    <video className="w-full h-full object-cover bg-zinc-100 dark:bg-zinc-900" src={b.url} autoPlay loop muted playsInline />
-                  ) : (
-                    <img className="w-full h-full object-cover bg-zinc-100 dark:bg-zinc-900" alt={b.title || 'Banner'} src={b.url || b.mobileImageUrl || b.imageUrl || b.image || b.bannerUrl} />
-                  )}
-                  {/* Text overlay (only shown if title/subtitle exist) */}
-                  {(b.title || b.subtitle) && (
-                    <div className="absolute inset-0 flex flex-col justify-end p-5 pointer-events-none">
-                      {b.bannerType && (
-                        <span className="bg-[#E53935] text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-md w-fit mb-1.5 shadow-sm">
-                          {b.bannerType}
-                        </span>
-                      )}
-                      {b.title && (
-                        <h2 className="font-headline-lg-mobile text-white text-base font-black leading-tight" style={{ textShadow: "0 2px 4px rgba(0,0,0,0.8)" }}>
-                          {b.title}
-                        </h2>
-                      )}
-                      {b.subtitle && (
-                        <p className="text-zinc-200 text-[10px] font-medium mt-1 leading-snug line-clamp-2 max-w-[85%]" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>
-                          {b.subtitle}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-            {/* Indicators */}
-            <div className="absolute bottom-4 right-margin-mobile flex gap-2">
-              {banners.map((_, i) => (
-                <div key={i} className={`h-1 rounded-full transition-all duration-300 ${activeSlide === i ? "w-8 bg-primary" : "w-2 bg-white/30"}`}></div>
-              ))}
-            </div>
-          </motion.section>
+        <main className="space-y-lg mt-0">
+          {/* Banner & Promo Strip Wrapper (to remove gap from space-y-lg) */}
+          <div className="flex flex-col w-full">
+            {/* Hero Banner Carousel */}
+            <motion.section
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, ease: "easeOut" }}
+              className="relative h-[260px] w-full overflow-hidden shadow-lg border-0"
+            >
+              <div className="carousel-track flex h-full" style={{ transform: `translateX(-${activeSlide * 100}%)` }}>
+                {banners.map((b, idx) => (
+                  <div
+                    key={b._id || b.publicId || idx}
+                    className="min-w-full h-full relative group cursor-pointer"
+                    onClick={() => handleBannerClick(b)}
+                  >
+                    {b.resourceType === 'video' ? (
+                      <video className="w-full h-full object-cover bg-zinc-100 dark:bg-zinc-900" src={b.url} autoPlay loop muted playsInline />
+                    ) : (
+                      <img className="w-full h-full object-cover bg-zinc-100 dark:bg-zinc-900" alt={b.title || 'Banner'} src={b.url || b.mobileImageUrl || b.imageUrl || b.image || b.bannerUrl} />
+                    )}
+                    {/* Text overlay (only shown if title/subtitle exist) */}
+                    {(b.title || b.subtitle) && (
+                      <div className="absolute inset-0 flex flex-col justify-end p-5 pointer-events-none">
+                        {b.bannerType && (
+                          <span className="bg-[var(--accent-red)] text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-md w-fit mb-1.5 shadow-sm">
+                            {b.bannerType}
+                          </span>
+                        )}
+                        {b.title && (
+                          <h2 className="font-headline-lg-mobile text-white text-base font-black leading-tight" style={{ textShadow: "0 2px 4px rgba(0,0,0,0.8)" }}>
+                            {b.title}
+                          </h2>
+                        )}
+                        {b.subtitle && (
+                          <p className="text-zinc-200 text-[10px] font-medium mt-1 leading-snug line-clamp-2 max-w-[85%]" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>
+                            {b.subtitle}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {/* Indicators */}
+              <div className="absolute bottom-4 right-margin-mobile flex gap-2">
+                {banners.map((_, i) => (
+                  <div key={i} className={`h-1 rounded-full transition-all duration-300 ${activeSlide === i ? "w-8 bg-[var(--accent-red)]" : "w-2 bg-white/30"}`}></div>
+                ))}
+              </div>
+            </motion.section>
 
+            {/* Domino's style promo strip */}
+            <div className="bg-[var(--accent-red)] text-white text-[9px] sm:text-[10px] font-semibold text-center py-2 px-2 shadow-sm w-full relative z-0 border-0">
+              {promoText}
+            </div>
+          </div>
 
           {/* OrderMethods Component Removed */}
 
