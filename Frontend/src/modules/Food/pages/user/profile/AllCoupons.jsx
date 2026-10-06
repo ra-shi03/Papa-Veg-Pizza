@@ -26,7 +26,7 @@ export default function AllCoupons() {
 
   const [isDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem("appTheme")
-    return savedTheme ? savedTheme === "dark" : true
+    return savedTheme ? savedTheme === "dark" : false
   })
 
   // Pizza images array for premium visuals

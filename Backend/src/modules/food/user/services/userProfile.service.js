@@ -31,10 +31,13 @@ export const updateCurrentUserProfile = async (userId, body) => {
         }
     }
 
-    if (body.name !== undefined) user.name = String(body.name || '').trim();
-    if (body.email !== undefined) user.email = String(body.email || '').trim().toLowerCase();
-    if (body.profileImage !== undefined) user.profileImage = String(body.profileImage || '').trim();
-    if (body.gender !== undefined) user.gender = String(body.gender || '').trim();
+    if (body.name !== undefined) user.name = body.name ? String(body.name).trim() : null;
+    let emailUpdate = undefined;
+    if (body.email !== undefined) {
+        emailUpdate = body.email ? String(body.email).trim().toLowerCase() : null;
+    }
+    if (body.profileImage !== undefined) user.profileImage = body.profileImage ? String(body.profileImage).trim() : null;
+    if (body.gender !== undefined) user.gender = body.gender ? String(body.gender).trim() : null;
 
     const dob = parseIsoDateOrNull(body.dateOfBirth);
     if (dob !== undefined) user.dateOfBirth = dob;
@@ -52,12 +55,38 @@ export const updateCurrentUserProfile = async (userId, body) => {
         }
     }
     // ensure gender/dob match if they were provided
-    if (body.gender !== undefined) profileUpdates.gender = String(body.gender || '').trim().toUpperCase();
+    if (body.gender !== undefined) profileUpdates.gender = body.gender ? String(body.gender).trim().toUpperCase() : null;
     if (dob !== undefined) profileUpdates.dob = dob;
-    if (body.name !== undefined) {
-        const parts = String(body.name || '').trim().split(' ');
-        profileUpdates.firstName = parts[0] || '';
-        profileUpdates.lastName = parts.slice(1).join(' ') || '';
+    
+    if (body.profileImage !== undefined) profileUpdates.profilePhoto = body.profileImage ? String(body.profileImage).trim() : null;
+    if (user.mobile) profileUpdates.phone = user.mobile;
+    
+    if (emailUpdate !== undefined) profileUpdates.email = emailUpdate;
+    
+    if (body.firstName !== undefined) profileUpdates.firstName = body.firstName ? String(body.firstName).trim() : null;
+    if (body.lastName !== undefined) profileUpdates.lastName = body.lastName ? String(body.lastName).trim() : null;
+    
+    if (body.name !== undefined && body.firstName === undefined) {
+        const parts = body.name ? String(body.name).trim().split(' ') : [];
+        profileUpdates.firstName = parts[0] || null;
+        profileUpdates.lastName = parts.slice(1).join(' ') || null;
+    }
+    
+    // Auto-compute profile completion if not explicitly provided as false
+    const isComplete = Boolean(
+        profileUpdates.firstName && 
+        profileUpdates.lastName && 
+        profileUpdates.email
+    );
+    
+    if (body.profileCompleted !== undefined) {
+        profileUpdates.profileCompleted = body.profileCompleted;
+        if (body.profileCompleted && !profileUpdates.profileCompletedAt) {
+            profileUpdates.profileCompletedAt = new Date();
+        }
+    } else if (isComplete) {
+        profileUpdates.profileCompleted = true;
+        profileUpdates.profileCompletedAt = new Date();
     }
 
     let profile = await Profile.findOne({ userId });
@@ -81,6 +110,12 @@ export const uploadCurrentUserProfileImage = async (userId, file) => {
     const url = await uploadImageBuffer(file.buffer, 'food/users/profile');
     user.profileImage = String(url || '').trim();
     await user.save();
+    
+    const profile = await Profile.findOne({ userId });
+    if (profile) {
+        profile.profilePhoto = user.profileImage;
+        await profile.save();
+    }
     return { profileImage: user.profileImage, user: user.toObject() };
 };
 

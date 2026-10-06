@@ -10,7 +10,7 @@ export default function ProfileDetails() {
 
   const [isDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem("appTheme")
-    return savedTheme ? savedTheme === "dark" : true
+    return savedTheme ? savedTheme === "dark" : false
   })
 
   // Get user details from profile context or fallback to localStorage

@@ -32,6 +32,10 @@ router.get('/v1/health', (req, res) => {
     res.status(200).json({ status: 'UP', message: 'Server is healthy' });
 });
 
+// Mock public env routes to prevent 404 errors from frontend
+router.get('/v1/food/public/env', (req, res) => res.status(200).json({ success: true, data: {} }));
+router.get('/v1/env/public', (req, res) => res.status(200).json({ success: true, data: {} }));
+
 // Food-prefixed auth routes
 router.use('/v1/food/auth', authRoutes);
 

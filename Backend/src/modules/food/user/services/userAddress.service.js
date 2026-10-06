@@ -27,6 +27,10 @@ export const listAddresses = async (userId) => {
 export const addAddress = async (userId, dto) => {
     const user = await FoodUser.findById(userId).select('addresses');
     if (!user) throw new ValidationError('User not found');
+    
+    if (!user.addresses) {
+        user.addresses = [];
+    }
 
     const address = {
         label: normalizeLabel(dto.label),
@@ -53,7 +57,7 @@ export const addAddress = async (userId, dto) => {
         existing.phone = address.phone;
         if (address.location) existing.location = address.location;
         await user.save();
-        return { address: existing.toObject() };
+        return { address: typeof existing.toObject === 'function' ? existing.toObject() : existing };
     }
 
     // First address becomes default automatically
@@ -64,7 +68,7 @@ export const addAddress = async (userId, dto) => {
     user.addresses.push(address);
     await user.save();
     const saved = user.addresses[user.addresses.length - 1];
-    return { address: saved.toObject() };
+    return { address: typeof saved.toObject === 'function' ? saved.toObject() : saved };
 };
 
 export const updateAddress = async (userId, addressId, dto) => {

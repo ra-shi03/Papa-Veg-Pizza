@@ -60,7 +60,7 @@ export default function Notifications() {
   // Theme state: defaults to dark mode like Home.jsx
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem("appTheme")
-    return savedTheme ? savedTheme === "dark" : true
+    return savedTheme ? savedTheme === "dark" : false
   })
 
   const [notificationsList, setNotificationsList] = useState(() => {

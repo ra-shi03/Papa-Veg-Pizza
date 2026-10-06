@@ -8,7 +8,7 @@
   font-family: 'Poppins', sans-serif;
   --primary-gray:        #34373C;
   --secondary-off-white: #F8F6F2;
-  --accent-red:          #ED2F35;
+  --accent-red:          #EE3A43;
   --muted-gray:          #62666D;
   --border-gray:         #D4D2CF;
 }
@@ -17,7 +17,7 @@
 .dark .user-app-theme {
   --primary-gray:        #F8F6F2;
   --secondary-off-white: #131313;
-  --accent-red:          #ED2F35;
+  --accent-red:          #EE3A43;
   --muted-gray:          #a1a1aa;
   --border-gray:         rgba(255, 255, 255, 0.10);
 }

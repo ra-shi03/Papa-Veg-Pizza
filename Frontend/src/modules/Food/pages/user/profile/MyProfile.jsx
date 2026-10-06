@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { ChevronDown, ArrowLeft, User, Mail, Calendar, CheckCircle2, Loader2, AlertCircle } from "lucide-react"
+import { ChevronDown, ArrowLeft, User, Mail, Calendar, CheckCircle2, Loader2, AlertCircle, Camera, Trash2 } from "lucide-react"
 import { useProfile } from "@food/context/ProfileContext"
 import { userAPI } from "@food/api"
 
@@ -68,7 +68,9 @@ export default function MyProfile() {
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
-  
+  const [profileImage, setProfileImage] = useState(null)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const fileInputRef = useRef(null)
   const [phone, setPhone] = useState(() => {
     const statePhone = location.state?.phone
     if (statePhone) {
@@ -136,6 +138,7 @@ export default function MyProfile() {
           setLastName(parts.slice(1).join(" ") || "")
         }
         if (userObj.email) setEmail(userObj.email)
+        if (userObj.profileImage) setProfileImage(userObj.profileImage)
         if (userObj.gender) setGender(userObj.gender)
         
         if (userObj.birthday) {
@@ -166,6 +169,55 @@ export default function MyProfile() {
     setIsFormValid(valid)
   }, [firstName, lastName, email, agreeTerms])
 
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIsUploadingImage(true)
+    setApiError("")
+    try {
+      const response = await userAPI.uploadProfileImage(file)
+      const imageUrl = response.data?.data?.profileImage || response.data?.profileImage || response.data?.user?.profileImage || response.profileImage
+      if (imageUrl) {
+        setProfileImage(imageUrl)
+        const stored = localStorage.getItem("currentUser") || localStorage.getItem("user_user")
+        if (stored) {
+          const userObj = JSON.parse(stored)
+          userObj.profileImage = imageUrl
+          localStorage.setItem("currentUser", JSON.stringify(userObj))
+          localStorage.setItem("user_user", JSON.stringify(userObj))
+          updateUserProfile(userObj)
+        }
+      }
+    } catch (err) {
+      console.error("Error uploading image:", err)
+      setApiError("Failed to upload profile image.")
+    } finally {
+      setIsUploadingImage(false)
+    }
+  }
+
+  const handleDeleteImage = async () => {
+    setIsUploadingImage(true)
+    setApiError("")
+    try {
+      await userAPI.updateProfile({ profileImage: "" })
+      setProfileImage(null)
+      const stored = localStorage.getItem("currentUser") || localStorage.getItem("user_user")
+      if (stored) {
+        const userObj = JSON.parse(stored)
+        userObj.profileImage = ""
+        localStorage.setItem("currentUser", JSON.stringify(userObj))
+        localStorage.setItem("user_user", JSON.stringify(userObj))
+        updateUserProfile(userObj)
+      }
+    } catch (err) {
+      console.error("Error deleting image:", err)
+      setApiError("Failed to delete profile image.")
+    } finally {
+      setIsUploadingImage(false)
+    }
+  }
+
   const handleCreateAccount = async () => {
     if (!isFormValid || isSaving) return
     setIsSaving(true)
@@ -190,6 +242,7 @@ export default function MyProfile() {
         ...storedUser,
         name: `${firstName.trim()} ${lastName.trim()}`,
         email: email.trim(),
+        profileImage: profileImage,
         gender: backendGender,
         birthday: formattedBirthday,
         dateOfBirth: formattedBirthday,
@@ -202,7 +255,10 @@ export default function MyProfile() {
       // API Call (exclude phone/mobile as backend rejects changing them)
       const apiPayload = {
         name: updatedUser.name,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         email: updatedUser.email,
+        profileImage: updatedUser.profileImage,
         gender: updatedUser.gender,
         birthday: updatedUser.birthday,
         dateOfBirth: updatedUser.dateOfBirth,
@@ -269,8 +325,44 @@ export default function MyProfile() {
         >
           
           <div className="space-y-3 text-center pt-2">
-            <div className="w-16 h-16 bg-[var(--accent-red)]/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-[var(--accent-red)]/20 shadow-sm">
-              <User className="w-8 h-8 text-[var(--accent-red)]" />
+            <div className="relative w-24 h-24 mx-auto mb-4 group">
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/*" 
+                onChange={handleImageUpload} 
+              />
+              <div className="w-full h-full rounded-full overflow-hidden border-2 border-[var(--accent-red)]/20 shadow-sm bg-gray-50 flex items-center justify-center relative">
+                {profileImage ? (
+                  <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-10 h-10 text-[var(--accent-red)]/40" />
+                )}
+                {isUploadingImage && (
+                  <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-[var(--accent-red)]" />
+                  </div>
+                )}
+              </div>
+              
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingImage}
+                className="absolute bottom-0 right-0 w-8 h-8 bg-white border border-gray-200 rounded-full shadow-sm flex items-center justify-center hover:bg-gray-50 transition-colors z-10"
+              >
+                <Camera className="w-4 h-4 text-gray-600" />
+              </button>
+              
+              {profileImage && (
+                <button 
+                  onClick={handleDeleteImage}
+                  disabled={isUploadingImage}
+                  className="absolute top-0 right-0 w-7 h-7 bg-white/90 border border-red-100 rounded-full shadow-sm flex items-center justify-center hover:bg-red-50 text-red-500 transition-colors z-10 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900">
               Welcome!

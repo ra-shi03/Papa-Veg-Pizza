@@ -9,7 +9,7 @@ export default function Payments() {
 
   const [isDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem("appTheme")
-    return savedTheme ? savedTheme === "dark" : true
+    return savedTheme ? savedTheme === "dark" : false
   })
 
   // Load selection from localStorage, defaulting to 'upi'

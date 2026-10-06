@@ -14,7 +14,7 @@ export default function EditProfile() {
 
   const [isDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem("appTheme")
-    return savedTheme ? savedTheme === "dark" : true
+    return savedTheme ? savedTheme === "dark" : false
   })
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)

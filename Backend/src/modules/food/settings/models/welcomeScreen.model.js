@@ -9,6 +9,22 @@ const welcomeScreenSchema = new mongoose.Schema({
     description: { type: String, default: 'Indulge in a symphony of flavors! Experience the magic of our artisanal pizzas, handcrafted with passion and the freshest ingredients.' },
     primaryButtonText: { type: String, default: 'SIGN IN TO UNLOCK OFFERS' },
     secondaryButtonText: { type: String, default: 'Continue as Guest' },
+    loginHeading: { type: String, default: 'Log in' },
+    loginDescription: { type: String, default: 'Log in or Sign up to explore exclusive deals and order your favorite pizzas instantly.' },
+    loginImage: { type: String, default: '' },
+    // Domino's style poster configs
+    posters: [{
+        id: { type: String },
+        imageUrl: { type: String },
+        order: { type: Number, default: 0 },
+        isActive: { type: Boolean, default: true },
+        startDate: { type: Date },
+        endDate: { type: Date },
+        deepLink: { type: String }
+    }],
+    posterDurationSeconds: { type: Number, default: 10 },
+    enableSkipButton: { type: Boolean, default: true },
+    enableTruecaller: { type: Boolean, default: true }
 }, { timestamps: true });
 
 // Ensure only one settings document exists

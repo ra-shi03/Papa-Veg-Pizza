@@ -2,13 +2,7 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 const userSchema = new mongoose.Schema({
-    email: {
-        type: String,
-        unique: true,
-        sparse: true,       // allows multiple docs with null email
-        trim: true,
-        lowercase: true
-    },
+
     mobile: {
         type: String,
         required: true,
@@ -70,7 +64,6 @@ const userSchema = new mongoose.Schema({
 
 // ─── Production Indexes ───────────────────────────────────────────────────────
 // Partial indexes: only index active, non-deleted accounts — keeps index small
-userSchema.index({ email: 1, isDeleted: 1 }, { name: 'idx_email_active' });
 userSchema.index({ mobile: 1, isDeleted: 1 }, { name: 'idx_mobile_active' });
 userSchema.index({ primaryRole: 1, isActive: 1, isDeleted: 1 }, { name: 'idx_role_active' });
 userSchema.index({ isActive: 1, isDeleted: 1 });

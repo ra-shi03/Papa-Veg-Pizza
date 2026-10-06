@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Upload, Trash2, Image as ImageIcon, Video, Loader2, Plus, Edit } from 'lucide-react';
+import { Save, Upload, Trash2, Image as ImageIcon, Video, Loader2, Plus, Edit, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminClient } from '../../../../../services/api/axios';
 import apiClient from '../../../../../services/api/axios';
@@ -12,6 +12,7 @@ export default function HomePageConfig() {
   const [isDealsModalOpen, setIsDealsModalOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState(null);
   const [dealForm, setDealForm] = useState({ id: '', title: '', description: '', badge: '', image: '', size: 'Medium' });
+  const [isTrainConfigOpen, setIsTrainConfigOpen] = useState(false);
 
   
   const [activeTab, setActiveTab] = useState('deals');
@@ -28,6 +29,18 @@ export default function HomePageConfig() {
   ];
 
   const [orderMethods, setOrderMethods] = useState(defaultMethods);
+  
+  const [trainConfig, setTrainConfig] = useState({
+    bannerTitle: 'Pizza On Your Seat',
+    bannerSubtitle: 'We will deliver your favourite Pizza right on your train seat while you travel.',
+    formTitle: 'Enter PNR to get started',
+    terms: [
+      'Ordering is only allowed for stations which are catered by us and are ahead by 2 hours or more.',
+      'Delivery is available only between 12:00 and 23:00 hours. The order would get cancelled if train reaches selected station outside of these operational hours.',
+      'Cancellation is only permitted within 2 hours of actual arrival at station.'
+    ]
+  });
+
   const fileInputRef = useRef(null);
   const dealImageInputRef = useRef(null);
 
@@ -69,6 +82,21 @@ export default function HomePageConfig() {
         }
         if (Array.isArray(data.deals)) {
           setDeals(data.deals);
+        }
+        if (data.trainConfig) {
+          setTrainConfig({
+            bannerTitle: data.trainConfig.bannerTitle || 'Pizza On Your Seat',
+            bannerSubtitle: data.trainConfig.bannerSubtitle || 'We will deliver your favourite Pizza right on your train seat while you travel.',
+            formTitle: data.trainConfig.formTitle || 'Enter PNR to get started',
+            terms: Array.isArray(data.trainConfig.terms) && data.trainConfig.terms.length > 0 
+                    ? data.trainConfig.terms 
+                    : [
+                        'Ordering is only allowed for stations which are catered by us and are ahead by 2 hours or more.',
+                        'Delivery is available only between 12:00 and 23:00 hours. The order would get cancelled if train reaches selected station outside of these operational hours.',
+                        'Cancellation is only permitted within 2 hours of actual arrival at station.'
+                      ],
+            faqs: Array.isArray(data.trainConfig.faqs) ? data.trainConfig.faqs : []
+          });
         }
 
         if (Array.isArray(data.orderMethods) && data.orderMethods.length > 0) {
@@ -304,6 +332,26 @@ export default function HomePageConfig() {
     }
   };
 
+  const handleSaveTrainConfig = async () => {
+    try {
+      const payload = { trainConfig };
+      let res;
+      try {
+        res = await adminClient.post('/settings/home-page', payload);
+      } catch {
+        res = await adminClient.put('/settings/home-page', payload);
+      }
+      const updated = res?.data?.data || payload;
+      try {
+        localStorage.setItem('pvp_home_config', JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent('homePageConfigUpdated', { detail: updated }));
+      } catch (_) {}
+      toast.success('Train delivery content updated successfully!');
+    } catch(err) {
+      toast.error('Failed to update train delivery content');
+    }
+  };
+
   return (
     <div className="p-4 max-w-4xl mx-auto">
 
@@ -476,6 +524,167 @@ export default function HomePageConfig() {
           ))}
         </div>
       </section>
+
+      {/* Deliver on Train Section */}
+      <section className="space-y-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+        <div 
+          className="flex items-center justify-between cursor-pointer group"
+          onClick={() => setIsTrainConfigOpen(!isTrainConfigOpen)}
+        >
+          <div>
+            <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-zinc-100 group-hover:text-primary transition-colors">
+              Deliver on Train Content
+            </h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+              Manage the content for the train delivery order method page.
+            </p>
+          </div>
+          <button className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-full text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors">
+            {isTrainConfigOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </button>
+        </div>
+        
+        {isTrainConfigOpen && (
+          <div className="space-y-4 bg-white dark:bg-zinc-900 p-4 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-sm animate-fadeIn">
+            <div>
+              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Banner Title</label>
+              <input
+                type="text"
+                value={trainConfig.bannerTitle}
+                onChange={e => setTrainConfig({ ...trainConfig, bannerTitle: e.target.value })}
+                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Banner Subtitle</label>
+              <textarea
+                value={trainConfig.bannerSubtitle}
+                onChange={e => setTrainConfig({ ...trainConfig, bannerSubtitle: e.target.value })}
+                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+                rows="2"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Form Title</label>
+              <input
+                type="text"
+                value={trainConfig.formTitle}
+                onChange={e => setTrainConfig({ ...trainConfig, formTitle: e.target.value })}
+                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-2 flex justify-between items-center">
+                <span>Terms & Conditions (Bullet point wise)</span>
+                <button
+                  type="button"
+                  onClick={() => setTrainConfig(prev => ({ ...prev, terms: [...(prev.terms || []), ''] }))}
+                  className="text-xs text-primary font-medium flex items-center gap-1 hover:underline"
+                >
+                  <Plus className="w-3 h-3" /> Add Point
+                </button>
+              </label>
+              <div className="space-y-2">
+                {(trainConfig.terms || []).map((term, index) => (
+                  <div key={index} className="flex gap-2 items-start">
+                    <span className="mt-2.5 text-zinc-400 text-[16px] leading-none">•</span>
+                    <input
+                      type="text"
+                      value={term}
+                      onChange={e => {
+                        const newTerms = [...trainConfig.terms];
+                        newTerms[index] = e.target.value;
+                        setTrainConfig(prev => ({ ...prev, terms: newTerms }));
+                      }}
+                      className="flex-1 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+                      placeholder="Enter term..."
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newTerms = trainConfig.terms.filter((_, i) => i !== index);
+                        setTrainConfig(prev => ({ ...prev, terms: newTerms }));
+                      }}
+                      className="mt-1.5 p-1 text-zinc-400 hover:text-red-500 transition-colors bg-zinc-50 hover:bg-red-50 rounded-md"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                {(!trainConfig.terms || trainConfig.terms.length === 0) && (
+                  <p className="text-sm text-zinc-500 italic py-2">No terms added. Click "Add Point" to add one.</p>
+                )}
+              </div>
+            </div>
+
+            {/* FAQs Section */}
+            <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800">
+              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-2 flex justify-between items-center">
+                <span>FAQs / T&Cs for Disclaimer Page</span>
+                <button
+                  type="button"
+                  onClick={() => setTrainConfig(prev => ({ ...prev, faqs: [...(prev.faqs || []), { question: '', answer: '' }] }))}
+                  className="text-xs text-primary font-medium flex items-center gap-1 hover:underline"
+                >
+                  <Plus className="w-3 h-3" /> Add FAQ
+                </button>
+              </label>
+              <div className="space-y-4">
+                {(trainConfig.faqs || []).map((faq, index) => (
+                  <div key={index} className="flex gap-2 items-start bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-lg border border-zinc-100 dark:border-zinc-800">
+                    <div className="flex-1 space-y-2">
+                      <input
+                        type="text"
+                        value={faq.question}
+                        onChange={e => {
+                          const newFaqs = [...(trainConfig.faqs || [])];
+                          newFaqs[index] = { ...newFaqs[index], question: e.target.value };
+                          setTrainConfig(prev => ({ ...prev, faqs: newFaqs }));
+                        }}
+                        className="w-full px-3 py-2 border rounded-md text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+                        placeholder="Heading (e.g. Order Delivery)"
+                      />
+                      <textarea
+                        value={faq.answer}
+                        onChange={e => {
+                          const newFaqs = [...(trainConfig.faqs || [])];
+                          newFaqs[index] = { ...newFaqs[index], answer: e.target.value };
+                          setTrainConfig(prev => ({ ...prev, faqs: newFaqs }));
+                        }}
+                        className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+                        placeholder="Details..."
+                        rows="3"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newFaqs = (trainConfig.faqs || []).filter((_, i) => i !== index);
+                        setTrainConfig(prev => ({ ...prev, faqs: newFaqs }));
+                      }}
+                      className="p-1.5 text-zinc-400 hover:text-red-500 transition-colors bg-white hover:bg-red-50 rounded-md shadow-sm border border-zinc-200"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                {(!trainConfig.faqs || trainConfig.faqs.length === 0) && (
+                  <p className="text-sm text-zinc-500 italic py-2">No FAQs added. Click "Add FAQ" to add one.</p>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={handleSaveTrainConfig}
+                className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm font-medium"
+              >
+                <Save className="w-4 h-4" /> Save Content
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+      
       {/* Deals / Combos Section */}
               </div>
       )}

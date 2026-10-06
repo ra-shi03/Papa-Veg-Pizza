@@ -75,6 +75,9 @@ const Login = lazy(() => import("@food/pages/user/auth/Login"))
 const SignIn = lazy(() => import("@food/pages/user/auth/SignIn"))
 const OTP = lazy(() => import("@food/pages/user/auth/OTP"))
 const AuthCallback = lazy(() => import("@food/pages/user/auth/AuthCallback"))
+const LocationSetup = lazy(() => import("@food/pages/user/location/LocationSetup"))
+const DeliveryLocation = lazy(() => import("@food/pages/user/location/DeliveryLocation"))
+const TrainTerms = lazy(() => import("@food/pages/user/location/TrainTerms"))
 
 // Help
 const Help = lazy(() => import("@food/pages/user/help/Help"))
@@ -294,6 +297,9 @@ export default function UserRouter() {
           <Route path="auth/login" element={<Login />} />
           <Route path="auth/sign-in" element={<Login />} />
           <Route path="auth/callback" element={<AuthCallback />} />
+          <Route path="location/setup" element={<LocationSetup />} />
+          <Route path="delivery-location" element={<DeliveryLocation />} />
+          <Route path="train-terms" element={<TrainTerms />} />
 
           {/* Help */}
           <Route path="help" element={<Help />} />

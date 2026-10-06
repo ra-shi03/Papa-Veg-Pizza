@@ -1,6 +1,7 @@
 import {
   requestUserOtp,
   verifyUserOtpAndLogin,
+  verifyTruecallerAndLogin,
   adminLogin,
   refreshAccessToken,
   requestDeliveryOtp,
@@ -189,6 +190,19 @@ export const updatePersonalProfileController = async (req, res, next) => {
     const { userId } = req.user;
     const result = await updatePersonalProfile(userId, req.body);
     return sendResponse(res, 200, "Profile updated successfully", result.data);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifyTruecallerController = async (req, res, next) => {
+  try {
+    const { payload } = req.body;
+    if (!payload || !payload.phone) {
+      return sendResponse(res, 400, "Invalid Truecaller payload", null);
+    }
+    const result = await verifyTruecallerAndLogin(payload);
+    return sendResponse(res, 200, "Login successful", result);
   } catch (error) {
     next(error);
   }

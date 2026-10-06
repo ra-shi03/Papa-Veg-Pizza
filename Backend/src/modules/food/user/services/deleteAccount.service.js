@@ -100,7 +100,8 @@ export async function deleteUserAccount(userId) {
             'food_safety_emergency_reports',
             'food_dining_requests',
             'food_offer_usages',
-            'food_referral_logs'
+            'food_referral_logs',
+            'profiles'
         ];
 
         for (const col of collectionsToClean) {

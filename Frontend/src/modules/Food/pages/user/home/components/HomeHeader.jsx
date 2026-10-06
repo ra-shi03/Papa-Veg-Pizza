@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 
 export function HomeHeader({ deliveryAddress, deliveryTime = 30, deliveryLabel = 'mins' }) {
   const navigate = useNavigate();
@@ -12,9 +13,12 @@ export function HomeHeader({ deliveryAddress, deliveryTime = 30, deliveryLabel =
         style={{ background: 'var(--secondary-off-white)' }}
       >
         {/* Left: dynamic delivery time bubble + delivery address */}
-        <div className="flex items-center gap-3 flex-1 overflow-hidden">
+        <div className="flex items-center gap-3 flex-1 overflow-hidden cursor-pointer" onClick={() => navigate('/food/user/delivery-location')}>
           {/* Neumorphic circle with dynamic minutes */}
-          <div
+          <motion.div
+            initial={{ scale: 0, rotate: -90 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 260, damping: 20 }}
             className="shrink-0 flex flex-col items-center justify-center rounded-full"
             style={{
               width: 48,
@@ -29,10 +33,15 @@ export function HomeHeader({ deliveryAddress, deliveryTime = 30, deliveryLabel =
             <span style={{ fontSize: 8, fontWeight: 700, color: 'var(--muted-gray)', fontFamily: 'Poppins,sans-serif', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>
               {deliveryLabel || 'mins'}
             </span>
-          </div>
+          </motion.div>
 
           {/* Delivery label + address */}
-          <div className="flex flex-col min-w-0">
+          <motion.div 
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 300, damping: 15, delay: 0.2 }}
+            className="flex flex-col min-w-0"
+          >
             <span
               className="flex items-center gap-0.5"
               style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent-red)', fontFamily: 'Poppins,sans-serif', textTransform: 'uppercase', letterSpacing: '0.06em' }}
@@ -46,7 +55,7 @@ export function HomeHeader({ deliveryAddress, deliveryTime = 30, deliveryLabel =
             >
               {deliveryAddress || 'Select Location'}
             </span>
-          </div>
+          </motion.div>
         </div>
 
         {/* Right: Bell + Profile — neumorphic round buttons */}
