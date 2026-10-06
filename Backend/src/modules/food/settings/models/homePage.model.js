@@ -19,6 +19,11 @@ const homePageSchema = new mongoose.Schema(
             default: 'LOWEST PRICES ONLY ON APP | FREE DELIVERY ABOVE ₹99',
             trim: true
         },
+        cravingHeading: {
+            type: String,
+            default: 'What are you craving for?',
+            trim: true
+        },
         banners: [
             {
                 url: { type: String, required: true },

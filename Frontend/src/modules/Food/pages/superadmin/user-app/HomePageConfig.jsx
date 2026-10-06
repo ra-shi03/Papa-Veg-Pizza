@@ -8,6 +8,7 @@ import { uploadAPI } from '../../../../../services/api';
 export default function HomePageConfig() {
   const [deliveryMinutes, setDeliveryMinutes] = useState(30);
   const [promoText, setPromoText] = useState('LOWEST PRICES ONLY ON APP | FREE DELIVERY ABOVE ₹99');
+  const [cravingHeading, setCravingHeading] = useState('What are you craving for?');
   const [banners, setBanners] = useState([]);
   const [deals, setDeals] = useState([]);
   const [isDealsModalOpen, setIsDealsModalOpen] = useState(false);
@@ -81,6 +82,9 @@ export default function HomePageConfig() {
         if (data.promoText) {
           setPromoText(data.promoText);
         }
+        if (data.cravingHeading) {
+          setCravingHeading(data.cravingHeading);
+        }
         if (Array.isArray(data.banners)) {
           setBanners(data.banners);
         }
@@ -136,7 +140,8 @@ export default function HomePageConfig() {
     const payload = {
       deliveryTimeMinutes: minutes,
       deliveryTimeLabel: 'mins',
-      promoText: promoText
+      promoText: promoText,
+      cravingHeading: cravingHeading
     };
 
     try {
@@ -413,6 +418,18 @@ export default function HomePageConfig() {
               onChange={(e) => setPromoText(e.target.value)}
               className="flex-1 px-3 py-1.5 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
               placeholder="e.g. LOWEST PRICES ONLY ON APP | FREE DELIVERY ABOVE ₹99"
+              disabled={isLoading}
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 w-32">Craving Heading:</span>
+            <input
+              type="text"
+              value={cravingHeading}
+              onChange={(e) => setCravingHeading(e.target.value)}
+              className="flex-1 px-3 py-1.5 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              placeholder="e.g. What are you craving for?"
               disabled={isLoading}
             />
           </div>

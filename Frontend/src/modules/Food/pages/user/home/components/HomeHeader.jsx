@@ -8,6 +8,15 @@ export function HomeHeader({ deliveryAddress, deliveryTime = 30, deliveryLabel =
   const [currentCatIndex, setCurrentCatIndex] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [searchValue, setSearchValue] = useState('');
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 40);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     if (categories && categories.length > 0) {
@@ -20,7 +29,7 @@ export function HomeHeader({ deliveryAddress, deliveryTime = 30, deliveryLabel =
 
   return (
     <div 
-      className="w-full pb-3"
+      className={`w-full pb-3 transition-all duration-300 ${isScrolled ? 'pt-3 shadow-md' : ''}`}
       style={{
         background: 'linear-gradient(to bottom, #B71C1C 0%, #E53935 100%)',
         position: 'sticky',
@@ -29,7 +38,13 @@ export function HomeHeader({ deliveryAddress, deliveryTime = 30, deliveryLabel =
       }}
     >
       {/* ── TOP BAR ────────────────────────── */}
-      <div className="w-full px-4 pt-4 pb-3 flex items-center justify-between">
+      <motion.div 
+        initial={false}
+        animate={{ height: isScrolled ? 0 : 'auto', opacity: isScrolled ? 0 : 1 }}
+        transition={{ duration: 0.25, ease: "easeInOut" }}
+        className="overflow-hidden"
+      >
+        <div className="w-full px-4 pt-4 pb-3 flex items-center justify-between">
         {/* Left: 30 MINS Block & Delivery Location */}
         <div className="flex items-center gap-3 flex-1 overflow-hidden">
           {/* Minutes box (Domino's style dark box, adapted for red theme) */}
@@ -93,7 +108,8 @@ export function HomeHeader({ deliveryAddress, deliveryTime = 30, deliveryLabel =
             </span>
           </button>
         </div>
-      </div>
+        </div>
+      </motion.div>
 
       {/* ── SEARCH BAR + TRAIN BUTTON ── */}
       <div className="px-4 flex items-center gap-2">
@@ -161,24 +177,32 @@ export function HomeHeader({ deliveryAddress, deliveryTime = 30, deliveryLabel =
         </div>
         
         {/* Deliver on Train Button */}
-        <button
-          onClick={() => navigate('/food/user/delivery-location', { state: { activeService: 'train' } })}
-          className="flex items-center gap-1.5 shrink-0 px-3 border-0 outline-none cursor-pointer"
-          style={{
-            height: 48,
-            borderRadius: 12,
-            background: '#FFFFFF',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-          }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--primary-gray)' }}>
-            train
-          </span>
-          <span className="flex flex-col text-left" style={{ lineHeight: 1.1 }}>
-            <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--primary-gray)', fontFamily: 'Poppins,sans-serif' }}>Deliver</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary-gray)', fontFamily: 'Poppins,sans-serif' }}>on Train</span>
-          </span>
-        </button>
+        <AnimatePresence>
+          {!isScrolled && (
+            <motion.button
+              initial={{ width: 0, opacity: 0, paddingLeft: 0, paddingRight: 0, marginLeft: -8 }}
+              animate={{ width: 'auto', opacity: 1, paddingLeft: 12, paddingRight: 12, marginLeft: 0 }}
+              exit={{ width: 0, opacity: 0, paddingLeft: 0, paddingRight: 0, marginLeft: -8 }}
+              transition={{ duration: 0.25, ease: "easeInOut" }}
+              onClick={() => navigate('/food/user/delivery-location', { state: { activeService: 'train' } })}
+              className="flex items-center gap-1.5 shrink-0 border-0 outline-none cursor-pointer overflow-hidden whitespace-nowrap"
+              style={{
+                height: 48,
+                borderRadius: 12,
+                background: '#FFFFFF',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}
+            >
+              <span className="material-symbols-outlined shrink-0" style={{ fontSize: 22, color: 'var(--primary-gray)' }}>
+                train
+              </span>
+              <span className="flex flex-col text-left shrink-0" style={{ lineHeight: 1.1 }}>
+                <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--primary-gray)', fontFamily: 'Poppins,sans-serif' }}>Deliver</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary-gray)', fontFamily: 'Poppins,sans-serif' }}>on Train</span>
+              </span>
+            </motion.button>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

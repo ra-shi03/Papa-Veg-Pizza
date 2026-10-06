@@ -21,7 +21,7 @@ export async function getProducts(req, res, next) {
 
 export async function getPublicMenu(req, res, next) {
     try {
-        const categories = await CategoryProduct.find({ type: 'Category', status: 'Active' }).sort({ order: 1 });
+        const categories = await CategoryProduct.find({ type: 'Category', status: 'Active' }).sort({ createdAt: 1 });
         const sections = await ProductSection.find({ status: 'Active' }).sort({ sortOrder: 1 });
         const products = await Product.find({ status: 'Active' })
             .populate('categoryId', 'name')
