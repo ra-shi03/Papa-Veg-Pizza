@@ -21,19 +21,7 @@ import { mockReviews, mockCustomers, mockOrders, mockOrderItems } from "./mockDa
 export default function Reviews() {
   const { role } = useOutletContext(); // Retrieve user role from outlet context
 
-  // Auto-seed database if empty on mount to ensure user sees frontend reviews
-  useEffect(() => {
-    try {
-      const val = localStorage.getItem("mock_db_customer_reviews");
-      if (!val || val === "[]") {
-        localStorage.setItem("mock_db_customer_reviews", JSON.stringify(mockReviews));
-        localStorage.setItem("mock_db_customers", JSON.stringify(mockCustomers));
-        localStorage.setItem("mock_db_store_orders", JSON.stringify(mockOrders));
-        localStorage.setItem("mock_db_order_items", JSON.stringify(mockOrderItems));
-        refetch();
-      }
-    } catch (_) {}
-  }, []);
+  // Mock auto-seeding removed as part of cleanup
 
   // ----------------------------------------------------
   // States: Filters, Pagination & Sorting
@@ -73,14 +61,7 @@ export default function Reviews() {
   // ----------------------------------------------------
   const stats = useMemo(() => {
     // Read from localStorage to reflect updates in real-time
-    const localReviews = (() => {
-      try {
-        const val = localStorage.getItem("mock_db_customer_reviews");
-        return val ? JSON.parse(val) : mockReviews;
-      } catch (_) {
-        return mockReviews;
-      }
-    })();
+    const localReviews = mockReviews;
 
     const totalCount = localReviews.length;
     const totalRating = localReviews.reduce((sum, r) => sum + r.rating, 0);
@@ -218,10 +199,10 @@ export default function Reviews() {
 
   const handleRefresh = () => {
     try {
-      localStorage.setItem("mock_db_customer_reviews", JSON.stringify(mockReviews));
-      localStorage.setItem("mock_db_customers", JSON.stringify(mockCustomers));
-      localStorage.setItem("mock_db_store_orders", JSON.stringify(mockOrders));
-      localStorage.setItem("mock_db_order_items", JSON.stringify(mockOrderItems));
+      // Removed mock DB seeding
+      
+      
+      
     } catch (_) {}
     refetch();
     toast.success("Reviews database re-seeded & synced successfully.");

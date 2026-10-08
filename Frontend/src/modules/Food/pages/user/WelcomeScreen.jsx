@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "@/services/api/axios";
 
+
 export default function WelcomeScreen() {
   const navigate = useNavigate();
   
@@ -11,18 +12,17 @@ export default function WelcomeScreen() {
   
   const timerRef = useRef(null);
   const currentIndexRef = useRef(0);
+  const hasRunRef = useRef(false);
 
   // Navigate forward based on auth state
   const handleProceed = () => {
-    // Save the index ONLY when proceeding, avoiding React Strict Mode double-increments
-    localStorage.setItem("lastShownPosterIndex", currentIndexRef.current.toString());
-    localStorage.setItem("papa_veg_welcome_shown", "true");
+    sessionStorage.setItem("papa_veg_welcome_shown", "true");
     
     const isAuthenticated = localStorage.getItem("user_authenticated") === "true";
     if (isAuthenticated) {
       navigate("/food/user", { replace: true });
     } else {
-      navigate("/user/auth/login", { replace: true });
+      navigate("/food/user/auth/login", { replace: true });
     }
   };
 
@@ -30,11 +30,10 @@ export default function WelcomeScreen() {
     const fetchConfig = async () => {
       try {
         const res = await axiosInstance.get('/settings/welcome');
-        const data = res.data?.data;
+        let data = res.data?.data;
         
         if (!data) {
-          handleProceed();
-          return;
+          data = { posters: [] };
         }
 
         setConfig(data);
@@ -42,38 +41,68 @@ export default function WelcomeScreen() {
         const now = new Date();
         let validPosters = data.posters
           ?.filter(p => p.isActive)
-          ?.filter(p => !p.startDate || new Date(p.startDate) <= now)
-          ?.filter(p => !p.endDate || new Date(p.endDate) >= now)
+          ?.filter(p => {
+            if (!p.startDate) return true;
+            const d = new Date(p.startDate);
+            return isNaN(d) || d <= now; // If invalid date, assume valid to prevent hiding
+          })
+          ?.filter(p => {
+            if (!p.endDate) return true;
+            const d = new Date(p.endDate);
+            return isNaN(d) || d >= now;
+          })
           ?.sort((a, b) => (a.order || 0) - (b.order || 0)) || [];
 
-        // Fallback to legacy hero image if no dynamic posters exist
+        // Fallback to legacy hero image or a hardcoded default if no dynamic posters exist
         if (validPosters.length === 0) {
-          if (data.heroMediaUrl) {
-            validPosters = [{
-              id: "fallback",
-              imageUrl: data.heroMediaUrl,
-              order: 0,
-              isActive: true
-            }];
-          } else {
-            handleProceed();
-            return;
-          }
+          console.log("No valid posters found! Raw posters:", data?.posters);
+          validPosters = [{
+            id: "fallback",
+            imageUrl: data.heroMediaUrl || "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=80",
+            order: 0,
+            isActive: true
+          }];
         }
 
-        // Determine which poster to show based on last stored index
+        // Determine which poster to show
+                // Debugging logs
+        console.log("Raw posters from API:", data?.posters);
+        console.log("Valid posters after filter:", validPosters);
         let lastIndex = parseInt(localStorage.getItem("lastShownPosterIndex"), 10);
-        if (isNaN(lastIndex)) lastIndex = -1;
+        console.log("Read lastIndex from localStorage:", lastIndex);
+        let nextIndex = 0;
         
-        let nextIndex = lastIndex + 1;
-        if (nextIndex >= validPosters.length) nextIndex = 0;
+        if (validPosters.length > 0) {
+          if (!hasRunRef.current) {
+            hasRunRef.current = true;
+            if (isNaN(lastIndex)) {
+              nextIndex = 0;
+            } else {
+              nextIndex = (lastIndex + 1) % validPosters.length;
+            }
+          } else {
+            // Second run in Strict Mode, don't increment
+            nextIndex = isNaN(lastIndex) ? 0 : lastIndex;
+          }
+        }
+        
+                console.log("Setting nextIndex to localStorage:", nextIndex);
+        localStorage.setItem("lastShownPosterIndex", nextIndex.toString());
         
         currentIndexRef.current = nextIndex;
         setActivePoster(validPosters[nextIndex]);
         setLoading(false);
       } catch (err) {
         console.error("Failed to load welcome screen config", err);
-        handleProceed(); // Skip on network error
+        alert("API Error: " + err.message);
+        // Fallback on network error instead of skipping
+        setConfig({});
+        setActivePoster({
+          id: "fallback_error",
+          imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=80",
+          isActive: true
+        });
+        setLoading(false);
       }
     };
 
