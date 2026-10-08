@@ -190,9 +190,8 @@ export default function Home() {
     }
   }, [locationConfirmed])
 
-  // Redirect to welcome screen if guest, or profile creation if profile is incomplete
+  // Fetch user data if authenticated
   useEffect(() => {
-    const welcomeShown = localStorage.getItem("papa_veg_welcome_shown")
     const isAuthenticated = localStorage.getItem("user_authenticated") === "true" || !!localStorage.getItem("user_accessToken")
     if (isAuthenticated) {
       try {
@@ -203,10 +202,8 @@ export default function Home() {
       } catch (e) {
         console.error("Failed to parse user profile status", e)
       }
-    } else if (!welcomeShown) {
-      navigate("/food/user/welcome")
     }
-  }, [navigate])
+  }, [])
 
   // Removed sync global location modal
 

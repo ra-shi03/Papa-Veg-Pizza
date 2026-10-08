@@ -4,15 +4,15 @@ import SplashScreen from '@/shared/components/SplashScreen.jsx'
 
 function App() {
   const [showSplash, setShowSplash] = useState(() => {
-    // Check if splash was already shown (persistent)
-    const splashShown = localStorage.getItem('PapaVegPizza_splash_shown')
+    // Check if splash was already shown (persistent per session)
+    const splashShown = sessionStorage.getItem('PapaVegPizza_splash_shown')
     return !splashShown
   })
 
   const [isLoading, setIsLoading] = useState(false)
 
   const handleSplashFinish = () => {
-    localStorage.setItem('PapaVegPizza_splash_shown', 'true')
+    sessionStorage.setItem('PapaVegPizza_splash_shown', 'true')
     setShowSplash(false)
   }
 

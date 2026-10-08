@@ -1,4 +1,4 @@
-import { Outlet, useLocation, useNavigate } from "react-router-dom"
+import { Outlet, useLocation, useNavigate, Navigate } from "react-router-dom"
 import { useEffect, useState, createContext, useContext } from "react"
 import { ProfileProvider } from "@food/context/ProfileContext"
 import { CartProvider } from "@food/context/CartContext"
@@ -102,11 +102,22 @@ function LocationSelectorProvider({ children }) {
 
 export default function UserLayout() {
   const location = useLocation()
+  const navigate = useNavigate()
 
   useEffect(() => {
     // Reset scroll to top whenever location changes (pathname, search, or hash)
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
   }, [location.pathname, location.search, location.hash])
+
+  // Check welcome early to avoid flash
+  const welcomeShown = sessionStorage.getItem("papa_veg_welcome_shown")
+  if (!welcomeShown && location.pathname !== "/food/user/welcome") {
+    return <Navigate to="/food/user/welcome" replace />
+  }
+
+  useEffect(() => {
+    // Other logic if needed, but the redirect is handled above
+  }, [])
 
   useUserNotifications()
 

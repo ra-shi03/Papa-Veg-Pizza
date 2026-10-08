@@ -52,20 +52,7 @@ export default function Complaints() {
   // ----------------------------------------------------
   const stats = useMemo(() => {
     let localComplaints = mockComplaints;
-    try {
-      const stored = localStorage.getItem("mock_db_customer_complaints");
-      if (stored) {
-        localComplaints = JSON.parse(stored);
-      }
-    } catch (_) {}
-
     let localRefunds = [];
-    try {
-      const storedRefunds = localStorage.getItem("mock_db_refunds");
-      if (storedRefunds) {
-        localRefunds = JSON.parse(storedRefunds);
-      }
-    } catch (_) {}
 
     const openComplaints = localComplaints.filter(c => c.status === "pending" || c.status === "investigating").length;
     const criticalComplaints = localComplaints.filter(c => c.priority === "critical" && c.status !== "resolved").length;

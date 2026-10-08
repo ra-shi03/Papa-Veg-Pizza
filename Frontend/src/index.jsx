@@ -38,7 +38,7 @@ function isNativeLikeShell() {
 }
 
 function resolveNativeInitialRoute() {
-  if (typeof window === 'undefined') return '/food/user'
+  if (typeof window === 'undefined') return '/welcome'
 
   const rawPathname = String(window.location?.pathname || '')
   const pathname = rawPathname.replace(/\/index\.html$/i, '') || '/'
@@ -58,7 +58,7 @@ function resolveNativeInitialRoute() {
   if (isModuleAuthenticated('admin')) return '/admin'
   if (isModuleAuthenticated('user')) return '/food/user'
 
-  return '/food/user'
+  return '/welcome'
 }
 
 function bootstrapNativeHashRoute() {

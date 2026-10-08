@@ -40,24 +40,23 @@ import {
 } from "../../modules/Food/pages/franchise-admin/reports/mockData.js";
 import { mockDailySales, mockDetailedOrders, mockStoreKitchenPerformance, getMockKitchenDayDetails, getMockDelayAnalysis, getMockWasteAnalysis, mockStaffPerformance, getMockStaffDetails, getMockStaffComparison, generateStorePerformanceMock, getMockStoreMonthDetails } from "../../modules/Food/pages/store-manager/reports/mockData.js";
 
-// Helper to load/save mock data from LocalStorage
+// Removed localStorage syncing for mock data as backend is now active
 const getStorageItem = (key, defaultVal) => {
-  try {
-    const val = localStorage.getItem(`mock_db_${key}`);
-    if (val === null || val === undefined || val === "null" || val === "undefined") {
-      return defaultVal;
-    }
-    return JSON.parse(val);
-  } catch (_) {
-    return defaultVal;
-  }
+  return defaultVal;
 };
 
 const setStorageItem = (key, val) => {
-  try {
-    localStorage.setItem(`mock_db_${key}`, JSON.stringify(val));
-  } catch (_) { }
+  // No-op
 };
+
+// Cleanup existing mock_db_ keys from localStorage
+if (typeof localStorage !== "undefined") {
+  Object.keys(localStorage).forEach(key => {
+    if (key.startsWith("mock_db_")) {
+      localStorage.removeItem(key);
+    }
+  });
+}
 
 // Initial Seed Data
 const initialCategories = [
