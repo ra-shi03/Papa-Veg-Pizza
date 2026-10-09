@@ -17,7 +17,11 @@ try {
 
 export const connectDB = async () => {
     try {
-        const conn = await mongoose.connect(config.mongodbUri);
+        const conn = await mongoose.connect(config.mongodbUri, {
+            serverSelectionTimeoutMS: 5000,
+            socketTimeoutMS: 45000,
+            connectTimeoutMS: 10000
+        });
         logger.info(`MongoDB connected: ${conn.connection.host}`);
     } catch (error) {
         logger.error(`MongoDB connection error: ${error.message}`);

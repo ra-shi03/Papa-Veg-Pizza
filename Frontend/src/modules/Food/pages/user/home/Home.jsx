@@ -176,6 +176,10 @@ export default function Home() {
 
   const [activeSlide, setActiveSlide] = useState(0)
 
+  // Ad Popup State
+  const [showAdPopup, setShowAdPopup] = useState(false);
+  const [adPopupData, setAdPopupData] = useState(null);
+
   // Modal states removed
   const [deliveryAddress, setDeliveryAddress] = useState(() => {
     return locationConfirmed ? (localStorage.getItem("deliveryAddress") || "") : ""
@@ -232,6 +236,9 @@ export default function Home() {
           }
           if (Array.isArray(data.deals)) {
             setDeals(data.deals.length > 0 ? data.deals : [])
+          }
+          if (data.adPopup && data.adPopup.enabled && data.adPopup.imageUrl) {
+            setAdPopupData(data.adPopup);
           }
         }
       } catch (err) {
@@ -386,6 +393,40 @@ export default function Home() {
     }, 5000)
     return () => clearInterval(interval)
   }, [banners])
+
+  // Ad Popup Logic
+  useEffect(() => {
+    if (!adPopupData) return;
+
+    const now = new Date();
+    if (adPopupData.startDate && new Date(adPopupData.startDate) > now) return;
+    if (adPopupData.endDate && new Date(adPopupData.endDate) < now) return;
+
+    const lastShown = localStorage.getItem("pvp_ad_popup_shown_ts");
+    let shouldShow = false;
+
+    if (adPopupData.frequencyRule === "every_launch") {
+      shouldShow = true;
+    } else if (adPopupData.frequencyRule === "once_per_session") {
+      if (!sessionStorage.getItem("pvp_ad_popup_shown_session")) {
+        shouldShow = true;
+        sessionStorage.setItem("pvp_ad_popup_shown_session", "true");
+      }
+    } else if (adPopupData.frequencyRule === "once_per_day") {
+      if (!lastShown || (now.getTime() - parseInt(lastShown)) > 86400000) {
+        shouldShow = true;
+      }
+    }
+
+    if (shouldShow) {
+      const img = new Image();
+      img.src = adPopupData.imageUrl;
+      img.onload = () => {
+        setShowAdPopup(true);
+        localStorage.setItem("pvp_ad_popup_shown_ts", now.getTime().toString());
+      };
+    }
+  }, [adPopupData]);
 
   // Sync States dynamically from events/localStorage updates
   useEffect(() => {
@@ -732,7 +773,50 @@ export default function Home() {
           locationConfirmed={locationConfirmed}
         />
 
-        {/* HomeModals Component Removed */}
+        {/* Ad Popup Modal */}
+        <AnimatePresence>
+          {showAdPopup && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[999] flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm"
+              onClick={() => setShowAdPopup(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ type: "spring", bounce: 0.4, duration: 0.6 }}
+                className="relative max-w-sm w-full bg-transparent rounded-2xl shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => setShowAdPopup(false)}
+                  className="absolute top-3 right-3 z-10 p-1.5 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-md transition-colors border border-white/20"
+                >
+                  <span className="material-symbols-outlined text-[18px] leading-none block">close</span>
+                </button>
+                <div 
+                  className="w-full cursor-pointer rounded-2xl overflow-hidden"
+                  onClick={() => {
+                    setShowAdPopup(false);
+                    if (adPopupData?.link) {
+                      navigate(adPopupData.link);
+                    }
+                  }}
+                >
+                  <img 
+                    src={adPopupData?.imageUrl} 
+                    alt="Promo" 
+                    className="w-full h-auto object-contain bg-transparent rounded-2xl" 
+                  />
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
       </div>
     </div>
   )

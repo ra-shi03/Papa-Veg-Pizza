@@ -83,11 +83,29 @@ const startServer = async () => {
             logger.warn('BullMQ is enabled but Redis is disabled. Queue initialization skipped.');
         }
 
-        // 6. Start the HTTP server
-        server = httpServer.listen(config.port, config.host, () => {
-            logger.info(`Server running in ${config.nodeEnv} mode on ${config.host}:${config.port}`);
-            console.log(`🌐 [URL] http://localhost:${config.port}`);
-        });
+        // 6. Start the HTTP server with port fallback
+        let currentPort = Number(config.port) || 5005;
+        const startListening = () => {
+            // Remove previous error listeners to avoid memory leaks on retry
+            httpServer.removeAllListeners('error');
+            
+            server = httpServer.listen(currentPort, config.host, () => {
+                logger.info(`Server running in ${config.nodeEnv} mode on ${config.host}:${currentPort}`);
+                console.log(`🌐 [URL] http://localhost:${currentPort}`);
+            });
+
+            server.on('error', (err) => {
+                if (err.code === 'EADDRINUSE') {
+                    logger.warn(`Port ${currentPort} is already in use. Trying port ${currentPort + 1}...`);
+                    currentPort++;
+                    startListening();
+                } else {
+                    logger.error(`Server Error: ${err.message}`);
+                    process.exit(1);
+                }
+            });
+        };
+        startListening();
 
         const runExpire = async () => {
             try {
@@ -97,21 +115,11 @@ const startServer = async () => {
             }
         };
         runExpire();
-        expireOffersInterval = setInterval(runExpire, 5 * 60 * 1000);
-
+        // Run every 3 minutes (180,000 ms) instead of 5 to prevent MongoDB NAT idle timeouts
+        expireOffersInterval = setInterval(runExpire, 3 * 60 * 1000);
 
         process.on('SIGINT', () => gracefulShutdown('SIGINT'));
         process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-
-        // Handle server errors (like EADDRINUSE)
-        server.on('error', (err) => {
-            if (err.code === 'EADDRINUSE') {
-                logger.error(`Port ${config.port} is already in use. Please kill the process or use a different port.`);
-            } else {
-                logger.error(`Server Error: ${err.message}`);
-            }
-            process.exit(1);
-        });
 
         // Handle unhandled promise rejections
         process.on('unhandledRejection', (err) => {
