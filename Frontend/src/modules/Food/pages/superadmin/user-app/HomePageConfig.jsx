@@ -15,7 +15,14 @@ export default function HomePageConfig() {
   const [editingDeal, setEditingDeal] = useState(null);
   const [dealForm, setDealForm] = useState({ id: '', title: '', description: '', badge: '', image: '', size: 'Medium' });
   const [isTrainConfigOpen, setIsTrainConfigOpen] = useState(false);
-
+  const [adPopup, setAdPopup] = useState({
+    enabled: false,
+    imageUrl: '',
+    link: '',
+    frequencyRule: 'once_per_session',
+    startDate: '',
+    endDate: ''
+  });
   
   const [activeTab, setActiveTab] = useState('deals');
   const [isLoading, setIsLoading] = useState(true);
@@ -104,6 +111,16 @@ export default function HomePageConfig() {
                         'Cancellation is only permitted within 2 hours of actual arrival at station.'
                       ],
             faqs: Array.isArray(data.trainConfig.faqs) ? data.trainConfig.faqs : []
+          });
+        }
+        if (data.adPopup) {
+          setAdPopup({
+            enabled: data.adPopup.enabled || false,
+            imageUrl: data.adPopup.imageUrl || '',
+            link: data.adPopup.link || '',
+            frequencyRule: data.adPopup.frequencyRule || 'once_per_session',
+            startDate: data.adPopup.startDate ? new Date(data.adPopup.startDate).toISOString().slice(0, 16) : '',
+            endDate: data.adPopup.endDate ? new Date(data.adPopup.endDate).toISOString().slice(0, 16) : ''
           });
         }
 
@@ -362,6 +379,55 @@ export default function HomePageConfig() {
     }
   };
 
+  const handleSaveAdPopup = async () => {
+    setIsSaving(true);
+    try {
+      const payload = { adPopup };
+      let res;
+      try {
+        res = await adminClient.post('/settings/home-page', payload);
+      } catch {
+        res = await adminClient.put('/settings/home-page', payload);
+      }
+      const updated = res?.data?.data || payload;
+      try {
+        localStorage.setItem('pvp_home_config', JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent('homePageConfigUpdated', { detail: updated }));
+      } catch (_) {}
+      toast.success('Ad Popup settings saved!');
+    } catch(err) {
+      toast.error('Failed to save Ad Popup settings');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const adPopupImageInputRef = useRef(null);
+  const handleAdPopupImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Only image files are supported for Ad Popup.');
+      return;
+    }
+    setIsUploadingDealImage(true);
+    try {
+      const res = await uploadAPI.uploadMedia(file);
+      const url = res?.data?.data?.url || res?.data?.url;
+      if (url) {
+        setAdPopup(prev => ({ ...prev, imageUrl: url }));
+        toast.success('Image uploaded successfully!');
+      } else {
+        toast.error('Failed to get uploaded image URL');
+      }
+    } catch (err) {
+      toast.error('Failed to upload image');
+    } finally {
+      setIsUploadingDealImage(false);
+      if (adPopupImageInputRef.current) adPopupImageInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="p-4 max-w-4xl mx-auto">
 
@@ -378,6 +444,18 @@ export default function HomePageConfig() {
           className={`pb-3 text-sm font-semibold transition-colors whitespace-nowrap ${activeTab === 'deals' ? 'border-b-2 border-primary text-primary' : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'}`}
         >
           Hot Deals
+        </button>
+        <button
+          onClick={() => setActiveTab('adpopup')}
+          className={`pb-3 text-sm font-semibold transition-colors whitespace-nowrap ${activeTab === 'adpopup' ? 'border-b-2 border-primary text-primary' : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'}`}
+        >
+          Ad Popup
+        </button>
+        <button
+          onClick={() => setActiveTab('orderMethods')}
+          className={`pb-3 text-sm font-semibold transition-colors whitespace-nowrap ${activeTab === 'orderMethods' ? 'border-b-2 border-primary text-primary' : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'}`}
+        >
+          Order Methods
         </button>
 
       </div>
@@ -534,6 +612,12 @@ export default function HomePageConfig() {
         </div>
       </section>
 
+      {/* Deals / Combos Section */}
+              </div>
+      )}
+
+      {activeTab === 'orderMethods' && (
+        <div className="space-y-6">
       {/* Order Methods Section */}
       <section className="space-y-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
         <div>
@@ -725,8 +809,7 @@ export default function HomePageConfig() {
         )}
       </section>
       
-      {/* Deals / Combos Section */}
-              </div>
+        </div>
       )}
 
       {activeTab === 'deals' && (
@@ -786,8 +869,106 @@ export default function HomePageConfig() {
         </div>
       </section>
 
+        </div>
+      )}
 
+      {activeTab === 'adpopup' && (
+        <div className="space-y-6">
+          <section className="space-y-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+            <div>
+              <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Ad Popup Settings</h2>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                Configure the promotional popup that appears when the user app home page finishes loading.
+              </p>
+            </div>
+            
+            <div className="bg-white dark:bg-zinc-900 p-4 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 w-32">Enable Popup:</span>
+                <button
+                  onClick={() => setAdPopup(prev => ({ ...prev, enabled: !prev.enabled }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                    adPopup.enabled ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-700'
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${adPopup.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
               </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 w-32">Image URL:</span>
+                <div className="flex gap-2 flex-1">
+                  <input
+                    type="text"
+                    value={adPopup.imageUrl}
+                    onChange={e => setAdPopup(prev => ({ ...prev, imageUrl: e.target.value }))}
+                    className="flex-1 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+                    placeholder="https://..."
+                  />
+                  <input type="file" ref={adPopupImageInputRef} onChange={handleAdPopupImageUpload} accept="image/*" className="hidden" />
+                  <button onClick={() => adPopupImageInputRef.current?.click()} disabled={isUploadingDealImage} className="px-3 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-md hover:bg-zinc-300 dark:hover:bg-zinc-600 text-sm font-medium flex items-center gap-1">
+                    {isUploadingDealImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Upload
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 w-32">Deep Link:</span>
+                <input
+                  type="text"
+                  value={adPopup.link}
+                  onChange={e => setAdPopup(prev => ({ ...prev, link: e.target.value }))}
+                  className="flex-1 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+                  placeholder="/food/user/product/..."
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 w-32">Frequency Rule:</span>
+                <select
+                  value={adPopup.frequencyRule}
+                  onChange={e => setAdPopup(prev => ({ ...prev, frequencyRule: e.target.value }))}
+                  className="flex-1 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+                >
+                  <option value="once_per_session">Once per session</option>
+                  <option value="once_per_day">Once per day</option>
+                  <option value="every_launch">Every launch</option>
+                </select>
+              </div>
+
+              <div className="flex gap-4">
+                <div className="flex-1 flex items-center gap-3">
+                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 w-32">Start Date:</span>
+                  <input
+                    type="datetime-local"
+                    value={adPopup.startDate}
+                    onChange={e => setAdPopup(prev => ({ ...prev, startDate: e.target.value }))}
+                    className="flex-1 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+                  />
+                </div>
+                <div className="flex-1 flex items-center gap-3">
+                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 w-24">End Date:</span>
+                  <input
+                    type="datetime-local"
+                    value={adPopup.endDate}
+                    onChange={e => setAdPopup(prev => ({ ...prev, endDate: e.target.value }))}
+                    className="flex-1 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+                  />
+                </div>
+              </div>
+              
+              <div className="pt-4 flex justify-end">
+                <button
+                  onClick={handleSaveAdPopup}
+                  disabled={isSaving}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm font-medium"
+                >
+                  <Save className="w-4 h-4" /> Save Popup Settings
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
       )}
 
 

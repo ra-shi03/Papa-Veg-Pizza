@@ -61,6 +61,14 @@ const homePageSchema = new mongoose.Schema(
                     answer: { type: String }
                 }
             ]
+        },
+        adPopup: {
+            enabled: { type: Boolean, default: false },
+            imageUrl: { type: String, default: '' },
+            link: { type: String, default: '' },
+            frequencyRule: { type: String, enum: ['once_per_session', 'once_per_day', 'every_launch'], default: 'once_per_session' },
+            startDate: { type: Date },
+            endDate: { type: Date }
         }
     },
     {
