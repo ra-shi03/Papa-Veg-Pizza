@@ -283,7 +283,7 @@ export default function CampaignAnalytics({ campaignId, isOpen, onClose }) {
                   </div>
 
                   {/* Donut Legend */}
-                  <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-zinc-650 dark:text-zinc-400 mt-2">
+                  <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-zinc-700 dark:text-zinc-300 dark:text-zinc-400 mt-2">
                     <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded bg-blue-500 shrink-0"></span> Push Alert (35%)</div>
                     <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded bg-purple-500 shrink-0"></span> Email (25%)</div>
                     <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded bg-orange-500 shrink-0"></span> SMS (20%)</div>
@@ -477,14 +477,14 @@ export default function CampaignAnalytics({ campaignId, isOpen, onClose }) {
                     <button 
                       onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                       disabled={currentPage === 1}
-                      className="px-3 py-1 border border-zinc-300 dark:border-zinc-700 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-650 dark:text-zinc-350 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="px-3 py-1 border border-zinc-300 dark:border-zinc-700 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-300 dark:text-zinc-350 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       Prev
                     </button>
                     <button 
                       onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                       disabled={currentPage === totalPages}
-                      className="px-3 py-1 border border-zinc-300 dark:border-zinc-700 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-650 dark:text-zinc-350 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="px-3 py-1 border border-zinc-300 dark:border-zinc-700 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-300 dark:text-zinc-350 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       Next
                     </button>

@@ -142,7 +142,7 @@ export default function CouponsManagement() {
       setTotalPages(result.totalPages);
       
       // Load real time derived statistics
-      const aggregateStats = getAggregateStats();
+      const aggregateStats = getAggregateStats(result.data);
       setStats(aggregateStats);
     } catch (err) {
       setError(err.message || 'Unable to connect to coupons collection.');
@@ -301,19 +301,28 @@ export default function CouponsManagement() {
   };
 
   // Single operations handlers
-  const handleDisableCoupon = async () => {
-    if (!selectedCoupon) return;
+  const handleToggleCouponStatus = async (couponToToggle) => {
+    const target = couponToToggle || selectedCoupon;
+    if (!target) return;
+    const isCurrentlyDisabled = target.status === 'disabled' || target.isActive === false;
+    const newStatus = isCurrentlyDisabled ? 'active' : 'disabled';
+    const newIsActive = isCurrentlyDisabled;
     setLoading(true);
     try {
-      await api.updateCoupon(selectedCoupon._id, { status: 'disabled' });
-      toast.success(`Coupon ${selectedCoupon.code} disabled.`);
+      await api.updateCoupon(target._id, { status: newStatus, isActive: newIsActive });
+      toast.success(`Coupon ${target.code} ${newIsActive ? 'enabled' : 'disabled'} successfully.`);
       setIsDisableConfirmOpen(false);
       setRetryTrigger(r => r + 1);
     } catch (err) {
-      toast.error('Failed to disable coupon.');
+      toast.error('Failed to update coupon status.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDisableCoupon = async () => {
+    if (!selectedCoupon) return;
+    await handleToggleCouponStatus(selectedCoupon);
   };
 
   const handleDeleteCoupon = async () => {
@@ -935,7 +944,7 @@ export default function CouponsManagement() {
 
                             {/* Usage */}
                             {columnVisibility.usage && (
-                              <td className="px-5 py-3.5 text-right font-mono text-zinc-650 dark:text-zinc-400">
+                              <td className="px-5 py-3.5 text-right font-mono text-zinc-700 dark:text-zinc-300 dark:text-zinc-400">
                                 {c.usageCount} / <span className="text-zinc-400 font-normal">{c.usageLimit}</span>
                               </td>
                             )}
@@ -958,7 +967,7 @@ export default function CouponsManagement() {
                             {columnVisibility.status && (
                               <td className="px-5 py-3.5">
                                 <span className={`px-2.5 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-wider ${
-                                  c.status === 'disabled' ? 'bg-zinc-100 text-zinc-650 dark:bg-zinc-800 dark:text-zinc-450 border border-zinc-200 dark:border-zinc-700' :
+                                  c.status === 'disabled' ? 'bg-zinc-100 text-zinc-700 dark:text-zinc-300 dark:bg-zinc-800 dark:text-zinc-450 border border-zinc-200 dark:border-zinc-700' :
                                   isExpired || c.status === 'expired' ? 'bg-rose-500/10 text-rose-650 dark:text-rose-455 border border-rose-500/15' :
                                   'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/15'
                                 }`}>
@@ -967,69 +976,66 @@ export default function CouponsManagement() {
                               </td>
                             )}
 
-                            {/* Actions menu */}
+                            {/* Actions buttons (Direct Icons: View, Edit, Disable, Delete) */}
                             {columnVisibility.actions && (
-                              <td className="px-5 py-3.5 text-right relative">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveMenuRowId(activeMenuRowId === c._id ? null : c._id);
-                                    setSelectedCoupon(c);
-                                  }}
-                                  className="p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-zinc-500 hover:text-black dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-850 cursor-pointer transition-colors"
-                                >
-                                  <MoreVertical size={13} />
-                                </button>
-
-                                {/* Dropdown Menu */}
-                                {activeMenuRowId === c._id && (
-                                  <div
-                                    ref={menuRef}
-                                    className="absolute right-6 top-10 w-40 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 rounded-xl shadow-xl py-1.5 z-30 divide-y divide-zinc-100 dark:divide-zinc-850 text-left text-[11px] font-bold"
+                              <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {/* View Drawer */}
+                                  <button
+                                    onClick={() => {
+                                      setSelectedCoupon(c);
+                                      setIsViewOpen(true);
+                                    }}
+                                    title="View Details"
+                                    className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:text-[var(--primary)] hover:border-[var(--primary)]/30 hover:bg-[var(--primary)]/5 cursor-pointer transition-colors shadow-2xs"
                                   >
-                                    <div className="py-0.5">
-                                      <button 
-                                        onClick={() => { setIsViewOpen(true); setActiveMenuRowId(null); }}
-                                        className="w-full px-3 py-1.5 text-zinc-700 dark:text-zinc-350 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center gap-2 cursor-pointer"
-                                      >
-                                        <Eye size={12} className="text-[var(--primary)]" />
-                                        View Drawer
-                                      </button>
-                                      <button 
-                                        onClick={() => { setIsEditOpen(true); setActiveMenuRowId(null); }}
-                                        className="w-full px-3 py-1.5 text-zinc-700 dark:text-zinc-350 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center gap-2 cursor-pointer"
-                                      >
-                                        <Edit size={12} className="text-zinc-500" />
-                                        Edit Details
-                                      </button>
-                                      <button 
-                                        onClick={() => { setIsCloneOpen(true); setActiveMenuRowId(null); }}
-                                        className="w-full px-3 py-1.5 text-zinc-700 dark:text-zinc-350 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center gap-2 cursor-pointer"
-                                      >
-                                        <Copy size={11} className="text-zinc-500" />
-                                        Clone Coupon
-                                      </button>
-                                    </div>
-                                    <div className="py-0.5">
-                                      {c.status !== 'disabled' && (
-                                        <button 
-                                          onClick={() => { setIsDisableConfirmOpen(true); setActiveMenuRowId(null); }}
-                                          className="w-full px-3 py-1.5 text-zinc-650 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 flex items-center gap-2 cursor-pointer"
-                                        >
-                                          <EyeOff size={11} className="text-zinc-450" />
-                                          Disable Offer
-                                        </button>
-                                      )}
-                                      <button 
-                                        onClick={() => { setIsDeleteConfirmOpen(true); setActiveMenuRowId(null); }}
-                                        className="w-full px-3 py-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 flex items-center gap-2 cursor-pointer"
-                                      >
-                                        <Trash2 size={12} />
-                                        Delete Coupon
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
+                                    <Eye size={13} />
+                                  </button>
+
+                                  {/* Edit Details */}
+                                  <button
+                                    onClick={() => {
+                                      setSelectedCoupon(c);
+                                      setIsEditOpen(true);
+                                    }}
+                                    title="Edit Details"
+                                    className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:text-blue-600 hover:border-blue-500/30 hover:bg-blue-50 dark:hover:bg-blue-950/20 cursor-pointer transition-colors shadow-2xs"
+                                  >
+                                    <Edit size={13} />
+                                  </button>
+
+                                  {/* Disable / Enable Offer */}
+                                  <button
+                                    onClick={() => {
+                                      setSelectedCoupon(c);
+                                      if (c.status === 'disabled' || c.isActive === false) {
+                                        handleToggleCouponStatus(c);
+                                      } else {
+                                        setIsDisableConfirmOpen(true);
+                                      }
+                                    }}
+                                    title={c.status === 'disabled' || c.isActive === false ? "Enable Offer" : "Disable Offer"}
+                                    className={`p-1.5 rounded-lg border cursor-pointer transition-colors shadow-2xs ${
+                                      c.status === 'disabled' || c.isActive === false
+                                        ? 'border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/60 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100/60'
+                                        : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:text-amber-600 hover:border-amber-500/30 hover:bg-amber-50 dark:hover:bg-amber-950/20'
+                                    }`}
+                                  >
+                                    {c.status === 'disabled' || c.isActive === false ? <CheckCircle2 size={13} /> : <EyeOff size={13} />}
+                                  </button>
+
+                                  {/* Delete Coupon */}
+                                  <button
+                                    onClick={() => {
+                                      setSelectedCoupon(c);
+                                      setIsDeleteConfirmOpen(true);
+                                    }}
+                                    title="Delete Coupon"
+                                    className="p-1.5 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50/50 dark:bg-rose-950/20 text-rose-500 hover:text-rose-600 hover:bg-rose-100/60 dark:hover:bg-rose-900/30 cursor-pointer transition-colors shadow-2xs"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
                               </td>
                             )}
                           </tr>

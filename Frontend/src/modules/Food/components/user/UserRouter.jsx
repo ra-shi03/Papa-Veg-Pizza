@@ -12,7 +12,6 @@ const WelcomeScreen = lazy(() => import("@food/pages/user/WelcomeScreen"))
 // Home & Discovery
 const Home = lazy(() => import("@food/pages/user/home/Home"))
 const MenuList = lazy(() => import("@food/pages/user/home/MenuList"))
-const HotDealsPage = lazy(() => import("@food/pages/user/home/HotDealsPage"))
 const Under250 = lazy(() => import("@food/pages/user/Under250"))
 const Categories = lazy(() => import("@food/pages/user/Categories"))
 const CategoryPage = lazy(() => import("@food/pages/user/CategoryPage"))
@@ -30,8 +29,9 @@ const OrderTracking = lazy(() => import("@food/pages/user/orders/OrderTracking")
 const OrderInvoice = lazy(() => import("@food/pages/user/orders/OrderInvoice"))
 const UserOrderDetails = lazy(() => import("@food/pages/user/orders/UserOrderDetails"))
 
-// Offers
+// Offers & Promise
 const Offers = lazy(() => import("@food/pages/user/Offers"))
+const PromisePage = lazy(() => import("@food/pages/user/PromisePage"))
 
 // Gourmet
 const Gourmet = lazy(() => import("@food/pages/user/Gourmet"))
@@ -101,7 +101,7 @@ export default function UserRouter() {
           {/* Home & Discovery */}
           <Route path="" element={<Home />} />
           <Route path="menu" element={<MenuList />} />
-          <Route path="deals" element={<HotDealsPage />} />
+          <Route path="promise" element={<PromisePage />} />
 
           <Route path="under-250" element={<Under250 />} />
           <Route path="categories" element={<Categories />} />

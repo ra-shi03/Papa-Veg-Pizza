@@ -6,6 +6,11 @@ const categoryProductSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  badge: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   icon: {
     type: String,
     trim: true
@@ -23,6 +28,10 @@ const categoryProductSchema = new mongoose.Schema({
     type: String,
     enum: ['Category', 'Product'],
     default: 'Category'
+  },
+  sort: {
+    type: Number,
+    default: 0
   }
 }, { timestamps: true });
 

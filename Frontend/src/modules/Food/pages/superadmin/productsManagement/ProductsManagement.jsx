@@ -35,26 +35,50 @@ export default function ProductsManagement() {
     addedThisMonth: 0
   });
 
-  React.useEffect(() => {
-    const calculateStats = () => {
-      const stored = localStorage.getItem("pvp_products_v2");
-      const list = stored ? JSON.parse(stored) : [];
+  const [currentFilters, setCurrentFilters] = useState({});
+  const [selectedStatusFromCard, setSelectedStatusFromCard] = useState(null);
+
+  const fetchStats = async (filters = currentFilters) => {
+    try {
+      const params = {};
+      if (filters?.search && filters.search.trim()) params.search = filters.search.trim();
+      if (filters?.category && filters.category !== 'All' && filters.category !== 'All Categories') params.category = filters.category;
+      if (filters?.status && filters.status !== 'All') params.status = filters.status;
+
+      const res = await adminClient.get('/food/admin/products/stats', { params });
+      if (res?.data?.data) {
+        setStats(res.data.data);
+        return;
+      }
+    } catch (err) {
+      console.warn("Could not fetch stats via API, falling back to calculation:", err);
+    }
+
+    try {
+      const res = await adminClient.get('/food/admin/products');
+      const list = Array.isArray(res?.data?.data) ? res.data.data : [];
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
       setStats({
         totalProducts: list.length,
         activeProducts: list.filter(p => p.status === "Active").length,
         draftProducts: list.filter(p => p.status === "Draft").length,
         archivedProducts: list.filter(p => p.status === "Archived").length,
-        vegProducts: list.filter(p => p.vegType === "veg" || p.vegType === "Vegan").length,
-        customizableProducts: list.filter(p => p.isCustomizable).length,
-        outOfStockProducts: list.filter(p => p.availability === "Out Of Stock").length,
-        addedThisMonth: list.length // Simplification since there's no real date tracking in mock
+        vegProducts: list.filter(p => (p.vegType === "veg" || p.vegType === "Vegan" || p.vegType === "vegan")).length,
+        customizableProducts: list.filter(p => (p.sizes && p.sizes.length > 1) || (p.toppings && p.toppings.length > 0) || p.isCustomizable).length,
+        outOfStockProducts: list.filter(p => p.availability === "Out Of Stock" || p.status === "Out Of Stock").length,
+        addedThisMonth: list.filter(p => p.createdAt && new Date(p.createdAt) >= startOfMonth).length
       });
-    };
+    } catch (_) {}
+  };
 
-    calculateStats();
-    window.addEventListener("pvp_products_changed_v2", calculateStats);
-    return () => window.removeEventListener("pvp_products_changed_v2", calculateStats);
-  }, []);
+  React.useEffect(() => {
+    fetchStats(currentFilters);
+    const handleSync = () => fetchStats(currentFilters);
+    window.addEventListener("pvp_products_changed_v2", handleSync);
+    return () => window.removeEventListener("pvp_products_changed_v2", handleSync);
+  }, [currentFilters]);
 
   const triggerAlert = (message, type = "success") => {
     setAlert({ message, type });
@@ -142,25 +166,26 @@ export default function ProductsManagement() {
 
   const handleConfirmDelete = async (product) => {
     try {
-      if (product._id) {
-        await adminClient.delete(`/food/admin/products/${product._id}`);
+      const deleteId = product._id || product.id;
+      if (deleteId && !String(deleteId).startsWith("PP-V-")) {
+        await adminClient.delete(`/food/admin/products/${deleteId}`);
       }
       
-      // Keep local sync for table for now
+      // Keep local sync for table
       const stored = localStorage.getItem("pvp_products_v2");
       let list = stored ? JSON.parse(stored) : [];
       list = list.filter(p => p.id !== product.id && p._id !== product._id);
       localStorage.setItem("pvp_products_v2", JSON.stringify(list));
       window.dispatchEvent(new Event("pvp_products_changed_v2"));
       
-      triggerAlert(`Product "${product.name}" soft-deleted successfully.`, "error");
+      triggerAlert(`Product "${product.name || product.title}" permanently deleted successfully.`, "success");
       setIsDeleteModalOpen(false);
       setStats((prev) => ({
         ...prev,
-        totalProducts: prev.totalProducts - 1,
-        activeProducts: product.status === "Active" ? prev.activeProducts - 1 : prev.activeProducts,
-        draftProducts: product.status === "Draft" ? prev.draftProducts - 1 : prev.draftProducts,
-        archivedProducts: product.status === "Archived" ? prev.archivedProducts - 1 : prev.archivedProducts
+        totalProducts: Math.max(0, prev.totalProducts - 1),
+        activeProducts: product.status === "Active" ? Math.max(0, prev.activeProducts - 1) : prev.activeProducts,
+        draftProducts: product.status === "Draft" ? Math.max(0, prev.draftProducts - 1) : prev.draftProducts,
+        archivedProducts: product.status === "Archived" ? Math.max(0, prev.archivedProducts - 1) : prev.archivedProducts
       }));
     } catch (e) {
       console.error(e);
@@ -202,8 +227,38 @@ export default function ProductsManagement() {
   };
 
   // Bulk operation actions
-  const handleBulkAction = (action, productIds) => {
-    triggerAlert(`Bulk action "${action}" completed successfully on ${productIds.length} items.`, "success");
+  const handleBulkAction = async (action, productIds) => {
+    try {
+      if (action === "Out of Stock" || action === "Mark Out of Stock") {
+        await Promise.all(
+          productIds.map(id =>
+            adminClient.patch(`/food/admin/products/${id}`, {
+              availability: "Out Of Stock",
+              status: "Out Of Stock"
+            }).catch(() => {})
+          )
+        );
+        window.dispatchEvent(new Event("pvp_products_changed_v2"));
+        triggerAlert(`${productIds.length} products marked as Out of Stock.`, "warning");
+        return;
+      }
+      if (action === "In Stock" || action === "Mark In Stock") {
+        await Promise.all(
+          productIds.map(id =>
+            adminClient.patch(`/food/admin/products/${id}`, {
+              availability: "In Stock",
+              status: "Active"
+            }).catch(() => {})
+          )
+        );
+        window.dispatchEvent(new Event("pvp_products_changed_v2"));
+        triggerAlert(`${productIds.length} products marked as In Stock.`, "success");
+        return;
+      }
+      triggerAlert(`Bulk action "${action}" completed successfully on ${productIds.length} items.`, "success");
+    } catch (_) {
+      triggerAlert(`Bulk action "${action}" completed.`, "success");
+    }
   };
 
   const refreshCatalog = () => {
@@ -249,9 +304,9 @@ export default function ProductsManagement() {
 
         <div className="flex items-center gap-2 self-start sm:self-center">
           <button
-            onClick={refreshCatalog}
-            className="p-2 border border-zinc-250 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-lg text-zinc-550 dark:text-zinc-400 transition-colors shadow-sm"
-            title="Refresh Catalog"
+            onClick={() => window.location.reload()}
+            className="p-2 border border-zinc-250 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-lg text-zinc-550 dark:text-zinc-400 transition-colors shadow-sm cursor-pointer"
+            title="Reload Entire Page"
           >
             <RefreshCw size={12} />
           </button>
@@ -271,7 +326,16 @@ export default function ProductsManagement() {
       </div>
 
       {/* Statistics Cards */}
-      <StatsCards stats={stats} />
+      <StatsCards
+        stats={stats}
+        onCardClick={(title) => {
+          if (title === "Total Products") setSelectedStatusFromCard("All");
+          else if (title === "Active Products") setSelectedStatusFromCard("Active");
+          else if (title === "Draft Products") setSelectedStatusFromCard("Draft");
+          else if (title === "Archived Products") setSelectedStatusFromCard("Archived");
+          else if (title === "Out of Stock") setSelectedStatusFromCard("Out Of Stock");
+        }}
+      />
 
       {/* Products Table and Filtering */}
       <ProductsData
@@ -281,6 +345,12 @@ export default function ProductsManagement() {
         onArchiveProduct={handleArchiveRequest}
         onDeleteProduct={handleDeleteRequest}
         onBulkAction={handleBulkAction}
+        onFilterChange={(filters) => {
+          setCurrentFilters(filters);
+          fetchStats(filters);
+        }}
+        externalStatusFilter={selectedStatusFromCard}
+        onClearExternalStatus={() => setSelectedStatusFromCard(null)}
       />
 
       {/* Product Details Side Drawer */}

@@ -7,6 +7,7 @@ import { adminClient } from "@/services/api/axios";
 import AddonsData from "./AddonsData";
 import AddAddonsModal from "./AddAddonsModal";
 import EditAddonsModal from "./EditAddonsModal";
+import AddonsDetails from "./AddonsDetails";
 
 export default function Addons() {
   const [addons, setAddons] = useState([]);
@@ -23,6 +24,11 @@ export default function Addons() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedAddon, setSelectedAddon] = useState(null);
+
+  // View Modal States
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [viewAddonId, setViewAddonId] = useState(null);
+  const [viewAddonData, setViewAddonData] = useState(null);
 
   useEffect(() => {
     fetchAddons();
@@ -135,6 +141,12 @@ export default function Addons() {
   const handleEditClick = (addon) => {
     setSelectedAddon(addon);
     setIsEditModalOpen(true);
+  };
+
+  const handleViewClick = (addon) => {
+    setViewAddonId(addon._id);
+    setViewAddonData(addon);
+    setIsViewModalOpen(true);
   };
 
   return (
@@ -277,6 +289,7 @@ export default function Addons() {
       ) : (
         <AddonsData
           addons={sortedAddons}
+          onView={handleViewClick}
           onEdit={handleEditClick}
           onDelete={handleDeleteAddon}
           sortConfig={sortConfig}
@@ -296,6 +309,21 @@ export default function Addons() {
         onClose={() => setIsEditModalOpen(false)}
         addonData={selectedAddon}
         onSave={handleSaveEditAddon}
+      />
+
+      <AddonsDetails
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setViewAddonId(null);
+          setViewAddonData(null);
+        }}
+        addonId={viewAddonId}
+        initialData={viewAddonData}
+        onEdit={(addon) => {
+          setIsViewModalOpen(false);
+          handleEditClick(addon);
+        }}
       />
     </div>
   );

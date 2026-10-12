@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Edit, Eye, Trash2, CheckCircle2, AlertCircle, Ban } from 'lucide-react';
+import { adminClient } from '../../../../../services/api/axios';
 
 // ==========================================
 // 1. DATA MODELS & DATASETS (MongoDB Mock)
@@ -91,132 +92,26 @@ export const mockCustomers = [
 
 export const initialCoupons = [
   {
-    _id: 'c-65e236b2f6b8b9c1a5b8e901',
-    code: 'PIZZA50',
-    title: 'Super Saver 50% Off',
-    description: 'Get 50% discount on order value up to ₹150. Applicable on all classic and premium pizzas.',
+    _id: 'coupon-seed-001',
+    code: 'WELCOME50',
+    title: '50% Off First Order',
+    description: 'Get 50% discount up to ₹150 on your first Papa Veg Pizza order',
     couponType: 'Percentage',
     value: 50,
-    minimumOrderAmount: 299,
+    discountValue: 50,
+    minimumOrderAmount: 249,
     maximumDiscount: 150,
+    maxDiscount: 150,
     usageLimit: 1000,
-    usagePerCustomer: 3,
-    applicableOn: 'Category',
-    productIds: [],
-    categoryIds: ['cat-pizza-classic', 'cat-pizza-premium'],
-    regionIds: ['reg-north', 'reg-south'],
-    zoneIds: ['zone-delhi', 'zone-noida', 'zone-blr'],
-    territoryIds: ['ter-cp', 'ter-dwarka', 'ter-sec62', 'ter-indiranagar'],
-    franchiseIds: ['fran-delhi-prime', 'fran-dwarka-bites', 'fran-noida-corp', 'fran-south-crust'],
-    storeIds: ['str-cp-1', 'str-dwarka-1', 'str-noida-62', 'str-indiranagar-1'],
-    customerSegments: ['New Customers', 'Premium Users'],
-    customerIds: [],
-    startDate: '2026-06-01T00:00:00.000Z',
-    endDate: '2026-08-31T23:59:59.000Z',
-    status: 'active',
-    createdBy: 'Siddharth Jamliya (Super)',
-    createdAt: '2026-05-28T10:14:32.000Z',
-    updatedAt: '2026-06-10T14:22:10.000Z'
-  },
-  {
-    _id: 'c-65e236b2f6b8b9c1a5b8e902',
-    code: 'FLAT100',
-    title: 'Flat ₹100 Discount',
-    description: 'Flat ₹100 discount on a minimum cart value of ₹499.',
-    couponType: 'Flat Amount',
-    value: 100,
-    minimumOrderAmount: 499,
-    maximumDiscount: 100,
-    usageLimit: 500,
+    usageLimitTotal: 1000,
     usagePerCustomer: 1,
+    usageLimitPerUser: 1,
+    usageCount: 0,
+    revenueGenerated: 0,
     applicableOn: 'All',
     productIds: [],
     categoryIds: [],
-    regionIds: ['reg-north', 'reg-south', 'reg-west', 'reg-east'],
-    zoneIds: [],
-    territoryIds: [],
-    franchiseIds: [],
-    storeIds: [],
-    customerSegments: ['Premium Users', 'Inactive Users'],
-    customerIds: [],
-    startDate: '2026-05-15T00:00:00.000Z',
-    endDate: '2026-07-15T23:59:59.000Z',
-    status: 'active',
-    createdBy: 'Rohan Sharma (Admin)',
-    createdAt: '2026-05-14T08:12:00.000Z',
-    updatedAt: '2026-05-14T08:12:00.000Z'
-  },
-  {
-    _id: 'c-65e236b2f6b8b9c1a5b8e903',
-    code: 'BOGOPREMIUM',
-    title: 'Buy One Get One Pizza',
-    description: 'Buy one Medium Veg Pepperoni Feast and get the second Veg Pepperoni absolutely free.',
-    couponType: 'Buy One Get One',
-    value: 0,
-    minimumOrderAmount: 389,
-    maximumDiscount: 389,
-    usageLimit: 200,
-    usagePerCustomer: 2,
-    applicableOn: 'Product',
-    productIds: ['prod-pep-feast'],
-    categoryIds: [],
-    regionIds: ['reg-west'],
-    zoneIds: ['zone-mumbai', 'zone-pune'],
-    territoryIds: ['ter-bandra', 'ter-hinjewadi'],
-    franchiseIds: ['fran-west-coast', 'fran-pune-tech'],
-    storeIds: ['str-bandra-1', 'str-hinjewadi-1'],
-    customerSegments: ['New Customers', 'Premium Users', 'Inactive Users'],
-    customerIds: [],
-    startDate: '2026-06-10T12:00:00.000Z',
-    endDate: '2026-06-25T23:59:59.000Z',
-    status: 'active',
-    createdBy: 'Siddharth Jamliya (Super)',
-    createdAt: '2026-06-08T09:30:15.000Z',
-    updatedAt: '2026-06-08T09:30:15.000Z'
-  },
-  {
-    _id: 'c-65e236b2f6b8b9c1a5b8e904',
-    code: 'FREEBREAD',
-    title: 'Free Garlic Bread Promotion',
-    description: 'Get free Garlic Breadsticks on orders exceeding ₹399.',
-    couponType: 'Free Product',
-    value: 149, // Value of Garlic Breadsticks
-    minimumOrderAmount: 399,
-    maximumDiscount: 149,
-    usageLimit: 300,
-    usagePerCustomer: 1,
-    applicableOn: 'Product',
-    productIds: ['prod-garlic-bread'],
-    categoryIds: [],
-    regionIds: ['reg-east'],
-    zoneIds: ['zone-kolkata'],
-    territoryIds: ['ter-saltlake'],
-    franchiseIds: ['fran-bengal-spiceland'],
-    storeIds: ['str-saltlake-1'],
-    customerSegments: ['Premium Users'],
-    customerIds: [],
-    startDate: '2026-06-01T00:00:00.000Z',
-    endDate: '2026-06-18T18:00:00.000Z', // Just expired
-    status: 'expired',
-    createdBy: 'Deepak Sen (Promotions)',
-    createdAt: '2026-05-30T11:45:00.000Z',
-    updatedAt: '2026-06-18T18:00:00.000Z'
-  },
-  {
-    _id: 'c-65e236b2f6b8b9c1a5b8e905',
-    code: 'WELCOME150',
-    title: 'First Order Special ₹150',
-    description: 'Get ₹150 flat discount on your very first order at Papa Veg Pizza.',
-    couponType: 'Flat Amount',
-    value: 150,
-    minimumOrderAmount: 399,
-    maximumDiscount: 150,
-    usageLimit: 2500,
-    usagePerCustomer: 1,
-    applicableOn: 'All',
-    productIds: [],
-    categoryIds: [],
-    regionIds: ['reg-north', 'reg-south', 'reg-west', 'reg-east'],
+    regionIds: [],
     zoneIds: [],
     territoryIds: [],
     franchiseIds: [],
@@ -226,78 +121,181 @@ export const initialCoupons = [
     startDate: '2026-01-01T00:00:00.000Z',
     endDate: '2026-12-31T23:59:59.000Z',
     status: 'active',
-    createdBy: 'Siddharth Jamliya (Super)',
-    createdAt: '2025-12-30T17:15:00.000Z',
+    isActive: true,
+    showOnHome: true,
+    createdBy: 'Super Admin',
+    createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z'
   },
   {
-    _id: 'c-65e236b2f6b8b9c1a5b8e906',
-    code: 'TESTDISABLE',
-    title: 'Temporary Disabled Offer',
-    description: 'This offer is temporarily suspended for maintenance.',
-    couponType: 'Percentage',
-    value: 15,
-    minimumOrderAmount: 199,
-    maximumDiscount: 50,
-    usageLimit: 100,
-    usagePerCustomer: 1,
+    _id: 'coupon-seed-002',
+    code: 'PAPAVEG100',
+    title: 'Flat ₹100 Off - Delhi Special',
+    description: 'Flat ₹100 off on delicious pizzas across Delhi branches on orders above ₹499',
+    couponType: 'Flat Amount',
+    value: 100,
+    discountValue: 100,
+    minimumOrderAmount: 499,
+    maximumDiscount: 100,
+    maxDiscount: 100,
+    usageLimit: 500,
+    usageLimitTotal: 500,
+    usagePerCustomer: 2,
+    usageLimitPerUser: 2,
+    usageCount: 0,
+    revenueGenerated: 0,
     applicableOn: 'All',
     productIds: [],
     categoryIds: [],
-    regionIds: ['reg-north'],
+    regionIds: ['6a48d7b89d94a658760493ba'],
+    zoneIds: ['6a48e8179d94a658760495c6'],
+    territoryIds: ['6a48f75f9d94a65876049aaf'],
+    franchiseIds: ['6a48f8179d94a65876049b75'],
+    storeIds: ['6aab7536c8d0f85c32b340f8'],
+    customerSegments: ['All Customers'],
+    customerIds: [],
+    startDate: '2026-02-01T00:00:00.000Z',
+    endDate: '2026-11-30T23:59:59.000Z',
+    status: 'active',
+    isActive: true,
+    showOnHome: true,
+    createdBy: 'Super Admin',
+    createdAt: '2026-02-01T00:00:00.000Z',
+    updatedAt: '2026-02-01T00:00:00.000Z'
+  },
+  {
+    _id: 'coupon-seed-003',
+    code: 'BOGOMANIA',
+    title: 'Buy 1 Get 1 Free Pizza',
+    description: 'Buy one medium pizza and get another pizza free of equal or lesser value',
+    couponType: 'Buy One Get One',
+    value: 0,
+    discountValue: 0,
+    minimumOrderAmount: 399,
+    maximumDiscount: 350,
+    maxDiscount: 350,
+    usageLimit: 300,
+    usageLimitTotal: 300,
+    usagePerCustomer: 2,
+    usageLimitPerUser: 2,
+    usageCount: 0,
+    revenueGenerated: 0,
+    applicableOn: 'Category',
+    productIds: [],
+    categoryIds: ['cat-pizza-classic', 'cat-pizza-premium'],
+    regionIds: ['6a48d4fd9d94a65876049371', '6a48d7b89d94a658760493ba'],
+    zoneIds: ['6a48e7199d94a658760495c0', '6a48e8179d94a658760495c6'],
+    territoryIds: ['6a48f2299d94a658760499c6', '6a48f75f9d94a65876049aaf'],
+    franchiseIds: ['6a48f8179d94a65876049b75'],
+    storeIds: ['6aab7536c8d0f85c32b340f8'],
+    customerSegments: ['All Customers'],
+    customerIds: [],
+    startDate: '2026-03-01T00:00:00.000Z',
+    endDate: '2026-10-31T23:59:59.000Z',
+    status: 'active',
+    isActive: true,
+    showOnHome: false,
+    createdBy: 'Super Admin',
+    createdAt: '2026-03-01T00:00:00.000Z',
+    updatedAt: '2026-03-01T00:00:00.000Z'
+  },
+  {
+    _id: 'coupon-seed-004',
+    code: 'FREEBREAD',
+    title: 'Free Stuffed Garlic Bread',
+    description: 'Complimentary freshly baked Stuffed Garlic Breadsticks on orders above ₹349',
+    couponType: 'Free Product',
+    value: 149,
+    discountValue: 149,
+    minimumOrderAmount: 349,
+    maximumDiscount: 149,
+    maxDiscount: 149,
+    usageLimit: 400,
+    usageLimitTotal: 400,
+    usagePerCustomer: 3,
+    usageLimitPerUser: 3,
+    usageCount: 0,
+    revenueGenerated: 0,
+    applicableOn: 'Product',
+    productIds: ['prod-garlic-bread'],
+    categoryIds: [],
+    regionIds: ['6a48d7b89d94a658760493ba'],
+    zoneIds: ['6a48e8179d94a658760495c6'],
+    territoryIds: ['6a48f75f9d94a65876049aaf'],
+    franchiseIds: ['6a48f8179d94a65876049b75'],
+    storeIds: ['6aab7536c8d0f85c32b340f8'],
+    customerSegments: ['All Customers'],
+    customerIds: [],
+    startDate: '2026-01-15T00:00:00.000Z',
+    endDate: '2026-09-30T23:59:59.000Z',
+    status: 'active',
+    isActive: true,
+    showOnHome: false,
+    createdBy: 'Super Admin',
+    createdAt: '2026-01-15T00:00:00.000Z',
+    updatedAt: '2026-01-15T00:00:00.000Z'
+  },
+  {
+    _id: 'coupon-seed-005',
+    code: 'WEEKEND20',
+    title: 'Weekend Feast 20% Off',
+    description: 'Enjoy 20% discount up to ₹100 on weekend orders across all outlets',
+    couponType: 'Percentage',
+    value: 20,
+    discountValue: 20,
+    minimumOrderAmount: 299,
+    maximumDiscount: 100,
+    maxDiscount: 100,
+    usageLimit: 1500,
+    usageLimitTotal: 1500,
+    usagePerCustomer: 5,
+    usageLimitPerUser: 5,
+    usageCount: 0,
+    revenueGenerated: 0,
+    applicableOn: 'All',
+    productIds: [],
+    categoryIds: [],
+    regionIds: [],
     zoneIds: [],
     territoryIds: [],
     franchiseIds: [],
     storeIds: [],
-    customerSegments: ['Premium Users', 'Inactive Users'],
+    customerSegments: ['All Customers'],
     customerIds: [],
-    startDate: '2026-06-01T00:00:00.000Z',
-    endDate: '2026-07-31T23:59:59.000Z',
-    status: 'disabled',
-    createdBy: 'Rohan Sharma (Admin)',
-    createdAt: '2026-05-29T10:00:00.000Z',
-    updatedAt: '2026-06-15T09:00:00.000Z'
+    startDate: '2026-01-01T00:00:00.000Z',
+    endDate: '2026-12-31T23:59:59.000Z',
+    status: 'active',
+    isActive: true,
+    showOnHome: true,
+    createdBy: 'Super Admin',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z'
   }
 ];
 
-export const initialCouponUsages = [
-  // Usages for PIZZA50
-  { _id: 'u-001', couponId: 'c-65e236b2f6b8b9c1a5b8e901', customerId: 'cust-101', customerName: 'Aarav Mehta', orderId: 'PVP-ORD-20412', orderAmount: 580, discountAmount: 150, usedAt: '2026-06-18T14:20:00.000Z', storeId: 'str-cp-1', regionId: 'reg-north' },
-  { _id: 'u-002', couponId: 'c-65e236b2f6b8b9c1a5b8e901', customerId: 'cust-102', customerName: 'Riya Sen', orderId: 'PVP-ORD-20419', orderAmount: 320, discountAmount: 150, usedAt: '2026-06-18T15:10:00.000Z', storeId: 'str-dwarka-1', regionId: 'reg-north' },
-  { _id: 'u-003', couponId: 'c-65e236b2f6b8b9c1a5b8e901', customerId: 'cust-103', customerName: 'Vikram Aditya', orderId: 'PVP-ORD-20422', orderAmount: 480, discountAmount: 150, usedAt: '2026-06-17T11:05:00.000Z', storeId: 'str-indiranagar-1', regionId: 'reg-south' },
-  { _id: 'u-004', couponId: 'c-65e236b2f6b8b9c1a5b8e901', customerId: 'cust-106', customerName: 'Diya Sharma', orderId: 'PVP-ORD-20435', orderAmount: 380, discountAmount: 150, usedAt: '2026-06-16T19:45:00.000Z', storeId: 'str-noida-62', regionId: 'reg-north' },
-  
-  // Usages for FLAT100
-  { _id: 'u-005', couponId: 'c-65e236b2f6b8b9c1a5b8e902', customerId: 'cust-103', customerName: 'Vikram Aditya', orderId: 'PVP-ORD-20401', orderAmount: 650, discountAmount: 100, usedAt: '2026-06-17T21:30:00.000Z', storeId: 'str-indiranagar-1', regionId: 'reg-south' },
-  { _id: 'u-006', couponId: 'c-65e236b2f6b8b9c1a5b8e902', customerId: 'cust-104', customerName: 'Ananya Iyer', orderId: 'PVP-ORD-20410', orderAmount: 510, discountAmount: 100, usedAt: '2026-06-16T13:12:00.000Z', storeId: 'str-koramangala-1', regionId: 'reg-south' },
-  { _id: 'u-007', couponId: 'c-65e236b2f6b8b9c1a5b8e902', customerId: 'cust-107', customerName: 'Rahul Dravid', orderId: 'PVP-ORD-20399', orderAmount: 800, discountAmount: 100, usedAt: '2026-06-15T20:15:00.000Z', storeId: 'str-cp-1', regionId: 'reg-north' },
-
-  // Usages for BOGOPREMIUM
-  { _id: 'u-008', couponId: 'c-65e236b2f6b8b9c1a5b8e903', customerId: 'cust-101', customerName: 'Aarav Mehta', orderId: 'PVP-ORD-20425', orderAmount: 778, discountAmount: 389, usedAt: '2026-06-18T10:15:00.000Z', storeId: 'str-bandra-1', regionId: 'reg-west' },
-  { _id: 'u-009', couponId: 'c-65e236b2f6b8b9c1a5b8e903', customerId: 'cust-106', customerName: 'Diya Sharma', orderId: 'PVP-ORD-20430', orderAmount: 820, discountAmount: 389, usedAt: '2026-06-17T17:50:00.000Z', storeId: 'str-hinjewadi-1', regionId: 'reg-west' },
-
-  // Usages for FREEBREAD
-  { _id: 'u-010', couponId: 'c-65e236b2f6b8b9c1a5b8e904', customerId: 'cust-102', customerName: 'Riya Sen', orderId: 'PVP-ORD-20381', orderAmount: 420, discountAmount: 149, usedAt: '2026-06-12T19:30:00.000Z', storeId: 'str-saltlake-1', regionId: 'reg-east' },
-
-  // Usages for WELCOME150
-  { _id: 'u-011', couponId: 'c-65e236b2f6b8b9c1a5b8e905', customerId: 'cust-105', customerName: 'Kabir Kapoor', orderId: 'PVP-ORD-20405', orderAmount: 450, discountAmount: 150, usedAt: '2026-06-18T09:00:00.000Z', storeId: 'str-saltlake-1', regionId: 'reg-east' },
-  { _id: 'u-012', couponId: 'c-65e236b2f6b8b9c1a5b8e905', customerId: 'cust-102', customerName: 'Riya Sen', orderId: 'PVP-ORD-20202', orderAmount: 410, discountAmount: 150, usedAt: '2026-05-18T18:40:00.000Z', storeId: 'str-cp-1', regionId: 'reg-north' }
-];
+export const initialCouponUsages = [];
 
 // ==========================================
 // 2. MOCK REST API CONTROLLERS
 // ==========================================
 
-const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
 export const getStoredCoupons = () => {
-  const data = localStorage.getItem('pvp_coupons');
-  if (!data) {
-    localStorage.setItem('pvp_coupons', JSON.stringify(initialCoupons));
-    return initialCoupons;
-  }
   try {
-    return JSON.parse(data);
+    const data = localStorage.getItem('pvp_coupons');
+    if (!data) {
+      localStorage.setItem('pvp_coupons', JSON.stringify(initialCoupons));
+      return initialCoupons;
+    }
+    const parsed = JSON.parse(data);
+    // If cache has stale mock codes or non-zero mock usages, reset to clean seed
+    const hasStale = Array.isArray(parsed) && parsed.some(c => 
+      c.code === 'PIZZA50' || c.code === 'TESTDISABLE' || c._id?.startsWith('c-65e') || (c.usageCount && c.usageCount > 0)
+    );
+    if (hasStale || !Array.isArray(parsed) || parsed.length === 0) {
+      localStorage.setItem('pvp_coupons', JSON.stringify(initialCoupons));
+      return initialCoupons;
+    }
+    return parsed;
   } catch (e) {
     return initialCoupons;
   }
@@ -313,15 +311,15 @@ let couponsDatabase = getStoredCoupons();
 let usagesDatabase = [...initialCouponUsages];
 
 // Helper to calculate usage statistics
-export const getAggregateStats = () => {
-  couponsDatabase = getStoredCoupons();
-  const activeCount = couponsDatabase.filter(c => c.status === 'active' && new Date(c.endDate) > new Date()).length;
-  const expiredCount = couponsDatabase.filter(c => c.status === 'expired' || new Date(c.endDate) <= new Date()).length;
-  const disabledCount = couponsDatabase.filter(c => c.status === 'disabled').length;
+export const getAggregateStats = (couponsList) => {
+  const coupons = couponsList && couponsList.length > 0 ? couponsList : getStoredCoupons();
+  const activeCount = coupons.filter(c => (c.status === 'active' || c.isActive) && new Date(c.endDate) > new Date()).length;
+  const expiredCount = coupons.filter(c => c.status === 'expired' || new Date(c.endDate) <= new Date()).length;
+  const disabledCount = coupons.filter(c => c.status === 'disabled' || c.isActive === false).length;
   
-  const totalUsages = usagesDatabase.length;
-  const totalDiscountGiven = usagesDatabase.reduce((sum, u) => sum + u.discountAmount, 0);
-  const totalRevenueGenerated = usagesDatabase.reduce((sum, u) => sum + u.orderAmount, 0);
+  const totalUsages = coupons.reduce((sum, c) => sum + (c.usageCount || 0), 0);
+  const totalDiscountGiven = coupons.reduce((sum, c) => sum + ((c.usageCount || 0) * (c.value || c.discountValue || 0)), 0);
+  const totalRevenueGenerated = coupons.reduce((sum, c) => sum + (c.revenueGenerated || 0), 0);
   const averageDiscount = totalUsages > 0 ? Math.round(totalDiscountGiven / totalUsages) : 0;
 
   return {
@@ -335,288 +333,95 @@ export const getAggregateStats = () => {
 };
 
 export const api = {
-  // GET /coupons
-  getCoupons: async (filters = {}, sorting = {}, pagination = {}) => {
-    await wait(600); // simulate network latency
-    
-    // Check error testing state
-    if (filters.triggerError) {
-      throw new Error('API request failed due to connection timeout. Database query failed.');
-    }
-
-    couponsDatabase = getStoredCoupons();
-    let result = [...couponsDatabase];
-
-    // Filter by code / search
-    if (filters.search) {
-      const q = filters.search.toLowerCase();
-      result = result.filter(c => 
-        c.code.toLowerCase().includes(q) || 
-        c.title.toLowerCase().includes(q) ||
-        (c.description && c.description.toLowerCase().includes(q))
-      );
-    }
-
-    // Filter by type
-    if (filters.type && filters.type !== 'Any Type' && filters.type !== 'All') {
-      result = result.filter(c => c.couponType === filters.type);
-    }
-
-    // Filter by status
-    if (filters.status && filters.status !== 'All Statuses' && filters.status !== 'All') {
-      const now = new Date();
-      result = result.filter(c => {
-        if (filters.status.toLowerCase() === 'active') {
-          return c.status === 'active' && new Date(c.endDate) > now;
-        }
-        if (filters.status.toLowerCase() === 'expired') {
-          return c.status === 'expired' || new Date(c.endDate) <= now;
-        }
-        if (filters.status.toLowerCase() === 'disabled') {
-          return c.status === 'disabled';
-        }
-        return c.status === filters.status.toLowerCase();
+  getCoupons: async (filters = {}, sorting = {}, pagination = { page: 1, pageSize: 10 }) => {
+    try {
+      const res = await adminClient.get('/settings/coupons');
+      let items = res.data?.data || [];
+      
+      const processed = items.map(c => {
+        const isExpired = new Date(c.endDate) < new Date();
+        const usageCount = c.usageCount || 0;
+        const revenueGenerated = c.revenueGenerated || 0;
+        return {
+          ...c,
+          usageCount,
+          revenueGenerated,
+          status: !c.isActive ? 'disabled' : (isExpired ? 'expired' : (c.status || 'active'))
+        };
       });
-    }
 
-    // Filter by Date Range
-    if (filters.startDate) {
-      const start = new Date(filters.startDate);
-      result = result.filter(c => new Date(c.startDate) >= start);
-    }
-    if (filters.endDate) {
-      const end = new Date(filters.endDate);
-      result = result.filter(c => new Date(c.endDate) <= end);
-    }
+      // Update localStorage cache
+      localStorage.setItem('pvp_coupons', JSON.stringify(processed));
 
-    // Filter by Region
-    if (filters.regionIds && filters.regionIds.length > 0) {
-      result = result.filter(c => 
-        c.regionIds.some(id => filters.regionIds.includes(id)) || c.regionIds.length === 0
-      );
-    }
-
-    // Filter by Zone
-    if (filters.zoneIds && filters.zoneIds.length > 0) {
-      result = result.filter(c => 
-        c.zoneIds.some(id => filters.zoneIds.includes(id)) || c.zoneIds.length === 0
-      );
-    }
-
-    // Filter by Territory
-    if (filters.territoryIds && filters.territoryIds.length > 0) {
-      result = result.filter(c => 
-        c.territoryIds.some(id => filters.territoryIds.includes(id)) || c.territoryIds.length === 0
-      );
-    }
-
-    // Filter by Franchise
-    if (filters.franchiseIds && filters.franchiseIds.length > 0) {
-      result = result.filter(c => 
-        c.franchiseIds.some(id => filters.franchiseIds.includes(id)) || c.franchiseIds.length === 0
-      );
-    }
-
-    // Filter by Store
-    if (filters.storeIds && filters.storeIds.length > 0) {
-      result = result.filter(c => 
-        c.storeIds.some(id => filters.storeIds.includes(id)) || c.storeIds.length === 0
-      );
-    }
-
-    // Filter by Customer Segment
-    if (filters.customerSegments && filters.customerSegments.length > 0) {
-      result = result.filter(c => 
-        c.customerSegments.some(seg => filters.customerSegments.includes(seg)) || c.customerSegments.length === 0
-      );
-    }
-
-    // Calculate dynamic usage/revenue stats per coupon
-    result = result.map(c => {
-      const couponUsages = usagesDatabase.filter(u => u.couponId === c._id);
-      const usageCount = couponUsages.length;
-      const revenueGenerated = couponUsages.reduce((sum, u) => sum + u.orderAmount, 0);
-      return {
-        ...c,
-        usageCount,
-        revenueGenerated
+      return { 
+        data: processed, 
+        totalCount: processed.length, 
+        totalPages: Math.max(1, Math.ceil(processed.length / (pagination?.pageSize || 10))) 
       };
-    });
-
-    // Apply Sorting
-    if (sorting.field) {
-      const field = sorting.field;
-      const desc = sorting.direction === 'desc';
-      result.sort((a, b) => {
-        let valA = a[field];
-        let valB = b[field];
-        
-        // Handle dates
-        if (field === 'startDate' || field === 'endDate' || field === 'createdAt' || field === 'updatedAt') {
-          valA = new Date(valA || 0).getTime();
-          valB = new Date(valB || 0).getTime();
-        }
-
-        if (valA === undefined || valA === null) return desc ? 1 : -1;
-        if (valB === undefined || valB === null) return desc ? -1 : 1;
-
-        if (typeof valA === 'string') {
-          return desc 
-            ? valB.localeCompare(valA)
-            : valA.localeCompare(valB);
-        }
-        return desc ? valB - valA : valA - valB;
-      });
+    } catch (e) {
+      console.warn("Falling back to cached coupons:", e);
+      const local = getStoredCoupons();
+      return {
+        data: local,
+        totalCount: local.length,
+        totalPages: Math.max(1, Math.ceil(local.length / (pagination?.pageSize || 10)))
+      };
     }
-
-    // Pagination
-    const totalCount = result.length;
-    const page = pagination.page || 1;
-    const limit = pagination.limit || 5;
-    const startIndex = (page - 1) * limit;
-    const paginatedResult = result.slice(startIndex, startIndex + limit);
-
-    return {
-      data: paginatedResult,
-      totalCount,
-      page,
-      limit,
-      totalPages: Math.ceil(totalCount / limit)
-    };
   },
-
-  // POST /coupons
-  createCoupon: async (couponData) => {
-    await wait(800);
-    couponsDatabase = getStoredCoupons();
-    const newCoupon = {
-      ...couponData,
-      _id: 'c-' + Math.random().toString(36).substr(2, 9),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      createdBy: 'Siddharth Jamliya (Super)',
-      productIds: couponData.productIds || [],
-      categoryIds: couponData.categoryIds || [],
-      regionIds: couponData.regionIds || [],
-      zoneIds: couponData.zoneIds || [],
-      territoryIds: couponData.territoryIds || [],
-      franchiseIds: couponData.franchiseIds || [],
-      storeIds: couponData.storeIds || [],
-      customerSegments: couponData.customerSegments || [],
-      customerIds: couponData.customerIds || []
-    };
-    couponsDatabase.unshift(newCoupon);
-    saveStoredCoupons(couponsDatabase);
-    return newCoupon;
-  },
-
-  // PUT /coupons/:id
-  updateCoupon: async (id, updatedFields) => {
-    await wait(800);
-    couponsDatabase = getStoredCoupons();
-    const index = couponsDatabase.findIndex(c => c._id === id);
-    if (index === -1) {
-      throw new Error(`Coupon with ID ${id} not found`);
+  getCouponAnalytics: async () => {
+    try {
+      const res = await adminClient.get('/settings/coupons/analytics');
+      return res.data?.data || res.data;
+    } catch (e) {
+      console.warn("Analytics API fallback:", e);
+      const coupons = getStoredCoupons();
+      const stats = getAggregateStats(coupons);
+      return {
+        totalUses: stats.totalRedemptions,
+        revenue: stats.revenueGenerated,
+        discountGiven: 0,
+        aov: 0,
+        activeCoupons: stats.activeCoupons,
+        expiredCoupons: stats.expiredCoupons,
+        disabledCoupons: stats.disabledCoupons,
+        dailyUsage: [
+          { day: 'Mon', height: 0, uses: 0 },
+          { day: 'Tue', height: 0, uses: 0 },
+          { day: 'Wed', height: 0, uses: 0 },
+          { day: 'Thu', height: 0, uses: 0 },
+          { day: 'Fri', height: 0, uses: 0 },
+          { day: 'Sat', height: 0, uses: 0 },
+          { day: 'Sun', height: 0, uses: 0 }
+        ],
+        recentUsageHistory: []
+      };
     }
-    
-    couponsDatabase[index] = {
-      ...couponsDatabase[index],
-      ...updatedFields,
-      updatedAt: new Date().toISOString()
-    };
-    saveStoredCoupons(couponsDatabase);
-    return couponsDatabase[index];
   },
-
-  // DELETE /coupons/:id
+  getCouponById: async (id) => {
+    const res = await adminClient.get(`/settings/coupons/${id}`);
+    return res.data.data;
+  },
+  createCoupon: async (payload) => {
+    const res = await adminClient.post('/settings/coupons', payload);
+    return res.data.data;
+  },
+  updateCoupon: async (id, payload) => {
+    const res = await adminClient.put(`/settings/coupons/${id}`, payload);
+    return res.data.data;
+  },
   deleteCoupon: async (id) => {
-    await wait(600);
-    couponsDatabase = getStoredCoupons();
-    const index = couponsDatabase.findIndex(c => c._id === id);
-    if (index === -1) {
-      throw new Error(`Coupon with ID ${id} not found`);
-    }
-    const deleted = couponsDatabase[index];
-    couponsDatabase.splice(index, 1);
-    saveStoredCoupons(couponsDatabase);
-    
-    // Also cleanup usages
-    usagesDatabase = usagesDatabase.filter(u => u.couponId !== id);
-    return deleted;
+    await adminClient.delete(`/settings/coupons/${id}`);
+    return true;
   },
-
-  // GET /coupon-usages
-  getCouponUsages: async (couponId, pagination = {}) => {
-    await wait(400);
-    const filteredUsages = usagesDatabase.filter(u => u.couponId === couponId);
-    
-    const page = pagination.page || 1;
-    const limit = pagination.limit || 5;
-    const startIndex = (page - 1) * limit;
-    const paginated = filteredUsages.slice(startIndex, startIndex + limit);
-
-    return {
-      data: paginated,
-      totalCount: filteredUsages.length,
-      page,
-      limit,
-      totalPages: Math.ceil(filteredUsages.length / limit)
-    };
-  },
-
-  // POST /coupons/validate
-  validateCoupon: async (code, customerId, storeId, orderAmount) => {
-    await wait(500);
-    const coupon = couponsDatabase.find(c => c.code.toUpperCase() === code.toUpperCase());
-    if (!coupon) {
-      return { valid: false, message: 'Invalid coupon code.' };
-    }
-    if (coupon.status !== 'active') {
-      return { valid: false, message: 'Coupon is not active.' };
-    }
-    if (new Date(coupon.endDate) < new Date()) {
-      return { valid: false, message: 'Coupon has expired.' };
-    }
-    if (orderAmount < coupon.minimumOrderAmount) {
-      return { valid: false, message: `Minimum order value required is ₹${coupon.minimumOrderAmount}.` };
-    }
-
-    // Check usage limits
-    const usagesForThisCoupon = usagesDatabase.filter(u => u.couponId === coupon._id);
-    if (usagesForThisCoupon.length >= coupon.usageLimit) {
-      return { valid: false, message: 'Coupon maximum usage limit reached.' };
-    }
-
-    // Check user limits
-    const userUsages = usagesForThisCoupon.filter(u => u.customerId === customerId);
-    if (userUsages.length >= coupon.usagePerCustomer) {
-      return { valid: false, message: 'You have reached the maximum redemptions limit for this coupon.' };
-    }
-
-    // Check location eligibility
-    if (coupon.storeIds.length > 0 && !coupon.storeIds.includes(storeId)) {
-      return { valid: false, message: 'Coupon is not applicable at this store location.' };
-    }
-
-    // Valid
-    let discountAmount = 0;
-    if (coupon.couponType === 'Percentage') {
-      discountAmount = Math.min((orderAmount * coupon.value) / 100, coupon.maximumDiscount);
-    } else if (coupon.couponType === 'Flat Amount') {
-      discountAmount = Math.min(coupon.value, coupon.maximumDiscount);
-    } else {
-      discountAmount = coupon.value || 0; // standard value
-    }
-
-    return {
-      valid: true,
-      coupon,
-      discountAmount,
-      message: 'Coupon code applied successfully!'
-    };
+  toggleCouponStatus: async (id, isActive) => {
+    const res = await adminClient.put(`/settings/coupons/${id}`, { isActive });
+    return res.data.data;
   }
 };
 
+// Removed mock ledger logic
+
+// ==========================================
 // ==========================================
 // 3. DEBOUNCE HOOK & COMPATIBILITY VIEWS
 // ==========================================

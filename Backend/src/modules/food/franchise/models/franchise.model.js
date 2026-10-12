@@ -94,8 +94,7 @@ const franchiseSchema = new mongoose.Schema(
         ownerUserId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
-            default: null,
-            index: true
+            default: null
         },
         // References the Super Admin User who created this franchise record.
         // Changed from FoodAdmin ref to User ref — single source of identity.

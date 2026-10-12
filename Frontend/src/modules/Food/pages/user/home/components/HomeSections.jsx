@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
-// ── Compact Deal Card (2 cards visible, rest scroll) ────────────────────────
-function DealCard({ deal, onClaimDeal, isDarkMode }) {
+// ── Compact Offer Card (2 cards visible, rest scroll) ────────────────────────
+function OfferCard({ offer, onClaimOffer, isDarkMode }) {
   const cardBg     = isDarkMode ? '#1c1c1c' : '#ffffff';
   const titleColor = isDarkMode ? '#f5f5f5' : '#1a1a1a';
   const descColor  = isDarkMode ? 'rgba(255,255,255,0.55)' : 'var(--muted-gray)';
@@ -27,10 +27,10 @@ function DealCard({ deal, onClaimDeal, isDarkMode }) {
     >
       {/* Image area */}
       <div style={{ position: 'relative', height: 130, background: '#34373C' }}>
-        {deal.image && (
+        {offer.image && (
           <img
-            src={deal.image}
-            alt={deal.title}
+            src={offer.image}
+            alt={offer.title}
             style={{ 
               width: '100%', 
               height: '100%', 
@@ -47,7 +47,7 @@ function DealCard({ deal, onClaimDeal, isDarkMode }) {
           }}
         />
         {/* Badge */}
-        {deal.badge && (
+        {offer.badge && (
           <div
             style={{
               position: 'absolute', top: 10, left: 10,
@@ -71,7 +71,7 @@ function DealCard({ deal, onClaimDeal, isDarkMode }) {
             >
               local_fire_department
             </span>
-            {deal.badge}
+            {offer.badge}
           </div>
         )}
         {/* Wave separator */}
@@ -100,7 +100,7 @@ function DealCard({ deal, onClaimDeal, isDarkMode }) {
             overflow: 'hidden'
           }}
         >
-          {deal.title}
+          {offer.title}
         </h4>
 
         {/* Description — uniform 2-line height */}
@@ -118,7 +118,7 @@ function DealCard({ deal, onClaimDeal, isDarkMode }) {
             overflow: 'hidden'
           }}
         >
-          {deal.description}
+          {offer.description}
         </p>
 
         {/* Bottom container pinned to bottom with marginTop: auto */}
@@ -148,7 +148,7 @@ function DealCard({ deal, onClaimDeal, isDarkMode }) {
               </div>
               <div>
                 <p style={{ fontSize: 8.5, color: descColor, fontFamily: 'Poppins,sans-serif', margin: 0, lineHeight: 1 }}>Size</p>
-                <p style={{ fontSize: 10, color: titleColor, fontWeight: 600, fontFamily: 'Poppins,sans-serif', margin: 0, lineHeight: 1.2 }}>{deal.size || 'Medium'}</p>
+                <p style={{ fontSize: 10, color: titleColor, fontWeight: 600, fontFamily: 'Poppins,sans-serif', margin: 0, lineHeight: 1.2 }}>{offer.size || 'Medium'}</p>
               </div>
             </div>
 
@@ -165,9 +165,9 @@ function DealCard({ deal, onClaimDeal, isDarkMode }) {
             </div>
           </div>
 
-          {/* Claim Deal button */}
+          {/* Claim Offer button */}
           <button
-            onClick={() => onClaimDeal(deal)}
+            onClick={() => onClaimOffer(offer)}
             style={{
               width: '100%',
               height: 36,
@@ -190,7 +190,7 @@ function DealCard({ deal, onClaimDeal, isDarkMode }) {
             onMouseEnter={e => e.currentTarget.style.opacity = '0.88'}
             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
-            Claim Deal
+            Claim Offer
             <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#fff' }}>
               arrow_forward
             </span>
@@ -201,164 +201,12 @@ function DealCard({ deal, onClaimDeal, isDarkMode }) {
   );
 }
 
-// ── Meal For One Card ─────────────────────────────────────────────────────────
-function MealForOneCard({ meal, isDarkMode, checkLocation, addToCart, triggerToast }) {
-  const [quantity, setQuantity] = useState(0);
 
-  const handleAdd = () => {
-    checkLocation(() => {
-      setQuantity(1);
-      addToCart(meal.id);
-      triggerToast('Meal added!');
-    });
-  };
-
-  const handleIncrement = () => {
-    setQuantity(prev => prev + 1);
-    addToCart(meal.id);
-  };
-
-  const handleDecrement = () => {
-    setQuantity(prev => Math.max(0, prev - 1));
-  };
-
-  const cardBg = isDarkMode ? '#1c1c1c' : '#ffffff';
-  const titleColor = isDarkMode ? '#f5f5f5' : '#1a1a1a';
-  const descColor = isDarkMode ? 'rgba(255,255,255,0.55)' : 'var(--muted-gray)';
-  
-  return (
-    <div
-      style={{
-        flex: '0 0 calc(75vw - 20px)',
-        maxWidth: 260,
-        background: cardBg,
-        borderRadius: 20,
-        overflow: 'hidden',
-        boxShadow: isDarkMode
-          ? '0 6px 20px rgba(0,0,0,0.4)'
-          : '0 4px 16px rgba(0,0,0,0.06)',
-        border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'}`,
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
-        transition: 'transform 0.2s ease'
-      }}
-    >
-      {/* Image area */}
-      <div style={{ position: 'relative', height: 150, background: isDarkMode ? '#2a2a2a' : '#f8f8f8', overflow: 'hidden' }}>
-        <img
-          src={meal.image}
-          alt={meal.title}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.3s ease' }}
-          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-        />
-        {/* Gradient Overlay for subtle premium feel */}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 40%)' }} />
-        
-        {/* Veg Indicator */}
-        {meal.isVeg && (
-          <div style={{ position: 'absolute', top: 12, left: 12, background: '#fff', borderRadius: 4, padding: 2, display: 'flex' }}>
-            <div style={{ width: 12, height: 12, border: '1px solid #1E7D32', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 2 }}>
-              <div style={{ width: 6, height: 6, background: '#1E7D32', borderRadius: '50%' }} />
-            </div>
-          </div>
-        )}
-
-        {/* Discount Badge */}
-        {meal.discountBadge && (
-          <div
-            style={{
-              position: 'absolute', top: 12, right: 12,
-              background: 'var(--accent-red)', color: '#fff',
-              fontSize: 10, fontWeight: 700, fontFamily: 'Poppins,sans-serif',
-              padding: '4px 8px', borderRadius: 8,
-              boxShadow: '0 2px 8px rgba(229, 57, 53, 0.4)'
-            }}
-          >
-            {meal.discountBadge}
-          </div>
-        )}
-      </div>
-
-      {/* Content area */}
-      <div style={{ padding: '14px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <h4 style={{ fontSize: 15, fontWeight: 700, color: titleColor, margin: '0 0 4px 0', fontFamily: 'Inter, sans-serif' }}>
-          {meal.title}
-        </h4>
-        <p style={{ fontSize: 12, color: descColor, margin: 0, fontFamily: 'Inter, sans-serif', lineHeight: 1.4, flex: 1 }}>
-          {meal.description}
-        </p>
-        
-        {/* Bottom row: Price & Button */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {meal.originalPrice && (
-              <span style={{ fontSize: 11, color: descColor, textDecoration: 'line-through', marginBottom: -2 }}>
-                ₹{meal.originalPrice}
-              </span>
-            )}
-            <span style={{ fontSize: 16, fontWeight: 800, color: titleColor, fontFamily: 'Inter, sans-serif' }}>
-              ₹{meal.price}
-            </span>
-          </div>
-
-          <div style={{ minWidth: 80, display: 'flex', justifyContent: 'flex-end' }}>
-            <AnimatePresence mode="wait">
-              {quantity === 0 ? (
-                <motion.button
-                  key="add"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  onClick={handleAdd}
-                  style={{
-                    height: 32, padding: '0 16px',
-                    background: 'rgba(229, 57, 53, 0.1)',
-                    color: 'var(--accent-red)', border: '1px solid var(--accent-red)',
-                    borderRadius: 8, fontSize: 12, fontWeight: 700,
-                    fontFamily: 'Inter, sans-serif', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: 4
-                  }}
-                >
-                  + Add
-                </motion.button>
-              ) : (
-                <motion.div
-                  key="controls"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  style={{
-                    height: 32, padding: '0 8px',
-                    background: 'var(--accent-red)',
-                    borderRadius: 8, display: 'flex', alignItems: 'center', gap: 12,
-                    boxShadow: '0 2px 8px rgba(229, 57, 53, 0.3)'
-                  }}
-                >
-                  <button onClick={handleDecrement} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 16, cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center' }}>
-                    &minus;
-                  </button>
-                  <span style={{ color: '#fff', fontSize: 13, fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>
-                    {quantity}
-                  </span>
-                  <button onClick={handleIncrement} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 16, cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center' }}>
-                    +
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 
 // ── Main Export ──────────────────────────────────────────────────────────────
 export function HomeSections({
-  deals,
+  offers,
   categories,
   sections,
   products,
@@ -369,213 +217,28 @@ export function HomeSections({
   triggerToast,
   toggleFavorite,
   addToCart,
-  dealsRef
+  offersRef
 }) {
   const navigate = useNavigate();
 
-  const handleClaimDeal = (deal) => {
+  const handleClaimOffer = (offer) => {
     checkLocation(() => {
-      navigate('/user/deals');
-      triggerToast(`Claiming: ${deal.title}`);
+      navigate('/user/offers');
+      triggerToast(`Claiming: ${offer.title}`);
     });
   };
 
   return (
     <>
-      {/* ── Hot Deals Section ─────────────────────────────────────────── */}
-      <section>
-        {/* Header row — items-center shifts View Deals button upward */}
-        <div className="px-margin-mobile flex justify-between items-center" style={{ marginBottom: 6 }}>
-          <div>
-            <h3
-              className="font-headline-lg-mobile"
-              style={{ color: isDarkMode ? '#fff' : 'var(--primary-gray)', margin: 0 }}
-            >
-              Hot Deals
-            </h3>
-            {/* Tagline */}
-            <p
-              style={{
-                fontSize: 11,
-                color: 'var(--muted-gray)',
-                fontFamily: 'Poppins,sans-serif',
-                margin: '2px 0 0',
-                fontStyle: 'italic'
-              }}
-            >
-              Great taste. Better value.
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              checkLocation(() => {
-                navigate('/user/deals');
-                triggerToast('Opening hot deals...');
-              });
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              outline: 'none',
-              color: 'var(--accent-red)',
-              fontSize: 12,
-              fontWeight: 600,
-              fontFamily: 'Poppins,sans-serif',
-              cursor: 'pointer',
-              padding: 0
-            }}
-          >
-            View Deals
-          </button>
-        </div>
 
-        {/* Scrollable deal cards — 2 visible at once */}
-        <div
-          ref={dealsRef}
-          className="hide-scrollbar"
-          style={{
-            display: 'flex',
-            gap: 12,
-            overflowX: 'auto',
-            padding: '12px 20px 4px'
-          }}
-        >
-          {deals.map((deal) => (
-            <DealCard
-              key={deal.id}
-              deal={deal}
-              isDarkMode={isDarkMode}
-              onClaimDeal={handleClaimDeal}
-            />
-          ))}
-        </div>
-      </section>
 
-      {/* ── Menu Categories ───────────────────────────────────────────── */}
-      <section>
 
-        {/* Promo Banner (Domino's style) */}
-        <div className="px-margin-mobile mt-4 mb-2">
-          <div 
-            className="flex items-center gap-3 p-3 rounded-xl border border-black/5 dark:border-white/5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-            style={{ background: isDarkMode ? '#1a1a1a' : '#ffffff', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}
-          >
-            <div className="w-11 h-11 shrink-0 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
-              <img src="https://cdn-icons-png.flaticon.com/512/2830/2830305.png" alt="Delivery" style={{ width: 28, height: 28, objectFit: 'contain' }} />
-            </div>
-            <div className="flex flex-col min-w-0 flex-1">
-              <span style={{ fontSize: 13, fontWeight: 700, color: isDarkMode ? '#f5f5f5' : 'var(--primary-gray)', fontFamily: 'Poppins,sans-serif', lineHeight: 1.2 }}>
-                Lowest Prices on App & Free Delivery
-              </span>
-              <span className="truncate" style={{ fontSize: 11, fontWeight: 500, color: 'var(--muted-gray)', fontFamily: 'Poppins,sans-serif', marginTop: 3 }}>
-                Add items worth ₹99 to get FREE delivery!
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {/* ── Meal for One ────────────────────────────────────────────── */}
-      <section>
-        <div className="px-margin-mobile flex justify-between items-end mb-md">
-          <div>
-            <h3
-              className="font-headline-lg-mobile"
-              style={{ color: isDarkMode ? '#fff' : 'var(--primary-gray)', margin: 0 }}
-            >
-              Meal for One
-            </h3>
-            <p
-              style={{
-                fontSize: 11,
-                color: 'var(--muted-gray)',
-                fontFamily: 'Poppins,sans-serif',
-                margin: '2px 0 0',
-                fontStyle: 'italic'
-              }}
-            >
-              Perfect combos made just for you
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              navigate('/user/menu');
-              triggerToast('Opening Combos...');
-            }}
-            style={{
-              background: 'none', border: 'none', outline: 'none',
-              color: 'var(--accent-red)', fontSize: 12, fontWeight: 600,
-              fontFamily: 'Poppins,sans-serif', cursor: 'pointer', padding: 0
-            }}
-          >
-            View All &rarr;
-          </button>
-        </div>
 
+      {/* ── Dynamic Menu Hierarchy (Category -> Product) ── */}
+      <section className="mt-8">
         <div className="flex overflow-x-auto hide-scrollbar gap-gutter px-margin-mobile pb-4">
-          {[
-            {
-              id: 'm1',
-              title: 'Classic Solo Meal',
-              description: 'Pizza + Drink',
-              price: 199,
-              originalPrice: 249,
-              discountBadge: '20% OFF',
-              isVeg: true,
-              image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=80'
-            },
-            {
-              id: 'm2',
-              title: 'Cheese Lover Meal',
-              description: 'Pizza + Side',
-              price: 249,
-              originalPrice: null,
-              discountBadge: null,
-              isVeg: true,
-              image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=500&auto=format&fit=crop&q=80'
-            },
-            {
-              id: 'm3',
-              title: 'Veggie Feast',
-              description: 'Pizza + Garlic Bread',
-              price: 229,
-              originalPrice: 279,
-              discountBadge: '₹50 OFF',
-              isVeg: true,
-              image: 'https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?w=500&auto=format&fit=crop&q=80'
-            }
-          ].map((meal) => {
-            return (
-              <MealForOneCard
-                key={meal.id}
-                meal={meal}
-                isDarkMode={isDarkMode}
-                checkLocation={checkLocation}
-                addToCart={addToCart}
-                triggerToast={triggerToast}
-              />
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ── Dynamic Menu Hierarchy (Category -> Section -> Product) ── */}
-      {sections?.filter(sec => sec.categoryId === activeCategory).map(section => {
-        const sectionProducts = products.filter(p => p.sectionId === section.id);
-        if (sectionProducts.length === 0) return null;
-        
-        return (
-          <section key={section.id} className="mt-8">
-            <div className="px-margin-mobile mb-md">
-              <h3
-                className="font-headline-lg-mobile"
-                style={{ color: isDarkMode ? '#fff' : 'var(--primary-gray)' }}
-              >
-                {section.name}
-              </h3>
-            </div>
-            <div className="flex overflow-x-auto hide-scrollbar gap-gutter px-margin-mobile pb-4">
-              {sectionProducts.map((product) => {
+          {products.filter(p => p.categoryId === activeCategory).map((product) => {
             const isFav = favorites.includes(product.id);
             return (
               <div
@@ -679,11 +342,9 @@ export function HomeSections({
                 </div>
               </div>
             );
-              })}
-            </div>
-          </section>
-        );
-      })}
+          })}
+        </div>
+      </section>
     </>
   );
 }

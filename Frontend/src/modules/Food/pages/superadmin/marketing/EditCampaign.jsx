@@ -605,7 +605,7 @@ export default function EditCampaign({ campaignId, isOpen, onClose, onCampaignUp
                             setCouponId('');
                             setCouponSearch('');
                           }}
-                          className="absolute right-3 top-2.5 text-xs text-zinc-400 hover:text-zinc-650 bg-zinc-200 dark:bg-zinc-800 px-2 py-0.5 rounded-md font-semibold"
+                          className="absolute right-3 top-2.5 text-xs text-zinc-400 hover:text-zinc-700 dark:text-zinc-300 bg-zinc-200 dark:bg-zinc-800 px-2 py-0.5 rounded-md font-semibold"
                         >
                           Clear
                         </button>
@@ -672,7 +672,7 @@ export default function EditCampaign({ campaignId, isOpen, onClose, onCampaignUp
                     </div>
                   ) : (
                     <div className="border border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 text-center bg-zinc-50/50 dark:bg-zinc-955/50">
-                      <Gift size={24} className="mx-auto text-zinc-400 dark:text-zinc-650" />
+                      <Gift size={24} className="mx-auto text-zinc-400 dark:text-zinc-700 dark:text-zinc-300" />
                       <p className="text-xs font-bold text-zinc-600 dark:text-zinc-400 mt-2">No Coupon Mapped</p>
                     </div>
                   )}

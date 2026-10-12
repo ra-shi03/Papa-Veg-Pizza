@@ -158,7 +158,6 @@ export default function FranchiseAdminRouter() {
             <Route path="foods" element={<Navigate to="/franchise-admin/products" replace />} />
             <Route path="food/list" element={<Navigate to="/franchise-admin/products" replace />} />
             <Route path="addons" element={<Navigate to="/franchise-admin/addons" replace />} />
-            <Route path="global-pricing" element={<Navigate to="/franchise-admin/store-pricing" replace />} />
 
             {/* PROMOTIONS, CUSTOMERS, DELIVERYMEN, etc. */}
             <Route path="campaigns/basic" element={<Navigate to="/franchise-admin/campaigns" replace />} />

@@ -79,7 +79,7 @@ export default function UpgradeTierModal({ isOpen, onClose, customerData, onSave
           </div>
           <button 
             onClick={onClose} 
-            className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-650"
+            className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
           >
             <X size={16} />
           </button>
@@ -160,7 +160,7 @@ export default function UpgradeTierModal({ isOpen, onClose, customerData, onSave
                   <p className="text-[9px] font-black text-zinc-450 uppercase tracking-widest leading-none mb-1">Key Benefits:</p>
                   <ul className="space-y-1">
                     {activeTierConfig.benefits.map((b, idx) => (
-                      <li key={idx} className="flex items-start gap-1.5 text-[10px] text-zinc-650 dark:text-zinc-450 font-medium">
+                      <li key={idx} className="flex items-start gap-1.5 text-[10px] text-zinc-700 dark:text-zinc-300 dark:text-zinc-450 font-medium">
                         <span className="text-emerald-500 shrink-0">•</span>
                         <span>{b}</span>
                       </li>

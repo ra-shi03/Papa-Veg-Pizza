@@ -45,7 +45,8 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Smartphone } from "lucide-react"
+  Smartphone,
+  Award } from "lucide-react"
 
 export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, isCollapsed = false, onToggleCollapse }) {
   const navigate = useNavigate()
@@ -96,10 +97,9 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
       items: [
         { name: "Products", icon: Pizza },
         { name: "Categories", icon: Grid },
-        { name: "Sections", icon: Layers },
+
         { name: "Add-ons / Toppings", icon: Sparkles },
         { name: "Combos & Deals", icon: Gift },
-        { name: "Global Pricing", icon: DollarSign }
       ]
     },
     {
@@ -128,7 +128,7 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
         { name: "Campaigns", icon: Megaphone },
         { name: "Push Notifications", icon: Bell },
 
-        { name: "Loyalty Program", icon: Trophy }
+        { name: "Rewards Program", icon: Trophy },
       ]
     },
     {
@@ -165,7 +165,8 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
       title: "User App",
       items: [
         { name: "Welcome Page", icon: Smartphone },
-        { name: "Home Page", icon: Home }
+        { name: "Home Page", icon: Home },
+        { name: "Promise Campaign", icon: Award }
       ]
     }
   ]
@@ -345,14 +346,11 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
                                 navigate("/food/superadmin/products")
                               } else if (item.name === "Categories") {
                                 navigate("/food/superadmin/categories")
-                              } else if (item.name === "Sections") {
-                                navigate("/food/superadmin/sections")
+
                               } else if (item.name === "Add-ons / Toppings") {
                                 navigate("/food/superadmin/addons")
                               } else if (item.name === "Combos & Deals") {
                                 navigate("/food/superadmin/combos-deals")
-                              } else if (item.name === "Global Pricing") {
-                                navigate("/food/superadmin/global-pricing")
                               } else if (item.name === "All Orders") {
                                 navigate("/food/superadmin/orders")
                               } else if (item.name === "Order Tracking") {
@@ -367,8 +365,8 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
                                 navigate("/food/superadmin/campaigns")
                               } else if (item.name === "Push Notifications") {
                                 navigate("/food/superadmin/push-notifications")
-                              } else if (item.name === "Loyalty Program") {
-                                navigate("/food/superadmin/loyalty")
+                              } else if (item.name === "Rewards Program") {
+                                navigate("/food/superadmin/rewards")
                               } else if (item.name === "Tax Reports") {
                                 navigate("/food/superadmin/tax-reports")
                               } else if (item.name === "Transactions") {
@@ -423,6 +421,8 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
                                 navigate("/food/superadmin/user-app/welcome-page")
                               } else if (item.name === "Home Page") {
                                 navigate("/food/superadmin/user-app/home-page")
+                              } else if (item.name === "Promise Campaign") {
+                                navigate("/food/superadmin/user-app/promise-campaign")
                               }
                               // On mobile, close sidebar when clicking a menu item
                               if (window.innerWidth < 1024) {

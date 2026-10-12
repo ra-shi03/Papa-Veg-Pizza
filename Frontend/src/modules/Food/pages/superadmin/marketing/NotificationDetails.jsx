@@ -139,7 +139,7 @@ export default function NotificationDetails({ notificationId, isOpen, onClose, o
                       <div>
                         <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block">Status</span>
                         <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] font-extrabold mt-1.5 ${
-                          notification.status === 'Draft' ? 'bg-zinc-100 text-zinc-650 dark:bg-zinc-800' :
+                          notification.status === 'Draft' ? 'bg-zinc-100 text-zinc-700 dark:text-zinc-300 dark:bg-zinc-800' :
                           notification.status === 'Scheduled' ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/10' :
                           notification.status === 'Processing' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/10' :
                           notification.status === 'Sent' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10' :

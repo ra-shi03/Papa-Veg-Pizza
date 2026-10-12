@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { X, UploadCloud, Plus, Trash2, Check, Loader2, ChevronDown } from "lucide-react";
+import { X, UploadCloud, Plus, Trash2, Check, Loader2, ChevronDown, Search } from "lucide-react";
 import { adminClient } from "@/services/api/axios";
 import { uploadAPI } from "@/services/api";
 import { toast } from "sonner";
@@ -7,18 +7,20 @@ import { toast } from "sonner";
 export default function AddProducts({ isOpen, onClose, product, mode = "add", onSave }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [categories, setCategories] = useState([]);
-  const [sections, setSections] = useState([]);
   const [addonsList, setAddonsList] = useState([]);
   const [franchises, setFranchises] = useState([]);
   const [stores, setStores] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isToppingsOpen, setIsToppingsOpen] = useState(false);
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
+  const categoryDropdownRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
     name: "",
     categoryId: "",
-    sectionId: "",
+    
     id: "",
     _id: "",
     shortDescription: "",
@@ -44,7 +46,6 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
           _id: product._id || "",
           name: product.name || "",
           categoryId: product.categoryId || "",
-          sectionId: product.sectionId || "",
           shortDescription: product.shortDescription || "",
           description: product.description || "",
           image: product.image || product.icon || "",
@@ -62,7 +63,6 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
           _id: "",
           name: "",
           categoryId: "",
-          sectionId: "",
           shortDescription: "",
           description: "",
           image: "",
@@ -79,6 +79,18 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
     }
   }, [isOpen, product, mode]);
 
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
+        setIsCategoryOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const fetchCategories = async () => {
     try {
       const res = await adminClient.get("/food/admin/category-products");
@@ -88,21 +100,6 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
     } catch (err) {
       console.error(err);
       toast.error("Failed to load categories");
-    }
-  };
-
-  const fetchSections = async (catId) => {
-    if (!catId) {
-      setSections([]);
-      return;
-    }
-    try {
-      const res = await adminClient.get(`/food/admin/sections?categoryId=${catId}`);
-      if (res?.data?.data) {
-        setSections(res.data.data);
-      }
-    } catch (err) {
-      console.error(err);
     }
   };
 
@@ -116,10 +113,6 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
       console.error(err);
     }
   };
-
-  useEffect(() => {
-    fetchSections(formData.categoryId);
-  }, [formData.categoryId]);
 
   const fetchFranchises = async () => {
     try {
@@ -209,7 +202,7 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
     if (!cleanedData.id) delete cleanedData.id;
     if (!cleanedData._id) delete cleanedData._id;
     if (!cleanedData.categoryId) delete cleanedData.categoryId;
-    if (!cleanedData.sectionId) delete cleanedData.sectionId;
+    
 
     try {
       await onSave(cleanedData, mode);
@@ -251,24 +244,56 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
                 <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-3 py-2 border rounded-lg text-sm bg-transparent dark:border-zinc-700 outline-none focus:border-[var(--primary)]" placeholder="e.g. Farmhouse Pizza" />
               </div>
               
-              <div>
+              <div className="relative" ref={categoryDropdownRef}>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Category *</label>
-                <select required value={formData.categoryId} onChange={e => setFormData({...formData, categoryId: e.target.value, sectionId: ''})} className="w-full px-3 py-2 border rounded-lg text-sm bg-transparent dark:border-zinc-700 outline-none focus:border-[var(--primary)]">
-                  <option value="">Select Category</option>
-                  {categories.map(c => (
-                    <option key={c._id || c.id} value={c._id || c.id}>{c.label}</option>
-                  ))}
-                </select>
-              </div>
+                <div 
+                  onClick={() => setIsCategoryOpen(!isCategoryOpen)}
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-transparent dark:border-zinc-700 cursor-pointer flex justify-between items-center focus:border-[var(--primary)]"
+                >
+                  <span className={!formData.categoryId ? "text-zinc-400" : "text-zinc-900 dark:text-zinc-100 line-clamp-1"}>
+                    {formData.categoryId ? (categories.find(c => (c._id || c.id) === formData.categoryId)?.label || "Select Category") : "Select Category"}
+                  </span>
+                  <ChevronDown size={16} className={`text-zinc-500 transition-transform ${isCategoryOpen ? "rotate-180" : ""}`} />
+                </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Section / Collection *</label>
-                <select required value={formData.sectionId} onChange={e => setFormData({...formData, sectionId: e.target.value})} className="w-full px-3 py-2 border rounded-lg text-sm bg-transparent dark:border-zinc-700 outline-none focus:border-[var(--primary)]">
-                  <option value="">Select Section</option>
-                  {sections.map(s => (
-                    <option key={s._id} value={s._id}>{s.name}</option>
-                  ))}
-                </select>
+                {isCategoryOpen && (
+                  <div className="absolute z-20 w-full mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg">
+                    <div className="p-2 border-b border-zinc-200 dark:border-zinc-700 flex items-center gap-2">
+                      <Search size={16} className="text-zinc-500" />
+                      <input 
+                        type="text" 
+                        placeholder="Search category..." 
+                        value={categorySearch}
+                        onChange={(e) => setCategorySearch(e.target.value)}
+                        className="w-full bg-transparent text-sm outline-none text-zinc-800 dark:text-zinc-200"
+                        onClick={(e) => e.stopPropagation()}
+                        autoFocus
+                      />
+                    </div>
+                    <div className="max-h-48 overflow-y-auto">
+                      {categories.filter(c => c.label?.toLowerCase().includes(categorySearch.toLowerCase())).map(c => {
+                        const isSelected = formData.categoryId === (c._id || c.id);
+                        return (
+                          <div 
+                            key={c._id || c.id}
+                            onClick={() => {
+                              setFormData({...formData, categoryId: c._id || c.id});
+                              setIsCategoryOpen(false);
+                              setCategorySearch("");
+                            }}
+                            className={`px-3 py-2 flex items-center justify-between cursor-pointer ${isSelected ? 'bg-zinc-50 dark:bg-zinc-800' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}
+                          >
+                            <span className="text-sm text-zinc-700 dark:text-zinc-300">{c.label}</span>
+                            {isSelected && <Check size={14} className="text-[var(--primary)]" />}
+                          </div>
+                        );
+                      })}
+                      {categories.filter(c => c.label?.toLowerCase().includes(categorySearch.toLowerCase())).length === 0 && (
+                        <div className="px-3 py-4 text-sm text-center text-zinc-500">No categories found</div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

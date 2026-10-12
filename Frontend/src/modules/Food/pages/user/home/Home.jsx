@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { HomeModals } from "./components/HomeModals"
@@ -10,15 +10,20 @@ import { HomeStyles } from "./components/HomeStyles"
 import { HomeHeader } from "./components/HomeHeader"
 import { HomeSections } from "./components/HomeSections"
 import { BottomNavBar } from "./components/BottomNavBar"
+import { OfferSection } from "./components/dynamic/OfferSection"
+import { CampaignSection } from "./components/dynamic/CampaignSection"
+import { CouponDetailsModal } from "./components/dynamic/CouponDetailsModal"
 import apiClient from "@/services/api/axios"
 
 
 export default function Home() {
+  const [rewardsConfig, setRewardsConfig] = useState(null);
   const navigate = useNavigate()
   const { isModalOpen, closeLocationModal, confirmLocation, locationConfirmed } = useLocationStore()
   const checkLocation = useLocationGuard()
-  const dealsRef = useRef(null)
-  const [activeDeal, setActiveDeal] = useState(null)
+  const offersRef = useRef(null)
+  const [activeOffer, setActiveOffer] = useState(null)
+  const [selectedCouponDetails, setSelectedCouponDetails] = useState(null)
 
   // Dynamic Home Page Config (delivery time set by superadmin)
   const [deliveryTime, setDeliveryTime] = useState(() => {
@@ -64,6 +69,8 @@ export default function Home() {
     return "What are you craving for?"
   })
 
+  const [showAllCategories, setShowAllCategories] = useState(false);
+
   // Dynamic Banners State
   const [banners, setBanners] = useState([
     {
@@ -83,14 +90,14 @@ export default function Home() {
   ]
   )
 
-  // Dynamic Deals State
-  const [deals, setDeals] = useState(() => {
+  // Dynamic Offers State
+  const [offers, setOffers] = useState(() => {
     try {
       const homeConfig = localStorage.getItem("pvp_home_config")
       if (homeConfig) {
         const parsed = JSON.parse(homeConfig)
-        if (parsed.deals && Array.isArray(parsed.deals) && parsed.deals.length > 0) {
-          return parsed.deals
+        if (parsed.offers && Array.isArray(parsed.offers) && parsed.offers.length > 0) {
+          return parsed.offers
         }
       }
     } catch (e) { }
@@ -135,10 +142,25 @@ export default function Home() {
 
   // Dynamic Categories State
   const [categories, setCategories] = useState([]);
-  const [sections, setSections] = useState([]);
+  
 
   // Dynamic Products State
   const [products, setProducts] = useState([]);
+  const [homeSearchQuery, setHomeSearchQuery] = useState("");
+
+  const displayedProducts = useMemo(() => {
+    if (!homeSearchQuery || !homeSearchQuery.trim()) return products;
+    const q = homeSearchQuery.toLowerCase().trim();
+    return products.filter(p => 
+      (p.title && p.title.toLowerCase().includes(q)) ||
+      (p.name && p.name.toLowerCase().includes(q)) ||
+      (p.description && p.description.toLowerCase().includes(q))
+    );
+  }, [products, homeSearchQuery]);
+  
+  // Dynamic API Layout State (Phase 4)
+  const [dynamicLayout, setDynamicLayout] = useState({ data: [], isLoading: true, error: null });
+  
   // App States
   const [userName, setUserName] = useState(() => {
     try {
@@ -234,8 +256,8 @@ export default function Home() {
           if (Array.isArray(data.banners)) {
             setBanners(data.banners.length > 0 ? data.banners : [])
           }
-          if (Array.isArray(data.deals)) {
-            setDeals(data.deals.length > 0 ? data.deals : [])
+          if (Array.isArray(data.offers)) {
+            setOffers(data.offers.length > 0 ? data.offers : [])
           }
           if (data.adPopup && data.adPopup.enabled && data.adPopup.imageUrl) {
             setAdPopupData(data.adPopup);
@@ -250,14 +272,29 @@ export default function Home() {
       try {
         const res = await apiClient.get('/food/admin/menu/public');
         if (res?.data?.data) {
-          const { categories: cats, sections: secs, products: prods } = res.data.data;
+          const { categories: cats, products: prods, sections: secs } = res.data.data;
           
           if (cats && cats.length > 0) {
-            const parsedCats = cats.map(c => ({
-              id: c._id || c.id,
-              label: c.label || c.name,
-              icon: c.icon || c.image || 'local_pizza'
-            }));
+            const uniqueCatsMap = new Map();
+            cats.forEach(c => {
+              const labelRaw = c.label || c.name;
+              if (!labelRaw) return;
+              const label = labelRaw.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+              if (!uniqueCatsMap.has(label)) {
+                uniqueCatsMap.set(label, {
+                  id: c._id || c.id,
+                  label: label,
+                  icon: c.icon || c.image || 'local_pizza'
+                });
+              } else {
+                 const existing = uniqueCatsMap.get(label);
+                 const newIcon = c.icon || c.image;
+                 if (newIcon && newIcon.startsWith('http') && existing.icon && !existing.icon.startsWith('http')) {
+                    existing.icon = newIcon;
+                 }
+              }
+            });
+            const parsedCats = Array.from(uniqueCatsMap.values());
             setCategories(parsedCats);
             setActiveCategory(prev => prev === "pizza" ? parsedCats[0].id : prev);
           }
@@ -289,8 +326,37 @@ export default function Home() {
       }
     }
 
+    const fetchDynamicLayout = async () => {
+      try {
+        setDynamicLayout(prev => ({ ...prev, isLoading: true, error: null }));
+        const res = await apiClient.get('/dynamic-home/home-layout');
+        if (res?.data?.data) {
+          setDynamicLayout({ data: res.data.data, isLoading: false, error: null });
+        } else {
+          setDynamicLayout(prev => ({ ...prev, isLoading: false }));
+        }
+      } catch (err) {
+        console.error("Failed to load dynamic layout:", err);
+        setDynamicLayout(prev => ({ ...prev, isLoading: false, error: err.message }));
+      }
+    }
+
+
+
+    const fetchRewards = async () => {
+      try {
+        const res = await apiClient.get("/food/admin/rewards/public");
+        if (res?.data?.data) {
+          setRewardsConfig(res.data.data);
+        }
+      } catch (err) {
+        console.error("Failed to load rewards config", err);
+      }
+    }
+    fetchRewards();
     fetchHomeConfig()
     fetchCategoryProducts()
+    fetchDynamicLayout()
 
     const handleConfigUpdate = (e) => {
       const updated = e?.detail
@@ -310,11 +376,22 @@ export default function Home() {
         if (Array.isArray(updated.banners)) {
           setBanners(updated.banners.length > 0 ? updated.banners : [])
         }
-        if (Array.isArray(updated.deals)) {
-          setDeals(updated.deals.length > 0 ? updated.deals : [])
+        if (Array.isArray(updated.offers)) {
+          setOffers(updated.offers.length > 0 ? updated.offers : [])
         }
       } else {
-        fetchHomeConfig()
+        const fetchRewards = async () => {
+      try {
+        const res = await apiClient.get("/food/admin/rewards/public");
+        if (res?.data?.data) {
+          setRewardsConfig(res.data.data);
+        }
+      } catch (err) {
+        console.error("Failed to load rewards config", err);
+      }
+    }
+    fetchRewards();
+    fetchHomeConfig()
       }
     }
 
@@ -442,14 +519,14 @@ export default function Home() {
       }
     }
 
-    const handleDealsSync = () => {
+    const handleOffersSync = () => {
       let list = []
       try {
         const homeConfig = localStorage.getItem("pvp_home_config")
         if (homeConfig) {
           const parsed = JSON.parse(homeConfig)
-          if (parsed.deals && Array.isArray(parsed.deals) && parsed.deals.length > 0) {
-            setDeals(parsed.deals)
+          if (parsed.offers && Array.isArray(parsed.offers) && parsed.offers.length > 0) {
+            setOffers(parsed.offers)
             return
           }
         }
@@ -488,7 +565,7 @@ export default function Home() {
       }
 
       if (list.length > 0) {
-        setDeals(list)
+        setOffers(list)
       }
     }
 
@@ -504,20 +581,30 @@ export default function Home() {
         if (stored) {
           const parsed = JSON.parse(stored)
           if (parsed.length > 0) {
-            setCategories(parsed.filter(c => c.status === "Active").map(c => {
-              const lower = c.name.toLowerCase();
-              let icon = "local_pizza";
-              if (lower.includes("burger")) icon = "lunch_dining";
-              else if (lower.includes("bread") || lower.includes("side")) icon = "bakery_dining";
-              else if (lower.includes("pasta")) icon = "dinner_dining";
-              else if (lower.includes("dessert") || lower.includes("sweet")) icon = "icecream";
-              else if (lower.includes("drink") || lower.includes("beverage")) icon = "local_drink";
-              return {
-                id: c.slug || c.name.toLowerCase().replace(/\s+/g, "-"),
-                label: c.name,
-                icon
-              };
-            }))
+            const activeCats = parsed.filter(c => c.status === "Active");
+            const uniqueCatsMap = new Map();
+            activeCats.forEach(c => {
+              const labelRaw = c.name;
+              if (!labelRaw) return;
+              const label = labelRaw.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+              
+              if (!uniqueCatsMap.has(label)) {
+                const lower = c.name.toLowerCase();
+                let icon = "local_pizza";
+                if (lower.includes("burger")) icon = "lunch_dining";
+                else if (lower.includes("bread") || lower.includes("side")) icon = "bakery_dining";
+                else if (lower.includes("pasta")) icon = "dinner_dining";
+                else if (lower.includes("dessert") || lower.includes("sweet")) icon = "icecream";
+                else if (lower.includes("drink") || lower.includes("beverage")) icon = "local_drink";
+                
+                uniqueCatsMap.set(label, {
+                  id: c.slug || label.toLowerCase().replace(/\s+/g, "-"),
+                  label: label,
+                  icon
+                });
+              }
+            });
+            setCategories(Array.from(uniqueCatsMap.values()));
           }
         }
       } catch (e) { }
@@ -552,8 +639,8 @@ export default function Home() {
 
     window.addEventListener("franchise_banners_changed", handleBannersSync)
     window.addEventListener("pvp_banners_changed", handleBannersSync)
-    window.addEventListener("franchise_coupons_changed", handleDealsSync)
-    window.addEventListener("pvp_coupons_changed", handleDealsSync)
+    window.addEventListener("franchise_coupons_changed", handleOffersSync)
+    window.addEventListener("pvp_coupons_changed", handleOffersSync)
     window.addEventListener("systemThemeChanged", handleBrandingSync)
     window.addEventListener("pvp_categories_changed", handleCategoriesSync)
     window.addEventListener("pvp_products_changed_v2", handleProductsSync)
@@ -561,8 +648,8 @@ export default function Home() {
     return () => {
       window.removeEventListener("franchise_banners_changed", handleBannersSync)
       window.removeEventListener("pvp_banners_changed", handleBannersSync)
-      window.removeEventListener("franchise_coupons_changed", handleDealsSync)
-      window.removeEventListener("pvp_coupons_changed", handleDealsSync)
+      window.removeEventListener("franchise_coupons_changed", handleOffersSync)
+      window.removeEventListener("pvp_coupons_changed", handleOffersSync)
       window.removeEventListener("systemThemeChanged", handleBrandingSync)
       window.removeEventListener("pvp_categories_changed", handleCategoriesSync)
       window.removeEventListener("pvp_products_changed_v2", handleProductsSync)
@@ -598,8 +685,8 @@ export default function Home() {
       navigate(`/user/product/${b.redirectId}`)
       triggerToast(`Opening product details...`)
     } else if (b.redirectType === "coupon" && b.redirectId) {
-      navigate("/user/deals")
-      triggerToast("Opening deals...")
+      navigate("/user/offers")
+      triggerToast("Opening offers...")
     } else {
       // Fallback matching algorithm by searching title & subtitle content
       const titleLower = (b.title || "").toLowerCase()
@@ -650,6 +737,8 @@ export default function Home() {
           deliveryTime={deliveryTime}
           deliveryLabel={deliveryLabel}
           categories={categories}
+          products={products}
+          onSearchChange={setHomeSearchQuery}
         />
 
         {/* Main Content */}
@@ -719,7 +808,7 @@ export default function Home() {
                 {cravingHeading}
               </h3>
               <div className="grid grid-cols-3 gap-x-4 gap-y-6 pb-2 pr-4">
-                {categories.map(cat => (
+                {(showAllCategories ? categories : categories.slice(0, 12)).map(cat => (
                   <div 
                     key={cat.id} 
                     className="flex flex-col items-center gap-2 shrink-0 cursor-pointer active:scale-95 transition-transform"
@@ -744,16 +833,62 @@ export default function Home() {
                   </div>
                 ))}
               </div>
+              {categories.length > 12 && !showAllCategories && (
+                <div className="flex justify-center mt-3 pr-4">
+                  <button 
+                    onClick={() => setShowAllCategories(true)}
+                    className="text-[var(--primary)] font-bold text-sm bg-transparent px-5 py-2 flex items-center gap-1 active:scale-95 transition-transform"
+                  >
+                    More <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>expand_more</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
-          {/* OrderMethods Component Removed */}
+          {/* Dynamic Rewards Section */}
+          {rewardsConfig && rewardsConfig.isEnabled && (
+            <div className="px-margin-mobile mt-2 mb-4">
+              <div className="bg-white rounded-xl shadow-[0_2px_15px_rgba(0,0,0,0.06)] border border-black/5 p-4" style={{ fontFamily: 'Poppins, sans-serif' }}>
+                <div className="flex gap-4 items-center">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 flex items-center justify-center p-2">
+                    {rewardsConfig.logoUrl ? (
+                      <img src={rewardsConfig.logoUrl} alt="Rewards Logo" className="max-w-full max-h-full object-contain" />
+                    ) : (
+                      <div className="text-[10px] text-zinc-400 text-center">No Logo</div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-zinc-800 font-bold text-sm sm:text-[15px] leading-snug mb-1.5">
+                      {rewardsConfig.title}
+                    </h3>
+                    <div className="text-zinc-500 text-xs sm:text-[13px] space-y-0.5">
+                      <p>{rewardsConfig.subtitle1}</p>
+                      <p>{rewardsConfig.subtitle2}</p>
+                    </div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => triggerToast("Enrollment coming soon!")}
+                  className="w-full mt-4 py-2.5 rounded-lg border-[1.5px] text-[13px] font-bold bg-white transition-colors active:scale-[0.98]"
+                  style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                >
+                  {rewardsConfig.buttonText}
+                </button>
+                <div className="text-center text-[10px] text-zinc-400 mt-2.5">
+                  {rewardsConfig.termsText} <a href={rewardsConfig.termsLink} className="text-blue-600 font-medium hover:underline">{rewardsConfig.termsLinkText}</a>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Dynamic API Sections Removed as per request */}
 
           <HomeSections
-            deals={deals}
+            offers={offers}
             categories={categories}
-            sections={sections}
-            products={products}
+            
+            products={displayedProducts}
             activeCategory={activeCategory}
             favorites={favorites}
             isDarkMode={isDarkMode}
@@ -761,7 +896,7 @@ export default function Home() {
             triggerToast={triggerToast}
             toggleFavorite={toggleFavorite}
             addToCart={addToCart}
-            dealsRef={dealsRef}
+            offersRef={offersRef}
           />
         </main>
 
@@ -816,6 +951,28 @@ export default function Home() {
             </motion.div>
           )}
         </AnimatePresence>
+        
+        <CouponDetailsModal 
+          isOpen={!!selectedCouponDetails}
+          offer={selectedCouponDetails}
+          onClose={() => setSelectedCouponDetails(null)}
+          onApply={(offer) => {
+            if (offer.actionType === 'open_url') {
+              window.open(offer.actionValue, '_blank');
+            } else if (offer.actionType === 'apply_coupon') {
+              navigate('/user/offers');
+              triggerToast(`Coupon ${offer.actionValue || offer.couponCode || ''} applied!`);
+            } else if (offer.actionType === 'open_product' && offer.actionValue) {
+              navigate(`/user/product/${offer.actionValue}`);
+            } else if (offer.actionType === 'open_category' && offer.actionValue) {
+              setActiveCategory(offer.actionValue);
+              triggerToast(`Opening category...`);
+            } else {
+              triggerToast(`Action: ${offer.actionType}`);
+            }
+          }}
+          isDarkMode={isDarkMode}
+        />
 
       </div>
     </div>

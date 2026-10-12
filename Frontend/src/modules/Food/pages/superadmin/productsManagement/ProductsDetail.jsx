@@ -69,10 +69,7 @@ export default function ProductsDetail({ isOpen, onClose, product }) {
               <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Category</p>
               <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{product.categoryId?.label || product.category || "-"}</p>
             </div>
-            <div>
-              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Section</p>
-              <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{product.sectionId?.name || product.section || "-"}</p>
-            </div>
+
           </div>
 
           <hr className="border-zinc-200 dark:border-zinc-800" />

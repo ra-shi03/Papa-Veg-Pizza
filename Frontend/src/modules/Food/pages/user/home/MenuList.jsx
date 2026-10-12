@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
+import { ArrowLeft, Search, ArrowUpDown, Check, X, Star } from "lucide-react"
+import apiClient from "@/services/api/axios"
 import DeliveryMapModal from "@food/components/user/DeliveryMapModal"
 import DeliveryOrCollectionModal from "@food/components/user/DeliveryOrCollectionModal"
 import { useLocationStore } from "@food/store/locationStore"
@@ -7,6 +9,69 @@ import { useLocationGuard } from "@food/hooks/useLocationGuard"
 import logoNew from "@/assets/logo1.png"
 
 const MENU_ITEMS = {
+  slices: [
+    {
+      id: "slice-margherita",
+      title: "Cheesy Classic Slice",
+      price: 99,
+      badge: "NEW",
+      image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=80",
+      description: "Generous single jumbo slice overloaded with gooey mozzarella and herb seasoned tomato sauce.",
+      sizes: ["Jumbo Single Slice", "Double Slice Box"],
+      rating: 4.8,
+      ratingCount: 38
+    },
+    {
+      id: "slice-paneer-tikka",
+      title: "Spicy Paneer Tikka Slice",
+      price: 129,
+      badge: "NEW",
+      image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=500&auto=format&fit=crop&q=80",
+      description: "Jumbo slice topped with smoky tandoori paneer, crisp bell peppers, and chipotle drizzle.",
+      sizes: ["Jumbo Single Slice", "Double Slice Box"],
+      rating: 4.9,
+      ratingCount: 42
+    }
+  ],
+  "cheese-burst": [
+    {
+      id: "cb-farmhouse",
+      title: "2in1 Cheese Burst Farmhouse",
+      price: 389,
+      badge: "NEW",
+      image: "https://images.unsplash.com/photo-1571407970349-bc81e7e96d47?w=500&auto=format&fit=crop&q=80",
+      description: "Double the cheese with a molten cheese-filled crust and golden liquid cheese topping.",
+      sizes: ["Regular", "Medium", "Large"],
+      rating: 4.9,
+      ratingCount: 56
+    }
+  ],
+  "big-big-pizza": [
+    {
+      id: "big-overload",
+      title: "Big Big Veggie Overload",
+      price: 499,
+      badge: "New Flavours",
+      image: "https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?w=500&auto=format&fit=crop&q=80",
+      description: "Giant 14-inch party-sized pizza loaded edge-to-edge with farm fresh veggies and creamy mozzarella.",
+      sizes: ["14in Jumbo Party"],
+      rating: 4.7,
+      ratingCount: 29
+    }
+  ],
+  "party-combo": [
+    {
+      id: "combo-party-feast",
+      title: "Ultimate Party Combo Feast",
+      price: 799,
+      badge: "UPTO ₹1000 OFF",
+      image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=500&auto=format&fit=crop&q=80",
+      description: "2 Medium Pizzas + 1 Garlic Bread Stix + 1 Choco Volcano Cake + 1.25L Pepsi.",
+      sizes: ["Party Pack for 4-5"],
+      rating: 4.9,
+      ratingCount: 64
+    }
+  ],
   pizzas: [
     {
       id: "fiery-schezwan",
@@ -175,42 +240,259 @@ export default function MenuList() {
     return () => window.removeEventListener("systemThemeChanged", handleBrandingSync);
   }, []);
 
+  // Helper to strictly sort categories according to superadmin configuration
+  const sortCategoriesBySuperadmin = (list) => {
+    return [...list].sort((a, b) => {
+      const aVal = Number(a.sort !== undefined && a.sort !== null ? a.sort : 0);
+      const bVal = Number(b.sort !== undefined && b.sort !== null ? b.sort : 0);
+      // If both have positive rank, sort ascending (1, 2, 3...)
+      if (aVal > 0 && bVal > 0) return aVal - bVal;
+      // Ranked items (sort > 0) come before unranked/0
+      if (aVal > 0 && bVal <= 0) return -1;
+      if (bVal > 0 && aVal <= 0) return 1;
+      // If both have the same rank (or 0), preserve createdAt ascending
+      if (a.createdAt && b.createdAt) {
+        return new Date(a.createdAt) - new Date(b.createdAt);
+      }
+      return 0;
+    });
+  };
+
   // Dynamic Categories State
   const [categories, setCategories] = useState(() => {
-    const defaultCats = [
-      { id: "pizzas", label: "Pizzas" },
-      { id: "burgers", label: "Burgers" },
-      { id: "breads", label: "Breads" },
-      { id: "pasta", label: "Pasta" },
-      { id: "desserts", label: "Desserts" },
-      { id: "drinks", label: "Drinks" }
-    ];
     try {
       const stored = localStorage.getItem("pvp_categories");
       if (stored) {
-        const parsed = JSON.parse(stored).filter(c => c.status === "Active");
+        const parsed = JSON.parse(stored).filter(c => c.status !== "Inactive");
         if (parsed.length > 0) {
-          return parsed.map(c => ({
-            id: c.slug || c.name.toLowerCase().replace(/\s+/g, "-"),
-            label: c.name
-          }));
+          const sorted = sortCategoriesBySuperadmin(parsed);
+          const seen = new Set();
+          const list = [];
+          sorted.forEach((c, idx) => {
+            const label = c.label || c.name || "";
+            let id = c.slug || label.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
+            if (label.toLowerCase() === "slices") id = "slices";
+            if (label.toLowerCase().includes("2 in 1") || label.toLowerCase().includes("2in1")) id = "cheese-burst";
+            if (label.toLowerCase().includes("big big")) id = "big-big-pizza";
+            if (label.toLowerCase().includes("party combo") || label.toLowerCase() === "party combo") id = "party-combo";
+            
+            if (seen.has(id)) {
+              id = `${id}-${c._id || idx}`;
+            }
+            seen.add(id);
+
+            list.push({
+              id,
+              _id: c._id || c.id || `${id}-${idx}`,
+              label,
+              badge: c.badge || "",
+              sort: c.sort ?? 0,
+              createdAt: c.createdAt
+            });
+          });
+          return list;
         }
       }
     } catch (e) {}
-    return defaultCats;
+    return [
+      { id: "slices", label: "Slices", badge: "NEW" },
+      { id: "cheese-burst", label: "2in1 Cheese Burst", badge: "NEW" },
+      { id: "big-big-pizza", label: "Big Big Pizza", badge: "New Flavours" },
+      { id: "party-combo", label: "Party Combo", badge: "UPTO ₹1000 OFF" }
+    ];
   });
+
+  // Dynamic Promise Header & Campaign Taglines State (Superadmin controlled)
+  const [promiseHeaderTitle, setPromiseHeaderTitle] = useState("Papa Veg Promise");
+  const [promiseHeaderStars, setPromiseHeaderStars] = useState("★ ★");
+  const [campaigns, setCampaigns] = useState([
+    {
+      _id: "c1",
+      tagline: "Where quality food meets honest prices!"
+    },
+    {
+      _id: "c2",
+      tagline: "0% Preservatives & Fresh Dough Daily in Every Store"
+    },
+    {
+      _id: "c3",
+      tagline: "No Weather Surge & Free Delivery with Minimum Order"
+    }
+  ]);
+  const [activeCampaignIndex, setActiveCampaignIndex] = useState(0);
+
+  // Auto-advance campaign slider every 4 seconds
+  useEffect(() => {
+    if (campaigns.length <= 1) return;
+    const interval = setInterval(() => {
+      setActiveCampaignIndex((prev) => (prev + 1) % campaigns.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [campaigns.length]);
+
+  // Fetch campaigns from backend superadmin promise-campaign API
+  useEffect(() => {
+    const fetchCampaigns = async () => {
+      try {
+        const res = await apiClient.get('/settings/promise-campaign');
+        const pData = res?.data?.data || res?.data;
+        if (pData?.header?.title) {
+          setPromiseHeaderTitle(pData.header.title);
+        }
+        if (pData?.header?.stars) {
+          setPromiseHeaderStars(pData.header.stars);
+        }
+        if (pData?.tickerItems && pData.tickerItems.length > 0) {
+          const activeTickers = pData.tickerItems.filter(t => t.isActive !== false);
+          if (activeTickers.length > 0) {
+            setCampaigns(activeTickers.map(t => ({
+              _id: t.id,
+              heading: t.heading || pData.header?.title || "Papa Veg Promise",
+              tagline: t.tagline || pData.header?.subtitle || "Where quality food meets honest prices!",
+              stars: pData.header?.stars || "★★"
+            })));
+            return;
+          }
+        }
+      } catch (err) {
+        // Fallback to legacy campaigns if any
+      }
+
+      try {
+        const res = await apiClient.get('/dynamic-home/campaigns');
+        const data = res?.data?.data || [];
+        if (data.length > 0) {
+          setCampaigns(data.map(c => ({
+            _id: c._id || c.slug,
+            heading: c.heading || c.name || "Papa Veg Promise",
+            tagline: c.tagline || "100% Pure Vegetarian Delight",
+            stars: "★★"
+          })));
+        }
+      } catch (_) {}
+    };
+    fetchCampaigns();
+  }, []);
+
+  // Fetch dynamic categories and products from backend superadmin
+  useEffect(() => {
+    const fetchCategoryProducts = async () => {
+      try {
+        let items = [];
+        try {
+          const res = await apiClient.get('/food/admin/category-products/public?sort=sort_asc');
+          items = res?.data?.data || [];
+        } catch (_) {
+          try {
+            const res = await apiClient.get('/food/admin/category-products/categories?sort=sort_asc');
+            items = res?.data?.data || [];
+          } catch (_) {
+            const res = await apiClient.get('/food/admin/menu/public');
+            items = res?.data?.data?.categories || [];
+          }
+        }
+
+        if (items.length > 0) {
+          const cats = items.filter(c => c.status !== "Inactive" && (c.type === "Category" || !c.type));
+          const prods = items.filter(c => c.type === "Product");
+
+          if (cats.length > 0) {
+            const sortedCats = sortCategoriesBySuperadmin(cats);
+            const seen = new Set();
+            const mappedCats = [];
+            sortedCats.forEach((c, idx) => {
+              const label = c.label || c.name || "";
+              let id = c.slug || label.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
+              if (label.toLowerCase() === "slices") id = "slices";
+              if (label.toLowerCase().includes("2 in 1") || label.toLowerCase().includes("2in1")) id = "cheese-burst";
+              if (label.toLowerCase().includes("big big")) id = "big-big-pizza";
+              if (label.toLowerCase().includes("party combo") || label.toLowerCase() === "party combo") id = "party-combo";
+
+              if (seen.has(id)) {
+                id = `${id}-${c._id || idx}`;
+              }
+              seen.add(id);
+
+              mappedCats.push({
+                id,
+                _id: c._id || c.id || `${id}-${idx}`,
+                label,
+                badge: c.badge || "",
+                icon: c.icon || "",
+                sort: c.sort ?? 0,
+                createdAt: c.createdAt
+              });
+            });
+            setCategories(mappedCats);
+            localStorage.setItem("pvp_categories", JSON.stringify(mappedCats));
+            if (!location.state?.category && mappedCats.length > 0) {
+              setActiveTab(prev => {
+                const exists = mappedCats.some(c => c.id === prev);
+                return exists ? prev : mappedCats[0].id;
+              });
+            }
+          }
+
+          if (prods.length > 0) {
+            const map = {};
+            prods.forEach(p => {
+              const catObj = cats.find(c => (c._id || c.id) === (typeof p.categoryId === 'object' ? p.categoryId?._id : p.categoryId));
+              const catKey = catObj ? (catObj.slug || (catObj.label || catObj.name).toLowerCase().replace(/[^a-z0-9]+/g, "-")) : "pizzas";
+              if (!map[catKey]) map[catKey] = [];
+              map[catKey].push({
+                id: p._id || p.id,
+                title: p.name,
+                price: p.price || 299,
+                badge: p.badge || "NEW",
+                image: p.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500",
+                description: p.shortDescription || p.description,
+                rating: 4.5,
+                ratingCount: 20
+              });
+            });
+            setProductsMap(map);
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to load backend category products:", e);
+      }
+    };
+    fetchCategoryProducts();
+  }, []);
 
   useEffect(() => {
     const handleCategoriesSync = () => {
       try {
         const stored = localStorage.getItem("pvp_categories");
         if (stored) {
-          const parsed = JSON.parse(stored).filter(c => c.status === "Active");
+          const parsed = JSON.parse(stored).filter(c => c.status !== "Inactive");
           if (parsed.length > 0) {
-            setCategories(parsed.map(c => ({
-              id: c.slug || c.name.toLowerCase().replace(/\s+/g, "-"),
-              label: c.name
-            })));
+            const sorted = sortCategoriesBySuperadmin(parsed);
+            const seen = new Set();
+            const mapped = [];
+            sorted.forEach((c, idx) => {
+              const label = c.label || c.name || "";
+              let id = c.slug || label.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
+              if (label.toLowerCase() === "slices") id = "slices";
+              if (label.toLowerCase().includes("2 in 1") || label.toLowerCase().includes("2in1")) id = "cheese-burst";
+              if (label.toLowerCase().includes("big big")) id = "big-big-pizza";
+              if (label.toLowerCase().includes("party combo") || label.toLowerCase() === "party combo") id = "party-combo";
+
+              if (seen.has(id)) {
+                id = `${id}-${c._id || idx}`;
+              }
+              seen.add(id);
+
+              mapped.push({
+                id,
+                _id: c._id || c.id || `${id}-${idx}`,
+                label,
+                badge: c.badge || "",
+                sort: c.sort ?? 0,
+                createdAt: c.createdAt
+              });
+            });
+            setCategories(mapped);
           }
         }
       } catch (e) {}
@@ -356,9 +638,95 @@ export default function MenuList() {
   const [activeTab, setActiveTab] = useState(() => {
     const defaultTab = location.state?.category;
     if (defaultTab) return defaultTab;
-    return "pizzas";
+    try {
+      const stored = localStorage.getItem("pvp_categories");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.length > 0 && parsed[0]?.id) return parsed[0].id;
+      }
+    } catch (_) {}
+    return "slices";
   });
-  const [isVegetarian, setIsVegetarian] = useState(true)
+
+  const [menuFilters, setMenuFilters] = useState(() => {
+    try {
+      const saved = localStorage.getItem("pvp_menu_filters");
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return {
+      vegOnly: { enabled: true, label: "Veg Only", defaultActive: true },
+      sortBy: { enabled: true, label: "Sort by", defaultOption: "default" }
+    };
+  });
+
+  const [isVegOnly, setIsVegOnly] = useState(() => {
+    try {
+      const saved = localStorage.getItem("pvp_menu_filters");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.vegOnly?.defaultActive !== undefined) return parsed.vegOnly.defaultActive;
+      }
+    } catch (_) {}
+    return true;
+  });
+
+  const [isVegetarian, setIsVegetarian] = useState(true);
+
+  const [sortBy, setSortBy] = useState(() => {
+    try {
+      const saved = localStorage.getItem("pvp_menu_filters");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.sortBy?.defaultOption) return parsed.sortBy.defaultOption;
+      }
+    } catch (_) {}
+    return "default";
+  });
+
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const sortMenuRef = useRef(null);
+
+  // Sync menuFilters from backend & localStorage
+  useEffect(() => {
+    const fetchFilters = async () => {
+      try {
+        const res = await apiClient.get('/settings/home-page');
+        const mf = res?.data?.data?.menuFilters;
+        if (mf) {
+          setMenuFilters(mf);
+          localStorage.setItem("pvp_menu_filters", JSON.stringify(mf));
+        }
+      } catch (_) {}
+    };
+    fetchFilters();
+
+    const handleFilterSync = (e) => {
+      if (e?.detail) {
+        setMenuFilters(e.detail);
+      } else {
+        try {
+          const saved = localStorage.getItem("pvp_menu_filters");
+          if (saved) setMenuFilters(JSON.parse(saved));
+        } catch (_) {}
+      }
+    };
+    window.addEventListener("pvp_menu_filters_changed", handleFilterSync);
+    return () => window.removeEventListener("pvp_menu_filters_changed", handleFilterSync);
+  }, []);
+
+  // Close sort menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (sortMenuRef.current && !sortMenuRef.current.contains(event.target)) {
+        setShowSortMenu(false);
+      }
+    };
+    if (showSortMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showSortMenu]);
+
   const [showServiceSelector, setShowServiceSelector] = useState(false)
   const [showMapModal, setShowMapModal] = useState(false)
   const [showStoreModal, setShowStoreModal] = useState(false)
@@ -615,12 +983,36 @@ export default function MenuList() {
   const totalCartCount = Object.values(cart).reduce((sum, item) => sum + item.quantity, 0)
   const totalCartPrice = Object.values(cart).reduce((sum, item) => sum + (item.price * item.quantity), 0)
 
-  // Filter menu items by debounced search query (case-insensitive, match title or description)
-  const filteredItems = (currentMenuItems[activeTab] || []).filter((item) => {
-    const titleMatch = item.title?.toLowerCase().includes(debouncedQuery.toLowerCase())
-    const descMatch = item.description?.toLowerCase().includes(debouncedQuery.toLowerCase())
-    return titleMatch || descMatch
-  })
+  // Helper to safely parse numeric price
+  const getNumericPrice = (item) => {
+    if (typeof item.price === "number") return item.price;
+    const num = parseFloat(String(item.price || 0).replace(/[^\d.]/g, ""));
+    return isNaN(num) ? 0 : num;
+  };
+
+  // Helper to safely parse numeric rating
+  const getNumericRating = (item) => {
+    if (typeof item.rating === "number") return item.rating;
+    const num = parseFloat(String(item.rating || 0).replace(/[^\d.]/g, ""));
+    return isNaN(num) ? 0 : num;
+  };
+
+  // Filter and sort menu items
+  const itemsForTab = currentMenuItems[activeTab] || currentMenuItems["slices"] || currentMenuItems["pizzas"] || [];
+  const filteredItems = itemsForTab.filter((item) => {
+    // If veg-only toggle is active and item is marked explicitly as non-veg
+    if (isVegOnly && item.isVeg === false) {
+      return false;
+    }
+    const titleMatch = item.title?.toLowerCase().includes(debouncedQuery.toLowerCase());
+    const descMatch = item.description?.toLowerCase().includes(debouncedQuery.toLowerCase());
+    return !debouncedQuery || titleMatch || descMatch;
+  }).sort((a, b) => {
+    if (sortBy === "price_asc") return getNumericPrice(a) - getNumericPrice(b);
+    if (sortBy === "price_desc") return getNumericPrice(b) - getNumericPrice(a);
+    if (sortBy === "rating") return getNumericRating(b) - getNumericRating(a);
+    return 0;
+  });
 
   const modalTextPrimary = isDarkMode ? "text-white" : "text-zinc-900"
   const modalTextSecondary = isDarkMode ? "text-zinc-400" : "text-zinc-500"
@@ -629,10 +1021,10 @@ export default function MenuList() {
   const modalBorder = isDarkMode ? "border-white/10" : "border-zinc-200"
 
   return (
-    <div className={`min-h-screen flex justify-center transition-colors duration-300 ${isDarkMode ? "bg-[#0a0a0a]" : "bg-gray-100"}`}>
-      <div className={`w-full max-w-md min-h-screen pb-32 font-body-md overflow-x-hidden relative shadow-2xl border-x ${
+    <div className={`min-h-screen flex justify-center transition-colors duration-300 ${isDarkMode ? "bg-[#0a0a0a]" : "bg-[#F8F6F2]"}`}>
+      <div className={`page-wrapper w-full max-w-md min-h-screen pb-32 font-body-md overflow-x-hidden relative shadow-2xl border-x ${
         isDarkMode ? "border-zinc-800/40" : "border-gray-200/50"
-      }`} style={{ backgroundColor: isDarkMode ? "#111111" : "#fbf9f8", color: isDarkMode ? "#e5e2e1" : "#1c1b1b" }}>
+      }`} style={{ backgroundColor: isDarkMode ? "#111111" : "#F8F6F2", color: isDarkMode ? "#e5e2e1" : "#1c1b1b" }}>
       {/* CSS overrides to keep design exact */}
       <style dangerouslySetInnerHTML={{
         __html: `
@@ -754,128 +1146,221 @@ export default function MenuList() {
         </div>
       )}
 
-      {/* Top Header Navigation */}
-      <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-45 bg-surface/90 backdrop-blur-xl border-b border-white/10 h-16 flex items-center justify-between px-5 transition-colors duration-300">
-        <button
-          onClick={() => navigate("/user")}
-          className={`material-symbols-outlined hover:opacity-85 active:scale-95 cursor-pointer bg-transparent border-0 outline-none ${isDarkMode ? "text-white" : "text-[#131313]"}`}
-        >
-          arrow_back
-        </button>
-        {/* Brand logo design */}
-        <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center justify-center">
-          <img
-            src={logoUrl}
-            alt="Papa Veg Pizza Logo"
-            className="h-14 md:h-16 w-auto object-contain transition-transform duration-300 hover:scale-105"
-          />
-        </div>
-        <div className="w-8"></div>
-      </header>
-
-      {/* Categories horizontal tabs */}
-      <div className="fixed top-16 left-1/2 -translate-x-1/2 w-full max-w-md z-45 bg-surface/85 backdrop-blur-md border-b border-white/10 px-5 flex overflow-x-auto hide-scrollbar py-3 gap-3">
-        {[
-          { id: "deals", label: "Deals", action: () => navigate("/user/deals") },
-          ...categories
-        ].map((tab) => {
-          const isSelected = activeTab === tab.id
-          return (
-            <button
-              key={tab.id}
-              onClick={() => {
-                if (tab.action) {
-                  tab.action()
-                } else {
-                  setActiveTab(tab.id)
-                }
-              }}
-              className={`px-5 py-2 rounded-lg font-label-sm text-xs uppercase font-extrabold cursor-pointer border transition-all active:scale-95 duration-200 ${isSelected
-                ? "bg-primary border-primary text-white shadow-[0_4px_12px_rgba(229,57,53,0.3)]"
-                : isDarkMode
-                  ? "bg-white/5 border-white/10 text-white/70 hover:bg-white/10"
-                  : "bg-zinc-100 border-zinc-200 text-zinc-600 hover:bg-zinc-200/70 shadow-sm"
-                }`}
-            >
-              {tab.label}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Main Categories Layout container */}
-      <main className="mt-36 px-5 space-y-6 max-w-lg mx-auto pt-4">
-
-        {/* Vegetarian Toggle Switch bar */}
-        <section className="glass-card rounded-2xl p-4 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="veg-box"><span className="veg-circle"></span></span>
-            <span className="font-label-sm uppercase text-xs tracking-wider font-bold">Vegetarian Only</span>
-          </div>
-          {/* Custom Toggle Switch */}
-          <div
-            onClick={() => setIsVegetarian(!isVegetarian)}
-            className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all flex items-center ${isVegetarian ? "bg-[#00C853]" : "bg-white/15"}`}
+      {/* ── TOP STICKY CONTAINER (Header + Filters + Category Tabs) ── */}
+      <div className="sticky top-0 z-45 bg-[#F8F6F2] dark:bg-[#111111] border-b border-zinc-200/60 dark:border-zinc-800 shadow-xs">
+        
+        {/* Row 1: Back + Menu Title + Search Bar */}
+        <div className="px-4 py-3 flex items-center gap-3">
+          <button
+            onClick={() => navigate('/user')}
+            className="p-1 -ml-1 text-gray-800 dark:text-white hover:bg-black/5 dark:hover:bg-zinc-800 rounded-full transition-colors flex items-center justify-center bg-transparent border-0 outline-none cursor-pointer"
+            aria-label="Go back to user home"
           >
-            <div className={`w-4 h-4 rounded-full bg-white transition-all transform ${isVegetarian ? "translate-x-6" : ""}`} />
-          </div>
-        </section>
-
-        {/* Localized deals & location alert indicator */}
-        <section
-          onClick={() => setShowServiceSelector(true)}
-          className={`rounded-2xl p-4 flex items-center justify-between cursor-pointer active:opacity-90 transition-all border ${
-            isDarkMode 
-              ? "bg-white/5 border-white/10 text-white shadow-none" 
-              : "bg-white border-primary/20 text-slate-800 shadow-[0_8px_20px_-4px_rgba(229,57,53,0.06)]"
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-primary text-2xl font-bold">local_pizza</span>
-            <div className="text-left">
-              <h4 className={`text-xs font-black uppercase tracking-wide ${isDarkMode ? "text-white" : "text-slate-900"}`}>
-                {locationName ? "Delivering to:" : "Add your location"}
-              </h4>
-              <p className={`text-[11px] line-clamp-1 max-w-[200px] leading-tight ${isDarkMode ? "text-white/60" : "text-slate-500"}`}>
-                {locationName || "See your local deals and pizzas"}
-              </p>
-            </div>
-          </div>
-          <span className="material-symbols-outlined text-primary text-lg font-bold">arrow_forward_ios</span>
-        </section>
-
-        {/* Section Header */}
-        <div className="flex flex-col gap-3 pb-2 border-b border-white/5">
-          <div className="flex items-center justify-between">
-            <h2 className={`font-headline-lg-mobile capitalize ${isDarkMode ? "text-white" : "text-[#131313]"}`}>{activeTab}</h2>
-            <span className="text-xs opacity-50 font-bold">{filteredItems.length} {filteredItems.length === 1 ? 'Item' : 'Items'}</span>
-          </div>
+            <ArrowLeft className="w-5 h-5 stroke-[2.4]" />
+          </button>
           
-          {/* Debounced Search Bar */}
-          <div className="relative w-full">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-sm opacity-50 pointer-events-none">
-              search
-            </span>
+          <h1 className="text-xl font-black text-gray-900 dark:text-white shrink-0 tracking-tight">
+            Menu
+          </h1>
+
+          {/* Search in menu input */}
+          <div className="flex-1 relative">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={`Search in ${activeTab}...`}
-              className={`w-full h-9 pl-9 pr-8 rounded-full text-xs font-semibold outline-none transition-all duration-300 border ${
-                isDarkMode
-                  ? "bg-white/5 border-white/10 text-white placeholder-white/30 focus:bg-white/10 focus:border-white/20 focus:ring-1 focus:ring-white/20"
-                  : "bg-zinc-100 border-zinc-200 text-zinc-800 placeholder-zinc-400 focus:bg-white focus:border-zinc-350 focus:ring-1 focus:ring-zinc-250"
-              }`}
+              placeholder="Search in menu..."
+              className="w-full h-9 pl-9 pr-8 bg-white/90 dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800 rounded-xl text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-100 placeholder-gray-400 outline-none focus:border-red-500 focus:bg-white transition-colors shadow-2xs"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 bg-transparent border-0 outline-none cursor-pointer flex items-center justify-center p-0 hover:opacity-85 text-zinc-400"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5 bg-transparent border-0 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-xs">close</span>
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
+        </div>
+
+        {/* Row 2: Filters (Veg Only & Sort by) - Dynamically configured via superadmin */}
+        {(menuFilters.vegOnly?.enabled !== false || menuFilters.sortBy?.enabled !== false) && (
+          <div className="px-4 pb-2.5 flex items-center gap-2 relative">
+            {/* Veg Only Button */}
+            {menuFilters.vegOnly?.enabled !== false && (
+              <button
+                type="button"
+                onClick={() => setIsVegOnly(!isVegOnly)}
+                className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                  isVegOnly
+                    ? "bg-green-50 dark:bg-green-950/30 border-green-600 text-green-700 dark:text-green-400 shadow-xs"
+                    : "bg-white/80 hover:bg-white dark:bg-zinc-900 border-zinc-250 dark:border-zinc-800 text-gray-700 dark:text-gray-300 shadow-2xs"
+                }`}
+              >
+                {/* Green Veg Indicator icon */}
+                <span className="w-3.5 h-3.5 border border-green-600 p-[1.5px] rounded-[3px] flex items-center justify-center bg-transparent">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-600 block" />
+                </span>
+                <span>{menuFilters.vegOnly?.label || "Veg Only"}</span>
+              </button>
+            )}
+
+            {/* Sort By Button */}
+            {menuFilters.sortBy?.enabled !== false && (
+              <div className="relative" ref={sortMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowSortMenu(!showSortMenu)}
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs ${
+                    sortBy !== "default"
+                      ? "border-red-500/50 text-red-600 dark:text-red-400 bg-red-50/40 dark:bg-red-950/20"
+                      : "border-zinc-250 dark:border-zinc-800 bg-white/80 hover:bg-white dark:bg-zinc-900 text-gray-700 dark:text-gray-300"
+                  }`}
+                >
+                  <span>{menuFilters.sortBy?.label || "Sort by"}</span>
+                  <ArrowUpDown className="w-3.5 h-3.5 text-gray-500" />
+                </button>
+
+                {/* Sort Dropdown */}
+                {showSortMenu && (
+                  <div className="absolute left-0 top-full mt-1.5 w-44 bg-[#F8F6F2] dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                    {[
+                      { id: "default", label: "Recommended" },
+                      { id: "price_asc", label: "Price: Low to High" },
+                      { id: "price_desc", label: "Price: High to Low" },
+                      { id: "rating", label: "Rating: High to Low" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          setSortBy(opt.id);
+                          setShowSortMenu(false);
+                        }}
+                        className={`w-full px-3 py-2 text-left text-xs font-medium flex items-center justify-between hover:bg-black/5 dark:hover:bg-zinc-800 cursor-pointer border-0 ${
+                          sortBy === opt.id
+                            ? "text-red-600 dark:text-red-400 font-bold bg-red-50/50 dark:bg-red-950/20"
+                            : "text-gray-700 dark:text-gray-300 bg-transparent"
+                        }`}
+                      >
+                        <span>{opt.label}</span>
+                        {sortBy === opt.id && <Check className="w-3.5 h-3.5 text-red-600" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Row 3: Horizontal Categories Tabs */}
+        <div className="flex items-center overflow-x-auto hide-scrollbar px-3 border-t border-zinc-200/60 dark:border-zinc-800/80 bg-[#F8F6F2] dark:bg-[#111111]">
+          {categories.map((cat, idx) => {
+            const isActive = activeTab === cat.id;
+            return (
+              <button
+                key={cat._id || `${cat.id}-${idx}`}
+                type="button"
+                onClick={() => setActiveTab(cat.id)}
+                className="flex flex-col items-center pt-2 px-3.5 shrink-0 transition-colors group cursor-pointer relative bg-transparent border-0"
+              >
+                {/* Badge Tag */}
+                {cat.badge ? (
+                  <span className="text-[9px] font-black text-white bg-[#E53935] px-2 py-0.5 rounded-full uppercase leading-none tracking-tight mb-1 shadow-xs whitespace-nowrap">
+                    {cat.badge}
+                  </span>
+                ) : (
+                  <span className="h-4 block" />
+                )}
+
+                {/* Category Title */}
+                <span className={`text-xs whitespace-nowrap pb-2 ${
+                  isActive
+                    ? "font-extrabold text-gray-900 dark:text-white"
+                    : "font-semibold text-gray-500 dark:text-gray-400 group-hover:text-gray-800"
+                }`}>
+                  {cat.label}
+                </span>
+
+                {/* Red Underline Active Indicator */}
+                {isActive && (
+                  <div className="h-[3px] bg-[#E53935] w-full rounded-t-sm" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+      </div>
+
+      {/* Campaign Promise Slider (Superadmin dynamic) - Full Width */}
+      {campaigns.length > 0 && (
+        <div 
+          onClick={() => navigate('/user/promise')}
+          className="w-full bg-[#F8F6F2] dark:bg-[#18181a] py-3.5 px-4 border-b border-zinc-200/60 dark:border-zinc-800 shadow-xs transition-all hover:bg-[#f3ece4] dark:hover:bg-[#1f1f23] cursor-pointer group"
+          role="button"
+          tabIndex={0}
+          title="Click to view Papa Veg Promise details"
+        >
+          <div className="max-w-xl mx-auto relative text-center">
+            {/* Campaign Promise Heading - STATIC SINGLE LINE (Does NOT slide) */}
+            <div className="flex items-center justify-center gap-1.5 mb-1 group-hover:scale-[1.01] transition-transform whitespace-nowrap overflow-hidden">
+              <span className="text-[var(--primary,#EE3A43)] font-black text-lg md:text-xl tracking-tight flex items-center gap-1 font-sans truncate">
+                {promiseHeaderTitle || "Papa Veg Promise"}
+              </span>
+              <span className="text-[#70e000] text-sm font-bold tracking-widest shrink-0">
+                {promiseHeaderStars || "★ ★"}
+              </span>
+            </div>
+            
+            {/* Subtle accent underline */}
+            <div className="w-24 h-[2.5px] bg-[#70e000] mx-auto rounded-full mb-2 shadow-xs" />
+
+            {/* Tagline / Promise text - THIS IS THE ONLY PART THAT SLIDES */}
+            <div className="overflow-hidden min-h-[20px] flex items-center justify-center">
+              <p 
+                key={activeCampaignIndex}
+                className="text-gray-800 dark:text-gray-200 text-xs sm:text-sm font-bold tracking-tight px-4 line-clamp-1 transition-opacity duration-300"
+              >
+                {campaigns[activeCampaignIndex]?.tagline || "Where quality food meets honest prices!"}
+              </p>
+            </div>
+
+            {/* Carousel Dot Indicators - changed active dot to #70e000 (3rd image update) */}
+            <div className="flex items-center justify-center gap-1.5 mt-2.5">
+              {campaigns.map((_, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveCampaignIndex(idx);
+                  }}
+                  className={`transition-all rounded-full border-0 p-0 cursor-pointer ${
+                    activeCampaignIndex === idx 
+                      ? "w-2.5 h-2.5 bg-[#70e000] shadow-xs" 
+                      : "w-2 h-2 bg-gray-300 dark:bg-zinc-700 hover:bg-gray-400"
+                  }`}
+                  aria-label={`Go to slide ${idx + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Categories Layout container */}
+      <main className="px-4 space-y-4 max-w-lg mx-auto pt-0">
+
+        {/* Section Divider Header */}
+        <div className="flex items-center justify-center mt-2 mb-4 px-4">
+          <div className="flex-1 h-[1px] bg-gray-200 dark:bg-zinc-800"></div>
+          <h2 className="px-5 text-xl font-extrabold text-gray-900 dark:text-white capitalize tracking-tight">
+            {categories.find(c => c.id === activeTab)?.label || activeTab}
+          </h2>
+          <div className="flex-1 h-[1px] bg-gray-200 dark:bg-zinc-800"></div>
         </div>
 
          {/* Menu list grid */}
