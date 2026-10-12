@@ -32,16 +32,6 @@ const homePageSchema = new mongoose.Schema(
                 uploadedAt: { type: Date, default: Date.now }
             }
         ],
-        deals: [
-            {
-                id: { type: String, required: true },
-                title: { type: String, required: true },
-                description: { type: String, required: true },
-                badge: { type: String },
-                image: { type: String },
-                size: { type: String }
-            }
-        ],
         orderMethods: [
             {
                 id: { type: String, required: true },
@@ -69,6 +59,18 @@ const homePageSchema = new mongoose.Schema(
             frequencyRule: { type: String, enum: ['once_per_session', 'once_per_day', 'every_launch'], default: 'once_per_session' },
             startDate: { type: Date },
             endDate: { type: Date }
+        },
+        menuFilters: {
+            vegOnly: {
+                enabled: { type: Boolean, default: true },
+                label: { type: String, default: 'Veg Only' },
+                defaultActive: { type: Boolean, default: true }
+            },
+            sortBy: {
+                enabled: { type: Boolean, default: true },
+                label: { type: String, default: 'Sort by' },
+                defaultOption: { type: String, default: 'default' }
+            }
         }
     },
     {

@@ -387,7 +387,7 @@ export default function Campaign() {
               className={`flex items-center gap-1.5 px-3.5 py-2 border rounded-xl text-xs font-bold transition-all ${
                 showFilters 
                   ? 'border-[var(--primary)] bg-[var(--primary)]/5 text-[var(--primary)] shadow-sm' 
-                  : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-650 dark:text-zinc-350'
+                  : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 dark:text-zinc-350'
               }`}
             >
               <Filter size={13} />
@@ -399,7 +399,7 @@ export default function Campaign() {
             <div className="relative" ref={columnDropdownRef}>
               <button 
                 onClick={() => setShowColumnDropdown(!showColumnDropdown)}
-                className="flex items-center gap-1.5 px-3.5 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-bold hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-650 dark:text-zinc-350 transition-colors"
+                className="flex items-center gap-1.5 px-3.5 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-bold hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 dark:text-zinc-350 transition-colors"
               >
                 <Columns size={13} />
                 <span>Columns</span>
@@ -429,7 +429,7 @@ export default function Campaign() {
             <button 
               onClick={handleExportCSV}
               disabled={campaigns.length === 0}
-              className="flex items-center gap-1.5 px-3.5 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-bold hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-650 dark:text-zinc-350 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="flex items-center gap-1.5 px-3.5 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-bold hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 dark:text-zinc-350 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               <Download size={13} />
               <span>Export CSV</span>

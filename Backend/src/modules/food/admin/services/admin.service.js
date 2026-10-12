@@ -364,8 +364,8 @@ export async function getStores(query) {
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
-            .select('storeName location area city profileImage coverImages menuImages menuPdf status managerName phone zoneId')
-            .populate('zoneId', 'name zoneName')
+            .select('storeName location area city profileImage coverImages menuImages menuPdf status managerName phone zoneId territoryId franchiseId regionId')
+            .populate('zoneId territoryId franchiseId regionId')
             .lean(),
         FoodStore.countDocuments(filter)
     ]);

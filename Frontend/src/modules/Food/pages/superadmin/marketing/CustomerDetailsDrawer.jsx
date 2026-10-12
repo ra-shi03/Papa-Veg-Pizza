@@ -103,7 +103,7 @@ export default function CustomerDetailsDrawer({ customerId, isOpen, onClose }) {
             </div>
             <button 
               onClick={onClose}
-              className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-650 rounded-full transition-colors"
+              className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:text-zinc-300 rounded-full transition-colors"
             >
               <X size={16} />
             </button>

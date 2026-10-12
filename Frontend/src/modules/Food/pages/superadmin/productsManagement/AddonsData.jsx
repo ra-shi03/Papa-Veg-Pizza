@@ -1,9 +1,10 @@
 import React from "react";
-import { Edit, Trash2, ArrowUpDown } from "lucide-react";
+import { Edit, Trash2, ArrowUpDown, Eye } from "lucide-react";
 import dayjs from "dayjs";
 
 export default function AddonsData({
   addons = [],
+  onView,
   onEdit,
   onDelete,
   sortConfig = { key: "name", direction: "asc" },
@@ -90,6 +91,15 @@ export default function AddonsData({
                 </td>
                 <td className="px-4 py-3 text-right sticky right-0 bg-white dark:bg-zinc-900 group-hover:bg-zinc-50/80 dark:group-hover:bg-zinc-800/50 transition-colors z-20">
                   <div className="flex items-center justify-end gap-1.5">
+                    {onView && (
+                      <button
+                        onClick={() => onView(item)}
+                        className="p-1.5 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                        title="View Add-on Details"
+                      >
+                        <Eye size={14} />
+                      </button>
+                    )}
                     <button
                       onClick={() => onEdit(item)}
                       className="p-1.5 text-zinc-400 hover:text-[var(--primary)] hover:bg-[var(--primary)]/10 rounded-lg transition-colors"

@@ -5,19 +5,96 @@ import {
   Users, CheckSquare, Search, ShoppingBag, Globe, RefreshCw
 } from 'lucide-react';
 import { 
-  mockRegions, mockZones, mockTerritories, mockFranchises, mockStores, 
-  mockProducts, mockCategories, mockCustomers, api 
+  api 
 } from './CouponsData';
 import { toast } from 'sonner';
 
 export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
   const [activeTab, setActiveTab] = useState(1);
   const [loading, setLoading] = useState(false);
+
+  const [dbProducts, setDbProducts] = useState([]);
+  const [dbCategories, setDbCategories] = useState([]);
+  const [dbRegions, setDbRegions] = useState([]);
+  const [dbZones, setDbZones] = useState([]);
+  const [dbTerritories, setDbTerritories] = useState([]);
+  const [dbFranchises, setDbFranchises] = useState([]);
+  const [dbStores, setDbStores] = useState([]);
+
+  useEffect(() => {
+    const fetchDropdownData = async () => {
+      try {
+        const { adminClient } = await import('../../../../../services/api/axios');
+        const results = await Promise.allSettled([
+          adminClient.get('/food/admin/products'),
+          adminClient.get('/food/admin/category-products'),
+          adminClient.get('/food/admin/regions'),
+          adminClient.get('/food/admin/zones'),
+          adminClient.get('/food/admin/territories'),
+          adminClient.get('/food/admin/franchises'),
+          adminClient.get('/food/admin/stores')
+        ]);
+        
+        
+        const extractArr = (res, name) => {
+          let arr = [];
+          const d = res?.data?.data || res?.data;
+          if (Array.isArray(d)) {
+            arr = d;
+          } else if (d && typeof d === 'object') {
+            const found = Object.values(d).find(Array.isArray);
+            if (found) arr = found;
+          }
+          if (arr.length === 0 && Array.isArray(res?.data)) arr = res.data;
+          
+          return arr.map((item, idx) => {
+            if (typeof item === 'string') return { id: item, name: item };
+            return {
+              ...item,
+              id: String(item._id || item.id || item.uid || item.categoryId || item.productId || `${name}-${idx}`),
+              name: item.name || item.storeName || item.label || item.title || item.id || `${name}-${idx}`
+            };
+          });
+        };
+
+        const prodRes = results[0].status === 'fulfilled' ? results[0].value : null;
+        const catRes = results[1].status === 'fulfilled' ? results[1].value : null;
+        const regRes = results[2].status === 'fulfilled' ? results[2].value : null;
+        const zoneRes = results[3].status === 'fulfilled' ? results[3].value : null;
+        const terrRes = results[4].status === 'fulfilled' ? results[4].value : null;
+        const franRes = results[5].status === 'fulfilled' ? results[5].value : null;
+        const storeRes = results[6].status === 'fulfilled' ? results[6].value : null;
+
+        setDbProducts(extractArr(prodRes, 'prod'));
+        setDbCategories(extractArr(catRes, 'cat'));
+        setDbRegions(extractArr(regRes, 'reg'));
+        setDbZones(extractArr(zoneRes, 'zone'));
+        setDbTerritories(extractArr(terrRes, 'ter'));
+        setDbFranchises(extractArr(franRes, 'fran'));
+        
+        let storesList = extractArr(storeRes, 'store');
+        if (storesList.length === 0) {
+          try {
+            const fallbackStores = await adminClient.get('/stores');
+            storesList = extractArr(fallbackStores, 'store');
+          } catch (_) {}
+        }
+        setDbStores(storesList);
+      } catch (err) {
+        console.error("Failed to load some dropdown data:", err);
+      }
+    };
+    if (isOpen) {
+      fetchDropdownData();
+    }
+  }, [isOpen]);
+
   const [showExitWarning, setShowExitWarning] = useState(false);
 
   // Form States - Conforms directly to MongoDB schema
   const [code, setCode] = useState('');
   const [title, setTitle] = useState('');
+  const [showOnHome, setShowOnHome] = useState(false);
   const [description, setDescription] = useState('');
   const [couponType, setCouponType] = useState('Percentage'); 
   const [value, setValue] = useState(0);
@@ -51,7 +128,8 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
 
   // Search queries
   const [productSearch, setProductSearch] = useState('');
-  const [customerSearch, setCustomerSearch] = useState('');
+  const [productCategoryFilter, setProductCategoryFilter] = useState('All');
+  
 
   // ----------------------------------------------------
   // Populate existing coupon values
@@ -102,26 +180,142 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
 
   // ----------------------------------------------------
   // Dynamic Option Filters for Dependent Region Hierarchy
+  // Hierarchy Order: Regions -> Zones -> Franchises -> Territories -> Stores
   // ----------------------------------------------------
   const filteredZones = useMemo(() => {
     if (regionIds.length === 0) return [];
-    return mockZones.filter(z => regionIds.includes(z.regionId));
-  }, [regionIds]);
-
-  const filteredTerritories = useMemo(() => {
-    if (zoneIds.length === 0) return [];
-    return mockTerritories.filter(t => zoneIds.includes(t.zoneId));
-  }, [zoneIds]);
+    return dbZones.filter(z => {
+      const rId = z.regionId?._id || z.regionId || z.id;
+      return regionIds.includes(rId);
+    });
+  }, [regionIds, dbZones]);
 
   const filteredFranchises = useMemo(() => {
-    if (territoryIds.length === 0) return [];
-    return mockFranchises.filter(f => territoryIds.includes(f.territoryId));
-  }, [territoryIds]);
+    if (zoneIds.length === 0) return [];
+    return dbFranchises.filter(f => {
+      const zId = f.zoneId?._id || f.zoneId;
+      if (zId && zoneIds.includes(zId)) return true;
+
+      // Mock/relational link via territoryId
+      if (f.territoryId) {
+        const ter = dbTerritories.find(t => (t.id || t._id) === f.territoryId);
+        if (ter && zoneIds.includes(ter.zoneId?._id || ter.zoneId)) return true;
+      }
+
+      // Link via stores belonging to selected zones
+      const hasStoreInZone = dbStores.some(s => {
+        const sFranId = s.franchiseId?._id || s.franchiseId;
+        const sZoneId = s.zoneId?._id || s.zoneId;
+        return (sFranId === f.id || sFranId === f._id) && zoneIds.includes(sZoneId);
+      });
+      if (hasStoreInZone) return true;
+
+      return false;
+    });
+  }, [zoneIds, dbFranchises, dbTerritories, dbStores]);
+
+  const filteredTerritories = useMemo(() => {
+    if (franchiseIds.length === 0) return [];
+
+    // Collect all zones that the selected franchises belong to
+    const activeZoneIds = new Set();
+    dbFranchises.forEach(f => {
+      const fId = String(f._id || f.id || '');
+      if (franchiseIds.some(id => String(id) === fId)) {
+        const zId = String(f.zoneId?._id || f.zoneId?.id || f.zoneId || '');
+        if (zId) activeZoneIds.add(zId);
+      }
+    });
+
+    // Also include any zoneIds already selected in column 2
+    zoneIds.forEach(zId => {
+      if (zId) activeZoneIds.add(String(zId));
+    });
+
+    // Collect specific territory IDs mapped to selected franchises or their stores
+    const franchiseTerritoryIds = new Set();
+    dbFranchises.forEach(f => {
+      const fId = String(f._id || f.id || '');
+      if (franchiseIds.some(id => String(id) === fId)) {
+        const tId = String(f.territoryId?._id || f.territoryId?.id || f.territoryId || '');
+        if (tId) franchiseTerritoryIds.add(tId);
+      }
+    });
+
+    dbStores.forEach(s => {
+      const sFranId = String(s.franchiseId?._id || s.franchiseId?.id || s.franchiseId || '');
+      const sTerrId = String(s.territoryId?._id || s.territoryId?.id || s.territoryId || '');
+      if (franchiseIds.some(id => String(id) === sFranId) && sTerrId) {
+        franchiseTerritoryIds.add(sTerrId);
+      }
+    });
+
+    return dbTerritories.filter(t => {
+      const tId = String(t.id || t._id || '');
+      const tZoneId = String(t.zoneId?._id || t.zoneId?.id || t.zoneId || '');
+
+      // Strictly must belong to one of the selected franchise / active zones
+      if (!activeZoneIds.has(tZoneId)) return false;
+
+      // If specific territories are mapped to these franchises/stores, prioritize them
+      if (franchiseTerritoryIds.size > 0) {
+        return franchiseTerritoryIds.has(tId);
+      }
+      return true;
+    });
+  }, [franchiseIds, zoneIds, dbTerritories, dbFranchises, dbStores]);
 
   const filteredStores = useMemo(() => {
     if (franchiseIds.length === 0) return [];
-    return mockStores.filter(s => franchiseIds.includes(s.franchiseId));
-  }, [franchiseIds]);
+    return dbStores.filter(s => {
+      const sFranId = String(s.franchiseId?._id || s.franchiseId?.id || s.franchiseId || '');
+      const matchesFranchise = franchiseIds.some(id => String(id) === sFranId);
+      if (!matchesFranchise) return false;
+
+      if (territoryIds.length > 0) {
+        const sTerrId = String(s.territoryId?._id || s.territoryId?.id || s.territoryId || '');
+        return sTerrId ? territoryIds.some(id => String(id) === sTerrId) : true;
+      }
+      return true;
+    });
+  }, [franchiseIds, territoryIds, dbStores]);
+
+  // Clean up child selections when parent selections change (safe guards prevent infinite update loops)
+  useEffect(() => {
+    setZoneIds(prev => {
+      if (!prev || prev.length === 0) return prev;
+      const valid = new Set(filteredZones.map(z => String(z.id || z._id)));
+      const next = prev.filter(zId => valid.has(String(zId)));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [filteredZones]);
+
+  useEffect(() => {
+    setFranchiseIds(prev => {
+      if (!prev || prev.length === 0) return prev;
+      const valid = new Set(filteredFranchises.map(f => String(f.id || f._id)));
+      const next = prev.filter(fId => valid.has(String(fId)));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [filteredFranchises]);
+
+  useEffect(() => {
+    setTerritoryIds(prev => {
+      if (!prev || prev.length === 0) return prev;
+      const valid = new Set(filteredTerritories.map(t => String(t.id || t._id)));
+      const next = prev.filter(tId => valid.has(String(tId)));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [filteredTerritories]);
+
+  useEffect(() => {
+    setStoreIds(prev => {
+      if (!prev || prev.length === 0) return prev;
+      const valid = new Set(filteredStores.map(s => String(s.id || s._id)));
+      const next = prev.filter(sId => valid.has(String(sId)));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [filteredStores]);
 
   // ----------------------------------------------------
   // Unsaved Changes Detection
@@ -163,48 +357,30 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
     coupon, code, title, description, couponType, value,
     minimumOrderAmount, maximumDiscount, usageLimit, usagePerCustomer,
     applicableOn, status, productIds, categoryIds, regionIds, zoneIds,
-    territoryIds, franchiseIds, storeIds, customerSegments, customerIds
-  ]);
-
-  // Clean up child selections when parent selections change
-  useEffect(() => {
-    setZoneIds(prev => prev.filter(zId => filteredZones.some(z => z.id === zId)));
-  }, [regionIds, filteredZones]);
-
-  useEffect(() => {
-    setTerritoryIds(prev => prev.filter(tId => filteredTerritories.some(t => t.id === tId)));
-  }, [zoneIds, filteredTerritories]);
-
-  useEffect(() => {
-    setFranchiseIds(prev => prev.filter(fId => filteredFranchises.some(f => f.id === fId)));
-  }, [territoryIds, filteredFranchises]);
-
-  useEffect(() => {
-    setStoreIds(prev => prev.filter(sId => filteredStores.some(s => s.id === sId)));
-  }, [franchiseIds, filteredStores]);
+    territoryIds, franchiseIds, storeIds, customerSegments,   ]);
 
   // ----------------------------------------------------
   // Item Searching & Filtering
   // ----------------------------------------------------
   const searchedProducts = useMemo(() => {
-    if (!productSearch) return mockProducts;
+    let prods = dbProducts;
+    if (productCategoryFilter !== 'All') {
+      prods = prods.filter(p => p.categoryId === productCategoryFilter);
+    }
+    if (!productSearch) return prods;
     const q = productSearch.toLowerCase();
-    return mockProducts.filter(p => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
-  }, [productSearch]);
+    return prods.filter(p => p.name.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q));
+  }, [productSearch, productCategoryFilter, dbProducts]);
 
-  const searchedCustomers = useMemo(() => {
-    if (!customerSearch) return mockCustomers;
-    const q = customerSearch.toLowerCase();
-    return mockCustomers.filter(c => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q));
-  }, [customerSearch]);
+  
 
   if (!isOpen || !coupon) return null;
 
   const handleRegionSelectAll = () => {
-    if (regionIds.length === mockRegions.length) {
+    if (regionIds.length === dbRegions.length) {
       setRegionIds([]);
     } else {
-      setRegionIds(mockRegions.map(r => r.id));
+      setRegionIds(dbRegions.map(r => r.id || r._id));
     }
   };
 
@@ -212,15 +388,7 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
     if (zoneIds.length === filteredZones.length) {
       setZoneIds([]);
     } else {
-      setZoneIds(filteredZones.map(z => z.id));
-    }
-  };
-
-  const handleTerritorySelectAll = () => {
-    if (territoryIds.length === filteredTerritories.length) {
-      setTerritoryIds([]);
-    } else {
-      setTerritoryIds(filteredTerritories.map(t => t.id));
+      setZoneIds(filteredZones.map(z => z.id || z._id));
     }
   };
 
@@ -228,7 +396,15 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
     if (franchiseIds.length === filteredFranchises.length) {
       setFranchiseIds([]);
     } else {
-      setFranchiseIds(filteredFranchises.map(f => f.id));
+      setFranchiseIds(filteredFranchises.map(f => f.id || f._id));
+    }
+  };
+
+  const handleTerritorySelectAll = () => {
+    if (territoryIds.length === filteredTerritories.length) {
+      setTerritoryIds([]);
+    } else {
+      setTerritoryIds(filteredTerritories.map(t => t.id || t._id));
     }
   };
 
@@ -236,7 +412,7 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
     if (storeIds.length === filteredStores.length) {
       setStoreIds([]);
     } else {
-      setStoreIds(filteredStores.map(s => s.id));
+      setStoreIds(filteredStores.map(s => s.id || s._id));
     }
   };
 
@@ -316,6 +492,7 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
     try {
       const payload = {
         code: code.trim().toUpperCase(),
+        showOnHome,
         title: title.trim(),
         description: description.trim(),
         couponType,
@@ -332,9 +509,7 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
         territoryIds,
         franchiseIds,
         storeIds,
-        customerSegments,
-        customerIds,
-        startDate: new Date(startDate).toISOString(),
+                        startDate: new Date(startDate).toISOString(),
         endDate: new Date(endDate).toISOString(),
         status
       };
@@ -355,15 +530,14 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
     { id: 2, title: 'Conditions', desc: 'Min order and limits' },
     { id: 3, title: 'Applicability', desc: 'Categories or products' },
     { id: 4, title: 'Region Assignment', desc: 'Dependent locations' },
-    { id: 5, title: 'Customer Targeting', desc: 'Customer segments' },
-    { id: 6, title: 'Validity', desc: 'Dates and final status' }
+    { id: 5, title: 'Validity', desc: 'Dates and final status' }
   ];
 
   return (
     <>
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center lg:pl-[280px] p-4">
-        {/* 1200px Width Container */}
-        <div className="bg-white dark:bg-zinc-955 w-full max-w-[1200px] h-[750px] max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl flex flex-col border border-zinc-200 dark:border-zinc-800 animate-in fade-in zoom-in-95 duration-200">
+        {/* Broad 1380px Width Container for maximum readability */}
+        <div className="bg-white dark:bg-zinc-955 w-full max-w-[1380px] h-[780px] max-h-[92vh] overflow-hidden rounded-2xl shadow-2xl flex flex-col border border-zinc-200 dark:border-zinc-800 animate-in fade-in zoom-in-95 duration-200">
           
           {/* Header */}
           <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-zinc-50 dark:bg-zinc-900 shrink-0">
@@ -383,7 +557,7 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
           <div className="flex flex-1 overflow-hidden min-h-0">
             
             {/* Left Navigation Stepper Sidebar */}
-            <div className="w-72 bg-zinc-50 dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 p-5 flex flex-col gap-1 overflow-y-auto shrink-0 select-none">
+            <div className="w-64 bg-zinc-50 dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 p-5 flex flex-col gap-1 overflow-y-auto shrink-0 select-none">
               <span className="text-[9px] font-bold text-zinc-450 dark:text-zinc-500 uppercase tracking-widest mb-4">Configuration Stages</span>
               {stepTabs.map((tab) => {
                 const isActive = activeTab === tab.id;
@@ -395,7 +569,7 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
                     className={`w-full text-left p-3.5 rounded-xl border flex items-start gap-3 transition-all cursor-pointer ${
                       isActive 
                         ? 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-805 shadow-sm text-[var(--primary)] font-bold' 
-                        : 'border-transparent text-zinc-650 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-850'
+                        : 'border-transparent text-zinc-700 dark:text-zinc-300 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-850'
                     }`}
                   >
                     <div className={`w-5 h-5 rounded-full border flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5 ${
@@ -637,7 +811,7 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
                       <div className="space-y-3 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 bg-zinc-50/50 dark:bg-zinc-900/20 animate-slide-down">
                         <label className="text-[10px] font-black text-zinc-450 uppercase tracking-wider block">Select Categories</label>
                         <div className="grid grid-cols-2 gap-2 mt-2">
-                          {mockCategories.map((cat) => {
+                          {dbCategories.map((cat) => {
                             const isSelected = categoryIds.includes(cat.id);
                             return (
                               <button
@@ -651,7 +825,7 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
                                 className={`p-3 rounded-lg border text-left flex items-center justify-between text-xs font-bold transition-all cursor-pointer ${
                                   isSelected 
                                     ? 'border-[var(--primary)] bg-[var(--primary)]/5 dark:bg-[var(--primary)]/10 text-black dark:text-white' 
-                                    : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-850 text-zinc-650'
+                                    : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-850 text-zinc-700 dark:text-zinc-300'
                                 }`}
                               >
                                 <span>{cat.name}</span>
@@ -664,50 +838,65 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
                     )}
 
                     {applicableOn === 'Product' && (
-                      <div className="space-y-3 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 bg-zinc-50/50 dark:bg-zinc-900/20 animate-slide-down">
-                        <div className="flex items-center justify-between gap-3">
-                          <label className="text-[10px] font-black text-zinc-450 uppercase tracking-wider">Select Products</label>
-                          <div className="relative max-w-xs w-full">
+                    <div className="space-y-3 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 bg-zinc-50/50 dark:bg-zinc-900/20 animate-slide-down">
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-[10px] font-black text-zinc-450 uppercase tracking-wider shrink-0">Select Products</label>
+                        <div className="flex items-center gap-2 flex-1 justify-end">
+                          <select 
+                            value={productCategoryFilter}
+                            onChange={(e) => setProductCategoryFilter(e.target.value)}
+                            className="h-7 px-2 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-md outline-none text-[10px] font-semibold max-w-[140px] truncate"
+                          >
+                            <option value="All">All Categories</option>
+                            {dbCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                          <div className="relative max-w-[160px] w-full">
                             <Search size={12} className="absolute left-2.5 top-2 text-zinc-400" />
                             <input 
                               type="text" 
                               value={productSearch}
                               onChange={(e) => setProductSearch(e.target.value)}
                               className="w-full h-7 pl-7 pr-2.5 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-md outline-none text-[10px] font-semibold"
-                              placeholder="Search products..."
+                              placeholder="Search products by SKU or name..."
                             />
                           </div>
                         </div>
+                      </div>
 
-                        <div className="grid grid-cols-2 gap-2 mt-2 max-h-[200px] overflow-y-auto pr-1">
-                          {searchedProducts.map((prod) => {
-                            const isSelected = productIds.includes(prod.id);
-                            return (
-                              <button
-                                type="button"
-                                key={prod.id}
-                                onClick={() => {
-                                  setProductIds(prev => 
-                                    prev.includes(prod.id) ? prev.filter(id => id !== prod.id) : [...prev, prod.id]
-                                  );
-                                }}
-                                className={`p-2 rounded-lg border text-left flex items-center justify-between text-xs font-bold transition-all cursor-pointer ${
-                                  isSelected 
-                                    ? 'border-[var(--primary)] bg-[var(--primary)]/5 dark:bg-[var(--primary)]/10 text-black dark:text-white' 
-                                    : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-850 text-zinc-650'
-                                }`}
-                              >
-                                <div className="min-w-0 pr-2">
+                      <div className="grid grid-cols-2 gap-2 mt-2 max-h-[200px] overflow-y-auto pr-1">
+                        {searchedProducts.map((prod) => {
+                          const isSelected = productIds.includes(prod.id);
+                          return (
+                            <label
+                              key={prod.id}
+                              className={`p-2 rounded-lg border text-left flex items-center justify-between text-xs font-bold transition-all cursor-pointer select-none ${
+                                isSelected 
+                                  ? 'border-[var(--primary)] bg-[var(--primary)]/5 dark:bg-[var(--primary)]/10 text-black dark:text-white' 
+                                  : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-850 text-zinc-700 dark:text-zinc-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                                <input 
+                                  type="checkbox" 
+                                  checked={isSelected}
+                                  onChange={() => {
+                                    setProductIds(prev => 
+                                      prev.includes(prod.id) ? prev.filter(id => id !== prod.id) : [...prev, prod.id]
+                                    );
+                                  }}
+                                  className="w-3.5 h-3.5 text-[var(--primary)] focus:ring-[var(--primary)] rounded cursor-pointer shrink-0"
+                                />
+                                <div className="min-w-0">
                                   <p className="truncate leading-none">{prod.name}</p>
                                   <span className="text-[9px] text-zinc-400 font-mono mt-1 block">{prod.sku} • ₹{prod.price}</span>
                                 </div>
-                                {isSelected && <Check size={14} className="text-[var(--primary)] shrink-0" />}
-                              </button>
-                            );
-                          })}
-                        </div>
+                              </div>
+                            </label>
+                          );
+                        })}
                       </div>
-                    )}
+                    </div>
+                  )}
                   </div>
                 </div>
               )}
@@ -720,253 +909,221 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
                     <p className="text-[11px] text-zinc-555">Configure franchised regions. Parents filter children dynamically.</p>
                   </div>
 
-                  {/* Dependent Select columns */}
-                  <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 bg-zinc-50/50 dark:bg-zinc-900/20 flex-1 overflow-hidden min-h-[300px]">
+                  {/* Dependent Hierarchical Select columns - Broad & Horizontally Scrollable */}
+                  <div className="flex gap-3.5 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-3.5 bg-zinc-50/60 dark:bg-zinc-900/30 flex-1 overflow-x-auto min-h-[420px] pb-3 shadow-inner">
                     
-                    {/* Regions List */}
-                    <div className="flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-950 overflow-hidden h-full min-h-[150px]">
-                      <div className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-3 py-2 flex items-center justify-between shrink-0 select-none">
-                        <span className="text-[9px] font-extrabold uppercase tracking-wide">Regions</span>
-                        <button type="button" onClick={handleRegionSelectAll} className="text-[8px] text-[var(--primary)] font-black uppercase hover:underline">All</button>
+                    {/* 1. Regions List */}
+                    <div className="flex flex-col flex-1 min-w-[220px] border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-950 overflow-hidden h-full shadow-sm">
+                      <div className="bg-zinc-100/70 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-3.5 py-2.5 flex items-center justify-between shrink-0 select-none">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
+                          Regions {regionIds.length > 0 && <span className="text-[var(--primary)] font-bold">({regionIds.length}/{dbRegions.length})</span>}
+                        </span>
+                        <button type="button" onClick={handleRegionSelectAll} className="text-[9px] text-[var(--primary)] font-black uppercase hover:underline cursor-pointer">
+                          {regionIds.length === dbRegions.length && dbRegions.length > 0 ? 'Clear' : 'All'}
+                        </button>
                       </div>
                       <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                        {mockRegions.map(reg => {
-                          const isChecked = regionIds.includes(reg.id);
+                        {dbRegions.map(reg => {
+                          const regId = reg.id || reg._id;
+                          const isChecked = regionIds.includes(regId);
                           return (
-                            <label key={reg.id} className="flex items-center gap-2 p-1.5 rounded hover:bg-zinc-50 dark:hover:bg-zinc-900 text-[10px] font-bold text-zinc-700 dark:text-zinc-350 cursor-pointer select-none">
+                            <label key={regId} className={`flex items-start gap-2.5 p-2 rounded-lg text-xs font-bold cursor-pointer select-none transition-colors ${
+                              isChecked ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'hover:bg-zinc-50 dark:hover:bg-zinc-900 text-zinc-700 dark:text-zinc-300'
+                            }`}>
                               <input 
                                 type="checkbox" 
                                 checked={isChecked}
                                 onChange={() => {
                                   setRegionIds(prev => 
-                                    prev.includes(reg.id) ? prev.filter(id => id !== reg.id) : [...prev, reg.id]
+                                    prev.includes(regId) ? prev.filter(id => id !== regId) : [...prev, regId]
                                   );
                                 }}
-                                className="w-3 h-3 text-[var(--primary)] focus:ring-[var(--primary)] rounded cursor-pointer"
+                                className="w-3.5 h-3.5 mt-0.5 text-[var(--primary)] focus:ring-[var(--primary)] rounded cursor-pointer shrink-0"
                               />
-                              <span className="truncate">{reg.name.split(' (')[0]}</span>
+                              <span className="leading-snug break-words" title={reg.name}>{reg.name}</span>
                             </label>
                           );
                         })}
                       </div>
                     </div>
 
-                    {/* Zones List */}
-                    <div className="flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-955 overflow-hidden h-full min-h-[150px]" style={{ opacity: regionIds.length === 0 ? 0.4 : 1 }}>
-                      <div className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-3 py-2 flex items-center justify-between shrink-0 select-none">
-                        <span className="text-[9px] font-extrabold uppercase tracking-wide">Zones</span>
-                        {filteredZones.length > 0 && <button type="button" onClick={handleZoneSelectAll} className="text-[8px] text-[var(--primary)] font-black uppercase hover:underline">All</button>}
+                    {/* 2. Zones List */}
+                    <div className="flex flex-col flex-1 min-w-[220px] border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-955 overflow-hidden h-full shadow-sm transition-opacity duration-200" style={{ opacity: regionIds.length === 0 ? 0.45 : 1 }}>
+                      <div className="bg-zinc-100/70 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-3.5 py-2.5 flex items-center justify-between shrink-0 select-none">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
+                          Zones {zoneIds.length > 0 && <span className="text-[var(--primary)] font-bold">({zoneIds.length}/{filteredZones.length})</span>}
+                        </span>
+                        {filteredZones.length > 0 && (
+                          <button type="button" onClick={handleZoneSelectAll} className="text-[9px] text-[var(--primary)] font-black uppercase hover:underline cursor-pointer">
+                            {zoneIds.length === filteredZones.length ? 'Clear' : 'All'}
+                          </button>
+                        )}
                       </div>
                       <div className="flex-1 overflow-y-auto p-2 space-y-1">
                         {regionIds.length === 0 ? (
-                          <p className="text-[9px] text-zinc-400 text-center mt-6">Select a Region</p>
+                          <p className="text-[10px] text-zinc-400 font-semibold text-center mt-8">Select a Region</p>
+                        ) : filteredZones.length === 0 ? (
+                          <p className="text-[10px] text-zinc-400 font-semibold text-center mt-8">No Zones Found</p>
                         ) : (
                           filteredZones.map(zone => {
-                            const isChecked = zoneIds.includes(zone.id);
+                            const zId = zone.id || zone._id;
+                            const isChecked = zoneIds.includes(zId);
                             return (
-                              <label key={zone.id} className="flex items-center gap-2 p-1.5 rounded hover:bg-zinc-50 dark:hover:bg-zinc-900 text-[10px] font-bold text-zinc-700 dark:text-zinc-350 cursor-pointer select-none">
+                              <label key={zId} className={`flex items-start gap-2.5 p-2 rounded-lg text-xs font-bold cursor-pointer select-none transition-colors ${
+                                isChecked ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'hover:bg-zinc-50 dark:hover:bg-zinc-900 text-zinc-700 dark:text-zinc-300'
+                              }`}>
                                 <input 
-                                  type="checkbox" 
-                                  checked={isChecked}
-                                  onChange={() => {
-                                    setZoneIds(prev => 
-                                      prev.includes(zone.id) ? prev.filter(id => id !== zone.id) : [...prev, zone.id]
-                                    );
-                                  }}
-                                  className="w-3 h-3 text-[var(--primary)] focus:ring-[var(--primary)] rounded cursor-pointer"
-                                />
-                                <span className="truncate">{zone.name}</span>
-                              </label>
-                            );
-                          })
-                        )}
-                      </div>
+                                type="checkbox" 
+                                checked={isChecked}
+                                onChange={() => {
+                                  setZoneIds(prev => 
+                                    prev.includes(zId) ? prev.filter(id => id !== zId) : [...prev, zId]
+                                  );
+                                }}
+                                className="w-3.5 h-3.5 mt-0.5 text-[var(--primary)] focus:ring-[var(--primary)] rounded cursor-pointer shrink-0"
+                              />
+                              <span className="leading-snug break-words" title={zone.name}>{zone.name}</span>
+                            </label>
+                          );
+                        })
+                      )}
                     </div>
+                  </div>
 
-                    {/* Territories List */}
-                    <div className="flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-955 overflow-hidden h-full min-h-[150px]" style={{ opacity: zoneIds.length === 0 ? 0.4 : 1 }}>
-                      <div className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-3 py-2 flex items-center justify-between shrink-0 select-none">
-                        <span className="text-[9px] font-extrabold uppercase tracking-wide">Territories</span>
-                        {filteredTerritories.length > 0 && <button type="button" onClick={handleTerritorySelectAll} className="text-[8px] text-[var(--primary)] font-black uppercase hover:underline">All</button>}
-                      </div>
-                      <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                        {zoneIds.length === 0 ? (
-                          <p className="text-[9px] text-zinc-400 text-center mt-6">Select a Zone</p>
-                        ) : (
-                          filteredTerritories.map(ter => {
-                            const isChecked = territoryIds.includes(ter.id);
-                            return (
-                              <label key={ter.id} className="flex items-center gap-2 p-1.5 rounded hover:bg-zinc-50 dark:hover:bg-zinc-900 text-[10px] font-bold text-zinc-700 dark:text-zinc-350 cursor-pointer select-none">
-                                <input 
-                                  type="checkbox" 
-                                  checked={isChecked}
-                                  onChange={() => {
-                                    setTerritoryIds(prev => 
-                                      prev.includes(ter.id) ? prev.filter(id => id !== ter.id) : [...prev, ter.id]
-                                    );
-                                  }}
-                                  className="w-3 h-3 text-[var(--primary)] focus:ring-[var(--primary)] rounded cursor-pointer"
-                                />
-                                <span className="truncate">{ter.name.split(' Territory')[0]}</span>
-                              </label>
-                            );
-                          })
-                        )}
-                      </div>
+                  {/* 3. Franchises List */}
+                  <div className="flex flex-col flex-1 min-w-[220px] border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-955 overflow-hidden h-full shadow-sm transition-opacity duration-200" style={{ opacity: zoneIds.length === 0 ? 0.45 : 1 }}>
+                    <div className="bg-zinc-100/70 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-3.5 py-2.5 flex items-center justify-between shrink-0 select-none">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
+                        Franchises {franchiseIds.length > 0 && <span className="text-[var(--primary)] font-bold">({franchiseIds.length}/{filteredFranchises.length})</span>}
+                      </span>
+                      {filteredFranchises.length > 0 && (
+                        <button type="button" onClick={handleFranchiseSelectAll} className="text-[9px] text-[var(--primary)] font-black uppercase hover:underline cursor-pointer">
+                          {franchiseIds.length === filteredFranchises.length ? 'Clear' : 'All'}
+                        </button>
+                      )}
                     </div>
-
-                    {/* Franchises List */}
-                    <div className="flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-955 overflow-hidden h-full min-h-[150px]" style={{ opacity: territoryIds.length === 0 ? 0.4 : 1 }}>
-                      <div className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-3 py-2 flex items-center justify-between shrink-0 select-none">
-                        <span className="text-[9px] font-extrabold uppercase tracking-wide">Franchises</span>
-                        {filteredFranchises.length > 0 && <button type="button" onClick={handleFranchiseSelectAll} className="text-[8px] text-[var(--primary)] font-black uppercase hover:underline">All</button>}
-                      </div>
-                      <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                        {territoryIds.length === 0 ? (
-                          <p className="text-[9px] text-zinc-400 text-center mt-6">Select a Territory</p>
-                        ) : (
-                          filteredFranchises.map(fran => {
-                            const isChecked = franchiseIds.includes(fran.id);
-                            return (
-                              <label key={fran.id} className="flex items-center gap-2 p-1.5 rounded hover:bg-zinc-50 dark:hover:bg-zinc-900 text-[10px] font-bold text-zinc-700 dark:text-zinc-350 cursor-pointer select-none">
-                                <input 
-                                  type="checkbox" 
-                                  checked={isChecked}
-                                  onChange={() => {
-                                    setFranchiseIds(prev => 
-                                      prev.includes(fran.id) ? prev.filter(id => id !== fran.id) : [...prev, fran.id]
-                                    );
-                                  }}
-                                  className="w-3 h-3 text-[var(--primary)] focus:ring-[var(--primary)] rounded cursor-pointer"
-                                />
-                                <span className="truncate">{fran.name}</span>
-                              </label>
-                            );
-                          })
-                        )}
-                      </div>
+                    <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                      {zoneIds.length === 0 ? (
+                        <p className="text-[10px] text-zinc-400 font-semibold text-center mt-8">Select a Zone</p>
+                      ) : filteredFranchises.length === 0 ? (
+                        <p className="text-[10px] text-zinc-400 font-semibold text-center mt-8">No Franchises Found</p>
+                      ) : (
+                        filteredFranchises.map(fran => {
+                          const fId = fran.id || fran._id;
+                          const isChecked = franchiseIds.includes(fId);
+                          return (
+                            <label key={fId} className={`flex items-start gap-2.5 p-2 rounded-lg text-xs font-bold cursor-pointer select-none transition-colors ${
+                              isChecked ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'hover:bg-zinc-50 dark:hover:bg-zinc-900 text-zinc-700 dark:text-zinc-350'
+                            }`}>
+                              <input 
+                                type="checkbox" 
+                                checked={isChecked}
+                                onChange={() => {
+                                  setFranchiseIds(prev => 
+                                    prev.includes(fId) ? prev.filter(id => id !== fId) : [...prev, fId]
+                                  );
+                                }}
+                                className="w-3.5 h-3.5 mt-0.5 text-[var(--primary)] focus:ring-[var(--primary)] rounded cursor-pointer shrink-0"
+                              />
+                              <span className="leading-snug break-words" title={fran.name}>{fran.name}</span>
+                            </label>
+                          );
+                        })
+                      )}
                     </div>
+                  </div>
 
-                    {/* Stores List */}
-                    <div className="flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-955 overflow-hidden h-full min-h-[150px]" style={{ opacity: franchiseIds.length === 0 ? 0.4 : 1 }}>
-                      <div className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-3 py-2 flex items-center justify-between shrink-0 select-none">
-                        <span className="text-[9px] font-extrabold uppercase tracking-wide">Stores</span>
-                        {filteredStores.length > 0 && <button type="button" onClick={handleStoreSelectAll} className="text-[8px] text-[var(--primary)] font-black uppercase hover:underline">All</button>}
-                      </div>
-                      <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                        {franchiseIds.length === 0 ? (
-                          <p className="text-[9px] text-zinc-400 text-center mt-6">Select a Franchise</p>
-                        ) : (
-                          filteredStores.map(store => {
-                            const isChecked = storeIds.includes(store.id);
-                            return (
-                              <label key={store.id} className="flex items-center gap-2 p-1.5 rounded hover:bg-zinc-50 dark:hover:bg-zinc-900 text-[10px] font-bold text-zinc-700 dark:text-zinc-350 cursor-pointer select-none">
-                                <input 
-                                  type="checkbox" 
-                                  checked={isChecked}
-                                  onChange={() => {
-                                    setStoreIds(prev => 
-                                      prev.includes(store.id) ? prev.filter(id => id !== store.id) : [...prev, store.id]
-                                    );
-                                  }}
-                                  className="w-3 h-3 text-[var(--primary)] focus:ring-[var(--primary)] rounded cursor-pointer"
-                                />
-                                <span className="truncate" title={store.name}>{store.name.split('Papa Veg Pizza - ')[1] || store.name}</span>
-                              </label>
-                            );
-                          })
-                        )}
-                      </div>
+                  {/* 4. Territories List */}
+                  <div className="flex flex-col flex-1 min-w-[220px] border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-955 overflow-hidden h-full shadow-sm transition-opacity duration-200" style={{ opacity: franchiseIds.length === 0 ? 0.45 : 1 }}>
+                    <div className="bg-zinc-100/70 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-3.5 py-2.5 flex items-center justify-between shrink-0 select-none">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
+                        Territories {territoryIds.length > 0 && <span className="text-[var(--primary)] font-bold">({territoryIds.length}/{filteredTerritories.length})</span>}
+                      </span>
+                      {filteredTerritories.length > 0 && (
+                        <button type="button" onClick={handleTerritorySelectAll} className="text-[9px] text-[var(--primary)] font-black uppercase hover:underline cursor-pointer">
+                          {territoryIds.length === filteredTerritories.length ? 'Clear' : 'All'}
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                      {franchiseIds.length === 0 ? (
+                        <p className="text-[10px] text-zinc-400 font-semibold text-center mt-8">Select a Franchise</p>
+                      ) : filteredTerritories.length === 0 ? (
+                        <p className="text-[10px] text-zinc-400 font-semibold text-center mt-8">No Territories Found</p>
+                      ) : (
+                        filteredTerritories.map(ter => {
+                          const tId = ter.id || ter._id;
+                          const isChecked = territoryIds.includes(tId);
+                          return (
+                            <label key={tId} className={`flex items-start gap-2.5 p-2 rounded-lg text-xs font-bold cursor-pointer select-none transition-colors ${
+                              isChecked ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'hover:bg-zinc-50 dark:hover:bg-zinc-900 text-zinc-700 dark:text-zinc-350'
+                            }`}>
+                              <input 
+                                type="checkbox" 
+                                checked={isChecked}
+                                onChange={() => {
+                                  setTerritoryIds(prev => 
+                                    prev.includes(tId) ? prev.filter(id => id !== tId) : [...prev, tId]
+                                  );
+                                }}
+                                className="w-3.5 h-3.5 mt-0.5 text-[var(--primary)] focus:ring-[var(--primary)] rounded cursor-pointer shrink-0"
+                              />
+                              <span className="leading-snug break-words" title={ter.name}>{ter.name}</span>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 5. Stores List */}
+                  <div className="flex flex-col flex-1 min-w-[220px] border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-955 overflow-hidden h-full shadow-sm transition-opacity duration-200" style={{ opacity: franchiseIds.length === 0 ? 0.45 : 1 }}>
+                    <div className="bg-zinc-100/70 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-3.5 py-2.5 flex items-center justify-between shrink-0 select-none">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
+                        Stores {storeIds.length > 0 && <span className="text-[var(--primary)] font-bold">({storeIds.length}/{filteredStores.length})</span>}
+                      </span>
+                      {filteredStores.length > 0 && (
+                        <button type="button" onClick={handleStoreSelectAll} className="text-[9px] text-[var(--primary)] font-black uppercase hover:underline cursor-pointer">
+                          {storeIds.length === filteredStores.length ? 'Clear' : 'All'}
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                      {franchiseIds.length === 0 ? (
+                        <p className="text-[10px] text-zinc-400 font-semibold text-center mt-8">Select a Franchise</p>
+                      ) : filteredStores.length === 0 ? (
+                        <p className="text-[10px] text-zinc-400 font-semibold text-center mt-8">No Stores Found</p>
+                      ) : (
+                        filteredStores.map(store => {
+                          const sId = store.id || store._id;
+                          const isChecked = storeIds.includes(sId);
+                          return (
+                            <label key={sId} className={`flex items-start gap-2.5 p-2 rounded-lg text-xs font-bold cursor-pointer select-none transition-colors ${
+                              isChecked ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'hover:bg-zinc-50 dark:hover:bg-zinc-900 text-zinc-700 dark:text-zinc-350'
+                            }`}>
+                              <input 
+                                type="checkbox" 
+                                checked={isChecked}
+                                onChange={() => {
+                                  setStoreIds(prev => 
+                                    prev.includes(sId) ? prev.filter(id => id !== sId) : [...prev, sId]
+                                  );
+                                }}
+                                className="w-3.5 h-3.5 mt-0.5 text-[var(--primary)] focus:ring-[var(--primary)] rounded cursor-pointer shrink-0"
+                              />
+                              <span className="leading-snug break-words" title={store.name}>{store.name}</span>
+                            </label>
+                          );
+                        })
+                      )}
                     </div>
                   </div>
                 </div>
+                </div>
               )}
 
-              {/* Step 5: Customer Targeting */}
+              {/* Step 5: Validity & Status */}
               {activeTab === 5 && (
-                <div className="space-y-6 flex-1">
-                  <div>
-                    <h3 className="text-sm font-black text-black dark:text-white">Customer Segment Targeting</h3>
-                    <p className="text-[11px] text-zinc-555">Target specific segments or direct customer accounts.</p>
-                  </div>
-
-                  <div className="space-y-5">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-450 uppercase tracking-wider block">Customer Segments</label>
-                      <div className="flex flex-wrap gap-2.5">
-                        {['New Customers', 'Premium Users', 'Inactive Users'].map((seg) => {
-                          const isSelected = customerSegments.includes(seg);
-                          return (
-                            <button
-                              type="button"
-                              key={seg}
-                              onClick={() => {
-                                      setCustomerSegments(prev => 
-                                        prev.includes(seg) ? prev.filter(item => item !== seg) : [...prev, seg]
-                                      );
-                                    }}
-                              className={`px-4 py-2 border rounded-full text-xs font-bold transition-all cursor-pointer ${
-                                isSelected 
-                                  ? 'bg-[var(--primary)]/10 text-[var(--primary)] border-[var(--primary)]' 
-                                  : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-350 dark:hover:border-zinc-700 text-zinc-655'
-                              }`}
-                            >
-                              {seg}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 bg-zinc-50/50 dark:bg-zinc-900/20">
-                      <div className="flex items-center justify-between gap-3">
-                        <label className="text-[10px] font-black text-zinc-450 uppercase tracking-wider">Target Specific Customers Only (Optional)</label>
-                        <div className="relative max-w-xs w-full">
-                          <Search size={12} className="absolute left-2.5 top-2 text-zinc-400" />
-                          <input 
-                            type="text" 
-                            value={customerSearch}
-                            onChange={(e) => setCustomerSearch(e.target.value)}
-                            className="w-full h-7 pl-7 pr-2.5 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-md outline-none text-[10px] font-semibold"
-                            placeholder="Search customers..."
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 mt-2 max-h-[160px] overflow-y-auto pr-1">
-                        {searchedCustomers.map((cust) => {
-                          const isSelected = customerIds.includes(cust.id);
-                          return (
-                            <button
-                              type="button"
-                              key={cust.id}
-                              onClick={() => {
-                                setCustomerIds(prev => 
-                                  prev.includes(cust.id) ? prev.filter(id => id !== cust.id) : [...prev, cust.id]
-                                );
-                              }}
-                              className={`p-2 rounded-lg border text-left flex items-center justify-between text-xs font-bold transition-all cursor-pointer ${
-                                isSelected 
-                                  ? 'border-[var(--primary)] bg-[var(--primary)]/5 dark:bg-[var(--primary)]/10 text-black dark:text-white' 
-                                  : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-850 text-zinc-655'
-                              }`}
-                            >
-                              <div className="min-w-0 pr-2">
-                                <p className="truncate leading-none">{cust.name}</p>
-                                <span className="text-[9px] text-zinc-400 mt-1 block truncate">{cust.email}</span>
-                              </div>
-                              {isSelected && <Check size={14} className="text-[var(--primary)] shrink-0" />}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 6: Validity & Status */}
-              {activeTab === 6 && (
                 <div className="space-y-6 flex-1">
                   <div>
                     <h3 className="text-sm font-black text-black dark:text-white">Campaign Validity Schedule</h3>
@@ -1000,43 +1157,7 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
                       />
                     </div>
 
-                    <div className="md:col-span-2 p-4 bg-zinc-50 dark:bg-zinc-900/40 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex items-center justify-between shadow-sm">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-white dark:bg-zinc-850 flex items-center justify-center text-[var(--primary)] border border-zinc-200 dark:border-zinc-700 shadow-sm shrink-0">
-                          <Globe size={15} />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-zinc-900 dark:text-zinc-50">Operational Status</p>
-                          <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Controls if client systems can parse this promotion.</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-955 p-1 border border-zinc-250 dark:border-zinc-800 rounded-lg">
-                        <button
-                          type="button"
-                          onClick={() => setStatus('active')}
-                          className={`px-3 py-1 rounded text-[10px] font-black uppercase transition-colors cursor-pointer ${
-                            status === 'active' 
-                              ? 'bg-emerald-500 text-white shadow-sm' 
-                              : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-350'
-                          }`}
-                        >
-                          Active
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setStatus('disabled')}
-                          className={`px-3 py-1 rounded text-[10px] font-black uppercase transition-colors cursor-pointer ${
-                            status === 'disabled' 
-                              ? 'bg-zinc-500 text-white shadow-sm' 
-                              : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-350'
-                          }`}
-                        >
-                          Disabled
-                        </button>
-                      </div>
                     </div>
-                  </div>
                 </div>
               )}
 
@@ -1060,7 +1181,7 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
                   >
                     Cancel
                   </button>
-                  {activeTab < 6 ? (
+                  {activeTab < 5 ? (
                     <button
                       type="button"
                       onClick={nextStep}

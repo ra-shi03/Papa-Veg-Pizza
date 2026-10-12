@@ -20,5 +20,23 @@ router.patch('/home-page', authMiddleware, requireSuperAdmin, updateHomePageConf
 router.post('/home-page/banner', authMiddleware, requireSuperAdmin, upload.single('file'), uploadHomePageBanner);
 router.delete('/home-page/banner/:publicId', authMiddleware, requireSuperAdmin, deleteHomePageBanner);
 
+import * as foodCouponController from '../controllers/foodCoupon.controller.js';
+import * as promiseCampaignController from '../controllers/promiseCampaign.controller.js';
+
+// Coupon management routes
+router.get('/coupons', authMiddleware, requireSuperAdmin, foodCouponController.getAllCoupons);
+router.get('/coupons/analytics', authMiddleware, requireSuperAdmin, foodCouponController.getCouponAnalytics);
+router.post('/coupons', authMiddleware, requireSuperAdmin, foodCouponController.createCoupon);
+router.get('/coupons/:id', authMiddleware, requireSuperAdmin, foodCouponController.getCouponById);
+router.put('/coupons/:id', authMiddleware, requireSuperAdmin, foodCouponController.updateCoupon);
+router.delete('/coupons/:id', authMiddleware, requireSuperAdmin, foodCouponController.deleteCoupon);
+
+// Promise Campaign routes
+router.get('/promise-campaign', promiseCampaignController.getPromiseCampaign);
+router.put('/promise-campaign', authMiddleware, requireSuperAdmin, promiseCampaignController.updatePromiseCampaign);
+router.post('/promise-campaign/item', authMiddleware, requireSuperAdmin, promiseCampaignController.addPromiseItem);
+router.put('/promise-campaign/item/:itemId', authMiddleware, requireSuperAdmin, promiseCampaignController.updatePromiseItem);
+router.delete('/promise-campaign/item/:itemId', authMiddleware, requireSuperAdmin, promiseCampaignController.deletePromiseItem);
+
 export default router;
 

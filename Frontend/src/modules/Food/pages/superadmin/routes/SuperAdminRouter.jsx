@@ -22,10 +22,9 @@ const KitchenStaffManagement = lazy(() => import("../userManagement/KitchenStaff
 const RolesPermissionManagement = lazy(() => import("../userManagement/RolesPermissionManagement"))
 const ProductsManagement = lazy(() => import("../productsManagement/ProductsManagement"))
 const CategoriesManagement = lazy(() => import("../productsManagement/CategoriesManagement"))
-const SectionsManagement = lazy(() => import("../productsManagement/SectionsManagement"))
+
 const Addons = lazy(() => import("../productsManagement/Addons"))
 const ComboDeals = lazy(() => import("../productsManagement/ComboDeals"))
-const GlobalPrice = lazy(() => import("../productsManagement/GlobalPrice"))
 const AllOrders = lazy(() => import("../orderManagement/AllOrders"))
 const OrderTracking = lazy(() => import("../orderManagement/OrderTracking"))
 const RefundRequests = lazy(() => import("../orderManagement/RefundRequests"))
@@ -35,7 +34,7 @@ const CouponsManagement = lazy(() => import("../marketing/CouponsManagement"))
 const Campaign = lazy(() => import("../marketing/Campaign"))
 const PushNotification = lazy(() => import("../marketing/PushNotification"))
 
-const LoyaltyProgram = lazy(() => import("../marketing/LoyaltyProgram"))
+const RewardsManagement = lazy(() => import("../marketing/RewardsManagement"))
 const TaxReports = lazy(() => import("../financial/TaxReports"))
 const TransactionManagement = lazy(() => import("../financial/TransactionManagement"))
 const FranchiseCommission = lazy(() => import("../financial/FranchiseCommission"))
@@ -58,6 +57,7 @@ const FeedbackAndReview = lazy(() => import("../support/FeedbackAndReview"))
 const CustomerComplaints = lazy(() => import("../support/CustomerComplaints"))
 const WelcomePage = lazy(() => import("../user-app/WelcomePage"))
 const HomePageConfig = lazy(() => import("../user-app/HomePageConfig"))
+const PromiseCampaignConfig = lazy(() => import("../user-app/PromiseCampaignConfig"))
 
 // Shared layout shell for user management pages to inherit Sidebar and Navbar
 function SuperAdminLayout() {
@@ -93,14 +93,11 @@ function SuperAdminLayout() {
     activeItem = "Products"
   } else if (location.pathname.includes("/categories")) {
     activeItem = "Categories"
-  } else if (location.pathname.includes("/sections")) {
-    activeItem = "Sections"
+
   } else if (location.pathname.includes("/addons")) {
     activeItem = "Add-ons / Toppings"
   } else if (location.pathname.includes("/combos-deals")) {
     activeItem = "Combos & Deals"
-  } else if (location.pathname.includes("/global-pricing")) {
-    activeItem = "Global Pricing"
   } else if (location.pathname.includes("/order-tracking")) {
     activeItem = "Order Tracking"
   } else if (location.pathname.includes("/orders")) {
@@ -116,8 +113,8 @@ function SuperAdminLayout() {
     activeItem = "Campaigns"
   } else if (location.pathname.includes("/push-notifications")) {
     activeItem = "Push Notifications"
-  } else if (location.pathname.includes("/loyalty")) {
-    activeItem = "Loyalty Program"
+  } else if (location.pathname.includes("/rewards")) {
+    activeItem = "Rewards Program"
   } else if (location.pathname.includes("/tax-reports")) {
     activeItem = "Tax Reports"
   } else if (location.pathname.includes("/transactions")) {
@@ -162,6 +159,8 @@ function SuperAdminLayout() {
     activeItem = "Welcome Page"
   } else if (location.pathname.includes("/user-app/home-page")) {
     activeItem = "Home Page"
+  } else if (location.pathname.includes("/user-app/promise-campaign")) {
+    activeItem = "Promise Campaign"
   }
 
   const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem("sa_sidebar_collapsed") === "true")
@@ -236,10 +235,9 @@ export default function SuperAdminRouter() {
             <Route path="/roles-permissions" element={<RolesPermissionManagement />} />
             <Route path="/products" element={<ProductsManagement />} />
             <Route path="/categories" element={<CategoriesManagement />} />
-            <Route path="/sections" element={<SectionsManagement />} />
+
             <Route path="/addons" element={<Addons />} />
             <Route path="/combos-deals" element={<ComboDeals />} />
-            <Route path="/global-pricing" element={<GlobalPrice />} />
             <Route path="/orders" element={<AllOrders />} />
             <Route path="/order-tracking" element={<OrderTracking />} />
             <Route path="/disputes" element={<Disputes />} />
@@ -249,7 +247,7 @@ export default function SuperAdminRouter() {
             <Route path="/campaigns" element={<Campaign />} />
             <Route path="/push-notifications" element={<PushNotification />} />
 
-            <Route path="/loyalty" element={<LoyaltyProgram />} />
+            <Route path="/rewards" element={<RewardsManagement />} />
             <Route path="/tax-reports" element={<TaxReports />} />
             <Route path="/transactions" element={<TransactionManagement />} />
             <Route path="/commissions" element={<FranchiseCommission />} />
@@ -272,6 +270,7 @@ export default function SuperAdminRouter() {
             <Route path="/feedback-reviews" element={<FeedbackAndReview />} />
             <Route path="/user-app/welcome-page" element={<WelcomePage />} />
             <Route path="/user-app/home-page" element={<HomePageConfig />} />
+            <Route path="/user-app/promise-campaign" element={<PromiseCampaignConfig />} />
           </Route>
         </Route>
 

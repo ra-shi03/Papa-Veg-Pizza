@@ -1,233 +1,281 @@
-import React from "react";
-import { X, Calendar, User, ShoppingBag, Clock, FileText, CheckCircle, Tag, Layers } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import {
+  X,
+  Calendar,
+  Clock,
+  Layers,
+  Tag,
+  DollarSign,
+  Loader2,
+  Edit,
+  AlertCircle
+} from "lucide-react";
+import dayjs from "dayjs";
+import { toast } from "sonner";
+import { adminClient } from "@/services/api/axios";
 
 export default function AddonsDetails({
   isOpen,
   onClose,
-  addon,
-  products = [],
-  mappings = [],
+  addonId,
+  initialData = null,
   onEdit
 }) {
-  if (!isOpen || !addon) return null;
+  const [addon, setAddon] = useState(initialData);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Find linked product list
-  const linkedProductIds = mappings
-    .filter(m => m.addonId === addon._id)
-    .map(m => m.productId);
-  const mappedProducts = products.filter(p => linkedProductIds.includes(p.id));
-
-  // Simulated audit logs
-  const auditTimeline = [
-    {
-      action: "Status Updated",
-      user: "Admin Shubh",
-      time: "14 Jun 2026, 04:30 PM",
-      detail: `Changed status to "${addon.status}"`
-    },
-    {
-      action: "Price Modified",
-      user: "Admin Shubh",
-      time: "10 Jun 2026, 11:15 AM",
-      detail: `Set price to ₹${addon.price}`
-    },
-    {
-      action: "Add-on Registered",
-      user: "Manager Amit",
-      time: addon.createdAt || "01 Jun 2026, 09:00 AM",
-      detail: "Created initial catalog profile"
+  useEffect(() => {
+    if (isOpen && addonId) {
+      fetchAddonDetails(addonId);
+    } else if (isOpen && initialData) {
+      setAddon(initialData);
+    } else {
+      setAddon(null);
+      setError(null);
     }
-  ];
+  }, [isOpen, addonId]);
+
+  const fetchAddonDetails = async (id) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await adminClient.get(`/food/admin/addons/${id}`);
+      if (res?.data?.success && res.data.data) {
+        setAddon(res.data.data);
+      } else {
+        throw new Error(res?.data?.message || "Failed to load addon details");
+      }
+    } catch (err) {
+      console.error("Error fetching addon by id:", err);
+      setError(err?.response?.data?.message || err?.message || "Failed to fetch addon details");
+      toast.error("Failed to fetch addon details");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
 
   return (
-    <>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm z-[70] transition-opacity duration-300"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
 
-      {/* Side drawer container */}
-      <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white dark:bg-zinc-950 shadow-2xl z-[80] flex flex-col transform transition-transform duration-300 animate-in slide-in-from-right-5 text-zinc-900 dark:text-zinc-100">
+      {/* Modal Dialog */}
+      <div className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden flex flex-col max-h-[90vh] z-10 animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header */}
-        <div className="px-4 h-14 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              className="p-1 hover:bg-zinc-150 dark:hover:bg-zinc-800 rounded-full transition-colors text-zinc-550 dark:text-zinc-400"
-            >
-              <X size={16} />
-            </button>
-            <div>
-              <h3 className="font-bold text-sm leading-none">Quick View Profile</h3>
-              <p className="text-[9px] text-zinc-400 font-bold mt-1 font-mono">{addon._id}</p>
+        <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-zinc-900/60 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20">
+              <Layers className="w-5 h-5" />
             </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
-              addon.status === "active"
-                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400"
-                : addon.status === "inactive"
-                ? "bg-zinc-100 text-zinc-650 dark:bg-zinc-900/30 dark:text-zinc-400"
-                : "bg-amber-100 text-amber-800 dark:bg-amber-950/20 dark:text-amber-400"
-            }`}>
-              {addon.status}
-            </span>
-          </div>
-        </div>
-
-        {/* Scrollable Body */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 hide-scrollbar">
-          
-          {/* Main Hero Card (WebP image) */}
-          <div className="relative rounded-xl overflow-hidden aspect-video border border-zinc-200 dark:border-zinc-800 shadow-sm bg-zinc-100 dark:bg-zinc-900">
-            <img
-              src={addon.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591?fm=webp&fit=crop&w=600&q=80"}
-              alt={addon.name}
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent flex flex-col justify-end p-3 text-white">
-              <div className="flex items-center gap-1.5 mb-1">
-                {addon.isVegan ? (
-                  <span className="px-1.5 py-0.5 bg-emerald-500 text-white text-[9px] font-black uppercase rounded shadow-sm">
-                    🌱 Vegan
+            <div>
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                Add-on Details
+                {addon?.status && (
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      addon.status === "Active"
+                        ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20"
+                        : "bg-red-50 text-red-600 border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20"
+                    }`}
+                  >
+                    {addon.status}
                   </span>
-                ) : (
-                  <>
-                    <div className="w-3 h-3 border flex items-center justify-center rounded-sm bg-white border-green-600">
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-600" />
-                    </div>
-                    <span className="text-[10px] font-black uppercase tracking-wider">
-                      Veg Add-on
-                    </span>
-                  </>
                 )}
-              </div>
-              <h4 className="text-base font-black leading-tight">{addon.name}</h4>
-              <p className="text-xs font-black text-amber-400 mt-0.5">₹{addon.price.toFixed(2)}</p>
+              </h2>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                View toppings and add-on configuration details
+              </p>
             </div>
           </div>
-
-          {/* Details fields */}
-          <div className="grid grid-cols-2 gap-3.5 bg-zinc-50 dark:bg-zinc-900/50 p-3.5 border border-zinc-150 dark:border-zinc-800 rounded-xl shadow-inner text-xs font-semibold">
-            <div>
-              <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Add-on Type</p>
-              <p className="text-zinc-850 dark:text-zinc-200 mt-0.5 capitalize">{addon.type}</p>
-            </div>
-            <div>
-              <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Max Quantity Allowed</p>
-              <p className="text-zinc-850 dark:text-zinc-200 mt-0.5 font-mono">{addon.maxQuantity} portions</p>
-            </div>
-            <div>
-              <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Display Order</p>
-              <p className="text-zinc-850 dark:text-zinc-200 mt-0.5 font-mono">#{addon.displayOrder || 1}</p>
-            </div>
-            <div>
-              <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Default Quantity</p>
-              <p className="text-zinc-850 dark:text-zinc-200 mt-0.5 font-mono">{addon.defaultQuantity || 0} unit</p>
-            </div>
-            {addon.description && (
-              <div className="col-span-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
-                <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Description</p>
-                <p className="text-[11px] font-medium text-zinc-600 dark:text-zinc-400 mt-0.5 leading-relaxed">
-                  {addon.description}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Compatible Categories */}
-          <div className="space-y-1.5">
-            <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-wider flex items-center gap-1">
-              <Layers size={11} className="text-[var(--primary)]" />
-              Compatible Categories
-            </h4>
-            <div className="flex flex-wrap gap-1">
-              {addon.category ? (
-                <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-750 dark:text-zinc-300 font-bold text-[10px] px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 shadow-sm">
-                  {addon.category}
-                </span>
-              ) : (
-                <span className="text-[10px] text-zinc-400 italic">No category linkages declared</span>
-              )}
-            </div>
-          </div>
-
-          {/* Assigned Products mapping */}
-          <div className="space-y-1.5">
-            <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-wider flex items-center gap-1">
-              <ShoppingBag size={11} className="text-[var(--primary)]" />
-              Assigned Products ({mappedProducts.length})
-            </h4>
-            {mappedProducts.length > 0 ? (
-              <div className="max-h-[140px] overflow-y-auto border border-zinc-200 dark:border-zinc-800 rounded-lg divide-y divide-zinc-150 dark:divide-zinc-850 bg-white dark:bg-zinc-900 scrollbar-thin">
-                {mappedProducts.map(p => (
-                  <div key={p.id} className="p-2 flex items-center justify-between text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
-                    <span className="font-bold">{p.name}</span>
-                    <span className="text-[9px] bg-zinc-100 dark:bg-zinc-850 px-1.5 py-0.5 text-zinc-500 rounded font-semibold">
-                      {p.category}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-[10px] text-zinc-400 italic">This add-on is currently reusable but not assigned to products.</p>
-            )}
-          </div>
-
-          {/* Meta dates info */}
-          <div className="bg-zinc-50 dark:bg-zinc-900/30 p-3 rounded-lg border border-zinc-150 dark:border-zinc-800 text-[10px] text-zinc-500 space-y-1 font-semibold">
-            <div className="flex justify-between items-center">
-              <span className="flex items-center gap-1"><Calendar size={10} /> Created</span>
-              <span className="font-mono text-zinc-700 dark:text-zinc-300">{addon.createdAt ? new Date(addon.createdAt).toLocaleDateString() : "01 Jun 2026"}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="flex items-center gap-1"><Clock size={10} /> Last Updated</span>
-              <span className="font-mono text-zinc-700 dark:text-zinc-300">{addon.updatedAt ? new Date(addon.updatedAt).toLocaleString() : "14 Jun 2026, 04:30 PM"}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="flex items-center gap-1"><User size={10} /> Created By</span>
-              <span className="text-zinc-700 dark:text-zinc-300">Admin Shubh</span>
-            </div>
-          </div>
-
-          {/* Audit Timeline */}
-          <div className="space-y-3">
-            <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-wider flex items-center gap-1">
-              <FileText size={11} className="text-[var(--primary)]" />
-              Audit Timeline
-            </h4>
-            <div className="relative pl-4 border-l border-zinc-200 dark:border-zinc-800 space-y-4">
-              {auditTimeline.map((item, idx) => (
-                <div key={idx} className="relative text-xs">
-                  <span className="absolute -left-[20.5px] top-1 w-2.5 h-2.5 rounded-full bg-white dark:bg-zinc-950 border-2 border-[var(--primary)] shrink-0" />
-                  <div className="flex justify-between font-bold text-zinc-800 dark:text-zinc-200">
-                    <span>{item.action}</span>
-                    <span className="text-[9px] text-zinc-400 font-medium font-mono">{item.time}</span>
-                  </div>
-                  <p className="text-[10px] text-zinc-500 mt-0.5 font-semibold">By {item.user} • {item.detail}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-        </div>
-
-        {/* Footer Actions */}
-        <div className="p-3 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex gap-2.5 justify-end shrink-0 z-10">
           <button
-            onClick={() => {
-              onClose();
-              if (onEdit) onEdit(addon);
-            }}
-            className="w-full py-2 bg-[var(--primary)] text-white font-bold text-xs rounded-lg hover:brightness-110 active:scale-95 transition-all shadow-md flex items-center justify-center gap-1.5"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
           >
-            Edit Add-on
+            <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Content Body */}
+        <div className="p-6 overflow-y-auto space-y-6 text-sm">
+          {loading ? (
+            <div className="py-20 flex flex-col items-center justify-center gap-3">
+              <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium">
+                Loading add-on details...
+              </p>
+            </div>
+          ) : error ? (
+            <div className="py-12 flex flex-col items-center justify-center gap-3 text-center">
+              <div className="p-3 bg-red-100 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-full">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h4 className="font-semibold text-zinc-900 dark:text-zinc-100">Failed to load add-on</h4>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm">{error}</p>
+              <button
+                onClick={() => fetchAddonDetails(addonId)}
+                className="mt-2 px-4 py-2 bg-[var(--primary)] text-white text-xs font-semibold rounded-lg hover:opacity-90 transition-opacity"
+              >
+                Retry
+              </button>
+            </div>
+          ) : addon ? (
+            <>
+              {/* Hero Banner with Image & Identity */}
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800">
+                <div className="w-24 h-24 rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shrink-0 shadow-sm flex items-center justify-center">
+                  {addon.image ? (
+                    <img
+                      src={addon.image}
+                      alt={addon.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center text-zinc-400 text-xs gap-1">
+                      <Tag className="w-6 h-6 stroke-1" />
+                      <span>No image</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 text-center sm:text-left space-y-1.5">
+                  <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
+                    {addon.name}
+                  </h3>
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-0.5">
+                    <span className="px-2.5 py-0.5 bg-zinc-200/80 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold rounded-md capitalize">
+                      {addon.type || "Standard"}
+                    </span>
+                    <span
+                      className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${
+                        addon.status === "Active"
+                          ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400"
+                          : "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400"
+                      }`}
+                    >
+                      Status: {addon.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Price Specifications Grid */}
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <DollarSign className="w-3.5 h-3.5 text-[var(--primary)]" />
+                  Pricing & Size Variations
+                </h4>
+
+                {addon.prices && addon.prices.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {addon.prices.map((p, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 bg-white dark:bg-zinc-800/60 rounded-xl border border-zinc-200 dark:border-zinc-700/80 shadow-xs flex flex-col justify-between"
+                      >
+                        <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 capitalize">
+                          {p.size || "Default Size"}
+                        </span>
+                        <div className="text-lg font-black text-zinc-900 dark:text-zinc-100 mt-1">
+                          ₹{Number(p.price || 0).toFixed(2)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-3 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border border-zinc-200 dark:border-zinc-800 text-sm">
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">Price:</span>{" "}
+                    <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                      ₹{Number(addon.price || 0).toFixed(2)}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Detailed Attributes Table */}
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-[var(--primary)]" />
+                  Add-on Details
+                </h4>
+                <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden divide-y divide-zinc-200 dark:divide-zinc-800 text-xs">
+                  <div className="flex justify-between p-3">
+                    <span className="text-zinc-500 dark:text-zinc-400 font-medium">Add-on Name</span>
+                    <span className="font-semibold text-zinc-800 dark:text-zinc-200">{addon.name}</span>
+                  </div>
+                  <div className="flex justify-between p-3 bg-zinc-50/50 dark:bg-zinc-800/20">
+                    <span className="text-zinc-500 dark:text-zinc-400 font-medium">Add-on Type</span>
+                    <span className="font-semibold capitalize text-zinc-800 dark:text-zinc-200">{addon.type}</span>
+                  </div>
+                  <div className="flex justify-between p-3">
+                    <span className="text-zinc-500 dark:text-zinc-400 font-medium">Status</span>
+                    <span className={`font-bold ${addon.status === "Active" ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}`}>
+                      {addon.status}
+                    </span>
+                  </div>
+                  {addon.description && (
+                    <div className="flex flex-col gap-1 p-3 bg-zinc-50/50 dark:bg-zinc-800/20">
+                      <span className="text-zinc-500 dark:text-zinc-400 font-medium">Description</span>
+                      <span className="text-zinc-700 dark:text-zinc-300">{addon.description}</span>
+                    </div>
+                  )}
+                  {addon.category && (
+                    <div className="flex justify-between p-3">
+                      <span className="text-zinc-500 dark:text-zinc-400 font-medium">Category</span>
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">{addon.category}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between p-3 bg-zinc-50/50 dark:bg-zinc-800/20">
+                    <span className="text-zinc-500 dark:text-zinc-400 font-medium flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5" /> Created Date
+                    </span>
+                    <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                      {addon.createdAt ? dayjs(addon.createdAt).format("DD MMMM YYYY, hh:mm A") : "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between p-3">
+                    <span className="text-zinc-500 dark:text-zinc-400 font-medium flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5" /> Last Updated
+                    </span>
+                    <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                      {addon.updatedAt ? dayjs(addon.updatedAt).format("DD MMMM YYYY, hh:mm A") : "N/A"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-3.5 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 flex items-center justify-end gap-2.5 shrink-0">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold rounded-lg transition-colors"
+          >
+            Close
+          </button>
+          {addon && onEdit && (
+            <button
+              onClick={() => {
+                onClose();
+                onEdit(addon);
+              }}
+              className="flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] text-white text-xs font-semibold rounded-lg hover:bg-[var(--primary)]/90 transition-colors shadow-sm"
+            >
+              <Edit className="w-3.5 h-3.5" />
+              Edit Add-on
+            </button>
+          )}
+        </div>
+
       </div>
-    </>
+    </div>
   );
 }

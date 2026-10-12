@@ -152,7 +152,7 @@ export default function CampaignDetails({ campaignId, isOpen, onClose, onEdit })
                       <div>
                         <h4 className="text-xs font-black text-zinc-900 dark:text-zinc-100">{campaign.title}</h4>
                         <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold mt-1.5 ${
-                          campaign.status === 'Draft' ? 'bg-zinc-100 text-zinc-650 dark:bg-zinc-800 dark:text-zinc-400' :
+                          campaign.status === 'Draft' ? 'bg-zinc-100 text-zinc-700 dark:text-zinc-300 dark:bg-zinc-800 dark:text-zinc-400' :
                           campaign.status === 'Scheduled' ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400' :
                           campaign.status === 'Running' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' :
                           campaign.status === 'Paused' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' :

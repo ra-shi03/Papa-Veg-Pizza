@@ -419,7 +419,7 @@ export default function NotificationLogs({ notificationId, isOpen, onClose }) {
                       {renderChannelDonut()}
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 text-[10px] font-bold text-zinc-650 dark:text-zinc-400 border-t border-zinc-100 dark:border-zinc-800 pt-3 select-none">
+                    <div className="grid grid-cols-3 gap-2 text-[10px] font-bold text-zinc-700 dark:text-zinc-300 dark:text-zinc-400 border-t border-zinc-100 dark:border-zinc-800 pt-3 select-none">
                       <div className="flex flex-col items-center gap-1">
                         <span className="flex items-center gap-1 text-blue-500"><span className="w-2 h-2 rounded bg-blue-500"></span> Push</span>
                         <span className="text-zinc-800 dark:text-zinc-200 font-black">50%</span>
@@ -490,7 +490,7 @@ export default function NotificationLogs({ notificationId, isOpen, onClose }) {
                       {renderAudiencePie()}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-[9px] font-bold text-zinc-650 dark:text-zinc-400 border-t border-zinc-100 dark:border-zinc-800 pt-2 shrink-0 select-none">
+                    <div className="grid grid-cols-2 gap-2 text-[9px] font-bold text-zinc-700 dark:text-zinc-300 dark:text-zinc-400 border-t border-zinc-100 dark:border-zinc-800 pt-2 shrink-0 select-none">
                       <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded bg-blue-500 shrink-0"></span> North (45%)</div>
                       <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded bg-emerald-500 shrink-0"></span> South (25%)</div>
                       <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded bg-orange-500 shrink-0"></span> West (20%)</div>
@@ -597,14 +597,14 @@ export default function NotificationLogs({ notificationId, isOpen, onClose }) {
                       <button 
                         onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                         disabled={currentPage === 1}
-                        className="p-1 border border-zinc-300 dark:border-zinc-700 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-650 dark:text-zinc-350 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="p-1 border border-zinc-300 dark:border-zinc-700 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 dark:text-zinc-350 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         <ChevronLeft size={16} />
                       </button>
                       <button 
                         onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                         disabled={currentPage === totalPages}
-                        className="p-1 border border-zinc-300 dark:border-zinc-700 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-650 dark:text-zinc-350 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="p-1 border border-zinc-300 dark:border-zinc-700 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 dark:text-zinc-350 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         <ChevronRight size={16} />
                       </button>

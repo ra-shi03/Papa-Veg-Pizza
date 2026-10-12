@@ -19,6 +19,17 @@ export const getAddons = async (req, res) => {
     }
 };
 
+export const getAddonById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const addon = await Addon.findById(id);
+        if (!addon) return sendError(res, 404, 'Addon not found');
+        return sendResponse(res, 200, 'Addon fetched successfully', addon);
+    } catch (error) {
+        return sendError(res, 500, 'Failed to fetch addon', error.message);
+    }
+};
+
 export const updateAddon = async (req, res) => {
     try {
         const { id } = req.params;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, Info, Tag, Calendar, BarChart3, AlertCircle, MapPin, 
   Users, ShoppingBag, Landmark, ArrowRight, Clock, ShieldCheck, 
@@ -6,13 +6,121 @@ import {
 } from 'lucide-react';
 import { 
   mockRegions, mockZones, mockTerritories, mockFranchises, mockStores, 
-  mockProducts, mockCategories, mockCustomers, api, initialCouponUsages 
+  mockProducts, mockCategories, mockCustomers, api 
 } from './CouponsData';
+import { adminClient } from '../../../../../services/api/axios';
 import { toast } from 'sonner';
 
 export default function CouponDetails({ isOpen, onClose, coupon }) {
   const [activeTab, setActiveTab] = useState('overview');
   
+  // Real DB metadata state
+  const [dbRegions, setDbRegions] = useState([]);
+  const [dbZones, setDbZones] = useState([]);
+  const [dbTerritories, setDbTerritories] = useState([]);
+  const [dbFranchises, setDbFranchises] = useState([]);
+  const [dbStores, setDbStores] = useState([]);
+  const [dbCategories, setDbCategories] = useState([]);
+  const [dbProducts, setDbProducts] = useState([]);
+
+  // Fetch real hierarchy and product data for name resolution
+  useEffect(() => {
+    if (!isOpen) return;
+    const fetchDropdownData = async () => {
+      try {
+        const results = await Promise.allSettled([
+          adminClient.get('/food/admin/products'),
+          adminClient.get('/food/admin/category-products'),
+          adminClient.get('/food/admin/regions'),
+          adminClient.get('/food/admin/zones'),
+          adminClient.get('/food/admin/territories'),
+          adminClient.get('/food/admin/franchises'),
+          adminClient.get('/food/admin/stores')
+        ]);
+        
+        const extractArr = (res, name) => {
+          let arr = [];
+          const d = res?.data?.data || res?.data;
+          if (Array.isArray(d)) arr = d;
+          else if (d && typeof d === 'object') {
+            const found = Object.values(d).find(Array.isArray);
+            if (found) arr = found;
+          }
+          if (arr.length === 0 && Array.isArray(res?.data)) arr = res.data;
+          return arr.map((item, idx) => {
+            if (typeof item === 'string') return { id: item, name: item };
+            return {
+              ...item,
+              id: String(item._id || item.id || item.uid || item.categoryId || item.productId || `${name}-${idx}`),
+              name: item.name || item.storeName || item.label || item.title || item.id || `${name}-${idx}`
+            };
+          });
+        };
+
+        if (results[0].status === 'fulfilled') setDbProducts(extractArr(results[0].value, 'prod'));
+        if (results[1].status === 'fulfilled') setDbCategories(extractArr(results[1].value, 'cat'));
+        if (results[2].status === 'fulfilled') setDbRegions(extractArr(results[2].value, 'reg'));
+        if (results[3].status === 'fulfilled') setDbZones(extractArr(results[3].value, 'zone'));
+        if (results[4].status === 'fulfilled') setDbTerritories(extractArr(results[4].value, 'ter'));
+        if (results[5].status === 'fulfilled') setDbFranchises(extractArr(results[5].value, 'fran'));
+        if (results[6].status === 'fulfilled') setDbStores(extractArr(results[6].value, 'store'));
+      } catch (err) {
+        console.error("Failed to load metadata in CouponDetails:", err);
+      }
+    };
+    fetchDropdownData();
+  }, [isOpen]);
+
+  // Name Resolution Maps
+  const regionMap = useMemo(() => {
+    const map = {};
+    mockRegions.forEach(r => { map[r.id] = r.name; });
+    dbRegions.forEach(r => { map[r.id] = r.name; if (r._id) map[String(r._id)] = r.name; });
+    return map;
+  }, [dbRegions]);
+
+  const zoneMap = useMemo(() => {
+    const map = {};
+    mockZones.forEach(z => { map[z.id] = z.name; });
+    dbZones.forEach(z => { map[z.id] = z.name; if (z._id) map[String(z._id)] = z.name; });
+    return map;
+  }, [dbZones]);
+
+  const territoryMap = useMemo(() => {
+    const map = {};
+    mockTerritories.forEach(t => { map[t.id] = t.name; });
+    dbTerritories.forEach(t => { map[t.id] = t.name; if (t._id) map[String(t._id)] = t.name; });
+    return map;
+  }, [dbTerritories]);
+
+  const franchiseMap = useMemo(() => {
+    const map = {};
+    mockFranchises.forEach(f => { map[f.id] = f.name; });
+    dbFranchises.forEach(f => { map[f.id] = f.name; if (f._id) map[String(f._id)] = f.name; });
+    return map;
+  }, [dbFranchises]);
+
+  const storeMap = useMemo(() => {
+    const map = {};
+    mockStores.forEach(s => { map[s.id] = s.name; });
+    dbStores.forEach(s => { map[s.id] = s.name; if (s._id) map[String(s._id)] = s.name; });
+    return map;
+  }, [dbStores]);
+
+  const categoryMap = useMemo(() => {
+    const map = {};
+    mockCategories.forEach(c => { map[c.id] = c.name; });
+    dbCategories.forEach(c => { map[c.id] = c.name; if (c._id) map[String(c._id)] = c.name; });
+    return map;
+  }, [dbCategories]);
+
+  const productMap = useMemo(() => {
+    const map = {};
+    mockProducts.forEach(p => { map[p.id] = p; });
+    dbProducts.forEach(p => { map[p.id] = p; if (p._id) map[String(p._id)] = p; });
+    return map;
+  }, [dbProducts]);
+
   // Usage Analytics States
   const [usages, setUsages] = useState([]);
   const [usagesLoading, setUsagesLoading] = useState(false);
@@ -28,18 +136,42 @@ export default function CouponDetails({ isOpen, onClose, coupon }) {
   }, [coupon, isOpen, activeTab, usagesPage]);
 
   const fetchUsages = async () => {
+    if (!coupon?._id) return;
     setUsagesLoading(true);
     try {
       const result = await api.getCouponUsages(coupon._id, { page: usagesPage, limit: 5 });
-      setUsages(result.data);
-      setUsagesTotalCount(result.totalCount);
-      setUsagesTotalPages(result.totalPages);
+      setUsages(result.data || []);
+      setUsagesTotalCount(result.totalCount || 0);
+      setUsagesTotalPages(result.totalPages || 1);
     } catch (err) {
-      toast.error('Failed to load coupon usage analytics.');
+      // Clean fallback if no usages exist yet
+      setUsages([]);
+      setUsagesTotalCount(0);
+      setUsagesTotalPages(1);
     } finally {
       setUsagesLoading(false);
     }
   };
+
+  const topStores = useMemo(() => {
+    if (!usages || usages.length === 0) return [];
+    const counts = {};
+    usages.forEach(u => {
+      const storeName = storeMap[u.storeId] || u.storeName || u.storeId || 'Store';
+      counts[storeName] = (counts[storeName] || 0) + 1;
+    });
+    return Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a,b) => b.count - a.count).slice(0, 3);
+  }, [usages, storeMap]);
+
+  const topRegions = useMemo(() => {
+    if (!usages || usages.length === 0) return [];
+    const counts = {};
+    usages.forEach(u => {
+      const regName = regionMap[u.regionId] || u.regionName || u.regionId || 'Region';
+      counts[regName] = (counts[regName] || 0) + 1;
+    });
+    return Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a,b) => b.count - a.count).slice(0, 3);
+  }, [usages, regionMap]);
 
   if (!isOpen || !coupon) return null;
 
@@ -48,46 +180,22 @@ export default function CouponDetails({ isOpen, onClose, coupon }) {
     toast.success(`Coupon code ${coupon.code} copied to clipboard!`);
   };
 
-  // ----------------------------------------------------
-  // Calculated Statistics for Usage Analytics
-  // ----------------------------------------------------
-  // Note: These represent all time stats based on mock database records.
-  // In a real database, this would be computed by aggregation queries.
-  const allTimeUsages = mockFranchises; // just a dummy hook or we can compute from initialCouponUsages
-  const couponSpecificUsages = api.getCouponUsages ? [] : []; // We will compute from raw initial usages list in memory
-  
-  // Let's filter initialCouponUsages to compute stats
-  const rawUsages = initialCouponUsages.filter(u => u.couponId === coupon._id);
-  const totalUses = rawUsages.length;
-  const totalDiscountGiven = rawUsages.reduce((sum, u) => sum + u.discountAmount, 0);
-  const revenueGenerated = rawUsages.reduce((sum, u) => sum + u.orderAmount, 0);
+  // Safe Array references
+  const categoryIds = coupon.categoryIds || [];
+  const productIds = coupon.productIds || [];
+  const regionIds = coupon.regionIds || [];
+  const zoneIds = coupon.zoneIds || [];
+  const territoryIds = coupon.territoryIds || [];
+  const franchiseIds = coupon.franchiseIds || [];
+  const storeIds = coupon.storeIds || [];
+  const customerSegments = coupon.customerSegments || [];
+  const customerIds = coupon.customerIds || [];
+
+  // Actual statistics from coupon ledger
+  const totalUses = coupon.usageCount || 0;
+  const revenueGenerated = coupon.revenueGenerated || 0;
+  const totalDiscountGiven = 0;
   const averageOrderValue = totalUses > 0 ? Math.round(revenueGenerated / totalUses) : 0;
-
-  // Top Stores using coupon
-  const storeCounts = rawUsages.reduce((acc, u) => {
-    acc[u.storeId] = (acc[u.storeId] || 0) + 1;
-    return acc;
-  }, {});
-  const topStores = Object.entries(storeCounts)
-    .map(([id, count]) => {
-      const storeObj = mockStores.find(s => s.id === id);
-      return { name: storeObj ? storeObj.name : 'Unknown Store', count };
-    })
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 3);
-
-  // Top Regions using coupon
-  const regionCounts = rawUsages.reduce((acc, u) => {
-    acc[u.regionId] = (acc[u.regionId] || 0) + 1;
-    return acc;
-  }, {});
-  const topRegions = Object.entries(regionCounts)
-    .map(([id, count]) => {
-      const regObj = mockRegions.find(r => r.id === id);
-      return { name: regObj ? regObj.name.split(' (')[0] : 'Unknown Region', count };
-    })
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 3);
 
   // Format dates
   const formatDateTime = (isoString) => {
@@ -263,7 +371,7 @@ export default function CouponDetails({ isOpen, onClose, coupon }) {
                         <ShieldCheck size={12} className="text-[var(--primary)]" />
                         Audit Trail &amp; Access Controls
                       </span>
-                      <div className="grid grid-cols-2 gap-4 text-[10px] font-semibold text-zinc-650 dark:text-zinc-450">
+                      <div className="grid grid-cols-2 gap-4 text-[10px] font-semibold text-zinc-700 dark:text-zinc-300 dark:text-zinc-450">
                         <div>
                           <p>Created By: <span className="font-bold text-zinc-800 dark:text-zinc-250">{coupon.createdBy}</span></p>
                           <p className="mt-1 font-mono">Date: {formatDateTime(coupon.createdAt)}</p>
@@ -306,13 +414,13 @@ export default function CouponDetails({ isOpen, onClose, coupon }) {
 
                     {coupon.applicableOn === 'Category' && (
                       <div className="p-4 border border-zinc-150 dark:border-zinc-805 bg-white dark:bg-zinc-950 rounded-xl space-y-2">
-                        <p className="text-[10px] font-black text-zinc-500">Target Categories ({coupon.categoryIds.length})</p>
+                        <p className="text-[10px] font-black text-zinc-500">Target Categories ({categoryIds.length})</p>
                         <div className="flex flex-wrap gap-1.5 mt-1">
-                          {coupon.categoryIds.map(catId => {
-                            const cat = mockCategories.find(c => c.id === catId);
+                          {categoryIds.map(catId => {
+                            const catName = categoryMap[catId] || catId;
                             return (
                               <span key={catId} className="px-2.5 py-1 rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-[10px] font-bold text-zinc-750 dark:text-zinc-300">
-                                {cat ? cat.name : catId}
+                                {catName}
                               </span>
                             );
                           })}
@@ -322,17 +430,20 @@ export default function CouponDetails({ isOpen, onClose, coupon }) {
 
                     {coupon.applicableOn === 'Product' && (
                       <div className="p-4 border border-zinc-150 dark:border-zinc-850 bg-white dark:bg-zinc-950 rounded-xl space-y-2">
-                        <p className="text-[10px] font-black text-zinc-500">Target Products ({coupon.productIds.length})</p>
+                        <p className="text-[10px] font-black text-zinc-500">Target Products ({productIds.length})</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
-                          {coupon.productIds.map(prodId => {
-                            const prod = mockProducts.find(p => p.id === prodId);
+                          {productIds.map(prodId => {
+                            const prod = productMap[prodId];
+                            const prodName = prod?.name || prodId;
                             return (
                               <div key={prodId} className="p-2 border border-zinc-150 dark:border-zinc-800 rounded bg-zinc-50 dark:bg-zinc-900 flex justify-between items-center">
                                 <div className="min-w-0">
-                                  <p className="font-bold text-zinc-850 dark:text-zinc-200 truncate">{prod ? prod.name : prodId}</p>
+                                  <p className="font-bold text-zinc-850 dark:text-zinc-200 truncate">{prodName}</p>
                                   <p className="text-[9px] text-zinc-450 font-mono mt-0.5">{prod ? prod.sku : ''}</p>
                                 </div>
-                                <span className="font-mono font-bold text-zinc-500 shrink-0 text-[10px]">₹{prod ? prod.price : ''}</span>
+                                <span className="font-mono font-bold text-zinc-500 shrink-0 text-[10px]">
+                                  {prod?.price ? `₹${prod.price}` : ''}
+                                </span>
                               </div>
                             );
                           })}
@@ -345,7 +456,7 @@ export default function CouponDetails({ isOpen, onClose, coupon }) {
                   <div className="space-y-3">
                     <span className="text-[9px] font-black text-zinc-450 dark:text-zinc-555 uppercase tracking-widest block">Geographic Access Scope</span>
                     
-                    {coupon.regionIds.length === 0 ? (
+                    {regionIds.length === 0 && zoneIds.length === 0 && territoryIds.length === 0 && franchiseIds.length === 0 && storeIds.length === 0 ? (
                       <p className="p-4 border border-zinc-150 dark:border-zinc-805 bg-white dark:bg-zinc-950 text-zinc-500 italic rounded-lg font-semibold text-center">
                         Global campaign. Active across all stores, franchises, and regions.
                       </p>
@@ -353,30 +464,66 @@ export default function CouponDetails({ isOpen, onClose, coupon }) {
                       <div className="border border-zinc-150 dark:border-zinc-850 rounded-xl overflow-hidden divide-y divide-zinc-150 dark:divide-zinc-850 bg-white dark:bg-zinc-950 font-semibold">
                         
                         {/* Regions List in drawer */}
-                        <div className="p-3">
-                          <span className="text-[9px] font-extrabold text-zinc-400 uppercase tracking-wide block mb-1.5">Regions ({coupon.regionIds.length})</span>
-                          <div className="flex flex-wrap gap-1.5">
-                            {coupon.regionIds.map(regId => {
-                              const regObj = mockRegions.find(r => r.id === regId);
-                              return (
-                                <span key={regId} className="px-2 py-0.5 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 rounded text-[9.5px]">
-                                  {regObj ? regObj.name.split(' (')[0] : regId}
-                                </span>
-                              );
-                            })}
+                        {regionIds.length > 0 && (
+                          <div className="p-3">
+                            <span className="text-[9px] font-extrabold text-zinc-400 uppercase tracking-wide block mb-1.5">Regions ({regionIds.length})</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {regionIds.map(regId => {
+                                const regName = regionMap[regId] || regId;
+                                return (
+                                  <span key={regId} className="px-2 py-0.5 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 rounded text-[9.5px]">
+                                    {regName}
+                                  </span>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
+                        )}
 
                         {/* Zones */}
-                        {coupon.zoneIds.length > 0 && (
+                        {zoneIds.length > 0 && (
                           <div className="p-3">
-                            <span className="text-[9px] font-extrabold text-zinc-400 uppercase tracking-wide block mb-1.5">Zones ({coupon.zoneIds.length})</span>
+                            <span className="text-[9px] font-extrabold text-zinc-400 uppercase tracking-wide block mb-1.5">Zones ({zoneIds.length})</span>
                             <div className="flex flex-wrap gap-1.5">
-                              {coupon.zoneIds.map(zoneId => {
-                                const zoneObj = mockZones.find(z => z.id === zoneId);
+                              {zoneIds.map(zoneId => {
+                                const zoneName = zoneMap[zoneId] || zoneId;
                                 return (
                                   <span key={zoneId} className="px-2 py-0.5 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 rounded text-[9.5px]">
-                                    {zoneObj ? zoneObj.name : zoneId}
+                                    {zoneName}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Territories */}
+                        {territoryIds.length > 0 && (
+                          <div className="p-3">
+                            <span className="text-[9px] font-extrabold text-zinc-400 uppercase tracking-wide block mb-1.5">Territories ({territoryIds.length})</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {territoryIds.map(terrId => {
+                                const terrName = territoryMap[terrId] || terrId;
+                                return (
+                                  <span key={terrId} className="px-2 py-0.5 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 rounded text-[9.5px]">
+                                    {terrName}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Franchises */}
+                        {franchiseIds.length > 0 && (
+                          <div className="p-3">
+                            <span className="text-[9px] font-extrabold text-zinc-400 uppercase tracking-wide block mb-1.5">Franchises ({franchiseIds.length})</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {franchiseIds.map(franId => {
+                                const franName = franchiseMap[franId] || franId;
+                                return (
+                                  <span key={franId} className="px-2 py-0.5 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 rounded text-[9.5px]">
+                                    {franName}
                                   </span>
                                 );
                               })}
@@ -385,15 +532,15 @@ export default function CouponDetails({ isOpen, onClose, coupon }) {
                         )}
 
                         {/* Stores List */}
-                        {coupon.storeIds.length > 0 && (
+                        {storeIds.length > 0 && (
                           <div className="p-3">
-                            <span className="text-[9px] font-extrabold text-zinc-400 uppercase tracking-wide block mb-1.5">Assigned Store Outlets ({coupon.storeIds.length})</span>
+                            <span className="text-[9px] font-extrabold text-zinc-400 uppercase tracking-wide block mb-1.5">Assigned Store Outlets ({storeIds.length})</span>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-[140px] overflow-y-auto pr-1">
-                              {coupon.storeIds.map(storeId => {
-                                const storeObj = mockStores.find(s => s.id === storeId);
+                              {storeIds.map(storeId => {
+                                const storeName = storeMap[storeId] || storeId;
                                 return (
-                                  <div key={storeId} className="p-1.5 border border-zinc-150 dark:border-zinc-800 rounded bg-zinc-50 dark:bg-zinc-900 text-[10px] truncate" title={storeObj ? storeObj.name : storeId}>
-                                    {storeObj ? storeObj.name.split('Papa Veg Pizza - ')[1] || storeObj.name : storeId}
+                                  <div key={storeId} className="p-1.5 border border-zinc-150 dark:border-zinc-800 rounded bg-zinc-50 dark:bg-zinc-900 text-[10px] truncate" title={storeName}>
+                                    {storeName}
                                   </div>
                                 );
                               })}
@@ -413,13 +560,13 @@ export default function CouponDetails({ isOpen, onClose, coupon }) {
                   {/* Customer segments */}
                   <div className="space-y-3">
                     <span className="text-[9px] font-black text-zinc-450 dark:text-zinc-555 uppercase tracking-widest block">Segment Filtering</span>
-                    {coupon.customerSegments.length === 0 ? (
+                    {customerSegments.length === 0 ? (
                       <p className="p-4 border border-zinc-150 dark:border-zinc-805 bg-white dark:bg-zinc-950 text-zinc-500 italic rounded-lg text-center">
                         Open coupon. Applicable to all customer categories and tiers.
                       </p>
                     ) : (
                       <div className="p-4 border border-zinc-150 dark:border-zinc-850 rounded-xl bg-white dark:bg-zinc-950 flex flex-wrap gap-2">
-                        {coupon.customerSegments.map(seg => (
+                        {customerSegments.map(seg => (
                           <span key={seg} className="px-3 py-1 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full text-xs font-bold text-zinc-700 dark:text-zinc-350">
                             {seg}
                           </span>
@@ -431,13 +578,13 @@ export default function CouponDetails({ isOpen, onClose, coupon }) {
                   {/* Explicit User lists */}
                   <div className="space-y-3">
                     <span className="text-[9px] font-black text-zinc-450 dark:text-zinc-555 uppercase tracking-widest block">Explicit Customer Exclusions / Inclusions</span>
-                    {coupon.customerIds.length === 0 ? (
+                    {customerIds.length === 0 ? (
                       <p className="p-4 border border-zinc-150 dark:border-zinc-805 bg-white dark:bg-zinc-950 text-zinc-500 italic rounded-lg text-center">
                         No customer list filters loaded. Access open based on Segment and Regional restrictions.
                       </p>
                     ) : (
                       <div className="border border-zinc-150 dark:border-zinc-850 rounded-xl overflow-hidden bg-white dark:bg-zinc-950 divide-y divide-zinc-150 dark:divide-zinc-850 max-h-[260px] overflow-y-auto">
-                        {coupon.customerIds.map(custId => {
+                        {customerIds.map(custId => {
                           const cust = mockCustomers.find(c => c.id === custId);
                           return (
                             <div key={custId} className="p-3 flex justify-between items-center hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
@@ -510,7 +657,7 @@ export default function CouponDetails({ isOpen, onClose, coupon }) {
                         <div className="space-y-2 font-semibold pt-1">
                           {topStores.map((item, idx) => (
                             <div key={idx} className="flex justify-between items-center text-[10.5px]">
-                              <span className="text-zinc-650 dark:text-zinc-350 truncate max-w-[200px]">{idx + 1}. {item.name.split('Papa Veg Pizza - ')[1] || item.name}</span>
+                              <span className="text-zinc-700 dark:text-zinc-300 dark:text-zinc-350 truncate max-w-[200px]">{idx + 1}. {item.name.split('Papa Veg Pizza - ')[1] || item.name}</span>
                               <span className="font-mono text-zinc-800 dark:text-white font-bold">{item.count} times</span>
                             </div>
                           ))}
@@ -527,7 +674,7 @@ export default function CouponDetails({ isOpen, onClose, coupon }) {
                         <div className="space-y-2 font-semibold pt-1">
                           {topRegions.map((item, idx) => (
                             <div key={idx} className="flex justify-between items-center text-[10.5px]">
-                              <span className="text-zinc-650 dark:text-zinc-350">{idx + 1}. {item.name}</span>
+                              <span className="text-zinc-700 dark:text-zinc-300 dark:text-zinc-350">{idx + 1}. {item.name}</span>
                               <span className="font-mono text-zinc-800 dark:text-white font-bold">{item.count} times</span>
                             </div>
                           ))}

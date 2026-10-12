@@ -73,7 +73,7 @@ export default function PointAdjustmentModal({ isOpen, onClose, customerData, on
           </div>
           <button 
             onClick={onClose} 
-            className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-650"
+            className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
           >
             <X size={16} />
           </button>

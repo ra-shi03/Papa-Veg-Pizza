@@ -11,6 +11,8 @@ import notificationRoutes from '../core/notifications/notification.routes.js';
 import { authMiddleware } from '../core/auth/auth.middleware.js';
 import * as businessSettingsController from '../modules/food/admin/controllers/businessSettings.controller.js';
 import * as productController from '../modules/food/admin/controllers/product.controller.js';
+import * as rewardConfigController from '../modules/food/admin/controllers/rewardConfig.controller.js';
+import * as categoryProductController from '../modules/food/admin/controllers/categoryProduct.controller.js';
 import { requireRoles } from '../core/roles/role.middleware.js';
 import { getQueuesController } from '../controllers/admin.controller.js';
 import webhookRoutes from '../core/payments/routes/webhook.routes.js';
@@ -20,6 +22,7 @@ import franchiseStoreManagerRoutes from '../modules/food/franchise/routes/storeM
 import franchiseStoreApprovalRoutes from '../modules/food/franchise/routes/storeApproval.routes.js';
 import kitchenStaffRoutes from '../modules/food/store/routes/kitchenStaff.routes.js';
 import settingsRoutes from '../modules/food/settings/routes/settings.routes.js';
+import dynamicHomeRoutes from '../modules/food/settings/routes/dynamicHome.routes.js';
 
 const router = express.Router();
 
@@ -53,6 +56,13 @@ router.get('/v1/food/admin/business-settings/public', businessSettingsController
 // Public menu route
 router.get('/v1/food/admin/menu/public', productController.getPublicMenu);
 
+
+// Public rewards config route
+router.get('/v1/food/admin/rewards/public', rewardConfigController.getPublicRewardConfig);
+
+// Public category-products routes
+router.get('/v1/food/admin/category-products/public', categoryProductController.getCategoryProducts);
+router.get('/v1/food/admin/category-products/categories', categoryProductController.getCategoryProducts);
 router.use('/v1/food/admin', authMiddleware, requireRoles('ADMIN'), storeAdminRoutes);
 router.use('/v1/food/user', authMiddleware, requireRoles('USER'), userRoutes);
 router.use('/v1/food/notifications', authMiddleware, requireRoles('USER', 'STORE', 'DELIVERY_PARTNER'), notificationRoutes);
@@ -66,5 +76,6 @@ router.use('/fcm-tokens', fcmRoutes);
 router.get('/v1/admin/queues', authMiddleware, requireRoles('ADMIN'), getQueuesController);
 
 router.use('/v1/settings', settingsRoutes);
+router.use('/v1/dynamic-home', dynamicHomeRoutes);
 
 export default router;

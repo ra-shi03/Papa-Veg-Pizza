@@ -25,17 +25,7 @@ export function BottomNavBar({
           <span className="text-[10px] font-semibold tracking-wide text-zinc-500 dark:text-zinc-400 mt-1">Menu</span>
         </button>
 
-        {/* Deals (Combos) */}
-        <button
-          onClick={() => {
-            navigate("/user/deals");
-            triggerToast("Opening Deals");
-          }}
-          className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none w-16 pt-1"
-        >
-          <span className="material-symbols-outlined text-[24px] text-zinc-500 dark:text-zinc-400">local_activity</span>
-          <span className="text-[10px] font-semibold tracking-wide text-zinc-500 dark:text-zinc-400 mt-1">Deals</span>
-        </button>
+
 
         {/* Home (Center Logo equivalent) */}
         <button

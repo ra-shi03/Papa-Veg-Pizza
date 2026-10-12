@@ -3,17 +3,136 @@ import { Addon } from '../models/addon.model.js';
 import { FoodFranchise } from '../../franchise/models/franchise.model.js';
 import { FoodStore } from '../../store/models/store.model.js';
 import { CategoryProduct } from '../models/categoryProduct.model.js';
-import { ProductSection } from '../models/productSection.model.js';
 import mongoose from 'mongoose';
 
 export async function getProducts(req, res, next) {
     try {
-        const products = await Product.find()
-            .populate('categoryId', 'label')
-            .populate('sectionId', 'name')
+        const { page, limit, search, category, status } = req.query;
+
+        const filter = {};
+        if (search && search.trim()) {
+            filter.name = { $regex: search.trim(), $options: 'i' };
+        }
+        if (status && status !== 'All') {
+            filter.status = status;
+        }
+        if (category && category !== 'All' && category !== 'All Categories') {
+            if (mongoose.Types.ObjectId.isValid(category)) {
+                filter.categoryId = category;
+            } else {
+                const matchingCats = await CategoryProduct.find({ 
+                    $or: [
+                        { label: { $regex: category.trim(), $options: 'i' } },
+                        { name: { $regex: category.trim(), $options: 'i' } }
+                    ]
+                }).select('_id');
+                if (matchingCats.length > 0) {
+                    filter.categoryId = { $in: matchingCats.map(c => c._id) };
+                }
+            }
+        }
+
+        const pageNum = parseInt(page, 10);
+        const limitNum = parseInt(limit, 10);
+
+        if (pageNum && limitNum) {
+            const totalCount = await Product.countDocuments(filter);
+            const totalPages = Math.max(1, Math.ceil(totalCount / limitNum));
+            const skip = (pageNum - 1) * limitNum;
+
+            const products = await Product.find(filter)
+                .populate('categoryId', 'label name')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limitNum);
+
+            return res.status(200).json({
+                success: true,
+                data: products,
+                pagination: {
+                    totalCount,
+                    totalPages,
+                    currentPage: pageNum,
+                    limit: limitNum
+                }
+            });
+        }
+
+        const products = await Product.find(filter)
+            .populate('categoryId', 'label name')
             .sort({ createdAt: -1 });
             
-        res.status(200).json({ success: true, data: products });
+        res.status(200).json({ success: true, data: products, totalCount: products.length });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function getProductStats(req, res, next) {
+    try {
+        const { search, category, status } = req.query;
+
+        const filter = {};
+        if (search && search.trim()) {
+            filter.name = { $regex: search.trim(), $options: 'i' };
+        }
+        if (status && status !== 'All') {
+            filter.status = status;
+        }
+        if (category && category !== 'All' && category !== 'All Categories') {
+            if (mongoose.Types.ObjectId.isValid(category)) {
+                filter.categoryId = category;
+            } else {
+                const matchingCats = await CategoryProduct.find({ 
+                    $or: [
+                        { label: { $regex: category.trim(), $options: 'i' } },
+                        { name: { $regex: category.trim(), $options: 'i' } }
+                    ]
+                }).select('_id');
+                if (matchingCats.length > 0) {
+                    filter.categoryId = { $in: matchingCats.map(c => c._id) };
+                }
+            }
+        }
+
+        const totalProducts = await Product.countDocuments(filter);
+        const activeProducts = await Product.countDocuments({ ...filter, status: { $regex: /^active$/i } });
+        const draftProducts = await Product.countDocuments({ ...filter, status: { $regex: /^draft$/i } });
+        const archivedProducts = await Product.countDocuments({ ...filter, status: { $regex: /^archived$/i } });
+        const vegProducts = await Product.countDocuments({ ...filter, vegType: { $regex: /^veg/i } });
+        const customizableProducts = await Product.countDocuments({
+            ...filter,
+            $or: [
+                { 'sizes.1': { $exists: true } },
+                { 'toppings.0': { $exists: true } },
+                { isCustomizable: true }
+            ]
+        });
+        const outOfStockProducts = await Product.countDocuments({
+            ...filter,
+            $or: [
+                { availability: { $regex: /out of stock/i } },
+                { status: { $regex: /out of stock/i } }
+            ]
+        });
+
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const addedThisMonth = await Product.countDocuments({ ...filter, createdAt: { $gte: startOfMonth } });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                totalProducts,
+                activeProducts,
+                draftProducts,
+                archivedProducts,
+                vegProducts,
+                customizableProducts,
+                outOfStockProducts,
+                addedThisMonth
+            }
+        });
     } catch (error) {
         next(error);
     }
@@ -21,11 +140,9 @@ export async function getProducts(req, res, next) {
 
 export async function getPublicMenu(req, res, next) {
     try {
-        const categories = await CategoryProduct.find({ type: 'Category', status: 'Active' }).sort({ createdAt: 1 });
-        const sections = await ProductSection.find({ status: 'Active' }).sort({ sortOrder: 1 });
+        const categories = await CategoryProduct.find({ type: 'Category', status: 'Active' }).sort({ sort: 1, createdAt: 1 });
         const products = await Product.find({ status: 'Active' })
             .populate('categoryId', 'name')
-            .populate('sectionId', 'name')
             .sort({ createdAt: -1 });
 
         // Transform them back to the format Home.jsx expects temporarily, or return as is.
@@ -35,7 +152,6 @@ export async function getPublicMenu(req, res, next) {
             success: true, 
             data: {
                 categories,
-                sections,
                 products
             } 
         });
@@ -51,7 +167,6 @@ export async function getProductById(req, res, next) {
         }
         const product = await Product.findById(req.params.id)
             .populate('categoryId', 'label')
-            .populate('sectionId', 'name')
             .populate('toppings', 'name')
             .populate('franchiseIds', 'companyName name franchiseName')
             .populate('storeIds', 'name storeName');

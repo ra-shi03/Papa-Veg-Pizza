@@ -863,7 +863,7 @@ export default function PushNotification() {
                           {visibleColumns.status && (
                             <td className="px-4 py-3.5 text-center select-none">
                               <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] font-extrabold ${
-                                notif.status === 'Draft' ? 'bg-zinc-100 text-zinc-650 dark:bg-zinc-800 dark:text-zinc-300' :
+                                notif.status === 'Draft' ? 'bg-zinc-100 text-zinc-700 dark:text-zinc-300 dark:bg-zinc-800 dark:text-zinc-300' :
                                 notif.status === 'Scheduled' ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400' :
                                 notif.status === 'Processing' ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' :
                                 notif.status === 'Sent' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-450' :

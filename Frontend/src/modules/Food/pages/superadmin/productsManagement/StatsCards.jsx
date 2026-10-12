@@ -12,48 +12,54 @@ import {
   TrendingDown
 } from "lucide-react";
 
-export default function StatsCards({ stats = {} }) {
-  const defaultStats = {
-    totalProducts: 1284,
-    activeProducts: 1210,
-    draftProducts: 53,
-    archivedProducts: 21,
-    vegProducts: 1150,
-    customizableProducts: 840,
-    outOfStockProducts: 8,
-    addedThisMonth: 74,
-    ...stats
+export default function StatsCards({ stats = {}, onCardClick }) {
+  const currentStats = {
+    totalProducts: stats?.totalProducts ?? 0,
+    activeProducts: stats?.activeProducts ?? 0,
+    draftProducts: stats?.draftProducts ?? 0,
+    archivedProducts: stats?.archivedProducts ?? 0,
+    vegProducts: stats?.vegProducts ?? 0,
+    customizableProducts: stats?.customizableProducts ?? 0,
+    outOfStockProducts: stats?.outOfStockProducts ?? 0,
+    addedThisMonth: stats?.addedThisMonth ?? 0,
   };
+
+  const total = currentStats.totalProducts;
+  const activePercent = total > 0 ? Math.round((currentStats.activeProducts / total) * 100) : 0;
+  const vegPercent = total > 0 ? Math.round((currentStats.vegProducts / total) * 100) : 0;
+  const draftPercent = total > 0 ? Math.round((currentStats.draftProducts / total) * 100) : 0;
 
   const cardData = [
     {
       title: "Total Products",
-      value: defaultStats.totalProducts,
-      change: "+4.2%",
+      value: currentStats.totalProducts,
+      change: "All items",
       isPositive: true,
+      isStable: true,
       icon: Package,
       color: "text-orange-500 bg-orange-50 dark:bg-orange-950/20 border-orange-100 dark:border-orange-900/30"
     },
     {
       title: "Active Products",
-      value: defaultStats.activeProducts,
-      change: "+2.1%",
+      value: currentStats.activeProducts,
+      change: `${activePercent}%`,
       isPositive: true,
       icon: CheckCircle,
       color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/30"
     },
     {
       title: "Draft Products",
-      value: defaultStats.draftProducts,
-      change: "-1.5%",
-      isPositive: false,
+      value: currentStats.draftProducts,
+      change: `${draftPercent}%`,
+      isPositive: currentStats.draftProducts === 0,
+      isStable: currentStats.draftProducts === 0,
       icon: FileText,
       color: "text-zinc-500 bg-zinc-50 dark:bg-zinc-900/40 border-zinc-150 dark:border-zinc-800"
     },
     {
       title: "Archived Products",
-      value: defaultStats.archivedProducts,
-      change: "Stable",
+      value: currentStats.archivedProducts,
+      change: `${currentStats.archivedProducts} items`,
       isPositive: true,
       isStable: true,
       icon: Archive,
@@ -61,32 +67,34 @@ export default function StatsCards({ stats = {} }) {
     },
     {
       title: "Veg Products",
-      value: defaultStats.vegProducts,
-      change: "+5.0%",
+      value: currentStats.vegProducts,
+      change: `${vegPercent}%`,
       isPositive: true,
       icon: Leaf,
       color: "text-green-600 bg-green-50 dark:bg-green-950/20 border-green-100 dark:border-green-900/30"
     },
     {
       title: "Customizable",
-      value: defaultStats.customizableProducts,
-      change: "+1.8%",
+      value: currentStats.customizableProducts,
+      change: `${currentStats.customizableProducts} items`,
       isPositive: true,
+      isStable: true,
       icon: Sliders,
       color: "text-indigo-500 bg-indigo-50 dark:bg-indigo-950/20 border-indigo-100 dark:border-indigo-900/30"
     },
     {
       title: "Out of Stock",
-      value: defaultStats.outOfStockProducts,
-      change: "-12%",
-      isPositive: true, // drop in out of stock is good
+      value: currentStats.outOfStockProducts,
+      change: currentStats.outOfStockProducts > 0 ? "Attention" : "All In Stock",
+      isPositive: currentStats.outOfStockProducts === 0,
+      isStable: currentStats.outOfStockProducts === 0,
       icon: XCircle,
       color: "text-rose-500 bg-rose-50 dark:bg-rose-955/20 border-rose-100 dark:border-rose-900/30"
     },
     {
       title: "Added This Month",
-      value: defaultStats.addedThisMonth,
-      change: "74 new",
+      value: currentStats.addedThisMonth,
+      change: `${currentStats.addedThisMonth} new`,
       isPositive: true,
       isStable: true,
       icon: Calendar,
@@ -101,7 +109,9 @@ export default function StatsCards({ stats = {} }) {
         return (
           <div
             key={idx}
-            className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 p-2.5 rounded-lg flex flex-col justify-between hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 shadow-sm"
+            onClick={() => onCardClick?.(card.title)}
+            className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 p-2.5 rounded-lg flex flex-col justify-between hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 shadow-sm cursor-pointer hover:border-[var(--primary)]/40 hover:shadow-md"
+            title={`Filter table by ${card.title}`}
           >
             <div className="flex items-center justify-between gap-1.5">
               <span className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider truncate">

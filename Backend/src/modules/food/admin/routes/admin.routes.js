@@ -10,7 +10,8 @@ import * as notificationBroadcastController from '../controllers/notificationBro
 import * as franchiseController from '../controllers/franchise.controller.js';
 import * as geographyController from '../controllers/geography.controller.js';
 import * as categoryProductController from '../controllers/categoryProduct.controller.js';
-import * as productSectionController from '../controllers/productSection.controller.js';
+import * as rewardConfigController from '../controllers/rewardConfig.controller.js';
+
 import * as productController from '../controllers/product.controller.js';
 import * as addonController from '../controllers/addon.controller.js';
 
@@ -25,8 +26,16 @@ router.get('/business-settings/public', businessSettingsController.getBusinessSe
 
 // ----- Public Category Products -----
 router.get('/category-products/categories', categoryProductController.getCategoryProducts);
+router.get('/category-products/public', categoryProductController.getCategoryProducts);
+
+// ----- Public Rewards Config -----
+
 
 router.use(requireAdmin);
+
+// ----- Admin Rewards Config -----
+router.get('/rewards/config', rewardConfigController.getRewardConfig);
+router.put('/rewards/config', rewardConfigController.updateRewardConfig);
 
 // ----- Profile / Work -----
 router.get('/profile/work', adminController.getStoreManagerProfileWork);
@@ -104,6 +113,7 @@ router.delete('/categories/:id', adminController.deleteCategory);
 
 // ----- Addons -----
 router.get('/addons', addonController.getAddons);
+router.get('/addons/:id', addonController.getAddonById);
 router.post('/addons', addonController.createAddon);
 router.patch('/addons/:id', addonController.updateAddon);
 router.delete('/addons/:id', addonController.deleteAddon);
@@ -114,25 +124,13 @@ router.patch('/categories/:id/make-global', adminController.makeCategoryGlobal);
 
 // ----- Category Products -----
 router.get('/category-products', categoryProductController.getCategoryProducts);
+router.get('/category-products/stats', categoryProductController.getCategoryStats);
 router.get('/category-products/:id', categoryProductController.getCategoryProductById);
 router.post('/category-products', categoryProductController.createCategoryProduct);
 router.patch('/category-products/:id', categoryProductController.updateCategoryProduct);
 router.delete('/category-products/:id', categoryProductController.deleteCategoryProduct);
 
-// ----- Product Sections -----
-router.get('/sections', productSectionController.getSections);
-router.get('/sections/:id', productSectionController.getSectionById);
-router.post('/sections', productSectionController.createSection);
-router.patch('/sections/:id', productSectionController.updateSection);
-router.delete('/sections/:id', productSectionController.deleteSection);
 
-
-// ----- Product Sections -----
-router.get('/sections', productSectionController.getSections);
-router.get('/sections/:id', productSectionController.getSectionById);
-router.post('/sections', productSectionController.createSection);
-router.patch('/sections/:id', productSectionController.updateSection);
-router.delete('/sections/:id', productSectionController.deleteSection);
 
 
 // ----- Store Add-ons Approval -----
@@ -156,6 +154,7 @@ router.delete('/foods/:id', adminController.deleteFood);
 
 // NEW Schema endpoints
 router.get('/products', productController.getProducts);
+router.get('/products/stats', productController.getProductStats);
 router.get('/products/:id', productController.getProductById);
 router.post('/products', productController.createProduct);
 router.patch('/products/:id', productController.updateProduct);
