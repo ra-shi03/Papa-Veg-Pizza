@@ -7,7 +7,9 @@ const getDefaultPromiseConfig = () => ({
         subtitle: 'Where quality food meets honest prices!',
         tagline: '100% Pure Vegetarian Delight',
         stars: '★★',
-        orderButtonText: 'Order Now'
+        orderButtonText: 'Order Now',
+        badgeText: 'Promise',
+        showBadge: true
     },
     tickerItems: [
         {

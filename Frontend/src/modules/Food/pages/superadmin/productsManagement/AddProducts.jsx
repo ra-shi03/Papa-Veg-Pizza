@@ -14,24 +14,33 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
   const [isToppingsOpen, setIsToppingsOpen] = useState(false);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");
+  const [addonSearch, setAddonSearch] = useState("");
   const categoryDropdownRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
     name: "",
     categoryId: "",
-    
     id: "",
     _id: "",
+    badge: "",
+    originalPrice: "",
+    discount: "",
+    discountType: "percentage", // "percentage" | "flat"
+    price: "",
+    saveAmount: 0,
     shortDescription: "",
     description: "",
     image: "",
-    price: "",
     status: "Active",
     franchiseIds: [],
     storeIds: [],
     toppings: [],
-    sizes: [{ size: "", price: "", description: "" }]
+    sizes: [
+      { size: "Regular", price: "", originalPrice: "", discount: "", discountType: "percentage", saveAmount: 0, description: "Serves 1 person only" },
+      { size: "Medium", price: "", originalPrice: "", discount: "", discountType: "percentage", saveAmount: 0, description: "Just right for 1-2 people" },
+      { size: "Large", price: "", originalPrice: "", discount: "", discountType: "percentage", saveAmount: 0, description: "Serves 3-4 people" }
+    ]
   });
 
   // Fetch categories, franchises when modal opens
@@ -41,20 +50,63 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
       fetchFranchises();
       
       if (product && mode !== "add") {
+        const rawSizes = product.sizes && Array.isArray(product.sizes) && product.sizes.length > 0 ? product.sizes : [];
+        let initializedSizes = [];
+        if (rawSizes.length > 0) {
+          initializedSizes = rawSizes.map(s => {
+            const orig = Number(s.originalPrice) || (s.mrp ? Number(s.mrp) : (Number(s.price) || 0));
+            const pr = Number(s.price) || 0;
+            let disc = Number(s.discount) || 0;
+            const discType = s.discountType || "percentage";
+            let save = Number(s.saveAmount) || 0;
+            if (orig > pr && !save) {
+              save = orig - pr;
+            }
+            if (orig > pr && !disc) {
+              disc = discType === "percentage" ? Math.round((save / orig) * 100) : save;
+            }
+            return {
+              size: s.size || "",
+              price: pr > 0 ? pr : (product.price || ""),
+              originalPrice: orig > 0 ? orig : (product.originalPrice || ""),
+              discount: disc > 0 ? disc : (product.discount || ""),
+              discountType: discType,
+              saveAmount: save > 0 ? save : (product.saveAmount || 0),
+              description: s.description || ""
+            };
+          });
+        } else {
+          const baseOrig = Number(product.originalPrice) || Number(product.mrp) || Number(product.price) || "";
+          const basePrice = product.price || "";
+          const baseDisc = product.discount || "";
+          const baseDiscType = product.discountType || "percentage";
+          const baseSave = Number(product.saveAmount) || (Number(baseOrig) > Number(basePrice) ? Number(baseOrig) - Number(basePrice) : 0);
+          initializedSizes = [
+            { size: "Regular", price: basePrice, originalPrice: baseOrig, discount: baseDisc, discountType: baseDiscType, saveAmount: baseSave, description: "Serves 1 person only" }
+          ];
+        }
+
+        const primarySize = initializedSizes.find(s => s.size?.toLowerCase() === "regular") || initializedSizes[0] || {};
+
         setFormData({
           id: product.id || "",
           _id: product._id || "",
           name: product.name || "",
-          categoryId: product.categoryId || "",
+          categoryId: product.categoryId?._id || product.categoryId?.id || product.categoryId || "",
+          badge: product.badge || "",
+          originalPrice: primarySize.originalPrice ?? product.originalPrice ?? "",
+          discount: primarySize.discount ?? product.discount ?? "",
+          discountType: primarySize.discountType ?? product.discountType ?? "percentage",
+          price: primarySize.price ?? product.price ?? "",
+          saveAmount: primarySize.saveAmount ?? product.saveAmount ?? 0,
           shortDescription: product.shortDescription || "",
           description: product.description || "",
           image: product.image || product.icon || "",
-          price: product.price || "",
           status: product.status || "Active",
           franchiseIds: product.franchiseIds || [],
           storeIds: product.storeIds || [],
-          toppings: Array.isArray(product.toppings) ? product.toppings : (typeof product.toppings === 'string' ? product.toppings.split(",").map(t => t.trim()).filter(Boolean) : []),
-          sizes: product.sizes && product.sizes.length ? product.sizes : [{ size: "", price: "", description: "" }]
+          toppings: Array.isArray(product.toppings) ? product.toppings.map(t => (typeof t === 'object' ? (t._id || t.id) : t)).filter(Boolean) : (typeof product.toppings === 'string' ? product.toppings.split(",").map(t => t.trim()).filter(Boolean) : []),
+          sizes: initializedSizes
         });
         fetchStores(product.franchiseId || "");
       } else {
@@ -63,15 +115,24 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
           _id: "",
           name: "",
           categoryId: "",
+          badge: "",
+          originalPrice: "",
+          discount: "",
+          discountType: "percentage",
+          price: "",
+          saveAmount: 0,
           shortDescription: "",
           description: "",
           image: "",
-          price: "",
           status: "Active",
           franchiseIds: [],
           storeIds: [],
           toppings: [],
-          sizes: [{ size: "", price: "", description: "" }]
+          sizes: [
+            { size: "Regular", price: "", originalPrice: "", discount: "", discountType: "percentage", saveAmount: 0, description: "Serves 1 person only" },
+            { size: "Medium", price: "", originalPrice: "", discount: "", discountType: "percentage", saveAmount: 0, description: "Just right for 1-2 people" },
+            { size: "Large", price: "", originalPrice: "", discount: "", discountType: "percentage", saveAmount: 0, description: "Serves 3-4 people" }
+          ]
         });
         fetchStores("");
       }
@@ -156,7 +217,6 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       toast.error("Only images are allowed");
-      return;
     }
     setIsUploading(true);
     try {
@@ -174,35 +234,169 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
     }
   };
 
-  const handleAddSize = () => setFormData(prev => ({ ...prev, sizes: [...prev.sizes, { size: "", price: "", description: "" }] }));
-  const handleRemoveSize = (index) => setFormData(prev => ({
-    ...prev,
-    sizes: prev.sizes.filter((_, i) => i !== index)
-  }));
-  const handleSizeChange = (index, field, value) => {
-    const newSizes = [...formData.sizes];
-    newSizes[index][field] = value;
-    setFormData(prev => ({ ...prev, sizes: newSizes }));
+  // Group addons by type (Crust, Toppings, Dips & Extras)
+  const groupedAddons = React.useMemo(() => {
+    const filtered = addonSearch.trim()
+      ? addonsList.filter(a => a.name?.toLowerCase().includes(addonSearch.toLowerCase().trim()))
+      : addonsList;
+
+    const groups = {
+      "Crust": [],
+      "Toppings": [],
+      "Dips & Extras": []
+    };
+
+    filtered.forEach(addon => {
+      const t = (addon.type || "").toLowerCase().trim();
+      if (t.includes("crust")) {
+        groups["Crust"].push(addon);
+      } else if (t.includes("dip") || t.includes("sauce") || t.includes("cheese") || t.includes("extra")) {
+        groups["Dips & Extras"].push(addon);
+      } else {
+        groups["Toppings"].push(addon);
+      }
+    });
+
+    return groups;
+  }, [addonsList, addonSearch]);
+
+  // Size-wise Pricing & Discount handler (Image 3)
+  const handleSizePricingChange = (index, field, value) => {
+    setFormData(prev => {
+      const newSizes = [...prev.sizes];
+      const target = { ...newSizes[index] };
+
+      let orig = field === "originalPrice" ? value : target.originalPrice;
+      let disc = field === "discount" ? value : target.discount;
+      let discType = field === "discountType" ? value : (target.discountType || "percentage");
+      let price = field === "price" ? value : target.price;
+      let saveAmount = target.saveAmount || 0;
+
+      const numOrig = parseFloat(orig) || 0;
+      const numDisc = parseFloat(disc) || 0;
+      const numPrice = parseFloat(price) || 0;
+
+      if (field === "originalPrice" || field === "discount" || field === "discountType") {
+        if (numOrig > 0 && numDisc > 0) {
+          if (discType === "percentage") {
+            const calculatedSavings = Math.round((numOrig * Math.min(100, Math.max(0, numDisc))) / 100);
+            saveAmount = calculatedSavings;
+            price = Math.max(0, numOrig - calculatedSavings);
+          } else {
+            const calculatedSavings = Math.min(numOrig, Math.max(0, numDisc));
+            saveAmount = calculatedSavings;
+            price = Math.max(0, numOrig - calculatedSavings);
+          }
+        } else if (numOrig > 0 && numPrice > 0 && numOrig >= numPrice) {
+          saveAmount = Math.max(0, numOrig - numPrice);
+        } else if (numOrig > 0 && !disc) {
+          saveAmount = 0;
+          if (field === "originalPrice" && !target.price) {
+            price = numOrig;
+          }
+        }
+      } else if (field === "price") {
+        if (numOrig > 0 && numPrice > 0 && numOrig >= numPrice) {
+          saveAmount = Math.max(0, numOrig - numPrice);
+          if (discType === "percentage") {
+            disc = Math.round((saveAmount / numOrig) * 100);
+          } else {
+            disc = saveAmount;
+          }
+        } else {
+          saveAmount = 0;
+        }
+      } else if (field === "size" || field === "description") {
+        target[field] = value;
+      }
+
+      target.originalPrice = orig;
+      target.discount = disc;
+      target.discountType = discType;
+      target.price = price;
+      target.saveAmount = saveAmount;
+      newSizes[index] = target;
+
+      // Sync primary size to top level
+      const primary = newSizes.find(s => s.size?.toLowerCase() === "regular") || newSizes[0] || {};
+      return {
+        ...prev,
+        sizes: newSizes,
+        price: primary.price || prev.price,
+        originalPrice: primary.originalPrice || prev.originalPrice,
+        discount: primary.discount || prev.discount,
+        discountType: primary.discountType || prev.discountType,
+        saveAmount: primary.saveAmount || prev.saveAmount
+      };
+    });
   };
+
+  const handleAddSize = () => setFormData(prev => ({ 
+    ...prev, 
+    sizes: [...prev.sizes, { size: "", price: "", originalPrice: "", discount: "", discountType: "percentage", saveAmount: 0, description: "" }] 
+  }));
+
+  const handleRemoveSize = (index) => setFormData(prev => {
+    const newSizes = prev.sizes.filter((_, i) => i !== index);
+    const primary = newSizes.find(s => s.size?.toLowerCase() === "regular") || newSizes[0] || {};
+    return {
+      ...prev,
+      sizes: newSizes,
+      price: primary.price || prev.price,
+      originalPrice: primary.originalPrice || prev.originalPrice,
+      discount: primary.discount || prev.discount,
+      discountType: primary.discountType || prev.discountType,
+      saveAmount: primary.saveAmount || prev.saveAmount
+    };
+  });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     
-    // Filter out empty sizes and format toppings
+    // Filter out empty sizes
+    const cleanedSizes = formData.sizes
+      .filter(s => s.size && s.size.trim())
+      .map(s => {
+        const pr = Number(s.price) || 0;
+        const orig = Number(s.originalPrice) || pr;
+        const disc = Number(s.discount) || 0;
+        const discType = s.discountType || "percentage";
+        const save = Number(s.saveAmount) || Math.max(0, orig - pr);
+        return {
+          size: s.size.trim(),
+          price: pr,
+          originalPrice: orig,
+          discount: disc,
+          discountType: discType,
+          saveAmount: save,
+          description: s.description ? s.description.trim() : ""
+        };
+      });
+
+    const primarySize = cleanedSizes.find(s => s.size.toLowerCase() === "regular") || cleanedSizes[0] || {};
+    const finalPrice = primarySize.price || Number(formData.price) || 0;
+    const finalOriginalPrice = primarySize.originalPrice || finalPrice;
+    const finalDiscount = primarySize.discount || 0;
+    const finalDiscountType = primarySize.discountType || "percentage";
+    const finalSaveAmount = primarySize.saveAmount || Math.max(0, finalOriginalPrice - finalPrice);
+
     const cleanedData = {
       ...formData,
-      sizes: formData.sizes.filter(s => s.size.trim())
+      price: finalPrice,
+      originalPrice: finalOriginalPrice,
+      discount: finalDiscount,
+      discountType: finalDiscountType,
+      saveAmount: finalSaveAmount,
+      badge: formData.badge ? formData.badge.trim() : "",
+      sizes: cleanedSizes,
+      toppings: formData.toppings
     };
-
-    // Calculate base price from sizes if available
-    cleanedData.price = cleanedData.sizes.length > 0 ? Number(cleanedData.sizes[0].price) || 0 : 0;
 
     // Clean up empty ObjectIds that MongoDB will reject
     if (!cleanedData.id) delete cleanedData.id;
     if (!cleanedData._id) delete cleanedData._id;
     if (!cleanedData.categoryId) delete cleanedData.categoryId;
-    
 
     try {
       await onSave(cleanedData, mode);
@@ -303,6 +497,44 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
                   <option value="Inactive">Inactive</option>
                 </select>
               </div>
+
+              {/* Product Badge */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                    Product Badge
+                  </label>
+                  {formData.badge && (
+                    <span className="bg-[#E53935] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider shadow-xs">
+                      {formData.badge}
+                    </span>
+                  )}
+                </div>
+                <input 
+                  type="text" 
+                  value={formData.badge} 
+                  onChange={e => setFormData({...formData, badge: e.target.value})} 
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-transparent dark:border-zinc-700 outline-none focus:border-[var(--primary)]" 
+                  placeholder="e.g. NEW, Bestseller, 20% OFF" 
+                />
+                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                  <span className="text-[10px] text-zinc-400 font-medium">Quick suggestions:</span>
+                  {["NEW", "Bestseller", "Trending", "Hot", "Customisable"].map(tag => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, badge: prev.badge === tag ? "" : tag }))}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
+                        formData.badge === tag
+                          ? "bg-[#E53935] text-white border-[#E53935]"
+                          : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400"
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div>
@@ -316,7 +548,7 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
             </div>
           </div>
 
-          {/* Image */}
+          {/* Product Image */}
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 pb-2">Product Image</h3>
             <div className="flex gap-4 items-center">
@@ -340,53 +572,301 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
             </div>
           </div>
 
-
-          {/* Toppings */}
+          {/* Sizes & Pricing Matrix (Image 3: Size-wise MRP, Discount, Selling Price & Save Banner) */}
           <div className="space-y-4">
-            <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 pb-2">Toppings</h3>
-            
-            <div className="relative">
-              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Toppings</label>
-              
-              <div 
-                onClick={() => setIsToppingsOpen(!isToppingsOpen)}
-                className="w-full px-3 py-2 border rounded-lg text-sm bg-transparent dark:border-zinc-700 cursor-pointer flex justify-between items-center focus:border-[var(--primary)]"
-              >
-                <span className={formData.toppings.length === 0 ? "text-zinc-400" : "text-zinc-900 dark:text-zinc-100 line-clamp-1"}>
-                  {formData.toppings.length === 0 
-                    ? "Select Toppings" 
-                    : formData.toppings.map(id => addonsList.find(a => a._id === id)?.name || id).join(", ")}
-                </span>
-                <ChevronDown size={16} className={`text-zinc-500 transition-transform ${isToppingsOpen ? "rotate-180" : ""}`} />
+            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
+              <div>
+                <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">Sizes & Pricing</h3>
+                <p className="text-[11px] text-zinc-400 mt-0.5">Configure per-size MRP, discounts, and selling price.</p>
               </div>
+              <button type="button" onClick={handleAddSize} className="text-[var(--primary)] flex items-center gap-1 text-xs font-semibold hover:underline cursor-pointer">
+                <Plus size={14} /> Add Size
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {formData.sizes.map((sizeObj, index) => {
+                const sizeOrig = Number(sizeObj.originalPrice) || 0;
+                const sizeSell = Number(sizeObj.price) || 0;
+                const sizeSavings = sizeObj.saveAmount || (sizeOrig > sizeSell ? sizeOrig - sizeSell : 0);
 
-              {isToppingsOpen && (
-                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  {addonsList.map(addon => {
-                    const isSelected = formData.toppings.includes(addon._id);
-                    return (
-                      <div 
-                        key={addon._id}
-                        onClick={() => {
-                          const newToppings = isSelected
-                            ? formData.toppings.filter(t => t !== addon._id)
-                            : [...formData.toppings, addon._id];
-                          setFormData({...formData, toppings: newToppings});
-                        }}
-                        className="px-3 py-2 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer"
-                      >
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-[var(--primary)] border-[var(--primary)]' : 'border-zinc-300 dark:border-zinc-600'}`}>
-                          {isSelected && <Check size={12} className="text-white" />}
-                        </div>
-                        <span className="text-sm text-zinc-700 dark:text-zinc-300">{addon.name}</span>
+                return (
+                  <div key={index} className="p-4 border border-zinc-200 dark:border-zinc-700 rounded-xl bg-zinc-50/60 dark:bg-zinc-900/40 relative space-y-4 shadow-2xs">
+                    {/* Top Size Header */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wide">
+                          Size {index + 1}:
+                        </span>
+                        <select 
+                          value={sizeObj.size} 
+                          onChange={(e) => handleSizePricingChange(index, 'size', e.target.value)} 
+                          className="px-2.5 py-1.5 border rounded-lg text-sm font-semibold bg-white dark:bg-zinc-950 dark:border-zinc-700 outline-none focus:border-[var(--primary)]"
+                        >
+                          <option value="">Select Size</option>
+                          <option value="Regular">Regular</option>
+                          <option value="Medium">Medium</option>
+                          <option value="Large">Large</option>
+                          <option value="Small">Small</option>
+                        </select>
                       </div>
-                    );
-                  })}
-                  {addonsList.length === 0 && (
-                    <div className="px-3 py-4 text-sm text-center text-zinc-500">No toppings available</div>
-                  )}
-                </div>
+                      {formData.sizes.length > 1 && (
+                        <button 
+                          type="button" 
+                          onClick={() => handleRemoveSize(index)} 
+                          className="text-rose-500 hover:text-rose-600 p-1.5 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                          title="Remove Size"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Image 3 layout: Original Price (MRP) | Discount (% Off / ₹ Flat) | Final Selling Price */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                      {/* Original Price / MRP */}
+                      <div>
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                          Original Price (MRP) ₹ *
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={sizeObj.originalPrice || ""}
+                          onChange={(e) => handleSizePricingChange(index, "originalPrice", e.target.value)}
+                          className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-zinc-950 dark:border-zinc-700 outline-none focus:border-[var(--primary)] font-semibold"
+                          placeholder="e.g. 299"
+                        />
+                        <span className="text-[10px] text-zinc-400 mt-1 block">Regular MRP before discount</span>
+                      </div>
+
+                      {/* Discount */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                            Discount
+                          </label>
+                          <div className="flex rounded-md overflow-hidden border border-zinc-200 dark:border-zinc-700 text-[10px] font-bold">
+                            <button
+                              type="button"
+                              onClick={() => handleSizePricingChange(index, "discountType", "percentage")}
+                              className={`px-2 py-0.5 transition-colors cursor-pointer ${
+                                (sizeObj.discountType || "percentage") === "percentage" 
+                                  ? "bg-[#D32F2F] text-white" 
+                                  : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
+                              }`}
+                            >
+                              % Off
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSizePricingChange(index, "discountType", "flat")}
+                              className={`px-2 py-0.5 transition-colors cursor-pointer ${
+                                sizeObj.discountType === "flat" 
+                                  ? "bg-[#D32F2F] text-white" 
+                                  : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
+                              }`}
+                            >
+                              ₹ Flat
+                            </button>
+                          </div>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max={sizeObj.discountType === "percentage" ? "100" : undefined}
+                            value={sizeObj.discount || ""}
+                            onChange={(e) => handleSizePricingChange(index, "discount", e.target.value)}
+                            className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-zinc-950 dark:border-zinc-700 outline-none focus:border-[var(--primary)] font-semibold pr-7"
+                            placeholder={sizeObj.discountType === "flat" ? "e.g. 50" : "e.g. 20"}
+                          />
+                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400 pointer-events-none">
+                            {sizeObj.discountType === "flat" ? "₹" : "%"}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-zinc-400 mt-1 block">
+                          {sizeObj.discountType === "flat" ? "Flat amount off MRP" : "Percentage off MRP"}
+                        </span>
+                      </div>
+
+                      {/* Final Selling Price */}
+                      <div>
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                          Final Selling Price ₹ *
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={sizeObj.price || ""}
+                          onChange={(e) => handleSizePricingChange(index, "price", e.target.value)}
+                          className="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-zinc-950 dark:border-zinc-700 outline-none focus:border-[var(--primary)] font-bold text-zinc-900 dark:text-white"
+                          placeholder="e.g. 249"
+                        />
+                        <span className="text-[10px] text-zinc-400 mt-1 block">Final price customer pays</span>
+                      </div>
+                    </div>
+
+                    {/* Live Save Banner matching Image 3 */}
+                    {(Number(sizeObj.originalPrice) > 0 || Number(sizeObj.price) > 0) && (
+                      <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-50/60 dark:bg-emerald-950/25 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="bg-[#169B45] text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-xs">
+                            Save ₹{sizeSavings}
+                          </span>
+                          <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                            Customer Saves: <span className="text-emerald-600 dark:text-emerald-400">₹{sizeSavings}</span>
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs font-medium">
+                          <span className="text-zinc-400 line-through">MRP: ₹{sizeObj.originalPrice || 0}</span>
+                          <span className="text-zinc-400 font-bold">➔</span>
+                          <span className="text-zinc-950 dark:text-white font-black text-sm">Pay: ₹{sizeObj.price || 0}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">
+                        Size Description
+                      </label>
+                      <input 
+                        type="text" 
+                        value={sizeObj.description || ""} 
+                        onChange={(e) => handleSizePricingChange(index, 'description', e.target.value)} 
+                        className="w-full px-3 py-1.5 border rounded-lg text-xs bg-white dark:bg-zinc-950 dark:border-zinc-700 outline-none focus:border-[var(--primary)]" 
+                        placeholder="e.g. Serves 1 person only" 
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+              {formData.sizes.length === 0 && (
+                <p className="text-xs text-zinc-500 text-center py-2">No sizes added.</p>
               )}
+            </div>
+          </div>
+
+          {/* Toppings / Add-ons by Type (Image 4 & User Requirements: Crust, Toppings, Dips) */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
+              <div>
+                <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">
+                  Toppings & Add-ons (Type-Wise)
+                </h3>
+                <p className="text-[11px] text-zinc-400 mt-0.5">
+                  Select which crusts, toppings, and dips can be chosen for this product.
+                </p>
+              </div>
+              <span className="text-xs font-bold text-[var(--primary)] bg-[var(--primary)]/10 px-2.5 py-1 rounded-full">
+                {formData.toppings.length} Assigned
+              </span>
+            </div>
+
+            {/* Search filter for toppings */}
+            <div className="relative">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+              <input
+                type="text"
+                placeholder="Search add-on name..."
+                value={addonSearch}
+                onChange={(e) => setAddonSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 border rounded-lg text-xs bg-transparent dark:border-zinc-700 outline-none focus:border-[var(--primary)]"
+              />
+            </div>
+
+            {/* Type-wise categories */}
+            <div className="space-y-4">
+              {Object.entries(groupedAddons).map(([groupTitle, addonsInGroup]) => {
+                const selectedInGroup = addonsInGroup.filter(a => formData.toppings.includes(a._id));
+                const allSelected = addonsInGroup.length > 0 && selectedInGroup.length === addonsInGroup.length;
+
+                const handleSelectAllGroup = () => {
+                  const groupIds = addonsInGroup.map(a => a._id);
+                  if (allSelected) {
+                    setFormData(prev => ({
+                      ...prev,
+                      toppings: prev.toppings.filter(id => !groupIds.includes(id))
+                    }));
+                  } else {
+                    setFormData(prev => ({
+                      ...prev,
+                      toppings: Array.from(new Set([...prev.toppings, ...groupIds]))
+                    }));
+                  }
+                };
+
+                return (
+                  <div key={groupTitle} className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-3.5 bg-zinc-50/40 dark:bg-zinc-900/40 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">
+                          {groupTitle}
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                          {selectedInGroup.length} of {addonsInGroup.length} selected
+                        </span>
+                      </div>
+                      {addonsInGroup.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleSelectAllGroup}
+                          className="text-[11px] font-semibold text-[var(--primary)] hover:underline cursor-pointer"
+                        >
+                          {allSelected ? "Deselect All" : "Select All"}
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {addonsInGroup.map(addon => {
+                        const isSelected = formData.toppings.includes(addon._id);
+                        const defaultPrice = addon.prices?.[0]?.price ?? 0;
+
+                        return (
+                          <div
+                            key={addon._id}
+                            onClick={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                toppings: isSelected
+                                  ? prev.toppings.filter(id => id !== addon._id)
+                                  : [...prev.toppings, addon._id]
+                              }));
+                            }}
+                            className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition-all ${
+                              isSelected
+                                ? "border-[var(--primary)] bg-[var(--primary)]/5 dark:bg-[var(--primary)]/10 text-zinc-900 dark:text-white"
+                                : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-700 dark:text-zinc-300"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0 pr-2">
+                              <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                                isSelected ? "bg-[var(--primary)] border-[var(--primary)]" : "border-zinc-300 dark:border-zinc-600"
+                              }`}>
+                                {isSelected && <Check size={11} className="text-white" />}
+                              </div>
+                              {addon.image && (
+                                <img src={addon.image} alt={addon.name} className="w-6 h-6 rounded object-cover shrink-0" />
+                              )}
+                              <span className="text-xs font-semibold truncate">{addon.name}</span>
+                            </div>
+                            <span className="text-[11px] font-bold text-zinc-500 shrink-0">
+                              {defaultPrice > 0 ? `+₹${defaultPrice}` : "Free"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {addonsInGroup.length === 0 && (
+                        <p className="text-xs text-zinc-400 italic col-span-2 py-1">No items found for {groupTitle}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -413,7 +893,7 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Select Store</label>
                 <select 
                   value={formData.storeIds.length > 0 ? formData.storeIds[0] : ""} 
-                  onChange={handleStoreChange}
+                  onChange={handleStoreChange} 
                   className="w-full px-3 py-2 border rounded-lg text-sm bg-transparent dark:border-zinc-700 outline-none focus:border-[var(--primary)]"
                 >
                   <option value="">All Stores</option>
@@ -426,50 +906,6 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
                   )}
                 </select>
               </div>
-            </div>
-          </div>
-
-          {/* Sizes */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
-              <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">Sizes & Pricing</h3>
-              <button type="button" onClick={handleAddSize} className="text-[var(--primary)] flex items-center gap-1 text-xs font-semibold hover:underline">
-                <Plus size={14} /> Add Size
-              </button>
-            </div>
-            
-            <div className="space-y-3">
-              {formData.sizes.map((sizeObj, index) => (
-                <div key={index} className="p-3 border border-zinc-200 dark:border-zinc-700 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 relative">
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div>
-                      <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">Size Name</label>
-                      <select value={sizeObj.size} onChange={(e) => handleSizeChange(index, 'size', e.target.value)} className="w-full px-2.5 py-1.5 border rounded-md text-sm bg-white dark:bg-zinc-950 dark:border-zinc-700 outline-none focus:border-[var(--primary)]">
-                        <option value="">Select Size</option>
-                        <option value="Small">Small</option>
-                        <option value="Regular">Regular</option>
-                        <option value="Medium">Medium</option>
-                        <option value="Large">Large</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">Price</label>
-                      <input type="number" step="0.01" value={sizeObj.price} onChange={(e) => handleSizeChange(index, 'price', e.target.value)} className="w-full px-2.5 py-1.5 border rounded-md text-sm bg-white dark:bg-zinc-950 dark:border-zinc-700 outline-none focus:border-[var(--primary)]" placeholder="e.g. 399" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">Description</label>
-                    <input type="text" value={sizeObj.description} onChange={(e) => handleSizeChange(index, 'description', e.target.value)} className="w-full px-2.5 py-1.5 border rounded-md text-sm bg-white dark:bg-zinc-950 dark:border-zinc-700 outline-none focus:border-[var(--primary)]" placeholder="e.g. Serves 2 people" />
-                  </div>
-                  
-                  <button type="button" onClick={() => handleRemoveSize(index)} className="absolute -top-2 -right-2 bg-white dark:bg-zinc-950 text-rose-500 hover:bg-rose-50 border border-rose-200 rounded-full p-1 shadow-sm transition-colors">
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              ))}
-              {formData.sizes.length === 0 && (
-                <p className="text-xs text-zinc-500 text-center py-2">No sizes added.</p>
-              )}
             </div>
           </div>
 

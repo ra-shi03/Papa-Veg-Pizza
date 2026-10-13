@@ -4,6 +4,10 @@ const productSizeSchema = new mongoose.Schema(
     {
         size: { type: String, required: true, trim: true },
         price: { type: Number, required: true, min: 0 },
+        originalPrice: { type: Number, default: 0, min: 0 },
+        discount: { type: Number, default: 0, min: 0 },
+        discountType: { type: String, enum: ['percentage', 'flat'], default: 'percentage' },
+        saveAmount: { type: Number, default: 0, min: 0 },
         description: { type: String, trim: true, default: '' }
     },
     { _id: true }
@@ -17,6 +21,11 @@ const productSchema = new mongoose.Schema(
         shortDescription: { type: String, trim: true, default: '' },
         description: { type: String, trim: true, default: '' },
         image: { type: String, trim: true, default: '' },
+        badge: { type: String, trim: true, default: '' },
+        originalPrice: { type: Number, default: 0, min: 0 },
+        discount: { type: Number, default: 0, min: 0 },
+        discountType: { type: String, enum: ['percentage', 'flat'], default: 'percentage' },
+        saveAmount: { type: Number, default: 0, min: 0 },
         price: { type: Number, default: 0, min: 0 },
         status: { type: String, enum: ['Active', 'Draft', 'Archived', 'Out Of Stock'], default: 'Active', index: true },
         availability: { type: String, enum: ['In Stock', 'Out Of Stock', 'Low Stock'], default: 'In Stock' },

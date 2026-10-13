@@ -69,7 +69,20 @@ export default function Home() {
     return "What are you craving for?"
   })
 
-  const [showAllCategories, setShowAllCategories] = useState(false);
+  // Helper to strictly sort categories according to superadmin configuration
+  const sortCategoriesBySuperadmin = (list) => {
+    return [...list].sort((a, b) => {
+      const aVal = Number(a.sort !== undefined && a.sort !== null ? a.sort : (a.order !== undefined && a.order !== null ? a.order : 999));
+      const bVal = Number(b.sort !== undefined && b.sort !== null ? b.sort : (b.order !== undefined && b.order !== null ? b.order : 999));
+      if (aVal !== bVal) {
+        return aVal - bVal;
+      }
+      if (a.createdAt && b.createdAt) {
+        return new Date(a.createdAt) - new Date(b.createdAt);
+      }
+      return 0;
+    });
+  };
 
   // Dynamic Banners State
   const [banners, setBanners] = useState([
@@ -135,13 +148,95 @@ export default function Home() {
     return DEALS
   })
 
+  // Default fallback coupons matching Domino's style with Papa Veg brand theme
+  const DEFAULT_COUPONS = [
+    {
+      _id: "coupon-get80",
+      code: "GET80",
+      title: "Get up to ₹80 Off",
+      description: "Up to ₹80 Off on orders worth ₹199 or more",
+      couponType: "Percentage",
+      discountType: "percentage",
+      value: 40,
+      discountValue: 40,
+      minimumOrderAmount: 199,
+      minOrderValue: 199,
+      maximumDiscount: 80,
+      maxDiscount: 80,
+      status: "active",
+      isActive: true,
+      endDate: "2026-12-31T23:59:59.000Z"
+    },
+    {
+      _id: "coupon-welcome50",
+      code: "WELCOME50",
+      title: "50% Off First Order",
+      description: "Get 50% discount up to ₹150 on your first Papa Veg Pizza order",
+      couponType: "Percentage",
+      discountType: "percentage",
+      value: 50,
+      discountValue: 50,
+      minimumOrderAmount: 249,
+      minOrderValue: 249,
+      maximumDiscount: 150,
+      maxDiscount: 150,
+      status: "active",
+      isActive: true,
+      endDate: "2026-12-31T23:59:59.000Z"
+    },
+    {
+      _id: "coupon-pvp100",
+      code: "PAPAVEG100",
+      title: "Flat ₹100 Off Special",
+      description: "Flat ₹100 off on delicious pizzas on orders above ₹499",
+      couponType: "Flat Amount",
+      discountType: "flat-price",
+      value: 100,
+      discountValue: 100,
+      minimumOrderAmount: 499,
+      minOrderValue: 499,
+      maximumDiscount: 100,
+      maxDiscount: 100,
+      status: "active",
+      isActive: true,
+      endDate: "2026-12-31T23:59:59.000Z"
+    }
+  ];
+
+  // Superadmin Dynamic Coupons State
+  const [coupons, setCoupons] = useState(() => {
+    try {
+      const superadmin = localStorage.getItem("pvp_coupons")
+      if (superadmin) {
+        const parsed = JSON.parse(superadmin).filter(c => (c.status === "active" || c.isActive) && (!c.endDate || new Date(c.endDate) > new Date()))
+        if (parsed.length > 0) {
+          return parsed
+        }
+      }
+    } catch (e) { }
+    return DEFAULT_COUPONS
+  })
+  const [copiedCode, setCopiedCode] = useState("")
+
   // Removed orderMethods state
 
   // Dynamic Logo State
   const [logoUrl, setLogoUrl] = useState(() => localStorage.getItem("sa_logo") || logoNew)
 
   // Dynamic Categories State
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState(() => {
+    try {
+      const stored = localStorage.getItem("pvp_categories");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const activeCats = parsed.filter(c => c.status !== "Inactive" && (c.type === "Category" || !c.type));
+          return sortCategoriesBySuperadmin(activeCats);
+        }
+      }
+    } catch (_) {}
+    return [];
+  });
   
 
   // Dynamic Products State
@@ -270,56 +365,91 @@ export default function Home() {
 
     const fetchCategoryProducts = async () => {
       try {
-        const res = await apiClient.get('/food/admin/menu/public');
-        if (res?.data?.data) {
-          const { categories: cats, products: prods, sections: secs } = res.data.data;
-          
-          if (cats && cats.length > 0) {
-            const uniqueCatsMap = new Map();
-            cats.forEach(c => {
-              const labelRaw = c.label || c.name;
-              if (!labelRaw) return;
-              const label = labelRaw.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-              if (!uniqueCatsMap.has(label)) {
-                uniqueCatsMap.set(label, {
-                  id: c._id || c.id,
-                  label: label,
-                  icon: c.icon || c.image || 'local_pizza'
-                });
-              } else {
-                 const existing = uniqueCatsMap.get(label);
-                 const newIcon = c.icon || c.image;
-                 if (newIcon && newIcon.startsWith('http') && existing.icon && !existing.icon.startsWith('http')) {
-                    existing.icon = newIcon;
-                 }
-              }
-            });
-            const parsedCats = Array.from(uniqueCatsMap.values());
-            setCategories(parsedCats);
-            setActiveCategory(prev => prev === "pizza" ? parsedCats[0].id : prev);
-          }
-          
-          if (secs && secs.length > 0) {
-            setSections(secs.map(s => ({
-              id: s._id || s.id,
-              categoryId: s.categoryId,
-              name: s.name,
-              slug: s.slug
-            })));
-          }
+        let fetchedCats = [];
+        let fetchedProds = [];
 
-          if (prods && prods.length > 0) {
-            setProducts(prods.map(p => ({
-              id: p._id || p.id,
-              title: p.name,
-              price: p.price || 299,
-              rating: 4.5,
-              description: p.shortDescription || p.description,
-              image: p.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500",
-              categoryId: typeof p.categoryId === 'object' ? p.categoryId?._id : p.categoryId,
-              sectionId: typeof p.sectionId === 'object' ? p.sectionId?._id : p.sectionId
-            })));
+        // 1. Prioritize Superadmin categories endpoint with sort order
+        try {
+          const cRes = await apiClient.get('/food/admin/category-products?sort=sort_asc');
+          if (Array.isArray(cRes?.data?.data) && cRes.data.data.length > 0) {
+            fetchedCats = cRes.data.data;
           }
+        } catch (_) {}
+
+        // 2. Fetch public menu for categories/sections/products fallback
+        try {
+          const res = await apiClient.get('/food/admin/menu/public');
+          if (res?.data?.data) {
+            const { categories: cats, products: prods, sections: secs } = res.data.data;
+            if (fetchedCats.length === 0 && Array.isArray(cats) && cats.length > 0) {
+              fetchedCats = cats;
+            }
+            if (Array.isArray(prods) && prods.length > 0) {
+              fetchedProds = prods;
+            }
+            if (secs && secs.length > 0) {
+              setSections(secs.map(s => ({
+                id: s._id || s.id,
+                categoryId: s.categoryId,
+                name: s.name,
+                slug: s.slug
+              })));
+            }
+          }
+        } catch (_) {}
+
+        // 3. Fallback to localStorage if needed
+        if (fetchedCats.length === 0) {
+          try {
+            const stored = localStorage.getItem("pvp_categories");
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                fetchedCats = parsed;
+              }
+            }
+          } catch (_) {}
+        }
+
+        if (fetchedCats.length > 0) {
+          const activeCats = fetchedCats.filter(c => c.status !== "Inactive" && (c.type === "Category" || !c.type));
+          const sortedCats = sortCategoriesBySuperadmin(activeCats);
+          const uniqueCatsMap = new Map();
+          sortedCats.forEach(c => {
+            const labelRaw = c.label || c.name;
+            if (!labelRaw) return;
+            const label = labelRaw.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+            if (!uniqueCatsMap.has(label)) {
+              uniqueCatsMap.set(label, {
+                id: c._id || c.id || c.slug || label.toLowerCase().replace(/\s+/g, '-'),
+                label: label,
+                icon: c.icon || c.image || 'local_pizza',
+                sort: Number(c.sort !== undefined && c.sort !== null ? c.sort : (c.order !== undefined && c.order !== null ? c.order : 999))
+              });
+            } else {
+              const existing = uniqueCatsMap.get(label);
+              const newIcon = c.icon || c.image;
+              if (newIcon && newIcon.startsWith('http') && existing.icon && !existing.icon.startsWith('http')) {
+                existing.icon = newIcon;
+              }
+            }
+          });
+          const parsedCats = Array.from(uniqueCatsMap.values());
+          setCategories(parsedCats);
+          setActiveCategory(prev => prev === "pizza" ? parsedCats[0]?.id || "pizza" : prev);
+        }
+
+        if (fetchedProds.length > 0) {
+          setProducts(fetchedProds.map(p => ({
+            id: p._id || p.id,
+            title: p.name,
+            price: p.price || 299,
+            rating: 4.5,
+            description: p.shortDescription || p.description,
+            image: p.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500",
+            categoryId: typeof p.categoryId === 'object' ? p.categoryId?._id : p.categoryId,
+            sectionId: typeof p.sectionId === 'object' ? p.sectionId?._id : p.sectionId
+          })));
         }
       } catch (err) {
         console.warn("Failed to load category products:", err);
@@ -353,10 +483,37 @@ export default function Home() {
         console.error("Failed to load rewards config", err);
       }
     }
+    const fetchCoupons = async () => {
+      try {
+        const res = await apiClient.get('/settings/coupons/public');
+        const list = res?.data?.data || res?.data;
+        if (Array.isArray(list) && list.length > 0) {
+          setCoupons(list);
+          return;
+        }
+      } catch (err) {
+        console.warn("Public coupons fetch error:", err);
+      }
+
+      try {
+        const superadmin = localStorage.getItem("pvp_coupons");
+        if (superadmin) {
+          const parsed = JSON.parse(superadmin).filter(c => (c.status === "active" || c.isActive) && (!c.endDate || new Date(c.endDate) > new Date()));
+          if (parsed.length > 0) {
+            setCoupons(parsed);
+            return;
+          }
+        }
+      } catch (_) {}
+
+      setCoupons(prev => (prev && prev.length > 0 ? prev : DEFAULT_COUPONS));
+    };
+
     fetchRewards();
-    fetchHomeConfig()
-    fetchCategoryProducts()
-    fetchDynamicLayout()
+    fetchHomeConfig();
+    fetchCategoryProducts();
+    fetchDynamicLayout();
+    fetchCoupons();
 
     const handleConfigUpdate = (e) => {
       const updated = e?.detail
@@ -381,26 +538,29 @@ export default function Home() {
         }
       } else {
         const fetchRewards = async () => {
-      try {
-        const res = await apiClient.get("/food/admin/rewards/public");
-        if (res?.data?.data) {
-          setRewardsConfig(res.data.data);
+          try {
+            const res = await apiClient.get("/food/admin/rewards/public");
+            if (res?.data?.data) {
+              setRewardsConfig(res.data.data);
+            }
+          } catch (err) {
+            console.error("Failed to load rewards config", err);
+          }
         }
-      } catch (err) {
-        console.error("Failed to load rewards config", err);
+        fetchRewards();
+        fetchHomeConfig();
       }
-    }
-    fetchRewards();
-    fetchHomeConfig()
-      }
+      fetchCoupons();
     }
 
     window.addEventListener("homePageConfigUpdated", handleConfigUpdate)
     window.addEventListener("storage", handleConfigUpdate)
+    window.addEventListener("pvp_coupons_changed", fetchCoupons)
 
     return () => {
       window.removeEventListener("homePageConfigUpdated", handleConfigUpdate)
       window.removeEventListener("storage", handleConfigUpdate)
+      window.removeEventListener("pvp_coupons_changed", fetchCoupons)
     }
   }, [])
 
@@ -444,6 +604,59 @@ export default function Home() {
       setToast({ visible: false, message: "" })
     }, 2500)
   }
+
+  const getCouponBadgeText = (c) => {
+    if (c.couponType === "Percentage" || c.discountType === "percentage") {
+      return `${c.value || c.discountValue || 0}% OFF`
+    }
+    if (c.couponType === "Flat Amount" || c.discountType === "flat") {
+      return `FLAT ₹${c.value || c.discountValue || 0} OFF`
+    }
+    if (c.couponType === "Buy One Get One" || c.couponType === "BOGO") {
+      return "BUY 1 GET 1"
+    }
+    if (c.couponType === "Free Product") {
+      return "FREE PRODUCT"
+    }
+    return "SPECIAL DEAL"
+  }
+
+  const handleCopyCoupon = (couponCode) => {
+    try {
+      navigator.clipboard?.writeText(couponCode)
+    } catch (_) {}
+    setCopiedCode(couponCode)
+    triggerToast(`Coupon code ${couponCode} copied!`)
+    setTimeout(() => {
+      setCopiedCode("")
+    }, 2500)
+  }
+
+  const handleOpenCouponModal = (c) => {
+    const code = c.code || c.couponCode || "PVPDEAL";
+    const minOrder = c.minimumOrderAmount || c.minOrderValue || 199;
+    const maxDiscount = c.maximumDiscount || c.maxDiscount || c.value || c.discountValue || 80;
+    const val = c.value || c.discountValue || 80;
+    const isPercentage = c.couponType === "Percentage" || c.discountType === "percentage";
+    const discountText = isPercentage ? `${val}% (up to ₹${maxDiscount})` : `₹${val}`;
+
+    setSelectedCouponDetails({
+      title: c.title || (isPercentage ? `Get up to ₹${maxDiscount} Off` : `Flat ₹${val} Off`),
+      subtitle: c.description || `Up to ₹${maxDiscount} Off on orders worth ₹${minOrder} or more`,
+      couponCode: code,
+      code: code,
+      minOrderValue: minOrder,
+      maxDiscount: maxDiscount,
+      discountText: discountText,
+      value: val,
+      isPercentage: isPercentage,
+      validTill: c.endDate ? new Date(c.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : "Today 11:00 PM",
+      isFirstOrderOnly: Boolean(c.isFirstOrderOnly || (Array.isArray(c.customerSegments) && c.customerSegments.includes('New Customers'))),
+      rawCoupon: c,
+      actionType: 'apply_coupon',
+      actionValue: code
+    });
+  };
 
   // Load Google Fonts and Material Icons dynamically
   useEffect(() => {
@@ -551,8 +764,9 @@ export default function Home() {
         try {
           const superadmin = localStorage.getItem("pvp_coupons")
           if (superadmin) {
-            const parsed = JSON.parse(superadmin).filter(c => c.status === "active")
+            const parsed = JSON.parse(superadmin).filter(c => c.status === "active" || c.isActive)
             if (parsed.length > 0) {
+              setCoupons(parsed);
               list = parsed.map(c => ({
                 id: c._id,
                 badge: c.couponType === "Percentage" ? "Save" : "Flat",
@@ -581,26 +795,20 @@ export default function Home() {
         if (stored) {
           const parsed = JSON.parse(stored)
           if (parsed.length > 0) {
-            const activeCats = parsed.filter(c => c.status === "Active");
+            const activeCats = parsed.filter(c => c.status !== "Inactive" && (c.type === "Category" || !c.type));
+            const sortedCats = sortCategoriesBySuperadmin(activeCats);
             const uniqueCatsMap = new Map();
-            activeCats.forEach(c => {
-              const labelRaw = c.name;
+            sortedCats.forEach(c => {
+              const labelRaw = c.label || c.name;
               if (!labelRaw) return;
               const label = labelRaw.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
               
               if (!uniqueCatsMap.has(label)) {
-                const lower = c.name.toLowerCase();
-                let icon = "local_pizza";
-                if (lower.includes("burger")) icon = "lunch_dining";
-                else if (lower.includes("bread") || lower.includes("side")) icon = "bakery_dining";
-                else if (lower.includes("pasta")) icon = "dinner_dining";
-                else if (lower.includes("dessert") || lower.includes("sweet")) icon = "icecream";
-                else if (lower.includes("drink") || lower.includes("beverage")) icon = "local_drink";
-                
                 uniqueCatsMap.set(label, {
-                  id: c.slug || label.toLowerCase().replace(/\s+/g, "-"),
+                  id: c._id || c.id || c.slug || label.toLowerCase().replace(/\s+/g, "-"),
                   label: label,
-                  icon
+                  icon: c.icon || c.image || 'local_pizza',
+                  sort: Number(c.sort !== undefined && c.sort !== null ? c.sort : (c.order !== undefined && c.order !== null ? c.order : 999))
                 });
               }
             });
@@ -808,7 +1016,7 @@ export default function Home() {
                 {cravingHeading}
               </h3>
               <div className="grid grid-cols-3 gap-x-4 gap-y-6 pb-2 pr-4">
-                {(showAllCategories ? categories : categories.slice(0, 12)).map(cat => (
+                {categories.slice(0, 12).map(cat => (
                   <div 
                     key={cat.id} 
                     className="flex flex-col items-center gap-2 shrink-0 cursor-pointer active:scale-95 transition-transform"
@@ -833,16 +1041,6 @@ export default function Home() {
                   </div>
                 ))}
               </div>
-              {categories.length > 12 && !showAllCategories && (
-                <div className="flex justify-center mt-3 pr-4">
-                  <button 
-                    onClick={() => setShowAllCategories(true)}
-                    className="text-[var(--primary)] font-bold text-sm bg-transparent px-5 py-2 flex items-center gap-1 active:scale-95 transition-transform"
-                  >
-                    More <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>expand_more</span>
-                  </button>
-                </div>
-              )}
             </div>
           )}
 
@@ -878,6 +1076,78 @@ export default function Home() {
                 <div className="text-center text-[10px] text-zinc-400 mt-2.5">
                   {rewardsConfig.termsText} <a href={rewardsConfig.termsLink} className="text-blue-600 font-medium hover:underline">{rewardsConfig.termsLinkText}</a>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Dynamic Superadmin Coupons & Offers Section (matching Reference Image 2 with App Theme Color) */}
+          {coupons && coupons.length > 0 && (
+            <div className="px-margin-mobile mt-3 mb-4 select-none" style={{ fontFamily: 'Poppins, sans-serif' }}>
+              <div className="flex items-center justify-between mb-2.5">
+                <h3 className="font-bold text-zinc-900 dark:text-white text-[16px] sm:text-[17px] tracking-tight m-0 font-headline-sm-mobile">
+                  Offers for you
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => navigate('/user/offers')}
+                  className="text-[var(--accent-red,#EE3A43)] text-xs font-semibold hover:underline flex items-center gap-0.5 bg-transparent border-0 cursor-pointer p-0"
+                >
+                  View All
+                  <span className="material-symbols-outlined text-[15px]">chevron_right</span>
+                </button>
+              </div>
+
+              {/* Horizontal Scroll Carousel with App Red Theme Color */}
+              <div 
+                className="flex overflow-x-auto hide-scrollbar gap-3 pb-2 pt-1 -mx-margin-mobile px-margin-mobile"
+                style={{ scrollSnapType: 'x mandatory' }}
+              >
+                {coupons.map((c) => {
+                  const minOrder = c.minimumOrderAmount || c.minOrderValue || 199;
+                  const maxDiscount = c.maximumDiscount || c.maxDiscount || c.value || c.discountValue || 80;
+                  const isPercentage = c.couponType === 'Percentage' || c.discountType === 'percentage';
+                  const titleText = c.title || (isPercentage ? `Get up to ₹${maxDiscount} Off` : `Flat ₹${c.value || c.discountValue || maxDiscount} Off`);
+                  const subText = c.description || `Up to ₹${maxDiscount} Off on orders worth ₹${minOrder} or more`;
+
+                  return (
+                    <div
+                      key={c._id || c.code}
+                      style={{ scrollSnapAlign: 'start' }}
+                      onClick={() => handleOpenCouponModal(c)}
+                      className="w-[285px] sm:w-[315px] shrink-0 bg-gradient-to-r from-[var(--accent-red,#EE3A43)] to-[#C8232C] rounded-2xl p-3 sm:p-3.5 shadow-md shadow-red-500/15 flex items-center justify-between text-white cursor-pointer select-none transition-all hover:scale-[1.01] active:scale-[0.99]"
+                    >
+                      {/* Left: Stamp Badge + Text */}
+                      <div className="min-w-0 flex-1 pr-2">
+                        <div className="flex items-center gap-1.5">
+                          {/* Scalloped Stamp Badge Icon (matching Image 2) */}
+                          <div className="w-5 h-5 rounded-md bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-white text-[15px] font-bold">
+                              percent
+                            </span>
+                          </div>
+                          <h4 className="font-bold text-white text-sm sm:text-[15px] tracking-tight leading-tight truncate m-0">
+                            {titleText}
+                          </h4>
+                        </div>
+                        <p className="text-white/85 text-[11px] sm:text-xs font-normal mt-1 leading-snug truncate m-0">
+                          {subText}
+                        </p>
+                      </div>
+
+                      {/* Right: Rounded Outline View Button (matching Image 2) */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenCouponModal(c);
+                        }}
+                        className="border border-white/90 text-white rounded-xl px-4 py-1.5 text-xs font-semibold hover:bg-white/10 active:scale-95 transition-all cursor-pointer shrink-0 ml-2 bg-transparent"
+                      >
+                        View
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -957,18 +1227,29 @@ export default function Home() {
           offer={selectedCouponDetails}
           onClose={() => setSelectedCouponDetails(null)}
           onApply={(offer) => {
-            if (offer.actionType === 'open_url') {
+            const code = offer.couponCode || offer.code || offer.actionValue;
+            if (code) {
+              try {
+                navigator.clipboard?.writeText(code);
+              } catch (_) {}
+              const couponObj = offer.rawCoupon || {
+                code: code,
+                couponCode: code,
+                title: offer.title,
+                value: offer.value || offer.maxDiscount || 80,
+                discountValue: offer.value || offer.maxDiscount || 80,
+                discountType: offer.isPercentage ? 'percentage' : 'flat-price',
+                minOrder: offer.minOrderValue || 199,
+                minimumOrderAmount: offer.minOrderValue || 199,
+                maxDiscount: offer.maxDiscount || 80
+              };
+              localStorage.setItem("pvp_applied_coupon", JSON.stringify(couponObj));
+              localStorage.setItem("cart_applied_coupon", JSON.stringify(couponObj));
+              triggerToast(`🎉 Coupon ${code} applied successfully!`);
+            } else if (offer.actionType === 'open_url') {
               window.open(offer.actionValue, '_blank');
-            } else if (offer.actionType === 'apply_coupon') {
-              navigate('/user/offers');
-              triggerToast(`Coupon ${offer.actionValue || offer.couponCode || ''} applied!`);
-            } else if (offer.actionType === 'open_product' && offer.actionValue) {
-              navigate(`/user/product/${offer.actionValue}`);
-            } else if (offer.actionType === 'open_category' && offer.actionValue) {
-              setActiveCategory(offer.actionValue);
-              triggerToast(`Opening category...`);
             } else {
-              triggerToast(`Action: ${offer.actionType}`);
+              triggerToast(`Applied offer: ${offer.title}`);
             }
           }}
           isDarkMode={isDarkMode}

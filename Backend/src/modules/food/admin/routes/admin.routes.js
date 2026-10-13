@@ -25,8 +25,15 @@ const router = express.Router();
 router.get('/business-settings/public', businessSettingsController.getBusinessSettings);
 
 // ----- Public Category Products -----
+router.get('/category-products', categoryProductController.getCategoryProducts);
 router.get('/category-products/categories', categoryProductController.getCategoryProducts);
 router.get('/category-products/public', categoryProductController.getCategoryProducts);
+
+// ----- Public Menu, Products & Addons -----
+router.get('/products', productController.getProducts);
+router.get('/products/public', productController.getPublicProducts);
+router.get('/menu/public', productController.getPublicMenu);
+router.get('/addons/public', addonController.getAddons);
 
 // ----- Public Rewards Config -----
 
@@ -158,6 +165,7 @@ router.get('/products/stats', productController.getProductStats);
 router.get('/products/:id', productController.getProductById);
 router.post('/products', productController.createProduct);
 router.patch('/products/:id', productController.updateProduct);
+router.put('/products/:id', productController.updateProduct);
 router.delete('/products/:id', productController.deleteProduct);
 
 // ----- Offers & Coupons -----

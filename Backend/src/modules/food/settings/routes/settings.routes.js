@@ -24,6 +24,7 @@ import * as foodCouponController from '../controllers/foodCoupon.controller.js';
 import * as promiseCampaignController from '../controllers/promiseCampaign.controller.js';
 
 // Coupon management routes
+router.get('/coupons/public', foodCouponController.getActivePublicCoupons);
 router.get('/coupons', authMiddleware, requireSuperAdmin, foodCouponController.getAllCoupons);
 router.get('/coupons/analytics', authMiddleware, requireSuperAdmin, foodCouponController.getCouponAnalytics);
 router.post('/coupons', authMiddleware, requireSuperAdmin, foodCouponController.createCoupon);

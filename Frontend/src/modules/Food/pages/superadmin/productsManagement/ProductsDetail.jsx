@@ -42,12 +42,19 @@ export default function ProductsDetail({ isOpen, onClose, product }) {
             </div>
             <div className="flex flex-col gap-2 w-full">
               <div className="flex justify-between items-start w-full">
-                <h2 className="text-xl font-black text-zinc-900 dark:text-zinc-100">{product.name}</h2>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-xl font-black text-zinc-900 dark:text-zinc-100">{product.name}</h2>
+                  {product.badge && (
+                    <span className="bg-[#E53935] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider shadow-xs">
+                      {product.badge}
+                    </span>
+                  )}
+                </div>
                 <div className={`w-4 h-4 border-2 flex items-center justify-center rounded-sm shrink-0 ${isVeg ? "border-green-600" : "border-red-600"}`}>
                   <div className={`w-2 h-2 rounded-full ${isVeg ? "bg-green-600" : "bg-red-600"}`} />
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center flex-wrap">
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                   product.status === "Active" ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
                 }`}>
@@ -57,7 +64,17 @@ export default function ProductsDetail({ isOpen, onClose, product }) {
                   {product.vegType}
                 </span>
               </div>
-              <p className="text-xl font-black text-[var(--primary)] mt-1">₹{product.price}</p>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <p className="text-xl font-black text-[var(--primary)]">₹{product.price}</p>
+                {product.originalPrice && Number(product.originalPrice) > Number(product.price) && (
+                  <>
+                    <span className="text-zinc-400 line-through text-sm font-semibold">₹{product.originalPrice}</span>
+                    <span className="bg-[#169B45] text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-2xs">
+                      Save ₹{product.saveAmount || (Number(product.originalPrice) - Number(product.price))}
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -96,16 +113,35 @@ export default function ProductsDetail({ isOpen, onClose, product }) {
           <div>
             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-3">Sizes & Pricing</p>
             {product.sizes && product.sizes.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3">
-                {product.sizes.map((sz, i) => (
-                  <div key={i} className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-3 flex flex-col justify-center bg-zinc-50 dark:bg-zinc-900">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-sm font-bold text-zinc-700 dark:text-zinc-300">{sz.size}</span>
-                      <span className="text-sm font-black text-zinc-900 dark:text-zinc-100">₹{sz.price}</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {product.sizes.map((sz, i) => {
+                  const hasDiscount = sz.originalPrice && Number(sz.originalPrice) > Number(sz.price);
+                  const savings = sz.saveAmount || (hasDiscount ? Number(sz.originalPrice) - Number(sz.price) : 0);
+
+                  return (
+                    <div key={i} className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-3 flex flex-col justify-between bg-zinc-50 dark:bg-zinc-900 gap-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{sz.size}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-black text-zinc-900 dark:text-zinc-100">₹{sz.price}</span>
+                          {hasDiscount && (
+                            <span className="text-xs text-zinc-400 line-through">₹{sz.originalPrice}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between gap-1 text-[10px]">
+                        {sz.description ? (
+                          <span className="text-zinc-500 line-clamp-1">{sz.description}</span>
+                        ) : <span />}
+                        {hasDiscount && savings > 0 && (
+                          <span className="bg-[#169B45] text-white font-bold px-1.5 py-0.5 rounded text-[9px] shrink-0">
+                            Save ₹{savings}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    {sz.description && <span className="text-[10px] text-zinc-500">{sz.description}</span>}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-sm text-zinc-500 italic">No custom sizes available.</p>
@@ -149,23 +185,30 @@ export default function ProductsDetail({ isOpen, onClose, product }) {
 
           <hr className="border-zinc-200 dark:border-zinc-800" />
 
-          {/* Toppings */}
+          {/* Toppings / Addons */}
           <div>
-            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-3">Custom Toppings</p>
+            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-3">Assigned Add-ons & Toppings</p>
             {product.toppings && product.toppings.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {product.toppings.map((t, i) => {
-                  const toppingName = typeof t === 'object' ? t.name : (typeof t === 'string' && t.length === 24 ? "Topping (ID)" : t);
+                  const toppingName = typeof t === 'object' ? t.name : (typeof t === 'string' && t.length === 24 ? "Add-on Item" : t);
+                  const toppingType = typeof t === 'object' && t.type ? t.type : "";
+
                   return (
-                    <span key={i} className="px-2.5 py-1 text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded border border-zinc-200 dark:border-zinc-700 flex items-center gap-1.5">
+                    <span key={i} className="px-2.5 py-1 text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg border border-zinc-200 dark:border-zinc-700 flex items-center gap-1.5">
                       <Check size={12} className="text-[var(--primary)]" />
+                      {toppingType && (
+                        <span className="text-[9px] uppercase font-bold text-zinc-400 bg-zinc-200 dark:bg-zinc-700 px-1 py-0.5 rounded">
+                          {toppingType}
+                        </span>
+                      )}
                       {toppingName}
                     </span>
                   );
                 })}
               </div>
             ) : (
-              <p className="text-sm text-zinc-500 italic">No custom toppings enabled.</p>
+              <p className="text-sm text-zinc-500 italic">No custom add-ons enabled.</p>
             )}
           </div>
 

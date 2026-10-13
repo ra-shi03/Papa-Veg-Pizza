@@ -11,6 +11,7 @@ import notificationRoutes from '../core/notifications/notification.routes.js';
 import { authMiddleware } from '../core/auth/auth.middleware.js';
 import * as businessSettingsController from '../modules/food/admin/controllers/businessSettings.controller.js';
 import * as productController from '../modules/food/admin/controllers/product.controller.js';
+import * as addonController from '../modules/food/admin/controllers/addon.controller.js';
 import * as rewardConfigController from '../modules/food/admin/controllers/rewardConfig.controller.js';
 import * as categoryProductController from '../modules/food/admin/controllers/categoryProduct.controller.js';
 import { requireRoles } from '../core/roles/role.middleware.js';
@@ -56,11 +57,19 @@ router.get('/v1/food/admin/business-settings/public', businessSettingsController
 // Public menu route
 router.get('/v1/food/admin/menu/public', productController.getPublicMenu);
 
+// Public products routes
+router.get('/v1/food/admin/products', productController.getProducts);
+router.get('/v1/food/admin/products/public', productController.getPublicProducts);
+router.get('/v1/food/products/public', productController.getPublicProducts);
+
+// Public addons route
+router.get('/v1/food/admin/addons/public', addonController.getAddons);
 
 // Public rewards config route
 router.get('/v1/food/admin/rewards/public', rewardConfigController.getPublicRewardConfig);
 
 // Public category-products routes
+router.get('/v1/food/admin/category-products', categoryProductController.getCategoryProducts);
 router.get('/v1/food/admin/category-products/public', categoryProductController.getCategoryProducts);
 router.get('/v1/food/admin/category-products/categories', categoryProductController.getCategoryProducts);
 router.use('/v1/food/admin', authMiddleware, requireRoles('ADMIN'), storeAdminRoutes);

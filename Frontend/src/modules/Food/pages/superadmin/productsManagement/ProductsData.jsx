@@ -707,16 +707,40 @@ export default function ProductsData({
                           <div className={`w-1.5 h-1.5 rounded-full ${isVeg ? "bg-green-600" : "bg-red-600"}`} />
                         </div>
                         <span className="font-bold text-zinc-900 dark:text-zinc-100 truncate">{p.name}</span>
+                        {p.badge && (
+                          <span className="bg-[#E53935] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider shadow-xs shrink-0">
+                            {p.badge}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-3 py-2 text-zinc-650 dark:text-zinc-300 font-semibold">{p.categoryId?.label || p.category || '-'}</td>
                     <td className="px-3 py-2">
-                      <div className="flex flex-col gap-0.5">
-                        {(p.sizes || []).map((sz, i) => (
-                          <span key={i} className="text-[10px] text-zinc-600 dark:text-zinc-400 font-medium">
-                            {sz.size}: <span className="font-bold text-zinc-900 dark:text-zinc-100">₹{sz.price}</span>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-zinc-900 dark:text-zinc-100 text-xs">
+                            ₹{p.price}
                           </span>
-                        ))}
+                          {p.originalPrice && Number(p.originalPrice) > Number(p.price) && (
+                            <>
+                              <span className="text-zinc-400 line-through text-[10px]">
+                                ₹{p.originalPrice}
+                              </span>
+                              <span className="bg-[#169B45] text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-2xs">
+                                Save ₹{p.saveAmount || (Number(p.originalPrice) - Number(p.price))}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        {(p.sizes && p.sizes.length > 0) && (
+                          <div className="flex flex-wrap items-center gap-1">
+                            {p.sizes.map((sz, i) => (
+                              <span key={i} className="text-[10px] text-zinc-500 font-medium bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.2 rounded">
+                                {sz.size}: ₹{sz.price}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-3 py-2 text-center">{getStatusBadge(p.status, p.availability)}</td>

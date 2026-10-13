@@ -236,115 +236,121 @@ export function HomeSections({
 
 
       {/* ── Dynamic Menu Hierarchy (Category -> Product) ── */}
-      <section className="mt-8">
-        <div className="flex overflow-x-auto hide-scrollbar gap-gutter px-margin-mobile pb-4">
-          {products.filter(p => p.categoryId === activeCategory).map((product) => {
-            const isFav = favorites.includes(product.id);
-            return (
-              <div
-                key={product.id}
-                className="glass-card hover-glow"
-                style={{
-                  minWidth: 185, maxWidth: 185,
-                  borderRadius: 16, overflow: 'hidden',
-                  display: 'flex', flexDirection: 'column',
-                  transition: 'transform 0.2s ease'
-                }}
-              >
-                {/* Image */}
-                <div style={{ position: 'relative', height: 110, overflow: 'hidden', background: '#1a1a1a' }}>
-                  <img
-                    src={product.image}
-                    alt={product.title}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                  <button
-                    onClick={() => toggleFavorite(product.id)}
+      {(() => {
+        const activeProds = products.filter(p => p.categoryId === activeCategory);
+        if (activeProds.length === 0) return null;
+        return (
+          <section className="mt-8">
+            <div className="flex overflow-x-auto hide-scrollbar gap-gutter px-margin-mobile pb-4">
+              {activeProds.map((product) => {
+                const isFav = favorites.includes(product.id);
+                return (
+                  <div
+                    key={product.id}
+                    className="glass-card hover-glow"
                     style={{
-                      position: 'absolute', top: 8, right: 8,
-                      background: 'rgba(0,0,0,0.4)',
-                      backdropFilter: 'blur(8px)',
-                      borderRadius: '50%', width: 28, height: 28,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      border: 'none', outline: 'none', cursor: 'pointer'
+                      minWidth: 185, maxWidth: 185,
+                      borderRadius: 16, overflow: 'hidden',
+                      display: 'flex', flexDirection: 'column',
+                      transition: 'transform 0.2s ease'
                     }}
                   >
-                    <span
-                      className="material-symbols-outlined"
-                      style={{
-                        fontSize: 14,
-                        color: 'var(--accent-red)',
-                        fontVariationSettings: `'FILL' ${isFav ? 1 : 0}`
-                      }}
-                    >
-                      favorite
-                    </span>
-                  </button>
-                </div>
-
-                {/* Info */}
-                <div style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 4 }}>
-                    <h4
-                      style={{
-                        fontSize: 11, fontWeight: 700,
-                        fontFamily: 'Poppins,sans-serif',
-                        color: isDarkMode ? '#f5f5f5' : 'var(--primary-gray)',
-                        lineHeight: 1.3, margin: 0,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1
-                      }}
-                    >
-                      {product.title}
-                    </h4>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-                      <span
-                        className="material-symbols-outlined"
-                        style={{ fontSize: 10, color: '#F59E0B', fontVariationSettings: "'FILL' 1" }}
+                    {/* Image */}
+                    <div style={{ position: 'relative', height: 110, overflow: 'hidden', background: '#1a1a1a' }}>
+                      <img
+                        src={product.image}
+                        alt={product.title}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                      <button
+                        onClick={() => toggleFavorite(product.id)}
+                        style={{
+                          position: 'absolute', top: 8, right: 8,
+                          background: 'rgba(0,0,0,0.4)',
+                          backdropFilter: 'blur(8px)',
+                          borderRadius: '50%', width: 28, height: 28,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          border: 'none', outline: 'none', cursor: 'pointer'
+                        }}
                       >
-                        star
-                      </span>
-                      <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--muted-gray)', fontFamily: 'Poppins,sans-serif' }}>
-                        {product.rating}
-                      </span>
+                        <span
+                          className="material-symbols-outlined"
+                          style={{
+                            fontSize: 14,
+                            color: 'var(--accent-red)',
+                            fontVariationSettings: `'FILL' ${isFav ? 1 : 0}`
+                          }}
+                        >
+                          favorite
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Info */}
+                    <div style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 4 }}>
+                        <h4
+                          style={{
+                            fontSize: 11, fontWeight: 700,
+                            fontFamily: 'Poppins,sans-serif',
+                            color: isDarkMode ? '#f5f5f5' : 'var(--primary-gray)',
+                            lineHeight: 1.3, margin: 0,
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1
+                          }}
+                        >
+                          {product.title}
+                        </h4>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                          <span
+                            className="material-symbols-outlined"
+                            style={{ fontSize: 10, color: '#F59E0B', fontVariationSettings: "'FILL' 1" }}
+                          >
+                            star
+                          </span>
+                          <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--muted-gray)', fontFamily: 'Poppins,sans-serif' }}>
+                            {product.rating}
+                          </span>
+                        </div>
+                      </div>
+
+                      <p
+                        style={{
+                          fontSize: 10, color: 'var(--muted-gray)',
+                          fontFamily: 'Poppins,sans-serif', margin: 0,
+                          lineHeight: 1.4,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {product.description}
+                      </p>
+
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent-red)', fontFamily: 'Poppins,sans-serif' }}>
+                          ₹{product.price}
+                        </span>
+                        <button
+                          onClick={() => checkLocation(() => addToCart(product.id))}
+                          style={{
+                            height: 26, padding: '0 12px',
+                            background: 'var(--accent-red)',
+                            color: '#fff', border: 'none', outline: 'none',
+                            borderRadius: 999, fontSize: 10, fontWeight: 700,
+                            fontFamily: 'Poppins,sans-serif',
+                            letterSpacing: '0.04em', textTransform: 'uppercase',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Add
+                        </button>
+                      </div>
                     </div>
                   </div>
-
-                  <p
-                    style={{
-                      fontSize: 10, color: 'var(--muted-gray)',
-                      fontFamily: 'Poppins,sans-serif', margin: 0,
-                      lineHeight: 1.4,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                    }}
-                  >
-                    {product.description}
-                  </p>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent-red)', fontFamily: 'Poppins,sans-serif' }}>
-                      ₹{product.price}
-                    </span>
-                    <button
-                      onClick={() => checkLocation(() => addToCart(product.id))}
-                      style={{
-                        height: 26, padding: '0 12px',
-                        background: 'var(--accent-red)',
-                        color: '#fff', border: 'none', outline: 'none',
-                        borderRadius: 999, fontSize: 10, fontWeight: 700,
-                        fontFamily: 'Poppins,sans-serif',
-                        letterSpacing: '0.04em', textTransform: 'uppercase',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })()}
     </>
   );
 }
