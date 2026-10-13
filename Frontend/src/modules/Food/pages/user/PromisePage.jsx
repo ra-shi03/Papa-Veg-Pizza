@@ -6,6 +6,7 @@ import {
   CheckCircle2, Star, ChevronRight
 } from 'lucide-react';
 import { apiClient } from '../../../../services/api/axios';
+import { renderFormattedText } from '@food/utils/formatText';
 
 // Icon map for dynamic rendering
 const ICON_MAP = {
@@ -32,6 +33,16 @@ export default function PromisePage() {
   const [data, setData] = useState(null);
   const isManualScrollingRef = useRef(false);
 
+  const handleOrderNow = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const currentPath = window.location.pathname;
+    const targetPath = currentPath.startsWith('/food') ? '/food/user/menu' : '/user/menu';
+    navigate(targetPath);
+  };
+
   useEffect(() => {
     const fetchPromiseData = async () => {
       try {
@@ -56,9 +67,11 @@ export default function PromisePage() {
   const fallbackData = {
     header: {
       title: 'Papa Veg Promise',
-      subtitle: 'Where quality food meets honest prices!',
+      subtitle: 'Where **quality food** meets **honest prices**!',
       stars: '★★',
-      orderButtonText: 'Order Now'
+      orderButtonText: 'Order Now',
+      badgeText: 'Promise',
+      showBadge: true
     },
     tabs: [
       {
@@ -203,7 +216,7 @@ export default function PromisePage() {
             <div className="flex items-center justify-between mb-3">
               <button
                 type="button"
-                onClick={() => navigate('/user/menu')}
+                onClick={handleOrderNow}
                 className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer text-zinc-800 dark:text-zinc-200"
                 aria-label="Back to menu"
               >
@@ -218,19 +231,23 @@ export default function PromisePage() {
                 <h1 className="text-2xl sm:text-3xl font-black text-[var(--primary,#E53935)] tracking-tight font-sans">
                   {currentData.header?.title || "Papa Veg Promise"}
                 </h1>
-                {/* Interactive Quality Guarantee Badge replacing ugly text stars */}
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#169B45]/15 text-[#169B45] border border-[#169B45]/30 hover:bg-[#169B45]/25 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-xs group"
-                  title="100% Quality & Honest Price Guarantee"
-                  aria-label="Quality Promise Verified"
-                >
-                  <Sparkles size={15} className="text-[#169B45] fill-[#169B45]/30 group-hover:rotate-12 transition-transform animate-pulse" />
-                  <span className="text-[10px] font-black uppercase tracking-wider">Promise</span>
-                </button>
+                {/* Interactive Quality Guarantee Badge */}
+                {currentData.header?.showBadge !== false && (currentData.header?.badgeText || "Promise") && (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#169B45]/15 text-[#169B45] border border-[#169B45]/30 hover:bg-[#169B45]/25 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-xs group"
+                    title="100% Quality & Honest Price Guarantee"
+                    aria-label="Quality Promise Verified"
+                  >
+                    <Sparkles size={15} className="text-[#169B45] fill-[#169B45]/30 group-hover:rotate-12 transition-transform animate-pulse" />
+                    <span className="text-[10px] font-black uppercase tracking-wider">
+                      {currentData.header?.badgeText || "Promise"}
+                    </span>
+                  </button>
+                )}
               </div>
               <p className="text-xs sm:text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                Where <strong className="text-zinc-950 dark:text-white font-extrabold">quality food</strong> meets <strong className="text-zinc-950 dark:text-white font-extrabold">honest prices</strong>!
+                {renderFormattedText(currentData.header?.subtitle || "Where **quality food** meets **honest prices**!")}
               </p>
             </div>
           </div>
@@ -348,12 +365,12 @@ export default function PromisePage() {
       </div>
 
       {/* Sticky Bottom Order Now Button */}
-      <div className="fixed bottom-0 inset-x-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 py-3.5 px-4 z-40">
+      <div className="fixed bottom-0 inset-x-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 py-3.5 px-4 z-50">
         <div className="max-w-lg mx-auto">
           <button
             type="button"
-            onClick={() => navigate('/user/menu')}
-            className="w-full h-12 bg-[var(--primary,#E53935)] hover:opacity-95 active:scale-[0.99] text-white rounded-xl font-black text-sm tracking-wide shadow-lg shadow-[var(--primary,#E53935)]/20 transition-all flex items-center justify-center gap-2 cursor-pointer uppercase"
+            onClick={handleOrderNow}
+            className="w-full h-12 bg-[var(--primary,#E53935)] hover:opacity-95 active:scale-[0.99] text-white rounded-xl font-black text-sm tracking-wide shadow-lg shadow-[var(--primary,#E53935)]/20 transition-all flex items-center justify-center gap-2 cursor-pointer uppercase select-none relative z-10"
           >
             {currentData.header?.orderButtonText || "Order Now"}
             <ChevronRight size={18} />

@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Award, Plus, Trash2, Edit2, Save, ExternalLink, 
   Check, X, Eye, Zap, Moon, Gift, Truck, Box, Bike, 
   Flame, Heart, ShieldCheck, Sparkles, Wheat, Star,
-  Info, RefreshCw
+  Info, RefreshCw, Bold
 } from 'lucide-react';
 import { adminClient } from '../../../../../services/api/axios';
 import { toast } from 'sonner';
+import { renderFormattedText } from '@food/utils/formatText';
 
 const AVAILABLE_ICONS = [
   { name: 'Award', icon: Award, label: 'Award / Medal' },
@@ -37,10 +38,12 @@ export default function PromiseCampaignConfig() {
   // Form State
   const [header, setHeader] = useState({
     title: 'Papa Veg Promise',
-    subtitle: 'Where quality food meets honest prices!',
+    subtitle: 'Where **quality food** meets **honest prices**!',
     tagline: '100% Pure Vegetarian Delight',
     stars: '★★',
-    orderButtonText: 'Order Now'
+    orderButtonText: 'Order Now',
+    badgeText: 'Promise',
+    showBadge: true
   });
 
   const [tickerItems, setTickerItems] = useState([]);
@@ -67,13 +70,77 @@ export default function PromiseCampaignConfig() {
     isActive: true
   });
 
+  const subtitleInputRef = useRef(null);
+  const tickerTaglineInputRef = useRef(null);
+
+  const handleMakeSubtitleBold = () => {
+    const input = subtitleInputRef.current;
+    if (!input) return;
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    const currentVal = header.subtitle || '';
+
+    if (start !== end) {
+      const selected = currentVal.substring(start, end);
+      const isAlreadyBold = selected.startsWith('**') && selected.endsWith('**');
+      const replacement = isAlreadyBold ? selected.slice(2, -2) : `**${selected}**`;
+      const newVal = currentVal.substring(0, start) + replacement + currentVal.substring(end);
+      setHeader({ ...header, subtitle: newVal });
+      setTimeout(() => {
+        input.focus();
+        input.setSelectionRange(start, start + replacement.length);
+      }, 0);
+    } else {
+      const newVal = currentVal.substring(0, start) + '**bold text**' + currentVal.substring(end);
+      setHeader({ ...header, subtitle: newVal });
+      setTimeout(() => {
+        input.focus();
+        input.setSelectionRange(start + 2, start + 11);
+      }, 0);
+    }
+  };
+
+  const handleMakeTickerTaglineBold = () => {
+    const input = tickerTaglineInputRef.current;
+    if (!input) return;
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    const currentVal = tickerForm.tagline || '';
+
+    if (start !== end) {
+      const selected = currentVal.substring(start, end);
+      const isAlreadyBold = selected.startsWith('**') && selected.endsWith('**');
+      const replacement = isAlreadyBold ? selected.slice(2, -2) : `**${selected}**`;
+      const newVal = currentVal.substring(0, start) + replacement + currentVal.substring(end);
+      setTickerForm({ ...tickerForm, tagline: newVal });
+      setTimeout(() => {
+        input.focus();
+        input.setSelectionRange(start, start + replacement.length);
+      }, 0);
+    } else {
+      const newVal = currentVal.substring(0, start) + '**bold text**' + currentVal.substring(end);
+      setTickerForm({ ...tickerForm, tagline: newVal });
+      setTimeout(() => {
+        input.focus();
+        input.setSelectionRange(start + 2, start + 11);
+      }, 0);
+    }
+  };
+
   const fetchConfig = async () => {
     setLoading(true);
     try {
       const res = await adminClient.get('/settings/promise-campaign');
       const data = res?.data?.data || res?.data;
       if (data) {
-        if (data.header) setHeader(data.header);
+        if (data.header) {
+          setHeader(prev => ({
+            ...prev,
+            ...data.header,
+            badgeText: data.header.badgeText !== undefined ? data.header.badgeText : 'Promise',
+            showBadge: data.header.showBadge !== undefined ? data.header.showBadge : true
+          }));
+        }
         if (data.tickerItems) setTickerItems(data.tickerItems);
         if (data.tabs && data.tabs.length > 0) {
           setTabs(data.tabs);
@@ -195,15 +262,15 @@ export default function PromiseCampaignConfig() {
       setEditingTicker(ticker);
       setTickerForm({
         id: ticker.id,
-        heading: ticker.heading,
-        tagline: ticker.tagline,
+        heading: ticker.heading || header.title || 'Papa Veg Promise',
+        tagline: ticker.tagline || ticker.heading || '',
         isActive: ticker.isActive !== false
       });
     } else {
       setEditingTicker(null);
       setTickerForm({
         id: `tick-${Date.now()}`,
-        heading: '',
+        heading: header.title || 'Papa Veg Promise',
         tagline: '',
         isActive: true
       });
@@ -212,17 +279,21 @@ export default function PromiseCampaignConfig() {
   };
 
   const handleSaveTicker = () => {
-    if (!tickerForm.heading.trim() || !tickerForm.tagline.trim()) {
-      toast.error('Both heading and tagline are required.');
+    if (!tickerForm.tagline.trim()) {
+      toast.error('Tagline text is required.');
       return;
     }
+    const finalSlide = {
+      ...tickerForm,
+      heading: tickerForm.heading || header.title || 'Papa Veg Promise'
+    };
     if (editingTicker) {
-      setTickerItems(prev => prev.map(t => t.id === editingTicker.id ? { ...t, ...tickerForm } : t));
+      setTickerItems(prev => prev.map(t => t.id === editingTicker.id ? { ...t, ...finalSlide } : t));
     } else {
-      setTickerItems(prev => [...prev, tickerForm]);
+      setTickerItems(prev => [...prev, finalSlide]);
     }
     setTickerModalOpen(false);
-    toast.success('Menu slider item updated!');
+    toast.success(editingTicker ? 'Tagline slide updated!' : 'Tagline slide added!');
   };
 
   const handleDeleteTicker = (tickId) => {
@@ -296,25 +367,101 @@ export default function PromiseCampaignConfig() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Star Rating / Accents</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Subtitle / Tagline</label>
+              <button
+                type="button"
+                onClick={handleMakeSubtitleBold}
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-black rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition-colors cursor-pointer border border-zinc-200 dark:border-zinc-700 shadow-xs"
+                title="Select text in the input and click to bold (**word**)"
+              >
+                <Bold size={11} className="stroke-[3]" />
+                <span>Bold Selection</span>
+              </button>
+            </div>
             <input 
-              type="text" 
-              value={header.stars || ''}
-              onChange={(e) => setHeader({ ...header, stars: e.target.value })}
-              className="w-full h-9 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 bg-zinc-50/50 dark:bg-zinc-950 text-xs font-bold focus:border-[var(--primary)] outline-none" 
-              placeholder="e.g. ★★"
-            />
-          </div>
-
-          <div className="space-y-1 md:col-span-2">
-            <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Subtitle / Tagline</label>
-            <input 
+              ref={subtitleInputRef}
               type="text" 
               value={header.subtitle || ''}
               onChange={(e) => setHeader({ ...header, subtitle: e.target.value })}
               className="w-full h-9 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 bg-zinc-50/50 dark:bg-zinc-950 text-xs font-semibold focus:border-[var(--primary)] outline-none" 
-              placeholder="e.g. Where quality food meets honest prices!"
+              placeholder="e.g. Where **quality food** meets **honest prices**!"
             />
+            {/* Live Formatted Subtitle Preview */}
+            <div className="pt-1 flex items-center gap-1.5 text-[11px] text-zinc-500 overflow-hidden">
+              <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 shrink-0">Live Preview:</span>
+              <span className="text-xs text-zinc-700 dark:text-zinc-300 font-medium truncate">
+                {renderFormattedText(header.subtitle || "Where **quality food** meets **honest prices**!")}
+              </span>
+            </div>
+          </div>
+
+          {/* Promise Badge Text & Visibility Toggle */}
+          <div className="space-y-2.5 p-3.5 bg-zinc-50/70 dark:bg-zinc-950/50 rounded-xl border border-zinc-200/80 dark:border-zinc-800 md:col-span-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-emerald-500" />
+                  Promise Header Badge
+                </label>
+                <p className="text-[11px] text-zinc-500 mt-0.5">
+                  Displays next to "{header.title || 'Papa Veg Promise'}" on the user promise page.
+                </p>
+              </div>
+
+              {/* Toggle Switch (Visible / Hidden) */}
+              <div className="flex items-center gap-2.5">
+                <span className={`text-xs font-bold ${header.showBadge !== false ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400'}`}>
+                  {header.showBadge !== false ? 'Visible' : 'Hidden'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setHeader(prev => ({ ...prev, showBadge: prev.showBadge === false ? true : false }))}
+                  className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                    header.showBadge !== false ? 'bg-emerald-500 justify-end' : 'bg-zinc-300 dark:bg-zinc-700 justify-start'
+                  }`}
+                  role="switch"
+                  aria-checked={header.showBadge !== false}
+                  title="Toggle Badge Visibility"
+                >
+                  <div className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-1 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-zinc-500 uppercase">Badge Text</label>
+                <input
+                  type="text"
+                  value={header.badgeText ?? 'Promise'}
+                  onChange={(e) => setHeader({ ...header, badgeText: e.target.value })}
+                  disabled={header.showBadge === false}
+                  className="w-full h-9 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 bg-white dark:bg-zinc-900 text-xs font-bold focus:border-[var(--primary)] outline-none disabled:opacity-50 disabled:bg-zinc-100 dark:disabled:bg-zinc-800"
+                  placeholder="e.g. Promise"
+                />
+              </div>
+
+              {/* Live Preview */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-zinc-500 uppercase">Live Badge Preview</label>
+                <div className="h-9 flex items-center px-3 rounded-lg border border-zinc-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-900 gap-2">
+                  <span className="text-xs font-black text-[var(--primary,#E53935)] truncate">
+                    {header.title || 'Papa Veg Promise'}
+                  </span>
+                  {header.showBadge !== false && (header.badgeText || 'Promise') ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#169B45]/15 text-[#169B45] border border-[#169B45]/30 shadow-xs shrink-0">
+                      <Sparkles size={11} className="text-[#169B45] fill-[#169B45]/30" />
+                      <span className="text-[9px] font-black uppercase tracking-wider">
+                        {header.badgeText || 'Promise'}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-zinc-400 italic">(Badge hidden)</span>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -327,7 +474,7 @@ export default function PromiseCampaignConfig() {
               Menu Page Campaign Ticker ({tickerItems.length} active slides)
             </h2>
             <p className="text-[11px] text-zinc-500 mt-0.5">
-              These headline promises auto-rotate on <code className="text-[10px] bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">/user/menu</code> and navigate to the promise page when clicked.
+              These rotating taglines slide on <code className="text-[10px] bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">/user/menu</code> under the fixed "{header.title || 'Papa Veg Promise'}" header.
             </p>
           </div>
           <button
@@ -340,17 +487,18 @@ export default function PromiseCampaignConfig() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {tickerItems.map((tick) => (
+          {tickerItems.map((tick, index) => (
             <div 
               key={tick.id}
               className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/40 flex flex-col justify-between gap-3 relative group"
             >
               <div>
-                <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest block mb-0.5">
-                  ★ Live Banner
+                <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest block mb-1">
+                  ★ Sliding Tagline #{index + 1}
                 </span>
-                <p className="text-xs font-black text-zinc-900 dark:text-white leading-tight">{tick.heading}</p>
-                <p className="text-[11px] text-zinc-500 font-medium leading-snug mt-1">{tick.tagline}</p>
+                <p className="text-xs font-semibold text-zinc-900 dark:text-white leading-snug">
+                  {renderFormattedText(tick.tagline || tick.heading)}
+                </p>
               </div>
 
               <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60">
@@ -608,7 +756,7 @@ export default function PromiseCampaignConfig() {
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-md rounded-2xl p-6 shadow-2xl animate-fade-in space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
               <h3 className="text-sm font-black text-zinc-900 dark:text-white">
-                {editingTicker ? 'Edit Menu Banner Slide' : 'Add Menu Banner Slide'}
+                {editingTicker ? 'Edit Sliding Tagline' : 'Add Sliding Tagline'}
               </h3>
               <button onClick={() => setTickerModalOpen(false)} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full cursor-pointer">
                 <X size={16} />
@@ -617,25 +765,36 @@ export default function PromiseCampaignConfig() {
 
             <div className="space-y-3.5">
               <div className="space-y-1">
-                <label className="text-[11px] font-black uppercase text-zinc-500">Banner Heading *</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black uppercase text-zinc-500">Tagline / Guarantee Text *</label>
+                  <button
+                    type="button"
+                    onClick={handleMakeTickerTaglineBold}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-black rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition-colors cursor-pointer border border-zinc-200 dark:border-zinc-700 shadow-xs"
+                    title="Select text in the input and click to bold (**word**)"
+                  >
+                    <Bold size={11} className="stroke-[3]" />
+                    <span>Bold Selection</span>
+                  </button>
+                </div>
                 <input 
-                  type="text" 
-                  value={tickerForm.heading}
-                  onChange={(e) => setTickerForm({ ...tickerForm, heading: e.target.value })}
-                  placeholder="e.g. Papa Veg Promise"
-                  className="w-full h-9 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 bg-zinc-50/50 dark:bg-zinc-950 text-xs font-bold outline-none focus:border-[var(--primary)]"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[11px] font-black uppercase text-zinc-500">Tagline / Guarantee Text *</label>
-                <input 
+                  ref={tickerTaglineInputRef}
                   type="text" 
                   value={tickerForm.tagline}
                   onChange={(e) => setTickerForm({ ...tickerForm, tagline: e.target.value })}
                   placeholder="e.g. 100% Pure Vegetarian & 0% Preservatives"
                   className="w-full h-9 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 bg-zinc-50/50 dark:bg-zinc-950 text-xs font-semibold outline-none focus:border-[var(--primary)]"
                 />
+                {/* Live Preview */}
+                <div className="pt-1 flex items-center gap-1.5 text-[11px] text-zinc-500 overflow-hidden">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 shrink-0">Live Preview:</span>
+                  <span className="text-xs text-zinc-700 dark:text-zinc-300 font-medium truncate">
+                    {renderFormattedText(tickerForm.tagline || "e.g. 100% Pure Vegetarian")}
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-400 font-medium mt-1 leading-snug">
+                  Only the tagline rotates in the menu banner under the fixed "{header.title || 'Papa Veg Promise'}" campaign heading.
+                </p>
               </div>
             </div>
 

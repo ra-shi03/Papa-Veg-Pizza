@@ -1,224 +1,40 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
-import { ArrowLeft, Search, ArrowUpDown, Check, X, Star } from "lucide-react"
-import apiClient from "@/services/api/axios"
+import { ArrowLeft, Search, ArrowUpDown, Check, X, Star, ChevronRight } from "lucide-react"
+import apiClient, { adminClient } from "@/services/api/axios"
 import DeliveryMapModal from "@food/components/user/DeliveryMapModal"
 import DeliveryOrCollectionModal from "@food/components/user/DeliveryOrCollectionModal"
 import { useLocationStore } from "@food/store/locationStore"
 import { useLocationGuard } from "@food/hooks/useLocationGuard"
 import logoNew from "@/assets/logo1.png"
+import { renderFormattedText } from "@food/utils/formatText"
 
-const MENU_ITEMS = {
-  slices: [
-    {
-      id: "slice-margherita",
-      title: "Cheesy Classic Slice",
-      price: 99,
-      badge: "NEW",
-      image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=80",
-      description: "Generous single jumbo slice overloaded with gooey mozzarella and herb seasoned tomato sauce.",
-      sizes: ["Jumbo Single Slice", "Double Slice Box"],
-      rating: 4.8,
-      ratingCount: 38
-    },
-    {
-      id: "slice-paneer-tikka",
-      title: "Spicy Paneer Tikka Slice",
-      price: 129,
-      badge: "NEW",
-      image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=500&auto=format&fit=crop&q=80",
-      description: "Jumbo slice topped with smoky tandoori paneer, crisp bell peppers, and chipotle drizzle.",
-      sizes: ["Jumbo Single Slice", "Double Slice Box"],
-      rating: 4.9,
-      ratingCount: 42
-    }
-  ],
-  "cheese-burst": [
-    {
-      id: "cb-farmhouse",
-      title: "2in1 Cheese Burst Farmhouse",
-      price: 389,
-      badge: "NEW",
-      image: "https://images.unsplash.com/photo-1571407970349-bc81e7e96d47?w=500&auto=format&fit=crop&q=80",
-      description: "Double the cheese with a molten cheese-filled crust and golden liquid cheese topping.",
-      sizes: ["Regular", "Medium", "Large"],
-      rating: 4.9,
-      ratingCount: 56
-    }
-  ],
-  "big-big-pizza": [
-    {
-      id: "big-overload",
-      title: "Big Big Veggie Overload",
-      price: 499,
-      badge: "New Flavours",
-      image: "https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?w=500&auto=format&fit=crop&q=80",
-      description: "Giant 14-inch party-sized pizza loaded edge-to-edge with farm fresh veggies and creamy mozzarella.",
-      sizes: ["14in Jumbo Party"],
-      rating: 4.7,
-      ratingCount: 29
-    }
-  ],
-  "party-combo": [
-    {
-      id: "combo-party-feast",
-      title: "Ultimate Party Combo Feast",
-      price: 799,
-      badge: "UPTO ₹1000 OFF",
-      image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=500&auto=format&fit=crop&q=80",
-      description: "2 Medium Pizzas + 1 Garlic Bread Stix + 1 Choco Volcano Cake + 1.25L Pepsi.",
-      sizes: ["Party Pack for 4-5"],
-      rating: 4.9,
-      ratingCount: 64
-    }
-  ],
-  pizzas: [
-    {
-      id: "fiery-schezwan",
-      title: "Fiery Schezwan Veggie",
-      price: 299,
-      badge: "NEW",
-      image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=80",
-      description: "Fiery schezwan sauce, dynamic mozzarella, onions, sweet bell peppers, and fresh greens.",
-      sizes: ["Oval 10in Crafted Flatz", "Personal Pan", "Medium Hand Tossed", "Large Stuffed Crust"],
-      rating: 4.3,
-      ratingCount: 19
-    },
-    {
-      id: "smokey-bbq",
-      title: "Smokey BBQ Veggie",
-      price: 299,
-      badge: "NEW",
-      image: "https://images.unsplash.com/photo-1571407970349-bc81e7e96d47?w=500&auto=format&fit=crop&q=80",
-      description: "Rich smokey BBQ base, melted mozzarella, loaded red onions, golden sweet corn, and BBQ drizzle.",
-      sizes: ["Oval 10in Crafted Flatz", "Personal Pan", "Medium Hand Tossed", "Large Stuffed Crust"],
-      rating: 4.5,
-      ratingCount: 22
-    },
-    {
-      id: "paneer-makhni",
-      title: "Paneer Makhni Masala",
-      price: 299,
-      badge: "NEW",
-      image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=500&auto=format&fit=crop&q=80",
-      description: "Indian style Makhni sauce, premium marinated paneer cubes, capsicum, red onions, and tomatoes.",
-      sizes: ["Oval 10in Crafted Flatz", "Personal Pan", "Medium Hand Tossed", "Large Stuffed Crust"],
-      rating: 4.7,
-      ratingCount: 35
-    },
-    {
-      id: "overloaded-veggies",
-      title: "Overloaded Veggies",
-      price: 299,
-      badge: "NEW",
-      image: "https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?w=500&auto=format&fit=crop&q=80",
-      description: "Black olives, mushrooms, sweet corn, red onions, tri-color bell peppers, and jalapeños.",
-      sizes: ["Oval 10in Crafted Flatz", "Personal Pan", "Medium Hand Tossed", "Large Stuffed Crust"],
-      rating: 4.4,
-      ratingCount: 18
-    }
-  ],
-  burgers: [
-    {
-      id: "crispy-veg-burger",
-      title: "Crispy Veg Burger",
-      price: 149,
-      image: "https://images.unsplash.com/photo-1550547660-d9450f859349?w=500&auto=format&fit=crop&q=80",
-      description: "Crispy mixed vegetable patty, fresh lettuce, tomatoes, and creamy classic mayonnaise.",
-      rating: 4.1,
-      ratingCount: 15
-    },
-    {
-      id: "spicy-paneer-burger",
-      title: "Spicy Paneer Burger",
-      price: 189,
-      image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&auto=format&fit=crop&q=80",
-      description: "Spicy marinated paneer patty, layered with spicy dressing, melted cheese, and sliced onions.",
-      rating: 4.6,
-      ratingCount: 28
-    }
-  ],
-  breads: [
-    {
-      id: "garlic-bread-stix",
-      title: "Garlic Bread Stix",
-      price: 119,
-      image: "https://images.unsplash.com/photo-1619535860434-ba1d8fa12536?w=500&auto=format&fit=crop&q=80",
-      description: "Freshly baked garlic bread sticks served warm with creamy dynamic dipping sauce.",
-      rating: 4.2,
-      ratingCount: 12
-    },
-    {
-      id: "cheese-garlic-bread",
-      title: "Cheese Garlic Bread",
-      price: 149,
-      image: "https://images.unsplash.com/photo-1574085733277-851d9d856a3a?w=500&auto=format&fit=crop&q=80",
-      description: "Toasted thick bread slices loaded with garlic butter, fresh parsley, and gooey melted mozzarella.",
-      rating: 4.5,
-      ratingCount: 19
-    }
-  ],
-  pasta: [
-    {
-      id: "creamy-mushroom-penne",
-      title: "Creamy Mushroom Penne",
-      price: 249,
-      image: "https://images.unsplash.com/photo-1645112411341-6c4fd023714a?w=500&auto=format&fit=crop&q=80",
-      description: "Penne tossed in a rich, creamy white parmesan sauce loaded with fresh button mushrooms and garlic herbs.",
-      rating: 4.3,
-      ratingCount: 14
-    },
-    {
-      id: "spiced-arrabbiata",
-      title: "Spiced Arrabbiata Pasta",
-      price: 229,
-      image: "https://images.unsplash.com/photo-1608897013039-887f21d8c804?w=500&auto=format&fit=crop&q=80",
-      description: "Penne pasta in a fiery, spiced San Marzano tomato sauce infused with fresh garlic, chili flakes, and basil leaves.",
-      rating: 4.4,
-      ratingCount: 21
-    }
-  ],
-  desserts: [
-    {
-      id: "warm-brownie",
-      title: "Warm Chocolate Brownie",
-      price: 129,
-      image: "https://images.unsplash.com/photo-1564355808539-22fda35bed7e?w=500&auto=format&fit=crop&q=80",
-      description: "Rich, dense chocolate brownie served warm with a shiny, gooey dark chocolate glaze on top.",
-      rating: 4.8,
-      ratingCount: 42
-    },
-    {
-      id: "choco-volcano",
-      title: "Choco Volcano Cake",
-      price: 139,
-      image: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=500&auto=format&fit=crop&q=80",
-      description: "Freshly baked soft chocolate sponge cake with a molten, oozing chocolate lava core inside.",
-      rating: 4.9,
-      ratingCount: 50
-    }
-  ],
-  drinks: [
-    {
-      id: "water-bottle",
-      title: "Purified Water Bottle",
-      price: 40,
-      image: "/food/bisleri_water_bottle.png",
-      description: "Ice-cold premium mineral packaged drinking water for refreshment.",
-      rating: 4.0,
-      ratingCount: 5
-    },
-    {
-      id: "pepsi-cola",
-      title: "Pepsi Cola (500ml)",
-      price: 60,
-      image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=500&auto=format&fit=crop&q=80",
-      description: "500ml bottle of cold, sparkling carbonated Pepsi cola beverage.",
-      rating: 4.3,
-      ratingCount: 8
-    }
-  ]
-}
+const CRUST_OPTIONS = [
+  {
+    name: "New Hand Tossed",
+    description: "Fresh Dough, Flavourful Edges",
+    price: 0,
+    image: "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=120&auto=format&fit=crop&q=80"
+  },
+  {
+    name: "Cheese Burst",
+    description: "Crust overflowing with molten liquid cheese",
+    price: 75,
+    image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=120&auto=format&fit=crop&q=80"
+  },
+  {
+    name: "100% Wheat Thin Crust",
+    description: "Light, crispy whole wheat base",
+    price: 50,
+    image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=120&auto=format&fit=crop&q=80"
+  },
+  {
+    name: "Fresh Pan",
+    description: "Thick, soft and buttery golden crust",
+    price: 40,
+    image: "https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?w=120&auto=format&fit=crop&q=80"
+  }
+];
 
 export default function MenuList() {
   const navigate = useNavigate()
@@ -245,17 +61,122 @@ export default function MenuList() {
     return [...list].sort((a, b) => {
       const aVal = Number(a.sort !== undefined && a.sort !== null ? a.sort : 0);
       const bVal = Number(b.sort !== undefined && b.sort !== null ? b.sort : 0);
-      // If both have positive rank, sort ascending (1, 2, 3...)
-      if (aVal > 0 && bVal > 0) return aVal - bVal;
-      // Ranked items (sort > 0) come before unranked/0
-      if (aVal > 0 && bVal <= 0) return -1;
-      if (bVal > 0 && aVal <= 0) return 1;
-      // If both have the same rank (or 0), preserve createdAt ascending
+      if (aVal !== bVal) {
+        return aVal - bVal;
+      }
+      // If both have the same rank, preserve createdAt ascending
       if (a.createdAt && b.createdAt) {
         return new Date(a.createdAt) - new Date(b.createdAt);
       }
       return 0;
     });
+  };
+
+  // Helper to match a product to a category
+  const getCategoryKeyForProduct = (p, currentCategories = []) => {
+    const pCat = p.categoryId;
+    const pCatId = typeof pCat === 'object' && pCat !== null ? pCat._id : (pCat || p.category_id);
+    const pCatLabel = (typeof pCat === 'object' && pCat !== null ? (pCat.label || pCat.name) : '') || p.category || p.categoryName || '';
+
+    // 1. Try finding category in currentCategories by _id
+    if (pCatId) {
+      const foundById = currentCategories.find(c => String(c._id || c.id) === String(pCatId));
+      if (foundById) {
+        return foundById.id || foundById.slug || (foundById.label || foundById.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
+      }
+    }
+
+    // 2. Try finding category by label / name
+    if (pCatLabel) {
+      const cleanLabel = pCatLabel.toLowerCase().trim();
+      const foundByLabel = currentCategories.find(c => {
+        const cLabel = (c.label || c.name || '').toLowerCase().trim();
+        const cSlug = c.id || c.slug || cLabel.replace(/[^a-z0-9]+/g, '-');
+        return cLabel === cleanLabel || cSlug === cleanLabel.replace(/[^a-z0-9]+/g, '-');
+      });
+      if (foundByLabel) {
+        return foundByLabel.id || foundByLabel.slug || (foundByLabel.label || foundByLabel.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
+      }
+      return cleanLabel.replace(/[^a-z0-9]+/g, '-');
+    }
+
+    return pCatId ? String(pCatId) : 'uncategorized';
+  };
+
+  // Helper to format a product for user menu display strictly from dynamic API data
+  const formatProductForMenu = (p) => {
+    const rawSizes = (p.sizes && Array.isArray(p.sizes) && p.sizes.length > 0) ? p.sizes : [];
+    const sizes = rawSizes.length > 0
+      ? rawSizes.map(s => {
+          const sizeName = typeof s === 'string' ? s : (s.size || s.name || 'Regular');
+          const sizePrice = typeof s === 'string' ? (Number(p.price) || 0) : (Number(s.price) || Number(p.price) || 0);
+          const sizeOriginalPrice = typeof s === 'string' ? 0 : (Number(s.originalPrice) || Number(s.mrp) || 0);
+          const sizeDiscount = typeof s === 'string' ? 0 : (Number(s.discount) || 0);
+          const sizeDiscountType = s.discountType || 'percentage';
+          const sizeSaveAmount = typeof s === 'string' ? 0 : (Number(s.saveAmount) || (sizeOriginalPrice > sizePrice ? sizeOriginalPrice - sizePrice : 0));
+          const sizeDesc = s.description || (
+            sizeName.toLowerCase() === 'regular' ? 'Serves 1 person only' :
+            sizeName.toLowerCase() === 'medium' ? 'Just right for 1-2 people' :
+            'Serves 3-4 people'
+          );
+          return { 
+            name: sizeName, 
+            size: sizeName,
+            price: sizePrice, 
+            originalPrice: sizeOriginalPrice > sizePrice ? sizeOriginalPrice : null,
+            discount: sizeDiscount,
+            discountType: sizeDiscountType,
+            saveAmount: sizeSaveAmount,
+            description: sizeDesc 
+          };
+        })
+      : [
+          { 
+            name: "Regular", 
+            size: "Regular",
+            price: Number(p.price) || 0, 
+            originalPrice: (Number(p.originalPrice) > Number(p.price)) ? Number(p.originalPrice) : null,
+            discount: Number(p.discount) || 0,
+            discountType: p.discountType || "percentage",
+            saveAmount: Number(p.saveAmount) || (Number(p.originalPrice) > Number(p.price) ? Number(p.originalPrice) - Number(p.price) : 0),
+            description: "Serves 1 person only" 
+          }
+        ];
+
+    const baseSize = sizes.find(s => s.name?.toLowerCase() === 'regular') || sizes[0] || {};
+    const basePrice = baseSize.price || Number(p.price) || 0;
+    const originalPrice = baseSize.originalPrice || (Number(p.originalPrice) > basePrice ? Number(p.originalPrice) : null);
+    const saveAmount = baseSize.saveAmount || (originalPrice > basePrice ? (Number(p.saveAmount) || (originalPrice - basePrice)) : 0);
+
+    // Strict Dynamic Badge - only when superadmin explicitly provided a badge
+    const badge = (p.badge && typeof p.badge === 'string' && p.badge.trim()) ? p.badge.trim() : "";
+
+    let toppingsSummary = p.shortDescription || "";
+    if (!toppingsSummary && Array.isArray(p.toppings) && p.toppings.length > 0) {
+      toppingsSummary = "Toppings: " + p.toppings.map(t => (typeof t === 'object' ? t.name : t)).filter(Boolean).join(" • ");
+    }
+    if (!toppingsSummary) {
+      toppingsSummary = p.description || "";
+    }
+
+    return {
+      id: p._id || p.id || `prod-${String(p.name || '').toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+      title: p.name || p.title || "",
+      price: basePrice,
+      originalPrice,
+      saveAmount,
+      badge,
+      image: p.image || "",
+      description: p.description || p.shortDescription || "",
+      toppingsSummary,
+      defaultCrust: p.defaultCrust || "New Hand Tossed",
+      sizes,
+      toppings: p.toppings || [],
+      isVeg: p.vegType !== 'non-veg',
+      rating: p.rating || 4.8,
+      ratingCount: p.ratingCount || 28,
+      status: p.status || "Active"
+    };
   };
 
   // Dynamic Categories State
@@ -271,10 +192,6 @@ export default function MenuList() {
           sorted.forEach((c, idx) => {
             const label = c.label || c.name || "";
             let id = c.slug || label.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
-            if (label.toLowerCase() === "slices") id = "slices";
-            if (label.toLowerCase().includes("2 in 1") || label.toLowerCase().includes("2in1")) id = "cheese-burst";
-            if (label.toLowerCase().includes("big big")) id = "big-big-pizza";
-            if (label.toLowerCase().includes("party combo") || label.toLowerCase() === "party combo") id = "party-combo";
             
             if (seen.has(id)) {
               id = `${id}-${c._id || idx}`;
@@ -286,6 +203,7 @@ export default function MenuList() {
               _id: c._id || c.id || `${id}-${idx}`,
               label,
               badge: c.badge || "",
+              icon: c.icon || "",
               sort: c.sort ?? 0,
               createdAt: c.createdAt
             });
@@ -294,12 +212,7 @@ export default function MenuList() {
         }
       }
     } catch (e) {}
-    return [
-      { id: "slices", label: "Slices", badge: "NEW" },
-      { id: "cheese-burst", label: "2in1 Cheese Burst", badge: "NEW" },
-      { id: "big-big-pizza", label: "Big Big Pizza", badge: "New Flavours" },
-      { id: "party-combo", label: "Party Combo", badge: "UPTO ₹1000 OFF" }
-    ];
+    return [];
   });
 
   // Dynamic Promise Header & Campaign Taglines State (Superadmin controlled)
@@ -378,35 +291,93 @@ export default function MenuList() {
   useEffect(() => {
     const fetchCategoryProducts = async () => {
       try {
-        let items = [];
+        let fetchedCats = [];
+        let fetchedProds = [];
+
+        // 1. Fetch Categories using the same endpoint as Superadmin panel (/food/admin/category-products)
         try {
-          const res = await apiClient.get('/food/admin/category-products/public?sort=sort_asc');
-          items = res?.data?.data || [];
-        } catch (_) {
-          try {
-            const res = await apiClient.get('/food/admin/category-products/categories?sort=sort_asc');
-            items = res?.data?.data || [];
-          } catch (_) {
-            const res = await apiClient.get('/food/admin/menu/public');
-            items = res?.data?.data?.categories || [];
+          const cRes = await adminClient.get('/food/admin/category-products?sort=sort_asc');
+          if (Array.isArray(cRes?.data?.data) && cRes.data.data.length > 0) {
+            fetchedCats = cRes.data.data;
           }
+        } catch (_) {}
+
+        if (fetchedCats.length === 0) {
+          try {
+            const cRes = await apiClient.get('/food/admin/category-products?sort=sort_asc');
+            if (Array.isArray(cRes?.data?.data) && cRes.data.data.length > 0) {
+              fetchedCats = cRes.data.data;
+            }
+          } catch (_) {}
         }
 
-        if (items.length > 0) {
-          const cats = items.filter(c => c.status !== "Inactive" && (c.type === "Category" || !c.type));
-          const prods = items.filter(c => c.type === "Product");
+        if (fetchedCats.length === 0) {
+          try {
+            const cRes = await apiClient.get('/food/admin/category-products/public?sort=sort_asc');
+            if (Array.isArray(cRes?.data?.data) && cRes.data.data.length > 0) {
+              fetchedCats = cRes.data.data;
+            }
+          } catch (_) {}
+        }
 
-          if (cats.length > 0) {
-            const sortedCats = sortCategoriesBySuperadmin(cats);
+        // 2. Fetch Products using the same endpoint as Superadmin panel (/food/admin/products)
+        try {
+          const pRes = await adminClient.get('/food/admin/products', { params: { limit: 250, page: 1 } });
+          const items = Array.isArray(pRes?.data?.data) ? pRes.data.data : (pRes?.data?.data?.foods || []);
+          if (items.length > 0) fetchedProds = items;
+        } catch (_) {}
+
+        if (fetchedProds.length === 0) {
+          try {
+            const pRes = await apiClient.get('/food/admin/products', { params: { limit: 250, page: 1 } });
+            const items = Array.isArray(pRes?.data?.data) ? pRes.data.data : (pRes?.data?.data?.foods || []);
+            if (items.length > 0) fetchedProds = items;
+          } catch (_) {}
+        }
+
+        if (fetchedProds.length === 0) {
+          try {
+            const pRes = await apiClient.get('/food/admin/products/public');
+            const items = Array.isArray(pRes?.data?.data) ? pRes.data.data : [];
+            if (items.length > 0) fetchedProds = items;
+          } catch (_) {}
+        }
+
+        if (fetchedCats.length === 0 || fetchedProds.length === 0) {
+          try {
+            const menuRes = await apiClient.get('/food/admin/menu/public');
+            const mData = menuRes?.data?.data;
+            if (fetchedCats.length === 0 && Array.isArray(mData?.categories) && mData.categories.length > 0) {
+              fetchedCats = mData.categories;
+            }
+            if (fetchedProds.length === 0 && Array.isArray(mData?.products) && mData.products.length > 0) {
+              fetchedProds = mData.products;
+            }
+          } catch (_) {}
+        }
+
+        if (fetchedProds.length === 0) {
+          try {
+            const stored = localStorage.getItem("pvp_products_v2");
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                fetchedProds = parsed;
+              }
+            }
+          } catch (_) {}
+        }
+
+        // Process Categories
+        let mappedCats = [];
+        if (fetchedCats.length > 0) {
+          const activeCats = fetchedCats.filter(c => c.status !== "Inactive" && (c.type === "Category" || !c.type));
+          if (activeCats.length > 0) {
+            const sortedCats = sortCategoriesBySuperadmin(activeCats);
             const seen = new Set();
-            const mappedCats = [];
             sortedCats.forEach((c, idx) => {
               const label = c.label || c.name || "";
               let id = c.slug || label.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
-              if (label.toLowerCase() === "slices") id = "slices";
-              if (label.toLowerCase().includes("2 in 1") || label.toLowerCase().includes("2in1")) id = "cheese-burst";
-              if (label.toLowerCase().includes("big big")) id = "big-big-pizza";
-              if (label.toLowerCase().includes("party combo") || label.toLowerCase() === "party combo") id = "party-combo";
 
               if (seen.has(id)) {
                 id = `${id}-${c._id || idx}`;
@@ -423,35 +394,48 @@ export default function MenuList() {
                 createdAt: c.createdAt
               });
             });
+
             setCategories(mappedCats);
             localStorage.setItem("pvp_categories", JSON.stringify(mappedCats));
+
             if (!location.state?.category && mappedCats.length > 0) {
               setActiveTab(prev => {
-                const exists = mappedCats.some(c => c.id === prev);
-                return exists ? prev : mappedCats[0].id;
+                if (userManuallySelectedCategoryRef.current && mappedCats.some(c => c.id === prev)) {
+                  return prev;
+                }
+                return mappedCats[0].id;
               });
             }
           }
+        }
 
-          if (prods.length > 0) {
-            const map = {};
-            prods.forEach(p => {
-              const catObj = cats.find(c => (c._id || c.id) === (typeof p.categoryId === 'object' ? p.categoryId?._id : p.categoryId));
-              const catKey = catObj ? (catObj.slug || (catObj.label || catObj.name).toLowerCase().replace(/[^a-z0-9]+/g, "-")) : "pizzas";
-              if (!map[catKey]) map[catKey] = [];
-              map[catKey].push({
-                id: p._id || p.id,
-                title: p.name,
-                price: p.price || 299,
-                badge: p.badge || "NEW",
-                image: p.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500",
-                description: p.shortDescription || p.description,
-                rating: 4.5,
-                ratingCount: 20
-              });
-            });
-            setProductsMap(map);
-          }
+        // Process Products category-wise
+        if (fetchedProds.length > 0) {
+          const currentCats = mappedCats.length > 0 ? mappedCats : categories;
+          const map = {};
+          fetchedProds.forEach(p => {
+            if (p.status && p.status.toLowerCase() !== "active") return;
+            const catKey = getCategoryKeyForProduct(p, currentCats);
+            if (!map[catKey]) map[catKey] = [];
+
+            const formatted = formatProductForMenu(p);
+            if (!map[catKey].some(item => item.id === formatted.id || item.title.toLowerCase() === formatted.title.toLowerCase())) {
+              map[catKey].push(formatted);
+            }
+
+            // Also map by MongoDB ObjectId
+            const pCat = p.categoryId;
+            const pCatId = typeof pCat === 'object' && pCat !== null ? pCat._id : (pCat || p.category_id);
+            if (pCatId && String(pCatId) !== catKey) {
+              const idKey = String(pCatId);
+              if (!map[idKey]) map[idKey] = [];
+              if (!map[idKey].some(item => item.id === formatted.id || item.title.toLowerCase() === formatted.title.toLowerCase())) {
+                map[idKey].push(formatted);
+              }
+            }
+          });
+
+          setProductsMap(map);
         }
       } catch (e) {
         console.warn("Failed to load backend category products:", e);
@@ -473,10 +457,6 @@ export default function MenuList() {
             sorted.forEach((c, idx) => {
               const label = c.label || c.name || "";
               let id = c.slug || label.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
-              if (label.toLowerCase() === "slices") id = "slices";
-              if (label.toLowerCase().includes("2 in 1") || label.toLowerCase().includes("2in1")) id = "cheese-burst";
-              if (label.toLowerCase().includes("big big")) id = "big-big-pizza";
-              if (label.toLowerCase().includes("party combo") || label.toLowerCase() === "party combo") id = "party-combo";
 
               if (seen.has(id)) {
                 id = `${id}-${c._id || idx}`;
@@ -488,6 +468,7 @@ export default function MenuList() {
                 _id: c._id || c.id || `${id}-${idx}`,
                 label,
                 badge: c.badge || "",
+                icon: c.icon || "",
                 sort: c.sort ?? 0,
                 createdAt: c.createdAt
               });
@@ -509,22 +490,23 @@ export default function MenuList() {
         const parsed = JSON.parse(stored).filter(p => p.status === "Active");
         if (parsed.length > 0) {
           const map = {};
+          const curCats = categories || [];
           parsed.forEach(p => {
-            const catKey = p.category ? p.category.toLowerCase().replace(/\s+/g, "-") : "pizzas";
+            const catKey = getCategoryKeyForProduct(p, curCats);
             if (!map[catKey]) map[catKey] = [];
-            
-            const priceVal = typeof p.price === 'string' ? parseInt(p.price.replace(/[^\d]/g, ""), 10) || 299 : p.price || 299;
-            map[catKey].push({
-              id: p.id || `prod-${p.name.toLowerCase().replace(/\s+/g, "-")}`,
-              title: p.name,
-              price: priceVal,
-              badge: "NEW",
-              image: p.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=80",
-              description: p.description || `${p.name} prepared fresh with premium toppings.`,
-              sizes: p.sizes || ["Regular", "Medium", "Large"],
-              rating: p.rating || 4.5,
-              ratingCount: Math.floor(Math.random() * 40) + 5
-            });
+            const formatted = formatProductForMenu(p);
+            if (!map[catKey].some(item => item.id === formatted.id || item.title.toLowerCase() === formatted.title.toLowerCase())) {
+              map[catKey].push(formatted);
+            }
+            const pCat = p.categoryId;
+            const pCatId = typeof pCat === 'object' && pCat !== null ? pCat._id : (pCat || p.category_id);
+            if (pCatId && String(pCatId) !== catKey) {
+              const idKey = String(pCatId);
+              if (!map[idKey]) map[idKey] = [];
+              if (!map[idKey].some(item => item.id === formatted.id || item.title.toLowerCase() === formatted.title.toLowerCase())) {
+                map[idKey].push(formatted);
+              }
+            }
           });
           return map;
         }
@@ -541,22 +523,23 @@ export default function MenuList() {
           const parsed = JSON.parse(stored).filter(p => p.status === "Active");
           if (parsed.length > 0) {
             const map = {};
+            const curCats = categories || [];
             parsed.forEach(p => {
-              const catKey = p.category ? p.category.toLowerCase().replace(/\s+/g, "-") : "pizzas";
+              const catKey = getCategoryKeyForProduct(p, curCats);
               if (!map[catKey]) map[catKey] = [];
-              
-              const priceVal = typeof p.price === 'string' ? parseInt(p.price.replace(/[^\d]/g, ""), 10) || 299 : p.price || 299;
-              map[catKey].push({
-                id: p.id || `prod-${p.name.toLowerCase().replace(/\s+/g, "-")}`,
-                title: p.name,
-                price: priceVal,
-                badge: "NEW",
-                image: p.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=80",
-                description: p.description || `${p.name} prepared fresh with premium toppings.`,
-                sizes: p.sizes || ["Regular", "Medium", "Large"],
-                rating: p.rating || 4.5,
-                ratingCount: Math.floor(Math.random() * 40) + 5
-              });
+              const formatted = formatProductForMenu(p);
+              if (!map[catKey].some(item => item.id === formatted.id || item.title.toLowerCase() === formatted.title.toLowerCase())) {
+                map[catKey].push(formatted);
+              }
+              const pCat = p.categoryId;
+              const pCatId = typeof pCat === 'object' && pCat !== null ? pCat._id : (pCat || p.category_id);
+              if (pCatId && String(pCatId) !== catKey) {
+                const idKey = String(pCatId);
+                if (!map[idKey]) map[idKey] = [];
+                if (!map[idKey].some(item => item.id === formatted.id || item.title.toLowerCase() === formatted.title.toLowerCase())) {
+                  map[idKey].push(formatted);
+                }
+              }
             });
             setProductsMap(map);
           }
@@ -565,13 +548,13 @@ export default function MenuList() {
     };
     window.addEventListener("pvp_products_changed_v2", handleProductsSync);
     return () => window.removeEventListener("pvp_products_changed_v2", handleProductsSync);
-  }, []);
+  }, [categories]);
 
   // Dynamic Toppings State
   const [toppings, setToppings] = useState(() => {
     const defaultToppings = [
-      { name: "Jalapeno", price: 45, badge: "Bestseller" },
-      { name: "Paneer", price: 55, badge: "Protein Rich" },
+      { name: "Jalapeno", price: 45 },
+      { name: "Paneer", price: 55 },
       { name: "Capsicum", price: 45 },
       { name: "Mushroom", price: 45 },
       { name: "Onion", price: 45 },
@@ -596,6 +579,33 @@ export default function MenuList() {
     return defaultToppings;
   });
 
+  const [allAddonsList, setAllAddonsList] = useState([]);
+
+  // Fetch toppings from backend public addons API
+  useEffect(() => {
+    const fetchAddons = async () => {
+      try {
+        const res = await apiClient.get('/food/admin/addons/public');
+        const data = res?.data?.data;
+        if (Array.isArray(data) && data.length > 0) {
+          setAllAddonsList(data);
+          const mapped = data.filter(a => (a.status || 'Active').toLowerCase() === 'active').map(a => {
+            const defaultPrice = (a.prices && a.prices.length > 0) ? Number(a.prices[0].price) : (Number(a.price) || 45);
+            return {
+              name: a.name,
+              price: defaultPrice,
+              badge: a.type?.toLowerCase() === 'topping' ? '' : (a.type || '')
+            };
+          });
+          if (mapped.length > 0) {
+            setToppings(mapped);
+          }
+        }
+      } catch (_) {}
+    };
+    fetchAddons();
+  }, []);
+
   useEffect(() => {
     const handleToppingsSync = () => {
       try {
@@ -617,35 +627,30 @@ export default function MenuList() {
   }, []);
 
   const getMergedMenuItems = () => {
-    const finalMap = { ...MENU_ITEMS };
-    if (productsMap) {
-      Object.keys(productsMap).forEach(key => {
-        const list = finalMap[key] ? [...finalMap[key]] : [];
-        const dynamicList = productsMap[key] || [];
-        dynamicList.forEach(dp => {
-          if (!list.some(lp => lp.title.toLowerCase() === dp.title.toLowerCase())) {
-            list.push(dp);
-          }
-        });
-        finalMap[key] = list;
-      });
-    }
-    return finalMap;
+    return productsMap || {};
   };
   
   const currentMenuItems = getMergedMenuItems();
 
+  const userManuallySelectedCategoryRef = useRef(false);
+
   const [activeTab, setActiveTab] = useState(() => {
     const defaultTab = location.state?.category;
-    if (defaultTab) return defaultTab;
+    if (defaultTab) {
+      userManuallySelectedCategoryRef.current = true;
+      return defaultTab;
+    }
     try {
       const stored = localStorage.getItem("pvp_categories");
       if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.length > 0 && parsed[0]?.id) return parsed[0].id;
+        const parsed = JSON.parse(stored).filter(c => c.status !== "Inactive");
+        if (parsed.length > 0) {
+          const sorted = sortCategoriesBySuperadmin(parsed);
+          if (sorted.length > 0 && sorted[0]?.id) return sorted[0].id;
+        }
       }
     } catch (_) {}
-    return "slices";
+    return "";
   });
 
   const [menuFilters, setMenuFilters] = useState(() => {
@@ -745,22 +750,92 @@ export default function MenuList() {
   const [debouncedQuery, setDebouncedQuery] = useState("")
   const [expandedItems, setExpandedItems] = useState({})
 
-  const [selectedCrust, setSelectedCrust] = useState("Ultimate Cheese")
-  const [selectedSizeOption, setSelectedSizeOption] = useState({ name: "Small", price: 299 })
+  // Custom Customize Modal States
+  const [customizeItem, setCustomizeItem] = useState(null)
+  const [selectedSize, setSelectedSize] = useState("")
+  const [selectedToppings, setSelectedToppings] = useState([])
+  const [selectedCheeseDip, setSelectedCheeseDip] = useState([])
+  const [selectedKetchup, setSelectedKetchup] = useState([])
+  const [selectedBreadDips, setSelectedBreadDips] = useState([])
+  const [selectedCrust, setSelectedCrust] = useState("New Hand Tossed")
+  const [selectedSizeOption, setSelectedSizeOption] = useState({ name: "Regular", price: 299, description: "Serves 1 person only" })
   const [selectedExtraCheese, setSelectedExtraCheese] = useState(false)
   const [selectedMealOptions, setSelectedMealOptions] = useState([])
   const [selectedToppingsList, setSelectedToppingsList] = useState([])
   const [quantity, setQuantity] = useState(1)
 
+  const getItemAssignedAddons = (item) => {
+    if (!item || !Array.isArray(item.toppings) || item.toppings.length === 0) {
+      return [];
+    }
+    return item.toppings.map(t => {
+      if (typeof t === 'object' && t && (t._id || t.name)) return t;
+      const found = allAddonsList.find(a => (a._id === t || a.id === t || a.name === t));
+      return found || (typeof t === 'string' ? { _id: t, name: t, type: 'topping', prices: [] } : t);
+    }).filter(Boolean);
+  };
+
+  const getAddonPriceForSize = (addon, sizeName = "Regular") => {
+    if (!addon) return 0;
+    if (Array.isArray(addon.prices) && addon.prices.length > 0) {
+      const matched = addon.prices.find(p => p.size?.toLowerCase() === sizeName?.toLowerCase());
+      if (matched && typeof matched.price === 'number') return matched.price;
+      return Number(addon.prices[0].price) || 0;
+    }
+    return Number(addon.price) || 0;
+  };
+
+  const currentItemAddons = React.useMemo(() => {
+    return getItemAssignedAddons(customizeItem);
+  }, [customizeItem, allAddonsList]);
+
+  const currentItemCrusts = React.useMemo(() => {
+    const fromProduct = currentItemAddons.filter(a => (a.type || '').toLowerCase().includes('crust'));
+    if (fromProduct.length > 0) return fromProduct;
+    return CRUST_OPTIONS.map(c => ({
+      _id: c.name,
+      name: c.name,
+      type: 'crust',
+      description: c.description,
+      image: c.image,
+      prices: [
+        { size: 'Regular', price: c.price },
+        { size: 'Medium', price: c.price > 0 ? c.price + 20 : 0 },
+        { size: 'Large', price: c.price > 0 ? c.price + 45 : 0 }
+      ]
+    }));
+  }, [currentItemAddons]);
+
+  const currentItemToppings = React.useMemo(() => {
+    return currentItemAddons.filter(a => (a.type || '').toLowerCase().includes('topping'));
+  }, [currentItemAddons]);
+
+  const currentItemDips = React.useMemo(() => {
+    return currentItemAddons.filter(a => !(a.type || '').toLowerCase().includes('crust') && !(a.type || '').toLowerCase().includes('topping'));
+  }, [currentItemAddons]);
+
   const openCustomizeModal = (item) => {
-    setCustomizeItem(item)
-    setSelectedCrust("Ultimate Cheese")
-    setSelectedSizeOption({ name: "Small", price: item.price })
-    setSelectedExtraCheese(false)
-    setSelectedMealOptions([])
-    setSelectedToppingsList([])
-    setQuantity(1)
-  }
+    setCustomizeItem(item);
+    const initialSizes = (item.sizes && item.sizes.length > 0 && typeof item.sizes[0] === 'object')
+      ? item.sizes
+      : [
+          { name: "Regular", price: item.price, description: "Serves 1 person only" }
+        ];
+    setSelectedSizeOption(initialSizes[0]);
+
+    const assigned = getItemAssignedAddons(item);
+    const assignedCrusts = assigned.filter(a => (a.type || '').toLowerCase().includes('crust'));
+    if (assignedCrusts.length > 0) {
+      setSelectedCrust(assignedCrusts[0].name);
+    } else {
+      setSelectedCrust(item.defaultCrust || "New Hand Tossed");
+    }
+
+    setSelectedExtraCheese(false);
+    setSelectedMealOptions([]);
+    setSelectedToppingsList([]);
+    setQuantity(1);
+  };
 
   const toggleExpand = (itemId) => {
     setExpandedItems(prev => ({
@@ -798,6 +873,20 @@ export default function MenuList() {
   }, [locationConfirmed])
   const [activeService, setActiveService] = useState(localStorage.getItem("activeService") || "delivery")
   const [toast, setToast] = useState({ visible: false, message: "" })
+
+  const [notifiedCategories, setNotifiedCategories] = useState({})
+  const handleToggleNotify = (catName) => {
+    const isCurrentlyNotified = Boolean(notifiedCategories[catName])
+    setNotifiedCategories(prev => ({
+      ...prev,
+      [catName]: !isCurrentlyNotified
+    }))
+    if (!isCurrentlyNotified) {
+      triggerToast(`🔔 You're subscribed! We'll alert you when ${catName} items arrive.`)
+    } else {
+      triggerToast(`Notification removed for ${catName}`)
+    }
+  }
 
   // Sync global location modal open state with local modal trigger
   useEffect(() => {
@@ -849,18 +938,11 @@ export default function MenuList() {
     return () => window.removeEventListener("cartUpdated", handleCartSync)
   }, [])
 
-  // Custom Customize Modal States
-  const [customizeItem, setCustomizeItem] = useState(null)
-  const [selectedSize, setSelectedSize] = useState("")
-  const [selectedToppings, setSelectedToppings] = useState([])
-  const [selectedCheeseDip, setSelectedCheeseDip] = useState([])
-  const [selectedKetchup, setSelectedKetchup] = useState([])
-  const [selectedBreadDips, setSelectedBreadDips] = useState([])
 
   // Load fonts and icons
   useEffect(() => {
     const linkFonts = document.createElement("link")
-    linkFonts.href = "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Inter:wght@400;600;700&display=swap"
+    linkFonts.href = "https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap"
     linkFonts.rel = "stylesheet"
     document.head.appendChild(linkFonts)
 
@@ -907,56 +989,58 @@ export default function MenuList() {
   }
 
   const calculateTotalPrice = () => {
-    if (!customizeItem) return 0
-    let base = selectedSizeOption.price || customizeItem.price
-    if (selectedExtraCheese) base += 65
-    
-    selectedMealOptions.forEach(opt => {
-      if (opt === "Pepsi Pet") base += 57
-      if (opt === "Masala Pop") base += 99
-      if (opt === "Indi Cheese Pocket") base += 109
-      if (opt === "Choco Volcano") base += 119
-      if (opt === "Cheese Garlic Bread") base += 165
-    })
-    
+    if (!customizeItem) return 0;
+    let base = Number(selectedSizeOption.price) || Number(customizeItem.price) || 0;
+
+    // Add selected crust price
+    const matchedCrust = currentItemCrusts.find(c => c.name === selectedCrust);
+    if (matchedCrust) {
+      base += getAddonPriceForSize(matchedCrust, selectedSizeOption.name);
+    }
+
+    if (selectedExtraCheese) base += 65;
+
+    // Add selected toppings
     selectedToppingsList.forEach(opt => {
-      const matched = toppings.find(t => t.name === opt)
+      const matched = currentItemToppings.find(t => t.name === opt);
       if (matched) {
-        base += matched.price
+        base += getAddonPriceForSize(matched, selectedSizeOption.name);
       } else {
-        if (opt === "Jalapeno") base += 45
-        if (opt === "Paneer") base += 55
-        if (opt === "Capsicum") base += 45
-        if (opt === "Mushroom") base += 45
-        if (opt === "Onion") base += 45
-        if (opt === "Red Paprika") base += 45
-        if (opt === "Red Capsicum") base += 45
-        if (opt === "Sweet Corn") base += 45
-        if (opt === "Tomato") base += 45
+        base += 45;
       }
-    })
-    
-    return base * quantity
-  }
+    });
+
+    // Add selected dips / meal extras
+    selectedMealOptions.forEach(opt => {
+      const matched = currentItemDips.find(d => d.name === opt);
+      if (matched) {
+        base += getAddonPriceForSize(matched, selectedSizeOption.name);
+      } else {
+        base += 30;
+      }
+    });
+
+    return base * (quantity || 1);
+  };
 
   const addCustomizedToCart = () => {
-    const toppingsKey = selectedToppingsList.sort().join("-")
-    const mealsKey = selectedMealOptions.sort().join("-")
-    const key = `${customizeItem.id}-${selectedSizeOption.name}-${selectedCrust}-${selectedExtraCheese ? 'cheese' : 'no'}-${toppingsKey}-${mealsKey}`
+    const toppingsKey = selectedToppingsList.sort().join("-");
+    const mealsKey = selectedMealOptions.sort().join("-");
+    const key = `${customizeItem.id}-${selectedSizeOption.name}-${selectedCrust}-${selectedExtraCheese ? 'cheese' : 'no'}-${toppingsKey}-${mealsKey}`;
     
     const customizedItemDetails = {
       ...customizeItem,
       id: customizeItem.id,
       title: `${customizeItem.title} (${selectedSizeOption.name})`,
       price: calculateTotalPrice() / quantity, // Price per unit
-      description: `Crust: ${selectedCrust}${selectedExtraCheese ? ', Extra Cheese' : ''}${selectedToppingsList.length > 0 ? ', Toppings: ' + selectedToppingsList.join(', ') : ''}${selectedMealOptions.length > 0 ? ', Meal: ' + selectedMealOptions.join(', ') : ''}`,
+      description: `Size: ${selectedSizeOption.name}${selectedCrust ? ', Crust: ' + selectedCrust : ''}${selectedToppingsList.length > 0 ? ', Toppings: ' + selectedToppingsList.join(', ') : ''}${selectedMealOptions.length > 0 ? ', Extras: ' + selectedMealOptions.join(', ') : ''}`,
       customized: true,
       selectedSize: selectedSizeOption.name,
       toppings: selectedToppingsList,
       meals: selectedMealOptions,
       crust: selectedCrust,
       extraCheese: selectedExtraCheese
-    }
+    };
     
     setCart(prev => {
       const existing = prev[key]
@@ -998,7 +1082,13 @@ export default function MenuList() {
   };
 
   // Filter and sort menu items
-  const itemsForTab = currentMenuItems[activeTab] || currentMenuItems["slices"] || currentMenuItems["pizzas"] || [];
+  const selectedCatObj = categories.find(c => c.id === activeTab || String(c._id) === activeTab);
+  const itemsForTab = (
+    currentMenuItems[activeTab] ||
+    (selectedCatObj ? currentMenuItems[selectedCatObj.id] : null) ||
+    (selectedCatObj ? currentMenuItems[String(selectedCatObj._id)] : null) ||
+    []
+  );
   const filteredItems = itemsForTab.filter((item) => {
     // If veg-only toggle is active and item is marked explicitly as non-veg
     if (isVegOnly && item.isVeg === false) {
@@ -1013,6 +1103,21 @@ export default function MenuList() {
     if (sortBy === "rating") return getNumericRating(b) - getNumericRating(a);
     return 0;
   });
+
+  const activeCategoryObj = categories.find(c => c.id === activeTab || String(c._id) === activeTab);
+  const activeCategoryName = activeCategoryObj?.label || (typeof activeTab === 'string' ? activeTab.replace(/-/g, ' ') : "this category");
+
+  const otherCategoriesWithItems = useMemo(() => {
+    return categories.filter(c => {
+      if (c.id === activeTab || String(c._id) === activeTab) return false;
+      const items = currentMenuItems[c.id] || (c._id && currentMenuItems[String(c._id)]) || [];
+      return Array.isArray(items) && items.length > 0;
+    });
+  }, [categories, activeTab, currentMenuItems]);
+
+  const firstCategoryWithItems = useMemo(() => {
+    return otherCategoriesWithItems[0] || null;
+  }, [otherCategoriesWithItems]);
 
   const modalTextPrimary = isDarkMode ? "text-white" : "text-zinc-900"
   const modalTextSecondary = isDarkMode ? "text-zinc-400" : "text-zinc-500"
@@ -1051,23 +1156,23 @@ export default function MenuList() {
         .hide-scrollbar { -ms-overflow-style: none !important; scrollbar-width: none !important; }
         
         .font-headline-lg-mobile {
-          font-family: 'Plus Jakarta Sans', sans-serif !important;
-          font-weight: 700 !important;
-          font-size: 28px !important;
-          line-height: 34px !important;
+          font-family: 'Poppins', sans-serif !important;
+          font-weight: 600 !important;
+          font-size: 20px !important;
+          line-height: 1.3 !important;
         }
         .font-body-md {
-          font-family: 'Inter', sans-serif !important;
+          font-family: 'Poppins', sans-serif !important;
           font-size: 16px !important;
           line-height: 24px !important;
           font-weight: 400 !important;
         }
         .font-label-sm {
-          font-family: 'Inter', sans-serif !important;
+          font-family: 'Poppins', sans-serif !important;
           font-size: 12px !important;
           line-height: 16px !important;
           font-weight: 600 !important;
-          letter-spacing: 0.05em !important;
+          letter-spacing: 0.04em !important;
         }
         
         .veg-box {
@@ -1159,7 +1264,10 @@ export default function MenuList() {
             <ArrowLeft className="w-5 h-5 stroke-[2.4]" />
           </button>
           
-          <h1 className="text-xl font-black text-gray-900 dark:text-white shrink-0 tracking-tight">
+          <h1 
+            className="text-lg sm:text-xl font-medium text-gray-800 dark:text-gray-100 shrink-0 tracking-normal"
+            style={{ fontFamily: "'Poppins', sans-serif" }}
+          >
             Menu
           </h1>
 
@@ -1171,7 +1279,8 @@ export default function MenuList() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search in menu..."
-              className="w-full h-9 pl-9 pr-8 bg-white/90 dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800 rounded-xl text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-100 placeholder-gray-400 outline-none focus:border-red-500 focus:bg-white transition-colors shadow-2xs"
+              style={{ fontFamily: "'Poppins', sans-serif" }}
+              className="w-full h-9 pl-9 pr-8 bg-white/90 dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800 rounded-xl text-xs sm:text-sm font-normal text-gray-800 dark:text-gray-100 placeholder-gray-400 outline-none focus:border-red-500 focus:bg-white transition-colors shadow-2xs"
             />
             {searchQuery && (
               <button
@@ -1192,7 +1301,8 @@ export default function MenuList() {
               <button
                 type="button"
                 onClick={() => setIsVegOnly(!isVegOnly)}
-                className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                style={{ fontFamily: "'Poppins', sans-serif" }}
+                className={`px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-2 transition-all cursor-pointer ${
                   isVegOnly
                     ? "bg-green-50 dark:bg-green-950/30 border-green-600 text-green-700 dark:text-green-400 shadow-xs"
                     : "bg-white/80 hover:bg-white dark:bg-zinc-900 border-zinc-250 dark:border-zinc-800 text-gray-700 dark:text-gray-300 shadow-2xs"
@@ -1212,7 +1322,8 @@ export default function MenuList() {
                 <button
                   type="button"
                   onClick={() => setShowSortMenu(!showSortMenu)}
-                  className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs ${
+                  style={{ fontFamily: "'Poppins', sans-serif" }}
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs ${
                     sortBy !== "default"
                       ? "border-red-500/50 text-red-600 dark:text-red-400 bg-red-50/40 dark:bg-red-950/20"
                       : "border-zinc-250 dark:border-zinc-800 bg-white/80 hover:bg-white dark:bg-zinc-900 text-gray-700 dark:text-gray-300"
@@ -1238,9 +1349,10 @@ export default function MenuList() {
                           setSortBy(opt.id);
                           setShowSortMenu(false);
                         }}
-                        className={`w-full px-3 py-2 text-left text-xs font-medium flex items-center justify-between hover:bg-black/5 dark:hover:bg-zinc-800 cursor-pointer border-0 ${
+                        style={{ fontFamily: "'Poppins', sans-serif" }}
+                        className={`w-full px-3 py-2 text-left text-xs font-normal flex items-center justify-between hover:bg-black/5 dark:hover:bg-zinc-800 cursor-pointer border-0 ${
                           sortBy === opt.id
-                            ? "text-red-600 dark:text-red-400 font-bold bg-red-50/50 dark:bg-red-950/20"
+                            ? "text-red-600 dark:text-red-400 font-medium bg-red-50/50 dark:bg-red-950/20"
                             : "text-gray-700 dark:text-gray-300 bg-transparent"
                         }`}
                       >
@@ -1263,7 +1375,10 @@ export default function MenuList() {
               <button
                 key={cat._id || `${cat.id}-${idx}`}
                 type="button"
-                onClick={() => setActiveTab(cat.id)}
+                onClick={() => {
+                  userManuallySelectedCategoryRef.current = true;
+                  setActiveTab(cat.id);
+                }}
                 className="flex flex-col items-center pt-2 px-3.5 shrink-0 transition-colors group cursor-pointer relative bg-transparent border-0"
               >
                 {/* Badge Tag */}
@@ -1276,11 +1391,14 @@ export default function MenuList() {
                 )}
 
                 {/* Category Title */}
-                <span className={`text-xs whitespace-nowrap pb-2 ${
-                  isActive
-                    ? "font-extrabold text-gray-900 dark:text-white"
-                    : "font-semibold text-gray-500 dark:text-gray-400 group-hover:text-gray-800"
-                }`}>
+                <span 
+                  style={{ fontFamily: "'Poppins', sans-serif" }}
+                  className={`text-xs whitespace-nowrap pb-2 ${
+                    isActive
+                      ? "font-semibold text-gray-900 dark:text-white"
+                      : "font-normal text-gray-500 dark:text-gray-400 group-hover:text-gray-800"
+                  }`}
+                >
                   {cat.label}
                 </span>
 
@@ -1310,9 +1428,6 @@ export default function MenuList() {
               <span className="text-[var(--primary,#EE3A43)] font-black text-lg md:text-xl tracking-tight flex items-center gap-1 font-sans truncate">
                 {promiseHeaderTitle || "Papa Veg Promise"}
               </span>
-              <span className="text-[#70e000] text-sm font-bold tracking-widest shrink-0">
-                {promiseHeaderStars || "★ ★"}
-              </span>
             </div>
             
             {/* Subtle accent underline */}
@@ -1324,7 +1439,7 @@ export default function MenuList() {
                 key={activeCampaignIndex}
                 className="text-gray-800 dark:text-gray-200 text-xs sm:text-sm font-bold tracking-tight px-4 line-clamp-1 transition-opacity duration-300"
               >
-                {campaigns[activeCampaignIndex]?.tagline || "Where quality food meets honest prices!"}
+                {renderFormattedText(campaigns[activeCampaignIndex]?.tagline || "Where **quality food** meets **honest prices**!")}
               </p>
             </div>
 
@@ -1352,405 +1467,485 @@ export default function MenuList() {
       )}
 
       {/* Main Categories Layout container */}
-      <main className="px-4 space-y-4 max-w-lg mx-auto pt-0">
+      <main className="w-full pt-0">
 
         {/* Section Divider Header */}
-        <div className="flex items-center justify-center mt-2 mb-4 px-4">
+        <div className="flex items-center justify-center mt-3 mb-4 px-4">
           <div className="flex-1 h-[1px] bg-gray-200 dark:bg-zinc-800"></div>
-          <h2 className="px-5 text-xl font-extrabold text-gray-900 dark:text-white capitalize tracking-tight">
-            {categories.find(c => c.id === activeTab)?.label || activeTab}
+          <h2 
+            className="px-5 text-base sm:text-lg font-medium text-zinc-800 dark:text-zinc-100 tracking-normal capitalize"
+            style={{ fontFamily: "'Poppins', sans-serif" }}
+          >
+            {categories.find(c => c.id === activeTab)?.label || (typeof activeTab === 'string' ? activeTab.replace(/-/g, ' ') : activeTab)}
           </h2>
           <div className="flex-1 h-[1px] bg-gray-200 dark:bg-zinc-800"></div>
         </div>
 
-         {/* Menu list grid */}
-        <section className="space-y-4">
-          {filteredItems.map((item) => (
-            <fieldset key={item.id} className="glass-card rounded-2xl overflow-hidden flex flex-col p-4 gap-1.5 border border-white/12 hover-glow transition-all duration-300 m-0 min-w-0">
-              
-              {/* Top Row: Details on left, Image & ADD Button on right */}
-              <div className="flex flex-row justify-between gap-4">
-                
-                {/* Left Details: Title, Price, Size Selector */}
-                <div className="flex-1 flex flex-col justify-start min-w-0 text-left gap-1">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="veg-box scale-75 shrink-0"><span className="veg-circle"></span></span>
-                      {item.badge && (
-                        <span className="bg-[#E53935]/10 text-[#E53935] text-[8px] font-black uppercase px-1.5 py-0.5 rounded tracking-wide">
-                          {item.badge}
-                        </span>
-                      )}
-                    </div>
-                    <h3 className={`font-headline-md-mobile text-xl leading-snug font-extrabold truncate ${isDarkMode ? "text-white" : "text-[#131313]"}`}>
+        {/* Menu list grid - Domino's full width cards with modern sleek spacing */}
+        <section className="flex flex-col w-full pb-8 gap-5 sm:gap-6">
+          {filteredItems.map((item) => {
+            const hasDiscount = Boolean(item.originalPrice && Number(item.originalPrice) > Number(item.price) && (Number(item.saveAmount) > 0 || (Number(item.originalPrice) - Number(item.price)) > 0));
+            const saveAmount = hasDiscount ? (item.saveAmount || (Number(item.originalPrice) - Number(item.price))) : 0;
+            const toppingsLine = item.toppingsSummary || item.description || "";
+
+            return (
+              <div 
+                key={item.id} 
+                onClick={() => checkLocation(() => openCustomizeModal(item))}
+                className="relative w-full overflow-hidden flex flex-col justify-end min-h-[330px] sm:min-h-[360px] aspect-[4/3.2] bg-zinc-950 group shadow-sm transition-all duration-300 cursor-pointer"
+              >
+                {/* Full-bleed Product Image covering entire card */}
+                {item.image && (
+                  <img
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    alt={item.title}
+                    src={item.image}
+                    loading="lazy"
+                  />
+                )}
+
+                {/* Top Badges - strictly dynamic from Superadmin */}
+                {Boolean(item.badge && item.badge.trim()) && (
+                  <div className="absolute top-3 left-3 flex items-center gap-2 z-10">
+                    <span className="bg-[#E53935] text-white text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-sm">
+                      {item.badge}
+                    </span>
+                  </div>
+                )}
+
+                {/* Dark Gradient Overlay with Veg Icon, Title, Toppings, Pricing & Red Add Button */}
+                <div className="relative z-10 w-full bg-gradient-to-t from-black/95 via-black/80 to-transparent pt-14 pb-3.5 px-4 text-left">
+                  {/* Veg Icon + Product Title */}
+                  <div className="flex items-center gap-2">
+                    <span className="veg-box scale-90 shrink-0 shadow-xs">
+                      <span className="veg-circle"></span>
+                    </span>
+                    <h3 className="text-white text-base sm:text-lg font-bold leading-snug truncate drop-shadow-md font-['Poppins',sans-serif]">
                       {item.title}
                     </h3>
                   </div>
 
-                  <div className="mt-1 flex flex-row items-center gap-3 text-left">
-                    <span className="text-primary font-black text-sm">₹{item.price}</span>
-                    
-                    {/* Rating Pill Badge */}
-                    <div className="flex items-center gap-1 bg-[#00c853]/10 dark:bg-[#00c853]/15 text-[#00c853] px-2 py-0.5 rounded-full text-[10px] font-black w-fit select-none">
-                      <span className="text-[9px]">★</span>
-                      <span>{item.rating || '4.3'}</span>
-                      <span className="opacity-70 font-semibold">({item.ratingCount || '19'})</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Side: Product Image & ADD Button Stack */}
-                <div className={`relative w-24 shrink-0 flex flex-col items-center ${(activeTab === "pizzas" || activeTab === "breads") ? "pb-4" : "pb-1"}`}>
-                  <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-200/10 shadow-sm">
-                    <img
-                      className="w-full h-full object-cover"
-                      alt={item.title}
-                      src={item.image}
-                    />
-                  </div>
-                  
-                  {/* ADD Button overlapping bottom of image */}
-                  <button
-                    onClick={() => checkLocation(() => {
-                      if (activeTab === "pizzas") {
-                        openCustomizeModal(item)
-                      } else {
-                        addToCart(item, selectedSize)
-                        triggerToast(`Added ${item.title} to cart!`)
-                      }
-                    })}
-                    className="absolute top-[80px] left-1/2 -translate-x-1/2 h-7 px-5 bg-[#E53935] hover:bg-red-700 text-white rounded-full font-label-sm text-[10px] uppercase font-black cursor-pointer border-0 active:scale-95 transition-all shadow-md shadow-[#E53935]/20 flex items-center justify-center whitespace-nowrap min-w-[65px] z-10"
-                  >
-                    ADD
-                  </button>
-
-                  {/* Customisable hint below add button */}
-                  {(activeTab === "pizzas" || activeTab === "breads") && (
-                    <span className="mt-3.5 text-zinc-500 dark:text-zinc-400 text-[10px] font-medium tracking-wide whitespace-nowrap select-none">
-                      Customisable
-                    </span>
+                  {/* Toppings Summary Line */}
+                  {toppingsLine && (
+                    <p className="text-zinc-300 text-xs mt-1 truncate font-medium font-['Poppins',sans-serif] drop-shadow-sm">
+                      {toppingsLine}
+                    </p>
                   )}
-                </div>
 
-              </div>
+                  {/* Pricing Row & Add Button (Directly over image overlay, no white footer) */}
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <div className="flex flex-col gap-1 min-w-0">
+                      {/* Price, Strikethrough MRP, and Green Save Tag */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-white font-bold text-lg sm:text-xl font-['Poppins',sans-serif] drop-shadow-sm">
+                          ₹{item.price}
+                        </span>
+                        {hasDiscount && (
+                          <>
+                            <span className="text-zinc-400 line-through text-xs sm:text-sm font-medium">
+                              ₹{item.originalPrice}
+                            </span>
+                            <span className="bg-[#169B45] text-white text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded shadow-xs">
+                              Save ₹{saveAmount}
+                            </span>
+                          </>
+                        )}
+                      </div>
 
-              {/* Bottom Row: Description spanning full-width */}
-              {item.description && (
-                <div className="pt-1.5 border-t border-dashed border-white/5 text-left">
-                  <p className={`text-[10px] leading-normal ${isDarkMode ? "text-white/60" : "text-zinc-500"}`}>
-                    {expandedItems[item.id]
-                      ? item.description
-                      : `${item.description.slice(0, 50)}${item.description.length > 50 ? "..." : ""}`}
-                    {item.description.length > 50 && (
+                      {/* Variant Selector Link */}
                       <button
+                        type="button"
                         onClick={(e) => {
-                          e.stopPropagation()
-                          toggleExpand(item.id)
+                          e.stopPropagation();
+                          checkLocation(() => openCustomizeModal(item));
                         }}
-                        className="ml-1 text-primary hover:underline font-bold bg-transparent border-0 outline-none cursor-pointer text-[10px]"
+                        className="flex items-center gap-1 text-[11px] sm:text-xs text-zinc-300 hover:text-white border-b border-dashed border-zinc-400 w-fit cursor-pointer transition-colors pb-0.5 text-left font-medium select-none bg-transparent p-0"
                       >
-                        {expandedItems[item.id] ? "less" : "more"}
+                        <span>Regular | {item.defaultCrust || "New Hand Tossed"}</span>
+                        <ChevronRight size={13} className="text-zinc-400 shrink-0" />
                       </button>
-                    )}
-                  </p>
-                </div>
-              )}
+                    </div>
 
-            </fieldset>
-          ))}
+                    {/* Bright Red Add Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        checkLocation(() => openCustomizeModal(item));
+                      }}
+                      className="shrink-0 h-10 px-5 bg-[var(--accent-red,#EE3A43)] hover:opacity-95 active:scale-95 text-white font-bold text-sm rounded-xl transition-all shadow-lg shadow-[var(--accent-red,#EE3A43)]/30 cursor-pointer flex items-center gap-1.5 select-none uppercase font-['Poppins',sans-serif] border-0"
+                    >
+                      <span>Add</span>
+                      <span className="text-lg leading-none font-bold">+</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
 
           {filteredItems.length === 0 && (
-            <div className="text-center py-16 opacity-50 space-y-3">
-              <span className="material-symbols-outlined text-4xl">
-                {searchQuery ? "search_off" : "local_pizza"}
-              </span>
-              <p className="font-bold text-xs uppercase tracking-wider">
-                {searchQuery ? "No items match your search" : "No items available in this category"}
+            <div className="py-12 sm:py-16 px-4 flex flex-col items-center justify-center text-center select-none w-full max-w-sm mx-auto animate-fade-in" style={{ fontFamily: "'Poppins', sans-serif" }}>
+              {/* Beautiful Modern Line-Art Illustration with Soft Organic Blush Blobs (inspired by Reference 2) */}
+              <div className="w-60 h-48 sm:w-68 sm:h-52 relative flex items-center justify-center mb-5">
+                <svg viewBox="0 0 280 230" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-sm">
+                  {/* Soft Organic Blush Blobs */}
+                  <path d="M196,28 C238,12 272,46 264,90 C256,132 214,146 188,124 C162,102 154,44 196,28 Z" fill="#FFEAE8" className="dark:opacity-25" />
+                  <path d="M38,120 C70,98 106,124 98,164 C90,204 44,216 24,188 C4,160 8,132 38,120 Z" fill="#FFF0F0" className="dark:opacity-20" />
+                  
+                  <g stroke="var(--accent-red, #EE3A43)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    {/* DRINK CUP (LEFT) */}
+                    {/* Straw with stripes */}
+                    <path d="M78 78 L78 46 L96 34" fill="none" />
+                    <line x1="78" y1="56" x2="84" y2="52" strokeWidth="2.5" />
+                    <line x1="78" y1="65" x2="85" y2="60" strokeWidth="2.5" />
+                    
+                    {/* Cup Lid */}
+                    <rect x="52" y="78" width="52" height="10" rx="5" fill="white" className="dark:fill-zinc-900" />
+                    
+                    {/* Cup Body */}
+                    <path d="M57 88 L65 168 C65.5 173 70 177 75 177 L89 177 C94 177 98.5 173 99 168 L107 88 Z" fill="white" className="dark:fill-zinc-900" />
+                    
+                    {/* Cup Details */}
+                    <line x1="60" y1="112" x2="104" y2="112" strokeWidth="2" strokeDasharray="4 3" />
+                    <circle cx="82" cy="138" r="9" fill="white" className="dark:fill-zinc-900" strokeWidth="2.2" />
+                    <path d="M78 137 Q82 142 86 137" fill="none" strokeWidth="2" />
+
+                    {/* STEAMING PIZZA SLICE (RIGHT) */}
+                    {/* Aroma Steam Curls */}
+                    <path d="M166 56 C170 46 164 38 168 28" fill="none" strokeWidth="2.5" />
+                    <path d="M188 64 C192 54 186 46 190 36" fill="none" strokeWidth="2.5" />
+                    <path d="M210 58 C214 50 208 42 212 32" fill="none" strokeWidth="2.5" />
+
+                    {/* Pizza Slice Body */}
+                    <path d="M130 96 C144 89 204 89 224 96 C229 98 231 104 227 109 L181 184 C179 188 173 188 170 184 L125 109 C122 104 124 98 130 96 Z" fill="white" className="dark:fill-zinc-900" />
+                    
+                    {/* Crust Rim line */}
+                    <path d="M134 107 C150 101 200 101 219 107" fill="none" strokeWidth="2.5" />
+
+                    {/* Delicious Toppings */}
+                    {/* Olive Rings */}
+                    <circle cx="160" cy="136" r="5.5" fill="white" className="dark:fill-zinc-900" strokeWidth="2.5" />
+                    <circle cx="190" cy="128" r="5" fill="white" className="dark:fill-zinc-900" strokeWidth="2.5" />
+                    <circle cx="177" cy="162" r="4.5" fill="white" className="dark:fill-zinc-900" strokeWidth="2.5" />
+
+                    {/* Veggie & Basil Marks */}
+                    <path d="M172 116 Q182 114 185 120" fill="none" strokeWidth="2.2" />
+                    <path d="M146 122 Q154 120 152 126" fill="none" strokeWidth="2.2" />
+                    <path d="M202 142 Q208 148 202 152" fill="none" strokeWidth="2.2" />
+
+                    {/* Melting Cheese drop */}
+                    <path d="M168 180 Q170 188 173 182" fill="none" strokeWidth="2" />
+
+                    {/* Ground Table Accent Lines */}
+                    <line x1="36" y1="198" x2="244" y2="198" strokeWidth="3" />
+                    <line x1="92" y1="208" x2="188" y2="208" strokeWidth="2.5" />
+                  </g>
+                </svg>
+              </div>
+
+              {/* Clean Title (Medium Weight, Not Bold) */}
+              <h3 className="text-base sm:text-lg font-medium text-[var(--accent-red,#EE3A43)] leading-snug">
+                {searchQuery
+                  ? `No Dishes Found`
+                  : `Fresh Dishes Coming Soon !`}
+              </h3>
+
+              {/* Short Quote / Description */}
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 max-w-[280px] leading-relaxed font-normal">
+                {searchQuery
+                  ? `“We couldn't find any dish matching '${searchQuery}'. Discover our other favorites!”`
+                  : `“We are handcrafting fresh recipes for ${activeCategoryName}. Delicious options await!”`}
               </p>
+
+              {/* Single Rounded Red Pill Action Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (searchQuery) {
+                    setSearchQuery("");
+                  } else if (firstCategoryWithItems) {
+                    userManuallySelectedCategoryRef.current = true;
+                    setActiveTab(firstCategoryWithItems.id);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }
+                }}
+                className="mt-6 w-full max-w-[210px] py-3 px-6 bg-[var(--accent-red,#EE3A43)] hover:bg-[#d92d36] active:scale-95 text-white text-xs font-medium tracking-wider rounded-full shadow-sm hover:shadow transition-all cursor-pointer border-0 uppercase"
+              >
+                {searchQuery
+                  ? "Clear Search"
+                  : firstCategoryWithItems
+                  ? `Explore Menu`
+                  : "Explore Menu"}
+              </button>
             </div>
           )}
         </section>
       </main>
 
-      {/* Floating Customize Overlay Modal (Swiggy / Pizza Hut style) */}
+      {/* Floating Modern Customization Sheet (matching Reference Image 2) */}
       {customizeItem && (
         <div className="fixed inset-0 z-55 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
           {/* Modal Container */}
-          <div className="w-full max-w-md bg-[#f3f3f5] dark:bg-[#18181a] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[90vh] overflow-hidden transition-colors duration-300 slide-up-modal">
+          <div className="w-full max-w-md bg-white dark:bg-[#18181a] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[90vh] overflow-hidden transition-colors duration-300 slide-up-modal font-['Poppins',sans-serif]">
             
-            {/* Header: Sticky Top */}
-            <div className="bg-white dark:bg-[#1f1f22] px-5 py-4 flex items-center justify-between border-b border-zinc-200/50 dark:border-white/5 shrink-0">
-              <div className="flex items-center gap-3">
-                <img
-                  src={customizeItem.image}
-                  alt={customizeItem.title}
-                  className="w-10 h-10 rounded-lg object-cover bg-zinc-900 border border-zinc-200/10"
-                />
-                <h3 className="font-headline-lg-mobile text-base text-zinc-900 dark:text-white truncate max-w-[240px]">
-                  {customizeItem.title}
-                </h3>
+            {/* Header: Sticky Top with Veg Icon, Title, Toppings summary, and Close button */}
+            <div className="bg-white dark:bg-[#1f1f22] px-5 py-4 flex items-start justify-between border-b border-zinc-200/70 dark:border-white/5 shrink-0">
+              <div className="flex items-start gap-2.5 text-left min-w-0 pr-2">
+                <span className="veg-box scale-90 shrink-0 mt-1">
+                  <span className="veg-circle"></span>
+                </span>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-base text-zinc-900 dark:text-white truncate">
+                    {customizeItem.title}
+                  </h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 line-clamp-1 font-medium">
+                    {customizeItem.toppingsSummary || customizeItem.description || "Toppings: Mozzarella Cheese • Fresh Herbs"}
+                  </p>
+                </div>
               </div>
               <button
+                type="button"
                 onClick={() => setCustomizeItem(null)}
-                className="material-symbols-outlined text-zinc-400 hover:text-zinc-600 dark:hover:text-white cursor-pointer bg-transparent border-0 outline-none p-1 flex items-center justify-center"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-500 hover:text-zinc-800 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer bg-transparent border-0 outline-none transition-colors shrink-0"
+                aria-label="Close"
               >
-                close
+                <X size={20} />
               </button>
             </div>
 
             {/* Scrollable Content Area */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-6">
+            <div className="flex-1 overflow-y-auto p-5 space-y-5 text-left">
               
-              {/* Rabbit Speech Banner */}
-              <div className="bg-[#e8e7fa] dark:bg-[#2b254a] rounded-2xl p-4 flex gap-3 items-start">
-                <span className="text-xl select-none">🐰</span>
-                <p className="text-xs text-[#3b2b85] dark:text-[#a89dfc] font-semibold leading-relaxed text-left">
-                  Hi, we've preselected some popular choices to help you place the order faster!
-                </p>
-              </div>
+              {/* 1. Change Size Section (Reference Image 2: side-by-side selectable cards with checkmarks & discounts) */}
+              <div>
+                <h4 className="text-sm font-bold text-zinc-900 dark:text-white mb-2.5">
+                  Change Size
+                </h4>
+                <div className={`grid ${((customizeItem.sizes?.length || 2) > 2) ? 'grid-cols-3' : 'grid-cols-2'} gap-2.5`}>
+                  {(customizeItem.sizes || []).map(sizeObj => {
+                    const isSelected = selectedSizeOption.name === sizeObj.name;
+                    const hasDiscount = sizeObj.originalPrice && Number(sizeObj.originalPrice) > Number(sizeObj.price);
+                    const savings = sizeObj.saveAmount || (hasDiscount ? Number(sizeObj.originalPrice) - Number(sizeObj.price) : 0);
 
-              {/* 1. Choose Your Crust */}
-              <div className="space-y-2">
-                <div className="text-left">
-                  <h4 className="text-sm font-extrabold text-zinc-900 dark:text-white">Choose Your Crust</h4>
-                </div>
-                <div className="bg-white dark:bg-[#1f1f22] rounded-2xl p-4 shadow-sm border border-zinc-200/30 dark:border-white/5 space-y-3">
-                  {[
-                    "Ultimate Cheese",
-                    "Personal Pan",
-                    "Medium Hand Tossed",
-                    "Large Stuffed Crust"
-                  ].map(crust => {
-                    const isSelected = selectedCrust === crust
-                    return (
-                      <div
-                        key={crust}
-                        onClick={() => setSelectedCrust(crust)}
-                        className="flex items-center justify-between cursor-pointer py-1"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="veg-box scale-75 shrink-0"><span className="veg-circle"></span></span>
-                          <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{crust}</span>
-                        </div>
-                        <div className="relative flex items-center justify-center">
-                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                            isSelected ? "border-[#ff5200]" : "border-zinc-400 dark:border-zinc-600"
-                          }`}>
-                            {isSelected && <div className="w-2 h-2 rounded-full bg-[#ff5200]" />}
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* 2. Choose Size */}
-              <div className="space-y-2">
-                <div className="text-left">
-                  <h4 className="text-sm font-extrabold text-zinc-900 dark:text-white">Choose Size</h4>
-                  <p className="text-[10px] text-zinc-400 font-bold">Select any 1</p>
-                </div>
-                <div className="bg-white dark:bg-[#1f1f22] rounded-2xl p-4 shadow-sm border border-zinc-200/30 dark:border-white/5 space-y-3">
-                  {[
-                    { name: "Small", price: customizeItem.price },
-                    { name: "Medium", price: customizeItem.price + 220 },
-                    { name: "Large", price: customizeItem.price + 380 }
-                  ].map(sizeObj => {
-                    const isSelected = selectedSizeOption.name === sizeObj.name
                     return (
                       <div
                         key={sizeObj.name}
                         onClick={() => setSelectedSizeOption(sizeObj)}
-                        className="flex items-center justify-between cursor-pointer py-1"
+                        className={`relative p-3 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                          isSelected
+                            ? "border-zinc-800 dark:border-white bg-zinc-50/80 dark:bg-zinc-800/60 shadow-xs"
+                            : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-900"
+                        }`}
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="veg-box scale-75 shrink-0"><span className="veg-circle"></span></span>
-                          <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{sizeObj.name}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-black text-zinc-500 dark:text-zinc-400">₹{sizeObj.price}</span>
-                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                            isSelected ? "border-[#ff5200]" : "border-zinc-400 dark:border-zinc-600"
-                          }`}>
-                            {isSelected && <div className="w-2 h-2 rounded-full bg-[#ff5200]" />}
+                        {/* Checkmark circle badge */}
+                        {isSelected && (
+                          <div className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-[#0066CC] dark:bg-[#3B82F6] text-white flex items-center justify-center shadow-xs">
+                            <Check size={12} strokeWidth={3} />
                           </div>
+                        )}
+                        <div>
+                          <div className="font-bold text-sm text-zinc-900 dark:text-white">
+                            {sizeObj.name}
+                          </div>
+                          <div className="flex items-baseline gap-1.5 mt-1 flex-wrap">
+                            <span className="font-bold text-sm text-zinc-900 dark:text-zinc-100">
+                              ₹{sizeObj.price}
+                            </span>
+                            {hasDiscount && (
+                              <span className="text-[11px] text-zinc-400 line-through">
+                                ₹{sizeObj.originalPrice}
+                              </span>
+                            )}
+                          </div>
+                          {hasDiscount && savings > 0 && (
+                            <span className="inline-block mt-1 bg-[#169B45] text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-2xs">
+                              Save ₹{savings}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-2 leading-tight">
+                          {sizeObj.description}
                         </div>
                       </div>
-                    )
+                    );
                   })}
                 </div>
               </div>
 
-              {/* 3. Extra Cheese Topping */}
-              <div className="space-y-2">
-                <div className="text-left">
-                  <h4 className="text-sm font-extrabold text-zinc-900 dark:text-white">Extra Cheese Topping</h4>
-                  <p className="text-[10px] text-zinc-400 font-bold">Select upto 1</p>
-                </div>
-                <div className="bg-white dark:bg-[#1f1f22] rounded-2xl p-4 shadow-sm border border-zinc-200/30 dark:border-white/5">
-                  <div
-                    onClick={() => setSelectedExtraCheese(!selectedExtraCheese)}
-                    className="flex items-center justify-between cursor-pointer py-1"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="veg-box scale-75 shrink-0"><span className="veg-circle"></span></span>
-                      <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Cheese</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-black text-zinc-500 dark:text-zinc-400">+ ₹65</span>
-                      <div className={`w-4 h-4 rounded border flex items-center justify-center ${
-                        selectedExtraCheese ? "border-[#ff5200] bg-[#ff5200] text-white" : "border-zinc-400 dark:border-zinc-600"
-                      }`}>
-                        {selectedExtraCheese && <span className="material-symbols-outlined text-[10px] font-bold">check</span>}
-                      </div>
-                    </div>
+              {/* 2. Change Crust Section (Image 2: crust cards with image, desc, size-based price and checkmark) */}
+              {currentItemCrusts.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-bold text-zinc-900 dark:text-white mb-2.5">
+                    Change Crust
+                  </h4>
+                  <div className="space-y-2.5">
+                    {currentItemCrusts.map(crust => {
+                      const isSelected = selectedCrust === crust.name;
+                      const crustPrice = getAddonPriceForSize(crust, selectedSizeOption.name);
+                      const crustImg = crust.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=300&auto=format&fit=crop&q=80";
+
+                      return (
+                        <div
+                          key={crust.name || crust._id}
+                          onClick={() => setSelectedCrust(crust.name)}
+                          className={`relative p-3 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-3 ${
+                            isSelected
+                              ? "border-zinc-800 dark:border-white bg-zinc-50/80 dark:bg-zinc-800/60 shadow-xs"
+                              : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-900"
+                          }`}
+                        >
+                          <img 
+                            src={crustImg} 
+                            alt={crust.name} 
+                            className="w-12 h-12 rounded-xl object-cover shrink-0 bg-zinc-100 dark:bg-zinc-800"
+                          />
+                          <div className="flex-1 min-w-0 pr-6">
+                            <div className="font-bold text-xs text-zinc-900 dark:text-white truncate">
+                              {crust.name}
+                            </div>
+                            <div className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 leading-tight line-clamp-1">
+                              {crust.description || (crust.name.includes("Burst") ? "Crust overflowing with molten liquid cheese" : "Fresh Dough, Flavourful Edges")}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="font-bold text-xs text-zinc-800 dark:text-zinc-200">
+                              {crustPrice > 0 ? `+ ₹${crustPrice}` : "₹0"}
+                            </span>
+                          </div>
+                          {isSelected && (
+                            <div className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-[#0066CC] dark:bg-[#3B82F6] text-white flex items-center justify-center shadow-xs">
+                              <Check size={12} strokeWidth={3} />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* 4. Make it a Meal */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="text-left">
-                    <h4 className="text-sm font-extrabold text-zinc-900 dark:text-white">Make it a Meal.</h4>
-                    <p className="text-[10px] text-zinc-400 font-bold">Select upto 5</p>
+              {/* 3. Customizable Toppings with Prices Section (Showing ONLY assigned toppings for this product) */}
+              {currentItemToppings.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <h4 className="text-sm font-bold text-zinc-900 dark:text-white">
+                      Toppings
+                    </h4>
+                    <span className="text-[11px] text-zinc-400 font-medium">
+                      {selectedToppingsList.length > 0 ? `${selectedToppingsList.length} selected` : "Optional add-ons"}
+                    </span>
                   </div>
-                  <button
-                    onClick={() => {
-                      const allMeals = ["Pepsi Pet", "Masala Pop", "Indi Cheese Pocket", "Choco Volcano", "Cheese Garlic Bread"]
-                      setSelectedMealOptions(prev => prev.length === allMeals.length ? [] : allMeals)
-                    }}
-                    className="text-xs text-[#E53935] font-black uppercase bg-transparent border-0 outline-none cursor-pointer hover:underline"
-                  >
-                    {selectedMealOptions.length === 5 ? "Deselect all" : "Select all"}
-                  </button>
-                </div>
-                <div className="bg-white dark:bg-[#1f1f22] rounded-2xl p-4 shadow-sm border border-zinc-200/30 dark:border-white/5 space-y-3">
-                  {[
-                    { name: "Pepsi Pet", price: 57, badge: "Bestseller" },
-                    { name: "Masala Pop", price: 99 },
-                    { name: "Indi Cheese Pocket", price: 109 },
-                    { name: "Choco Volcano", price: 119 },
-                    { name: "Cheese Garlic Bread", price: 165 }
-                  ].map(meal => {
-                    const isSelected = selectedMealOptions.includes(meal.name)
-                    return (
-                      <div
-                        key={meal.name}
-                        onClick={() => {
-                          setSelectedMealOptions(prev => 
-                            prev.includes(meal.name) 
-                              ? prev.filter(m => m !== meal.name) 
-                              : [...prev, meal.name]
-                          )
-                        }}
-                        className="flex items-center justify-between cursor-pointer py-1"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="veg-box scale-75 shrink-0"><span className="veg-circle"></span></span>
-                          <div className="text-left">
-                            {meal.badge && (
-                              <span className="text-[8px] font-black uppercase text-[#E53935] tracking-wide block leading-none mb-0.5">{meal.badge}</span>
-                            )}
-                            <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{meal.name}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-black text-zinc-500 dark:text-zinc-400">+ ₹{meal.price}</span>
-                          <div className={`w-4 h-4 rounded border flex items-center justify-center ${
-                            isSelected ? "border-[#ff5200] bg-[#ff5200] text-white" : "border-zinc-400 dark:border-zinc-600"
-                          }`}>
-                            {isSelected && <span className="material-symbols-outlined text-[10px] font-bold">check</span>}
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
+                  <div className="bg-white dark:bg-[#1f1f22] rounded-2xl p-3 shadow-xs border border-zinc-200/80 dark:border-zinc-800 divide-y divide-zinc-100 dark:divide-zinc-800">
+                    {currentItemToppings.map(top => {
+                      const isSelected = selectedToppingsList.includes(top.name);
+                      const topPrice = getAddonPriceForSize(top, selectedSizeOption.name);
 
-              {/* 5. Add Toppings */}
-              <div className="space-y-2">
-                <div className="text-left">
-                  <h4 className="text-sm font-extrabold text-zinc-900 dark:text-white">Add More Veg Toppings Personal</h4>
-                  <p className="text-[10px] text-zinc-400 font-bold">Select upto 2</p>
-                </div>
-                <div className="bg-white dark:bg-[#1f1f22] rounded-2xl p-4 shadow-sm border border-zinc-200/30 dark:border-white/5 space-y-3">
-                  {toppings.map(top => {
-                    const isSelected = selectedToppingsList.includes(top.name)
-                    return (
-                      <div
-                        key={top.name}
-                        onClick={() => {
-                          setSelectedToppingsList(prev => {
-                            if (prev.includes(top.name)) {
-                              return prev.filter(t => t !== top.name)
-                            } else {
-                              if (prev.length >= 2) {
-                                triggerToast("You can select up to 2 toppings!")
-                                return prev
-                              }
-                              return [...prev, top.name]
-                            }
-                          })
-                        }}
-                        className="flex items-center justify-between cursor-pointer py-1"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="veg-box scale-75 shrink-0"><span className="veg-circle"></span></span>
-                          <div className="text-left">
-                            {top.badge && (
-                              <span className={`text-[8px] font-black uppercase tracking-wide block leading-none mb-0.5 ${
-                                top.badge === "Bestseller" ? "text-primary" : "text-pink-600 dark:text-pink-400"
-                              }`}>{top.badge}</span>
-                            )}
-                            <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{top.name}</span>
+                      return (
+                        <div
+                          key={top.name || top._id}
+                          onClick={() => {
+                            setSelectedToppingsList(prev => 
+                              prev.includes(top.name)
+                                ? prev.filter(t => t !== top.name)
+                                : [...prev, top.name]
+                            );
+                          }}
+                          className="flex items-center justify-between cursor-pointer py-2.5 first:pt-1 last:pb-1 group"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                            <span className="veg-box scale-75 shrink-0">
+                              <span className="veg-circle"></span>
+                            </span>
+                            <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+                              {top.name}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="text-xs font-bold text-zinc-600 dark:text-zinc-300">
+                              + ₹{topPrice}
+                            </span>
+                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                              isSelected 
+                                ? "bg-[#0066CC] dark:bg-[#3B82F6] border-[#0066CC] dark:border-[#3B82F6] text-white" 
+                                : "border-zinc-300 dark:border-zinc-700 group-hover:border-zinc-400"
+                            }`}>
+                              {isSelected && <Check size={13} strokeWidth={3} />}
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-black text-zinc-500 dark:text-zinc-400">+ ₹{top.price}</span>
-                          <div className={`w-4 h-4 rounded border flex items-center justify-center ${
-                            isSelected ? "border-[#ff5200] bg-[#ff5200] text-white" : "border-zinc-400 dark:border-zinc-600"
-                          }`}>
-                            {isSelected && <span className="material-symbols-outlined text-[10px] font-bold">check</span>}
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 4. Dips & Extras Section (Showing ONLY assigned dips for this product) */}
+              {currentItemDips.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <h4 className="text-sm font-bold text-zinc-900 dark:text-white">
+                      Dips & Extras
+                    </h4>
+                  </div>
+                  <div className="bg-white dark:bg-[#1f1f22] rounded-2xl p-3 shadow-xs border border-zinc-200/80 dark:border-zinc-800 divide-y divide-zinc-100 dark:divide-zinc-800">
+                    {currentItemDips.map(dip => {
+                      const isSelected = selectedMealOptions.includes(dip.name);
+                      const dipPrice = getAddonPriceForSize(dip, selectedSizeOption.name);
+
+                      return (
+                        <div
+                          key={dip.name || dip._id}
+                          onClick={() => {
+                            setSelectedMealOptions(prev =>
+                              prev.includes(dip.name)
+                                ? prev.filter(d => d !== dip.name)
+                                : [...prev, dip.name]
+                            );
+                          }}
+                          className="flex items-center justify-between cursor-pointer py-2.5 first:pt-1 last:pb-1 group"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                            <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+                              {dip.name}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="text-xs font-bold text-zinc-600 dark:text-zinc-300">
+                              + ₹{dipPrice}
+                            </span>
+                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                              isSelected 
+                                ? "bg-[#0066CC] dark:bg-[#3B82F6] border-[#0066CC] dark:border-[#3B82F6] text-white" 
+                                : "border-zinc-300 dark:border-zinc-700 group-hover:border-zinc-400"
+                            }`}>
+                              {isSelected && <Check size={13} strokeWidth={3} />}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
             </div>
 
-            {/* Footer: Fixed Bottom */}
-            <div className="bg-white dark:bg-[#1f1f22] p-4 flex items-center justify-between gap-4 border-t border-zinc-200/50 dark:border-white/5 shrink-0">
-              {/* Quantity Selector */}
-              <div className="flex items-center border border-primary/30 rounded-xl h-11 px-3 gap-4 bg-white dark:bg-transparent">
-                <button
-                  onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
-                  className="material-symbols-outlined text-primary hover:opacity-80 active:scale-95 cursor-pointer bg-transparent border-0 outline-none text-base font-bold flex items-center justify-center"
-                >
-                  remove
-                </button>
-                <span className="text-xs font-black text-primary w-4 text-center select-none">{quantity}</span>
-                <button
-                  onClick={() => setQuantity(prev => prev + 1)}
-                  className="material-symbols-outlined text-primary hover:opacity-80 active:scale-95 cursor-pointer bg-transparent border-0 outline-none text-base font-bold flex items-center justify-center"
-                >
-                  add
-                </button>
+            {/* Sticky Bottom Footer (matching Reference Image 2) */}
+            <div className="bg-white dark:bg-[#1f1f22] p-4 border-t border-zinc-200/80 dark:border-white/5 shrink-0 space-y-2">
+              <div className="text-xs text-zinc-600 dark:text-zinc-400 text-left truncate font-medium">
+                {selectedSizeOption.name} {selectedCrust ? `| ${selectedCrust}` : ""}
+                {selectedToppingsList.length > 0 && ` • ${selectedToppingsList.length} Toppings`}
               </div>
-
-              {/* Add to Cart CTA */}
               <button
+                type="button"
                 onClick={addCustomizedToCart}
-                className="flex-1 h-11 bg-primary hover:bg-primary-hover text-white font-extrabold rounded-xl text-xs uppercase cursor-pointer border-0 shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                className="w-full h-12 bg-[var(--accent-red,#EE3A43)] hover:opacity-95 active:scale-[0.99] text-white font-bold text-sm tracking-wide rounded-xl shadow-lg shadow-[var(--accent-red,#EE3A43)]/20 transition-all flex items-center justify-center gap-2 cursor-pointer uppercase select-none"
               >
-                <span>Add Item</span>
-                <span className="opacity-50">|</span>
                 <span>₹{calculateTotalPrice()}</span>
+                <span className="opacity-60">|</span>
+                <span>Add</span>
+                <span className="text-base leading-none font-bold">+</span>
               </button>
             </div>
 

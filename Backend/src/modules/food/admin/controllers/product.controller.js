@@ -41,7 +41,8 @@ export async function getProducts(req, res, next) {
             const skip = (pageNum - 1) * limitNum;
 
             const products = await Product.find(filter)
-                .populate('categoryId', 'label name')
+                .populate('categoryId', 'label name badge icon sort')
+                .populate('toppings')
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limitNum);
@@ -59,7 +60,8 @@ export async function getProducts(req, res, next) {
         }
 
         const products = await Product.find(filter)
-            .populate('categoryId', 'label name')
+            .populate('categoryId', 'label name badge icon sort')
+            .populate('toppings')
             .sort({ createdAt: -1 });
             
         res.status(200).json({ success: true, data: products, totalCount: products.length });
@@ -138,16 +140,49 @@ export async function getProductStats(req, res, next) {
     }
 }
 
-export async function getPublicMenu(req, res, next) {
+export async function getPublicProducts(req, res, next) {
     try {
-        const categories = await CategoryProduct.find({ type: 'Category', status: 'Active' }).sort({ sort: 1, createdAt: 1 });
-        const products = await Product.find({ status: 'Active' })
-            .populate('categoryId', 'name')
+        const { category, search } = req.query;
+
+        const filter = { status: { $regex: /^active$/i } };
+        if (search && search.trim()) {
+            filter.name = { $regex: search.trim(), $options: 'i' };
+        }
+        if (category && category !== 'All' && category !== 'All Categories') {
+            if (mongoose.Types.ObjectId.isValid(category)) {
+                filter.categoryId = category;
+            } else {
+                const matchingCats = await CategoryProduct.find({ 
+                    $or: [
+                        { label: { $regex: category.trim(), $options: 'i' } },
+                        { name: { $regex: category.trim(), $options: 'i' } }
+                    ]
+                }).select('_id');
+                if (matchingCats.length > 0) {
+                    filter.categoryId = { $in: matchingCats.map(c => c._id) };
+                }
+            }
+        }
+
+        const products = await Product.find(filter)
+            .populate('categoryId', 'label name badge icon sort')
+            .populate('toppings')
             .sort({ createdAt: -1 });
 
-        // Transform them back to the format Home.jsx expects temporarily, or return as is.
-        // The old Home.jsx expects res.data.data to be an array of items, but we should let Home.jsx 
-        // handle the new format if we are to integrate the 3-level menu hierarchy!
+        res.status(200).json({ success: true, data: products, totalCount: products.length });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function getPublicMenu(req, res, next) {
+    try {
+        const categories = await CategoryProduct.find({ status: { $ne: 'Inactive' } }).sort({ sort: 1, createdAt: 1 });
+        const products = await Product.find({ status: { $regex: /^active$/i } })
+            .populate('categoryId', 'label name badge icon sort')
+            .populate('toppings')
+            .sort({ createdAt: -1 });
+
         res.status(200).json({ 
             success: true, 
             data: {
@@ -167,7 +202,7 @@ export async function getProductById(req, res, next) {
         }
         const product = await Product.findById(req.params.id)
             .populate('categoryId', 'label')
-            .populate('toppings', 'name')
+            .populate('toppings')
             .populate('franchiseIds', 'companyName name franchiseName')
             .populate('storeIds', 'name storeName');
         if (!product) {

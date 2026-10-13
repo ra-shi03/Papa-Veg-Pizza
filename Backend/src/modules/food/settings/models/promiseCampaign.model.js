@@ -22,7 +22,7 @@ const promiseTabSchema = new mongoose.Schema({
 
 const promiseTickerSchema = new mongoose.Schema({
     id: { type: String, required: true },
-    heading: { type: String, required: true },
+    heading: { type: String, default: 'Papa Veg Promise' },
     tagline: { type: String, required: true },
     isActive: { type: Boolean, default: true }
 }, { _id: false });
@@ -33,7 +33,9 @@ const promiseCampaignSchema = new mongoose.Schema({
         subtitle: { type: String, default: 'Where quality food meets honest prices!' },
         tagline: { type: String, default: '100% Pure Vegetarian Delight' },
         stars: { type: String, default: '★★' },
-        orderButtonText: { type: String, default: 'Order Now' }
+        orderButtonText: { type: String, default: 'Order Now' },
+        badgeText: { type: String, default: 'Promise' },
+        showBadge: { type: Boolean, default: true }
     },
     tickerItems: [promiseTickerSchema],
     tabs: [promiseTabSchema],
