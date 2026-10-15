@@ -320,7 +320,8 @@ export default function PromisePage() {
                     return (
                       <div
                         key={item.id || idx}
-                        className="bg-white dark:bg-zinc-900/80 rounded-2xl p-4 border border-zinc-200/70 dark:border-zinc-800 shadow-xs flex items-center gap-4 transition-all hover:shadow-md"
+                        style={{ backgroundColor: 'var(--secondary-off-white, #F8F6F2)' }}
+                        className="dark:!bg-zinc-900/80 rounded-2xl p-4 border border-zinc-200/80 dark:border-zinc-800 shadow-xs flex items-center gap-4 transition-all hover:shadow-md"
                       >
                         {/* Icon Circle */}
                         <div className="relative shrink-0">

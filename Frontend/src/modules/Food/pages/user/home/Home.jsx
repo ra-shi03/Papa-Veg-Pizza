@@ -11,9 +11,13 @@ import { HomeHeader } from "./components/HomeHeader"
 import { HomeSections } from "./components/HomeSections"
 import { BottomNavBar } from "./components/BottomNavBar"
 import { OfferSection } from "./components/dynamic/OfferSection"
-import { CampaignSection } from "./components/dynamic/CampaignSection"
 import { CouponDetailsModal } from "./components/dynamic/CouponDetailsModal"
+import { ShowcaseSections } from "./components/dynamic/ShowcaseSections"
+import { PapaVegPromiseSection } from "./components/dynamic/PapaVegPromiseSection"
+import DeliveryCardAboveNav from "./components/dynamic/DeliveryCardAboveNav"
+import { ChevronsUp } from "lucide-react"
 import apiClient from "@/services/api/axios"
+import { applySystemTheme } from "@/shared/utils/themeSync"
 
 
 export default function Home() {
@@ -67,6 +71,25 @@ export default function Home() {
       }
     } catch (_) { }
     return "What are you craving for?"
+  })
+
+  const [deliveryCardData, setDeliveryCardData] = useState(() => {
+    try {
+      const stored = localStorage.getItem("pvp_home_config")
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (parsed?.deliveryCard) return parsed.deliveryCard
+      }
+    } catch (_) { }
+    return {
+      enabled: true,
+      title: 'Lowest Prices on Papa Veg Pizza App & Free Delivery',
+      subtitle: 'Add items worth ₹99 to get FREE delivery!',
+      iconType: 'animation',
+      iconUrl: '',
+      animationType: 'scooter',
+      link: '/user/menu'
+    }
   })
 
   // Helper to strictly sort categories according to superadmin configuration
@@ -231,7 +254,19 @@ export default function Home() {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const activeCats = parsed.filter(c => c.status !== "Inactive" && (c.type === "Category" || !c.type));
-          return sortCategoriesBySuperadmin(activeCats);
+          const sorted = sortCategoriesBySuperadmin(activeCats);
+          return sorted.map(c => {
+            const labelRaw = c.label || c.name || "";
+            const slug = c.slug || labelRaw.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
+            return {
+              id: c.slug || slug,
+              _id: c._id || c.id,
+              slug: slug,
+              label: labelRaw,
+              icon: c.icon || c.image || 'local_pizza',
+              sort: Number(c.sort !== undefined && c.sort !== null ? c.sort : (c.order !== undefined && c.order !== null ? c.order : 999))
+            };
+          });
         }
       }
     } catch (_) {}
@@ -277,19 +312,50 @@ export default function Home() {
     }
   })
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    const savedTheme = localStorage.getItem("appTheme")
-    return savedTheme ? savedTheme === "dark" : false
-  })
+    const savedTheme = localStorage.getItem("sa_themeMode") || localStorage.getItem("appTheme");
+    return savedTheme ? savedTheme === "dark" : false;
+  });
+
   useEffect(() => {
-    const root = document.documentElement
+    const root = document.documentElement;
     if (isDarkMode) {
-      root.classList.add("dark")
-      localStorage.setItem("appTheme", "dark")
+      root.classList.add("dark");
+      localStorage.setItem("appTheme", "dark");
     } else {
-      root.classList.remove("dark")
-      localStorage.setItem("appTheme", "light")
+      root.classList.remove("dark");
+      localStorage.setItem("appTheme", "light");
     }
-  }, [isDarkMode])
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    applySystemTheme();
+    const handleThemeSync = () => {
+      const mode = localStorage.getItem("sa_themeMode") || localStorage.getItem("appTheme");
+      if (mode) {
+        setIsDarkMode(mode === "dark");
+      }
+      applySystemTheme();
+    };
+
+    window.addEventListener("systemThemeChanged", handleThemeSync);
+    window.addEventListener("storage", handleThemeSync);
+    return () => {
+      window.removeEventListener("systemThemeChanged", handleThemeSync);
+      window.removeEventListener("storage", handleThemeSync);
+    };
+  }, []);
+
+  // Left-side circular scroll to top button state
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  useEffect(() => {
+    const handleWindowScroll = () => {
+      setShowScrollTop(window.scrollY > 220);
+    };
+    window.addEventListener("scroll", handleWindowScroll, { passive: true });
+    handleWindowScroll();
+    return () => window.removeEventListener("scroll", handleWindowScroll);
+  }, []);
 
   const [activeSlide, setActiveSlide] = useState(0)
 
@@ -357,6 +423,9 @@ export default function Home() {
           if (data.adPopup && data.adPopup.enabled && data.adPopup.imageUrl) {
             setAdPopupData(data.adPopup);
           }
+          if (data.deliveryCard) {
+            setDeliveryCardData(data.deliveryCard);
+          }
         }
       } catch (err) {
         console.warn("Failed to load home page dynamic config:", err)
@@ -420,8 +489,11 @@ export default function Home() {
             if (!labelRaw) return;
             const label = labelRaw.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
             if (!uniqueCatsMap.has(label)) {
+              const slug = c.slug || labelRaw.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
               uniqueCatsMap.set(label, {
-                id: c._id || c.id || c.slug || label.toLowerCase().replace(/\s+/g, '-'),
+                id: c.slug || slug,
+                _id: c._id || c.id,
+                slug: slug,
                 label: label,
                 icon: c.icon || c.image || 'local_pizza',
                 sort: Number(c.sort !== undefined && c.sort !== null ? c.sort : (c.order !== undefined && c.order !== null ? c.order : 999))
@@ -804,8 +876,11 @@ export default function Home() {
               const label = labelRaw.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
               
               if (!uniqueCatsMap.has(label)) {
+                const slug = c.slug || labelRaw.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
                 uniqueCatsMap.set(label, {
-                  id: c._id || c.id || c.slug || label.toLowerCase().replace(/\s+/g, "-"),
+                  id: c.slug || slug,
+                  _id: c._id || c.id,
+                  slug: slug,
                   label: label,
                   icon: c.icon || c.image || 'local_pizza',
                   sort: Number(c.sort !== undefined && c.sort !== null ? c.sort : (c.order !== undefined && c.order !== null ? c.order : 999))
@@ -845,6 +920,13 @@ export default function Home() {
       } catch (e) { }
     }
 
+    const handleHomeConfigSync = (e) => {
+      const cfg = e?.detail;
+      if (cfg?.deliveryCard) {
+        setDeliveryCardData(cfg.deliveryCard);
+      }
+    };
+
     window.addEventListener("franchise_banners_changed", handleBannersSync)
     window.addEventListener("pvp_banners_changed", handleBannersSync)
     window.addEventListener("franchise_coupons_changed", handleOffersSync)
@@ -852,6 +934,7 @@ export default function Home() {
     window.addEventListener("systemThemeChanged", handleBrandingSync)
     window.addEventListener("pvp_categories_changed", handleCategoriesSync)
     window.addEventListener("pvp_products_changed_v2", handleProductsSync)
+    window.addEventListener("homePageConfigUpdated", handleHomeConfigSync)
 
     return () => {
       window.removeEventListener("franchise_banners_changed", handleBannersSync)
@@ -861,6 +944,7 @@ export default function Home() {
       window.removeEventListener("systemThemeChanged", handleBrandingSync)
       window.removeEventListener("pvp_categories_changed", handleCategoriesSync)
       window.removeEventListener("pvp_products_changed_v2", handleProductsSync)
+      window.removeEventListener("homePageConfigUpdated", handleHomeConfigSync)
     }
   }, [])
 
@@ -1015,13 +1099,22 @@ export default function Home() {
               <h3 className="font-bold text-zinc-900 text-[16px] mb-4 font-headline-sm-mobile">
                 {cravingHeading}
               </h3>
-              <div className="grid grid-cols-3 gap-x-4 gap-y-6 pb-2 pr-4">
+              <div className="grid grid-cols-3 gap-x-2.5 sm:gap-x-4 gap-y-6 pb-2 pr-4">
                 {categories.slice(0, 12).map(cat => (
                   <div 
                     key={cat.id} 
                     className="flex flex-col items-center gap-2 shrink-0 cursor-pointer active:scale-95 transition-transform"
                     onClick={() => {
-                       setActiveCategory(cat.id);
+                      const menuBasePath = window.location.pathname.startsWith('/food') ? '/food/user/menu' : '/user/menu';
+                      const targetKey = cat.slug || cat.id || cat.label;
+                      navigate(`${menuBasePath}?category=${encodeURIComponent(targetKey)}`, {
+                        state: {
+                          category: cat.id,
+                          categoryName: cat.label || cat.name,
+                          categoryId: cat._id || cat.id,
+                          slug: cat.slug || cat.id
+                        }
+                      });
                     }}
                   >
                     <div className="w-[104px] h-[104px] sm:w-[116px] sm:h-[116px] rounded-full border border-zinc-200 shadow-sm flex items-center justify-center p-1 bg-white mx-auto">
@@ -1035,8 +1128,11 @@ export default function Home() {
                         )}
                       </div>
                     </div>
-                    <span className="text-[13px] font-bold text-zinc-700 text-center w-full truncate">
-                      {cat.label}
+                    <span 
+                      style={{ fontFamily: "'Poppins', sans-serif" }}
+                      className="text-[10px] sm:text-[11.5px] font-normal text-zinc-700 dark:text-zinc-300 text-center whitespace-nowrap tracking-tight w-full block overflow-hidden text-ellipsis px-0.5"
+                    >
+                      {cat.label || cat.name}
                     </span>
                   </div>
                 ))}
@@ -1046,10 +1142,16 @@ export default function Home() {
 
           {/* Dynamic Rewards Section */}
           {rewardsConfig && rewardsConfig.isEnabled && (
-            <div className="px-margin-mobile mt-2 mb-4">
-              <div className="bg-white rounded-xl shadow-[0_2px_15px_rgba(0,0,0,0.06)] border border-black/5 p-4" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                <div className="flex gap-4 items-center">
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 flex items-center justify-center p-2">
+            <div className="px-2 sm:px-3 mt-2 mb-4">
+              <div 
+                className="rounded-2xl shadow-[0_2px_15px_rgba(0,0,0,0.04)] border-x border-b border-t-0 border-zinc-200/80 dark:border-zinc-800 p-3.5 sm:p-4 transition-colors"
+                style={{ 
+                  backgroundColor: isDarkMode ? '#1a1a1a' : 'var(--secondary-off-white, #fbf9f9)', 
+                  fontFamily: 'Poppins, sans-serif' 
+                }}
+              >
+                <div className="flex gap-3 sm:gap-4 items-center">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 flex items-center justify-center p-1">
                     {rewardsConfig.logoUrl ? (
                       <img src={rewardsConfig.logoUrl} alt="Rewards Logo" className="max-w-full max-h-full object-contain" />
                     ) : (
@@ -1057,10 +1159,16 @@ export default function Home() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-zinc-800 font-bold text-sm sm:text-[15px] leading-snug mb-1.5">
+                    <h3 
+                      className="text-zinc-900 dark:text-white font-semibold text-[13px] sm:text-[14px] leading-snug mb-1 tracking-tight whitespace-nowrap overflow-hidden text-ellipsis"
+                      style={{ fontFamily: 'Poppins, sans-serif' }}
+                    >
                       {rewardsConfig.title}
                     </h3>
-                    <div className="text-zinc-500 text-xs sm:text-[13px] space-y-0.5">
+                    <div 
+                      className="text-zinc-600 dark:text-zinc-400 text-xs sm:text-[13px] space-y-0.5 font-normal"
+                      style={{ fontFamily: 'Poppins, sans-serif' }}
+                    >
                       <p>{rewardsConfig.subtitle1}</p>
                       <p>{rewardsConfig.subtitle2}</p>
                     </div>
@@ -1068,13 +1176,22 @@ export default function Home() {
                 </div>
                 <button 
                   onClick={() => triggerToast("Enrollment coming soon!")}
-                  className="w-full mt-4 py-2.5 rounded-lg border-[1.5px] text-[13px] font-bold bg-white transition-colors active:scale-[0.98]"
-                  style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                  className="w-full mt-3.5 py-2.5 rounded-lg border-[1.5px] text-[13px] font-medium bg-transparent transition-colors active:scale-[0.98] hover:bg-black/5 dark:hover:bg-white/5"
+                  style={{ borderColor: 'var(--accent-red, #EE3A43)', color: 'var(--accent-red, #EE3A43)', fontFamily: 'Poppins, sans-serif' }}
                 >
                   {rewardsConfig.buttonText}
                 </button>
-                <div className="text-center text-[10px] text-zinc-400 mt-2.5">
-                  {rewardsConfig.termsText} <a href={rewardsConfig.termsLink} className="text-blue-600 font-medium hover:underline">{rewardsConfig.termsLinkText}</a>
+                <div 
+                  className="text-center text-[10px] sm:text-[11px] text-zinc-600 dark:text-zinc-300 font-medium mt-2.5 whitespace-nowrap overflow-hidden text-ellipsis"
+                  style={{ fontFamily: 'Poppins, sans-serif' }}
+                >
+                  {rewardsConfig.termsText}{" "}
+                  <a 
+                    href={rewardsConfig.termsLink} 
+                    className="text-blue-600 dark:text-blue-400 font-semibold hover:underline"
+                  >
+                    {rewardsConfig.termsLinkText}
+                  </a>
                 </div>
               </div>
             </div>
@@ -1082,25 +1199,16 @@ export default function Home() {
 
           {/* Dynamic Superadmin Coupons & Offers Section (matching Reference Image 2 with App Theme Color) */}
           {coupons && coupons.length > 0 && (
-            <div className="px-margin-mobile mt-3 mb-4 select-none" style={{ fontFamily: 'Poppins, sans-serif' }}>
-              <div className="flex items-center justify-between mb-2.5">
+            <div className="mt-3 mb-4 select-none" style={{ fontFamily: 'Poppins, sans-serif' }}>
+              <div className="px-2 sm:px-3 mb-2.5">
                 <h3 className="font-bold text-zinc-900 dark:text-white text-[16px] sm:text-[17px] tracking-tight m-0 font-headline-sm-mobile">
                   Offers for you
                 </h3>
-                <button
-                  type="button"
-                  onClick={() => navigate('/user/offers')}
-                  className="text-[var(--accent-red,#EE3A43)] text-xs font-semibold hover:underline flex items-center gap-0.5 bg-transparent border-0 cursor-pointer p-0"
-                >
-                  View All
-                  <span className="material-symbols-outlined text-[15px]">chevron_right</span>
-                </button>
               </div>
 
               {/* Horizontal Scroll Carousel with App Red Theme Color */}
               <div 
-                className="flex overflow-x-auto hide-scrollbar gap-3 pb-2 pt-1 -mx-margin-mobile px-margin-mobile"
-                style={{ scrollSnapType: 'x mandatory' }}
+                className="flex overflow-x-auto hide-scrollbar gap-3 pb-2 pt-1 px-2 sm:px-3"
               >
                 {coupons.map((c) => {
                   const minOrder = c.minimumOrderAmount || c.minOrderValue || 199;
@@ -1112,9 +1220,8 @@ export default function Home() {
                   return (
                     <div
                       key={c._id || c.code}
-                      style={{ scrollSnapAlign: 'start' }}
                       onClick={() => handleOpenCouponModal(c)}
-                      className="w-[285px] sm:w-[315px] shrink-0 bg-gradient-to-r from-[var(--accent-red,#EE3A43)] to-[#C8232C] rounded-2xl p-3 sm:p-3.5 shadow-md shadow-red-500/15 flex items-center justify-between text-white cursor-pointer select-none transition-all hover:scale-[1.01] active:scale-[0.99]"
+                      className="w-[325px] sm:w-[355px] shrink-0 bg-gradient-to-r from-[var(--accent-red,#EE3A43)] to-[#C8232C] rounded-2xl p-3.5 sm:p-4 shadow-md shadow-red-500/15 flex items-center justify-between text-white cursor-pointer select-none transition-all hover:scale-[1.01] active:scale-[0.99]"
                     >
                       {/* Left: Stamp Badge + Text */}
                       <div className="min-w-0 flex-1 pr-2">
@@ -1152,7 +1259,15 @@ export default function Home() {
             </div>
           )}
 
-          {/* Dynamic API Sections Removed as per request */}
+          {/* Dynamic Showcase Sections (Paneer Max, 6 in 1, Combo Bonanza, etc. created by Superadmin) */}
+          <ShowcaseSections 
+            onAddToCart={addToCart} 
+            triggerToast={triggerToast} 
+            isDarkMode={isDarkMode} 
+          />
+
+          {/* Papa Veg Pizza Promise Section (Fetched from backend with app's theme) */}
+          <PapaVegPromiseSection isDarkMode={isDarkMode} />
 
           <HomeSections
             offers={offers}
@@ -1169,6 +1284,35 @@ export default function Home() {
             offersRef={offersRef}
           />
         </main>
+
+        {/* Left-side Circular Scroll To Top Button (matching screenshot) */}
+        <AnimatePresence>
+          {showScrollTop && (
+            <motion.button
+              type="button"
+              initial={{ opacity: 0, scale: 0.6, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.6, y: 15 }}
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              style={{
+                backgroundColor: isDarkMode ? '#1a1a1a' : 'var(--secondary-off-white, #F8F6F2)'
+              }}
+              className={`fixed ${deliveryCardData && deliveryCardData.enabled !== false ? 'bottom-[122px]' : 'bottom-22 sm:bottom-24'} left-3.5 sm:left-5 z-40 w-11 h-11 rounded-full border border-zinc-200/90 dark:border-zinc-700 shadow-lg shadow-black/15 flex items-center justify-center text-zinc-700 dark:text-zinc-200 hover:text-[var(--accent-red,#EE3A43)] dark:hover:text-red-400 hover:scale-105 active:scale-95 transition-all cursor-pointer`}
+              title="Scroll to Top"
+            >
+              <ChevronsUp size={22} strokeWidth={2.4} />
+            </motion.button>
+          )}
+        </AnimatePresence>
+
+        {/* Delivery Card Just Above Navbar (Dynamic Promotion Strip) */}
+        {deliveryCardData && deliveryCardData.enabled !== false && (
+          <DeliveryCardAboveNav
+            config={deliveryCardData}
+            isDarkMode={isDarkMode}
+            navigate={navigate}
+          />
+        )}
 
         {/* BottomNavBar & Floating Cart */}
         <BottomNavBar

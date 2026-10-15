@@ -6,7 +6,17 @@ export const getRewardConfig = async (req, res) => {
     let config = await RewardConfig.findOne();
     if (!config) {
       // Create default if it doesn't exist
-      config = await RewardConfig.create({});
+      config = await RewardConfig.create({
+        isEnabled: false,
+        logoUrl: '',
+        title: 'Earn Points to Unlock Free Treats!',
+        subtitle1: '1 Order = 100 Points',
+        subtitle2: 'Relish freebies at 600 points',
+        buttonText: 'Enroll Now',
+        termsText: 'By enrolling you agree to our',
+        termsLinkText: 'Terms and Conditions',
+        termsLink: '#'
+      });
     }
     res.status(200).json({ success: true, data: config });
   } catch (error) {

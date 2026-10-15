@@ -27,6 +27,10 @@ export const HomeStyles = ({ isDarkMode }) => (
         box-shadow: ${isDarkMode ? 'none' : '0 4px 16px rgba(0,0,0,0.05)'} !important;
         transition: all 0.3s cubic-bezier(0.4,0,0.2,1) !important;
       }
+      .home-product-card {
+        border: none !important;
+        outline: none !important;
+      }
       .glass-card:hover {
         box-shadow: ${isDarkMode ? '0 4px 20px rgba(0,0,0,0.3)' : '0 12px 28px rgba(0,0,0,0.08)'} !important;
       }

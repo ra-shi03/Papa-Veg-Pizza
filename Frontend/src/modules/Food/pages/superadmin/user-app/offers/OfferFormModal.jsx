@@ -26,7 +26,6 @@ export default function OfferFormModal({ isOpen, onClose, initialData, onSave })
   const [isSaving, setIsSaving] = useState(false);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [campaigns, setCampaigns] = useState([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -58,9 +57,6 @@ export default function OfferFormModal({ isOpen, onClose, initialData, onSave })
       }).catch(() => {});
       adminClient.get('/food/admin/categories').then(res => {
         if (res.data?.data) setCategories(res.data.data.categories || res.data.data);
-      }).catch(() => {});
-      adminClient.get('/dynamic-home/campaigns-admin').then(res => {
-        if (res.data?.data) setCampaigns(res.data.data);
       }).catch(() => {});
     } catch (err) {
       console.error(err);
@@ -200,7 +196,6 @@ export default function OfferFormModal({ isOpen, onClose, initialData, onSave })
                     <option value="apply_coupon">Apply Coupon</option>
                     <option value="open_product">Open Product Details</option>
                     <option value="open_category">Open Category</option>
-                    <option value="open_campaign">Open Campaign</option>
                     <option value="open_url">Open External URL</option>
                   </select>
                 </div>
@@ -210,7 +205,6 @@ export default function OfferFormModal({ isOpen, onClose, initialData, onSave })
                     {formData.actionType === 'apply_coupon' && 'Coupon Code'}
                     {formData.actionType === 'open_product' && 'Select Product'}
                     {formData.actionType === 'open_category' && 'Select Category'}
-                    {formData.actionType === 'open_campaign' && 'Select Campaign'}
                     {formData.actionType === 'open_url' && 'Web URL'}
                   </label>
                   
@@ -248,16 +242,6 @@ export default function OfferFormModal({ isOpen, onClose, initialData, onSave })
                     >
                       <option value="" disabled>Select a category...</option>
                       {categories.map(c => <option key={c._id} value={c._id}>{c.label || c.name}</option>)}
-                    </select>
-                  )}
-                  {formData.actionType === 'open_campaign' && (
-                    <select 
-                      name="actionValue" 
-                      value={formData.actionValue} onChange={handleChange}
-                      className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm dark:text-zinc-100"
-                    >
-                      <option value="" disabled>Select a campaign...</option>
-                      {campaigns.map(c => <option key={c._id} value={c.slug}>{c.name}</option>)}
                     </select>
                   )}
                 </div>

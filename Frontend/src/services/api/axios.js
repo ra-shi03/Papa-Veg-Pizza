@@ -55,6 +55,10 @@ function getAccessToken(module) {
     if (module === "user") {
       return localStorage.getItem("accessToken") || null;
     }
+    // Also allow admin module to fall back to general accessToken or token
+    if (module === "admin") {
+      return localStorage.getItem("accessToken") || localStorage.getItem("token") || null;
+    }
     return null;
   } catch {
     return null;

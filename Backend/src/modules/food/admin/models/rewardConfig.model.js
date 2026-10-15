@@ -7,7 +7,6 @@ const rewardConfigSchema = new mongoose.Schema({
   },
   logoUrl: {
     type: String,
-    required: true,
     default: '' // Will store the Cloudinary/uploaded image URL
   },
   title: {

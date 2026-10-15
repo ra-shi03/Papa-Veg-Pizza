@@ -72,6 +72,97 @@ export default function MenuList() {
     });
   };
 
+  // Helper to extract category passed from navigation (state or query params)
+  const getIncomingCategory = () => {
+    const stateCat = location.state?.category || location.state?.categoryId || location.state?.categoryName || location.state?.slug;
+    if (stateCat) return stateCat;
+    try {
+      const searchParams = new URLSearchParams(location.search);
+      const queryCat = searchParams.get("category") || searchParams.get("cat");
+      if (queryCat) return queryCat;
+    } catch (_) {}
+    return null;
+  };
+
+  // Helper to flexibly and accurately match an incoming category request against dynamic categories
+  const resolveCategoryTab = (target, categoryList = []) => {
+    if (!target || !Array.isArray(categoryList) || categoryList.length === 0) return null;
+    const targetStr = String(target).trim().toLowerCase();
+    const targetClean = targetStr.replace(/[^a-z0-9]/g, '');
+    const targetNoU = targetClean.replace(/u/g, ''); // Handles flavour vs flavor
+
+    // 1. Direct match on id, _id, or slug
+    const directMatch = categoryList.find(c => {
+      const cId = String(c.id || '').trim().toLowerCase();
+      const cDbId = String(c._id || '').trim().toLowerCase();
+      const cSlug = String(c.slug || '').trim().toLowerCase();
+      return cId === targetStr || cDbId === targetStr || cSlug === targetStr;
+    });
+    if (directMatch) return directMatch.id;
+
+    // 2. Exact match on label or name
+    const labelMatch = categoryList.find(c => {
+      const cLabel = String(c.label || c.name || '').trim().toLowerCase();
+      return cLabel === targetStr;
+    });
+    if (labelMatch) return labelMatch.id;
+
+    // 3. Clean alphanumeric match (ignoring spaces, hyphens, punctuation)
+    const cleanMatch = categoryList.find(c => {
+      const cLabelClean = String(c.label || c.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const cIdClean = String(c.id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const cSlugClean = String(c.slug || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      return cLabelClean === targetClean || cIdClean === targetClean || cSlugClean === targetClean;
+    });
+    if (cleanMatch) return cleanMatch.id;
+
+    // 4. Match ignoring British/American spelling differences (e.g. flavour vs flavor)
+    const spellingMatch = categoryList.find(c => {
+      const cLabelNoU = String(c.label || c.name || '').toLowerCase().replace(/[^a-z0-9]/g, '').replace(/u/g, '');
+      const cIdNoU = String(c.id || '').toLowerCase().replace(/[^a-z0-9]/g, '').replace(/u/g, '');
+      return cLabelNoU === targetNoU || cIdNoU === targetNoU;
+    });
+    if (spellingMatch) return spellingMatch.id;
+
+    // 5. Partial / substring match
+    const partialMatch = categoryList.find(c => {
+      const cLabelClean = String(c.label || c.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      return Boolean(cLabelClean && targetClean && (cLabelClean.includes(targetClean) || targetClean.includes(cLabelClean)));
+    });
+    if (partialMatch) return partialMatch.id;
+
+    // 6. Legacy aliases mapping
+    if (targetClean.includes('pizza')) {
+      const pizzaCat = categoryList.find(c => String(c.label || c.name || c.id).toLowerCase().includes('pizza'));
+      if (pizzaCat) return pizzaCat.id;
+    }
+    if (targetClean.includes('burger')) {
+      const burgerCat = categoryList.find(c => String(c.label || c.name || c.id).toLowerCase().includes('burger'));
+      if (burgerCat) return burgerCat.id;
+    }
+    if (targetClean.includes('bread')) {
+      const breadCat = categoryList.find(c => String(c.label || c.name || c.id).toLowerCase().includes('bread'));
+      if (breadCat) return breadCat.id;
+    }
+    if (targetClean.includes('drink') || targetClean.includes('beverage')) {
+      const drinkCat = categoryList.find(c => {
+        const l = String(c.label || c.name || c.id).toLowerCase();
+        return l.includes('drink') || l.includes('beverage');
+      });
+      if (drinkCat) return drinkCat.id;
+    }
+    if (targetClean.includes('dessert')) {
+      const dessertCat = categoryList.find(c => String(c.label || c.name || c.id).toLowerCase().includes('dessert'));
+      if (dessertCat) return dessertCat.id;
+    }
+    if (targetClean.includes('pasta')) {
+      const pastaCat = categoryList.find(c => String(c.label || c.name || c.id).toLowerCase().includes('pasta'));
+      if (pastaCat) return pastaCat.id;
+    }
+
+    return null;
+  };
+
   // Helper to match a product to a category
   const getCategoryKeyForProduct = (p, currentCategories = []) => {
     const pCat = p.categoryId;
@@ -268,21 +359,8 @@ export default function MenuList() {
           }
         }
       } catch (err) {
-        // Fallback to legacy campaigns if any
+        // Ignored
       }
-
-      try {
-        const res = await apiClient.get('/dynamic-home/campaigns');
-        const data = res?.data?.data || [];
-        if (data.length > 0) {
-          setCampaigns(data.map(c => ({
-            _id: c._id || c.slug,
-            heading: c.heading || c.name || "Papa Veg Promise",
-            tagline: c.tagline || "100% Pure Vegetarian Delight",
-            stars: "★★"
-          })));
-        }
-      } catch (_) {}
     };
     fetchCampaigns();
   }, []);
@@ -398,7 +476,14 @@ export default function MenuList() {
             setCategories(mappedCats);
             localStorage.setItem("pvp_categories", JSON.stringify(mappedCats));
 
-            if (!location.state?.category && mappedCats.length > 0) {
+            const incoming = getIncomingCategory();
+            if (incoming && mappedCats.length > 0) {
+              const resolved = resolveCategoryTab(incoming, mappedCats);
+              if (resolved) {
+                userManuallySelectedCategoryRef.current = true;
+                setActiveTab(resolved);
+              }
+            } else if (mappedCats.length > 0) {
               setActiveTab(prev => {
                 if (userManuallySelectedCategoryRef.current && mappedCats.some(c => c.id === prev)) {
                   return prev;
@@ -633,12 +718,21 @@ export default function MenuList() {
   const currentMenuItems = getMergedMenuItems();
 
   const userManuallySelectedCategoryRef = useRef(false);
+  const activeTabButtonRef = useRef(null);
 
   const [activeTab, setActiveTab] = useState(() => {
-    const defaultTab = location.state?.category;
-    if (defaultTab) {
+    const incoming = getIncomingCategory();
+    if (incoming) {
       userManuallySelectedCategoryRef.current = true;
-      return defaultTab;
+      try {
+        const stored = localStorage.getItem("pvp_categories");
+        if (stored) {
+          const parsed = JSON.parse(stored).filter(c => c.status !== "Inactive");
+          const resolved = resolveCategoryTab(incoming, parsed);
+          if (resolved) return resolved;
+        }
+      } catch (_) {}
+      return incoming;
     }
     try {
       const stored = localStorage.getItem("pvp_categories");
@@ -905,16 +999,32 @@ export default function MenuList() {
   }
 
   useEffect(() => {
-    if (location.state?.category) {
-      const cat = location.state.category
-      if (cat === "pizza") setActiveTab("pizzas")
-      else if (cat === "burger") setActiveTab("burgers")
-      else if (cat === "bread") setActiveTab("breads")
-      else if (cat === "pasta" || cat === "desserts" || cat === "drinks") {
-        setActiveTab(cat)
+    const incoming = getIncomingCategory();
+    if (incoming) {
+      userManuallySelectedCategoryRef.current = true;
+      const resolved = resolveCategoryTab(incoming, categories);
+      if (resolved) {
+        setActiveTab(resolved);
+      } else {
+        setActiveTab(incoming);
       }
     }
-  }, [location.state])
+  }, [location.state, location.search, categories]);
+
+  // Smoothly scroll active category tab button into view
+  useEffect(() => {
+    if (!activeTab) return;
+    const timer = setTimeout(() => {
+      if (activeTabButtonRef.current) {
+        activeTabButtonRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "center"
+        });
+      }
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [activeTab, categories]);
   const [locationName, setLocationName] = useState(localStorage.getItem("deliveryAddress") || "")
   const [cart, setCart] = useState(() => {
     try {
@@ -1374,6 +1484,7 @@ export default function MenuList() {
             return (
               <button
                 key={cat._id || `${cat.id}-${idx}`}
+                ref={isActive ? activeTabButtonRef : null}
                 type="button"
                 onClick={() => {
                   userManuallySelectedCategoryRef.current = true;

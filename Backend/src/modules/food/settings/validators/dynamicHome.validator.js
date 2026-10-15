@@ -8,7 +8,7 @@ export const validateUiOffer = (req, res, next) => {
         iconImage: z.string().optional(),
         backgroundColorToken: z.string().optional(),
         buttonText: z.string().optional(),
-        actionType: z.enum(['apply_coupon', 'open_product', 'open_category', 'open_campaign', 'open_url']),
+        actionType: z.enum(['apply_coupon', 'open_product', 'open_category', 'open_url']),
         actionValue: z.string().optional(),
         showDetailsModal: z.boolean().optional(),
         offerDetails: z.array(z.string()).optional(),
@@ -29,47 +29,11 @@ export const validateUiOffer = (req, res, next) => {
     }
 };
 
-export const validateCampaign = (req, res, next) => {
-    const schema = z.object({
-        name: z.string().min(1, 'Name is required'),
-        slug: z.string().min(1, 'Slug is required'),
-        logoImage: z.string().min(1, 'Logo image is required'),
-        bannerImage: z.string().optional(),
-        heading: z.string().optional(),
-        tagline: z.string().optional(),
-        gradientFrom: z.string().optional(),
-        gradientTo: z.string().optional(),
-        items: z.array(z.object({
-            product: z.string().min(1, 'Product ID is required'),
-            badgeText: z.string().optional(),
-            overrideImage: z.string().optional(),
-            overrideToppingsText: z.string().optional(),
-            defaultVariant: z.object({
-                sizeName: z.string().optional(),
-                crustName: z.string().optional()
-            }).optional(),
-            sortOrder: z.number().optional(),
-            isActive: z.boolean().optional()
-        })).optional(),
-        startDate: z.string().nullable().optional(),
-        endDate: z.string().nullable().optional(),
-        isActive: z.boolean().optional(),
-        sortOrder: z.number().optional()
-    });
-
-    try {
-        req.body = schema.parse(req.body);
-        next();
-    } catch (error) {
-        return sendError(res, 400, error.errors[0].message);
-    }
-};
-
 export const validateHomeSection = (req, res, next) => {
     const schema = z.object({
-        type: z.enum(['offers', 'campaign', 'category_list', 'banner']),
+        type: z.enum(['offers', 'category_list', 'banner']),
         referenceId: z.string().nullable().optional(),
-        refModel: z.enum(['Campaign', 'Category', 'FoodBanner']).nullable().optional(),
+        refModel: z.enum(['Category', 'FoodBanner']).nullable().optional(),
         title: z.string().optional(),
         platform: z.enum(['all', 'web', 'app']).optional(),
         isActive: z.boolean().optional(),
@@ -86,7 +50,7 @@ export const validateHomeSection = (req, res, next) => {
 
 export const validateReorder = (req, res, next) => {
     const schema = z.object({
-        modelName: z.enum(['UiOffer', 'Campaign', 'HomeSection']),
+        modelName: z.enum(['UiOffer', 'HomeSection']),
         items: z.array(z.object({
             id: z.string().min(1),
             sortOrder: z.number()
@@ -103,7 +67,7 @@ export const validateReorder = (req, res, next) => {
 
 export const validateToggleActive = (req, res, next) => {
     const schema = z.object({
-        modelName: z.enum(['UiOffer', 'Campaign', 'HomeSection']),
+        modelName: z.enum(['UiOffer', 'HomeSection']),
         isActive: z.boolean()
     });
 

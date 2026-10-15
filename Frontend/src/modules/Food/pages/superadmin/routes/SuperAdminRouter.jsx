@@ -58,6 +58,7 @@ const CustomerComplaints = lazy(() => import("../support/CustomerComplaints"))
 const WelcomePage = lazy(() => import("../user-app/WelcomePage"))
 const HomePageConfig = lazy(() => import("../user-app/HomePageConfig"))
 const PromiseCampaignConfig = lazy(() => import("../user-app/PromiseCampaignConfig"))
+const ShowcaseSectionsConfig = lazy(() => import("../user-app/ShowcaseSectionsConfig"))
 
 // Shared layout shell for user management pages to inherit Sidebar and Navbar
 function SuperAdminLayout() {
@@ -161,6 +162,8 @@ function SuperAdminLayout() {
     activeItem = "Home Page"
   } else if (location.pathname.includes("/user-app/promise-campaign")) {
     activeItem = "Promise Campaign"
+  } else if (location.pathname.includes("/user-app/showcase-sections")) {
+    activeItem = "Showcase Sections"
   }
 
   const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem("sa_sidebar_collapsed") === "true")
@@ -271,6 +274,7 @@ export default function SuperAdminRouter() {
             <Route path="/user-app/welcome-page" element={<WelcomePage />} />
             <Route path="/user-app/home-page" element={<HomePageConfig />} />
             <Route path="/user-app/promise-campaign" element={<PromiseCampaignConfig />} />
+            <Route path="/user-app/showcase-sections" element={<ShowcaseSectionsConfig />} />
           </Route>
         </Route>
 

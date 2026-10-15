@@ -39,5 +39,17 @@ router.post('/promise-campaign/item', authMiddleware, requireSuperAdmin, promise
 router.put('/promise-campaign/item/:itemId', authMiddleware, requireSuperAdmin, promiseCampaignController.updatePromiseItem);
 router.delete('/promise-campaign/item/:itemId', authMiddleware, requireSuperAdmin, promiseCampaignController.deletePromiseItem);
 
+import * as showcaseSectionController from '../controllers/showcaseSection.controller.js';
+
+// Dynamic Showcase Sections routes (Paneer Max, 6 in 1, Combo Bonanza, etc.)
+router.get('/showcase-sections', showcaseSectionController.getPublicShowcaseSections);
+router.get('/showcase-sections/admin', authMiddleware, requireSuperAdmin, showcaseSectionController.getAllShowcaseSectionsAdmin);
+router.post('/showcase-sections', authMiddleware, requireSuperAdmin, showcaseSectionController.createShowcaseSection);
+router.patch('/showcase-sections/reorder', authMiddleware, requireSuperAdmin, showcaseSectionController.reorderShowcaseSections);
+router.get('/showcase-sections/:id', authMiddleware, requireSuperAdmin, showcaseSectionController.getShowcaseSectionById);
+router.put('/showcase-sections/:id', authMiddleware, requireSuperAdmin, showcaseSectionController.updateShowcaseSection);
+router.delete('/showcase-sections/:id', authMiddleware, requireSuperAdmin, showcaseSectionController.deleteShowcaseSection);
+router.patch('/showcase-sections/:id/toggle', authMiddleware, requireSuperAdmin, showcaseSectionController.toggleShowcaseSectionStatus);
+
 export default router;
 
