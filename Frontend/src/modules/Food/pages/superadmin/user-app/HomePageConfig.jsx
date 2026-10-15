@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import CampaignsList from './campaigns/CampaignsList';
-import { Save, Upload, Trash2, Image as ImageIcon, Video, Loader2, Plus, Edit, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, Upload, Trash2, Image as ImageIcon, Video, Loader2, Plus, Edit, ChevronDown, ChevronUp, Bike, Sparkles, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminClient } from '../../../../../services/api/axios';
 import apiClient from '../../../../../services/api/axios';
 import { uploadAPI } from '../../../../../services/api';
+import { AnimatedDeliveryScooter } from '../../user/home/components/dynamic/DeliveryCardAboveNav';
 
 export default function HomePageConfig() {
   const [deliveryMinutes, setDeliveryMinutes] = useState(30);
@@ -25,6 +25,18 @@ export default function HomePageConfig() {
     vegOnly: { enabled: true, label: 'Veg Only', defaultActive: true },
     sortBy: { enabled: true, label: 'Sort by', defaultOption: 'default' }
   });
+
+  const [deliveryCard, setDeliveryCard] = useState({
+    enabled: true,
+    title: 'Lowest Prices on Papa Veg Pizza App & Free Delivery',
+    subtitle: 'Add items worth ₹99 to get FREE delivery!',
+    iconType: 'animation',
+    iconUrl: '',
+    animationType: 'scooter',
+    link: '/user/menu'
+  });
+  const [isUploadingDeliveryIcon, setIsUploadingDeliveryIcon] = useState(false);
+  const deliveryIconInputRef = useRef(null);
   
   const [activeTab, setActiveTab] = useState('general');
   const [isLoading, setIsLoading] = useState(true);
@@ -159,6 +171,18 @@ export default function HomePageConfig() {
            // Sync defaults to backend if it was empty
            adminClient.put('/settings/home-page', { orderMethods: defaultMethods }).catch(() => {});
         }
+
+        if (data.deliveryCard) {
+          setDeliveryCard({
+            enabled: data.deliveryCard.enabled !== false,
+            title: data.deliveryCard.title || 'Lowest Prices on Papa Veg Pizza App & Free Delivery',
+            subtitle: data.deliveryCard.subtitle || 'Add items worth ₹99 to get FREE delivery!',
+            iconType: data.deliveryCard.iconType || 'animation',
+            iconUrl: data.deliveryCard.iconUrl || '',
+            animationType: data.deliveryCard.animationType || 'scooter',
+            link: data.deliveryCard.link || '/user/menu'
+          });
+        }
       }
     } catch (err) {
       console.error('Failed to load home page configuration:', err);
@@ -180,7 +204,8 @@ export default function HomePageConfig() {
       deliveryTimeMinutes: minutes,
       deliveryTimeLabel: 'mins',
       promoText: promoText,
-      cravingHeading: cravingHeading
+      cravingHeading: cravingHeading,
+      deliveryCard: deliveryCard
     };
 
     try {
@@ -204,6 +229,58 @@ export default function HomePageConfig() {
       toast.error('Failed to save delivery time');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveDeliveryCard = async () => {
+    setIsSaving(true);
+    const payload = {
+      deliveryCard
+    };
+
+    try {
+      let res;
+      try {
+        res = await adminClient.post('/settings/home-page', payload);
+      } catch (postErr) {
+        res = await adminClient.put('/settings/home-page', payload);
+      }
+
+      const updated = res?.data?.data || payload;
+      
+      try {
+        localStorage.setItem('pvp_home_config', JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent('homePageConfigUpdated', { detail: updated }));
+      } catch (_) {}
+
+      toast.success('Delivery Card settings updated successfully!');
+    } catch (err) {
+      console.error('Save failed:', err);
+      toast.error('Failed to save delivery card settings');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeliveryIconUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingDeliveryIcon(true);
+    try {
+      const res = await uploadAPI.uploadMedia(file);
+      const url = res?.data?.data?.url || res?.data?.url;
+      if (url) {
+        setDeliveryCard(prev => ({ ...prev, iconUrl: url }));
+        toast.success('Delivery icon uploaded successfully!');
+      } else {
+        toast.error('Failed to get uploaded icon URL');
+      }
+    } catch (err) {
+      console.error('Delivery icon upload error:', err);
+      toast.error('Failed to upload delivery icon');
+    } finally {
+      setIsUploadingDeliveryIcon(false);
+      if (deliveryIconInputRef.current) deliveryIconInputRef.current.value = '';
     }
   };
 
@@ -388,13 +465,6 @@ export default function HomePageConfig() {
         >
           General Settings
         </button>
-        
-        <button
-          onClick={() => setActiveTab('campaigns')}
-          className={`pb-3 text-sm font-semibold transition-colors whitespace-nowrap ${activeTab === 'campaigns' ? 'border-b-2 border-primary text-primary' : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'}`}
-        >
-          Campaigns
-        </button>
 
         <button
           onClick={() => setActiveTab('adpopup')}
@@ -480,6 +550,250 @@ export default function HomePageConfig() {
             </button>
           </div>
         </div>
+      </section>
+
+      {/* ── Delivery Card Above Navbar (Dynamic Promotion Strip) ── */}
+      <section className="space-y-4 pt-5 border-t border-zinc-200 dark:border-zinc-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                <Bike className="w-4 h-4 text-primary" />
+                Delivery Card Above Navbar
+              </h2>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${deliveryCard.enabled ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'}`}>
+                {deliveryCard.enabled ? 'Active on App' : 'Disabled'}
+              </span>
+            </div>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+              Configure the floating delivery promotion card that appears directly above the bottom navigation bar.
+            </p>
+          </div>
+
+          <label className="relative inline-flex items-center cursor-pointer select-none self-start sm:self-auto">
+            <input
+              type="checkbox"
+              checked={deliveryCard.enabled}
+              onChange={(e) => setDeliveryCard(prev => ({ ...prev, enabled: e.target.checked }))}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-zinc-600 peer-checked:bg-primary"></div>
+            <span className="ml-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+              {deliveryCard.enabled ? 'Enabled' : 'Disabled'}
+            </span>
+          </label>
+        </div>
+
+        {deliveryCard.enabled && (
+          <div className="space-y-4 bg-zinc-50 dark:bg-zinc-900/60 p-4 rounded-xl border border-zinc-200/80 dark:border-zinc-800">
+            {/* Title & Subtitle Inputs */}
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Card Title:
+                </label>
+                <input
+                  type="text"
+                  value={deliveryCard.title}
+                  onChange={(e) => setDeliveryCard(prev => ({ ...prev, title: e.target.value }))}
+                  className="w-full px-3 py-1.5 border border-zinc-200 dark:border-zinc-700 rounded-md text-sm bg-white dark:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-primary"
+                  placeholder="e.g. Lowest Prices on Papa Veg Pizza App & Free Delivery"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Card Subtitle (supports bolding with **text**):
+                </label>
+                <input
+                  type="text"
+                  value={deliveryCard.subtitle}
+                  onChange={(e) => setDeliveryCard(prev => ({
+                    ...prev,
+                    subtitle: e.target.value
+                      .replace(/\$/g, '₹')
+                      .replace(/\b[rR][sS]\b\.?\s?/g, '₹')
+                      .replace(/\b[rR]upees?\b\s?/gi, '₹')
+                  }))}
+                  className="w-full px-3 py-1.5 border border-zinc-200 dark:border-zinc-700 rounded-md text-sm bg-white dark:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-primary"
+                  placeholder="e.g. Add items worth ₹99 to get FREE delivery!"
+                />
+              </div>
+            </div>
+
+            {/* Icon Type Selection (Image vs Animation) */}
+            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
+                Delivery Icon Mode:
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDeliveryCard(prev => ({ ...prev, iconType: 'animation' }))}
+                  className={`flex-1 py-2 px-3 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    deliveryCard.iconType === 'animation'
+                      ? 'border-primary bg-primary/10 text-primary shadow-xs'
+                      : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50'
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Animation
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDeliveryCard(prev => ({ ...prev, iconType: 'image' }))}
+                  className={`flex-1 py-2 px-3 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    deliveryCard.iconType === 'image'
+                      ? 'border-primary bg-primary/10 text-primary shadow-xs'
+                      : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50'
+                  }`}
+                >
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  Image
+                </button>
+              </div>
+
+              {/* Icon Mode Details */}
+              {deliveryCard.iconType === 'animation' ? (
+                <div className="mt-3 p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                      Animation Source:
+                    </span>
+                    <span className="text-[11px] font-semibold text-primary">
+                      {deliveryCard.iconUrl ? 'Custom Animation / GIF' : 'Built-in App Animated Scooter'}
+                    </span>
+                  </div>
+
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={deliveryCard.iconUrl || ''}
+                      onChange={(e) => setDeliveryCard(prev => ({ ...prev, iconUrl: e.target.value }))}
+                      placeholder="Leave empty for built-in animated scooter, or paste GIF / SVG / Lottie URL"
+                      className="flex-1 px-3 py-1.5 border border-zinc-200 dark:border-zinc-700 rounded-md text-xs bg-zinc-50 dark:bg-zinc-800/50"
+                    />
+                    <input
+                      type="file"
+                      ref={deliveryIconInputRef}
+                      onChange={handleDeliveryIconUpload}
+                      accept="image/gif,image/webp,image/svg+xml,image/png"
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => deliveryIconInputRef.current?.click()}
+                      disabled={isUploadingDeliveryIcon}
+                      className="px-3 py-1.5 bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900 rounded-md text-xs font-semibold hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {isUploadingDeliveryIcon ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                      Upload
+                    </button>
+                    {deliveryCard.iconUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setDeliveryCard(prev => ({ ...prev, iconUrl: '' }))}
+                        className="px-2 py-1.5 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md"
+                        title="Reset to built-in animated scooter"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                    💡 The built-in animation features an animated Papa Veg delivery scooter with rotating radiant glow rays and spinning wheels in the app's brand theme.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-3 p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-2.5">
+                  <span className="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                    Upload or Paste Image Icon URL:
+                  </span>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={deliveryCard.iconUrl || ''}
+                      onChange={(e) => setDeliveryCard(prev => ({ ...prev, iconUrl: e.target.value }))}
+                      placeholder="https://... or upload delivery icon"
+                      className="flex-1 px-3 py-1.5 border border-zinc-200 dark:border-zinc-700 rounded-md text-xs bg-zinc-50 dark:bg-zinc-800/50"
+                    />
+                    <input
+                      type="file"
+                      ref={deliveryIconInputRef}
+                      onChange={handleDeliveryIconUpload}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => deliveryIconInputRef.current?.click()}
+                      disabled={isUploadingDeliveryIcon}
+                      className="px-3 py-1.5 bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900 rounded-md text-xs font-semibold hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {isUploadingDeliveryIcon ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                      Upload
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Live Interactive Preview */}
+            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
+              <span className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
+                Live Preview (App Theme):
+              </span>
+              <div className="max-w-md mx-auto p-2 bg-zinc-200/60 dark:bg-zinc-950 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-800">
+                <div className="w-full bg-[#FFFFFF] dark:bg-[#18181b] border border-zinc-200/90 dark:border-zinc-800 rounded-t-2xl px-3 py-2 flex items-center justify-between gap-2.5 shadow-sm">
+                  <div className="shrink-0 flex items-center justify-center">
+                    {deliveryCard.iconType === 'image' && deliveryCard.iconUrl ? (
+                      <div className="relative w-12 h-12 flex items-center justify-center rounded-xl overflow-hidden bg-amber-50/60 dark:bg-amber-950/20">
+                        <img
+                          src={deliveryCard.iconUrl}
+                          alt="Delivery"
+                          className="w-10 h-10 object-contain drop-shadow-xs"
+                        />
+                      </div>
+                    ) : deliveryCard.iconType === 'animation' && deliveryCard.iconUrl ? (
+                      <div className="relative w-12 h-12 flex items-center justify-center">
+                        <img
+                          src={deliveryCard.iconUrl}
+                          alt="Delivery Animation"
+                          className="w-11 h-11 object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <AnimatedDeliveryScooter />
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-[12.5px] font-bold text-zinc-900 dark:text-white leading-tight tracking-tight truncate m-0">
+                      {deliveryCard.title || 'Lowest Prices on Papa Veg Pizza App & Free Delivery'}
+                    </h4>
+                    <p className="text-[10.5px] text-zinc-600 dark:text-zinc-400 font-medium leading-snug mt-0.5 m-0 line-clamp-1">
+                      {deliveryCard.subtitle || 'Add items worth ₹99 to get FREE delivery!'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Save Delivery Card Button */}
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={handleSaveDeliveryCard}
+                disabled={isSaving}
+                className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 text-xs font-bold transition-all shadow-sm cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                {isSaving ? 'Saving...' : 'Save Delivery Card'}
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Dynamic Banners Section */}
@@ -767,15 +1081,6 @@ export default function HomePageConfig() {
       
         </div>
       )}
-
-      
-      {activeTab === 'campaigns' && (
-        <div className="space-y-6">
-          <CampaignsList />
-        </div>
-      )}
-
-
 
       {activeTab === 'adpopup' && (
         <div className="space-y-6">

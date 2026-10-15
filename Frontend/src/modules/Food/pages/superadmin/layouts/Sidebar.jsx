@@ -166,7 +166,8 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
       items: [
         { name: "Welcome Page", icon: Smartphone },
         { name: "Home Page", icon: Home },
-        { name: "Promise Campaign", icon: Award }
+        { name: "Promise Campaign", icon: Award },
+        { name: "Showcase Sections", icon: Sparkles }
       ]
     }
   ]
@@ -423,6 +424,8 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
                                 navigate("/food/superadmin/user-app/home-page")
                               } else if (item.name === "Promise Campaign") {
                                 navigate("/food/superadmin/user-app/promise-campaign")
+                              } else if (item.name === "Showcase Sections") {
+                                navigate("/food/superadmin/user-app/showcase-sections")
                               }
                               // On mobile, close sidebar when clicking a menu item
                               if (window.innerWidth < 1024) {

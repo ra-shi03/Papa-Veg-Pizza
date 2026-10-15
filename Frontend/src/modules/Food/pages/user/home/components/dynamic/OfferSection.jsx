@@ -61,7 +61,7 @@ export function OfferSection({ offers = [], isLoading = false, onActionClick, is
 
   return (
     <section className="mt-4 mb-2">
-      <div className="px-margin-mobile mb-3">
+      <div className="px-2 sm:px-3 mb-3">
         <h3
           className="font-headline-lg-mobile font-bold text-[16px]"
           style={{ color: isDarkMode ? '#fff' : 'var(--primary-gray)', margin: 0 }}
@@ -72,7 +72,7 @@ export function OfferSection({ offers = [], isLoading = false, onActionClick, is
 
       {/* Horizontal Scroll Container */}
       <div 
-        className="flex overflow-x-auto hide-scrollbar gap-3 pb-2 px-margin-mobile"
+        className="flex overflow-x-auto hide-scrollbar gap-3 pb-2 px-2 sm:px-3"
         style={{ scrollSnapType: 'x mandatory', scrollPaddingLeft: '20px', paddingLeft: '20px', paddingRight: '20px' }}
       >
         {isLoading ? (

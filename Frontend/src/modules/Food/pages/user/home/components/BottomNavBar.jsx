@@ -16,7 +16,8 @@ export function BottomNavBar({
         {/* Menu (Slice) */}
         <button
           onClick={() => {
-            navigate("/user/menu");
+            const menuBasePath = window.location.pathname.startsWith('/food') ? '/food/user/menu' : '/user/menu';
+            navigate(menuBasePath);
             triggerToast("Opening Menu");
           }}
           className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none w-16 pt-1"

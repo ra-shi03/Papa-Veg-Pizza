@@ -12,6 +12,7 @@ import SearchOverlay from "./SearchOverlay"
 import BottomNavigation from "./BottomNavigation"
 // import DesktopNavbar from "./DesktopNavbar"
 import { useUserNotifications } from "../../hooks/useUserNotifications"
+import { applySystemTheme } from "@/shared/utils/themeSync"
 
 // Create SearchOverlay context with default value
 const SearchOverlayContext = createContext({
@@ -109,15 +110,16 @@ export default function UserLayout() {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
   }, [location.pathname, location.search, location.hash])
 
-  // Check welcome early to avoid flash
-  const welcomeShown = sessionStorage.getItem("papa_veg_welcome_shown")
-  if (!welcomeShown && location.pathname !== "/food/user/welcome") {
-    return <Navigate to="/food/user/welcome" replace />
-  }
-
   useEffect(() => {
-    // Other logic if needed, but the redirect is handled above
-  }, [])
+    applySystemTheme();
+    const handleTheme = () => applySystemTheme();
+    window.addEventListener('systemThemeChanged', handleTheme);
+    window.addEventListener('storage', handleTheme);
+    return () => {
+      window.removeEventListener('systemThemeChanged', handleTheme);
+      window.removeEventListener('storage', handleTheme);
+    };
+  }, []);
 
   useUserNotifications()
 

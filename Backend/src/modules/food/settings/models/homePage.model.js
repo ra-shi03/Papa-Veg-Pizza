@@ -71,6 +71,15 @@ const homePageSchema = new mongoose.Schema(
                 label: { type: String, default: 'Sort by' },
                 defaultOption: { type: String, default: 'default' }
             }
+        },
+        deliveryCard: {
+            enabled: { type: Boolean, default: true },
+            title: { type: String, default: 'Lowest Prices on Papa Veg Pizza App & Free Delivery' },
+            subtitle: { type: String, default: 'Add items worth ₹99 to get FREE delivery!' },
+            iconType: { type: String, enum: ['image', 'animation'], default: 'animation' },
+            iconUrl: { type: String, default: '' },
+            animationType: { type: String, default: 'scooter' },
+            link: { type: String, default: '/user/menu' }
         }
     },
     {

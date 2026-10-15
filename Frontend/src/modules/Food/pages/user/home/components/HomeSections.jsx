@@ -241,18 +241,20 @@ export function HomeSections({
         if (activeProds.length === 0) return null;
         return (
           <section className="mt-8">
-            <div className="flex overflow-x-auto hide-scrollbar gap-gutter px-margin-mobile pb-4">
+            <div className="flex overflow-x-auto hide-scrollbar gap-[6px] px-2 sm:px-3 pb-4">
               {activeProds.map((product) => {
                 const isFav = favorites.includes(product.id);
                 return (
                   <div
                     key={product.id}
-                    className="glass-card hover-glow"
+                    className="glass-card hover-glow home-product-card !border-none !border-0"
                     style={{
                       minWidth: 185, maxWidth: 185,
-                      borderRadius: 16, overflow: 'hidden',
+                      borderRadius: 5, overflow: 'hidden',
                       display: 'flex', flexDirection: 'column',
-                      transition: 'transform 0.2s ease'
+                      transition: 'transform 0.2s ease',
+                      border: 'none',
+                      outline: 'none'
                     }}
                   >
                     {/* Image */}

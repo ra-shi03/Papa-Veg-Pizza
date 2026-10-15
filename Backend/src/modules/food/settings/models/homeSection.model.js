@@ -4,13 +4,13 @@ const homeSectionSchema = new mongoose.Schema(
     {
         type: {
             type: String,
-            enum: ['offers', 'campaign', 'category_list', 'banner'],
+            enum: ['offers', 'category_list', 'banner'],
             required: true
         },
         referenceId: { type: mongoose.Schema.Types.ObjectId, refPath: 'refModel' },
         refModel: {
             type: String,
-            enum: ['Campaign', 'Category', 'FoodBanner'], // Extendable based on type
+            enum: ['Category', 'FoodBanner'], // Extendable based on type
             default: null
         },
         title: { type: String, trim: true, default: '' },

@@ -21,10 +21,10 @@ export const requireAdmin = (req, res, next) => {
     next();
 };
 
-// ─── Require specifically superadmin ─────────────────────────────────────────
+// ─── Require specifically superadmin (or admin) ──────────────────────────────
 export const requireSuperAdmin = (req, res, next) => {
     const role = normalizeRole(req.user?.role);
-    if (role !== 'SUPERADMIN' && role !== 'SUPER-ADMIN') {
+    if (role !== 'SUPERADMIN' && role !== 'SUPER-ADMIN' && role !== 'ADMIN') {
         return sendError(res, 403, 'Super Admin access required');
     }
     next();

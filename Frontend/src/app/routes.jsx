@@ -117,7 +117,7 @@ const AppRoutes = () => {
 
 
       {/* Handle root and other paths via FoodAppWrapper */}
-      <Route path="/" element={<Navigate to="/welcome" replace />} />
+      <Route path="/" element={<Navigate to="/food/user" replace />} />
       <Route path="/*" element={<FoodAppWrapper />} />
     </Routes>
   )
