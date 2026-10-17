@@ -119,11 +119,16 @@ export const FALLBACK_REWARD_PRODUCTS = [
   }
 ];
 
-export default function RewardsWalletView({ onBack, initialTab = 'rewards' }) {
+export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewardsConfig: propRewardsConfig }) {
   const normalizedInitial = initialTab === 'cheesy' ? 'rewards' : initialTab;
   const [activeTab, setActiveTab] = useState(normalizedInitial); // 'rewards' or 'wallet'
-  const [rewardsConfig, setRewardsConfig] = useState(null);
-  const [products, setProducts] = useState(FALLBACK_REWARD_PRODUCTS);
+  const [rewardsConfig, setRewardsConfig] = useState(propRewardsConfig || null);
+  const [products, setProducts] = useState(() => {
+    if (Array.isArray(propRewardsConfig?.rewardProducts) && propRewardsConfig.rewardProducts.length > 0) {
+      return propRewardsConfig.rewardProducts.slice(0, 10);
+    }
+    return FALLBACK_REWARD_PRODUCTS;
+  });
   const [selectedVegFilter, setSelectedVegFilter] = useState('all'); // 'all', 'veg', 'non-veg'
   const [sortBy, setSortBy] = useState('default');
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
@@ -136,17 +141,19 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards' }) {
 
   const sortDropdownRef = useRef(null);
 
-  // Sync products with dynamic superadmin configuration whenever rewardsConfig changes
+  // Sync state if propRewardsConfig changes
   useEffect(() => {
-    if (Array.isArray(rewardsConfig?.rewardProducts) && rewardsConfig.rewardProducts.length > 0) {
-      setProducts(rewardsConfig.rewardProducts.slice(0, 10));
+    if (propRewardsConfig) {
+      setRewardsConfig(propRewardsConfig);
+      if (Array.isArray(propRewardsConfig.rewardProducts) && propRewardsConfig.rewardProducts.length > 0) {
+        setProducts(propRewardsConfig.rewardProducts.slice(0, 10));
+      }
     }
-  }, [rewardsConfig]);
+  }, [propRewardsConfig]);
 
-  // Fetch dynamic rewards configuration and store products via API
+  // Fetch dynamic rewards configuration from backend API
   useEffect(() => {
     fetchRewardsData();
-    fetchStoreProducts();
   }, []);
 
   // Handle outside click for sort dropdown
@@ -175,95 +182,13 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards' }) {
         setRewardsConfig(cfg);
         if (Array.isArray(cfg.rewardProducts) && cfg.rewardProducts.length > 0) {
           setProducts(cfg.rewardProducts.slice(0, 10));
+          return;
         }
       }
+      setProducts(FALLBACK_REWARD_PRODUCTS);
     } catch (err) {
       console.warn('Could not load dynamic rewards config from backend, using defaults', err);
-    }
-  };
-
-  const fetchStoreProducts = async () => {
-    // If superadmin explicitly provided rewardProducts, don't overwrite with auto-fetched store products
-    if (Array.isArray(rewardsConfig?.rewardProducts) && rewardsConfig.rewardProducts.length > 0) {
-      return;
-    }
-    try {
-      let fetched = [];
-      try {
-        const res = await apiClient.get('/food/admin/products');
-        const list = res?.data?.data?.products || res?.data?.data || [];
-        if (Array.isArray(list) && list.length > 0) {
-          fetched = list;
-        }
-      } catch (_) {
-        try {
-          const res = await apiClient.get('/food/admin/category-products');
-          const list = res?.data?.data?.products || res?.data?.data || [];
-          if (Array.isArray(list) && list.length > 0) {
-            fetched = list;
-          }
-        } catch (_) {}
-      }
-
-      if (fetched.length > 0) {
-        const NON_PIZZA_KEYWORDS = [
-          'brownie', 'cake', 'lava', 'tea', 'coffee', 'beverage', 'shake', 'drink',
-          'pepsi', 'coke', 'sprite', 'mirinda', 'fanta', 'water', 'dip', 'garlic bread',
-          'breadstick', 'burger', 'wrap', 'taco', 'dessert', 'side', 'pasta', 'sauce', 'addon', 'cup'
-        ];
-
-        const isPizza = (p) => {
-          const name = String(p.name || '').toLowerCase();
-          const cat = String(p.categoryName || p.category || p.category?.name || p.categoryId?.name || '').toLowerCase();
-          if (NON_PIZZA_KEYWORDS.some(kw => name.includes(kw) || cat.includes(kw))) {
-            return false;
-          }
-          if (cat.includes('pizza') || name.includes('pizza') || p.defaultCrust || p.crust) {
-            return true;
-          }
-          const pizzaNames = [
-            'margherita', 'paratha', 'paneer', 'farmhouse', 'paradise', 'cheese',
-            'corn', 'capsicum', 'mushroom', 'onion', 'paprika', 'makhani', 'peri peri',
-            'veggie', 'delight', 'extravaganza', 'supreme'
-          ];
-          return pizzaNames.some(kw => name.includes(kw));
-        };
-
-        const pizzaItems = fetched
-          .filter(p => p.status !== 'Draft' && p.status !== 'Archived')
-          .filter(isPizza);
-
-        const mapped = pizzaItems.map(p => {
-          const firstSize = Array.isArray(p.sizes) && p.sizes.length > 0 ? p.sizes[0] : null;
-          const price = Number(firstSize?.price ?? p.price ?? 199);
-          const originalPrice = Number(firstSize?.originalPrice ?? p.originalPrice ?? price);
-          const isVeg = p.vegType ? p.vegType === 'veg' || p.vegType === 'vegan' : !String(p.name).toLowerCase().includes('chicken');
-          return {
-            id: p._id || p.id,
-            name: p.name,
-            size: firstSize?.size || 'Regular',
-            crust: p.defaultCrust || 'New Hand Tossed',
-            description: p.shortDescription || p.description || 'Delicious freshly baked pizza prepared with premium mozzarella and hand-picked veggies.',
-            image: p.image || 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=500&auto=format&fit=crop&q=60',
-            requiredPoints: 600,
-            originalPrice: originalPrice > 0 ? originalPrice : price,
-            isVeg
-          };
-        });
-
-        // Ensure we always have exactly 10 pizza products (fill from fallback pizzas if needed)
-        const combined = [...mapped];
-        for (const fb of FALLBACK_REWARD_PRODUCTS) {
-          if (combined.length >= 10) break;
-          if (!combined.some(c => c.name.toLowerCase() === fb.name.toLowerCase())) {
-            combined.push(fb);
-          }
-        }
-
-        setProducts(combined.slice(0, 10));
-      }
-    } catch (e) {
-      console.warn('Could not fetch store products for rewards, using defaults', e);
+      setProducts(FALLBACK_REWARD_PRODUCTS);
     }
   };
 
