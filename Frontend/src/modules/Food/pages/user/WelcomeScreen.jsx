@@ -14,21 +14,10 @@ export default function WelcomeScreen() {
   const currentIndexRef = useRef(0);
   const hasRunRef = useRef(false);
 
-  // Navigate forward based on destination or auth state
-  const handleProceed = (destination) => {
+  // Navigate forward to login page
+  const handleProceed = () => {
     sessionStorage.setItem("papa_veg_welcome_shown", "true");
-    
-    if (destination) {
-      navigate(destination, { replace: true });
-      return;
-    }
-
-    const isAuthenticated = localStorage.getItem("user_authenticated") === "true";
-    if (isAuthenticated) {
-      navigate("/food/user", { replace: true });
-    } else {
-      navigate("/food/user/auth/login", { replace: true });
-    }
+    navigate("/food/user/auth/login", { replace: true });
   };
 
   useEffect(() => {
@@ -142,12 +131,12 @@ export default function WelcomeScreen() {
 
   return (
     <div className="relative w-full h-[100dvh] bg-black overflow-hidden select-none">
-      {/* Skip Button (Directly enters home page) */}
+      {/* Skip Button (Enters login page) */}
       {config?.enableSkipButton !== false && (
         <button 
           onClick={(e) => {
             e.stopPropagation();
-            handleProceed("/food/user");
+            handleProceed();
           }}
           className="absolute top-12 right-6 z-20 px-5 py-2 bg-black/40 hover:bg-black/60 backdrop-blur-md text-white text-sm font-semibold rounded-full uppercase tracking-wider border border-white/20 transition-all cursor-pointer"
         >
@@ -161,7 +150,7 @@ export default function WelcomeScreen() {
         alt="Promo"
         className="w-full h-full object-cover cursor-pointer"
         onClick={handlePosterClick}
-        onError={() => handleProceed("/food/user")}
+        onError={() => handleProceed()}
       />
     </div>
   );

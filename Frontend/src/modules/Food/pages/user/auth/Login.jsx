@@ -57,11 +57,7 @@ export default function Login() {
           
           window.dispatchEvent(new CustomEvent("authStatusChanged", { detail: { module: "user", status: "login" } }));
           
-          if (isNewUser) {
-            navigate("/user/location/setup", { replace: true });
-          } else {
-            navigate(location.state?.from || "/user/location/setup", { replace: true });
-          }
+          navigate("/user/location/setup", { replace: true });
         }
       }
     } catch (err) {
@@ -116,18 +112,7 @@ export default function Login() {
 
   return (
     <div className="min-h-[100dvh] pb-8 overflow-x-hidden flex flex-col bg-white text-[var(--primary-gray)] relative">
-      <main className="flex-1 flex flex-col justify-start p-6 pt-10 max-w-md mx-auto w-full z-10 relative">
-        {/* Top bar with Skip button */}
-        <div className="w-full flex justify-end mb-2">
-          <button
-            type="button"
-            onClick={() => navigate("/food/user", { replace: true })}
-            className="text-xs font-semibold text-zinc-500 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 px-3.5 py-1.5 rounded-full transition-all cursor-pointer border-0"
-          >
-            Skip &rarr;
-          </button>
-        </div>
-
+      <main className="flex-1 flex flex-col justify-start p-6 pt-16 max-w-md mx-auto w-full z-10 relative">
         <motion.div 
           initial={{ opacity: 0, scale: 0.8, rotate: -5 }}
           animate={{ opacity: 1, scale: 1, rotate: 0 }}
@@ -210,16 +195,6 @@ export default function Login() {
                   "Send OTP"
                 )}
               </button>
-
-              <div className="text-center pt-2">
-                <button
-                  type="button"
-                  onClick={() => navigate("/food/user", { replace: true })}
-                  className="text-xs font-semibold text-[var(--accent-red,#EE3A43)] hover:underline cursor-pointer bg-transparent border-0"
-                >
-                  Continue as Guest
-                </button>
-              </div>
             </motion.form>
             
             <div className="flex-1"></div>

@@ -46,11 +46,23 @@ export default function Home() {
   };
   const navigate = useNavigate()
 
-  // Ensure Welcome Screen is shown first for new sessions / mobile app open
+  // Strict sequential flow: Welcome -> Login -> Location Setup -> Home
   useEffect(() => {
     const welcomeShown = sessionStorage.getItem("papa_veg_welcome_shown");
+    const isAuthenticated = localStorage.getItem("user_authenticated") === "true";
+    const hasLocation = !!localStorage.getItem("deliveryAddress") || !!localStorage.getItem("deliveryLocation") || !!localStorage.getItem("user_location");
+
     if (!welcomeShown) {
-      navigate("/food/user/welcome", { replace: true });
+      navigate("/welcome", { replace: true });
+      return;
+    }
+    if (!isAuthenticated) {
+      navigate("/food/user/auth/login", { replace: true });
+      return;
+    }
+    if (!hasLocation) {
+      navigate("/user/location/setup", { replace: true });
+      return;
     }
   }, [navigate]);
 
