@@ -5,11 +5,55 @@ import apiClient from '@/services/api/axios';
 import { userAPI } from '@food/api';
 import WalletSection from './WalletSection';
 
-// 10 Signature Pizza Products for Rewards Catalogue
-const FALLBACK_REWARD_PRODUCTS = [
+// 10 Signature Pizza Products for Rewards Catalogue (matching Reference Screenshot)
+export const FALLBACK_REWARD_PRODUCTS = [
+  {
+    id: 'so-cheesee',
+    name: 'SO CHEESEE',
+    size: 'Regular',
+    crust: 'New Hand Tossed',
+    description: 'So Cheesy Pizza Sandwich with premium molten mozzarella & herb seasoning.',
+    image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=60',
+    requiredPoints: 600,
+    originalPrice: 149,
+    isVeg: true
+  },
+  {
+    id: 'smoky-corn-paneer',
+    name: 'SMOKY CORN PANEER',
+    size: 'Regular',
+    crust: 'New Hand Tossed',
+    description: 'Smoky Corn Paneer Pizza Sandwich loaded with roasted corn and spiced cottage cheese.',
+    image: 'https://images.unsplash.com/photo-1604382355076-af4b0eb60143?w=500&auto=format&fit=crop&q=60',
+    requiredPoints: 600,
+    originalPrice: 129,
+    isVeg: true
+  },
+  {
+    id: 'paneer-tikka',
+    name: 'PANEER TIKKA',
+    size: 'Regular',
+    crust: 'New Hand Tossed',
+    description: 'Paneer Tikka Pizza Sandwich infused with aromatic tandoori masala and crunchy capsicum.',
+    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=500&auto=format&fit=crop&q=60',
+    requiredPoints: 600,
+    originalPrice: 129,
+    isVeg: true
+  },
+  {
+    id: 'hott-pepper',
+    name: 'HOTT PEPPER',
+    size: 'Regular',
+    crust: 'New Hand Tossed',
+    description: 'Hot Pepper Pizza Sandwich with fiery red paprika and roasted jalapenos.',
+    image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=500&auto=format&fit=crop&q=60',
+    requiredPoints: 600,
+    originalPrice: 119,
+    isVeg: true
+  },
   {
     id: 'margherita',
-    name: 'Margherita',
+    name: 'MARGHERITA',
     size: 'Regular',
     crust: 'New Hand Tossed',
     description: 'Classic delight with 100% real mozzarella cheese.',
@@ -19,102 +63,58 @@ const FALLBACK_REWARD_PRODUCTS = [
     isVeg: true
   },
   {
-    id: 'corn-cheese-paratha',
-    name: 'Corn n Cheese Paratha Pizza',
+    id: 'corn-n-cheese',
+    name: 'CORN N CHEESE',
     size: 'Regular',
-    crust: '100% Wheat Thin Crust',
-    description: 'A delicious fusion of corn stuffed paratha and cheesy pizza.',
-    image: 'https://images.unsplash.com/photo-1604382355076-af4b0eb60143?w=500&auto=format&fit=crop&q=60',
+    crust: 'New Hand Tossed',
+    description: 'Sweet & juicy golden corn feast with molten mozzarella cheese.',
+    image: 'https://images.unsplash.com/photo-1594007654729-407eedc4be65?w=500&auto=format&fit=crop&q=60',
+    requiredPoints: 600,
+    originalPrice: 149,
+    isVeg: true
+  },
+  {
+    id: 'farmhouse',
+    name: 'FARMHOUSE',
+    size: 'Regular',
+    crust: 'New Hand Tossed',
+    description: 'Delightful combination of onion, capsicum, tomato & grilled mushroom.',
+    image: 'https://images.unsplash.com/photo-1571407970349-bc81e7e96d47?w=500&auto=format&fit=crop&q=60',
     requiredPoints: 600,
     originalPrice: 199,
     isVeg: true
   },
   {
     id: 'veggie-paradise',
-    name: 'Veggie Paradise',
+    name: 'VEGGIE PARADISE',
     size: 'Regular',
     crust: 'New Hand Tossed',
     description: 'The awesome foursome! Golden corn, black olives, capsicum, red paprika.',
     image: 'https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?w=500&auto=format&fit=crop&q=60',
     requiredPoints: 600,
-    originalPrice: 259,
+    originalPrice: 219,
     isVeg: true
   },
   {
     id: 'peppy-paneer',
-    name: 'Peppy Paneer',
+    name: 'PEPPY PANEER',
     size: 'Regular',
     crust: 'Fresh Pan Pizza',
     description: 'Flavorful trio of juicy paneer, crisp capsicum with spicy red paprika.',
     image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=60',
     requiredPoints: 600,
-    originalPrice: 259,
-    isVeg: true
-  },
-  {
-    id: 'farmhouse',
-    name: 'Farmhouse',
-    size: 'Regular',
-    crust: 'New Hand Tossed',
-    description: 'Delightful combination of onion, capsicum, tomato & grilled mushroom.',
-    image: 'https://images.unsplash.com/photo-1571407970349-bc81e7e96d47?w=500&auto=format&fit=crop&q=60',
-    requiredPoints: 600,
-    originalPrice: 259,
-    isVeg: true
-  },
-  {
-    id: 'cheese-n-corn',
-    name: 'Cheese n Corn Pizza',
-    size: 'Regular',
-    crust: 'Cheese Burst',
-    description: 'A sweet & juicy golden corn feast with molten mozzarella cheese.',
-    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=500&auto=format&fit=crop&q=60',
-    requiredPoints: 600,
-    originalPrice: 219,
+    originalPrice: 229,
     isVeg: true
   },
   {
     id: 'paneer-makhani',
-    name: 'Paneer Makhani Pizza',
+    name: 'PANEER MAKHANI',
     size: 'Regular',
     crust: 'New Hand Tossed',
     description: 'Juicy paneer chunks marinated in rich tandoori makhani gravy with onion and capsicum.',
     image: 'https://images.unsplash.com/photo-1534308983496-4fabb1a015ee?w=500&auto=format&fit=crop&q=60',
     requiredPoints: 600,
-    originalPrice: 299,
-    isVeg: true
-  },
-  {
-    id: 'mexican-green-wave',
-    name: 'Mexican Green Wave',
-    size: 'Regular',
-    crust: 'Fresh Pan Pizza',
-    description: 'A mexican fiesta! Onion, crisp capsicum, juicy tomatoes & jalapenos with mexican herbs.',
-    image: 'https://images.unsplash.com/photo-1594007654729-407eedc4be65?w=500&auto=format&fit=crop&q=60',
-    requiredPoints: 600,
-    originalPrice: 279,
-    isVeg: true
-  },
-  {
-    id: 'golden-delight',
-    name: 'Golden Delight',
-    size: 'Regular',
-    crust: '100% Wheat Thin Crust',
-    description: 'Golden sweet corn, double cheese, and roasted bell peppers on thin crust.',
-    image: 'https://images.unsplash.com/photo-1588315029754-2dd089d39a1a?w=500&auto=format&fit=crop&q=60',
-    requiredPoints: 600,
     originalPrice: 249,
-    isVeg: true
-  },
-  {
-    id: 'deluxe-veggie',
-    name: 'Deluxe Veggie',
-    size: 'Regular',
-    crust: 'New Hand Tossed',
-    description: 'For a vegetarian feast: onion, capsicum, grilled mushroom, corn & paneer.',
-    image: 'https://images.unsplash.com/photo-1585238342024-78d387f4a707?w=500&auto=format&fit=crop&q=60',
-    requiredPoints: 600,
-    originalPrice: 289,
     isVeg: true
   }
 ];
@@ -134,6 +134,13 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards' }) {
   });
 
   const sortDropdownRef = useRef(null);
+
+  // Sync products with dynamic superadmin configuration whenever rewardsConfig changes
+  useEffect(() => {
+    if (Array.isArray(rewardsConfig?.rewardProducts) && rewardsConfig.rewardProducts.length > 0) {
+      setProducts(rewardsConfig.rewardProducts.slice(0, 10));
+    }
+  }, [rewardsConfig]);
 
   // Fetch dynamic rewards configuration and store products via API
   useEffect(() => {
@@ -163,7 +170,11 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards' }) {
         res = await apiClient.get('/food/admin/rewards/config');
       }
       if (res?.data?.data) {
-        setRewardsConfig(res.data.data);
+        const cfg = res.data.data;
+        setRewardsConfig(cfg);
+        if (Array.isArray(cfg.rewardProducts) && cfg.rewardProducts.length > 0) {
+          setProducts(cfg.rewardProducts.slice(0, 10));
+        }
       }
     } catch (err) {
       console.warn('Could not load dynamic rewards config from backend, using defaults', err);
@@ -171,6 +182,10 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards' }) {
   };
 
   const fetchStoreProducts = async () => {
+    // If superadmin explicitly provided rewardProducts, don't overwrite with auto-fetched store products
+    if (Array.isArray(rewardsConfig?.rewardProducts) && rewardsConfig.rewardProducts.length > 0) {
+      return;
+    }
     try {
       let fetched = [];
       try {
@@ -450,80 +465,88 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards' }) {
               </div>
 
               {/* ── Sticky Filter & Sort Bar (Matching Screenshot 1 & 2) ── */}
-              <div className="sticky top-0 z-20 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md py-2.5 flex items-center justify-between gap-2 border-b border-zinc-100 dark:border-zinc-800">
-                <div className="flex items-center gap-2">
-                  {/* Veg Only Filter */}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedVegFilter(prev => prev === 'veg' ? 'all' : 'veg')}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
-                      selectedVegFilter === 'veg'
-                        ? 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
-                        : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300'
-                    }`}
-                  >
-                    <span className="w-3.5 h-3.5 border border-emerald-600 flex items-center justify-center rounded-[2px] p-[1px]">
-                      <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full" />
-                    </span>
-                    Veg Only
-                  </button>
+              {(rewardsConfig?.showVegFilter !== false || rewardsConfig?.showNonVegFilter !== false || rewardsConfig?.showSortFilter !== false) && (
+                <div className="sticky top-0 z-20 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md py-2.5 flex items-center justify-between gap-2 border-b border-zinc-100 dark:border-zinc-800">
+                  <div className="flex items-center gap-2">
+                    {/* Veg Only Filter */}
+                    {rewardsConfig?.showVegFilter !== false && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedVegFilter(prev => prev === 'veg' ? 'all' : 'veg')}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                          selectedVegFilter === 'veg'
+                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                            : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300'
+                        }`}
+                      >
+                        <span className="w-3.5 h-3.5 border border-emerald-600 flex items-center justify-center rounded-[2px] p-[1px]">
+                          <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full" />
+                        </span>
+                        Veg Only
+                      </button>
+                    )}
 
-                  {/* Non Veg Only Filter */}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedVegFilter(prev => prev === 'non-veg' ? 'all' : 'non-veg')}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
-                      selectedVegFilter === 'non-veg'
-                        ? 'bg-red-50 border-red-500 text-red-700 dark:bg-red-950/40 dark:text-red-400'
-                        : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300'
-                    }`}
-                  >
-                    <span className="w-3.5 h-3.5 border border-amber-800 dark:border-red-500 flex items-center justify-center rounded-[2px] p-[1px]">
-                      <span className="w-0 h-0 border-l-[3.5px] border-l-transparent border-r-[3.5px] border-r-transparent border-b-[6px] border-b-amber-800 dark:border-b-red-500" />
-                    </span>
-                    Non Veg Only
-                  </button>
-                </div>
+                    {/* Non Veg Only Filter */}
+                    {rewardsConfig?.showNonVegFilter !== false && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedVegFilter(prev => prev === 'non-veg' ? 'all' : 'non-veg')}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                          selectedVegFilter === 'non-veg'
+                            ? 'bg-red-50 border-red-500 text-red-700 dark:bg-red-950/40 dark:text-red-400'
+                            : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300'
+                        }`}
+                      >
+                        <span className="w-3.5 h-3.5 border border-amber-800 dark:border-red-500 flex items-center justify-center rounded-[2px] p-[1px]">
+                          <span className="w-0 h-0 border-l-[3.5px] border-l-transparent border-r-[3.5px] border-r-transparent border-b-[6px] border-b-amber-800 dark:border-b-red-500" />
+                        </span>
+                        Non Veg Only
+                      </button>
+                    )}
+                  </div>
 
-                {/* Sort By Dropdown */}
-                <div className="relative" ref={sortDropdownRef}>
-                  <button
-                    type="button"
-                    onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 cursor-pointer"
-                  >
-                    <span>Sort by</span>
-                    <ArrowUpDown className="w-3.5 h-3.5 text-zinc-400" />
-                  </button>
+                  {/* Sort By Dropdown */}
+                  {rewardsConfig?.showSortFilter !== false && (
+                    <div className="relative" ref={sortDropdownRef}>
+                      <button
+                        type="button"
+                        onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 cursor-pointer"
+                      >
+                        <span>Sort by</span>
+                        <ArrowUpDown className="w-3.5 h-3.5 text-zinc-400" />
+                      </button>
 
-                  {isSortDropdownOpen && (
-                    <div className="absolute right-0 mt-1 w-44 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg py-1 z-30 text-xs">
-                      {[
-                        { id: 'default', label: 'Default' },
-                        { id: 'points_asc', label: 'Points: Low to High' },
-                        { id: 'points_desc', label: 'Points: High to Low' },
-                        { id: 'price_asc', label: 'Price: Low to High' },
-                        { id: 'price_desc', label: 'Price: High to Low' }
-                      ].map(opt => (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => {
-                            setSortBy(opt.id);
-                            setIsSortDropdownOpen(false);
-                          }}
-                          className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800 ${
-                            sortBy === opt.id ? 'text-[#EE3A43] font-bold bg-zinc-50 dark:bg-zinc-800' : 'text-zinc-700 dark:text-zinc-300'
-                          }`}
-                        >
-                          <span>{opt.label}</span>
-                          {sortBy === opt.id && <Check className="w-3.5 h-3.5 text-[#EE3A43]" />}
-                        </button>
-                      ))}
+                      {isSortDropdownOpen && (
+                        <div className="absolute right-0 mt-1 w-44 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg py-1 z-30 text-xs">
+                          {[
+                            { id: 'default', label: 'Default' },
+                            { id: 'points_asc', label: 'Points: Low to High' },
+                            { id: 'points_desc', label: 'Points: High to Low' },
+                            { id: 'price_asc', label: 'Price: Low to High' },
+                            { id: 'price_desc', label: 'Price: High to Low' }
+                          ].map(opt => (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => {
+                                setSortBy(opt.id);
+                                setIsSortDropdownOpen(false);
+                              }}
+                              className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800 ${
+                                sortBy === opt.id ? 'text-[#EE3A43] font-bold bg-zinc-50 dark:bg-zinc-800' : 'text-zinc-700 dark:text-zinc-300'
+                              }`}
+                            >
+                              <span>{opt.label}</span>
+                              {sortBy === opt.id && <Check className="w-3.5 h-3.5 text-[#EE3A43]" />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              </div>
+              )}
 
               {/* ── Products List (Fetched from API) ── */}
               <div className="divide-y divide-zinc-100 dark:divide-zinc-800/80">
