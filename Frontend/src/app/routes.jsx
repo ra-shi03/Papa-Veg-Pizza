@@ -38,6 +38,7 @@ const RedirectToFood = () => {
 };
 
 // const MasterLandingPage = lazy(() => import('./MasterLandingPage'))
+const WelcomeScreen = lazy(() => import('../modules/Food/pages/user/WelcomeScreen'))
 const FranchiseAdminRouter = lazy(() => import('../modules/Food/pages/franchise-admin/routes/FranchiseAdminRouter'))
 const SuperAdminRouter = lazy(() => import('../modules/Food/pages/superadmin/routes/SuperAdminRouter'))
 const StoreManagerRouter = lazy(() => import('../modules/Food/pages/store-manager/routes/StoreManagerRouter'))
@@ -116,8 +117,11 @@ const AppRoutes = () => {
       } />
 
 
+      {/* Welcome Screen */}
+      <Route path="/welcome" element={<Suspense fallback={<PageLoader />}><WelcomeScreen /></Suspense>} />
+
       {/* Handle root and other paths via FoodAppWrapper */}
-      <Route path="/" element={<Navigate to="/food/user/welcome" replace />} />
+      <Route path="/" element={<Navigate to="/welcome" replace />} />
       <Route path="/*" element={<FoodAppWrapper />} />
     </Routes>
   )
