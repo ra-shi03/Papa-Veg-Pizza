@@ -15,7 +15,7 @@ const MenuList = lazy(() => import("@food/pages/user/home/MenuList"))
 const Under250 = lazy(() => import("@food/pages/user/Under250"))
 const Categories = lazy(() => import("@food/pages/user/Categories"))
 const CategoryPage = lazy(() => import("@food/pages/user/CategoryPage"))
-const SearchResults = lazy(() => import("@food/pages/user/search/ProfessionalSearch"))
+const SearchResults = lazy(() => import("@food/pages/user/search/UserSearchPage"))
 const ProductDetail = lazy(() => import("@food/pages/user/ProductDetail"))
 
 // Cart
@@ -86,8 +86,9 @@ const OrderHelp = lazy(() => import("@food/pages/user/help/OrderHelp"))
 // Notifications
 const Notifications = lazy(() => import("@food/pages/user/Notifications"))
 
-// Wallet
+// Wallet & Rewards
 const Wallet = lazy(() => import("@food/pages/user/Wallet"))
+const Rewards = lazy(() => import("@food/pages/user/Rewards"))
 
 // Complaints
 const SubmitComplaint = lazy(() => import("@food/pages/user/complaints/SubmitComplaint"))
@@ -324,6 +325,7 @@ export default function UserRouter() {
               </ProtectedRoute>
             }
           />
+          <Route path="rewards" element={<Rewards />} />
 
           {/* Complaints - Protected (user auth) */}
           <Route

@@ -41,13 +41,15 @@ export const getUserWallet = async (userId) => {
     const oid = new mongoose.Types.ObjectId(id);
     const wallet = await FoodUserWallet.findOne({ userId: oid });
     if (!wallet) {
-        return { balance: 0, referralEarnings: 0, transactions: [] };
+        return { balance: 0, referralEarnings: 0, isEnrolled: false, enrolledAt: null, transactions: [] };
     }
     // Return newest first (UI expects recent transactions on top)
     const tx = Array.isArray(wallet.transactions) ? [...wallet.transactions].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) : [];
     return {
         balance: Number(wallet.balance) || 0,
         referralEarnings: Number(wallet.referralEarnings) || 0,
+        isEnrolled: Boolean(wallet.isEnrolled),
+        enrolledAt: wallet.enrolledAt || null,
         transactions: tx.map((t) => ({
             id: String(t._id),
             _id: t._id,
@@ -60,6 +62,16 @@ export const getUserWallet = async (userId) => {
             metadata: t.metadata || {}
         }))
     };
+};
+
+export const enrollUserInRewards = async (userId) => {
+    const wallet = await ensureWallet(userId);
+    wallet.isEnrolled = true;
+    if (!wallet.enrolledAt) {
+        wallet.enrolledAt = new Date();
+    }
+    await wallet.save();
+    return getUserWallet(userId);
 };
 
 export const createWalletTopupOrder = async (userId, amountInr) => {

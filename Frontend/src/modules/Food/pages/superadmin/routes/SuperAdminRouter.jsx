@@ -59,6 +59,7 @@ const WelcomePage = lazy(() => import("../user-app/WelcomePage"))
 const HomePageConfig = lazy(() => import("../user-app/HomePageConfig"))
 const PromiseCampaignConfig = lazy(() => import("../user-app/PromiseCampaignConfig"))
 const ShowcaseSectionsConfig = lazy(() => import("../user-app/ShowcaseSectionsConfig"))
+const SearchConfig = lazy(() => import("../user-app/SearchConfig"))
 
 // Shared layout shell for user management pages to inherit Sidebar and Navbar
 function SuperAdminLayout() {
@@ -275,6 +276,7 @@ export default function SuperAdminRouter() {
             <Route path="/user-app/home-page" element={<HomePageConfig />} />
             <Route path="/user-app/promise-campaign" element={<PromiseCampaignConfig />} />
             <Route path="/user-app/showcase-sections" element={<ShowcaseSectionsConfig />} />
+            <Route path="/user-app/search-config" element={<SearchConfig />} />
           </Route>
         </Route>
 

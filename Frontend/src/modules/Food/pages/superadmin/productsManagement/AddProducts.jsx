@@ -1,5 +1,21 @@
-import React, { useState, useEffect, useRef } from "react";
-import { X, UploadCloud, Plus, Trash2, Check, Loader2, ChevronDown, Search } from "lucide-react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import {
+  X,
+  UploadCloud,
+  Plus,
+  Trash2,
+  Check,
+  Loader2,
+  ChevronDown,
+  Search,
+  Disc,
+  Sparkles,
+  Droplets,
+  Flame,
+  Tag,
+  Layers,
+  CheckSquare
+} from "lucide-react";
 import { adminClient } from "@/services/api/axios";
 import { uploadAPI } from "@/services/api";
 import { toast } from "sonner";
@@ -12,6 +28,7 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
   const [stores, setStores] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isToppingsOpen, setIsToppingsOpen] = useState(false);
+  const [selectedTypeTab, setSelectedTypeTab] = useState("all");
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");
   const [addonSearch, setAddonSearch] = useState("");
@@ -36,6 +53,9 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
     franchiseIds: [],
     storeIds: [],
     toppings: [],
+    defaultCrust: "New Hand Tossed",
+    showCrust: true,
+    crusts: [],
     sizes: [
       { size: "Regular", price: "", originalPrice: "", discount: "", discountType: "percentage", saveAmount: 0, description: "Serves 1 person only" },
       { size: "Medium", price: "", originalPrice: "", discount: "", discountType: "percentage", saveAmount: 0, description: "Just right for 1-2 people" },
@@ -106,6 +126,9 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
           franchiseIds: product.franchiseIds || [],
           storeIds: product.storeIds || [],
           toppings: Array.isArray(product.toppings) ? product.toppings.map(t => (typeof t === 'object' ? (t._id || t.id) : t)).filter(Boolean) : (typeof product.toppings === 'string' ? product.toppings.split(",").map(t => t.trim()).filter(Boolean) : []),
+          defaultCrust: product.defaultCrust || "New Hand Tossed",
+          showCrust: product.showCrust !== undefined ? Boolean(product.showCrust) : true,
+          crusts: Array.isArray(product.crusts) ? product.crusts.map(c => (typeof c === 'object' ? (c._id || c.id) : c)).filter(Boolean) : [],
           sizes: initializedSizes
         });
         fetchStores(product.franchiseId || "");
@@ -128,6 +151,9 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
           franchiseIds: [],
           storeIds: [],
           toppings: [],
+          defaultCrust: "New Hand Tossed",
+          showCrust: true,
+          crusts: [],
           sizes: [
             { size: "Regular", price: "", originalPrice: "", discount: "", discountType: "percentage", saveAmount: 0, description: "Serves 1 person only" },
             { size: "Medium", price: "", originalPrice: "", discount: "", discountType: "percentage", saveAmount: 0, description: "Just right for 1-2 people" },
@@ -234,31 +260,102 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
     }
   };
 
-  // Group addons by type (Crust, Toppings, Dips & Extras)
-  const groupedAddons = React.useMemo(() => {
+  const crustAddons = useMemo(() => {
+    const list = addonsList.filter(a => (a.type || "").toLowerCase().includes("crust"));
+    if (list.length > 0) {
+      return [...list].sort((a, b) => {
+        const aDef = a.isDefault || a.name?.toLowerCase().includes("hand tossed");
+        const bDef = b.isDefault || b.name?.toLowerCase().includes("hand tossed");
+        if (aDef && !bDef) return -1;
+        if (!aDef && bDef) return 1;
+        return 0;
+      });
+    }
+    return [
+      { name: "New Hand Tossed", price: 0, isDefault: true }
+    ];
+  }, [addonsList]);
+
+  // Group addons dynamically by their exact type (Crust, Toppings, Dips, Extra Cheese, and any custom types)
+  const groupedAddons = useMemo(() => {
     const filtered = addonSearch.trim()
       ? addonsList.filter(a => a.name?.toLowerCase().includes(addonSearch.toLowerCase().trim()))
       : addonsList;
 
-    const groups = {
-      "Crust": [],
-      "Toppings": [],
-      "Dips & Extras": []
+    const standardTypeMeta = {
+      "crust": { label: "Crusts", icon: Disc, color: "text-amber-500 bg-amber-500/10 border-amber-500/20" },
+      "topping": { label: "Toppings", icon: Sparkles, color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20" },
+      "dip": { label: "Dips & Sauces", icon: Droplets, color: "text-sky-500 bg-sky-500/10 border-sky-500/20" },
+      "extra cheese": { label: "Extra Cheese", icon: Flame, color: "text-orange-500 bg-orange-500/10 border-orange-500/20" }
     };
 
+    const typeOrder = ["crust", "topping", "dip", "extra cheese"];
+    const groupsMap = {};
+
     filtered.forEach(addon => {
-      const t = (addon.type || "").toLowerCase().trim();
-      if (t.includes("crust")) {
-        groups["Crust"].push(addon);
-      } else if (t.includes("dip") || t.includes("sauce") || t.includes("cheese") || t.includes("extra")) {
-        groups["Dips & Extras"].push(addon);
-      } else {
-        groups["Toppings"].push(addon);
+      const rawType = (addon.type || "Topping").trim();
+      const normType = rawType.toLowerCase();
+      const nameLower = (addon.name || "").toLowerCase();
+
+      let groupKey = normType;
+      if (normType.includes("crust")) {
+        groupKey = "crust";
+      } else if (normType.includes("cheese") || nameLower.includes("cheese")) {
+        groupKey = "extra cheese";
+      } else if (normType.includes("dip") || normType.includes("sauce")) {
+        groupKey = "dip";
+      } else if (normType.includes("topping")) {
+        groupKey = "topping";
       }
+
+      if (!groupsMap[groupKey]) {
+        const meta = standardTypeMeta[groupKey] || {
+          label: rawType.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" "),
+          icon: Tag,
+          color: "text-purple-500 bg-purple-500/10 border-purple-500/20"
+        };
+        groupsMap[groupKey] = {
+          key: groupKey,
+          label: meta.label,
+          icon: meta.icon,
+          color: meta.color,
+          items: []
+        };
+      }
+      groupsMap[groupKey].items.push(addon);
     });
 
-    return groups;
+    // Ensure standard types appear even if empty when not searching
+    if (!addonSearch.trim()) {
+      typeOrder.forEach(key => {
+        if (!groupsMap[key]) {
+          const meta = standardTypeMeta[key];
+          groupsMap[key] = {
+            key,
+            label: meta.label,
+            icon: meta.icon,
+            color: meta.color,
+            items: []
+          };
+        }
+      });
+    }
+
+    // Sort: standard types in defined order, then any custom types alphabetically
+    return Object.values(groupsMap).sort((a, b) => {
+      const idxA = typeOrder.indexOf(a.key);
+      const idxB = typeOrder.indexOf(b.key);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.label.localeCompare(b.label);
+    });
   }, [addonsList, addonSearch]);
+
+  const displayedGroups = useMemo(() => {
+    if (selectedTypeTab === "all") return groupedAddons;
+    return groupedAddons.filter(g => g.key === selectedTypeTab);
+  }, [groupedAddons, selectedTypeTab]);
 
   // Size-wise Pricing & Discount handler (Image 3)
   const handleSizePricingChange = (index, field, value) => {
@@ -390,7 +487,10 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
       saveAmount: finalSaveAmount,
       badge: formData.badge ? formData.badge.trim() : "",
       sizes: cleanedSizes,
-      toppings: formData.toppings
+      toppings: formData.toppings,
+      defaultCrust: formData.defaultCrust || "New Hand Tossed",
+      showCrust: formData.showCrust !== undefined ? Boolean(formData.showCrust) : true,
+      crusts: formData.crusts || []
     };
 
     // Clean up empty ObjectIds that MongoDB will reject
@@ -750,42 +850,181 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
             </div>
           </div>
 
-          {/* Toppings / Add-ons by Type (Image 4 & User Requirements: Crust, Toppings, Dips) */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
-              <div>
-                <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">
-                  Toppings & Add-ons (Type-Wise)
-                </h3>
-                <p className="text-[11px] text-zinc-400 mt-0.5">
-                  Select which crusts, toppings, and dips can be chosen for this product.
-                </p>
+          {/* Crust Customization & Default Crust Option */}
+          <div className="p-4 rounded-xl border border-amber-500/25 bg-amber-50/40 dark:bg-amber-950/20 space-y-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                  <Disc size={18} />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-amber-900 dark:text-amber-200">
+                    Crust Customization & Default Crust
+                  </h3>
+                  <p className="text-[11px] text-amber-700/80 dark:text-amber-300/70">
+                    Set the default crust for this product (e.g. Hand Tossed at ₹0) and control crust visibility.
+                  </p>
+                </div>
               </div>
-              <span className="text-xs font-bold text-[var(--primary)] bg-[var(--primary)]/10 px-2.5 py-1 rounded-full">
-                {formData.toppings.length} Assigned
-              </span>
+              <label className="flex items-center gap-2 cursor-pointer self-start sm:self-center select-none bg-white dark:bg-zinc-900 px-3 py-1.5 rounded-lg border border-amber-500/30 shadow-2xs">
+                <input
+                  type="checkbox"
+                  checked={formData.showCrust}
+                  onChange={(e) => setFormData(prev => ({ ...prev, showCrust: e.target.checked }))}
+                  className="w-4 h-4 text-[var(--primary)] rounded accent-[var(--primary)] cursor-pointer"
+                />
+                <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">
+                  Show Crust Option
+                </span>
+              </label>
             </div>
 
-            {/* Search filter for toppings */}
-            <div className="relative">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-              <input
-                type="text"
-                placeholder="Search add-on name..."
-                value={addonSearch}
-                onChange={(e) => setAddonSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 border rounded-lg text-xs bg-transparent dark:border-zinc-700 outline-none focus:border-[var(--primary)]"
-              />
+            {formData.showCrust && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-3 border-t border-amber-500/15">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                    Default Crust (Pre-selected) *
+                  </label>
+                  <select
+                    value={formData.defaultCrust || "New Hand Tossed"}
+                    onChange={(e) => setFormData(prev => ({ ...prev, defaultCrust: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-lg text-xs bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 outline-none focus:border-[var(--primary)] font-bold text-zinc-900 dark:text-white"
+                  >
+                    {crustAddons.map(c => {
+                      const isHandTossed = c.name?.toLowerCase().includes("hand tossed") || c.isDefault;
+                      const defaultPrice = c.prices?.[0]?.price ?? (c.price ?? 0);
+                      return (
+                        <option key={c.name} value={c.name}>
+                          {c.name} {isHandTossed ? "(₹0 Default Base • Free)" : `(+₹${defaultPrice})`}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1 block">
+                    Pre-selected automatically in customization modal with ₹0 extra price.
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                    Category Display Scope
+                  </label>
+                  <div className="px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-800 dark:text-zinc-200 flex items-center justify-between">
+                    <span className="truncate">
+                      {categories.find(c => (c._id || c.id) === formData.categoryId)?.label || "Selected Category"}
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
+                      Crust Enabled
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1 block">
+                    User app customization modal will display the "Change Crust" section.
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Toppings / Add-ons by Type with Checkbox Selection */}
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3 gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider flex items-center gap-2">
+                  <CheckSquare size={16} className="text-[var(--primary)]" />
+                  Toppings & Add-ons by Type
+                </h3>
+                <p className="text-[11px] text-zinc-400 mt-0.5">
+                  Select which crusts, toppings, dips, and extra cheese can be chosen for this product using checkboxes.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 self-start sm:self-center">
+                <span className="text-xs font-bold text-[var(--primary)] bg-[var(--primary)]/10 px-2.5 py-1 rounded-full">
+                  {formData.toppings.length} Assigned
+                </span>
+                {addonsList.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allIds = addonsList.map(a => a._id || a.id).filter(Boolean);
+                      const isAllAssigned = allIds.length > 0 && allIds.every(id => formData.toppings.includes(id));
+                      setFormData(prev => ({
+                        ...prev,
+                        toppings: isAllAssigned ? [] : allIds
+                      }));
+                    }}
+                    className="text-[11px] font-semibold text-[var(--primary)] hover:underline cursor-pointer border border-[var(--primary)]/30 px-2.5 py-1 rounded-lg transition-colors hover:bg-[var(--primary)]/5"
+                  >
+                    {addonsList.length > 0 && addonsList.every(a => formData.toppings.includes(a._id || a.id)) ? "Deselect All" : "Select All"}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Type tabs & Search Bar */}
+            <div className="space-y-2.5">
+              {/* Type Category Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTypeTab("all")}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                    selectedTypeTab === "all"
+                      ? "bg-[var(--primary)] text-white shadow-xs"
+                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                  }`}
+                >
+                  <Layers size={13} />
+                  All Types ({addonsList.length})
+                </button>
+                {groupedAddons.map(g => {
+                  const Icon = g.icon;
+                  const count = g.items.length;
+                  const isSelected = selectedTypeTab === g.key;
+                  return (
+                    <button
+                      key={g.key}
+                      type="button"
+                      onClick={() => setSelectedTypeTab(g.key)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                        isSelected
+                          ? "bg-[var(--primary)] text-white shadow-xs"
+                          : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                      }`}
+                    >
+                      <Icon size={13} />
+                      {g.label} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Search filter for toppings */}
+              <div className="relative">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                <input
+                  type="text"
+                  placeholder="Search add-on name..."
+                  value={addonSearch}
+                  onChange={(e) => setAddonSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 border rounded-lg text-xs bg-transparent dark:border-zinc-700 outline-none focus:border-[var(--primary)]"
+                />
+              </div>
             </div>
 
             {/* Type-wise categories */}
             <div className="space-y-4">
-              {Object.entries(groupedAddons).map(([groupTitle, addonsInGroup]) => {
-                const selectedInGroup = addonsInGroup.filter(a => formData.toppings.includes(a._id));
+              {displayedGroups.map(group => {
+                const groupTitle = group.label;
+                const addonsInGroup = group.items;
+                const Icon = group.icon;
+                const selectedInGroup = addonsInGroup.filter(a => {
+                  const id = a._id || a.id;
+                  return formData.toppings.includes(id) || formData.toppings.includes(a.name);
+                });
                 const allSelected = addonsInGroup.length > 0 && selectedInGroup.length === addonsInGroup.length;
 
                 const handleSelectAllGroup = () => {
-                  const groupIds = addonsInGroup.map(a => a._id);
+                  const groupIds = addonsInGroup.map(a => a._id || a.id).filter(Boolean);
                   if (allSelected) {
                     setFormData(prev => ({
                       ...prev,
@@ -800,9 +1039,12 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
                 };
 
                 return (
-                  <div key={groupTitle} className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-3.5 bg-zinc-50/40 dark:bg-zinc-900/40 space-y-3">
+                  <div key={group.key} className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-3.5 bg-zinc-50/40 dark:bg-zinc-900/40 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
+                        <div className={`p-1 rounded-md border ${group.color} shrink-0`}>
+                          <Icon size={13} className="stroke-[2.5]" />
+                        </div>
                         <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">
                           {groupTitle}
                         </span>
@@ -823,41 +1065,51 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {addonsInGroup.map(addon => {
-                        const isSelected = formData.toppings.includes(addon._id);
-                        const defaultPrice = addon.prices?.[0]?.price ?? 0;
+                        const addonId = addon._id || addon.id;
+                        const isSelected = formData.toppings.includes(addonId) || formData.toppings.includes(addon.name);
+                        const defaultPrice = addon.prices?.[0]?.price ?? (addon.price ?? 0);
 
                         return (
-                          <div
-                            key={addon._id}
-                            onClick={() => {
-                              setFormData(prev => ({
-                                ...prev,
-                                toppings: isSelected
-                                  ? prev.toppings.filter(id => id !== addon._id)
-                                  : [...prev.toppings, addon._id]
-                              }));
-                            }}
-                            className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition-all ${
+                          <label
+                            key={addonId}
+                            className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer select-none transition-all ${
                               isSelected
-                                ? "border-[var(--primary)] bg-[var(--primary)]/5 dark:bg-[var(--primary)]/10 text-zinc-900 dark:text-white"
+                                ? "border-[var(--primary)] bg-[var(--primary)]/5 dark:bg-[var(--primary)]/10 text-zinc-900 dark:text-white ring-1 ring-[var(--primary)]/20 font-semibold"
                                 : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-700 dark:text-zinc-300"
                             }`}
                           >
-                            <div className="flex items-center gap-2 min-w-0 pr-2">
-                              <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                                isSelected ? "bg-[var(--primary)] border-[var(--primary)]" : "border-zinc-300 dark:border-zinc-600"
-                              }`}>
-                                {isSelected && <Check size={11} className="text-white" />}
-                              </div>
-                              {addon.image && (
-                                <img src={addon.image} alt={addon.name} className="w-6 h-6 rounded object-cover shrink-0" />
+                            <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    toppings: isSelected
+                                      ? prev.toppings.filter(id => id !== addonId && id !== addon.name)
+                                      : [...prev.toppings, addonId]
+                                  }));
+                                }}
+                                className="w-4 h-4 rounded text-[var(--primary)] accent-[var(--primary)] focus:ring-[var(--primary)]/20 border-zinc-300 dark:border-zinc-700 cursor-pointer shrink-0"
+                              />
+                              {addon.image ? (
+                                <img src={addon.image} alt={addon.name} className="w-6 h-6 rounded object-cover shrink-0 border border-zinc-200 dark:border-zinc-800" />
+                              ) : (
+                                <div className="w-6 h-6 rounded bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 text-[10px] text-zinc-400 font-bold">
+                                  {addon.name?.charAt(0) || "T"}
+                                </div>
                               )}
-                              <span className="text-xs font-semibold truncate">{addon.name}</span>
+                              <span className="text-xs truncate">{addon.name}</span>
+                              {addon.isDefault && (
+                                <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25 shrink-0">
+                                  Default
+                                </span>
+                              )}
                             </div>
-                            <span className="text-[11px] font-bold text-zinc-500 shrink-0">
-                              {defaultPrice > 0 ? `+₹${defaultPrice}` : "Free"}
+                            <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 shrink-0">
+                              {Number(defaultPrice) > 0 ? `+₹${defaultPrice}` : "Free"}
                             </span>
-                          </div>
+                          </label>
                         );
                       })}
                       {addonsInGroup.length === 0 && (
@@ -867,6 +1119,11 @@ export default function AddProducts({ isOpen, onClose, product, mode = "add", on
                   </div>
                 );
               })}
+              {displayedGroups.length === 0 && (
+                <div className="py-6 text-center text-zinc-400 text-xs">
+                  No add-on types found matching "{addonSearch}".
+                </div>
+              )}
             </div>
           </div>
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
+import IrctcOrderHistoryModal from "@food/components/user/IrctcOrderHistoryModal"
 
 export default function DeliverOnTrainModal({ show, onClose }) {
   const navigate = useNavigate()
@@ -450,64 +451,11 @@ export default function DeliverOnTrainModal({ show, onClose }) {
       </main>
 
       {/* IRCTC ORDER HISTORY MODAL */}
-      {showHistoryModal && (
-        <div className="fixed inset-0 z-55 flex items-center justify-center p-5 bg-black/70 backdrop-blur-sm animate-fadeIn">
-          <div className={`w-full max-w-sm rounded-3xl p-6 space-y-4 text-left ${isDarkMode ? "bg-[#181818] border border-white/10" : "bg-white border border-black/10 shadow-2xl"}`}>
-            <div className="flex justify-between items-center border-b border-white/10 pb-2">
-              <h3 className={`font-headline-lg-mobile text-base font-extrabold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
-                Train Order History
-              </h3>
-              <button 
-                onClick={() => setShowHistoryModal(false)}
-                className={`material-symbols-outlined hover:opacity-100 cursor-pointer bg-transparent border-0 outline-none ${isDarkMode ? "text-white/50" : "text-black/50"}`}
-              >
-                close
-              </button>
-            </div>
-            
-            <div className="space-y-3 max-h-60 overflow-y-auto">
-              {/* Past Order Item 1 */}
-              <div className="p-3 bg-white/5 border border-white/10 rounded-2xl space-y-2">
-                <div className="flex justify-between items-center text-[10px] font-black uppercase text-[#00C853]">
-                  <span>Delivered</span>
-                  <span className="text-white/40">24 May 2026</span>
-                </div>
-                <div className="text-xs">
-                  <p className="font-extrabold text-white">1x Margherita Supreme (Medium)</p>
-                  <p className="opacity-60 text-[10px] mt-0.5">Train 12050 (Seat C2-18), Mathura Jn</p>
-                </div>
-                <div className="flex justify-between items-center text-[11px] pt-1.5 border-t border-white/5 font-extrabold">
-                  <span className="opacity-60">Total Paid</span>
-                  <span className="text-white">₹348</span>
-                </div>
-              </div>
-
-              {/* Past Order Item 2 */}
-              <div className="p-3 bg-white/5 border border-white/10 rounded-2xl space-y-2">
-                <div className="flex justify-between items-center text-[10px] font-black uppercase text-[#E53935]">
-                  <span>Cancelled</span>
-                  <span className="text-white/40">10 Apr 2026</span>
-                </div>
-                <div className="text-xs">
-                  <p className="font-extrabold text-white">2x Farmhouse Delight (Personal)</p>
-                  <p className="opacity-60 text-[10px] mt-0.5">Train 12626 (Seat A3-4), Agra Cantt</p>
-                </div>
-                <div className="flex justify-between items-center text-[11px] pt-1.5 border-t border-white/5 font-extrabold">
-                  <span className="opacity-60">Refund Status</span>
-                  <span className="text-[#00C853]">Refunded (₹598)</span>
-                </div>
-              </div>
-            </div>
-
-            <button 
-              onClick={() => setShowHistoryModal(false)}
-              className="w-full h-11 bg-[#E53935] text-white font-bold rounded-xl text-xs uppercase cursor-pointer border-0 shadow-lg active:scale-95 transition-all"
-            >
-              Close History
-            </button>
-          </div>
-        </div>
-      )}
+      <IrctcOrderHistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        isDarkMode={isDarkMode}
+      />
 
       {/* IRCTC TERMS & CONDITIONS MORE INFO MODAL */}
       {showTermsModal && (

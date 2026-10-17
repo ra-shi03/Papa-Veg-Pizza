@@ -5,7 +5,7 @@ import { HomeModals } from "./components/HomeModals"
 import { useLocationStore } from "@food/store/locationStore"
 import { useLocationGuard } from "@food/hooks/useLocationGuard"
 import logoNew from "@/assets/logo1.png"
-import { PRODUCTS, DEALS } from "./HomeData"
+import { DEALS } from "./HomeData"
 import { HomeStyles } from "./components/HomeStyles"
 import { HomeHeader } from "./components/HomeHeader"
 import { HomeSections } from "./components/HomeSections"
@@ -15,19 +15,58 @@ import { CouponDetailsModal } from "./components/dynamic/CouponDetailsModal"
 import { ShowcaseSections } from "./components/dynamic/ShowcaseSections"
 import { PapaVegPromiseSection } from "./components/dynamic/PapaVegPromiseSection"
 import DeliveryCardAboveNav from "./components/dynamic/DeliveryCardAboveNav"
+import ProductCustomizeModal from "@food/components/user/ProductCustomizeModal"
+import UserSidebarDrawer from "@food/components/user/UserSidebarDrawer"
+import DeliverOnTrainModal from "@food/components/user/DeliverOnTrainModal"
+import RewardsWalletLoading from "@food/components/user/RewardsWalletLoading"
+import RewardsWalletView from "../rewards/RewardsWalletView"
 import { ChevronsUp } from "lucide-react"
-import apiClient from "@/services/api/axios"
+import apiClient, { adminClient } from "@/services/api/axios"
 import { applySystemTheme } from "@/shared/utils/themeSync"
 
 
 export default function Home() {
   const [rewardsConfig, setRewardsConfig] = useState(null);
+  const [showRewardsLoading, setShowRewardsLoading] = useState(false);
+  const [showRewardsPage, setShowRewardsPage] = useState(false);
+  const rewardsLoadingTimeoutRef = useRef(null);
+
+  const handleStartRewardsFlow = () => {
+    setShowRewardsLoading(true);
+    if (rewardsLoadingTimeoutRef.current) clearTimeout(rewardsLoadingTimeoutRef.current);
+    rewardsLoadingTimeoutRef.current = setTimeout(() => {
+      setShowRewardsLoading(false);
+      setShowRewardsPage(true);
+    }, 1200);
+  };
+
+  const handleCancelRewardsLoading = () => {
+    if (rewardsLoadingTimeoutRef.current) clearTimeout(rewardsLoadingTimeoutRef.current);
+    setShowRewardsLoading(false);
+  };
   const navigate = useNavigate()
   const { isModalOpen, closeLocationModal, confirmLocation, locationConfirmed } = useLocationStore()
   const checkLocation = useLocationGuard()
   const offersRef = useRef(null)
   const [activeOffer, setActiveOffer] = useState(null)
   const [selectedCouponDetails, setSelectedCouponDetails] = useState(null)
+  const [selectedProductForCustomize, setSelectedProductForCustomize] = useState(null)
+  const [isProfileSidebarOpen, setIsProfileSidebarOpen] = useState(false)
+  const [showTrainModal, setShowTrainModal] = useState(false)
+
+  // Dynamic Bottom Nav State (Domino's 5-button bar configured by superadmin)
+  const [bottomNavItems, setBottomNavItems] = useState(() => {
+    try {
+      const stored = localStorage.getItem("pvp_home_config")
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed?.bottomNav) && parsed.bottomNav.length > 0) {
+          return parsed.bottomNav
+        }
+      }
+    } catch (_) {}
+    return null
+  })
 
   // Dynamic Home Page Config (delivery time set by superadmin)
   const [deliveryTime, setDeliveryTime] = useState(() => {
@@ -107,24 +146,21 @@ export default function Home() {
     });
   };
 
-  // Dynamic Banners State
-  const [banners, setBanners] = useState([
-    {
-      _id: "ban-01",
-      title: "Paneer Volcano",
-      image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCAJ1H7kfpIOVMST01cGdHOPK9zctqfPYuepo56-9Xt8VrjDotL945EWt6kVO8vNRM6ZK05zTPtpbInlC7BZrM6lBerNPa7UpA5DOzn1haf6-X4-TAanChNFzPI_Z6swWdt8jQnNq15ghwIv45L3x3XQnOvikSqpnRcI0TTf4czhHBPzZ-TfCC56kA2jx9m7t4XshJq08a_j1JyJAAyLP-ZS-8LGBejGgSyxcu3_N-t3KtKJjAOXBRaK9jKvwOU8KYa0JFB0wV1eQk2",
-      subtitle: "New Arrival",
-      bannerType: "Homepage Banner"
-    },
-    {
-      _id: "ban-02",
-      title: "BOGO: Double Joy",
-      image: "https://lh3.googleusercontent.com/aida-public/AB6AXuDhuBxF93NgpKNex48f17LImalRGfdBdZZqdLlNVab_K797rBPt0Qh41WKGhgBUY6BX_bguMlz7KB3zhPf89Rb5oW64QUft3d_e82SxwKnTaFUsozTWPHo6vjRJCZN72RrObT3u1FDquXmxIKDfadJDBh5XbyhXZ_DIZSk9oFll3KyAH08_2eo65-hOmzFFodulfl8DgB-vAiO7mZrjtsLHVOxzjYiVoALoG-MuCzQKaQPFXhiXSdpE_9bap7jwEFN7pqFbEtDXGEui",
-      subtitle: "Limited Offer",
-      bannerType: "Homepage Banner"
-    }
-  ]
-  )
+  // Dynamic Banners State (Zero hardcoded banners)
+  const [banners, setBanners] = useState(() => {
+    try {
+      const homeConfig = localStorage.getItem("pvp_home_config");
+      if (homeConfig) {
+        const parsed = JSON.parse(homeConfig);
+        if (Array.isArray(parsed.banners)) {
+          return parsed.banners.filter(
+            (b) => b._id !== "ban-01" && b._id !== "ban-02" && b.title !== "Paneer Volcano"
+          );
+        }
+      }
+    } catch (_) {}
+    return [];
+  });
 
   // Dynamic Offers State
   const [offers, setOffers] = useState(() => {
@@ -274,19 +310,21 @@ export default function Home() {
   });
   
 
-  // Dynamic Products State
-  const [products, setProducts] = useState([]);
-  const [homeSearchQuery, setHomeSearchQuery] = useState("");
+  // Dynamic Products State (100% Real Dynamic Data from Backend / Database)
+  const [products, setProducts] = useState(() => {
+    try {
+      const stored = localStorage.getItem("pvp_products_v2");
+      if (stored) {
+        const parsed = JSON.parse(stored).filter(p => p.status === "Active" || !p.status);
+        if (parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (_) {}
+    return [];
+  });
 
-  const displayedProducts = useMemo(() => {
-    if (!homeSearchQuery || !homeSearchQuery.trim()) return products;
-    const q = homeSearchQuery.toLowerCase().trim();
-    return products.filter(p => 
-      (p.title && p.title.toLowerCase().includes(q)) ||
-      (p.name && p.name.toLowerCase().includes(q)) ||
-      (p.description && p.description.toLowerCase().includes(q))
-    );
-  }, [products, homeSearchQuery]);
+
   
   // Dynamic API Layout State (Phase 4)
   const [dynamicLayout, setDynamicLayout] = useState({ data: [], isLoading: true, error: null });
@@ -413,10 +451,11 @@ export default function Home() {
           if (data.cravingHeading) {
             setCravingHeading(data.cravingHeading)
           }
-          localStorage.setItem("pvp_home_config", JSON.stringify(data))
-          if (Array.isArray(data.banners)) {
-            setBanners(data.banners.length > 0 ? data.banners : [])
-          }
+          const validBanners = Array.isArray(data.banners)
+            ? data.banners.filter((b) => b._id !== "ban-01" && b._id !== "ban-02" && b.title !== "Paneer Volcano")
+            : [];
+          localStorage.setItem("pvp_home_config", JSON.stringify({ ...data, banners: validBanners }));
+          setBanners(validBanners);
           if (Array.isArray(data.offers)) {
             setOffers(data.offers.length > 0 ? data.offers : [])
           }
@@ -425,6 +464,9 @@ export default function Home() {
           }
           if (data.deliveryCard) {
             setDeliveryCardData(data.deliveryCard);
+          }
+          if (Array.isArray(data.bottomNav)) {
+            setBottomNavItems(data.bottomNav);
           }
         }
       } catch (err) {
@@ -511,17 +553,56 @@ export default function Home() {
           setActiveCategory(prev => prev === "pizza" ? parsedCats[0]?.id || "pizza" : prev);
         }
 
+        if (fetchedProds.length === 0) {
+          try {
+            const pRes = await adminClient.get('/food/admin/products', { params: { limit: 250, page: 1 } });
+            const items = Array.isArray(pRes?.data?.data) ? pRes.data.data : (pRes?.data?.data?.foods || []);
+            if (items.length > 0) fetchedProds = items;
+          } catch (_) {}
+        }
+        if (fetchedProds.length === 0) {
+          try {
+            const pRes = await apiClient.get('/food/admin/products', { params: { limit: 250, page: 1 } });
+            const items = Array.isArray(pRes?.data?.data) ? pRes.data.data : (pRes?.data?.data?.foods || []);
+            if (items.length > 0) fetchedProds = items;
+          } catch (_) {}
+        }
+        if (fetchedProds.length === 0) {
+          try {
+            const pRes = await apiClient.get('/food/admin/products/public');
+            const items = Array.isArray(pRes?.data?.data) ? pRes.data.data : [];
+            if (items.length > 0) fetchedProds = items;
+          } catch (_) {}
+        }
+        if (fetchedProds.length === 0) {
+          try {
+            const stored = localStorage.getItem("pvp_products_v2");
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                fetchedProds = parsed;
+              }
+            }
+          } catch (_) {}
+        }
+
         if (fetchedProds.length > 0) {
-          setProducts(fetchedProds.map(p => ({
+          const activeProds = fetchedProds.filter(p => p.status === "Active" || !p.status);
+          const mapped = activeProds.map(p => ({
+            ...p,
             id: p._id || p.id,
-            title: p.name,
-            price: p.price || 299,
-            rating: 4.5,
-            description: p.shortDescription || p.description,
-            image: p.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500",
+            title: p.name || p.title,
+            name: p.name || p.title,
+            price: Number(p.price) || (p.sizes && Number(p.sizes[0]?.price)) || 0,
+            originalPrice: p.originalPrice || p.mrp || (p.sizes && (p.sizes[0]?.originalPrice || p.sizes[0]?.mrp)) || null,
+            saveAmount: p.saveAmount || (p.sizes && p.sizes[0]?.saveAmount) || null,
+            rating: p.rating || 4.5,
+            description: p.shortDescription || p.description || "",
+            image: p.image || p.imageUrl || (Array.isArray(p.images) && p.images[0]) || "",
             categoryId: typeof p.categoryId === 'object' ? p.categoryId?._id : p.categoryId,
             sectionId: typeof p.sectionId === 'object' ? p.sectionId?._id : p.sectionId
-          })));
+          }));
+          setProducts(mapped);
         }
       } catch (err) {
         console.warn("Failed to load category products:", err);
@@ -603,10 +684,14 @@ export default function Home() {
           setCravingHeading(updated.cravingHeading)
         }
         if (Array.isArray(updated.banners)) {
-          setBanners(updated.banners.length > 0 ? updated.banners : [])
+          const valid = updated.banners.filter((b) => b._id !== "ban-01" && b._id !== "ban-02" && b.title !== "Paneer Volcano");
+          setBanners(valid);
         }
         if (Array.isArray(updated.offers)) {
           setOffers(updated.offers.length > 0 ? updated.offers : [])
+        }
+        if (Array.isArray(updated.bottomNav)) {
+          setBottomNavItems(updated.bottomNav.length > 0 ? updated.bottomNav : null)
         }
       } else {
         const fetchRewards = async () => {
@@ -626,11 +711,13 @@ export default function Home() {
     }
 
     window.addEventListener("homePageConfigUpdated", handleConfigUpdate)
+    window.addEventListener("pvp_home_config_changed", handleConfigUpdate)
     window.addEventListener("storage", handleConfigUpdate)
     window.addEventListener("pvp_coupons_changed", fetchCoupons)
 
     return () => {
       window.removeEventListener("homePageConfigUpdated", handleConfigUpdate)
+      window.removeEventListener("pvp_home_config_changed", handleConfigUpdate)
       window.removeEventListener("storage", handleConfigUpdate)
       window.removeEventListener("pvp_coupons_changed", fetchCoupons)
     }
@@ -796,8 +883,9 @@ export default function Home() {
       try {
         const res = await apiClient.get("/settings/home-page")
         const data = res?.data?.data
-        if (data && Array.isArray(data.banners) && data.banners.length > 0) {
-          setBanners(data.banners)
+        if (data && Array.isArray(data.banners)) {
+          const valid = data.banners.filter((b) => b._id !== "ban-01" && b._id !== "ban-02" && b.title !== "Paneer Volcano");
+          setBanners(valid);
         }
       } catch (err) {
         console.warn("Failed to sync banners from API:", err)
@@ -900,21 +988,19 @@ export default function Home() {
           const parsed = JSON.parse(stored).filter(p => p.status === "Active")
           if (parsed.length > 0) {
             const mapped = parsed.map(p => ({
-              id: p.id || `prod-${p.name.toLowerCase().replace(/\s+/g, "-")}`,
-              title: p.name,
-              price: typeof p.price === 'string' ? parseInt(p.price.replace(/[^\d]/g, ""), 10) || 299 : p.price || 299,
+              ...p,
+              id: p._id || p.id || `prod-${String(p.name || '').toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+              title: p.name || p.title,
+              name: p.name || p.title,
+              price: typeof p.price === 'string' ? parseInt(p.price.replace(/[^\d]/g, ""), 10) || 0 : Number(p.price) || (p.sizes && Number(p.sizes[0]?.price)) || 0,
+              originalPrice: p.originalPrice || p.mrp || (p.sizes && (p.sizes[0]?.originalPrice || p.sizes[0]?.mrp)) || null,
+              saveAmount: p.saveAmount || (p.sizes && p.sizes[0]?.saveAmount) || null,
               rating: p.rating || 4.5,
-              description: p.description || `${p.name} prepared fresh with premium toppings.`,
-              image: p.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=80",
+              description: p.shortDescription || p.description || "",
+              image: p.image || p.imageUrl || (Array.isArray(p.images) && p.images[0]) || "",
               category: p.category
-            }))
-            const merged = [...PRODUCTS]
-            mapped.forEach(mp => {
-              if (!merged.some(dp => dp.title.toLowerCase() === mp.title.toLowerCase())) {
-                merged.push(mp)
-              }
-            })
-            setProducts(merged)
+            }));
+            setProducts(mapped);
           }
         }
       } catch (e) { }
@@ -961,54 +1047,157 @@ export default function Home() {
 
   // Cart operations
   const addToCart = (id) => {
-    setCart(prev => ({
-      ...prev,
-      [id]: (prev[id] || 0) + 1
-    }))
-    triggerToast("Added to basket!")
-  }
+    const key = String(id);
+    const stored = JSON.parse(localStorage.getItem("userCart") || "{}");
+    const currentQty = typeof stored[key] === 'object' && stored[key] !== null ? (stored[key].quantity || 1) : Number(stored[key] || 0);
+    stored[key] = currentQty + 1;
+    localStorage.setItem("userCart", JSON.stringify(stored));
+    setCart(stored);
+    window.dispatchEvent(new Event("cartUpdated"));
+    triggerToast("Added to basket!");
+  };
+
+  const removeFromCart = (id) => {
+    const key = String(id);
+    const stored = JSON.parse(localStorage.getItem("userCart") || "{}");
+    const currentQty = typeof stored[key] === 'object' && stored[key] !== null ? (stored[key].quantity || 1) : Number(stored[key] || 0);
+    if (currentQty > 1) {
+      if (typeof stored[key] === 'object' && stored[key] !== null) {
+        stored[key].quantity = currentQty - 1;
+      } else {
+        stored[key] = currentQty - 1;
+      }
+    } else {
+      delete stored[key];
+    }
+    localStorage.setItem("userCart", JSON.stringify(stored));
+    setCart(stored);
+    window.dispatchEvent(new Event("cartUpdated"));
+  };
+
+  // Dedicated removal handler for customized or base products
+  const handleRemoveProductFromCart = (productId) => {
+    const pIdStr = String(productId);
+    const stored = JSON.parse(localStorage.getItem("userCart") || "{}");
+    let targetKey = pIdStr;
+    if (!stored[targetKey]) {
+      targetKey = Object.keys(stored).find(k => k === pIdStr || k.startsWith(pIdStr + "-"));
+    }
+    if (targetKey && stored[targetKey]) {
+      const curVal = stored[targetKey];
+      const curQty = typeof curVal === 'object' && curVal !== null ? (curVal.quantity || 1) : Number(curVal || 0);
+      if (curQty > 1) {
+        if (typeof curVal === 'object' && curVal !== null) {
+          stored[targetKey].quantity = curQty - 1;
+        } else {
+          stored[targetKey] = curQty - 1;
+        }
+      } else {
+        delete stored[targetKey];
+      }
+      localStorage.setItem("userCart", JSON.stringify(stored));
+      setCart(stored);
+      window.dispatchEvent(new Event("cartUpdated"));
+    }
+  };
+
+  // Add customized item from ProductCustomizeModal
+  const handleAddCustomizedToCart = (customizedItem, quantity = 1) => {
+    const key = customizedItem.customizedKey || String(customizedItem.id);
+    const stored = JSON.parse(localStorage.getItem("userCart") || "{}");
+    
+    // Store quantity in userCart for backward compatibility with numeric lookups
+    const existing = stored[key];
+    const prevQty = typeof existing === 'object' && existing !== null ? (existing.quantity || 1) : Number(existing || 0);
+    stored[key] = prevQty + quantity;
+    localStorage.setItem("userCart", JSON.stringify(stored));
+
+    // Also persist detailed customized spec so Cart.jsx and Checkout have full crust & topping info
+    try {
+      const customMap = JSON.parse(localStorage.getItem("pvp_customized_items") || "{}");
+      customMap[key] = customizedItem;
+      localStorage.setItem("pvp_customized_items", JSON.stringify(customMap));
+    } catch (_) {}
+
+    setCart(stored);
+    window.dispatchEvent(new Event("cartUpdated"));
+    triggerToast(`Added ${customizedItem.title || customizedItem.name} to basket!`);
+  };
 
   // Banner click navigation routing
   const handleBannerClick = (b) => {
-    if (b.redirectType === "category" && b.redirectId) {
-      navigate("/user/menu", { state: { category: b.redirectId } })
-      triggerToast(`Opening ${b.redirectId} category...`)
-    } else if (b.redirectType === "product" && b.redirectId) {
-      navigate(`/user/product/${b.redirectId}`)
-      triggerToast(`Opening product details...`)
-    } else if (b.redirectType === "coupon" && b.redirectId) {
-      navigate("/user/offers")
-      triggerToast("Opening offers...")
-    } else {
-      // Fallback matching algorithm by searching title & subtitle content
-      const titleLower = (b.title || "").toLowerCase()
-      const descLower = (b.subtitle || "").toLowerCase()
-      if (titleLower.includes("pizza") || descLower.includes("pizza")) {
-        navigate("/user/menu", { state: { category: "pizza" } })
-        triggerToast("Opening pizza menu...")
-      } else if (titleLower.includes("bread") || descLower.includes("bread") || titleLower.includes("side") || descLower.includes("side")) {
-        navigate("/user/menu", { state: { category: "bread" } })
-        triggerToast("Opening bread & sides menu...")
-      } else if (titleLower.includes("burger") || descLower.includes("burger")) {
-        navigate("/user/menu", { state: { category: "burger" } })
-        triggerToast("Opening burger menu...")
-      } else if (titleLower.includes("drink") || descLower.includes("drink") || titleLower.includes("beverage") || descLower.includes("beverage") || titleLower.includes("coke") || descLower.includes("coke")) {
-        navigate("/user/menu", { state: { category: "drinks" } })
-        triggerToast("Opening drinks menu...")
-      } else if (titleLower.includes("dessert") || descLower.includes("dessert") || titleLower.includes("sweet") || descLower.includes("sweet")) {
-        navigate("/user/menu", { state: { category: "desserts" } })
-        triggerToast("Opening desserts menu...")
-      } else if (titleLower.includes("pasta") || descLower.includes("pasta")) {
-        navigate("/user/menu", { state: { category: "pasta" } })
-        triggerToast("Opening pasta menu...")
-      } else {
-        navigate("/user/menu")
-        triggerToast("Opening Menu...")
-      }
+    let menuRoute = '/user/menu';
+    if (window.location.pathname.startsWith('/food') && !menuRoute.startsWith('/food')) {
+      menuRoute = `/food${menuRoute}`;
     }
-  }
 
-  const totalCartCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0)
+    // 1. Direct category assignment configured by Superadmin
+    const targetCategory = b.category || b.categoryId || b.categoryName || (b.redirectType === "category" ? b.redirectId : null);
+    if (targetCategory) {
+      navigate(`${menuRoute}?category=${encodeURIComponent(targetCategory)}`, {
+        state: { 
+          category: targetCategory,
+          categoryId: targetCategory,
+          categoryName: b.categoryName || targetCategory
+        } 
+      });
+      triggerToast(`Opening ${b.categoryName || targetCategory} menu...`);
+      return;
+    }
+
+    // 2. Specific product, coupon, or link redirect
+    if (b.redirectType === "product" && b.redirectId) {
+      navigate(`/user/product/${b.redirectId}`);
+      triggerToast(`Opening product details...`);
+      return;
+    } else if (b.redirectType === "coupon" && b.redirectId) {
+      navigate("/user/offers");
+      triggerToast("Opening offers...");
+      return;
+    } else if (b.link) {
+      let target = b.link;
+      if (window.location.pathname.startsWith('/food') && !target.startsWith('/food') && target.startsWith('/')) {
+        target = `/food${target}`;
+      }
+      navigate(target);
+      return;
+    }
+
+    // 3. Fallback matching algorithm by searching title & subtitle content
+    const titleLower = (b.title || "").toLowerCase();
+    const descLower = (b.subtitle || "").toLowerCase();
+    let matchedCat = null;
+    if (titleLower.includes("pizza") || descLower.includes("pizza")) {
+      matchedCat = "pizza";
+    } else if (titleLower.includes("bread") || descLower.includes("bread") || titleLower.includes("side") || descLower.includes("side")) {
+      matchedCat = "bread";
+    } else if (titleLower.includes("burger") || descLower.includes("burger")) {
+      matchedCat = "burger";
+    } else if (titleLower.includes("drink") || descLower.includes("drink") || titleLower.includes("beverage") || descLower.includes("beverage") || titleLower.includes("coke") || descLower.includes("coke")) {
+      matchedCat = "drinks";
+    } else if (titleLower.includes("dessert") || descLower.includes("dessert") || titleLower.includes("sweet") || descLower.includes("sweet")) {
+      matchedCat = "desserts";
+    } else if (titleLower.includes("pasta") || descLower.includes("pasta")) {
+      matchedCat = "pasta";
+    }
+
+    if (matchedCat) {
+      navigate(`${menuRoute}?category=${encodeURIComponent(matchedCat)}`, {
+        state: { category: matchedCat }
+      });
+      triggerToast(`Opening ${matchedCat} menu...`);
+    } else {
+      navigate(menuRoute);
+      triggerToast("Opening Menu...");
+    }
+  };
+
+  const totalCartCount = Object.values(cart).reduce((sum, qty) => {
+    if (typeof qty === "object" && qty !== null) {
+      return sum + (Number(qty.quantity) || 1);
+    }
+    return sum + (Number(qty) || 0);
+  }, 0)
 
   return (
     <div className={`min-h-screen flex justify-center transition-colors duration-300 ${isDarkMode ? "bg-[#0a0a0a]" : "bg-gray-100"}`}>
@@ -1030,62 +1219,66 @@ export default function Home() {
           deliveryLabel={deliveryLabel}
           categories={categories}
           products={products}
-          onSearchChange={setHomeSearchQuery}
+          onOpenSidebar={() => setIsProfileSidebarOpen(true)}
         />
 
         {/* Main Content */}
         <main className="space-y-lg mt-0">
           {/* Banner & Promo Strip Wrapper (to remove gap from space-y-lg) */}
           <div className="flex flex-col w-full">
-            {/* Hero Banner Carousel */}
-            <motion.section
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.6, ease: "easeOut" }}
-              className="relative h-[260px] w-full overflow-hidden shadow-lg border-0"
-            >
-              <div className="carousel-track flex h-full" style={{ transform: `translateX(-${activeSlide * 100}%)` }}>
-                {banners.map((b, idx) => (
-                  <div
-                    key={b._id || b.publicId || idx}
-                    className="min-w-full h-full relative group cursor-pointer"
-                    onClick={() => handleBannerClick(b)}
-                  >
-                    {b.resourceType === 'video' ? (
-                      <video className="w-full h-full object-cover bg-zinc-100 dark:bg-zinc-900" src={b.url} autoPlay loop muted playsInline />
-                    ) : (
-                      <img className="w-full h-full object-cover bg-zinc-100 dark:bg-zinc-900" alt={b.title || 'Banner'} src={b.url || b.mobileImageUrl || b.imageUrl || b.image || b.bannerUrl} />
-                    )}
-                    {/* Text overlay (only shown if title/subtitle exist) */}
-                    {(b.title || b.subtitle) && (
-                      <div className="absolute inset-0 flex flex-col justify-end p-5 pointer-events-none">
-                        {b.bannerType && (
-                          <span className="bg-[var(--accent-red)] text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-md w-fit mb-1.5 shadow-sm">
-                            {b.bannerType}
-                          </span>
-                        )}
-                        {b.title && (
-                          <h2 className="font-headline-lg-mobile text-white text-base font-black leading-tight" style={{ textShadow: "0 2px 4px rgba(0,0,0,0.8)" }}>
-                            {b.title}
-                          </h2>
-                        )}
-                        {b.subtitle && (
-                          <p className="text-zinc-200 text-[10px] font-medium mt-1 leading-snug line-clamp-2 max-w-[85%]" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>
-                            {b.subtitle}
-                          </p>
-                        )}
-                      </div>
-                    )}
+            {/* Hero Banner Carousel (Rendered only when dynamic banners exist) */}
+            {banners && banners.length > 0 && (
+              <motion.section
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+                className="relative h-[260px] w-full overflow-hidden shadow-lg border-0"
+              >
+                <div className="carousel-track flex h-full" style={{ transform: `translateX(-${activeSlide * 100}%)` }}>
+                  {banners.map((b, idx) => (
+                    <div
+                      key={b._id || b.publicId || idx}
+                      className="min-w-full h-full relative group cursor-pointer"
+                      onClick={() => handleBannerClick(b)}
+                    >
+                      {b.resourceType === 'video' ? (
+                        <video className="w-full h-full object-cover bg-zinc-100 dark:bg-zinc-900" src={b.url} autoPlay loop muted playsInline />
+                      ) : (
+                        <img className="w-full h-full object-cover bg-zinc-100 dark:bg-zinc-900" alt={b.title || 'Banner'} src={b.url || b.mobileImageUrl || b.imageUrl || b.image || b.bannerUrl} />
+                      )}
+                      {/* Text overlay (only shown if title/subtitle exist) */}
+                      {(b.title || b.subtitle) && (
+                        <div className="absolute inset-0 flex flex-col justify-end p-5 pointer-events-none">
+                          {b.bannerType && (
+                            <span className="bg-[var(--accent-red)] text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-md w-fit mb-1.5 shadow-sm">
+                              {b.bannerType}
+                            </span>
+                          )}
+                          {b.title && (
+                            <h2 className="font-headline-lg-mobile text-white text-base font-black leading-tight" style={{ textShadow: "0 2px 4px rgba(0,0,0,0.8)" }}>
+                              {b.title}
+                            </h2>
+                          )}
+                          {b.subtitle && (
+                            <p className="text-zinc-200 text-[10px] font-medium mt-1 leading-snug line-clamp-2 max-w-[85%]" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>
+                              {b.subtitle}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {/* Indicators */}
+                {banners.length > 1 && (
+                  <div className="absolute bottom-4 right-margin-mobile flex gap-2">
+                    {banners.map((_, i) => (
+                      <div key={i} className={`h-1 rounded-full transition-all duration-300 ${activeSlide === i ? "w-8 bg-[var(--accent-red)]" : "w-2 bg-white/30"}`}></div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              {/* Indicators */}
-              <div className="absolute bottom-4 right-margin-mobile flex gap-2">
-                {banners.map((_, i) => (
-                  <div key={i} className={`h-1 rounded-full transition-all duration-300 ${activeSlide === i ? "w-8 bg-[var(--accent-red)]" : "w-2 bg-white/30"}`}></div>
-                ))}
-              </div>
-            </motion.section>
+                )}
+              </motion.section>
+            )}
 
             {/* Domino's style promo strip */}
             <div className="bg-[var(--accent-red)] text-white text-[9px] sm:text-[10px] font-semibold text-center py-2 px-2 shadow-sm w-full relative z-0 border-0">
@@ -1175,8 +1368,9 @@ export default function Home() {
                   </div>
                 </div>
                 <button 
-                  onClick={() => triggerToast("Enrollment coming soon!")}
-                  className="w-full mt-3.5 py-2.5 rounded-lg border-[1.5px] text-[13px] font-medium bg-transparent transition-colors active:scale-[0.98] hover:bg-black/5 dark:hover:bg-white/5"
+                  type="button"
+                  onClick={handleStartRewardsFlow}
+                  className="w-full mt-3.5 py-2.5 rounded-lg border-[1.5px] text-[13px] font-medium bg-transparent transition-colors active:scale-[0.98] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
                   style={{ borderColor: 'var(--accent-red, #EE3A43)', color: 'var(--accent-red, #EE3A43)', fontFamily: 'Poppins, sans-serif' }}
                 >
                   {rewardsConfig.buttonText}
@@ -1272,8 +1466,7 @@ export default function Home() {
           <HomeSections
             offers={offers}
             categories={categories}
-            
-            products={displayedProducts}
+            products={products}
             activeCategory={activeCategory}
             favorites={favorites}
             isDarkMode={isDarkMode}
@@ -1320,6 +1513,30 @@ export default function Home() {
           triggerToast={triggerToast}
           totalCartCount={totalCartCount}
           locationConfirmed={locationConfirmed}
+          items={bottomNavItems}
+        />
+
+        {/* Product Customization Modal (Sizes, Crust, Toppings & Sticky Bottom Price Bar) */}
+        <ProductCustomizeModal
+          isOpen={Boolean(selectedProductForCustomize)}
+          onClose={() => setSelectedProductForCustomize(null)}
+          item={selectedProductForCustomize}
+          onAddToCart={handleAddCustomizedToCart}
+          isDarkMode={isDarkMode}
+        />
+
+        {/* User Profile Navigation Sidebar Drawer */}
+        <UserSidebarDrawer
+          isOpen={isProfileSidebarOpen}
+          onClose={() => setIsProfileSidebarOpen(false)}
+          isDarkMode={isDarkMode}
+          onOpenDeliverOnTrain={() => setShowTrainModal(true)}
+        />
+
+        {/* Deliver on Train Modal */}
+        <DeliverOnTrainModal
+          show={showTrainModal}
+          onClose={() => setShowTrainModal(false)}
         />
 
         {/* Ad Popup Modal */}
@@ -1398,6 +1615,22 @@ export default function Home() {
           }}
           isDarkMode={isDarkMode}
         />
+
+        {/* Rewards & Wallet Loading Screen */}
+        {showRewardsLoading && (
+          <RewardsWalletLoading 
+            onBack={handleCancelRewardsLoading} 
+            categories={categories} 
+          />
+        )}
+
+        {/* Rewards & Wallet View matching Reference Images 1 & 2 */}
+        {showRewardsPage && (
+          <RewardsWalletView 
+            onBack={() => setShowRewardsPage(false)} 
+            initialTab="rewards" 
+          />
+        )}
 
       </div>
     </div>

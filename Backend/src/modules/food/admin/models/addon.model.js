@@ -9,6 +9,7 @@ const addonSchema = new mongoose.Schema({
   }],
   image: { type: String, default: '' },
   status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
+  isDefault: { type: Boolean, default: false },
 }, { timestamps: true });
 
 export const Addon = mongoose.model('Addon', addonSchema);

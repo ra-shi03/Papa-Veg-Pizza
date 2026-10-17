@@ -4,6 +4,7 @@ import { ArrowLeft, MapPin, Bike, ShoppingBag, Utensils, Train, ChevronRight, Ca
 import { useLocationStore } from '@food/store/locationStore';
 import { locationAPI } from '@/services/api/location';
 import apiClient from '@/services/api/axios';
+import IrctcOrderHistoryModal from '@food/components/user/IrctcOrderHistoryModal';
 
 export default function DeliveryLocation() {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ export default function DeliveryLocation() {
   const [isLoadingStores, setIsLoadingStores] = useState(false);
   const [pnr, setPnr] = useState('');
   const [agreed, setAgreed] = useState(false);
+  const [showIrctcHistoryModal, setShowIrctcHistoryModal] = useState(false);
 
   const iconMap = {
     delivery: Bike,
@@ -350,15 +352,27 @@ export default function DeliveryLocation() {
               </label>
 
               <button 
+                type="button"
                 disabled={pnr.length !== 10 || !agreed}
-                className="w-full mt-6 bg-[#E53935] disabled:bg-zinc-300 disabled:text-zinc-500 text-white font-bold py-3.5 rounded-xl text-[14px] transition-all active:scale-[0.98]"
+                onClick={() => {
+                  if (pnr.length === 10 && agreed) {
+                    localStorage.setItem("activeService", "train");
+                    localStorage.setItem("pvp_train_pnr", pnr);
+                    localStorage.setItem("deliveryAddress", `Delivery on Train (PNR: ${pnr})`);
+                    navigate("/user/menu");
+                  }
+                }}
+                className="w-full mt-6 bg-[#E53935] disabled:bg-zinc-300 disabled:text-zinc-500 text-white font-bold py-3.5 rounded-xl text-[14px] transition-all active:scale-[0.98] cursor-pointer"
               >
                 Submit
               </button>
             </div>
 
             {/* Order History */}
-            <div className="bg-white rounded-2xl p-4 border border-zinc-200 shadow-sm flex items-center justify-between cursor-pointer active:bg-zinc-50">
+            <div 
+              onClick={() => setShowIrctcHistoryModal(true)}
+              className="bg-white rounded-2xl p-4 border border-zinc-200 shadow-sm flex items-center justify-between cursor-pointer active:bg-zinc-50 transition-colors"
+            >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center">
                   <Train className="w-5 h-5 text-zinc-700" />
@@ -391,6 +405,12 @@ export default function DeliveryLocation() {
           </div>
         )}
       </div>
+
+      {/* IRCTC Order History Bottom Sheet Modal */}
+      <IrctcOrderHistoryModal
+        isOpen={showIrctcHistoryModal}
+        onClose={() => setShowIrctcHistoryModal(false)}
+      />
     </div>
   );
 }

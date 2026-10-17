@@ -4,7 +4,7 @@ const walletTransactionSchema = new mongoose.Schema(
     {
         type: {
             type: String,
-            enum: ['addition', 'deduction', 'refund'],
+            enum: ['addition', 'deduction', 'refund', 'expired'],
             required: true
         },
         amount: { type: Number, required: true },
@@ -23,6 +23,8 @@ const userWalletSchema = new mongoose.Schema(
         userId: { type: mongoose.Schema.Types.ObjectId, required: true, unique: true, index: true },
         balance: { type: Number, default: 0 },
         referralEarnings: { type: Number, default: 0 },
+        isEnrolled: { type: Boolean, default: false },
+        enrolledAt: { type: Date, default: null },
         transactions: { type: [walletTransactionSchema], default: [] }
     },
     { collection: 'food_user_wallets', timestamps: true }

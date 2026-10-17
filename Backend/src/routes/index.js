@@ -14,6 +14,7 @@ import * as productController from '../modules/food/admin/controllers/product.co
 import * as addonController from '../modules/food/admin/controllers/addon.controller.js';
 import * as rewardConfigController from '../modules/food/admin/controllers/rewardConfig.controller.js';
 import * as categoryProductController from '../modules/food/admin/controllers/categoryProduct.controller.js';
+import * as adminController from '../modules/food/admin/controllers/admin.controller.js';
 import { requireRoles } from '../core/roles/role.middleware.js';
 import { getQueuesController } from '../controllers/admin.controller.js';
 import webhookRoutes from '../core/payments/routes/webhook.routes.js';
@@ -64,6 +65,8 @@ router.get('/v1/food/products/public', productController.getPublicProducts);
 
 // Public addons route
 router.get('/v1/food/admin/addons/public', addonController.getAddons);
+router.get('/v1/food/admin/addons/stats', addonController.getAddonStats);
+router.get('/v1/food/admin/addons/stats/public', addonController.getAddonStats);
 
 // Public rewards config route
 router.get('/v1/food/admin/rewards/public', rewardConfigController.getPublicRewardConfig);
@@ -72,6 +75,13 @@ router.get('/v1/food/admin/rewards/public', rewardConfigController.getPublicRewa
 router.get('/v1/food/admin/category-products', categoryProductController.getCategoryProducts);
 router.get('/v1/food/admin/category-products/public', categoryProductController.getCategoryProducts);
 router.get('/v1/food/admin/category-products/categories', categoryProductController.getCategoryProducts);
+
+// Public categories routes (No Auth Required - serves categories from CategoryProduct)
+router.get('/v1/food/admin/categories', categoryProductController.getCategoryProducts);
+router.get('/v1/food/admin/categories/public', categoryProductController.getCategoryProducts);
+router.get('/v1/food/categories/public', categoryProductController.getCategoryProducts);
+router.get('/v1/food/categories', categoryProductController.getCategoryProducts);
+
 router.use('/v1/food/admin', authMiddleware, requireRoles('ADMIN'), storeAdminRoutes);
 router.use('/v1/food/user', authMiddleware, requireRoles('USER'), userRoutes);
 router.use('/v1/food/notifications', authMiddleware, requireRoles('USER', 'STORE', 'DELIVERY_PARTNER'), notificationRoutes);

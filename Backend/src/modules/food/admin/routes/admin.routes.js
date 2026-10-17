@@ -14,6 +14,7 @@ import * as rewardConfigController from '../controllers/rewardConfig.controller.
 
 import * as productController from '../controllers/product.controller.js';
 import * as addonController from '../controllers/addon.controller.js';
+import * as addonTypeController from '../controllers/addonType.controller.js';
 
 import * as orderController from '../../orders/controllers/order.controller.js';
 import { getAdminPageController, upsertAdminPageController } from '../controllers/pageContent.controller.js';
@@ -34,9 +35,12 @@ router.get('/products', productController.getProducts);
 router.get('/products/public', productController.getPublicProducts);
 router.get('/menu/public', productController.getPublicMenu);
 router.get('/addons/public', addonController.getAddons);
+router.get('/addons/stats/public', addonController.getAddonStats);
+router.get('/addon-types/public', addonTypeController.getAddonTypes);
 
-// ----- Public Rewards Config -----
-
+// ----- Public Categories -----
+router.get('/categories', categoryProductController.getCategoryProducts);
+router.get('/categories/public', categoryProductController.getCategoryProducts);
 
 router.use(requireAdmin);
 
@@ -113,17 +117,24 @@ router.delete('/store-commissions/:id', adminController.deleteStoreCommission);
 router.patch('/store-commissions/:id/toggle', adminController.toggleStoreCommissionStatus);
 
 // ----- Categories -----
-router.get('/categories', adminController.getCategories);
 router.post('/categories', adminController.createCategory);
 router.patch('/categories/:id', adminController.updateCategory);
 router.delete('/categories/:id', adminController.deleteCategory);
 
 // ----- Addons -----
+router.get('/addons/stats', addonController.getAddonStats);
 router.get('/addons', addonController.getAddons);
 router.get('/addons/:id', addonController.getAddonById);
 router.post('/addons', addonController.createAddon);
 router.patch('/addons/:id', addonController.updateAddon);
 router.delete('/addons/:id', addonController.deleteAddon);
+
+// ----- Addon Types -----
+router.get('/addon-types', addonTypeController.getAddonTypes);
+router.get('/addon-types/:id', addonTypeController.getAddonTypeById);
+router.post('/addon-types', addonTypeController.createAddonType);
+router.patch('/addon-types/:id', addonTypeController.updateAddonType);
+router.delete('/addon-types/:id', addonTypeController.deleteAddonType);
 router.patch('/categories/:id/toggle', adminController.toggleCategoryStatus);
 router.patch('/categories/:id/approve', adminController.approveCategory);
 router.patch('/categories/:id/reject', adminController.rejectCategory);

@@ -1,4 +1,5 @@
 import { Addon } from '../models/addon.model.js';
+import { Product } from '../models/product.model.js';
 import { sendError, sendResponse } from '../../../../utils/response.js';
 
 export const createAddon = async (req, res) => {
@@ -13,47 +14,16 @@ export const createAddon = async (req, res) => {
 const DEFAULT_ADDONS = [
     {
         name: 'New Hand Tossed',
-        type: 'crust',
+        type: 'Crust',
         prices: [
             { size: 'Regular', price: 0 },
             { size: 'Medium', price: 0 },
-            { size: 'Large', price: 0 }
+            { size: 'Large', price: 0 },
+            { size: 'Default', price: 0 }
         ],
         image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=300&auto=format&fit=crop&q=80',
-        status: 'Active'
-    },
-    {
-        name: 'Cheese Burst',
-        type: 'crust',
-        prices: [
-            { size: 'Regular', price: 75 },
-            { size: 'Medium', price: 95 },
-            { size: 'Large', price: 120 }
-        ],
-        image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=300&auto=format&fit=crop&q=80',
-        status: 'Active'
-    },
-    {
-        name: '100% Wheat Thin Crust',
-        type: 'crust',
-        prices: [
-            { size: 'Regular', price: 50 },
-            { size: 'Medium', price: 70 },
-            { size: 'Large', price: 90 }
-        ],
-        image: 'https://images.unsplash.com/photo-1590947132387-155cc02f3212?w=300&auto=format&fit=crop&q=80',
-        status: 'Active'
-    },
-    {
-        name: 'Fresh Pan',
-        type: 'crust',
-        prices: [
-            { size: 'Regular', price: 40 },
-            { size: 'Medium', price: 60 },
-            { size: 'Large', price: 80 }
-        ],
-        image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=300&auto=format&fit=crop&q=80',
-        status: 'Active'
+        status: 'Active',
+        isDefault: true
     },
     {
         name: 'Paneer',
@@ -167,6 +137,16 @@ const DEFAULT_ADDONS = [
     }
 ];
 
+export const normalizeAddonType = (rawType = '') => {
+    const t = String(rawType || '').trim().toLowerCase();
+    if (t.includes('crust')) return 'crust';
+    if (t.includes('cheese')) return 'cheese';
+    if (t.includes('dip') || t.includes('sauce')) return 'dip';
+    if (t.includes('topping')) return 'topping';
+    if (t.includes('burst')) return 'burst';
+    return t || 'other';
+};
+
 export const getAddons = async (req, res) => {
     try {
         let count = await Addon.countDocuments();
@@ -180,12 +160,60 @@ export const getAddons = async (req, res) => {
             // Also ensure crust addons exist if only toppings were present
             const crustCount = await Addon.countDocuments({ type: { $regex: /^crust$/i } });
             if (crustCount === 0) {
-                const crustsToSeed = DEFAULT_ADDONS.filter(a => a.type === 'crust');
+                const crustsToSeed = DEFAULT_ADDONS.filter(a => normalizeAddonType(a.type) === 'crust');
                 await Addon.insertMany(crustsToSeed);
+            } else {
+                // Ensure default 'New Hand Tossed' crust exists
+                const existingHandTossed = await Addon.findOne({ name: { $regex: /^new hand tossed$/i } });
+                if (!existingHandTossed) {
+                    await Addon.create({
+                        name: 'New Hand Tossed',
+                        type: 'Crust',
+                        prices: [
+                            { size: 'Regular', price: 0 },
+                            { size: 'Medium', price: 0 },
+                            { size: 'Large', price: 0 },
+                            { size: 'Default', price: 0 }
+                        ],
+                        image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=300&auto=format&fit=crop&q=80',
+                        status: 'Active',
+                        isDefault: true
+                    });
+                }
             }
         }
-        const addons = await Addon.find().sort({ createdAt: -1 });
-        return sendResponse(res, 200, 'Addons fetched successfully', addons);
+
+        // Count how many products use each addon in their toppings array
+        const allProducts = await Product.find().select('toppings');
+        const connectedAddonCountMap = {};
+        allProducts.forEach(p => {
+            if (Array.isArray(p.toppings)) {
+                p.toppings.forEach(tid => {
+                    if (tid) {
+                        const idStr = tid.toString();
+                        connectedAddonCountMap[idStr] = (connectedAddonCountMap[idStr] || 0) + 1;
+                    }
+                });
+            }
+        });
+
+        const { type, status } = req.query;
+        const queryFilter = {};
+        if (status) {
+            queryFilter.status = { $regex: new RegExp(`^${status}$`, 'i') };
+        }
+        if (type) {
+            queryFilter.type = { $regex: new RegExp(type, 'i') };
+        }
+
+        const addons = await Addon.find(queryFilter).sort({ createdAt: -1 });
+        const addonsWithCounts = addons.map(a => {
+            const doc = a.toObject();
+            doc.connectedProductsCount = connectedAddonCountMap[a._id.toString()] || 0;
+            return doc;
+        });
+
+        return sendResponse(res, 200, 'Addons fetched successfully', addonsWithCounts);
     } catch (error) {
         return sendError(res, 500, 'Failed to fetch addons', error.message);
     }
@@ -221,5 +249,112 @@ export const deleteAddon = async (req, res) => {
         return sendResponse(res, 200, 'Addon deleted successfully');
     } catch (error) {
         return sendError(res, 500, 'Failed to delete addon', error.message);
+    }
+};
+
+export const getAddonStats = async (req, res) => {
+    try {
+        const totalAddons = await Addon.countDocuments();
+        const activeAddons = await Addon.countDocuments({ status: { $regex: /^active$/i } });
+        const inactiveAddons = await Addon.countDocuments({ status: { $regex: /^inactive$/i } });
+
+        // Calculate average price across all addons
+        const allAddons = await Addon.find().select('_id name type status prices price isDefault');
+        let totalPriceSum = 0;
+        let priceCount = 0;
+        allAddons.forEach(a => {
+            if (a.prices && a.prices.length > 0) {
+                totalPriceSum += Number(a.prices[0].price || 0);
+                priceCount += 1;
+            } else if (a.price) {
+                totalPriceSum += Number(a.price || 0);
+                priceCount += 1;
+            }
+        });
+        const avgPrice = priceCount > 0 ? (totalPriceSum / priceCount).toFixed(2) : "0.00";
+
+        // Count connected products per addon
+        const allProducts = await Product.find().select('toppings');
+        const connectedAddonCountMap = {};
+        allProducts.forEach(p => {
+            if (Array.isArray(p.toppings)) {
+                p.toppings.forEach(tid => {
+                    if (tid) {
+                        const idStr = tid.toString();
+                        connectedAddonCountMap[idStr] = (connectedAddonCountMap[idStr] || 0) + 1;
+                    }
+                });
+            }
+        });
+
+        // Group addons strictly by normalized canonical types - NO DUPLICATES!
+        const TYPE_META = {
+            crust: { key: 'crust', label: 'Crusts' },
+            topping: { key: 'topping', label: 'Toppings' },
+            dip: { key: 'dip', label: 'Dips & Sauces' },
+            cheese: { key: 'cheese', label: 'Cheese & Extra Cheese' },
+            burst: { key: 'burst', label: 'Burst' }
+        };
+
+        const typeMap = new Map();
+
+        allAddons.forEach(a => {
+            const rawType = (a.type || 'topping').trim();
+            const normKey = normalizeAddonType(rawType);
+            const meta = TYPE_META[normKey] || {
+                key: normKey,
+                label: rawType.charAt(0).toUpperCase() + rawType.slice(1)
+            };
+
+            if (!typeMap.has(normKey)) {
+                typeMap.set(normKey, {
+                    type: normKey,
+                    rawType,
+                    label: meta.label,
+                    count: 0,
+                    activeCount: 0,
+                    inactiveCount: 0,
+                    connectedProductsCount: 0
+                });
+            }
+
+            const entry = typeMap.get(normKey);
+            entry.count += 1;
+            const isActive = (a.status || '').toLowerCase() === 'active';
+            if (isActive) entry.activeCount += 1;
+            else entry.inactiveCount += 1;
+
+            const connectedCount = connectedAddonCountMap[a._id.toString()] || 0;
+            entry.connectedProductsCount += connectedCount;
+        });
+
+        // Filter out types with count 0 and sort in standard logical order
+        const preferredOrder = ['crust', 'topping', 'dip', 'cheese', 'burst'];
+        const types = Array.from(typeMap.values())
+            .filter(t => t.count > 0)
+            .sort((a, b) => {
+                const idxA = preferredOrder.indexOf(a.type);
+                const idxB = preferredOrder.indexOf(b.type);
+                if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                if (idxA !== -1) return -1;
+                if (idxB !== -1) return 1;
+                return a.label.localeCompare(b.label);
+            });
+
+        const typeCounts = {};
+        types.forEach(t => {
+            typeCounts[t.type] = t.count;
+        });
+
+        return sendResponse(res, 200, 'Addon stats fetched successfully', {
+            totalAddons,
+            activeAddons,
+            inactiveAddons,
+            avgPrice,
+            types,
+            typeCounts
+        });
+    } catch (error) {
+        return sendError(res, 500, 'Failed to fetch addon stats', error.message);
     }
 };

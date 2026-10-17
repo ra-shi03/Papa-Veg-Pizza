@@ -145,10 +145,36 @@ export default function Cart() {
   useEffect(() => {
     const resolveAndSyncCart = () => {
       const stored = JSON.parse(localStorage.getItem("userCart") || "{}")
+      const customItemsMap = JSON.parse(localStorage.getItem("pvp_customized_items") || "{}")
+      let dynamicProds = []
+      try {
+        dynamicProds = JSON.parse(localStorage.getItem("pvp_products_v2") || "[]")
+      } catch (_) {}
+
       const list = []
 
       Object.entries(stored).forEach(([key, qty]) => {
-        if (qty <= 0) return
+        const itemQuantity = typeof qty === 'object' && qty !== null ? Number(qty.quantity || 1) : Number(qty)
+        if (itemQuantity <= 0) return
+
+        // 1. Check if stored in pvp_customized_items
+        if (customItemsMap[key]) {
+          const c = customItemsMap[key]
+          list.push({
+            key,
+            id: key,
+            itemId: c.id,
+            name: c.title || c.name,
+            price: Number(c.price) || 0,
+            image: c.image || c.imageUrl || "",
+            description: c.description || "",
+            size: c.selectedSize || "",
+            quantity: itemQuantity,
+            restaurant: "Papa Veg Pizza",
+            restaurantId: "papa-veg-pizza-1"
+          })
+          return
+        }
 
         let baseId = key
         let size = ""
@@ -172,10 +198,31 @@ export default function Cart() {
             image: prod.image,
             description: prod.description,
             size,
-            quantity: qty,
+            quantity: itemQuantity,
             restaurant: "Papa Veg Pizza",
             restaurantId: "papa-veg-pizza-1"
           })
+          return
+        }
+
+        // 2. Check dynamic products from superadmin / API
+        if (Array.isArray(dynamicProds) && dynamicProds.length > 0) {
+          const foundDyn = dynamicProds.find(p => String(p._id || p.id) === String(baseId) || key.startsWith(String(p._id || p.id)))
+          if (foundDyn) {
+            list.push({
+              key,
+              id: key,
+              itemId: foundDyn._id || foundDyn.id,
+              name: size ? `${foundDyn.name || foundDyn.title} (${size})` : (foundDyn.name || foundDyn.title),
+              price: Number(foundDyn.price) || 0,
+              image: foundDyn.image || foundDyn.imageUrl || (Array.isArray(foundDyn.images) ? foundDyn.images[0] : ""),
+              description: foundDyn.description || "",
+              size,
+              quantity: itemQuantity,
+              restaurant: "Papa Veg Pizza",
+              restaurantId: "papa-veg-pizza-1"
+            })
+          }
         }
       })
 
