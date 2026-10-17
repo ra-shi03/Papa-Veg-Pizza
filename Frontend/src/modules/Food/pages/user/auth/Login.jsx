@@ -19,6 +19,13 @@ export default function Login() {
   const [config, setConfig] = useState(null);
 
   useEffect(() => {
+    // Ensure Welcome Screen is always seen before Login page
+    const welcomeShown = sessionStorage.getItem("papa_veg_welcome_shown");
+    if (!welcomeShown) {
+      navigate("/welcome", { replace: true });
+      return;
+    }
+
     clearModuleAuth("user");
     localStorage.removeItem("tempPhone");
     localStorage.removeItem("currentUser");

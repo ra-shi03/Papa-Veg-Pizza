@@ -66,7 +66,7 @@ const AppRoutes = () => {
     if (!isNativeLikeShell) return
 
     const route = `${location.pathname || ''}${location.search || ''}`
-    if (route.startsWith('/food/') || route.startsWith('/admin') || route.startsWith('/superadmin')) {
+    if (route.startsWith('/admin') || route.startsWith('/superadmin') || (route.startsWith('/food/') && localStorage.getItem('user_authenticated') === 'true')) {
       localStorage.setItem(NATIVE_LAST_ROUTE_KEY, route)
     }
   }, [location.pathname, location.search])
