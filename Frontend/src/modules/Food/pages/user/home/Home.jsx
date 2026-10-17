@@ -20,13 +20,24 @@ import UserSidebarDrawer from "@food/components/user/UserSidebarDrawer"
 import DeliverOnTrainModal from "@food/components/user/DeliverOnTrainModal"
 import RewardsWalletLoading from "@food/components/user/RewardsWalletLoading"
 import RewardsWalletView from "../rewards/RewardsWalletView"
-import { ChevronsUp } from "lucide-react"
+import { ChevronsUp, X } from "lucide-react"
 import apiClient, { adminClient } from "@/services/api/axios"
 import { applySystemTheme } from "@/shared/utils/themeSync"
 
+const DEFAULT_REWARD_TERMS = [
+  "The Papa Veg Pizza Cheesy Rewards Loyalty Program (Loyalty Program) is being conducted by Papa Veg Pizza.",
+  "Loyalty program is designed to reward selected Papa Veg Pizza customers for online order placed through Papa Veg Pizza Application, Mobile Website and our call centre. Customers who are eligible for the program (select customers) will be able to view the Cheesy Rewards Icon in Papa Veg Pizza application homepage and need to register in the Papa Veg Pizza application page to participate in the Program.",
+  "The cheesy rewards loyalty program is currently open for only orders placed through Papa Veg Pizza's App, mobile website and call centre.",
+  "Every time the registered customer places an order via Papa Veg Pizza's Application, such customer can earn 100 points (having value equivalent to 1 pizza slice), on the order value of at least INR 350, as Cheesy Rewards points. These points will be credited to the Papa Veg Pizza's wallet within 48 working hours of successful delivery of the order. These points can only be redeemed to pay for a free pizza (from the selected pizza range) once customer has accumulated 600 points (ie. Equivalent to 6 slices of pizza). Customer needs to check their Papa Veg Pizza's app for more details to find the actual list of Pizzas from which a FREE pizza can be redeemed in lieu of points.",
+  "A minimum order value of INR 350 (excl. tax/charges) is required to earn Cheesy Rewards Points.",
+  "This scheme can be availed only on 1st Order of the day. Customer is eligible to earn max 100 points (ie. Equivalent to 1 slice).",
+  "For redemption of Points/Free Pizza minimum 600 points must be accumulated. Points in multiple of 600 points will only be eligible for redemption. Max 1 slice/100 points can be earned in a day.",
+  "Wallet Points are valid for a period of 365 days from the day of enrolment in the Cheesy Rewards Loyalty Program. After which points will lapse automatically."
+];
 
 export default function Home() {
   const [rewardsConfig, setRewardsConfig] = useState(null);
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [showRewardsLoading, setShowRewardsLoading] = useState(false);
   const [showRewardsPage, setShowRewardsPage] = useState(false);
   const rewardsLoadingTimeoutRef = useRef(null);
@@ -45,6 +56,17 @@ export default function Home() {
     setShowRewardsLoading(false);
   };
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (isTermsModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isTermsModalOpen]);
 
   // Strict sequential flow: Welcome -> Login -> Location Setup -> Home
   useEffect(() => {
@@ -1400,13 +1422,14 @@ export default function Home() {
                   className="text-center text-[10px] sm:text-[11px] text-zinc-600 dark:text-zinc-300 font-medium mt-2.5 whitespace-nowrap overflow-hidden text-ellipsis"
                   style={{ fontFamily: 'Poppins, sans-serif' }}
                 >
-                  {rewardsConfig.termsText}{" "}
-                  <a 
-                    href={rewardsConfig.termsLink} 
-                    className="text-blue-600 dark:text-blue-400 font-semibold hover:underline"
+                  {rewardsConfig.termsText || 'By enrolling you agree to our'}{" "}
+                  <button 
+                    type="button"
+                    onClick={() => setIsTermsModalOpen(true)}
+                    className="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline bg-transparent border-0 p-0 cursor-pointer"
                   >
-                    {rewardsConfig.termsLinkText}
-                  </a>
+                    {rewardsConfig.termsLinkText || 'Terms and Conditions'}
+                  </button>
                 </div>
               </div>
             </div>
@@ -1652,6 +1675,69 @@ export default function Home() {
             initialTab="rewards" 
           />
         )}
+
+        {/* Terms & Conditions Bottom Sheet Modal matching Image 1 */}
+        <AnimatePresence>
+          {isTermsModalOpen && (
+            <div className="fixed inset-0 z-50 flex flex-col justify-end items-center">
+              {/* Semi-transparent dark overlay */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                onClick={() => setIsTermsModalOpen(false)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-[1px]"
+              />
+
+              {/* Floating circular close button centered directly above bottom sheet */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: 0.2 }}
+                className="relative z-10 mb-3"
+              >
+                <button
+                  type="button"
+                  onClick={() => setIsTermsModalOpen(false)}
+                  className="w-11 h-11 rounded-full bg-zinc-200/90 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 flex items-center justify-center shadow-lg active:scale-90 transition-transform cursor-pointer border border-white/20"
+                  aria-label="Close Terms and Conditions"
+                >
+                  <X className="w-5 h-5 stroke-[2.5]" />
+                </button>
+              </motion.div>
+
+              {/* Bottom Sheet Card */}
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 28, stiffness: 300 }}
+                className="relative z-10 w-full max-w-lg bg-white dark:bg-zinc-900 rounded-t-[28px] shadow-2xl flex flex-col max-h-[75vh] overflow-hidden"
+                style={{ fontFamily: 'Poppins, sans-serif' }}
+              >
+                <div className="px-6 pt-5 pb-3">
+                  <h3 className="text-[17px] sm:text-lg font-bold text-zinc-900 dark:text-white tracking-tight m-0">
+                    Terms & Conditions
+                  </h3>
+                </div>
+
+                <div className="px-6 pb-6 overflow-y-auto space-y-3.5 hide-scrollbar">
+                  {(Array.isArray(rewardsConfig?.terms) && rewardsConfig.terms.length > 0
+                    ? rewardsConfig.terms
+                    : DEFAULT_REWARD_TERMS
+                  ).map((term, idx) => (
+                    <div key={idx} className="flex items-start gap-2.5 text-zinc-600 dark:text-zinc-300 text-xs sm:text-[13px] leading-relaxed">
+                      <span className="text-zinc-400 font-bold text-sm leading-none mt-0.5 select-none shrink-0">•</span>
+                      <p className="flex-1 m-0">{term}</p>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
       </div>
     </div>
