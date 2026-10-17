@@ -312,12 +312,15 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards' }) {
     }
   ];
 
-  const terms = rewardsConfig?.terms || [
-    'Enrollment in the Rewards Program is free for all registered customers.',
-    'Points are credited within 24 hours of successful order delivery.',
-    'Orders below the minimum threshold (₹349) do not qualify for point accrual.',
-    'Reward products are subject to daily kitchen availability and stock.',
-    'Papa Veg Pizza reserves the right to modify point rules and redemption criteria at any time.'
+  const terms = (Array.isArray(rewardsConfig?.terms) && rewardsConfig.terms.length > 0) ? rewardsConfig.terms : [
+    "The Papa Veg Pizza Cheesy Rewards Loyalty Program (Loyalty Program) is being conducted by Papa Veg Pizza.",
+    "Loyalty program is designed to reward selected Papa Veg Pizza customers for online order placed through Papa Veg Pizza Application, Mobile Website and our call centre. Customers who are eligible for the program (select customers) will be able to view the Cheesy Rewards Icon in Papa Veg Pizza application homepage and need to register in the Papa Veg Pizza application page to participate in the Program.",
+    "The cheesy rewards loyalty program is currently open for only orders placed through Papa Veg Pizza's App, mobile website and call centre.",
+    "Every time the registered customer places an order via Papa Veg Pizza's Application, such customer can earn 100 points (having value equivalent to 1 pizza slice), on the order value of at least INR 350, as Cheesy Rewards points. These points will be credited to the Papa Veg Pizza's wallet within 48 working hours of successful delivery of the order. These points can only be redeemed to pay for a free pizza (from the selected pizza range) once customer has accumulated 600 points (ie. Equivalent to 6 slices of pizza). Customer needs to check their Papa Veg Pizza's app for more details to find the actual list of Pizzas from which a FREE pizza can be redeemed in lieu of points.",
+    "A minimum order value of INR 350 (excl. tax/charges) is required to earn Cheesy Rewards Points.",
+    "This scheme can be availed only on 1st Order of the day. Customer is eligible to earn max 100 points (ie. Equivalent to 1 slice).",
+    "For redemption of Points/Free Pizza minimum 600 points must be accumulated. Points in multiple of 600 points will only be eligible for redemption. Max 1 slice/100 points can be earned in a day.",
+    "Wallet Points are valid for a period of 365 days from the day of enrolment in the Cheesy Rewards Loyalty Program. After which points will lapse automatically."
   ];
 
   return (
@@ -703,42 +706,46 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards' }) {
         </div>
       )}
 
-      {/* ── Terms & Conditions Modal ── */}
+      {/* ── Terms & Conditions Modal (Matching Image 1) ── */}
       {isTermsModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl max-w-md w-full p-5 shadow-2xl border border-zinc-100 dark:border-zinc-800 max-h-[80vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-[var(--accent-red,#EE3A43)]" />
-                <h3 className="font-bold text-base text-zinc-900 dark:text-white">
-                  Terms & Conditions
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsTermsModalOpen(false)}
-                className="p-1 rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+        <div className="fixed inset-0 z-50 flex flex-col justify-end items-center">
+          {/* Dimmed backdrop */}
+          <div 
+            onClick={() => setIsTermsModalOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-[1px] animate-in fade-in duration-200"
+          />
 
-            <div className="overflow-y-auto py-3 space-y-2.5 flex-1">
-              {terms.map((term, i) => (
-                <div key={i} className="flex items-start gap-2 text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
-                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 mt-1.5 shrink-0" />
-                  <span>{term}</span>
-                </div>
-              ))}
-            </div>
-
+          {/* Floating circular close button centered directly above bottom sheet */}
+          <div className="relative z-10 mb-3 animate-in zoom-in-95 duration-200">
             <button
               type="button"
               onClick={() => setIsTermsModalOpen(false)}
-              className="w-full mt-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-750 text-zinc-800 dark:text-zinc-200 font-semibold text-xs rounded-xl"
+              className="w-11 h-11 rounded-full bg-zinc-200/90 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 flex items-center justify-center shadow-lg active:scale-90 transition-transform cursor-pointer border border-white/20"
+              aria-label="Close Terms and Conditions"
             >
-              I Understand
+              <X className="w-5 h-5 stroke-[2.5]" />
             </button>
+          </div>
+
+          {/* Bottom Sheet Card */}
+          <div 
+            className="relative z-10 w-full max-w-lg bg-white dark:bg-zinc-900 rounded-t-[28px] shadow-2xl flex flex-col max-h-[75vh] overflow-hidden animate-in slide-in-from-bottom duration-250"
+            style={{ fontFamily: 'Poppins, sans-serif' }}
+          >
+            <div className="px-6 pt-5 pb-3">
+              <h3 className="text-[17px] sm:text-lg font-bold text-zinc-900 dark:text-white tracking-tight m-0">
+                Terms & Conditions
+              </h3>
+            </div>
+
+            <div className="px-6 pb-6 overflow-y-auto space-y-3.5 hide-scrollbar">
+              {terms.map((term, i) => (
+                <div key={i} className="flex items-start gap-2.5 text-zinc-600 dark:text-zinc-300 text-xs sm:text-[13px] leading-relaxed">
+                  <span className="text-zinc-400 font-bold text-sm leading-none mt-0.5 select-none shrink-0">•</span>
+                  <p className="flex-1 m-0">{term}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
