@@ -156,20 +156,56 @@ export default function RewardsManagement() {
     rewardProducts: [],
     faqs: [
       {
-        question: 'How do I earn points in the Rewards program?',
-        answer: 'You earn 100 points on every delivered order above ₹349 placed via the Papa Veg Pizza app or website.'
+        question: "What is the Papa Veg Pizza Cheesy Rewards Program?",
+        answer: "The Cheesy Rewards Program is a loyalty program designed to reward our valued customers. Every time you order your favorite delicious pizzas, you earn Cheesy Reward Points that can be redeemed for FREE pizzas!"
       },
       {
-        question: 'How do I unlock and redeem free items?',
-        answer: 'Once you accumulate 600 points, all eligible reward items unlock automatically. You can add any unlocked reward product to your cart during checkout for ₹0.'
+        question: "How can I avail the benefits of the program?",
+        answer: "Simply enroll in the Cheesy Rewards program by tapping 'Enroll Now' on the Papa Veg Pizza app. Once enrolled, your eligible orders will automatically earn points towards free treats."
       },
       {
-        question: 'Do my points expire?',
-        answer: 'Points remain valid for 12 months from the date they are credited to your account.'
+        question: "How does this program work?",
+        answer: "For every delivered order of ₹349 or more, you earn 100 points (equivalent to 1 slice). Once you collect 600 points (6 slices), a full pizza from our signature catalogue unlocks for FREE!"
       },
       {
-        question: 'Can I combine free reward items with discount coupons?',
-        answer: 'Yes! You can apply active promo codes along with your redeemed reward treats on eligible orders.'
+        question: "Is there a limit to how many Cheesy Rewards Points I can earn or redeem in an order?",
+        answer: "You can earn a maximum of 100 points per day on your first order above ₹349. You can redeem 600 points per free pizza reward in an eligible order."
+      },
+      {
+        question: "Do I need to pay anything while redeeming points for FREE pizza?",
+        answer: "No! The redeemed pizza is 100% free (₹0). Only standard delivery charges or taxes for any additional cart items may apply if your cart does not meet free delivery conditions."
+      },
+      {
+        question: "What are eligible items for FREE pizza?",
+        answer: "Eligible items include all pizzas featured in the Cheesy Rewards catalogue (such as So Cheesee, Smoky Corn Paneer, Paneer Tikka, Margherita, Farmhouse, etc.)."
+      },
+      {
+        question: "Is there any expiry of Cheesy Rewards Points?",
+        answer: "Yes, Cheesy Rewards Points are valid for 365 days from the date they are credited to your account."
+      },
+      {
+        question: "How can I check my Cheesy Rewards Points balance?",
+        answer: "You can view your real-time points balance, slices progress meter, and transaction history in the Rewards & Wallet section of the Papa Veg Pizza app."
+      },
+      {
+        question: "Is this program applicable on Papa Veg Pizza orders through Swiggy or Zomato as well?",
+        answer: "No, the Cheesy Rewards loyalty program is exclusively available for orders placed directly via the Papa Veg Pizza official mobile app and website."
+      },
+      {
+        question: "Is the program applicable on Papa Veg Pizza orders through IRCTC?",
+        answer: "Currently, Cheesy Rewards points can only be earned and redeemed on direct app and website deliveries, and cannot be combined with IRCTC train delivery orders."
+      },
+      {
+        question: "Can I opt-out from the program?",
+        answer: "Participation is voluntary and free. If you wish to close your loyalty account, you can contact our customer support team at any time."
+      },
+      {
+        question: "Can I redeem my Cheesy Rewards Points for real money?",
+        answer: "No, Cheesy Rewards points have no direct cash value and can only be redeemed for eligible menu items within the Papa Veg Pizza app."
+      },
+      {
+        question: "Can I transfer/gift/share my Cheesy Rewards Points to others?",
+        answer: "Cheesy Rewards Points are non-transferable and linked to your registered mobile number and account."
       }
     ],
     terms: [
