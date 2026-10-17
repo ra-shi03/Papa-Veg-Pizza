@@ -200,6 +200,9 @@ export const userAPI = {
       return inFlight;
     };
   })(),
+  /** POST /food/user/wallet/enroll (Bearer USER) */
+  enrollInRewards: () =>
+    userClient.post("/food/user/wallet/enroll"),
   /** GET /food/user/referrals/stats (Bearer USER) */
   getReferralStats: () =>
     userClient.get("/food/user/referrals/stats"),

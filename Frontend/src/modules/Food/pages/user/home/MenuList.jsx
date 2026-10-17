@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
-import { ArrowLeft, Search, ArrowUpDown, Check, X, Star, ChevronRight } from "lucide-react"
+import { ArrowLeft, Search, ArrowUpDown, Check, X, Star, ChevronRight, ChevronUp, UtensilsCrossed } from "lucide-react"
 import apiClient, { adminClient } from "@/services/api/axios"
 import DeliveryMapModal from "@food/components/user/DeliveryMapModal"
 import DeliveryOrCollectionModal from "@food/components/user/DeliveryOrCollectionModal"
@@ -8,6 +8,8 @@ import { useLocationStore } from "@food/store/locationStore"
 import { useLocationGuard } from "@food/hooks/useLocationGuard"
 import logoNew from "@/assets/logo1.png"
 import { renderFormattedText } from "@food/utils/formatText"
+import MenuSearchOverlay from "@food/components/user/MenuSearchOverlay"
+
 
 const CRUST_OPTIONS = [
   {
@@ -15,24 +17,6 @@ const CRUST_OPTIONS = [
     description: "Fresh Dough, Flavourful Edges",
     price: 0,
     image: "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=120&auto=format&fit=crop&q=80"
-  },
-  {
-    name: "Cheese Burst",
-    description: "Crust overflowing with molten liquid cheese",
-    price: 75,
-    image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=120&auto=format&fit=crop&q=80"
-  },
-  {
-    name: "100% Wheat Thin Crust",
-    description: "Light, crispy whole wheat base",
-    price: 50,
-    image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=120&auto=format&fit=crop&q=80"
-  },
-  {
-    name: "Fresh Pan",
-    description: "Thick, soft and buttery golden crust",
-    price: 40,
-    image: "https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?w=120&auto=format&fit=crop&q=80"
   }
 ];
 
@@ -252,6 +236,8 @@ export default function MenuList() {
 
     return {
       id: p._id || p.id || `prod-${String(p.name || '').toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+      _id: p._id || p.id,
+      name: p.name || p.title || "",
       title: p.name || p.title || "",
       price: basePrice,
       originalPrice,
@@ -261,12 +247,18 @@ export default function MenuList() {
       description: p.description || p.shortDescription || "",
       toppingsSummary,
       defaultCrust: p.defaultCrust || "New Hand Tossed",
+      showCrust: p.showCrust !== undefined ? Boolean(p.showCrust) : true,
+      crusts: p.crusts || [],
       sizes,
       toppings: p.toppings || [],
       isVeg: p.vegType !== 'non-veg',
       rating: p.rating || 4.8,
       ratingCount: p.ratingCount || 28,
-      status: p.status || "Active"
+      status: p.status || "Active",
+      category: (typeof p.categoryId === 'object' && p.categoryId !== null ? (p.categoryId.label || p.categoryId.name) : '') || p.category || p.categoryName || '',
+      categoryLabel: (typeof p.categoryId === 'object' && p.categoryId !== null ? (p.categoryId.label || p.categoryId.name) : '') || p.category || '',
+      categoryId: typeof p.categoryId === 'object' && p.categoryId !== null ? (p.categoryId._id || p.categoryId.id) : (p.categoryId || ''),
+      rawProduct: p
     };
   };
 
@@ -504,6 +496,12 @@ export default function MenuList() {
             if (!map[catKey]) map[catKey] = [];
 
             const formatted = formatProductForMenu(p);
+            const matchedCat = currentCats.find(c => c.id === catKey || String(c._id) === catKey);
+            if (matchedCat && !formatted.category) {
+              formatted.category = matchedCat.label;
+              formatted.categoryLabel = matchedCat.label;
+            }
+
             if (!map[catKey].some(item => item.id === formatted.id || item.title.toLowerCase() === formatted.title.toLowerCase())) {
               map[catKey].push(formatted);
             }
@@ -719,6 +717,11 @@ export default function MenuList() {
 
   const userManuallySelectedCategoryRef = useRef(false);
   const activeTabButtonRef = useRef(null);
+  const isProgrammaticScrollRef = useRef(false);
+  const scrollTimeoutRef = useRef(null);
+  const activeTabRef = useRef("");
+  const categorySectionsWithItemsRef = useRef([]);
+  const [showQuickMenuModal, setShowQuickMenuModal] = useState(false);
 
   const [activeTab, setActiveTab] = useState(() => {
     const incoming = getIncomingCategory();
@@ -784,6 +787,75 @@ export default function MenuList() {
 
   const [showSortMenu, setShowSortMenu] = useState(false);
   const sortMenuRef = useRef(null);
+  const compactSortMenuRef = useRef(null);
+
+  // Track scroll position to dynamically collapse ← Menu, make compact sticky header, and spy active category
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+          if (scrollY > 40) {
+            setIsScrolled(true);
+          } else if (scrollY < 15) {
+            setIsScrolled(false);
+          }
+
+          // Scrollspy: automatically move category tab as user scrolls through products
+          if (!isProgrammaticScrollRef.current) {
+            const sections = categorySectionsWithItemsRef.current;
+            if (sections && sections.length > 0) {
+              const headerOffset = 135;
+              let newActiveId = null;
+
+              for (let i = 0; i < sections.length; i++) {
+                const catId = sections[i].category.id;
+                const el = document.getElementById(`category-section-${catId}`);
+                if (el) {
+                  const rect = el.getBoundingClientRect();
+                  if (rect.top <= headerOffset) {
+                    newActiveId = catId;
+                  }
+                }
+              }
+
+              const isNearBottom = (window.innerHeight + scrollY) >= (document.documentElement.scrollHeight - 50);
+              if (isNearBottom) {
+                newActiveId = sections[sections.length - 1].category.id;
+              } else if (!newActiveId && sections.length > 0) {
+                newActiveId = sections[0].category.id;
+              }
+
+              if (newActiveId && newActiveId !== activeTabRef.current) {
+                setActiveTab(newActiveId);
+              }
+            }
+          }
+
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    const handleUserInterrupt = () => {
+      isProgrammaticScrollRef.current = false;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("wheel", handleUserInterrupt, { passive: true });
+    window.addEventListener("touchmove", handleUserInterrupt, { passive: true });
+    handleScroll();
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("wheel", handleUserInterrupt);
+      window.removeEventListener("touchmove", handleUserInterrupt);
+    };
+  }, []);
 
   // Sync menuFilters from backend & localStorage
   useEffect(() => {
@@ -816,7 +888,9 @@ export default function MenuList() {
   // Close sort menu on click outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (sortMenuRef.current && !sortMenuRef.current.contains(event.target)) {
+      const clickedInsideExpanded = sortMenuRef.current && sortMenuRef.current.contains(event.target);
+      const clickedInsideCompact = compactSortMenuRef.current && compactSortMenuRef.current.contains(event.target);
+      if (!clickedInsideExpanded && !clickedInsideCompact) {
         setShowSortMenu(false);
       }
     };
@@ -842,7 +916,60 @@ export default function MenuList() {
 
   const [searchQuery, setSearchQuery] = useState("")
   const [debouncedQuery, setDebouncedQuery] = useState("")
+  const [isSearchOverlayOpen, setIsSearchOverlayOpen] = useState(false)
   const [expandedItems, setExpandedItems] = useState({})
+
+  // Record products viewed/clicked by user into localStorage for recently viewed carousel
+  const recordViewedProduct = (item) => {
+    try {
+      if (!item) return;
+      const current = localStorage.getItem("pvp_recently_viewed_products");
+      const list = current ? JSON.parse(current) : [];
+      const itemId = item.id || item._id;
+      const filtered = list.filter(p => (p.id || p._id) !== itemId);
+      const toSave = {
+        id: itemId,
+        _id: item._id || item.id,
+        title: item.title || item.name,
+        name: item.name || item.title,
+        price: item.price,
+        originalPrice: item.originalPrice || null,
+        saveAmount: item.saveAmount || 0,
+        image: item.image || "",
+        defaultCrust: item.defaultCrust,
+        showCrust: item.showCrust,
+        category: item.category,
+        categoryLabel: item.categoryLabel,
+        toppingsSummary: item.toppingsSummary,
+        sizes: item.sizes,
+        toppings: item.toppings,
+        crusts: item.crusts,
+        viewedAt: Date.now()
+      };
+      const updated = [toSave, ...filtered].slice(0, 10);
+      localStorage.setItem("pvp_recently_viewed_products", JSON.stringify(updated));
+      window.dispatchEvent(new Event("pvp_recently_viewed_changed"));
+    } catch (_) {}
+  };
+
+  // Flattened products list across all categories for full-screen search overlay
+  const allFlattenedProducts = useMemo(() => {
+    const list = [];
+    const seen = new Set();
+    Object.values(productsMap || {}).forEach(arr => {
+      if (Array.isArray(arr)) {
+        arr.forEach(p => {
+          const key = p.id || p._id || p.title;
+          if (key && !seen.has(key)) {
+            seen.add(key);
+            list.push(p);
+          }
+        });
+      }
+    });
+    return list;
+  }, [productsMap]);
+
 
   // Custom Customize Modal States
   const [customizeItem, setCustomizeItem] = useState(null)
@@ -871,34 +998,79 @@ export default function MenuList() {
 
   const getAddonPriceForSize = (addon, sizeName = "Regular") => {
     if (!addon) return 0;
+    // Hand Tossed / Default crust is always ₹0 by default
+    const isHandTossed = addon.isDefault || 
+      (addon.name || '').toLowerCase().includes('hand tossed') || 
+      addon.name === (customizeItem?.defaultCrust || 'New Hand Tossed');
+    if (isHandTossed) {
+      return 0;
+    }
     if (Array.isArray(addon.prices) && addon.prices.length > 0) {
       const matched = addon.prices.find(p => p.size?.toLowerCase() === sizeName?.toLowerCase());
       if (matched && typeof matched.price === 'number') return matched.price;
       return Number(addon.prices[0].price) || 0;
     }
-    return Number(addon.price) || 0;
+    const basePrice = Number(addon.price) || 0;
+    if (sizeName?.toLowerCase() === 'medium') return basePrice > 0 ? basePrice + 20 : 0;
+    if (sizeName?.toLowerCase() === 'large') return basePrice > 0 ? basePrice + 45 : 0;
+    return basePrice;
   };
 
   const currentItemAddons = React.useMemo(() => {
     return getItemAssignedAddons(customizeItem);
   }, [customizeItem, allAddonsList]);
 
+  // Fetch only crust addons for crust customization
   const currentItemCrusts = React.useMemo(() => {
-    const fromProduct = currentItemAddons.filter(a => (a.type || '').toLowerCase().includes('crust'));
-    if (fromProduct.length > 0) return fromProduct;
-    return CRUST_OPTIONS.map(c => ({
-      _id: c.name,
-      name: c.name,
-      type: 'crust',
-      description: c.description,
-      image: c.image,
-      prices: [
-        { size: 'Regular', price: c.price },
-        { size: 'Medium', price: c.price > 0 ? c.price + 20 : 0 },
-        { size: 'Large', price: c.price > 0 ? c.price + 45 : 0 }
-      ]
-    }));
-  }, [currentItemAddons]);
+    if (customizeItem && customizeItem.showCrust === false) {
+      return [];
+    }
+
+    let crusts = [];
+    if (customizeItem?.crusts && Array.isArray(customizeItem.crusts) && customizeItem.crusts.length > 0) {
+      crusts = customizeItem.crusts
+        .map(c => (typeof c === 'object' && c ? c : (allAddonsList || []).find(a => (a._id === c || a.id === c))))
+        .filter(Boolean);
+    }
+
+    if (crusts.length === 0) {
+      const fromProduct = currentItemAddons.filter(a => (a.type || '').toLowerCase().includes('crust'));
+      if (fromProduct.length > 0) {
+        crusts = fromProduct;
+      }
+    }
+
+    if (crusts.length === 0) {
+      const dbCrusts = (allAddonsList || []).filter(a => (a.type || '').toLowerCase().includes('crust'));
+      if (dbCrusts.length > 0) {
+        crusts = dbCrusts;
+      } else {
+        crusts = CRUST_OPTIONS.map(c => ({
+          _id: c.name,
+          name: c.name,
+          type: 'crust',
+          description: c.description,
+          image: c.image,
+          prices: [
+            { size: 'Regular', price: c.price },
+            { size: 'Medium', price: c.price > 0 ? c.price + 20 : 0 },
+            { size: 'Large', price: c.price > 0 ? c.price + 45 : 0 }
+          ]
+        }));
+      }
+    }
+
+    const defaultCrustName = (customizeItem?.defaultCrust || "New Hand Tossed").toLowerCase();
+    return [...crusts].sort((a, b) => {
+      const aName = (a.name || "").toLowerCase();
+      const bName = (b.name || "").toLowerCase();
+      const aIsDefault = a.isDefault || aName === defaultCrustName || aName.includes("hand tossed");
+      const bIsDefault = b.isDefault || bName === defaultCrustName || bName.includes("hand tossed");
+      if (aIsDefault && !bIsDefault) return -1;
+      if (!aIsDefault && bIsDefault) return 1;
+      return 0;
+    });
+  }, [customizeItem, currentItemAddons, allAddonsList]);
 
   const currentItemToppings = React.useMemo(() => {
     return currentItemAddons.filter(a => (a.type || '').toLowerCase().includes('topping'));
@@ -909,6 +1081,7 @@ export default function MenuList() {
   }, [currentItemAddons]);
 
   const openCustomizeModal = (item) => {
+    recordViewedProduct(item);
     setCustomizeItem(item);
     const initialSizes = (item.sizes && item.sizes.length > 0 && typeof item.sizes[0] === 'object')
       ? item.sizes
@@ -917,13 +1090,8 @@ export default function MenuList() {
         ];
     setSelectedSizeOption(initialSizes[0]);
 
-    const assigned = getItemAssignedAddons(item);
-    const assignedCrusts = assigned.filter(a => (a.type || '').toLowerCase().includes('crust'));
-    if (assignedCrusts.length > 0) {
-      setSelectedCrust(assignedCrusts[0].name);
-    } else {
-      setSelectedCrust(item.defaultCrust || "New Hand Tossed");
-    }
+    const defaultCrustName = item.defaultCrust || "New Hand Tossed";
+    setSelectedCrust(defaultCrustName);
 
     setSelectedExtraCheese(false);
     setSelectedMealOptions([]);
@@ -948,10 +1116,6 @@ export default function MenuList() {
     }
   }, [searchQuery])
 
-  // Reset search query when active category tab changes
-  useEffect(() => {
-    setSearchQuery("")
-  }, [activeTab])
 
   // Sync local location state with global location confirmation changes
   useEffect(() => {
@@ -1003,11 +1167,26 @@ export default function MenuList() {
     if (incoming) {
       userManuallySelectedCategoryRef.current = true;
       const resolved = resolveCategoryTab(incoming, categories);
-      if (resolved) {
-        setActiveTab(resolved);
-      } else {
-        setActiveTab(incoming);
-      }
+      const targetId = resolved || incoming;
+      setActiveTab(targetId);
+
+      const timer = setTimeout(() => {
+        const targetEl = document.getElementById(`category-section-${targetId}`);
+        if (targetEl) {
+          isProgrammaticScrollRef.current = true;
+          const stickyHeaderOffset = 100;
+          const elementPosition = targetEl.getBoundingClientRect().top + window.pageYOffset;
+          const offsetPosition = Math.max(0, elementPosition - stickyHeaderOffset);
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: "smooth"
+          });
+          setTimeout(() => {
+            isProgrammaticScrollRef.current = false;
+          }, 700);
+        }
+      }, 350);
+      return () => clearTimeout(timer);
     }
   }, [location.state, location.search, categories]);
 
@@ -1075,6 +1254,7 @@ export default function MenuList() {
   }, [])
 
   const addToCart = (item, size = "") => {
+    recordViewedProduct(item);
     const key = size ? `${item.id}-${size}` : item.id
     setCart(prev => {
       const existing = prev[key]
@@ -1191,28 +1371,87 @@ export default function MenuList() {
     return isNaN(num) ? 0 : num;
   };
 
-  // Filter and sort menu items
-  const selectedCatObj = categories.find(c => c.id === activeTab || String(c._id) === activeTab);
-  const itemsForTab = (
-    currentMenuItems[activeTab] ||
-    (selectedCatObj ? currentMenuItems[selectedCatObj.id] : null) ||
-    (selectedCatObj ? currentMenuItems[String(selectedCatObj._id)] : null) ||
-    []
-  );
-  const filteredItems = itemsForTab.filter((item) => {
-    // If veg-only toggle is active and item is marked explicitly as non-veg
-    if (isVegOnly && item.isVeg === false) {
-      return false;
+  // Helper to reliably find products for a category regardless of how keys were stored
+  const getRawItemsForCategory = useCallback((cat) => {
+    if (!currentMenuItems || !cat) return [];
+
+    const keysToTry = [
+      cat.id,
+      cat._id ? String(cat._id) : null,
+      cat.slug,
+      cat.label,
+      cat.name,
+      cat.label ? cat.label.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-') : null,
+      cat.name ? cat.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-') : null,
+      cat.label ? cat.label.toLowerCase().trim() : null,
+      cat.name ? cat.name.toLowerCase().trim() : null,
+    ].filter(Boolean);
+
+    // 1. Direct key match
+    for (const key of keysToTry) {
+      const list = currentMenuItems[key];
+      if (Array.isArray(list) && list.length > 0) return list;
     }
-    const titleMatch = item.title?.toLowerCase().includes(debouncedQuery.toLowerCase());
-    const descMatch = item.description?.toLowerCase().includes(debouncedQuery.toLowerCase());
-    return !debouncedQuery || titleMatch || descMatch;
-  }).sort((a, b) => {
-    if (sortBy === "price_asc") return getNumericPrice(a) - getNumericPrice(b);
-    if (sortBy === "price_desc") return getNumericPrice(b) - getNumericPrice(a);
-    if (sortBy === "rating") return getNumericRating(b) - getNumericRating(a);
-    return 0;
-  });
+
+    // 2. Normalized key match
+    const currentKeys = Object.keys(currentMenuItems);
+    for (const key of keysToTry) {
+      const target = String(key).toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+      const foundKey = currentKeys.find(k => String(k).toLowerCase().trim().replace(/[^a-z0-9]/g, '') === target);
+      if (foundKey) {
+        const list = currentMenuItems[foundKey];
+        if (Array.isArray(list) && list.length > 0) return list;
+      }
+    }
+
+    return [];
+  }, [currentMenuItems]);
+
+  // Filter and sort menu items for all categories (continuous scroll feed)
+  const categorySections = useMemo(() => {
+    return categories.map((cat) => {
+      const rawItems = getRawItemsForCategory(cat);
+      const items = rawItems.filter((item) => {
+        if (isVegOnly && item.isVeg === false) {
+          return false;
+        }
+        const titleMatch = item.title?.toLowerCase().includes(debouncedQuery.toLowerCase());
+        const descMatch = item.description?.toLowerCase().includes(debouncedQuery.toLowerCase());
+        return !debouncedQuery || titleMatch || descMatch;
+      }).sort((a, b) => {
+        if (sortBy === "price_asc") return getNumericPrice(a) - getNumericPrice(b);
+        if (sortBy === "price_desc") return getNumericPrice(b) - getNumericPrice(a);
+        if (sortBy === "rating") return getNumericRating(b) - getNumericRating(a);
+        return 0;
+      });
+
+      // Deduplicate items by unique key if needed
+      const uniqueItems = [];
+      const seenIds = new Set();
+      for (const it of items) {
+        const itKey = it.id || it._id || it.title;
+        if (!seenIds.has(itKey)) {
+          seenIds.add(itKey);
+          uniqueItems.push(it);
+        }
+      }
+
+      return {
+        category: cat,
+        items: uniqueItems,
+        totalRaw: rawItems.length
+      };
+    });
+  }, [categories, getRawItemsForCategory, isVegOnly, debouncedQuery, sortBy]);
+
+  // Only sections that contain items matching current filters/search
+  const categorySectionsWithItems = useMemo(() => {
+    return categorySections.filter((section) => section.items.length > 0);
+  }, [categorySections]);
+
+  const totalFilteredCount = useMemo(() => {
+    return categorySectionsWithItems.reduce((acc, curr) => acc + curr.items.length, 0);
+  }, [categorySectionsWithItems]);
 
   const activeCategoryObj = categories.find(c => c.id === activeTab || String(c._id) === activeTab);
   const activeCategoryName = activeCategoryObj?.label || (typeof activeTab === 'string' ? activeTab.replace(/-/g, ' ') : "this category");
@@ -1226,8 +1465,44 @@ export default function MenuList() {
   }, [categories, activeTab, currentMenuItems]);
 
   const firstCategoryWithItems = useMemo(() => {
-    return otherCategoriesWithItems[0] || null;
-  }, [otherCategoriesWithItems]);
+    return otherCategoriesWithItems[0] || (categorySectionsWithItems[0]?.category) || null;
+  }, [otherCategoriesWithItems, categorySectionsWithItems]);
+
+  // Keep refs in sync for scrollspy window listener
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
+
+  useEffect(() => {
+    categorySectionsWithItemsRef.current = categorySectionsWithItems;
+  }, [categorySectionsWithItems]);
+
+  // Smooth scroll handler when a category tab is clicked
+  const handleCategoryTabClick = (catId) => {
+    userManuallySelectedCategoryRef.current = true;
+    setActiveTab(catId);
+
+    const targetEl = document.getElementById(`category-section-${catId}`);
+    if (targetEl) {
+      isProgrammaticScrollRef.current = true;
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+
+      const stickyHeaderOffset = 100;
+      const elementPosition = targetEl.getBoundingClientRect().top + window.pageYOffset;
+      const offsetPosition = Math.max(0, elementPosition - stickyHeaderOffset);
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth"
+      });
+
+      scrollTimeoutRef.current = setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+      }, 700);
+    } else {
+      isProgrammaticScrollRef.current = false;
+    }
+  };
 
   const modalTextPrimary = isDarkMode ? "text-white" : "text-zinc-900"
   const modalTextSecondary = isDarkMode ? "text-zinc-400" : "text-zinc-500"
@@ -1237,7 +1512,7 @@ export default function MenuList() {
 
   return (
     <div className={`min-h-screen flex justify-center transition-colors duration-300 ${isDarkMode ? "bg-[#0a0a0a]" : "bg-[#F8F6F2]"}`}>
-      <div className={`page-wrapper w-full max-w-md min-h-screen pb-32 font-body-md overflow-x-hidden relative shadow-2xl border-x ${
+      <div className={`page-wrapper w-full max-w-md min-h-screen pb-32 font-body-md overflow-x-clip relative shadow-2xl border-x ${
         isDarkMode ? "border-zinc-800/40" : "border-gray-200/50"
       }`} style={{ backgroundColor: isDarkMode ? "#111111" : "#F8F6F2", color: isDarkMode ? "#e5e2e1" : "#1c1b1b" }}>
       {/* CSS overrides to keep design exact */}
@@ -1362,60 +1637,159 @@ export default function MenuList() {
       )}
 
       {/* ── TOP STICKY CONTAINER (Header + Filters + Category Tabs) ── */}
-      <div className="sticky top-0 z-45 bg-[#F8F6F2] dark:bg-[#111111] border-b border-zinc-200/60 dark:border-zinc-800 shadow-xs">
+      <div className={`sticky top-0 z-45 bg-[#F8F6F2] dark:bg-[#111111] border-b border-zinc-200 dark:border-zinc-800 transition-all duration-200 ${
+        isScrolled ? "shadow-md" : "shadow-xs"
+      }`}>
         
-        {/* Row 1: Back + Menu Title + Search Bar */}
-        <div className="px-4 py-3 flex items-center gap-3">
-          <button
-            onClick={() => navigate('/user')}
-            className="p-1 -ml-1 text-gray-800 dark:text-white hover:bg-black/5 dark:hover:bg-zinc-800 rounded-full transition-colors flex items-center justify-center bg-transparent border-0 outline-none cursor-pointer"
-            aria-label="Go back to user home"
-          >
-            <ArrowLeft className="w-5 h-5 stroke-[2.4]" />
-          </button>
-          
-          <h1 
-            className="text-lg sm:text-xl font-medium text-gray-800 dark:text-gray-100 shrink-0 tracking-normal"
-            style={{ fontFamily: "'Poppins', sans-serif" }}
-          >
-            Menu
-          </h1>
+        {/* Row 1: Back + Menu Title + Search Bar + Compact Filters (when scrolled) */}
+        <div className="px-3.5 sm:px-4 pt-3 pb-2.5 flex items-center gap-2 sm:gap-2.5">
+          {/* Back Navigation & Menu Title (Visible at top, smoothly hides when scrolled) */}
+          <div className={`flex items-center gap-2 overflow-hidden transition-all duration-300 shrink-0 ${
+            isScrolled 
+              ? "max-w-0 opacity-0 -mr-2 pointer-events-none" 
+              : "max-w-[140px] opacity-100"
+          }`}>
+            <button
+              onClick={() => navigate('/user')}
+              className="p-1.5 -ml-1 text-gray-800 dark:text-white hover:bg-black/5 dark:hover:bg-zinc-800 rounded-full transition-colors flex items-center justify-center bg-transparent border-0 outline-none cursor-pointer"
+              aria-label="Go back to user home"
+            >
+              <ArrowLeft className="w-5 h-5 stroke-[2.4]" />
+            </button>
+            
+            <h1 
+              className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-100 shrink-0 tracking-normal"
+              style={{ fontFamily: "'Poppins', sans-serif" }}
+            >
+              Menu
+            </h1>
+          </div>
 
-          {/* Search in menu input */}
-          <div className="flex-1 relative">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          {/* Search in menu input (Expands to full width on left when back/menu hides) */}
+          <div 
+            onClick={() => setIsSearchOverlayOpen(true)}
+            className="flex-1 min-w-0 relative cursor-pointer"
+          >
+            <Search className="w-4 h-4 text-zinc-400 dark:text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
+              readOnly
+              onClick={() => setIsSearchOverlayOpen(true)}
+              onFocus={(e) => {
+                e.target.blur();
+                setIsSearchOverlayOpen(true);
+              }}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search in menu..."
               style={{ fontFamily: "'Poppins', sans-serif" }}
-              className="w-full h-9 pl-9 pr-8 bg-white/90 dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800 rounded-xl text-xs sm:text-sm font-normal text-gray-800 dark:text-gray-100 placeholder-gray-400 outline-none focus:border-red-500 focus:bg-white transition-colors shadow-2xs"
+              className="w-full h-10 pl-10 pr-9 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 focus:border-[var(--accent-red,#EE3A43)] dark:focus:border-[var(--accent-red,#EE3A43)] rounded-xl text-xs sm:text-sm font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 outline-none transition-all shadow-xs cursor-pointer"
             />
             {searchQuery && (
               <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5 bg-transparent border-0 cursor-pointer"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSearchQuery("");
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-0.5 bg-transparent border-0 cursor-pointer"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-4 h-4" />
               </button>
+            )}
+          </div>
+
+          {/* Compact Action Buttons on Right (Appears when scrolled, matching Image 2 & 3) */}
+          <div className={`flex items-center gap-1.5 overflow-hidden transition-all duration-300 shrink-0 ${
+            isScrolled 
+              ? "max-w-[120px] opacity-100 ml-0.5" 
+              : "max-w-0 opacity-0 -ml-2 pointer-events-none"
+          }`}>
+            {/* Compact Veg Only Button */}
+            {menuFilters.vegOnly?.enabled !== false && (
+              <button
+                type="button"
+                onClick={() => setIsVegOnly(!isVegOnly)}
+                title={isVegOnly ? "Show All items" : "Show Veg Only"}
+                className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all cursor-pointer shadow-xs ${
+                  isVegOnly
+                    ? "bg-green-50 dark:bg-green-950/40 border-green-600 text-green-700 shadow-xs ring-1 ring-green-600/30"
+                    : "bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-700 hover:border-zinc-400"
+                }`}
+              >
+                <span className="w-4 h-4 border-[1.5px] border-green-600 p-[1.5px] rounded-[3px] flex items-center justify-center bg-transparent">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-600 block" />
+                </span>
+              </button>
+            )}
+
+            {/* Compact Sort Button */}
+            {menuFilters.sortBy?.enabled !== false && (
+              <div className="relative" ref={compactSortMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowSortMenu(!showSortMenu)}
+                  title="Sort Menu"
+                  className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all cursor-pointer shadow-xs ${
+                    sortBy !== "default"
+                      ? "border-red-500 text-red-600 dark:text-red-400 bg-red-50/50 dark:bg-red-950/30 ring-1 ring-red-500/30"
+                      : "border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:border-zinc-400"
+                  }`}
+                >
+                  <ArrowUpDown className="w-4 h-4 text-zinc-700 dark:text-zinc-300" />
+                </button>
+
+                {/* Dropdown for compact sort */}
+                {isScrolled && showSortMenu && (
+                  <div className="absolute right-0 top-full mt-1.5 w-44 bg-[#F8F6F2] dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                    {[
+                      { id: "default", label: "Recommended" },
+                      { id: "price_asc", label: "Price: Low to High" },
+                      { id: "price_desc", label: "Price: High to Low" },
+                      { id: "rating", label: "Rating: High to Low" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          setSortBy(opt.id);
+                          setShowSortMenu(false);
+                        }}
+                        style={{ fontFamily: "'Poppins', sans-serif" }}
+                        className={`w-full px-3 py-2 text-left text-xs font-normal flex items-center justify-between hover:bg-black/5 dark:hover:bg-zinc-800 cursor-pointer border-0 ${
+                          sortBy === opt.id
+                            ? "text-red-600 dark:text-red-400 font-medium bg-red-50/50 dark:bg-red-950/20"
+                            : "text-gray-700 dark:text-gray-300 bg-transparent"
+                        }`}
+                      >
+                        <span>{opt.label}</span>
+                        {sortBy === opt.id && <Check className="w-3.5 h-3.5 text-red-600" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
 
-        {/* Row 2: Filters (Veg Only & Sort by) - Dynamically configured via superadmin */}
+        {/* Row 2: Expanded Filters (Visible only when at top / !isScrolled) */}
         {(menuFilters.vegOnly?.enabled !== false || menuFilters.sortBy?.enabled !== false) && (
-          <div className="px-4 pb-2.5 flex items-center gap-2 relative">
+          <div className={`px-3.5 sm:px-4 flex items-center gap-2 relative overflow-hidden transition-all duration-300 ${
+            isScrolled 
+              ? "max-h-0 opacity-0 pb-0 pointer-events-none" 
+              : "max-h-12 opacity-100 pb-3"
+          }`}>
             {/* Veg Only Button */}
             {menuFilters.vegOnly?.enabled !== false && (
               <button
                 type="button"
                 onClick={() => setIsVegOnly(!isVegOnly)}
                 style={{ fontFamily: "'Poppins', sans-serif" }}
-                className={`px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-2 transition-all cursor-pointer ${
+                className={`h-9 px-3 rounded-lg border text-xs font-medium flex items-center gap-2 transition-all cursor-pointer shadow-xs ${
                   isVegOnly
-                    ? "bg-green-50 dark:bg-green-950/30 border-green-600 text-green-700 dark:text-green-400 shadow-xs"
-                    : "bg-white/80 hover:bg-white dark:bg-zinc-900 border-zinc-250 dark:border-zinc-800 text-gray-700 dark:text-gray-300 shadow-2xs"
+                    ? "bg-green-50 dark:bg-green-950/30 border-green-600 text-green-700 dark:text-green-400 ring-1 ring-green-600/20"
+                    : "bg-white hover:bg-zinc-50 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300"
                 }`}
               >
                 {/* Green Veg Indicator icon */}
@@ -1433,18 +1807,18 @@ export default function MenuList() {
                   type="button"
                   onClick={() => setShowSortMenu(!showSortMenu)}
                   style={{ fontFamily: "'Poppins', sans-serif" }}
-                  className={`px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs ${
+                  className={`h-9 px-3 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
                     sortBy !== "default"
-                      ? "border-red-500/50 text-red-600 dark:text-red-400 bg-red-50/40 dark:bg-red-950/20"
-                      : "border-zinc-250 dark:border-zinc-800 bg-white/80 hover:bg-white dark:bg-zinc-900 text-gray-700 dark:text-gray-300"
+                      ? "border-red-500 text-red-600 dark:text-red-400 bg-red-50/50 dark:bg-red-950/20 ring-1 ring-red-500/20"
+                      : "border-zinc-300 dark:border-zinc-700 bg-white hover:bg-zinc-50 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300"
                   }`}
                 >
                   <span>{menuFilters.sortBy?.label || "Sort by"}</span>
-                  <ArrowUpDown className="w-3.5 h-3.5 text-gray-500" />
+                  <ArrowUpDown className="w-3.5 h-3.5 text-zinc-500" />
                 </button>
 
-                {/* Sort Dropdown */}
-                {showSortMenu && (
+                {/* Sort Dropdown when not scrolled */}
+                {!isScrolled && showSortMenu && (
                   <div className="absolute left-0 top-full mt-1.5 w-44 bg-[#F8F6F2] dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                     {[
                       { id: "default", label: "Recommended" },
@@ -1478,23 +1852,20 @@ export default function MenuList() {
         )}
 
         {/* Row 3: Horizontal Categories Tabs */}
-        <div className="flex items-center overflow-x-auto hide-scrollbar px-3 border-t border-zinc-200/60 dark:border-zinc-800/80 bg-[#F8F6F2] dark:bg-[#111111]">
+        <div className="flex items-center overflow-x-auto hide-scrollbar px-3 border-t border-zinc-200/80 dark:border-zinc-800 bg-[#F8F6F2] dark:bg-[#111111]">
           {categories.map((cat, idx) => {
-            const isActive = activeTab === cat.id;
+            const isActive = activeTab === cat.id || String(cat._id) === activeTab;
             return (
               <button
                 key={cat._id || `${cat.id}-${idx}`}
                 ref={isActive ? activeTabButtonRef : null}
                 type="button"
-                onClick={() => {
-                  userManuallySelectedCategoryRef.current = true;
-                  setActiveTab(cat.id);
-                }}
-                className="flex flex-col items-center pt-2 px-3.5 shrink-0 transition-colors group cursor-pointer relative bg-transparent border-0"
+                onClick={() => handleCategoryTabClick(cat.id)}
+                className="flex flex-col items-center pt-2 px-3.5 shrink-0 transition-colors group cursor-pointer relative bg-transparent border-0 outline-none"
               >
                 {/* Badge Tag */}
                 {cat.badge ? (
-                  <span className="text-[9px] font-black text-white bg-[#E53935] px-2 py-0.5 rounded-full uppercase leading-none tracking-tight mb-1 shadow-xs whitespace-nowrap">
+                  <span className="text-[9px] font-bold text-white bg-[#E53935] px-2 py-0.5 rounded-full uppercase leading-none tracking-tight mb-1 shadow-xs whitespace-nowrap">
                     {cat.badge}
                   </span>
                 ) : (
@@ -1504,18 +1875,18 @@ export default function MenuList() {
                 {/* Category Title */}
                 <span 
                   style={{ fontFamily: "'Poppins', sans-serif" }}
-                  className={`text-xs whitespace-nowrap pb-2 ${
+                  className={`whitespace-nowrap pb-2 transition-all ${
                     isActive
-                      ? "font-semibold text-gray-900 dark:text-white"
-                      : "font-normal text-gray-500 dark:text-gray-400 group-hover:text-gray-800"
+                      ? "text-sm font-bold text-zinc-950 dark:text-white"
+                      : "text-xs font-normal text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-800"
                   }`}
                 >
-                  {cat.label}
+                  {cat.label || cat.name || cat.id}
                 </span>
 
                 {/* Red Underline Active Indicator */}
                 {isActive && (
-                  <div className="h-[3px] bg-[#E53935] w-full rounded-t-sm" />
+                  <div className="h-[3px] bg-[#E53935] w-full rounded-full transition-all" />
                 )}
               </button>
             );
@@ -1578,220 +1949,224 @@ export default function MenuList() {
       )}
 
       {/* Main Categories Layout container */}
-      <main className="w-full pt-0">
-
-        {/* Section Divider Header */}
-        <div className="flex items-center justify-center mt-3 mb-4 px-4">
-          <div className="flex-1 h-[1px] bg-gray-200 dark:bg-zinc-800"></div>
-          <h2 
-            className="px-5 text-base sm:text-lg font-medium text-zinc-800 dark:text-zinc-100 tracking-normal capitalize"
-            style={{ fontFamily: "'Poppins', sans-serif" }}
-          >
-            {categories.find(c => c.id === activeTab)?.label || (typeof activeTab === 'string' ? activeTab.replace(/-/g, ' ') : activeTab)}
-          </h2>
-          <div className="flex-1 h-[1px] bg-gray-200 dark:bg-zinc-800"></div>
-        </div>
-
-        {/* Menu list grid - Domino's full width cards with modern sleek spacing */}
-        <section className="flex flex-col w-full pb-8 gap-5 sm:gap-6">
-          {filteredItems.map((item) => {
-            const hasDiscount = Boolean(item.originalPrice && Number(item.originalPrice) > Number(item.price) && (Number(item.saveAmount) > 0 || (Number(item.originalPrice) - Number(item.price)) > 0));
-            const saveAmount = hasDiscount ? (item.saveAmount || (Number(item.originalPrice) - Number(item.price))) : 0;
-            const toppingsLine = item.toppingsSummary || item.description || "";
-
-            return (
-              <div 
-                key={item.id} 
-                onClick={() => checkLocation(() => openCustomizeModal(item))}
-                className="relative w-full overflow-hidden flex flex-col justify-end min-h-[330px] sm:min-h-[360px] aspect-[4/3.2] bg-zinc-950 group shadow-sm transition-all duration-300 cursor-pointer"
-              >
-                {/* Full-bleed Product Image covering entire card */}
-                {item.image && (
-                  <img
-                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    alt={item.title}
-                    src={item.image}
-                    loading="lazy"
-                  />
-                )}
-
-                {/* Top Badges - strictly dynamic from Superadmin */}
-                {Boolean(item.badge && item.badge.trim()) && (
-                  <div className="absolute top-3 left-3 flex items-center gap-2 z-10">
-                    <span className="bg-[#E53935] text-white text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-sm">
-                      {item.badge}
-                    </span>
-                  </div>
-                )}
-
-                {/* Dark Gradient Overlay with Veg Icon, Title, Toppings, Pricing & Red Add Button */}
-                <div className="relative z-10 w-full bg-gradient-to-t from-black/95 via-black/80 to-transparent pt-14 pb-3.5 px-4 text-left">
-                  {/* Veg Icon + Product Title */}
-                  <div className="flex items-center gap-2">
-                    <span className="veg-box scale-90 shrink-0 shadow-xs">
-                      <span className="veg-circle"></span>
-                    </span>
-                    <h3 className="text-white text-base sm:text-lg font-bold leading-snug truncate drop-shadow-md font-['Poppins',sans-serif]">
-                      {item.title}
-                    </h3>
-                  </div>
-
-                  {/* Toppings Summary Line */}
-                  {toppingsLine && (
-                    <p className="text-zinc-300 text-xs mt-1 truncate font-medium font-['Poppins',sans-serif] drop-shadow-sm">
-                      {toppingsLine}
-                    </p>
-                  )}
-
-                  {/* Pricing Row & Add Button (Directly over image overlay, no white footer) */}
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    <div className="flex flex-col gap-1 min-w-0">
-                      {/* Price, Strikethrough MRP, and Green Save Tag */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-white font-bold text-lg sm:text-xl font-['Poppins',sans-serif] drop-shadow-sm">
-                          ₹{item.price}
-                        </span>
-                        {hasDiscount && (
-                          <>
-                            <span className="text-zinc-400 line-through text-xs sm:text-sm font-medium">
-                              ₹{item.originalPrice}
-                            </span>
-                            <span className="bg-[#169B45] text-white text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded shadow-xs">
-                              Save ₹{saveAmount}
-                            </span>
-                          </>
-                        )}
-                      </div>
-
-                      {/* Variant Selector Link */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          checkLocation(() => openCustomizeModal(item));
-                        }}
-                        className="flex items-center gap-1 text-[11px] sm:text-xs text-zinc-300 hover:text-white border-b border-dashed border-zinc-400 w-fit cursor-pointer transition-colors pb-0.5 text-left font-medium select-none bg-transparent p-0"
-                      >
-                        <span>Regular | {item.defaultCrust || "New Hand Tossed"}</span>
-                        <ChevronRight size={13} className="text-zinc-400 shrink-0" />
-                      </button>
-                    </div>
-
-                    {/* Bright Red Add Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        checkLocation(() => openCustomizeModal(item));
-                      }}
-                      className="shrink-0 h-10 px-5 bg-[var(--accent-red,#EE3A43)] hover:opacity-95 active:scale-95 text-white font-bold text-sm rounded-xl transition-all shadow-lg shadow-[var(--accent-red,#EE3A43)]/30 cursor-pointer flex items-center gap-1.5 select-none uppercase font-['Poppins',sans-serif] border-0"
-                    >
-                      <span>Add</span>
-                      <span className="text-lg leading-none font-bold">+</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-
-          {filteredItems.length === 0 && (
-            <div className="py-12 sm:py-16 px-4 flex flex-col items-center justify-center text-center select-none w-full max-w-sm mx-auto animate-fade-in" style={{ fontFamily: "'Poppins', sans-serif" }}>
-              {/* Beautiful Modern Line-Art Illustration with Soft Organic Blush Blobs (inspired by Reference 2) */}
-              <div className="w-60 h-48 sm:w-68 sm:h-52 relative flex items-center justify-center mb-5">
-                <svg viewBox="0 0 280 230" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-sm">
-                  {/* Soft Organic Blush Blobs */}
-                  <path d="M196,28 C238,12 272,46 264,90 C256,132 214,146 188,124 C162,102 154,44 196,28 Z" fill="#FFEAE8" className="dark:opacity-25" />
-                  <path d="M38,120 C70,98 106,124 98,164 C90,204 44,216 24,188 C4,160 8,132 38,120 Z" fill="#FFF0F0" className="dark:opacity-20" />
+      <main className="w-full pt-0 pb-10">
+        {totalFilteredCount === 0 ? (
+          <div className="py-12 sm:py-16 px-4 flex flex-col items-center justify-center text-center select-none w-full max-w-sm mx-auto animate-fade-in" style={{ fontFamily: "'Poppins', sans-serif" }}>
+            {/* Beautiful Modern Line-Art Illustration with Soft Organic Blush Blobs (inspired by Reference 2) */}
+            <div className="w-60 h-48 sm:w-68 sm:h-52 relative flex items-center justify-center mb-5">
+              <svg viewBox="0 0 280 230" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-sm">
+                {/* Soft Organic Blush Blobs */}
+                <path d="M196,28 C238,12 272,46 264,90 C256,132 214,146 188,124 C162,102 154,44 196,28 Z" fill="#FFEAE8" className="dark:opacity-25" />
+                <path d="M38,120 C70,98 106,124 98,164 C90,204 44,216 24,188 C4,160 8,132 38,120 Z" fill="#FFF0F0" className="dark:opacity-20" />
+                
+                <g stroke="var(--accent-red, #EE3A43)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  {/* DRINK CUP (LEFT) */}
+                  {/* Straw with stripes */}
+                  <path d="M78 78 L78 46 L96 34" fill="none" />
+                  <line x1="78" y1="56" x2="84" y2="52" strokeWidth="2.5" />
+                  <line x1="78" y1="65" x2="85" y2="60" strokeWidth="2.5" />
                   
-                  <g stroke="var(--accent-red, #EE3A43)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    {/* DRINK CUP (LEFT) */}
-                    {/* Straw with stripes */}
-                    <path d="M78 78 L78 46 L96 34" fill="none" />
-                    <line x1="78" y1="56" x2="84" y2="52" strokeWidth="2.5" />
-                    <line x1="78" y1="65" x2="85" y2="60" strokeWidth="2.5" />
-                    
-                    {/* Cup Lid */}
-                    <rect x="52" y="78" width="52" height="10" rx="5" fill="white" className="dark:fill-zinc-900" />
-                    
-                    {/* Cup Body */}
-                    <path d="M57 88 L65 168 C65.5 173 70 177 75 177 L89 177 C94 177 98.5 173 99 168 L107 88 Z" fill="white" className="dark:fill-zinc-900" />
-                    
-                    {/* Cup Details */}
-                    <line x1="60" y1="112" x2="104" y2="112" strokeWidth="2" strokeDasharray="4 3" />
-                    <circle cx="82" cy="138" r="9" fill="white" className="dark:fill-zinc-900" strokeWidth="2.2" />
-                    <path d="M78 137 Q82 142 86 137" fill="none" strokeWidth="2" />
+                  {/* Cup Lid */}
+                  <rect x="52" y="78" width="52" height="10" rx="5" fill="white" className="dark:fill-zinc-900" />
+                  
+                  {/* Cup Body */}
+                  <path d="M57 88 L65 168 C65.5 173 70 177 75 177 L89 177 C94 177 98.5 173 99 168 L107 88 Z" fill="white" className="dark:fill-zinc-900" />
+                  
+                  {/* Cup Details */}
+                  <line x1="60" y1="112" x2="104" y2="112" strokeWidth="2" strokeDasharray="4 3" />
+                  <circle cx="82" cy="138" r="9" fill="white" className="dark:fill-zinc-900" strokeWidth="2.2" />
+                  <path d="M78 137 Q82 142 86 137" fill="none" strokeWidth="2" />
 
-                    {/* STEAMING PIZZA SLICE (RIGHT) */}
-                    {/* Aroma Steam Curls */}
-                    <path d="M166 56 C170 46 164 38 168 28" fill="none" strokeWidth="2.5" />
-                    <path d="M188 64 C192 54 186 46 190 36" fill="none" strokeWidth="2.5" />
-                    <path d="M210 58 C214 50 208 42 212 32" fill="none" strokeWidth="2.5" />
+                  {/* STEAMING PIZZA SLICE (RIGHT) */}
+                  {/* Aroma Steam Curls */}
+                  <path d="M166 56 C170 46 164 38 168 28" fill="none" strokeWidth="2.5" />
+                  <path d="M188 64 C192 54 186 46 190 36" fill="none" strokeWidth="2.5" />
+                  <path d="M210 58 C214 50 208 42 212 32" fill="none" strokeWidth="2.5" />
 
-                    {/* Pizza Slice Body */}
-                    <path d="M130 96 C144 89 204 89 224 96 C229 98 231 104 227 109 L181 184 C179 188 173 188 170 184 L125 109 C122 104 124 98 130 96 Z" fill="white" className="dark:fill-zinc-900" />
-                    
-                    {/* Crust Rim line */}
-                    <path d="M134 107 C150 101 200 101 219 107" fill="none" strokeWidth="2.5" />
+                  {/* Pizza Slice Body */}
+                  <path d="M130 96 C144 89 204 89 224 96 C229 98 231 104 227 109 L181 184 C179 188 173 188 170 184 L125 109 C122 104 124 98 130 96 Z" fill="white" className="dark:fill-zinc-900" />
+                  
+                  {/* Crust Rim line */}
+                  <path d="M134 107 C150 101 200 101 219 107" fill="none" strokeWidth="2.5" />
 
-                    {/* Delicious Toppings */}
-                    {/* Olive Rings */}
-                    <circle cx="160" cy="136" r="5.5" fill="white" className="dark:fill-zinc-900" strokeWidth="2.5" />
-                    <circle cx="190" cy="128" r="5" fill="white" className="dark:fill-zinc-900" strokeWidth="2.5" />
-                    <circle cx="177" cy="162" r="4.5" fill="white" className="dark:fill-zinc-900" strokeWidth="2.5" />
+                  {/* Delicious Toppings */}
+                  <circle cx="160" cy="136" r="5.5" fill="white" className="dark:fill-zinc-900" strokeWidth="2.5" />
+                  <circle cx="190" cy="128" r="5" fill="white" className="dark:fill-zinc-900" strokeWidth="2.5" />
+                  <circle cx="177" cy="162" r="4.5" fill="white" className="dark:fill-zinc-900" strokeWidth="2.5" />
 
-                    {/* Veggie & Basil Marks */}
-                    <path d="M172 116 Q182 114 185 120" fill="none" strokeWidth="2.2" />
-                    <path d="M146 122 Q154 120 152 126" fill="none" strokeWidth="2.2" />
-                    <path d="M202 142 Q208 148 202 152" fill="none" strokeWidth="2.2" />
+                  {/* Veggie & Basil Marks */}
+                  <path d="M172 116 Q182 114 185 120" fill="none" strokeWidth="2.2" />
+                  <path d="M146 122 Q154 120 152 126" fill="none" strokeWidth="2.2" />
+                  <path d="M202 142 Q208 148 202 152" fill="none" strokeWidth="2.2" />
 
-                    {/* Melting Cheese drop */}
-                    <path d="M168 180 Q170 188 173 182" fill="none" strokeWidth="2" />
+                  {/* Melting Cheese drop */}
+                  <path d="M168 180 Q170 188 173 182" fill="none" strokeWidth="2" />
 
-                    {/* Ground Table Accent Lines */}
-                    <line x1="36" y1="198" x2="244" y2="198" strokeWidth="3" />
-                    <line x1="92" y1="208" x2="188" y2="208" strokeWidth="2.5" />
-                  </g>
-                </svg>
+                  {/* Ground Table Accent Lines */}
+                  <line x1="36" y1="198" x2="244" y2="198" strokeWidth="3" />
+                  <line x1="92" y1="208" x2="188" y2="208" strokeWidth="2.5" />
+                </g>
+              </svg>
+            </div>
+
+            {/* Clean Title (Medium Weight, Not Bold) */}
+            <h3 className="text-base sm:text-lg font-medium text-[var(--accent-red,#EE3A43)] leading-snug">
+              {searchQuery
+                ? `No Dishes Found`
+                : `Fresh Dishes Coming Soon !`}
+            </h3>
+
+            {/* Short Quote / Description */}
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 max-w-[280px] leading-relaxed font-normal">
+              {searchQuery
+                ? `“We couldn't find any dish matching '${searchQuery}'. Discover our other favorites!”`
+                : `“We are handcrafting fresh recipes for you. Delicious options await!”`}
+            </p>
+
+            {/* Single Rounded Red Pill Action Button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (searchQuery) {
+                  setSearchQuery("");
+                } else if (firstCategoryWithItems) {
+                  handleCategoryTabClick(firstCategoryWithItems.id);
+                }
+              }}
+              className="mt-6 w-full max-w-[210px] py-3 px-6 bg-[var(--accent-red,#EE3A43)] hover:bg-[#d92d36] active:scale-95 text-white text-xs font-medium tracking-wider rounded-full shadow-sm hover:shadow transition-all cursor-pointer border-0 uppercase"
+            >
+              {searchQuery
+                ? "Clear Search"
+                : firstCategoryWithItems
+                ? `Explore Menu`
+                : "Explore Menu"}
+            </button>
+          </div>
+        ) : (
+          categorySectionsWithItems.map(({ category, items }) => (
+            <div
+              key={category._id || category.id}
+              id={`category-section-${category.id}`}
+              className="w-full scroll-mt-24"
+            >
+              {/* Category Section Divider Header (Matches Domino's screenshot media_1792050211697_9dee3bdf.png) */}
+              <div className="flex items-center justify-center py-5 sm:py-6 px-4 select-none">
+                <div className="flex-1 h-[1.5px] bg-zinc-300 dark:bg-zinc-700 max-w-[130px]"></div>
+                <h2 
+                  className="px-4 text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-100 tracking-tight leading-none"
+                  style={{ fontFamily: "'Poppins', sans-serif" }}
+                >
+                  {category.label || category.name || (typeof category.id === 'string' ? category.id.replace(/-/g, ' ') : category.id)}
+                </h2>
+                <div className="flex-1 h-[1.5px] bg-zinc-300 dark:bg-zinc-700 max-w-[130px]"></div>
               </div>
 
-              {/* Clean Title (Medium Weight, Not Bold) */}
-              <h3 className="text-base sm:text-lg font-medium text-[var(--accent-red,#EE3A43)] leading-snug">
-                {searchQuery
-                  ? `No Dishes Found`
-                  : `Fresh Dishes Coming Soon !`}
-              </h3>
+              {/* Menu list grid - Domino's full width cards with modern sleek spacing */}
+              <section className="flex flex-col w-full gap-5 sm:gap-6">
+                {items.map((item) => {
+                  const hasDiscount = Boolean(item.originalPrice && Number(item.originalPrice) > Number(item.price) && (Number(item.saveAmount) > 0 || (Number(item.originalPrice) - Number(item.price)) > 0));
+                  const saveAmount = hasDiscount ? (item.saveAmount || (Number(item.originalPrice) - Number(item.price))) : 0;
+                  const toppingsLine = item.toppingsSummary || item.description || "";
 
-              {/* Short Quote / Description */}
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 max-w-[280px] leading-relaxed font-normal">
-                {searchQuery
-                  ? `“We couldn't find any dish matching '${searchQuery}'. Discover our other favorites!”`
-                  : `“We are handcrafting fresh recipes for ${activeCategoryName}. Delicious options await!”`}
-              </p>
+                  return (
+                    <div 
+                      key={item.id} 
+                      onClick={() => checkLocation(() => openCustomizeModal(item))}
+                      className="relative w-full overflow-hidden flex flex-col justify-end min-h-[330px] sm:min-h-[360px] aspect-[4/3.2] bg-zinc-950 group shadow-sm transition-all duration-300 cursor-pointer"
+                    >
+                      {/* Full-bleed Product Image covering entire card */}
+                      {item.image && (
+                        <img
+                          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          alt={item.title}
+                          src={item.image}
+                          loading="lazy"
+                        />
+                      )}
 
-              {/* Single Rounded Red Pill Action Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (searchQuery) {
-                    setSearchQuery("");
-                  } else if (firstCategoryWithItems) {
-                    userManuallySelectedCategoryRef.current = true;
-                    setActiveTab(firstCategoryWithItems.id);
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }
-                }}
-                className="mt-6 w-full max-w-[210px] py-3 px-6 bg-[var(--accent-red,#EE3A43)] hover:bg-[#d92d36] active:scale-95 text-white text-xs font-medium tracking-wider rounded-full shadow-sm hover:shadow transition-all cursor-pointer border-0 uppercase"
-              >
-                {searchQuery
-                  ? "Clear Search"
-                  : firstCategoryWithItems
-                  ? `Explore Menu`
-                  : "Explore Menu"}
-              </button>
+                      {/* Top Badges - strictly dynamic from Superadmin */}
+                      {Boolean(item.badge && item.badge.trim()) && (
+                        <div className="absolute top-3 left-3 flex items-center gap-2 z-10">
+                          <span className="bg-[#E53935] text-white text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-sm">
+                            {item.badge}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Dark Gradient Overlay with Veg Icon, Title, Toppings, Pricing & Red Add Button */}
+                      <div className="relative z-10 w-full bg-gradient-to-t from-black/95 via-black/80 to-transparent pt-14 pb-3.5 px-4 text-left">
+                        {/* Veg Icon + Product Title */}
+                        <div className="flex items-center gap-2">
+                          <span className="veg-box scale-90 shrink-0 shadow-xs">
+                            <span className="veg-circle"></span>
+                          </span>
+                          <h3 className="text-white text-base sm:text-lg font-bold leading-snug truncate drop-shadow-md font-['Poppins',sans-serif]">
+                            {item.title}
+                          </h3>
+                        </div>
+
+                        {/* Toppings Summary Line */}
+                        {toppingsLine && (
+                          <p className="text-zinc-300 text-xs mt-1 truncate font-medium font-['Poppins',sans-serif] drop-shadow-sm">
+                            {toppingsLine}
+                          </p>
+                        )}
+
+                        {/* Pricing Row & Add Button (Directly over image overlay, no white footer) */}
+                        <div className="mt-3 flex items-center justify-between gap-3">
+                          <div className="flex flex-col gap-1 min-w-0">
+                            {/* Price, Strikethrough MRP, and Green Save Tag */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-white font-bold text-lg sm:text-xl font-['Poppins',sans-serif] drop-shadow-sm">
+                                ₹{item.price}
+                              </span>
+                              {hasDiscount && (
+                                <>
+                                  <span className="text-zinc-400 line-through text-xs sm:text-sm font-medium">
+                                    ₹{item.originalPrice}
+                                  </span>
+                                  <span className="bg-[#169B45] text-white text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded shadow-xs">
+                                    Save ₹{saveAmount}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+
+                            {/* Variant Selector Link */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                checkLocation(() => openCustomizeModal(item));
+                              }}
+                              className="flex items-center gap-1 text-[11px] sm:text-xs text-zinc-300 hover:text-white border-b border-dashed border-zinc-400 w-fit cursor-pointer transition-colors pb-0.5 text-left font-medium select-none bg-transparent p-0"
+                            >
+                              <span>Regular | {item.defaultCrust || "New Hand Tossed"}</span>
+                              <ChevronRight size={13} className="text-zinc-400 shrink-0" />
+                            </button>
+                          </div>
+
+                          {/* Bright Red Add Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              checkLocation(() => openCustomizeModal(item));
+                            }}
+                            className="shrink-0 h-10 px-5 bg-[var(--accent-red,#EE3A43)] hover:opacity-95 active:scale-95 text-white font-bold text-sm rounded-xl transition-all shadow-lg shadow-[var(--accent-red,#EE3A43)]/30 cursor-pointer flex items-center gap-1.5 select-none uppercase font-['Poppins',sans-serif] border-0"
+                          >
+                            <span>Add</span>
+                            <span className="text-lg leading-none font-bold">+</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </section>
             </div>
-          )}
-        </section>
+          ))
+        )}
       </main>
 
       {/* Floating Modern Customization Sheet (matching Reference Image 2) */}
@@ -1911,24 +2286,24 @@ export default function MenuList() {
                             alt={crust.name} 
                             className="w-12 h-12 rounded-xl object-cover shrink-0 bg-zinc-100 dark:bg-zinc-800"
                           />
-                          <div className="flex-1 min-w-0 pr-6">
+                          <div className="flex-1 min-w-0 pr-4">
                             <div className="font-bold text-xs text-zinc-900 dark:text-white truncate">
                               {crust.name}
                             </div>
                             <div className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 leading-tight line-clamp-1">
-                              {crust.description || (crust.name.includes("Burst") ? "Crust overflowing with molten liquid cheese" : "Fresh Dough, Flavourful Edges")}
+                              {crust.description || (crust.name.includes("Burst") ? "Crust overflowing with molten liquid..." : "Fresh Dough, Flavourful Edges")}
                             </div>
                           </div>
-                          <div className="text-right shrink-0">
+                          <div className="text-right shrink-0 flex flex-col items-end justify-center min-w-[48px]">
+                            {isSelected && (
+                              <div className="w-5 h-5 rounded-full bg-[#0066CC] dark:bg-[#3B82F6] text-white flex items-center justify-center shadow-xs mb-1">
+                                <Check size={12} strokeWidth={3} />
+                              </div>
+                            )}
                             <span className="font-bold text-xs text-zinc-800 dark:text-zinc-200">
                               {crustPrice > 0 ? `+ ₹${crustPrice}` : "₹0"}
                             </span>
                           </div>
-                          {isSelected && (
-                            <div className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-[#0066CC] dark:bg-[#3B82F6] text-white flex items-center justify-center shadow-xs">
-                              <Check size={12} strokeWidth={3} />
-                            </div>
-                          )}
                         </div>
                       );
                     })}
@@ -1976,7 +2351,7 @@ export default function MenuList() {
                             <span className="text-xs font-bold text-zinc-600 dark:text-zinc-300">
                               + ₹{topPrice}
                             </span>
-                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
                               isSelected 
                                 ? "bg-[#0066CC] dark:bg-[#3B82F6] border-[#0066CC] dark:border-[#3B82F6] text-white" 
                                 : "border-zinc-300 dark:border-zinc-700 group-hover:border-zinc-400"
@@ -2025,7 +2400,7 @@ export default function MenuList() {
                             <span className="text-xs font-bold text-zinc-600 dark:text-zinc-300">
                               + ₹{dipPrice}
                             </span>
-                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
                               isSelected 
                                 ? "bg-[#0066CC] dark:bg-[#3B82F6] border-[#0066CC] dark:border-[#3B82F6] text-white" 
                                 : "border-zinc-300 dark:border-zinc-700 group-hover:border-zinc-400"
@@ -2220,12 +2595,12 @@ export default function MenuList() {
 
       {/* Floating Action Cart basket FAB */}
       {totalCartCount > 0 && (
-        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 w-full max-w-md pointer-events-none z-45">
+        <div className="fixed bottom-24 right-4 pointer-events-none z-45">
           <button
             onClick={() => {
               navigate("/user/cart")
             }}
-            className="absolute right-4 bottom-0 pointer-events-auto w-14 h-14 bg-primary text-on-primary rounded-full shadow-[0_0_20px_rgba(229,57,53,0.4)] flex items-center justify-center active:scale-95 transition-transform cursor-pointer"
+            className="pointer-events-auto w-14 h-14 bg-primary text-on-primary rounded-full shadow-[0_0_20px_rgba(229,57,53,0.4)] flex items-center justify-center active:scale-95 transition-transform cursor-pointer"
           >
             <span className="material-symbols-outlined text-[28px]">shopping_basket</span>
             <div className="absolute -top-1 -right-1 w-6 h-6 bg-white text-on-primary-container rounded-full text-[10px] font-bold flex items-center justify-center border border-primary animate-bounce">
@@ -2234,7 +2609,127 @@ export default function MenuList() {
           </button>
         </div>
       )}
+
+      {/* Floating Action Controls (Domino's style matching media_1792050211697_9dee3bdf.png) */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-md px-4 pointer-events-none z-40 flex items-center justify-between">
+        {/* Scroll-to-Top Floating Circular Button */}
+        {isScrolled ? (
+          <button
+            type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            title="Scroll to top"
+            aria-label="Scroll to top"
+            className="pointer-events-auto w-11 h-11 bg-white/95 dark:bg-zinc-800/95 text-zinc-800 dark:text-zinc-100 rounded-full shadow-lg border border-zinc-200 dark:border-zinc-700 flex items-center justify-center cursor-pointer hover:scale-105 active:scale-95 transition-all backdrop-blur-sm"
+          >
+            <ChevronUp className="w-5 h-5 stroke-[2.5]" />
+          </button>
+        ) : (
+          <div className="w-11 h-11" />
+        )}
+
+        {/* Floating "Menu" Pill Button (Opens Quick Jump Category Sheet) */}
+        <button
+          type="button"
+          onClick={() => setShowQuickMenuModal(true)}
+          className="pointer-events-auto px-5 py-2.5 bg-[var(--secondary-off-white,#F8F6F2)] dark:bg-[#18181a] text-[var(--primary,#EE3A43)] rounded-full shadow-2xl backdrop-blur-md flex items-center gap-2 font-bold text-xs tracking-wider uppercase cursor-pointer hover:scale-105 active:scale-95 transition-all border border-zinc-300/80 dark:border-zinc-700/80"
+        >
+          <UtensilsCrossed className="w-4 h-4 text-[var(--primary,#EE3A43)] stroke-[2.5]" />
+          <span className="text-[var(--primary,#EE3A43)]">Menu</span>
+        </button>
+
+        <div className="w-11 h-11" />
+      </div>
+
+      {/* Quick Category Jump Sheet */}
+      {showQuickMenuModal && (
+        <div 
+          onClick={() => setShowQuickMenuModal(false)}
+          className="fixed inset-0 z-55 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white dark:bg-[#18181a] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden p-5 max-h-[75vh] flex flex-col slide-up-modal font-['Poppins',sans-serif]"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                <UtensilsCrossed className="w-4 h-4 text-[var(--primary,#EE3A43)]" />
+                <span>Categories</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowQuickMenuModal(false)}
+                className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 hover:text-zinc-800 dark:hover:text-white cursor-pointer border-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto py-2 divide-y divide-zinc-100 dark:divide-zinc-800/60 max-h-[60vh]">
+              {categorySectionsWithItems.map(({ category, items }) => {
+                const isActive = activeTab === category.id || String(category._id) === activeTab;
+                return (
+                  <button
+                    key={category._id || category.id}
+                    type="button"
+                    onClick={() => {
+                      setShowQuickMenuModal(false);
+                      handleCategoryTabClick(category.id);
+                    }}
+                    className={`w-full py-3 px-2 flex items-center justify-between text-left transition-colors cursor-pointer border-0 bg-transparent rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${
+                      isActive ? "text-[#E53935] font-bold" : "text-zinc-800 dark:text-zinc-200 font-medium"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      {isActive && <div className="w-2 h-2 rounded-full bg-[var(--primary,#EE3A43)] shrink-0" />}
+                      <span className="text-sm">{category.label || category.name || category.id}</span>
+                      {category.badge && (
+                        <span className="text-[9px] font-bold text-white bg-[var(--primary,#EE3A43)] px-1.5 py-0.5 rounded-full uppercase">
+                          {category.badge}
+                        </span>
+                      )}
+                    </div>
+                    <span
+                      className={`text-xs tabular-nums font-semibold shrink-0 ml-4 ${
+                        isActive
+                          ? "text-[var(--primary,#EE3A43)] font-bold"
+                          : "text-zinc-400 dark:text-zinc-500"
+                      }`}
+                    >
+                      {items.length}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Dynamic Full-Screen Search Overlay matching user's Image 2 */}
+      <MenuSearchOverlay
+        isOpen={isSearchOverlayOpen}
+        onClose={() => setIsSearchOverlayOpen(false)}
+        allProducts={allFlattenedProducts}
+        allAddons={allAddonsList}
+        categories={categories}
+        initialQuery={searchQuery}
+        onOpenCustomize={(product) => {
+          setIsSearchOverlayOpen(false);
+          checkLocation(() => openCustomizeModal(product));
+        }}
+        onAddToCart={(product) => {
+          checkLocation(() => {
+            if (product.sizes && product.sizes.length > 1) {
+              setIsSearchOverlayOpen(false);
+              openCustomizeModal(product);
+            } else {
+              addToCart(product);
+              triggerToast(`Added ${product.title} to cart!`);
+            }
+          });
+        }}
+      />
       </div>
     </div>
   )
 }
+

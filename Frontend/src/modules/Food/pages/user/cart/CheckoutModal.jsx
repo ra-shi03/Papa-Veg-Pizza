@@ -116,6 +116,11 @@ export default function CheckoutModal({
 
     const defaultPayment = paymentMethods?.[0] || { id: "cod", type: "cod", cardNumber: "Cash On Delivery", cardHolder: "Guest" }
 
+    const activeService = localStorage.getItem("activeService") || "delivery"
+    const savedDeliveryAddress = localStorage.getItem("deliveryAddress") || ""
+    const isTrain = activeService === "train" || savedDeliveryAddress.toLowerCase().includes("train")
+    const trainPnr = localStorage.getItem("pvp_train_pnr") || ""
+
     // Place the order
     const orderId = createOrder({
       items: cartItems.map(item => ({
@@ -126,8 +131,8 @@ export default function CheckoutModal({
         image: item.image
       })),
       address: {
-        street: newAddressObject.street,
-        additionalDetails: newAddressObject.additionalDetails,
+        street: isTrain && savedDeliveryAddress ? savedDeliveryAddress : newAddressObject.street,
+        additionalDetails: isTrain && trainPnr ? `IRCTC Train PNR: ${trainPnr}` : newAddressObject.additionalDetails,
         city: newAddressObject.city,
         state: newAddressObject.state,
         zipCode: newAddressObject.zipCode
@@ -137,6 +142,13 @@ export default function CheckoutModal({
         phone: contactPhone,
         email: contactEmail
       },
+      isTrainOrder: isTrain,
+      orderType: isTrain ? "train" : "delivery",
+      pnr: trainPnr || undefined,
+      trainDetails: isTrain ? {
+        deliveryAddress: savedDeliveryAddress,
+        pnr: trainPnr
+      } : undefined,
       timeSlot: timeOption,
       promoOptIn: promoCommunication,
       paymentMethod: defaultPayment,
@@ -147,6 +159,36 @@ export default function CheckoutModal({
       restaurant: cartItems[0]?.restaurant || "Papa Veg Pizza",
       note: instructions.trim()
     })
+
+    if (isTrain) {
+      try {
+        const existing = JSON.parse(localStorage.getItem("pvp_train_orders") || "[]")
+        const trainOrderEntry = {
+          orderId,
+          id: orderId,
+          isTrainOrder: true,
+          orderType: "train",
+          createdAt: new Date().toISOString(),
+          status: "confirmed",
+          total,
+          items: cartItems.map(item => ({
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity
+          })),
+          trainDetails: {
+            deliveryAddress: savedDeliveryAddress,
+            pnr: trainPnr
+          },
+          deliveryAddress: {
+            street: savedDeliveryAddress || newAddressObject.street,
+            additionalDetails: `Train delivery PNR: ${trainPnr}`,
+            city: newAddressObject.city
+          }
+        }
+        localStorage.setItem("pvp_train_orders", JSON.stringify([trainOrderEntry, ...existing]))
+      } catch (_) {}
+    }
 
     // Clear cart in storage & context
     try {

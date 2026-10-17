@@ -29,7 +29,10 @@ const homePageSchema = new mongoose.Schema(
                 url: { type: String, required: true },
                 publicId: { type: String, required: true },
                 resourceType: { type: String, enum: ['image', 'video'], default: 'image' },
-                uploadedAt: { type: Date, default: Date.now }
+                uploadedAt: { type: Date, default: Date.now },
+                category: { type: String, default: '' },
+                categoryName: { type: String, default: '' },
+                link: { type: String, default: '' }
             }
         ],
         orderMethods: [
@@ -80,7 +83,20 @@ const homePageSchema = new mongoose.Schema(
             iconUrl: { type: String, default: '' },
             animationType: { type: String, default: 'scooter' },
             link: { type: String, default: '/user/menu' }
-        }
+        },
+        bottomNav: [
+            {
+                id: { type: String, required: true },
+                label: { type: String, required: true },
+                icon: { type: String, default: 'local_pizza' },
+                iconType: { type: String, enum: ['material', 'image'], default: 'material' },
+                iconUrl: { type: String, default: '' },
+                badge: { type: String, default: '' },
+                link: { type: String, default: '/user/menu' },
+                enabled: { type: Boolean, default: true },
+                sortOrder: { type: Number, default: 1 }
+            }
+        ]
     },
     {
         collection: 'food_home_page_settings',

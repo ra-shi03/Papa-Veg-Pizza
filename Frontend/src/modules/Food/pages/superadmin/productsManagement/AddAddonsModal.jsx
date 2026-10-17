@@ -1,17 +1,33 @@
 import React, { useState, useEffect } from "react";
-import { X, CloudUpload, CheckCircle, Search, Trash2, Loader2 } from "lucide-react";
+import { X, CloudUpload, CheckCircle, Search, Trash2, Loader2, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { uploadAPI } from "@/services/api";
+import { adminClient } from "@/services/api/axios";
+import TypeSearchDropdown from "./TypeSearchDropdown";
 
-export default function AddAddonsModal({ isOpen, onClose, onSave }) {
+export default function AddAddonsModal({ isOpen, onClose, onSave, typesList = [] }) {
   const [name, setName] = useState("");
   const [type, setType] = useState("");
+  const [availableTypes, setAvailableTypes] = useState(typesList || []);
   const [prices, setPrices] = useState([{ size: "Default", price: "" }]);
   const [image, setImage] = useState("");
   const [status, setStatus] = useState("Active");
+  const [isDefault, setIsDefault] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+
+  useEffect(() => {
+    if (typesList && typesList.length > 0) {
+      setAvailableTypes(typesList);
+    } else if (isOpen) {
+      adminClient.get("/food/admin/addon-types").then(res => {
+        if (res?.data?.success && Array.isArray(res.data.data)) {
+          setAvailableTypes(res.data.data);
+        }
+      }).catch(() => {});
+    }
+  }, [typesList, isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -20,6 +36,7 @@ export default function AddAddonsModal({ isOpen, onClose, onSave }) {
       setPrices([{ size: "Default", price: "" }]);
       setImage("");
       setStatus("Active");
+      setIsDefault(false);
       setLoading(false);
     }
   }, [isOpen]);
@@ -69,7 +86,7 @@ export default function AddAddonsModal({ isOpen, onClose, onSave }) {
   };
 
   const handleSubmit = async () => {
-    const validPrices = prices.filter(p => p.size && p.price !== "");
+    const validPrices = prices.filter(p => p.size && (p.price !== "" || isDefault));
     if (!name || !type || validPrices.length === 0) {
       alert("Name, Type, and at least one Price are required.");
       return;
@@ -78,12 +95,22 @@ export default function AddAddonsModal({ isOpen, onClose, onSave }) {
     const payload = {
       name,
       type,
-      prices: validPrices.map(p => ({ size: p.size, price: Number(p.price) })),
+      prices: validPrices.map(p => ({ size: p.size, price: Number(p.price || 0) })),
       image,
-      status
+      status,
+      isDefault
     };
     await onSave(payload);
     setLoading(false);
+  };
+
+  const setZeroPrices = () => {
+    setPrices([
+      { size: "Regular", price: "0" },
+      { size: "Medium", price: "0" },
+      { size: "Large", price: "0" },
+      { size: "Default", price: "0" }
+    ]);
   };
 
   return (
@@ -109,19 +136,23 @@ export default function AddAddonsModal({ isOpen, onClose, onSave }) {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Extra Cheese Burst"
+                placeholder="e.g. New Hand Tossed or Extra Cheese"
                 className="w-full px-4 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)] transition-colors outline-none"
               />
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Type *</label>
-              <input
-                type="text"
+              <TypeSearchDropdown
                 value={type}
-                onChange={(e) => setType(e.target.value)}
-                placeholder="e.g. Topping, Crust, Dip"
-                className="w-full px-4 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)] transition-colors outline-none"
+                onChange={(selectedType) => setType(selectedType)}
+                typesList={availableTypes}
+                onSelectCrustHandTossed={() => {
+                  if (!isDefault && name.toLowerCase().includes("hand tossed")) {
+                    setIsDefault(true);
+                    setZeroPrices();
+                  }
+                }}
               />
             </div>
 
@@ -135,6 +166,36 @@ export default function AddAddonsModal({ isOpen, onClose, onSave }) {
                 <option value="Active">Active</option>
                 <option value="Inactive">Inactive</option>
               </select>
+            </div>
+
+            {/* Default Option Toggle */}
+            <div className="col-span-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-bold text-amber-900 dark:text-amber-200 block">
+                  Default Option (e.g. Base Crust without extra price)
+                </span>
+                <span className="text-[10px] text-amber-700 dark:text-amber-300/80">
+                  Enable if this is the default free option selected automatically on products (e.g. New Hand Tossed).
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="add-is-default-checkbox"
+                  checked={isDefault}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setIsDefault(checked);
+                    if (checked) {
+                      setZeroPrices();
+                    }
+                  }}
+                  className="w-4 h-4 text-[var(--primary)] rounded cursor-pointer accent-[var(--primary)]"
+                />
+                <label htmlFor="add-is-default-checkbox" className="text-xs font-bold cursor-pointer select-none">
+                  Default (₹0)
+                </label>
+              </div>
             </div>
 
             <div className="col-span-2 space-y-3">

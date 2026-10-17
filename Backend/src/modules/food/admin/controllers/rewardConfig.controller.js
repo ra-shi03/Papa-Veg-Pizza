@@ -45,10 +45,22 @@ export const updateRewardConfig = async (req, res) => {
 // Get public config for user app
 export const getPublicRewardConfig = async (req, res) => {
   try {
-    const config = await RewardConfig.findOne();
-    // Return config if enabled, otherwise return null/disabled state
-    if (!config || !config.isEnabled) {
-      return res.status(200).json({ success: true, data: { isEnabled: false } });
+    let config = await RewardConfig.findOne();
+    if (!config) {
+      config = await RewardConfig.create({
+        isEnabled: true,
+        programName: 'Cheesy Rewards',
+        orderPointsTitle: '1 Order = 100 Points',
+        orderPointsSubtitle: 'On every order above ₹349',
+        freeItemsTitle: 'Unlock Free Items',
+        freeItemsSubtitle: 'Starting at 600 Points',
+        minOrderAmount: 349,
+        pointsPerOrder: 100,
+        defaultPointsRequired: 600,
+        buttonText: 'Enroll Now',
+        termsText: 'By enrolling you agree to our',
+        termsLinkText: 'Terms and Conditions'
+      });
     }
     res.status(200).json({ success: true, data: config });
   } catch (error) {

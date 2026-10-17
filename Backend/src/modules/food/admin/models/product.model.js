@@ -34,7 +34,10 @@ const productSchema = new mongoose.Schema(
         storeIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'FoodStore' }],
         toppings: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Addon' }],
         sizes: { type: [productSizeSchema], default: [] },
-        vegType: { type: String, enum: ['veg', 'non-veg', 'vegan'], default: 'veg' }
+        vegType: { type: String, enum: ['veg', 'non-veg', 'vegan'], default: 'veg' },
+        defaultCrust: { type: String, default: 'New Hand Tossed', trim: true },
+        showCrust: { type: Boolean, default: true },
+        crusts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Addon' }]
     },
     {
         collection: 'products',

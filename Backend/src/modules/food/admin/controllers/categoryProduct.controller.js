@@ -18,7 +18,7 @@ export const getCategoryProducts = async (req, res) => {
     else if (sort === 'sort_desc') sortObj = { sort: -1, createdAt: 1 };
 
     const categoryProducts = await CategoryProduct.find(query).sort(sortObj);
-    res.json({ success: true, data: categoryProducts });
+    res.json({ success: true, data: categoryProducts, categories: categoryProducts });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

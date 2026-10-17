@@ -43,6 +43,7 @@ export async function getProducts(req, res, next) {
             const products = await Product.find(filter)
                 .populate('categoryId', 'label name badge icon sort')
                 .populate('toppings')
+                .populate('crusts')
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limitNum);
@@ -62,6 +63,7 @@ export async function getProducts(req, res, next) {
         const products = await Product.find(filter)
             .populate('categoryId', 'label name badge icon sort')
             .populate('toppings')
+            .populate('crusts')
             .sort({ createdAt: -1 });
             
         res.status(200).json({ success: true, data: products, totalCount: products.length });
@@ -167,6 +169,7 @@ export async function getPublicProducts(req, res, next) {
         const products = await Product.find(filter)
             .populate('categoryId', 'label name badge icon sort')
             .populate('toppings')
+            .populate('crusts')
             .sort({ createdAt: -1 });
 
         res.status(200).json({ success: true, data: products, totalCount: products.length });
@@ -181,6 +184,7 @@ export async function getPublicMenu(req, res, next) {
         const products = await Product.find({ status: { $regex: /^active$/i } })
             .populate('categoryId', 'label name badge icon sort')
             .populate('toppings')
+            .populate('crusts')
             .sort({ createdAt: -1 });
 
         res.status(200).json({ 
@@ -203,6 +207,7 @@ export async function getProductById(req, res, next) {
         const product = await Product.findById(req.params.id)
             .populate('categoryId', 'label')
             .populate('toppings')
+            .populate('crusts')
             .populate('franchiseIds', 'companyName name franchiseName')
             .populate('storeIds', 'name storeName');
         if (!product) {

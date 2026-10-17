@@ -1,5 +1,5 @@
 import React from "react";
-import { Edit, Trash2, ArrowUpDown, Eye } from "lucide-react";
+import { Edit, Trash2, ArrowUpDown, Eye, Package } from "lucide-react";
 import dayjs from "dayjs";
 
 export default function AddonsData({
@@ -20,7 +20,7 @@ export default function AddonsData({
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden select-none">
       <div className="overflow-x-auto w-full relative">
-        <table className="w-full border-collapse text-left text-xs min-w-[800px]">
+        <table className="w-full border-collapse text-left text-xs min-w-[850px]">
           <thead className="bg-zinc-50 dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-850 text-zinc-500 font-bold uppercase sticky top-0 z-30">
             <tr>
               <th className="px-4 py-3 w-16 text-center">Image</th>
@@ -29,6 +29,9 @@ export default function AddonsData({
               </th>
               <th className="px-4 py-3 cursor-pointer hover:text-[var(--primary)]" onClick={() => onSort("type")}>
                 Type {getSortIcon("type")}
+              </th>
+              <th className="px-4 py-3 text-center cursor-pointer hover:text-[var(--primary)]" onClick={() => onSort("connectedProductsCount")}>
+                In Products {getSortIcon("connectedProductsCount")}
               </th>
               <th className="px-4 py-3 cursor-pointer hover:text-[var(--primary)]" onClick={() => onSort("size")}>
                 Size {getSortIcon("size")}
@@ -58,10 +61,27 @@ export default function AddonsData({
                   </div>
                 </td>
                 <td className="px-4 py-3 font-bold text-black dark:text-white">
-                  {item.name}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span>{item.name}</span>
+                    {item.isDefault && (
+                      <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black tracking-wide uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+                        Default
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3 capitalize">
                   {item.type}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  {item.connectedProductsCount > 0 ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                      <Package size={11} />
+                      {item.connectedProductsCount} {item.connectedProductsCount === 1 ? "Product" : "Products"}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-zinc-400 font-medium">0 Products</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 font-medium text-zinc-600 dark:text-zinc-400 align-top">
                   {item.prices && item.prices.length > 0 ? (
@@ -73,9 +93,17 @@ export default function AddonsData({
                 <td className="px-4 py-3 text-right font-black text-black dark:text-white align-top">
                   {item.prices && item.prices.length > 0 ? (
                     <div className="flex flex-col gap-1 text-right">
-                      {item.prices.map((p, i) => <span key={i}>₹{Number(p.price).toFixed(2)}</span>)}
+                      {item.prices.map((p, i) => (
+                        <span key={i} className={Number(p.price) === 0 ? "text-emerald-600 dark:text-emerald-400 font-bold" : ""}>
+                          {Number(p.price) === 0 ? "₹0.00 (Default • Free)" : `₹${Number(p.price).toFixed(2)}`}
+                        </span>
+                      ))}
                     </div>
-                  ) : `₹${Number(item.price || 0).toFixed(2)}`}
+                  ) : Number(item.price || 0) === 0 ? (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">₹0.00 (Default • Free)</span>
+                  ) : (
+                    `₹${Number(item.price || 0).toFixed(2)}`
+                  )}
                 </td>
                 <td className="px-4 py-3 text-center">
                   <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
@@ -120,7 +148,7 @@ export default function AddonsData({
             ))}
             {addons.length === 0 && (
               <tr>
-                <td colSpan="8" className="px-4 py-12 text-center text-zinc-500 text-sm font-medium">
+                <td colSpan="9" className="px-4 py-12 text-center text-zinc-500 text-sm font-medium">
                   No add-ons found matching your criteria.
                 </td>
               </tr>

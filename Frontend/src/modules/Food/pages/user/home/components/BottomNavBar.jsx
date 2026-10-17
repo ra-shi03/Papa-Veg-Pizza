@@ -1,82 +1,138 @@
-import React from "react";
+import React, { useMemo } from "react";
+import { useLocation } from "react-router-dom";
+
+export const DEFAULT_BOTTOM_NAV = [
+  { id: 'menu', label: 'Menu', icon: 'local_pizza', iconType: 'material', iconUrl: '', badge: '', link: '/user/menu', enabled: true, sortOrder: 1 },
+  { id: 'reorder', label: 'Reorder', icon: 'shopping_bag', iconType: 'material', iconUrl: '', badge: '', link: '/user/orders', enabled: true, sortOrder: 2 },
+  { id: 'big-big', label: 'Big Big', icon: 'local_pizza', iconType: 'material', iconUrl: '', badge: 'NEW', link: '/user/menu?search=big', enabled: true, sortOrder: 3 },
+  { id: 'combos', label: 'Combos', icon: 'lunch_dining', iconType: 'material', iconUrl: '', badge: '', link: '/user/offers', enabled: true, sortOrder: 4 },
+  { id: 'rewards', label: 'Rewards', icon: 'stars', iconType: 'material', iconUrl: '', badge: '', link: '/user/wallet', enabled: true, sortOrder: 5 }
+];
 
 export function BottomNavBar({
   navigate,
   triggerToast,
   totalCartCount = 0,
-  locationConfirmed = false
+  locationConfirmed = false,
+  items = null
 }) {
+  const location = useLocation();
+
+  // Get active items either from props or localStorage, or default
+  const navItems = useMemo(() => {
+    let source = items;
+    if (!source || !Array.isArray(source) || source.length === 0) {
+      try {
+        const stored = localStorage.getItem("pvp_home_config");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed?.bottomNav) && parsed.bottomNav.length > 0) {
+            source = parsed.bottomNav;
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (!source || !Array.isArray(source) || source.length === 0) {
+      source = DEFAULT_BOTTOM_NAV;
+    }
+
+    return [...source]
+      .filter(item => item.enabled !== false)
+      .sort((a, b) => (Number(a.sortOrder) || 1) - (Number(b.sortOrder) || 1));
+  }, [items]);
+
+  const currentPath = location.pathname;
+
+  const handleNavClick = (item) => {
+    let target = item.link || '/user';
+    // Support relative paths if deployed under /food
+    if (window.location.pathname.startsWith('/food') && !target.startsWith('/food')) {
+      target = `/food${target}`;
+    }
+
+    if (item.id === 'home' || target === '/user' || target === '/food/user') {
+      if (currentPath === '/user' || currentPath === '/food/user' || currentPath === '/') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        navigate(target);
+      }
+    } else {
+      navigate(target);
+    }
+
+    if (triggerToast) {
+      triggerToast(`Opening ${item.label}`);
+    }
+  };
+
   return (
-    <>
-      {/* ── Domino's Style Full-Width Bottom Nav Bar ── */}
-      <nav 
-        className="fixed bottom-0 left-0 w-full z-50 bg-[#FFFFFF] dark:bg-[#121212] border-t border-black/5 dark:border-white/5 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] flex justify-around items-center px-1 pb-safe"
-        style={{ height: 64 }}
-      >
-        {/* Menu (Slice) */}
-        <button
-          onClick={() => {
-            const menuBasePath = window.location.pathname.startsWith('/food') ? '/food/user/menu' : '/user/menu';
-            navigate(menuBasePath);
-            triggerToast("Opening Menu");
-          }}
-          className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none w-16 pt-1"
-        >
-          <span className="material-symbols-outlined text-[24px] text-zinc-500 dark:text-zinc-400">local_pizza</span>
-          <span className="text-[10px] font-semibold tracking-wide text-zinc-500 dark:text-zinc-400 mt-1">Menu</span>
-        </button>
+    <nav 
+      aria-label="Bottom Navigation"
+      className="fixed bottom-0 left-0 w-full z-50 bg-[#FFFFFF] dark:bg-[#121212] border-t border-zinc-200/80 dark:border-white/5 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] flex justify-around items-center px-1 pb-safe select-none"
+      style={{ height: 60 }}
+    >
+      {navItems.map((item) => {
+        const isCurrentActive = currentPath === item.link || (item.link !== '/user' && currentPath.startsWith(item.link));
+        const isCartOrOrders = (item.id === 'reorder' || item.id === 'cart' || (item.link || '').includes('cart'));
+        const showCartBadge = isCartOrOrders && totalCartCount > 0 && locationConfirmed;
 
+        return (
+          <button
+            key={item.id || item.label}
+            type="button"
+            onClick={() => handleNavClick(item)}
+            className="flex-1 flex flex-col items-center justify-center transition-all duration-200 active:scale-95 cursor-pointer bg-transparent border-0 outline-none relative py-1 px-0.5 group"
+          >
+            {/* Optional Top Badge (e.g. "NEW" from screenshot) */}
+            {item.badge && (
+              <span className="absolute -top-1 left-1/2 -translate-x-1/2 bg-[#E53935] text-white text-[7.5px] font-black px-1.5 py-[1px] rounded-full uppercase tracking-tighter shadow-2xs leading-none z-10 scale-90">
+                {item.badge}
+              </span>
+            )}
 
+            {/* Icon Container */}
+            <div className="relative flex items-center justify-center h-6 w-6">
+              {item.iconType === 'image' && item.iconUrl ? (
+                <img 
+                  src={item.iconUrl} 
+                  alt={item.label} 
+                  className={`w-6 h-6 object-contain transition-transform group-hover:scale-105 ${isCurrentActive ? 'scale-105' : 'opacity-80'}`}
+                />
+              ) : (
+                <span 
+                  className={`material-symbols-outlined text-[24px] transition-colors ${
+                    isCurrentActive 
+                      ? 'text-[#E53935] dark:text-[#E53935] font-bold' 
+                      : 'text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-200'
+                  }`}
+                  style={isCurrentActive ? { fontVariationSettings: "'FILL' 1" } : { fontVariationSettings: "'FILL' 0" }}
+                >
+                  {item.icon || 'local_pizza'}
+                </span>
+              )}
 
-        {/* Home (Center Logo equivalent) */}
-        <button
-          onClick={() => {
-            if (window.location.pathname === "/user" || window.location.pathname === "/user/") {
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            } else {
-              navigate("/user");
-            }
-            triggerToast("Opening Home");
-          }}
-          className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none relative -mt-4 w-16"
-        >
-          <div className="w-[52px] h-[52px] rounded-full flex items-center justify-center bg-[#FFFFFF] dark:bg-zinc-900 shadow-[0_-2px_10px_rgba(0,0,0,0.06)] text-[var(--accent-red)] z-10 relative border-t border-black/5 dark:border-white/5">
-            <div className="w-[44px] h-[44px] rounded-full flex items-center justify-center bg-[#EEECEA] dark:bg-zinc-800">
-               <span className="material-symbols-outlined text-[28px] fill" style={{ fontVariationSettings: " 'FILL' 1 " }}>home</span>
+              {/* Shopping / Cart count badge */}
+              {showCartBadge && (
+                <div className="absolute -top-1.5 -right-2 w-4 h-4 bg-[#E53935] text-white rounded-full text-[9px] font-black flex items-center justify-center border-2 border-white dark:border-[#121212] shadow-xs animate-scale-in">
+                  {totalCartCount}
+                </div>
+              )}
             </div>
-          </div>
-          <span className="text-[10px] font-bold tracking-wide text-[var(--accent-red)] mt-0.5">Home</span>
-        </button>
 
-        {/* Cart / Reorder */}
-        <button
-          onClick={() => {
-            navigate("/user/cart");
-            triggerToast("Opening Cart");
-          }}
-          className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none w-16 relative pt-1"
-        >
-          <span className="material-symbols-outlined text-[24px] text-zinc-500 dark:text-zinc-400">shopping_bag</span>
-          {totalCartCount > 0 && locationConfirmed && (
-             <div className="absolute top-0 right-[14px] w-[18px] h-[18px] bg-[var(--accent-red)] text-white rounded-full text-[9px] font-bold flex items-center justify-center border-2 border-white dark:border-[#121212]">
-                {totalCartCount}
-             </div>
-          )}
-          <span className="text-[10px] font-semibold tracking-wide text-zinc-500 dark:text-zinc-400 mt-1">Cart</span>
-        </button>
-
-        {/* Account / Rewards */}
-        <button
-          onClick={() => {
-            navigate("/user/account");
-            triggerToast("Opening Account");
-          }}
-          className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none w-16 pt-1"
-        >
-          <span className="material-symbols-outlined text-[24px] text-zinc-500 dark:text-zinc-400">star</span>
-          <span className="text-[10px] font-semibold tracking-wide text-zinc-500 dark:text-zinc-400 mt-1">Account</span>
-        </button>
-      </nav>
-    </>
+            {/* Label below icon */}
+            <span 
+              className={`text-[10px] tracking-tight mt-1 transition-colors leading-none truncate max-w-[64px] ${
+                isCurrentActive 
+                  ? 'font-bold text-[#E53935] dark:text-[#E53935]' 
+                  : 'font-medium text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-200'
+              }`}
+            >
+              {item.label}
+            </span>
+          </button>
+        );
+      })}
+    </nav>
   );
 }

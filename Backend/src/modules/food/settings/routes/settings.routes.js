@@ -1,6 +1,6 @@
 import express from 'express';
 import { getWelcomeScreenConfig, updateWelcomeScreenConfig } from '../controllers/welcomeScreen.controller.js';
-import { getHomePageConfig, createOrUpdateHomePageConfig, updateHomePageConfig, uploadHomePageBanner, deleteHomePageBanner } from '../controllers/homePage.controller.js';
+import { getHomePageConfig, createOrUpdateHomePageConfig, updateHomePageConfig, uploadHomePageBanner, updateHomePageBanner, deleteHomePageBanner } from '../controllers/homePage.controller.js';
 import { authMiddleware, requireSuperAdmin } from '../../../../core/auth/auth.middleware.js';
 import { upload } from '../../../../middleware/upload.js';
 
@@ -18,6 +18,8 @@ router.post('/home-page', authMiddleware, requireSuperAdmin, createOrUpdateHomeP
 router.put('/home-page', authMiddleware, requireSuperAdmin, updateHomePageConfig);
 router.patch('/home-page', authMiddleware, requireSuperAdmin, updateHomePageConfig);
 router.post('/home-page/banner', authMiddleware, requireSuperAdmin, upload.single('file'), uploadHomePageBanner);
+router.patch('/home-page/banner/:publicId', authMiddleware, requireSuperAdmin, updateHomePageBanner);
+router.put('/home-page/banner/:publicId', authMiddleware, requireSuperAdmin, updateHomePageBanner);
 router.delete('/home-page/banner/:publicId', authMiddleware, requireSuperAdmin, deleteHomePageBanner);
 
 import * as foodCouponController from '../controllers/foodCoupon.controller.js';
@@ -50,6 +52,31 @@ router.get('/showcase-sections/:id', authMiddleware, requireSuperAdmin, showcase
 router.put('/showcase-sections/:id', authMiddleware, requireSuperAdmin, showcaseSectionController.updateShowcaseSection);
 router.delete('/showcase-sections/:id', authMiddleware, requireSuperAdmin, showcaseSectionController.deleteShowcaseSection);
 router.patch('/showcase-sections/:id/toggle', authMiddleware, requireSuperAdmin, showcaseSectionController.toggleShowcaseSectionStatus);
+
+import * as searchPageConfigController from '../controllers/searchPageConfig.controller.js';
+
+// Search Page Configuration routes
+router.get('/search-config/public', searchPageConfigController.getPublicSearchConfig);
+router.get('/search-config/admin', authMiddleware, requireSuperAdmin, searchPageConfigController.getAdminSearchConfig);
+router.put('/search-config', authMiddleware, requireSuperAdmin, searchPageConfigController.updateSearchConfig);
+
+// Popular Searches CRUD & Sort
+router.post('/search-config/popular', authMiddleware, requireSuperAdmin, searchPageConfigController.createPopularSearch);
+router.put('/search-config/popular/:id', authMiddleware, requireSuperAdmin, searchPageConfigController.updatePopularSearch);
+router.delete('/search-config/popular/:id', authMiddleware, requireSuperAdmin, searchPageConfigController.deletePopularSearch);
+router.patch('/search-config/popular/reorder', authMiddleware, requireSuperAdmin, searchPageConfigController.reorderPopularSearches);
+
+// New Launches CRUD & Sort
+router.post('/search-config/new-launches', authMiddleware, requireSuperAdmin, searchPageConfigController.createNewLaunch);
+router.put('/search-config/new-launches/:id', authMiddleware, requireSuperAdmin, searchPageConfigController.updateNewLaunch);
+router.delete('/search-config/new-launches/:id', authMiddleware, requireSuperAdmin, searchPageConfigController.deleteNewLaunch);
+router.patch('/search-config/new-launches/reorder', authMiddleware, requireSuperAdmin, searchPageConfigController.reorderNewLaunches);
+
+// Search By Tabs CRUD & Sync
+router.post('/search-config/sync-addons', authMiddleware, requireSuperAdmin, searchPageConfigController.syncRealAddonsToSearchConfig);
+router.post('/search-config/tabs', authMiddleware, requireSuperAdmin, searchPageConfigController.createSearchByTab);
+router.put('/search-config/tabs/:id', authMiddleware, requireSuperAdmin, searchPageConfigController.updateSearchByTab);
+router.delete('/search-config/tabs/:id', authMiddleware, requireSuperAdmin, searchPageConfigController.deleteSearchByTab);
 
 export default router;
 

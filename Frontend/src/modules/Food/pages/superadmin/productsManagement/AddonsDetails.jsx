@@ -152,6 +152,11 @@ export default function AddonsDetails({
                     <span className="px-2.5 py-0.5 bg-zinc-200/80 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold rounded-md capitalize">
                       {addon.type || "Standard"}
                     </span>
+                    {addon.isDefault && (
+                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+                        Default Base Option
+                      </span>
+                    )}
                     <span
                       className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${
                         addon.status === "Active"
@@ -182,8 +187,8 @@ export default function AddonsDetails({
                         <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 capitalize">
                           {p.size || "Default Size"}
                         </span>
-                        <div className="text-lg font-black text-zinc-900 dark:text-zinc-100 mt-1">
-                          ₹{Number(p.price || 0).toFixed(2)}
+                        <div className={`text-lg font-black mt-1 ${Number(p.price || 0) === 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-900 dark:text-zinc-100"}`}>
+                          {Number(p.price || 0) === 0 ? "₹0.00 (Free)" : `₹${Number(p.price || 0).toFixed(2)}`}
                         </div>
                       </div>
                     ))}

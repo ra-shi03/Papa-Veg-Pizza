@@ -4,7 +4,7 @@ const foodItemSchema = new mongoose.Schema(
     {
         categoryId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'Category',
+            ref: 'FoodCategory',
             required: true,
             index: true
         },
