@@ -1673,6 +1673,7 @@ export default function Home() {
           <RewardsWalletView 
             onBack={() => setShowRewardsPage(false)} 
             initialTab="rewards" 
+            rewardsConfig={rewardsConfig}
           />
         )}
 
