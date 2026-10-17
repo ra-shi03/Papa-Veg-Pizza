@@ -1365,9 +1365,9 @@ export default function Home() {
                 }}
               >
                 <div className="flex gap-3 sm:gap-4 items-center">
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 flex items-center justify-center p-1">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 flex items-center justify-center p-0.5">
                     {rewardsConfig.logoUrl ? (
-                      <img src={rewardsConfig.logoUrl} alt="Rewards Logo" className="max-w-full max-h-full object-contain" />
+                      <img src={rewardsConfig.logoUrl} alt="Rewards Logo" className="w-full h-full object-contain drop-shadow-xs" />
                     ) : (
                       <div className="text-[10px] text-zinc-400 text-center">No Logo</div>
                     )}
