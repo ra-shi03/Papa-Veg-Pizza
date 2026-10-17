@@ -14,11 +14,24 @@ const rewardProductOverrideSchema = new mongoose.Schema({
   requiredPoints: { type: Number, default: 600 },
   isVeg: { type: Boolean, default: true },
   size: { type: String, default: 'Regular' },
-  crust: { type: String, default: 'New Hand Tossed' }
+  crust: { type: String, default: 'New Hand Tossed' },
+  sortOrder: { type: Number, default: 0 }
 }, { _id: false });
 
 const rewardConfigSchema = new mongoose.Schema({
   isEnabled: {
+    type: Boolean,
+    default: true
+  },
+  showVegFilter: {
+    type: Boolean,
+    default: true
+  },
+  showNonVegFilter: {
+    type: Boolean,
+    default: true
+  },
+  showSortFilter: {
     type: Boolean,
     default: true
   },
