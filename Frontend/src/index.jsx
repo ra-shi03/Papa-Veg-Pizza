@@ -38,27 +38,26 @@ function isNativeLikeShell() {
 }
 
 function resolveNativeInitialRoute() {
-  if (typeof window === 'undefined') return '/food/user'
+  if (typeof window === 'undefined') return '/welcome'
 
   const rawPathname = String(window.location?.pathname || '')
   const pathname = rawPathname.replace(/\/index\.html$/i, '') || '/'
-  const storedRoute = String(localStorage.getItem(NATIVE_LAST_ROUTE_KEY) || '').trim()
 
-  if (pathname.startsWith('/food/')) return pathname
+  if (pathname.startsWith('/welcome')) return '/welcome'
   if (pathname.startsWith('/store')) return `/food${pathname}`
   if (pathname.startsWith('/delivery')) return `/food${pathname}`
-  if (pathname.startsWith('/user')) return `/food${pathname}`
-  if (pathname.startsWith('/admin')) return pathname
-  if (storedRoute.startsWith('/food/') || storedRoute.startsWith('/admin')) {
-    return storedRoute
-  }
+  if (pathname.startsWith('/admin') || pathname.startsWith('/superadmin')) return pathname
 
   if (isModuleAuthenticated('store')) return '/food/store'
   if (isModuleAuthenticated('delivery')) return '/food/delivery'
   if (isModuleAuthenticated('admin')) return '/admin'
-  if (isModuleAuthenticated('user')) return '/food/user'
+  if (isModuleAuthenticated('user')) {
+    const hasLocation = !!localStorage.getItem("deliveryAddress") || !!localStorage.getItem("deliveryLocation") || !!localStorage.getItem("user_location");
+    if (!hasLocation) return '/user/location/setup'
+    return '/food/user'
+  }
 
-  return '/food/user'
+  return '/welcome'
 }
 
 function bootstrapNativeHashRoute() {
