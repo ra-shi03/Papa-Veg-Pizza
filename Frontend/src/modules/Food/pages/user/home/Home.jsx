@@ -45,6 +45,15 @@ export default function Home() {
     setShowRewardsLoading(false);
   };
   const navigate = useNavigate()
+
+  // Ensure Welcome Screen is shown first for new sessions / mobile app open
+  useEffect(() => {
+    const welcomeShown = sessionStorage.getItem("papa_veg_welcome_shown");
+    if (!welcomeShown) {
+      navigate("/food/user/welcome", { replace: true });
+    }
+  }, [navigate]);
+
   const { isModalOpen, closeLocationModal, confirmLocation, locationConfirmed } = useLocationStore()
   const checkLocation = useLocationGuard()
   const offersRef = useRef(null)
