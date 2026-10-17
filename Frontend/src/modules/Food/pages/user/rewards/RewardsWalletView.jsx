@@ -128,6 +128,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards' }) {
   const [sortBy, setSortBy] = useState('default');
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
   const [isFaqModalOpen, setIsFaqModalOpen] = useState(false);
+  const [expandedFaqIndex, setExpandedFaqIndex] = useState(null);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(() => {
     return localStorage.getItem('pvp_rewards_enrolled') === 'true';
@@ -308,22 +309,58 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards' }) {
     return result;
   }, [products, selectedVegFilter, sortBy]);
 
-  const faqs = rewardsConfig?.faqs || [
+  const faqs = (Array.isArray(rewardsConfig?.faqs) && rewardsConfig.faqs.length > 0) ? rewardsConfig.faqs : [
     {
-      question: 'How do I earn points in the Rewards program?',
-      answer: 'You earn 100 points on every delivered order above ₹349 placed via the Papa Veg Pizza app or website.'
+      question: "What is the Papa Veg Pizza Cheesy Rewards Program?",
+      answer: "The Cheesy Rewards Program is a loyalty program designed to reward our valued customers. Every time you order your favorite delicious pizzas, you earn Cheesy Reward Points that can be redeemed for FREE pizzas!"
     },
     {
-      question: 'How do I unlock and redeem free items?',
-      answer: 'Once you accumulate 600 points, all eligible reward items unlock automatically. You can add any unlocked reward product to your cart during checkout for ₹0.'
+      question: "How can I avail the benefits of the program?",
+      answer: "Simply enroll in the Cheesy Rewards program by tapping 'Enroll Now' on the Papa Veg Pizza app. Once enrolled, your eligible orders will automatically earn points towards free treats."
     },
     {
-      question: 'Do my points expire?',
-      answer: 'Points remain valid for 12 months from the date they are credited to your account.'
+      question: "How does this program work?",
+      answer: "For every delivered order of ₹349 or more, you earn 100 points (equivalent to 1 slice). Once you collect 600 points (6 slices), a full pizza from our signature catalogue unlocks for FREE!"
     },
     {
-      question: 'Can I combine free reward items with discount coupons?',
-      answer: 'Yes! You can apply active promo codes along with your redeemed reward treats on eligible orders.'
+      question: "Is there a limit to how many Cheesy Rewards Points I can earn or redeem in an order?",
+      answer: "You can earn a maximum of 100 points per day on your first order above ₹349. You can redeem 600 points per free pizza reward in an eligible order."
+    },
+    {
+      question: "Do I need to pay anything while redeeming points for FREE pizza?",
+      answer: "No! The redeemed pizza is 100% free (₹0). Only standard delivery charges or taxes for any additional cart items may apply if your cart does not meet free delivery conditions."
+    },
+    {
+      question: "What are eligible items for FREE pizza?",
+      answer: "Eligible items include all pizzas featured in the Cheesy Rewards catalogue (such as So Cheesee, Smoky Corn Paneer, Paneer Tikka, Margherita, Farmhouse, etc.)."
+    },
+    {
+      question: "Is there any expiry of Cheesy Rewards Points?",
+      answer: "Yes, Cheesy Rewards Points are valid for 365 days from the date they are credited to your account."
+    },
+    {
+      question: "How can I check my Cheesy Rewards Points balance?",
+      answer: "You can view your real-time points balance, slices progress meter, and transaction history in the Rewards & Wallet section of the Papa Veg Pizza app."
+    },
+    {
+      question: "Is this program applicable on Papa Veg Pizza orders through Swiggy or Zomato as well?",
+      answer: "No, the Cheesy Rewards loyalty program is exclusively available for orders placed directly via the Papa Veg Pizza official mobile app and website."
+    },
+    {
+      question: "Is the program applicable on Papa Veg Pizza orders through IRCTC?",
+      answer: "Currently, Cheesy Rewards points can only be earned and redeemed on direct app and website deliveries, and cannot be combined with IRCTC train delivery orders."
+    },
+    {
+      question: "Can I opt-out from the program?",
+      answer: "Participation is voluntary and free. If you wish to close your loyalty account, you can contact our customer support team at any time."
+    },
+    {
+      question: "Can I redeem my Cheesy Rewards Points for real money?",
+      answer: "No, Cheesy Rewards points have no direct cash value and can only be redeemed for eligible menu items within the Papa Veg Pizza app."
+    },
+    {
+      question: "Can I transfer/gift/share my Cheesy Rewards Points to others?",
+      answer: "Cheesy Rewards Points are non-transferable and linked to your registered mobile number and account."
     }
   ];
 
@@ -685,46 +722,72 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards' }) {
         </div>
       )}
 
-      {/* ── FAQs Modal ── */}
+      {/* ── Frequently Asked Questions Bottom Sheet Modal (Matching Reference Image) ── */}
       {isFaqModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl max-w-md w-full p-5 shadow-2xl border border-zinc-100 dark:border-zinc-800 max-h-[80vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
-              <div className="flex items-center gap-2">
-                <HelpCircle className="w-5 h-5 text-[var(--accent-red,#EE3A43)]" />
-                <h3 className="font-bold text-base text-zinc-900 dark:text-white">
-                  Frequently Asked Questions
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsFaqModalOpen(false)}
-                className="p-1 rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+        <div className="fixed inset-0 z-50 flex flex-col justify-end items-center">
+          {/* Dimmed backdrop */}
+          <div 
+            onClick={() => setIsFaqModalOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-[1px] animate-in fade-in duration-200"
+          />
 
-            <div className="overflow-y-auto py-3 space-y-3 flex-1 divide-y divide-zinc-100 dark:divide-zinc-800">
-              {faqs.map((faq, i) => (
-                <div key={i} className="pt-3 first:pt-0">
-                  <h4 className="font-semibold text-xs sm:text-sm text-zinc-900 dark:text-white">
-                    {faq.question}
-                  </h4>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
-                    {faq.answer}
-                  </p>
-                </div>
-              ))}
-            </div>
-
+          {/* Floating circular close button centered directly above bottom sheet */}
+          <div className="relative z-10 mb-3 animate-in zoom-in-95 duration-200">
             <button
               type="button"
               onClick={() => setIsFaqModalOpen(false)}
-              className="w-full mt-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-750 text-zinc-800 dark:text-zinc-200 font-semibold text-xs rounded-xl"
+              className="w-11 h-11 rounded-full bg-zinc-200/90 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 flex items-center justify-center shadow-lg active:scale-90 transition-transform cursor-pointer border border-white/20"
+              aria-label="Close FAQs"
             >
-              Close
+              <X className="w-5 h-5 stroke-[2.5]" />
             </button>
+          </div>
+
+          {/* Bottom Sheet Card */}
+          <div 
+            className="relative z-10 w-full max-w-lg bg-white dark:bg-zinc-900 rounded-t-[28px] shadow-2xl flex flex-col max-h-[75vh] overflow-hidden animate-in slide-in-from-bottom duration-250"
+            style={{ fontFamily: 'Poppins, sans-serif' }}
+          >
+            {/* Header */}
+            <div className="px-6 pt-5 pb-3.5">
+              <h3 className="text-[17px] sm:text-lg font-bold text-zinc-900 dark:text-white tracking-tight m-0">
+                Frequently Asked Questions
+              </h3>
+            </div>
+
+            {/* Accordion FAQ List */}
+            <div className="px-6 pb-6 overflow-y-auto space-y-2.5 hide-scrollbar">
+              {faqs.map((faq, index) => {
+                const isOpen = expandedFaqIndex === index;
+                return (
+                  <div 
+                    key={index} 
+                    className="rounded-xl border border-zinc-150 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-850/60 overflow-hidden transition-colors"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setExpandedFaqIndex(isOpen ? null : index)}
+                      className="w-full px-4 py-3.5 flex items-center justify-between text-left gap-3 cursor-pointer select-none"
+                    >
+                      <span className="text-xs sm:text-[13px] font-medium text-zinc-800 dark:text-zinc-200 leading-snug">
+                        {faq.question}
+                      </span>
+                      <ChevronDown 
+                        className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform duration-200 ${
+                          isOpen ? 'rotate-180 text-[var(--accent-red,#EE3A43)]' : ''
+                        }`} 
+                      />
+                    </button>
+
+                    {isOpen && (
+                      <div className="px-4 pb-3.5 pt-1 text-xs sm:text-[12.5px] text-zinc-600 dark:text-zinc-400 leading-relaxed border-t border-zinc-150/60 dark:border-zinc-800/80">
+                        {faq.answer}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
