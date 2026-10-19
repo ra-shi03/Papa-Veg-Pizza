@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Loader2, Upload, Save, Eye, Plus, Trash2, HelpCircle, FileText, 
-  CheckCircle2, Award, ArrowUp, ArrowDown, Search, X, Check, Filter, Pizza, Layers 
+  CheckCircle2, Award, ArrowUp, ArrowDown, Search, X, Check, Filter, Pizza, Layers, LogOut 
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminClient } from '@/services/api/axios';
@@ -153,6 +153,11 @@ export default function RewardsManagement() {
     termsText: 'By enrolling you agree to our',
     termsLinkText: 'Terms and Conditions',
     termsLink: '#',
+    quitLinkText: 'Quit Program',
+    quitModalTitle: 'Quit Cheesy Rewards?',
+    quitModalDescription: "All your points and progress will be removed. You'll need to enrol again to start earning rewards.",
+    quitStayButtonText: 'Stay',
+    quitConfirmButtonText: 'Quit Anyway',
     rewardProducts: [],
     faqs: [
       {
@@ -243,6 +248,11 @@ export default function RewardsManagement() {
         setConfig(prev => ({
           ...prev,
           ...d,
+          quitLinkText: d.quitLinkText || prev.quitLinkText || 'Quit Program',
+          quitModalTitle: d.quitModalTitle || prev.quitModalTitle || 'Quit Cheesy Rewards?',
+          quitModalDescription: d.quitModalDescription || prev.quitModalDescription || "All your points and progress will be removed. You'll need to enrol again to start earning rewards.",
+          quitStayButtonText: d.quitStayButtonText || prev.quitStayButtonText || 'Stay',
+          quitConfirmButtonText: d.quitConfirmButtonText || prev.quitConfirmButtonText || 'Quit Anyway',
           showVegFilter: d.showVegFilter !== undefined ? d.showVegFilter : true,
           showNonVegFilter: d.showNonVegFilter !== undefined ? d.showNonVegFilter : true,
           showSortFilter: d.showSortFilter !== undefined ? d.showSortFilter : true,
@@ -507,7 +517,8 @@ export default function RewardsManagement() {
           { id: 'general', label: 'General & Header', icon: Award },
           { id: 'rules', label: 'Points & Rules', icon: CheckCircle2 },
           { id: 'faqs', label: 'FAQs', icon: HelpCircle },
-          { id: 'terms', label: 'Terms & Conditions', icon: FileText }
+          { id: 'terms', label: 'Terms & Conditions', icon: FileText },
+          { id: 'quit', label: 'Quit Program Modal', icon: LogOut }
         ].map(t => {
           const Icon = t.icon;
           return (
@@ -1081,6 +1092,116 @@ export default function RewardsManagement() {
                     </button>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: Quit Program Modal */}
+          {activeTab === 'quit' && (
+            <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl shadow-xs border border-zinc-200 dark:border-zinc-800 space-y-5">
+              <div className="border-b pb-3 dark:border-zinc-800">
+                <h3 className="font-bold text-base flex items-center gap-2 text-zinc-900 dark:text-white">
+                  <LogOut className="w-5 h-5 text-[var(--primary,#EE3A43)]" />
+                  Quit Program & Modal Settings
+                </h3>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Customize the Quit Program link shown in the footer and the confirmation bottom sheet modal when a user chooses to opt out.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase mb-1">
+                    Footer Link Text
+                  </label>
+                  <input
+                    type="text"
+                    value={config.quitLinkText || ''}
+                    onChange={e => setConfig(prev => ({ ...prev, quitLinkText: e.target.value }))}
+                    placeholder="Quit Program"
+                    className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-zinc-800 dark:border-zinc-700 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                  />
+                  <p className="text-[11px] text-zinc-400 mt-1">
+                    Appears in footer as: FAQs | Terms & Conditions | {config.quitLinkText || 'Quit Program'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase mb-1">
+                    Confirmation Modal Title
+                  </label>
+                  <input
+                    type="text"
+                    value={config.quitModalTitle || ''}
+                    onChange={e => setConfig(prev => ({ ...prev, quitModalTitle: e.target.value }))}
+                    placeholder="Quit Cheesy Rewards?"
+                    className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-zinc-800 dark:border-zinc-700 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase mb-1">
+                    Confirmation Modal Description
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={config.quitModalDescription || ''}
+                    onChange={e => setConfig(prev => ({ ...prev, quitModalDescription: e.target.value }))}
+                    placeholder="All your points and progress will be removed. You'll need to enrol again to start earning rewards."
+                    className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-zinc-800 dark:border-zinc-700 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase mb-1">
+                      Stay Button Text (Dismiss)
+                    </label>
+                    <input
+                      type="text"
+                      value={config.quitStayButtonText || ''}
+                      onChange={e => setConfig(prev => ({ ...prev, quitStayButtonText: e.target.value }))}
+                      placeholder="Stay"
+                      className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-zinc-800 dark:border-zinc-700 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase mb-1">
+                      Quit Button Text (Confirm Action)
+                    </label>
+                    <input
+                      type="text"
+                      value={config.quitConfirmButtonText || ''}
+                      onChange={e => setConfig(prev => ({ ...prev, quitConfirmButtonText: e.target.value }))}
+                      placeholder="Quit Anyway"
+                      className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-zinc-800 dark:border-zinc-700 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                    />
+                  </div>
+                </div>
+
+                {/* Modal Visual Preview */}
+                <div className="mt-6 pt-5 border-t border-zinc-200 dark:border-zinc-800">
+                  <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">
+                    Modal Visual Preview
+                  </h4>
+                  <div className="border border-zinc-200 dark:border-zinc-700 rounded-2xl p-5 bg-white dark:bg-zinc-800 max-w-sm mx-auto shadow-sm text-center">
+                    <h4 className="text-base font-black text-zinc-900 dark:text-white">
+                      {config.quitModalTitle || 'Quit Cheesy Rewards?'}
+                    </h4>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-300 mt-2 leading-relaxed">
+                      {config.quitModalDescription || "All your points and progress will be removed. You'll need to enrol again to start earning rewards."}
+                    </p>
+                    <div className="flex gap-3 mt-5">
+                      <div className="flex-1 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-600 font-bold text-xs text-zinc-700 dark:text-zinc-200 text-center">
+                        {config.quitStayButtonText || 'Stay'}
+                      </div>
+                      <div className="flex-1 py-2.5 rounded-xl bg-[#EE3A43] text-white font-bold text-xs text-center shadow-sm">
+                        {config.quitConfirmButtonText || 'Quit Anyway'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}

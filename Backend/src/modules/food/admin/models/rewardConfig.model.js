@@ -99,6 +99,26 @@ const rewardConfigSchema = new mongoose.Schema({
     type: String,
     default: '#'
   },
+  quitLinkText: {
+    type: String,
+    default: 'Quit Program'
+  },
+  quitModalTitle: {
+    type: String,
+    default: 'Quit Cheesy Rewards?'
+  },
+  quitModalDescription: {
+    type: String,
+    default: "All your points and progress will be removed. You'll need to enrol again to start earning rewards."
+  },
+  quitStayButtonText: {
+    type: String,
+    default: 'Stay'
+  },
+  quitConfirmButtonText: {
+    type: String,
+    default: 'Quit Anyway'
+  },
   faqs: {
     type: [rewardFaqSchema],
     default: [

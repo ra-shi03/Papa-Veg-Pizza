@@ -16,7 +16,8 @@ import {
     getUserWalletController,
     createWalletTopupOrderController,
     verifyWalletTopupPaymentController,
-    enrollUserInRewardsController
+    enrollUserInRewardsController,
+    quitUserRewardsController
 } from '../controllers/userWallet.controller.js';
 import {
     getUserReferralDetailsController,
@@ -41,6 +42,7 @@ router.post('/profile/profile-image', upload.single('file'), uploadCurrentUserPr
 // Wallet (Bearer USER)
 router.get('/wallet', getUserWalletController);
 router.post('/wallet/enroll', enrollUserInRewardsController);
+router.post('/wallet/quit', quitUserRewardsController);
 router.post('/wallet/topup/order', createWalletTopupOrderController);
 router.post('/wallet/topup/verify', verifyWalletTopupPaymentController);
 

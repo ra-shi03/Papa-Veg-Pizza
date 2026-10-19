@@ -203,6 +203,9 @@ export const userAPI = {
   /** POST /food/user/wallet/enroll (Bearer USER) */
   enrollInRewards: () =>
     userClient.post("/food/user/wallet/enroll"),
+  /** POST /food/user/wallet/quit (Bearer USER) */
+  quitRewards: () =>
+    userClient.post("/food/user/wallet/quit"),
   /** GET /food/user/referrals/stats (Bearer USER) */
   getReferralStats: () =>
     userClient.get("/food/user/referrals/stats"),

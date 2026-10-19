@@ -137,6 +137,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
   const [isFaqModalOpen, setIsFaqModalOpen] = useState(false);
   const [expandedFaqIndex, setExpandedFaqIndex] = useState(null);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
+  const [isQuitModalOpen, setIsQuitModalOpen] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(() => {
     return localStorage.getItem('pvp_rewards_enrolled') === 'true';
   });
@@ -238,6 +239,22 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
     window.dispatchEvent(new Event('pvp_rewards_enrolled_changed'));
     toast.success('🎉 Congratulations! You are now enrolled in Cheesy Rewards.');
     fetchRewardsData();
+  };
+
+  const handleQuitProgram = async () => {
+    try {
+      if (userAPI.quitRewards) {
+        await userAPI.quitRewards();
+      }
+    } catch (e) {
+      console.warn('Backend quit enrollment note:', e?.message || e);
+    }
+    setIsEnrolled(false);
+    setUserPoints(0);
+    localStorage.removeItem('pvp_rewards_enrolled');
+    window.dispatchEvent(new Event('pvp_rewards_enrolled_changed'));
+    setIsQuitModalOpen(false);
+    toast.info('You have left the Cheesy Rewards program.');
   };
 
   // Filter & Sort Products
@@ -692,12 +709,12 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                 )}
               </div>
 
-              {/* ── Footer FAQs & Terms Links (Aligned to Left) ── */}
-              <div className="pt-6 pb-6 text-left px-1 sm:px-2 text-xs flex items-center gap-2">
+              {/* ── Footer FAQs, Terms & Quit Program Links (Matching Reference Image 2) ── */}
+              <div className="pt-6 pb-6 text-left px-1 sm:px-2 text-xs flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setIsFaqModalOpen(true)}
-                  className="font-bold text-[var(--accent-red,#EE3A43)] hover:underline cursor-pointer"
+                  className="font-bold text-[#005b82] dark:text-sky-400 hover:underline cursor-pointer bg-transparent border-0 p-0"
                 >
                   FAQs
                 </button>
@@ -705,10 +722,22 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                 <button
                   type="button"
                   onClick={() => setIsTermsModalOpen(true)}
-                  className="font-bold text-[var(--accent-red,#EE3A43)] hover:underline cursor-pointer"
+                  className="font-bold text-[#005b82] dark:text-sky-400 hover:underline cursor-pointer bg-transparent border-0 p-0"
                 >
                   Terms & Conditions
                 </button>
+                {isEnrolled && (
+                  <>
+                    <span className="text-zinc-300 dark:text-zinc-700 font-light">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsQuitModalOpen(true)}
+                      className="font-bold text-[#005b82] dark:text-sky-400 hover:underline cursor-pointer bg-transparent border-0 p-0"
+                    >
+                      {rewardsConfig?.quitLinkText || 'Quit Program'}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -883,6 +912,54 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                   <p className="flex-1 m-0">{term}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Quit Program Bottom Sheet Modal (Matching Reference Image 3) ── */}
+      {isQuitModalOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end items-center">
+          {/* Dimmed backdrop */}
+          <div 
+            onClick={() => setIsQuitModalOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-[1px] animate-in fade-in duration-200"
+          />
+
+          {/* Bottom Sheet Card */}
+          <div 
+            className="relative z-10 w-full max-w-md bg-white dark:bg-zinc-900 rounded-t-[28px] shadow-2xl p-6 pb-8 animate-in slide-in-from-bottom duration-250"
+            style={{ fontFamily: "'Poppins', sans-serif" }}
+          >
+            {/* Title */}
+            <h3 className="text-lg sm:text-xl font-bold text-zinc-900 dark:text-white tracking-tight mb-2">
+              {rewardsConfig?.quitModalTitle || `Quit ${rewardsConfig?.programName || 'Cheesy Rewards'}?`}
+            </h3>
+
+            {/* Description */}
+            <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-300 leading-relaxed mb-6 font-normal">
+              {rewardsConfig?.quitModalDescription || "All your points and progress will be removed. You'll need to enrol again to start earning rewards."}
+            </p>
+
+            {/* Action Buttons: Stay (left) and Quit Anyway (right) */}
+            <div className="grid grid-cols-2 gap-3.5">
+              {/* Stay Button */}
+              <button
+                type="button"
+                onClick={() => setIsQuitModalOpen(false)}
+                className="w-full py-3 px-4 rounded-xl border border-zinc-900 dark:border-zinc-300 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-bold text-sm hover:bg-zinc-50 dark:hover:bg-zinc-700 active:scale-[0.98] transition-all cursor-pointer"
+              >
+                {rewardsConfig?.quitStayButtonText || 'Stay'}
+              </button>
+
+              {/* Quit Anyway Button */}
+              <button
+                type="button"
+                onClick={handleQuitProgram}
+                className="w-full py-3 px-4 rounded-xl bg-[#EE3A43] hover:bg-[#d92d36] text-white font-bold text-sm shadow-md shadow-red-500/20 active:scale-[0.98] transition-all cursor-pointer border-0"
+                style={{ backgroundColor: 'var(--accent-red, #EE3A43)', color: '#ffffff' }}
+              >
+                {rewardsConfig?.quitConfirmButtonText || 'Quit Anyway'}
+              </button>
             </div>
           </div>
         </div>

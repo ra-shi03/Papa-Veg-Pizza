@@ -74,6 +74,14 @@ export const enrollUserInRewards = async (userId) => {
     return getUserWallet(userId);
 };
 
+export const quitUserRewards = async (userId) => {
+    const wallet = await ensureWallet(userId);
+    wallet.isEnrolled = false;
+    wallet.enrolledAt = null;
+    await wallet.save();
+    return getUserWallet(userId);
+};
+
 export const createWalletTopupOrder = async (userId, amountInr) => {
     const amount = Number(amountInr);
     if (!Number.isFinite(amount) || amount <= 0) {
