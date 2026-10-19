@@ -791,18 +791,49 @@ export default function MenuList() {
 
   // Track scroll position to dynamically collapse ← Menu, make compact sticky header, and spy active category
   const [isScrolled, setIsScrolled] = useState(false);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
+  const anchorScrollYRef = useRef(0);
+  const lastScrollYRef = useRef(0);
 
   useEffect(() => {
     let ticking = false;
     const handleScroll = () => {
       if (!ticking) {
         window.requestAnimationFrame(() => {
-          const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
-          if (scrollY > 40) {
-            setIsScrolled(true);
-          } else if (scrollY < 15) {
-            setIsScrolled(false);
+          const rawScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+          const scrollY = Math.max(0, rawScrollY);
+
+          // Update floating scroll-to-top button visibility
+          setShowScrollToTop(scrollY > 280);
+
+          // Dynamic Header Collapse / Expand:
+          // Scrolling down slightly -> hide menu & collapse into compact header (Image 2)
+          // Scrolling up slightly (to top side) -> show menu & expand header (Image 1)
+          if (!isProgrammaticScrollRef.current) {
+            if (scrollY <= 20) {
+              // Always show full menu when at or near top
+              setIsScrolled(false);
+              anchorScrollYRef.current = scrollY;
+            } else {
+              const diff = scrollY - anchorScrollYRef.current;
+
+              // Scrolling down by threshold (>= 12px)
+              if (diff >= 12) {
+                setIsScrolled(true);
+                setShowSortMenu(false);
+                anchorScrollYRef.current = scrollY;
+              } 
+              // Scrolling up towards top side by threshold (<= -10px)
+              else if (diff <= -10) {
+                setIsScrolled(false);
+                anchorScrollYRef.current = scrollY;
+              }
+            }
+          } else {
+            anchorScrollYRef.current = scrollY;
           }
+
+          lastScrollYRef.current = scrollY;
 
           // Scrollspy: automatically move category tab as user scrolls through products
           if (!isProgrammaticScrollRef.current) {
@@ -843,6 +874,7 @@ export default function MenuList() {
 
     const handleUserInterrupt = () => {
       isProgrammaticScrollRef.current = false;
+      anchorScrollYRef.current = Math.max(0, window.scrollY || document.documentElement.scrollTop || 0);
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
@@ -2613,7 +2645,7 @@ export default function MenuList() {
       {/* Floating Action Controls (Domino's style matching media_1792050211697_9dee3bdf.png) */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-md px-4 pointer-events-none z-40 flex items-center justify-between">
         {/* Scroll-to-Top Floating Circular Button */}
-        {isScrolled ? (
+        {showScrollToTop ? (
           <button
             type="button"
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
