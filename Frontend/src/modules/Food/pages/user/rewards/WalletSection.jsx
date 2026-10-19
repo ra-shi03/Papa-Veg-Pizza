@@ -63,6 +63,7 @@ export default function WalletSection({
     }
     setLocalEnrolled(true);
     localStorage.setItem("pvp_rewards_enrolled", "true");
+    window.dispatchEvent(new Event("pvp_rewards_enrolled_changed"));
     if (onEnroll) {
       onEnroll();
     }

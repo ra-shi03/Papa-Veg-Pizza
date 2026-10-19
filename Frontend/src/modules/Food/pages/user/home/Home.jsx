@@ -22,6 +22,7 @@ import RewardsWalletLoading from "@food/components/user/RewardsWalletLoading"
 import RewardsWalletView from "../rewards/RewardsWalletView"
 import { ChevronsUp, X } from "lucide-react"
 import apiClient, { adminClient } from "@/services/api/axios"
+import { userAPI } from "@food/api"
 import { applySystemTheme } from "@/shared/utils/themeSync"
 
 const DEFAULT_REWARD_TERMS = [
@@ -40,7 +41,38 @@ export default function Home() {
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [showRewardsLoading, setShowRewardsLoading] = useState(false);
   const [showRewardsPage, setShowRewardsPage] = useState(false);
+  const [isRewardsEnrolled, setIsRewardsEnrolled] = useState(() => {
+    return localStorage.getItem('pvp_rewards_enrolled') === 'true';
+  });
   const rewardsLoadingTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    const handleEnrollSync = () => {
+      setIsRewardsEnrolled(localStorage.getItem('pvp_rewards_enrolled') === 'true');
+    };
+    window.addEventListener('pvp_rewards_enrolled_changed', handleEnrollSync);
+    window.addEventListener('storage', handleEnrollSync);
+    return () => {
+      window.removeEventListener('pvp_rewards_enrolled_changed', handleEnrollSync);
+      window.removeEventListener('storage', handleEnrollSync);
+    };
+  }, []);
+
+  useEffect(() => {
+    const checkWalletEnrollment = async () => {
+      try {
+        if (userAPI?.getWallet) {
+          const res = await userAPI.getWallet();
+          const wallet = res?.data?.data?.wallet || res?.data?.wallet;
+          if (wallet?.isEnrolled) {
+            setIsRewardsEnrolled(true);
+            localStorage.setItem('pvp_rewards_enrolled', 'true');
+          }
+        }
+      } catch (_) {}
+    };
+    checkWalletEnrollment();
+  }, []);
 
   const handleStartRewardsFlow = () => {
     setShowRewardsLoading(true);
@@ -1380,57 +1412,97 @@ export default function Home() {
           {rewardsConfig && rewardsConfig.isEnabled && (
             <div className="px-2 sm:px-3 mt-2 mb-4">
               <div 
-                className="rounded-2xl shadow-[0_2px_15px_rgba(0,0,0,0.04)] border-x border-b border-t-0 border-zinc-200/80 dark:border-zinc-800 p-3.5 sm:p-4 transition-colors"
+                className="rounded-2xl shadow-[0_2px_15px_rgba(0,0,0,0.04)] border border-zinc-200/80 dark:border-zinc-800 p-3.5 sm:p-4 transition-colors"
                 style={{ 
                   backgroundColor: isDarkMode ? '#1a1a1a' : 'var(--secondary-off-white, #fbf9f9)', 
                   fontFamily: 'Poppins, sans-serif' 
                 }}
               >
-                <div className="flex gap-3 sm:gap-4 items-center">
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 flex items-center justify-center p-0.5">
-                    {rewardsConfig.logoUrl ? (
-                      <img src={rewardsConfig.logoUrl} alt="Rewards Logo" className="w-full h-full object-contain drop-shadow-xs" />
-                    ) : (
-                      <div className="text-[10px] text-zinc-400 text-center">No Logo</div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 
-                      className="text-zinc-900 dark:text-white font-semibold text-[13px] sm:text-[14px] leading-snug mb-1 tracking-tight whitespace-nowrap overflow-hidden text-ellipsis"
-                      style={{ fontFamily: 'Poppins, sans-serif' }}
-                    >
-                      {rewardsConfig.title}
-                    </h3>
+                {isRewardsEnrolled ? (
+                  /* ── Enrolled State: Matching Reference Image 4 with our existing theme ── */
+                  <div className="flex gap-3 sm:gap-4 items-center">
                     <div 
-                      className="text-zinc-600 dark:text-zinc-400 text-xs sm:text-[13px] space-y-0.5 font-normal"
-                      style={{ fontFamily: 'Poppins, sans-serif' }}
+                      onClick={handleStartRewardsFlow}
+                      className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 flex items-center justify-center p-0.5 cursor-pointer hover:scale-105 transition-transform"
+                      title="View Rewards & Wallet"
                     >
-                      <p>{rewardsConfig.subtitle1}</p>
-                      <p>{rewardsConfig.subtitle2}</p>
+                      <img 
+                        src={rewardsConfig.logoUrl || localStorage.getItem("sa_logo") || logoNew} 
+                        alt="Rewards Logo" 
+                        className="w-full h-full object-contain drop-shadow-xs" 
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 
+                        className="text-zinc-900 dark:text-white font-bold text-[14px] sm:text-[15px] leading-snug mb-2 tracking-tight cursor-pointer"
+                        onClick={handleStartRewardsFlow}
+                        style={{ fontFamily: 'Poppins, sans-serif' }}
+                      >
+                        Start earning rewards on every {rewardsConfig.orderPointsSubtitle ? rewardsConfig.orderPointsSubtitle.replace(/^on every /i, '') : 'order above ₹349'}!
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const menuPath = window.location.pathname.startsWith('/food') ? '/food/user/menu' : '/user/menu';
+                          navigate(menuPath);
+                        }}
+                        className="text-[var(--accent-red,#EE3A43)] font-bold text-sm sm:text-[15px] hover:underline flex items-center gap-1 p-0 bg-transparent border-0 cursor-pointer"
+                        style={{ fontFamily: 'Poppins, sans-serif' }}
+                      >
+                        <span>Order Now</span>
+                      </button>
                     </div>
                   </div>
-                </div>
-                <button 
-                  type="button"
-                  onClick={handleStartRewardsFlow}
-                  className="w-full mt-3.5 py-2.5 rounded-lg border-[1.5px] text-[13px] font-medium bg-transparent transition-colors active:scale-[0.98] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
-                  style={{ borderColor: 'var(--accent-red, #EE3A43)', color: 'var(--accent-red, #EE3A43)', fontFamily: 'Poppins, sans-serif' }}
-                >
-                  {rewardsConfig.buttonText}
-                </button>
-                <div 
-                  className="text-center text-[10px] sm:text-[11px] text-zinc-600 dark:text-zinc-300 font-medium mt-2.5 whitespace-nowrap overflow-hidden text-ellipsis"
-                  style={{ fontFamily: 'Poppins, sans-serif' }}
-                >
-                  {rewardsConfig.termsText || 'By enrolling you agree to our'}{" "}
-                  <button 
-                    type="button"
-                    onClick={() => setIsTermsModalOpen(true)}
-                    className="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline bg-transparent border-0 p-0 cursor-pointer"
-                  >
-                    {rewardsConfig.termsLinkText || 'Terms and Conditions'}
-                  </button>
-                </div>
+                ) : (
+                  /* ── Pre-Enrollment State: Matching Reference Image 3 ── */
+                  <div>
+                    <div className="flex gap-3 sm:gap-4 items-center">
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 flex items-center justify-center p-0.5">
+                        <img 
+                          src={rewardsConfig.logoUrl || localStorage.getItem("sa_logo") || logoNew} 
+                          alt="Rewards Logo" 
+                          className="w-full h-full object-contain drop-shadow-xs" 
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 
+                          className="text-zinc-900 dark:text-white font-semibold text-[13px] sm:text-[14px] leading-snug mb-1 tracking-tight whitespace-nowrap overflow-hidden text-ellipsis"
+                          style={{ fontFamily: 'Poppins, sans-serif' }}
+                        >
+                          {rewardsConfig.title || 'Earn Points to Unlock Free Treats!'}
+                        </h3>
+                        <div 
+                          className="text-zinc-600 dark:text-zinc-400 text-xs sm:text-[13px] space-y-0.5 font-normal"
+                          style={{ fontFamily: 'Poppins, sans-serif' }}
+                        >
+                          <p>{rewardsConfig.subtitle1 || '1 Order = 100 Points'}</p>
+                          <p>{rewardsConfig.subtitle2 || 'Relish freebies at 600 points'}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={handleStartRewardsFlow}
+                      className="w-full mt-3.5 py-2.5 rounded-lg border-[1.5px] text-[13px] font-medium bg-transparent transition-colors active:scale-[0.98] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                      style={{ borderColor: 'var(--accent-red, #EE3A43)', color: 'var(--accent-red, #EE3A43)', fontFamily: 'Poppins, sans-serif' }}
+                    >
+                      {rewardsConfig.buttonText || 'Enroll Now'}
+                    </button>
+                    <div 
+                      className="text-center text-[10px] sm:text-[11px] text-zinc-600 dark:text-zinc-300 font-medium mt-2.5 whitespace-nowrap overflow-hidden text-ellipsis"
+                      style={{ fontFamily: 'Poppins, sans-serif' }}
+                    >
+                      {rewardsConfig.termsText || 'By enrolling you agree to our'}{" "}
+                      <button 
+                        type="button"
+                        onClick={() => setIsTermsModalOpen(true)}
+                        className="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline bg-transparent border-0 p-0 cursor-pointer"
+                      >
+                        {rewardsConfig.termsLinkText || 'Terms and Conditions'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

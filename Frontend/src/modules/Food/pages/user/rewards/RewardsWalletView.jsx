@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Lock, ArrowUpDown, Check, ChevronDown, HelpCircle, FileText, X, Sparkles, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import apiClient from '@/services/api/axios';
@@ -120,6 +121,7 @@ export const FALLBACK_REWARD_PRODUCTS = [
 ];
 
 export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewardsConfig: propRewardsConfig }) {
+  const navigate = useNavigate();
   const normalizedInitial = initialTab === 'cheesy' ? 'rewards' : initialTab;
   const [activeTab, setActiveTab] = useState(normalizedInitial); // 'rewards' or 'wallet'
   const [rewardsConfig, setRewardsConfig] = useState(propRewardsConfig || null);
@@ -138,6 +140,13 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
   const [isEnrolled, setIsEnrolled] = useState(() => {
     return localStorage.getItem('pvp_rewards_enrolled') === 'true';
   });
+  const [userPoints, setUserPoints] = useState(0);
+
+  const handleNavigateMenu = () => {
+    if (onBack) onBack();
+    const menuPath = window.location.pathname.startsWith('/food') ? '/food/user/menu' : '/user/menu';
+    navigate(menuPath);
+  };
 
   const sortDropdownRef = useRef(null);
 
@@ -182,14 +191,34 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
         setRewardsConfig(cfg);
         if (Array.isArray(cfg.rewardProducts) && cfg.rewardProducts.length > 0) {
           setProducts(cfg.rewardProducts.slice(0, 10));
-          return;
+        } else {
+          setProducts(FALLBACK_REWARD_PRODUCTS);
         }
+      } else {
+        setProducts(FALLBACK_REWARD_PRODUCTS);
       }
-      setProducts(FALLBACK_REWARD_PRODUCTS);
     } catch (err) {
       console.warn('Could not load dynamic rewards config from backend, using defaults', err);
       setProducts(FALLBACK_REWARD_PRODUCTS);
     }
+
+    try {
+      if (userAPI?.getWallet) {
+        const wRes = await userAPI.getWallet();
+        const w = wRes?.data?.data?.wallet || wRes?.data?.wallet;
+        if (w) {
+          if (w.isEnrolled) {
+            setIsEnrolled(true);
+            localStorage.setItem('pvp_rewards_enrolled', 'true');
+          }
+          if (typeof w.points === 'number') {
+            setUserPoints(w.points);
+          } else if (typeof w.loyaltyPoints === 'number') {
+            setUserPoints(w.loyaltyPoints);
+          }
+        }
+      }
+    } catch (_) {}
   };
 
   const handleEnroll = async () => {
@@ -206,7 +235,9 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
     }
     setIsEnrolled(true);
     localStorage.setItem('pvp_rewards_enrolled', 'true');
+    window.dispatchEvent(new Event('pvp_rewards_enrolled_changed'));
     toast.success('🎉 Congratulations! You are now enrolled in Cheesy Rewards.');
+    fetchRewardsData();
   };
 
   // Filter & Sort Products
@@ -349,82 +380,157 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
           {/* ── VIEW 1: CHEESY REWARDS ── */}
           {activeTab === 'rewards' && (
             <div className="space-y-4">
-              {/* Top Reward Benefits Card matching Reference Image 1 */}
-              <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-150 dark:border-zinc-800 p-4 sm:p-5 shadow-2xs">
-                {/* Benefit 1: 1 Order = 100 Points */}
-                <div className="flex items-center gap-3.5">
-                  <div className="w-12 h-12 rounded-full border border-red-100 dark:border-red-900/40 bg-red-50/70 dark:bg-red-950/30 flex items-center justify-center shrink-0">
-                    <svg viewBox="0 0 40 40" className="w-8 h-8 text-[var(--accent-red,#EE3A43)]" fill="none" stroke="currentColor" strokeWidth="1.8">
-                      <circle cx="20" cy="20" r="16" />
-                      <path d="M20 20 L20 4 A16 16 0 0 1 31.3 8.7 Z" fill="currentColor" fillOpacity="0.25" />
-                      <line x1="20" y1="20" x2="20" y2="36" />
-                      <line x1="20" y1="20" x2="6.1" y2="12" />
-                      <line x1="20" y1="20" x2="33.9" y2="28" />
-                      <circle cx="23" cy="11" r="1" fill="currentColor" stroke="none" />
-                    </svg>
+              {/* Top Reward Card: Image 1 when enrolled, Image 2 when not enrolled */}
+              {isEnrolled ? (
+                /* ── Enrolled State: Balance & Progress Card (Matching Reference Image 1) ── */
+                <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-150 dark:border-zinc-800 p-4 sm:p-5 shadow-2xs">
+                  {/* Top: Balance + 6-slice pie chart */}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
+                        Your Balance
+                      </p>
+                      <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mt-0.5">
+                        {userPoints} Points
+                      </h2>
+                    </div>
+
+                    {/* 6-slice pizza pie chart icon */}
+                    <div className="w-11 h-11 relative flex items-center justify-center shrink-0">
+                      <svg viewBox="0 0 40 40" className="w-11 h-11" fill="none">
+                        <circle cx="20" cy="20" r="18" fill="#E4E4E7" className="dark:fill-zinc-700" />
+                        <line x1="20" y1="2" x2="20" y2="38" stroke="#ffffff" className="dark:stroke-zinc-900" strokeWidth="1.8" />
+                        <line x1="4.4" y1="11" x2="35.6" y2="29" stroke="#ffffff" className="dark:stroke-zinc-900" strokeWidth="1.8" />
+                        <line x1="4.4" y1="29" x2="35.6" y2="11" stroke="#ffffff" className="dark:stroke-zinc-900" strokeWidth="1.8" />
+                      </svg>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-[15px] sm:text-base text-zinc-900 dark:text-white leading-snug">
-                      {rewardsConfig?.orderPointsTitle || '1 Order = 100 Points'}
-                    </h3>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                      {rewardsConfig?.orderPointsSubtitle || 'On every order above ₹349'}
+
+                  {/* Horizontal Progress Track from 0 to 600 */}
+                  <div className="mt-4 mb-1">
+                    <div className="relative flex items-center">
+                      {/* Left blue circle dot at 0 */}
+                      <div className="w-3.5 h-3.5 rounded-full bg-[#0077B6] z-10 shrink-0 ring-2 ring-white dark:ring-zinc-900 shadow-xs" />
+                      
+                      {/* Track line connecting 0 to 600 */}
+                      <div className="flex-1 h-1 bg-zinc-200 dark:bg-zinc-700 mx-0 relative">
+                        <div 
+                          className="h-full bg-[#0077B6] transition-all duration-300"
+                          style={{ width: `${Math.min(100, Math.max(0, (userPoints / 600) * 100))}%` }}
+                        />
+                      </div>
+
+                      {/* Right blue circle dot at 600 */}
+                      <div className="w-3.5 h-3.5 rounded-full bg-[#0077B6] z-10 shrink-0 ring-2 ring-white dark:ring-zinc-900 shadow-xs" />
+                    </div>
+
+                    {/* Label 600 under right dot */}
+                    <div className="flex justify-end mt-1">
+                      <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
+                        600
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Dotted separator line */}
+                  <div className="border-t border-dashed border-zinc-200 dark:border-zinc-700 my-3" />
+
+                  {/* Sub-row: Place your first order to get 100 Points | View Menu */}
+                  <div className="flex items-center justify-between text-xs sm:text-[13px]">
+                    <p className="text-zinc-700 dark:text-zinc-300 m-0">
+                      Place your first order to get{' '}
+                      <span className="font-bold text-zinc-900 dark:text-white">
+                        {rewardsConfig?.pointsPerOrder || 100} Points
+                      </span>
                     </p>
+                    <button
+                      type="button"
+                      onClick={handleNavigateMenu}
+                      className="text-[#EE3A43] font-bold hover:underline cursor-pointer p-0 bg-transparent border-0 shrink-0 ml-2"
+                      style={{ color: 'var(--accent-red, #EE3A43)' }}
+                    >
+                      View Menu
+                    </button>
                   </div>
                 </div>
-
-                {/* Vertical connecting dotted line */}
-                <div className="w-12 flex justify-center py-1">
-                  <div className="w-0.5 h-3.5 border-l-2 border-dashed border-zinc-200 dark:border-zinc-700" />
-                </div>
-
-                {/* Benefit 2: Unlock Free Items */}
-                <div className="flex items-center gap-3.5">
-                  <div className="w-12 h-12 rounded-full border border-red-100 dark:border-red-900/40 bg-red-50/70 dark:bg-red-950/30 flex items-center justify-center shrink-0">
-                    <svg viewBox="0 0 40 40" className="w-8 h-8 text-[var(--accent-red,#EE3A43)]" fill="none" stroke="currentColor" strokeWidth="1.8">
-                      <circle cx="20" cy="20" r="16" />
-                      <line x1="20" y1="4" x2="20" y2="36" />
-                      <line x1="6.1" y1="12" x2="33.9" y2="28" />
-                      <line x1="6.1" y1="28" x2="33.9" y2="12" />
-                      <circle cx="20" cy="11" r="1" fill="currentColor" stroke="none" />
-                      <circle cx="27" cy="16" r="1" fill="currentColor" stroke="none" />
-                      <circle cx="27" cy="24" r="1" fill="currentColor" stroke="none" />
-                      <circle cx="20" cy="29" r="1" fill="currentColor" stroke="none" />
-                      <circle cx="13" cy="24" r="1" fill="currentColor" stroke="none" />
-                      <circle cx="13" cy="16" r="1" fill="currentColor" stroke="none" />
-                    </svg>
+              ) : (
+                /* ── Pre-Enrollment Benefits Card (Matching Reference Image 2) ── */
+                <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-150 dark:border-zinc-800 p-4 sm:p-5 shadow-2xs">
+                  {/* Benefit 1: 1 Order = 100 Points */}
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-full border border-red-100 dark:border-red-900/40 bg-red-50/70 dark:bg-red-950/30 flex items-center justify-center shrink-0">
+                      <svg viewBox="0 0 40 40" className="w-8 h-8 text-[var(--accent-red,#EE3A43)]" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <circle cx="20" cy="20" r="16" />
+                        <path d="M20 20 L20 4 A16 16 0 0 1 31.3 8.7 Z" fill="currentColor" fillOpacity="0.25" />
+                        <line x1="20" y1="20" x2="20" y2="36" />
+                        <line x1="20" y1="20" x2="6.1" y2="12" />
+                        <line x1="20" y1="20" x2="33.9" y2="28" />
+                        <circle cx="23" cy="11" r="1" fill="currentColor" stroke="none" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-[15px] sm:text-base text-zinc-900 dark:text-white leading-snug">
+                        {rewardsConfig?.orderPointsTitle || '1 Order = 100 Points'}
+                      </h3>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                        {rewardsConfig?.orderPointsSubtitle || 'On every order above ₹349'}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-[15px] sm:text-base text-zinc-900 dark:text-white leading-snug">
-                      {rewardsConfig?.freeItemsTitle || 'Unlock Free Items'}
-                    </h3>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                      {rewardsConfig?.freeItemsSubtitle || 'Starting at 600 Points'}
-                    </p>
+
+                  {/* Vertical connecting dotted line */}
+                  <div className="w-12 flex justify-center py-1">
+                    <div className="w-0.5 h-3.5 border-l-2 border-dashed border-zinc-200 dark:border-zinc-700" />
                   </div>
-                </div>
 
-                {/* Enroll Button */}
-                <button
-                  type="button"
-                  onClick={handleEnroll}
-                  className="w-full mt-4 py-2.5 sm:py-3 bg-[#EE3A43] hover:bg-[#d92d36] text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-red-500/25 active:scale-[0.99] cursor-pointer border-0"
-                  style={{ backgroundColor: 'var(--accent-red, #EE3A43)', color: '#ffffff' }}
-                >
-                  {isEnrolled ? '✓ Enrolled in Rewards' : (rewardsConfig?.buttonText || 'Enroll Now')}
-                </button>
+                  {/* Benefit 2: Unlock Free Items */}
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-full border border-red-100 dark:border-red-900/40 bg-red-50/70 dark:bg-red-950/30 flex items-center justify-center shrink-0">
+                      <svg viewBox="0 0 40 40" className="w-8 h-8 text-[var(--accent-red,#EE3A43)]" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <circle cx="20" cy="20" r="16" />
+                        <line x1="20" y1="4" x2="20" y2="36" />
+                        <line x1="6.1" y1="12" x2="33.9" y2="28" />
+                        <line x1="6.1" y1="28" x2="33.9" y2="12" />
+                        <circle cx="20" cy="11" r="1" fill="currentColor" stroke="none" />
+                        <circle cx="27" cy="16" r="1" fill="currentColor" stroke="none" />
+                        <circle cx="27" cy="24" r="1" fill="currentColor" stroke="none" />
+                        <circle cx="20" cy="29" r="1" fill="currentColor" stroke="none" />
+                        <circle cx="13" cy="24" r="1" fill="currentColor" stroke="none" />
+                        <circle cx="13" cy="16" r="1" fill="currentColor" stroke="none" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-[15px] sm:text-base text-zinc-900 dark:text-white leading-snug">
+                        {rewardsConfig?.freeItemsTitle || 'Unlock Free Items'}
+                      </h3>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                        {rewardsConfig?.freeItemsSubtitle || 'Starting at 600 Points'}
+                      </p>
+                    </div>
+                  </div>
 
-                <p className="text-center text-[11px] text-zinc-500 dark:text-zinc-400 mt-2.5">
-                  {rewardsConfig?.termsText || 'By enrolling you agree to our'}{' '}
+                  {/* Enroll Button */}
                   <button
                     type="button"
-                    onClick={() => setIsTermsModalOpen(true)}
-                    className="text-[var(--accent-red,#EE3A43)] font-semibold hover:underline cursor-pointer"
+                    onClick={handleEnroll}
+                    className="w-full mt-4 py-2.5 sm:py-3 bg-[#EE3A43] hover:bg-[#d92d36] text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-red-500/25 active:scale-[0.99] cursor-pointer border-0"
+                    style={{ backgroundColor: 'var(--accent-red, #EE3A43)', color: '#ffffff' }}
                   >
-                    {rewardsConfig?.termsLinkText || 'Terms and Conditions'}
+                    {rewardsConfig?.buttonText || 'Enroll Now'}
                   </button>
-                </p>
-              </div>
+
+                  <p className="text-center text-[11px] text-zinc-500 dark:text-zinc-400 mt-2.5">
+                    {rewardsConfig?.termsText || 'By enrolling you agree to our'}{' '}
+                    <button
+                      type="button"
+                      onClick={() => setIsTermsModalOpen(true)}
+                      className="text-[var(--accent-red,#EE3A43)] font-semibold hover:underline cursor-pointer bg-transparent border-0 p-0"
+                    >
+                      {rewardsConfig?.termsLinkText || 'Terms and Conditions'}
+                    </button>
+                  </p>
+                </div>
+              )}
 
               {/* ── Sticky Filter & Sort Bar (Matching Screenshot 1 & 2) ── */}
               {(rewardsConfig?.showVegFilter !== false || rewardsConfig?.showNonVegFilter !== false || rewardsConfig?.showSortFilter !== false) && (
@@ -623,27 +729,48 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
         </div>
       </div>
 
-      {/* ── Sticky Bottom Action Bar with Enroll Now (Matching Reference Image 2) ── */}
+      {/* ── Sticky Bottom Action Bar with Enroll Now / View Menu (Matching Reference Image 1 & 2) ── */}
       {activeTab === 'rewards' && (
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border-t border-zinc-100 dark:border-zinc-800 p-3 sm:p-4 max-w-md mx-auto shadow-lg">
-          <button
-            type="button"
-            onClick={handleEnroll}
-            className="w-full py-3 bg-[#EE3A43] hover:bg-[#d92d36] text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-red-500/25 active:scale-[0.99] cursor-pointer border-0"
-            style={{ backgroundColor: 'var(--accent-red, #EE3A43)', color: '#ffffff' }}
-          >
-            {isEnrolled ? '✓ Enrolled in Rewards' : (rewardsConfig?.buttonText || 'Enroll Now')}
-          </button>
-          <p className="text-center text-[10.5px] text-zinc-500 dark:text-zinc-400 mt-1.5">
-            {rewardsConfig?.termsText || 'By enrolling you agree to our'}{' '}
-            <button
-              type="button"
-              onClick={() => setIsTermsModalOpen(true)}
-              className="text-[var(--accent-red,#EE3A43)] font-semibold hover:underline cursor-pointer"
-            >
-              {rewardsConfig?.termsLinkText || 'Terms and Conditions'}
-            </button>
-          </p>
+          {isEnrolled ? (
+            <>
+              <button
+                type="button"
+                onClick={handleNavigateMenu}
+                className="w-full py-3 bg-[#EE3A43] hover:bg-[#d92d36] text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-red-500/25 active:scale-[0.99] cursor-pointer border-0"
+                style={{ backgroundColor: 'var(--accent-red, #EE3A43)', color: '#ffffff' }}
+              >
+                View Menu
+              </button>
+              <p className="text-center text-[11px] text-zinc-600 dark:text-zinc-300 mt-2 font-medium">
+                Place your first order to get{' '}
+                <span className="font-bold text-zinc-900 dark:text-white">
+                  {rewardsConfig?.pointsPerOrder || 100} Points
+                </span>
+              </p>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={handleEnroll}
+                className="w-full py-3 bg-[#EE3A43] hover:bg-[#d92d36] text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-red-500/25 active:scale-[0.99] cursor-pointer border-0"
+                style={{ backgroundColor: 'var(--accent-red, #EE3A43)', color: '#ffffff' }}
+              >
+                {rewardsConfig?.buttonText || 'Enroll Now'}
+              </button>
+              <p className="text-center text-[10.5px] text-zinc-500 dark:text-zinc-400 mt-1.5">
+                {rewardsConfig?.termsText || 'By enrolling you agree to our'}{' '}
+                <button
+                  type="button"
+                  onClick={() => setIsTermsModalOpen(true)}
+                  className="text-[var(--accent-red,#EE3A43)] font-semibold hover:underline cursor-pointer bg-transparent border-0 p-0"
+                >
+                  {rewardsConfig?.termsLinkText || 'Terms and Conditions'}
+                </button>
+              </p>
+            </>
+          )}
         </div>
       )}
 
