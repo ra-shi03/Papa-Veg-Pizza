@@ -409,19 +409,19 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                   {/* Horizontal Progress Track from 0 to 600 */}
                   <div className="mt-4 mb-1">
                     <div className="relative flex items-center">
-                      {/* Left blue circle dot at 0 */}
-                      <div className="w-3.5 h-3.5 rounded-full bg-[#0077B6] z-10 shrink-0 ring-2 ring-white dark:ring-zinc-900 shadow-xs" />
+                      {/* Left red circle dot at 0 */}
+                      <div className="w-3.5 h-3.5 rounded-full bg-[#EE3A43] z-10 shrink-0 ring-2 ring-white dark:ring-zinc-900 shadow-xs" />
                       
                       {/* Track line connecting 0 to 600 */}
                       <div className="flex-1 h-1 bg-zinc-200 dark:bg-zinc-700 mx-0 relative">
                         <div 
-                          className="h-full bg-[#0077B6] transition-all duration-300"
+                          className="h-full bg-[#EE3A43] transition-all duration-300"
                           style={{ width: `${Math.min(100, Math.max(0, (userPoints / 600) * 100))}%` }}
                         />
                       </div>
 
-                      {/* Right blue circle dot at 600 */}
-                      <div className="w-3.5 h-3.5 rounded-full bg-[#0077B6] z-10 shrink-0 ring-2 ring-white dark:ring-zinc-900 shadow-xs" />
+                      {/* Right red circle dot at 600 */}
+                      <div className="w-3.5 h-3.5 rounded-full bg-[#EE3A43] z-10 shrink-0 ring-2 ring-white dark:ring-zinc-900 shadow-xs" />
                     </div>
 
                     {/* Label 600 under right dot */}
