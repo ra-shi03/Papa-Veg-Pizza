@@ -6,7 +6,9 @@ Thumbs.db
 
 # AI / Assistant tool files
 .claude/
+.claude
 .gemini/
+.gemini
 
 # Dependencies
 node_modules/
@@ -40,3 +42,4 @@ yarn-error.log*
 *.ntvs*
 *.njsproj
 *.sln
+

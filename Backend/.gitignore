@@ -36,3 +36,10 @@ Thumbs.db
 
 # ignore scripts
 script/
+
+
+# AI tools
+.claude/
+.claude
+.gemini/
+.gemini
