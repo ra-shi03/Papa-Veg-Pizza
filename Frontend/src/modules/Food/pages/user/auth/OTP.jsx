@@ -178,6 +178,8 @@ export default function OTP() {
         // Save current user session
         setUserAuthData("user", token, user, refreshToken)
         sessionStorage.removeItem("userAuthData")
+        localStorage.removeItem("customer_logged_out")
+        localStorage.setItem("customer_has_visited", "true")
         window.dispatchEvent(new Event("userAuthChanged"))
 
         setSuccess(true)
@@ -234,6 +236,8 @@ export default function OTP() {
 
       setUserAuthData("user", accessToken, user, refreshToken)
       sessionStorage.removeItem("userAuthData")
+      localStorage.removeItem("customer_logged_out")
+      localStorage.setItem("customer_has_visited", "true")
       window.dispatchEvent(new Event("userAuthChanged"))
 
       setSuccess(true)

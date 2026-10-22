@@ -100,6 +100,7 @@ export default function AccountMenuList({ isDarkMode, onToggleTheme }) {
       localStorage.removeItem("user_user");
       localStorage.removeItem("user_accessToken");
       localStorage.removeItem("user_refreshToken");
+      localStorage.setItem("customer_logged_out", "true");
       window.dispatchEvent(new Event("userAuthChanged"));
       navigate("/food/user");
     }
@@ -118,6 +119,7 @@ export default function AccountMenuList({ isDarkMode, onToggleTheme }) {
       localStorage.removeItem("user_user");
       localStorage.removeItem("user_accessToken");
       localStorage.removeItem("user_refreshToken");
+      localStorage.setItem("customer_logged_out", "true");
       window.dispatchEvent(new Event("userAuthChanged"));
       navigate("/user/auth/login");
     } catch (e) {

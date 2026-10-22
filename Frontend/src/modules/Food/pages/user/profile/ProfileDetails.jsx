@@ -245,6 +245,7 @@ export default function ProfileDetails() {
       setLoggingOut(false)
     }
     clearSession()
+    localStorage.setItem("customer_logged_out", "true")
     setAccount(null)
     setIsAuthenticated(false)
     setShowLogoutModal(false)

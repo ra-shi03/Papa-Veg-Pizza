@@ -51,11 +51,6 @@ function resolveNativeInitialRoute() {
   if (isModuleAuthenticated('store')) return '/food/store'
   if (isModuleAuthenticated('delivery')) return '/food/delivery'
   if (isModuleAuthenticated('admin')) return '/admin'
-  if (isModuleAuthenticated('user')) {
-    const hasLocation = !!localStorage.getItem("deliveryAddress") || !!localStorage.getItem("deliveryLocation") || !!localStorage.getItem("user_location");
-    if (!hasLocation) return '/user/location/setup'
-    return '/food/user'
-  }
 
   return '/welcome'
 }

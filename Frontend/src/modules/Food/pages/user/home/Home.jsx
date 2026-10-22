@@ -141,6 +141,7 @@ export default function Home() {
       navigate("/welcome", { replace: true });
       return;
     }
+    localStorage.setItem("customer_has_visited", "true");
   }, [navigate]);
 
   const { isModalOpen, closeLocationModal, confirmLocation, locationConfirmed } = useLocationStore()

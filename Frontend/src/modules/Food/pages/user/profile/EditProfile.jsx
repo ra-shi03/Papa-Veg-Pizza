@@ -122,6 +122,7 @@ export default function EditProfile() {
       
       const USER_SESSION_PREFERENCE_KEYS = ["userVegMode", "userVegModeOption", "food-under-250-filters"]
       USER_SESSION_PREFERENCE_KEYS.forEach((key) => localStorage.removeItem(key))
+      localStorage.setItem("customer_logged_out", "true")
       window.dispatchEvent(new Event("userAuthChanged"))
       navigate("/food/user", { replace: true })
     }
@@ -148,6 +149,7 @@ export default function EditProfile() {
       
       const USER_SESSION_PREFERENCE_KEYS = ["userVegMode", "userVegModeOption", "food-under-250-filters"]
       USER_SESSION_PREFERENCE_KEYS.forEach((key) => localStorage.removeItem(key))
+      localStorage.setItem("customer_logged_out", "true")
       window.dispatchEvent(new Event("userAuthChanged"))
       navigate("/user/auth/login", { replace: true })
     } catch (err) {

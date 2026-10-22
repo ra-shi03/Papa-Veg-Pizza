@@ -61,6 +61,8 @@ export default function Login() {
           localStorage.setItem("user_refreshToken", tokens.refreshToken);
           localStorage.setItem("user_authenticated", "true");
           localStorage.setItem("user_profile", JSON.stringify(user));
+          localStorage.removeItem("customer_logged_out");
+          localStorage.setItem("customer_has_visited", "true");
           
           window.dispatchEvent(new CustomEvent("authStatusChanged", { detail: { module: "user", status: "login" } }));
           

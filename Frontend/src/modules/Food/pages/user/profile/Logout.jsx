@@ -72,6 +72,7 @@ export default function Logout() {
       clearModuleAuth("user")
       localStorage.removeItem("cart")
       USER_SESSION_PREFERENCE_KEYS.forEach((key) => localStorage.removeItem(key))
+      localStorage.setItem("customer_logged_out", "true")
 
       // Clear sessionStorage
       sessionStorage.removeItem("userAuthData")

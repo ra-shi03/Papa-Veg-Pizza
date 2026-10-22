@@ -146,6 +146,7 @@ export default function LocationSetup() {
           lng
         });
         
+        localStorage.setItem("customer_has_visited", "true");
         navigate("/food/user", { replace: true });
       } else {
         setErrorMessage(message);
@@ -190,6 +191,7 @@ export default function LocationSetup() {
             });
             
             // Go to home
+            localStorage.setItem("customer_has_visited", "true");
             navigate("/food/user", { replace: true });
           } else {
             setErrorMessage(message);
@@ -244,6 +246,7 @@ export default function LocationSetup() {
         lng
       });
       
+      localStorage.setItem("customer_has_visited", "true");
       navigate("/food/user", { replace: true });
     } catch(err) {
       setStatus("manual");
@@ -360,6 +363,7 @@ export default function LocationSetup() {
         lng
       });
       
+      localStorage.setItem("customer_has_visited", "true");
       navigate("/food/user", { replace: true });
 
     } catch(err) {

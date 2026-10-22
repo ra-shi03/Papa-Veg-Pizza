@@ -86,6 +86,7 @@ export default function UserSidebarDrawer({
       localStorage.removeItem('user_accessToken');
       localStorage.removeItem('currentUser');
       localStorage.removeItem('user_user');
+      localStorage.setItem('customer_logged_out', 'true');
       window.dispatchEvent(new Event('storage'));
     } catch (_) {}
     setIsLoggedIn(false);
