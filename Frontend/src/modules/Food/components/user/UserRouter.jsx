@@ -359,7 +359,7 @@ export default function UserRouter() {
             }
           />
 
-          {/* Wallet - Protected (user auth) */}
+          {/* Wallet & Rewards - Protected (user auth) */}
           <Route
             path="wallet"
             element={
@@ -368,7 +368,14 @@ export default function UserRouter() {
               </ProtectedRoute>
             }
           />
-          <Route path="rewards" element={<Rewards />} />
+          <Route
+            path="rewards"
+            element={
+              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
+                <Rewards />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Complaints - Protected (user auth) */}
           <Route

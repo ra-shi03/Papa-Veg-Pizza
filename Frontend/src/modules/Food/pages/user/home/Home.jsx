@@ -42,13 +42,19 @@ export default function Home() {
   const [showRewardsLoading, setShowRewardsLoading] = useState(false);
   const [showRewardsPage, setShowRewardsPage] = useState(false);
   const [isRewardsEnrolled, setIsRewardsEnrolled] = useState(() => {
-    return localStorage.getItem('pvp_rewards_enrolled') === 'true';
+    const isAuth =
+      localStorage.getItem("user_authenticated") === "true" ||
+      Boolean(localStorage.getItem("user_accessToken") || localStorage.getItem("accessToken"));
+    return isAuth && localStorage.getItem('pvp_rewards_enrolled') === 'true';
   });
   const rewardsLoadingTimeoutRef = useRef(null);
 
   useEffect(() => {
     const handleEnrollSync = () => {
-      setIsRewardsEnrolled(localStorage.getItem('pvp_rewards_enrolled') === 'true');
+      const isAuth =
+        localStorage.getItem("user_authenticated") === "true" ||
+        Boolean(localStorage.getItem("user_accessToken") || localStorage.getItem("accessToken"));
+      setIsRewardsEnrolled(isAuth && localStorage.getItem('pvp_rewards_enrolled') === 'true');
     };
     window.addEventListener('pvp_rewards_enrolled_changed', handleEnrollSync);
     window.addEventListener('storage', handleEnrollSync);
@@ -60,6 +66,16 @@ export default function Home() {
 
   useEffect(() => {
     const checkWalletEnrollment = async () => {
+      const isAuth =
+        localStorage.getItem("user_authenticated") === "true" ||
+        Boolean(localStorage.getItem("user_accessToken") || localStorage.getItem("accessToken"));
+
+      if (!isAuth) {
+        setIsRewardsEnrolled(false);
+        localStorage.removeItem('pvp_rewards_enrolled');
+        return;
+      }
+
       try {
         // Server rewards membership is the source of truth (covers enrol/quit on another device).
         const res = await userAPI.getRewards();
@@ -70,12 +86,29 @@ export default function Home() {
           if (enrolled) localStorage.setItem('pvp_rewards_enrolled', 'true');
           else localStorage.removeItem('pvp_rewards_enrolled');
         }
-      } catch (_) {}
+      } catch (err) {
+        if (err?.response?.status === 401) {
+          setIsRewardsEnrolled(false);
+          localStorage.removeItem('pvp_rewards_enrolled');
+        }
+      }
     };
     checkWalletEnrollment();
   }, []);
 
   const handleStartRewardsFlow = () => {
+    const isAuth =
+      localStorage.getItem("user_authenticated") === "true" ||
+      Boolean(localStorage.getItem("user_accessToken") || localStorage.getItem("accessToken"));
+
+    if (!isAuth) {
+      const loginPath = window.location.pathname.startsWith('/food')
+        ? '/food/user/auth/login'
+        : '/user/auth/login';
+      navigate(loginPath, { state: { from: window.location.pathname } });
+      return;
+    }
+
     setShowRewardsLoading(true);
     if (rewardsLoadingTimeoutRef.current) clearTimeout(rewardsLoadingTimeoutRef.current);
     rewardsLoadingTimeoutRef.current = setTimeout(() => {

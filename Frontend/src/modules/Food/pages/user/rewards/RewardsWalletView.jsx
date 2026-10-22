@@ -214,27 +214,55 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
     }
 
     // Enrolment + points come from the server (rewards membership), never from localStorage alone.
-    try {
-      const rRes = await userAPI.getRewards();
-      const r = rRes?.data?.data?.rewards;
-      if (r) {
-        const enrolled = Boolean(r.isEnrolled);
-        setIsEnrolled(enrolled);
-        setUserPoints(Number(r.points) || 0);
-        const wasEnrolled = localStorage.getItem('pvp_rewards_enrolled') === 'true';
-        if (enrolled) localStorage.setItem('pvp_rewards_enrolled', 'true');
-        else localStorage.removeItem('pvp_rewards_enrolled');
-        if (wasEnrolled !== enrolled) window.dispatchEvent(new Event('pvp_rewards_enrolled_changed'));
-      }
-    } catch (_) {}
+    const isAuth =
+      localStorage.getItem("user_authenticated") === "true" ||
+      Boolean(localStorage.getItem("user_accessToken") || localStorage.getItem("accessToken"));
 
-    try {
-      const wRes = await userAPI.getWalletMe();
-      setWalletBalance(Number(wRes?.data?.data?.wallet?.balance) || 0);
-    } catch (_) {}
+    if (isAuth) {
+      try {
+        const rRes = await userAPI.getRewards();
+        const r = rRes?.data?.data?.rewards;
+        if (r) {
+          const enrolled = Boolean(r.isEnrolled);
+          setIsEnrolled(enrolled);
+          setUserPoints(Number(r.points) || 0);
+          const wasEnrolled = localStorage.getItem('pvp_rewards_enrolled') === 'true';
+          if (enrolled) localStorage.setItem('pvp_rewards_enrolled', 'true');
+          else localStorage.removeItem('pvp_rewards_enrolled');
+          if (wasEnrolled !== enrolled) window.dispatchEvent(new Event('pvp_rewards_enrolled_changed'));
+        }
+      } catch (err) {
+        if (err?.response?.status === 401) {
+          setIsEnrolled(false);
+          localStorage.removeItem('pvp_rewards_enrolled');
+        }
+      }
+
+      try {
+        const wRes = await userAPI.getWalletMe();
+        setWalletBalance(Number(wRes?.data?.data?.wallet?.balance) || 0);
+      } catch (_) {}
+    } else {
+      setIsEnrolled(false);
+      setUserPoints(0);
+      setWalletBalance(0);
+    }
   };
 
   const handleEnroll = async () => {
+    const isAuth =
+      localStorage.getItem("user_authenticated") === "true" ||
+      Boolean(localStorage.getItem("user_accessToken") || localStorage.getItem("accessToken"));
+
+    if (!isAuth) {
+      toast.info("Please log in to join rewards");
+      const loginPath = window.location.pathname.startsWith('/food')
+        ? '/food/user/auth/login'
+        : '/user/auth/login';
+      navigate(loginPath, { state: { from: window.location.pathname } });
+      return;
+    }
+
     const programName = rewardsConfig?.programName || 'Cheesy Rewards';
     if (isEnrolled) {
       toast.info(`You are already enrolled in ${programName}!`);
