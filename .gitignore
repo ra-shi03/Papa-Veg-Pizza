@@ -1,0 +1,42 @@
+# OS Files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# AI / Assistant tool files
+.claude/
+.gemini/
+
+# Dependencies
+node_modules/
+Backend/node_modules/
+Frontend/node_modules/
+
+# Production builds
+Frontend/dist/
+Frontend/dist-ssr/
+dist/
+
+# Environment files
+.env
+.env.*
+!.env.example
+Backend/.env
+Backend/.env.*
+Frontend/.env
+Frontend/.env.*
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDEs
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
