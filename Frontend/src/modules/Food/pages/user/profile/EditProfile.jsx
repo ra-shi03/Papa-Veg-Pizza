@@ -123,7 +123,7 @@ export default function EditProfile() {
       const USER_SESSION_PREFERENCE_KEYS = ["userVegMode", "userVegModeOption", "food-under-250-filters"]
       USER_SESSION_PREFERENCE_KEYS.forEach((key) => localStorage.removeItem(key))
       window.dispatchEvent(new Event("userAuthChanged"))
-      navigate("/user/auth/login", { replace: true })
+      navigate("/food/user", { replace: true })
     }
   }
 

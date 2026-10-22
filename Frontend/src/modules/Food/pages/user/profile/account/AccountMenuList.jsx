@@ -101,7 +101,7 @@ export default function AccountMenuList({ isDarkMode, onToggleTheme }) {
       localStorage.removeItem("user_accessToken");
       localStorage.removeItem("user_refreshToken");
       window.dispatchEvent(new Event("userAuthChanged"));
-      navigate("/user/auth/login");
+      navigate("/food/user");
     }
   };
 

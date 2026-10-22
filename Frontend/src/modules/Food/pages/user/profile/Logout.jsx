@@ -79,9 +79,9 @@ export default function Logout() {
       // Dispatch auth change event to notify other components
       window.dispatchEvent(new Event("userAuthChanged"))
 
-      // Small delay for UX, then navigate to sign in
+      // Small delay for UX, then navigate to home page
       setTimeout(() => {
-        navigate("/user/auth/login", { replace: true })
+        navigate("/food/user", { replace: true })
       }, 500)
     } catch (err) {
       // Even if there's an error, we should still clear local data and logout
@@ -98,7 +98,7 @@ export default function Logout() {
       
       // Still navigate after showing error
       setTimeout(() => {
-        navigate("/user/auth/login", { replace: true })
+        navigate("/food/user", { replace: true })
       }, 2000)
     }
   }
