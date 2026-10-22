@@ -27,7 +27,11 @@ export default function BottomNavigation() {
 
   // Check active routes - support both /user/* and /* paths
   const isUnder250 = pathname === "/food/under-250" || pathname.startsWith("/food/user/under-250")
-  const isProfile = pathname.startsWith("/food/profile") || pathname.startsWith("/food/user/profile")
+  const isProfile =
+    pathname.startsWith("/food/profile") ||
+    pathname.startsWith("/food/user/profile") ||
+    pathname.startsWith("/food/account") ||
+    pathname.startsWith("/food/user/account")
   const isDelivery =
     !isUnder250 &&
     !isProfile &&
@@ -36,7 +40,8 @@ export default function BottomNavigation() {
       pathname === "/food/user" ||
       (pathname.startsWith("/food/user") &&
         !pathname.includes("/under-250") &&
-        !pathname.includes("/profile")))
+        !pathname.includes("/profile") &&
+        !pathname.includes("/account")))
 
   return (
     <div
@@ -87,7 +92,7 @@ export default function BottomNavigation() {
 
         {/* Profile Tab */}
         <Link
-          to="/food/user/profile"
+          to="/food/user/account/profile-details"
           className={`flex flex-1 flex-col items-center gap-1.5 px-2 sm:px-3 py-2 transition-all duration-200 relative ${isProfile
             ? "text-[#7e3866]"
             : "text-gray-600 dark:text-gray-400"

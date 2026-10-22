@@ -710,9 +710,25 @@ export default function AddressSelectorPage() {
 
           <div className="space-y-4">
             {addresses.length === 0 ? (
-              <div className="text-center py-10 opacity-50">
-                <MapPin className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-                <p>No addresses saved yet</p>
+              <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                <img
+                  src="/no-addresses.png"
+                  alt="No saved addresses"
+                  className="w-32 sm:w-36 h-auto object-contain mb-3 select-none drop-shadow-xs"
+                />
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
+                  No saved addresses found!
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-6 max-w-xs">
+                  Add your first address to get started
+                </p>
+                <Button
+                  onClick={handleAddAddressClick}
+                  className="w-full max-w-xs h-11 text-white font-bold text-sm rounded-xl cursor-pointer"
+                  style={{ backgroundColor: 'var(--accent-red, #EE3A43)' }}
+                >
+                  Add Address
+                </Button>
               </div>
             ) : (
               addresses.map((addr, idx) => {

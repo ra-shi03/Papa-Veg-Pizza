@@ -164,9 +164,9 @@ export default function DeliveryCardAboveNav({ config, isDarkMode = false }) {
   return (
     <aside 
       aria-label="Free Delivery Information"
-      className="fixed bottom-[64px] left-0 right-0 z-40 flex justify-center pointer-events-none select-none transition-all duration-300"
+      className="fixed bottom-[60px] left-0 right-0 z-40 flex justify-center pointer-events-none select-none transition-all duration-300"
     >
-      <div className="w-full max-w-md pointer-events-auto px-0 sm:px-2">
+      <div className="w-full max-w-md pointer-events-auto px-0">
         <div
           style={{
             backgroundColor: isDarkMode ? '#18181b' : 'var(--secondary-off-white, #FFFFFF)',

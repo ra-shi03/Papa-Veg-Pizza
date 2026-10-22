@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useLocation } from "react-router-dom"
 import { ArrowLeft, Search, MoreVertical, ChevronRight, Star, RotateCcw, AlertCircle, Loader2, Clock, X, Share2, MessageCircle, Send, Copy, Mail, MessagesSquare, Link2 } from "lucide-react"
 import { orderAPI } from "@food/api"
 import { useCart } from "@food/context/CartContext"
 import { toast } from "sonner"
 import { getCompanyNameAsync } from "@food/utils/businessSettings"
+import noOrdersImg from "@/assets/no-orders.png"
 const debugLog = (...args) => { }
 const debugWarn = (...args) => { }
 const debugError = (...args) => { }
@@ -12,7 +13,23 @@ const debugError = (...args) => { }
 
 export default function Orders() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { replaceCart } = useCart()
+
+  const handleBack = () => {
+    if (
+      location.state?.from &&
+      (location.state.from.includes("cart") || location.state.from.includes("menu"))
+    ) {
+      navigate(location.state.from)
+      return
+    }
+    const profilePath = window.location.pathname.startsWith("/food")
+      ? "/food/user/account/profile-details"
+      : "/user/account/profile-details"
+    navigate(profilePath)
+  }
+
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -660,15 +677,22 @@ Order again from this restaurant in the ${companyName} app.`
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] pb-10">
-        <div className="bg-white dark:bg-[#121212] p-4 flex items-center shadow-sm sticky top-0 z-10 border-b dark:border-gray-800">
-          <Link to="/user">
-            <ArrowLeft className="w-6 h-6 text-gray-700 dark:text-gray-300 cursor-pointer" />
-          </Link>
-          <h1 className="ml-4 text-xl font-semibold text-gray-800 dark:text-gray-100">Your Orders</h1>
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] pb-10 font-sans">
+        <div className="bg-white dark:bg-[#121212] px-4 py-3.5 flex items-center shadow-xs sticky top-0 z-10 border-b border-gray-100 dark:border-gray-800">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="p-1.5 -ml-1.5 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer bg-transparent border-0 flex items-center justify-center"
+            aria-label="Back"
+          >
+            <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
+          </button>
+          <h1 className="ml-3 text-[17px] sm:text-lg font-bold text-gray-900 dark:text-white m-0">
+            My Orders
+          </h1>
         </div>
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 text-[#7e3866] animate-spin" />
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="w-8 h-8 text-[var(--accent-red,#EE3A43)] animate-spin" />
         </div>
       </div>
     )
@@ -676,18 +700,43 @@ Order again from this restaurant in the ${companyName} app.`
 
   if (orders.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] pb-10">
-        <div className="bg-white dark:bg-[#121212] p-4 flex items-center shadow-sm sticky top-0 z-10 border-b dark:border-gray-800">
-          <Link to="/user">
-            <ArrowLeft className="w-6 h-6 text-gray-700 dark:text-gray-300 cursor-pointer" />
-          </Link>
-          <h1 className="ml-4 text-xl font-semibold text-gray-800 dark:text-gray-100">Your Orders</h1>
+      <div className="min-h-screen bg-white dark:bg-[#0a0a0a] flex flex-col font-sans">
+        {/* Header */}
+        <div className="bg-white dark:bg-[#121212] px-4 py-3.5 flex items-center shadow-xs sticky top-0 z-10 border-b border-gray-100 dark:border-gray-800">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="p-1.5 -ml-1.5 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer bg-transparent border-0 flex items-center justify-center"
+            aria-label="Back"
+          >
+            <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
+          </button>
+          <h1 className="ml-3 text-[17px] sm:text-lg font-bold text-gray-900 dark:text-white m-0">
+            My Orders
+          </h1>
         </div>
-        <div className="px-4 py-8 text-center text-gray-600 dark:text-gray-400">
-          <p>You haven't placed any orders yet</p>
-          <Link to="/user">
-            <button className="mt-4 text-[#7e3866] font-medium">Start Ordering</button>
-          </Link>
+
+        {/* Empty State (2nd Image) */}
+        <div className="flex-1 flex flex-col items-center justify-center px-6 -mt-8 sm:-mt-12 text-center">
+          <img
+            src={noOrdersImg}
+            alt="No orders found"
+            className="w-44 sm:w-52 h-auto object-contain select-none mb-6 drop-shadow-xs"
+          />
+          <h2 className="text-[17px] sm:text-[19px] font-bold text-zinc-900 dark:text-white max-w-xs leading-snug mb-2 tracking-tight">
+            Seems like you have not ordered from Papa Veg Pizza in the recent past
+          </h2>
+          <p className="text-xs sm:text-[13px] text-zinc-500 dark:text-zinc-400 mb-6">
+            Place your order now
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate("/food/user/menu")}
+            className="px-8 h-11 bg-[#E53935] hover:bg-[#d92d36] text-white font-bold text-sm tracking-wide rounded-xl shadow-md shadow-red-500/25 active:scale-[0.98] transition-all cursor-pointer border-0"
+            style={{ backgroundColor: "var(--accent-red, #EE3A43)" }}
+          >
+            Explore Menu
+          </button>
         </div>
       </div>
     )
@@ -696,17 +745,24 @@ Order again from this restaurant in the ${companyName} app.`
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] pb-10 font-sans">
       {/* Header */}
-      <div className="bg-white dark:bg-[#121212] p-4 flex items-center shadow-sm sticky top-0 z-10 border-b dark:border-gray-800">
-        <Link to="/user">
-          <ArrowLeft className="w-6 h-6 text-gray-700 dark:text-gray-300 cursor-pointer" />
-        </Link>
-        <h1 className="ml-4 text-xl font-semibold text-gray-800 dark:text-gray-100">Your Orders</h1>
+      <div className="bg-white dark:bg-[#121212] px-4 py-3.5 flex items-center shadow-xs sticky top-0 z-10 border-b border-gray-100 dark:border-gray-800">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="p-1.5 -ml-1.5 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer bg-transparent border-0 flex items-center justify-center"
+          aria-label="Back"
+        >
+          <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
+        </button>
+        <h1 className="ml-3 text-[17px] sm:text-lg font-bold text-gray-900 dark:text-white m-0">
+          My Orders
+        </h1>
       </div>
 
       {/* Search Bar */}
       <div className="p-4 bg-white dark:bg-[#121212] mt-1 border-b dark:border-gray-800">
         <div className="flex items-center bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2 shadow-sm">
-          <Search className="w-5 h-5 text-[#7e3866]" />
+          <Search className="w-5 h-5 text-gray-400" />
           <input
             type="text"
             placeholder="Search by restaurant or dish"

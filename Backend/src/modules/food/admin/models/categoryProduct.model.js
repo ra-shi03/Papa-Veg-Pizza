@@ -15,6 +15,11 @@ const categoryProductSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  borderColor: {
+    type: String,
+    trim: true,
+    default: '#E4E4E7'
+  },
   description: {
     type: String,
     trim: true

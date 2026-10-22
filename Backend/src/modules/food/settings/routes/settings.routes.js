@@ -78,5 +78,15 @@ router.post('/search-config/tabs', authMiddleware, requireSuperAdmin, searchPage
 router.put('/search-config/tabs/:id', authMiddleware, requireSuperAdmin, searchPageConfigController.updateSearchByTab);
 router.delete('/search-config/tabs/:id', authMiddleware, requireSuperAdmin, searchPageConfigController.deleteSearchByTab);
 
+import * as faqController from '../controllers/faq.controller.js';
+
+// FAQ Routes
+router.get('/faqs/public', faqController.getPublicFaqs);
+router.get('/faqs/admin', authMiddleware, requireSuperAdmin, faqController.getAdminFaqs);
+router.post('/faqs', authMiddleware, requireSuperAdmin, faqController.createFaq);
+router.put('/faqs/:id', authMiddleware, requireSuperAdmin, faqController.updateFaq);
+router.delete('/faqs/:id', authMiddleware, requireSuperAdmin, faqController.deleteFaq);
+router.patch('/faqs/:id/toggle', authMiddleware, requireSuperAdmin, faqController.toggleFaqStatus);
+
 export default router;
 

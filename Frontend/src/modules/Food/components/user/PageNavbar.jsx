@@ -1112,7 +1112,7 @@ export default function PageNavbar({
  
           {/* Profile - Only shown if showProfile is true */}
           {showProfile && (
-            <Link to="/user/profile">
+            <Link to="/user/account/profile-details">
               <Button
                 variant="ghost"
                 size="icon"

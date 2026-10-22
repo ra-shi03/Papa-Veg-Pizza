@@ -21,6 +21,7 @@ import {
 import { fetchPolyline } from '../utils/googleMaps.js';
 import * as foodTransactionService from './foodTransaction.service.js';
 import * as dispatchService from './order-dispatch.service.js';
+import { awardOrderPointsSafely } from '../../user/services/rewards.service.js';
 import {
   buildOrderIdentityFilter,
   emitDeliveryDropOtpToUser,
@@ -1040,6 +1041,9 @@ export async function completeDelivery(orderId, deliveryPartnerId, body = {}) {
   });
 
   emitOrderUpdate(order, deliveryPartnerId);
+
+  // Cheesy Rewards: award points once for this delivered order (eligibility checked in the service).
+  awardOrderPointsSafely(order._id);
   
   enqueueOrderEvent('delivery_completed', {
     orderMongoId: order._id?.toString?.(),
@@ -1076,6 +1080,8 @@ export async function updateOrderStatusDelivery(orderId, deliveryPartnerId, orde
     to: orderStatus,
   });
   await order.save();
+
+  if (orderStatus === 'delivered') awardOrderPointsSafely(order._id);
 
   enqueueOrderEvent('delivery_status_updated', {
     orderMongoId: order._id?.toString?.(),

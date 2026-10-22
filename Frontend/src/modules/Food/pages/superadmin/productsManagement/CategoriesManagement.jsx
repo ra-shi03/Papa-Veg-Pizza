@@ -21,11 +21,22 @@ import { toast } from 'sonner';
 import apiClient, { adminClient } from '@/services/api/axios';
 import { uploadAPI } from '@/services/api';
 
+const PRESET_BORDER_COLORS = [
+  { label: 'Default Grey', value: '#E4E4E7' },
+  { label: 'Red / Tomato', value: '#E53935' },
+  { label: 'Amber / Cheddar', value: '#F59E0B' },
+  { label: 'Emerald / Fresh', value: '#10B981' },
+  { label: 'Royal Blue', value: '#3B82F6' },
+  { label: 'Purple / Plum', value: '#8B5CF6' },
+  { label: 'Hot Pink', value: '#EC4899' },
+  { label: 'Dark Charcoal', value: '#27272A' },
+];
+
 export default function CategoriesManagement() {
   const [menus, setMenus] = useState([]);
   const [isMenusModalOpen, setIsMenusModalOpen] = useState(false);
   const [editingMenu, setEditingMenu] = useState(null);
-  const [menuForm, setMenuForm] = useState({ id: '', label: '', badge: '', icon: '', type: 'Category', status: 'Active', sort: 0 });
+  const [menuForm, setMenuForm] = useState({ id: '', label: '', badge: '', icon: '', borderColor: '#E4E4E7', type: 'Category', status: 'Active', sort: 0 });
   
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewCategory, setViewCategory] = useState(null);
@@ -116,10 +127,24 @@ export default function CategoriesManagement() {
   const handleOpenMenuModal = (menu = null) => {
     if (menu) {
       setEditingMenu(menu);
-      setMenuForm({ ...menu, badge: menu.badge || '', sort: menu.sort ?? 0 });
+      setMenuForm({ 
+        ...menu, 
+        badge: menu.badge || '', 
+        borderColor: menu.borderColor || '#E4E4E7',
+        sort: menu.sort ?? 0 
+      });
     } else {
       setEditingMenu(null);
-      setMenuForm({ id: '', label: '', badge: '', icon: '', type: 'Category', status: 'Active', sort: 0 });
+      setMenuForm({ 
+        id: '', 
+        label: '', 
+        badge: '', 
+        icon: '', 
+        borderColor: '#E4E4E7', 
+        type: 'Category', 
+        status: 'Active', 
+        sort: 0 
+      });
     }
     setIsMenusModalOpen(true);
   };
@@ -427,7 +452,10 @@ export default function CategoriesManagement() {
                 Sort: {menu.sort ?? 0}
               </span>
               <div className="flex flex-col items-center text-center">
-                <div className="flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full w-20 h-20 mb-4 overflow-hidden shrink-0 shadow-inner">
+                <div 
+                  className="flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full w-20 h-20 mb-3 overflow-hidden shrink-0 shadow-sm border-[3px] transition-all"
+                  style={{ borderColor: menu.borderColor || '#E4E4E7' }}
+                >
                   {menu.icon && (menu.icon.startsWith('http') || menu.icon.startsWith('data:')) ? (
                     <img src={menu.icon} alt={menu.label} className="w-full h-full object-cover p-2" />
                   ) : (
@@ -435,6 +463,15 @@ export default function CategoriesManagement() {
                   )}
                 </div>
                 <h3 className="font-bold text-lg text-zinc-900 dark:text-zinc-100">{menu.label}</h3>
+                <div className="flex items-center gap-1.5 mt-1 bg-zinc-50 dark:bg-zinc-800/60 px-2 py-0.5 rounded-full border border-zinc-200/80 dark:border-zinc-700/60">
+                  <div 
+                    className="w-2.5 h-2.5 rounded-full border border-black/10 shrink-0" 
+                    style={{ backgroundColor: menu.borderColor || '#E4E4E7' }} 
+                  />
+                  <span className="text-[10px] font-mono font-medium text-zinc-600 dark:text-zinc-300 uppercase">
+                    {menu.borderColor || '#E4E4E7'}
+                  </span>
+                </div>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 truncate w-full px-2" title={menu.icon}>{menu.icon}</p>
               </div>
               
@@ -509,6 +546,90 @@ export default function CategoriesManagement() {
                   </button>
                 </div>
               </div>
+
+              {/* Border Color (Dynamic per category) */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+                    Border Color (Per Category)
+                  </label>
+                  <span className="text-[11px] font-mono font-medium text-zinc-500 uppercase">
+                    {menuForm.borderColor || '#E4E4E7'}
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-2 mb-2">
+                  <div 
+                    className="w-10 h-10 rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden relative shrink-0 cursor-pointer shadow-xs"
+                    style={{ backgroundColor: menuForm.borderColor || '#E4E4E7' }}
+                  >
+                    <input 
+                      type="color"
+                      value={menuForm.borderColor || '#E4E4E7'}
+                      onChange={e => setMenuForm({ ...menuForm, borderColor: e.target.value })}
+                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                      title="Choose custom color"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    value={menuForm.borderColor || '#E4E4E7'}
+                    onChange={e => setMenuForm({ ...menuForm, borderColor: e.target.value })}
+                    className="flex-1 px-3 py-2.5 border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/50 dark:bg-zinc-800 dark:border-zinc-700 transition-shadow"
+                    placeholder="#E4E4E7"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMenuForm({ ...menuForm, borderColor: '#E4E4E7' })}
+                    className="px-3 py-2.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 rounded-lg text-xs font-semibold transition-colors"
+                  >
+                    Reset
+                  </button>
+                </div>
+
+                {/* Preset color swatches */}
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  <span className="text-[11px] text-zinc-400 mr-1 font-medium">Presets:</span>
+                  {PRESET_BORDER_COLORS.map(c => {
+                    const isSelected = (menuForm.borderColor || '#E4E4E7').toLowerCase() === c.value.toLowerCase();
+                    return (
+                      <button
+                        key={c.value}
+                        type="button"
+                        onClick={() => setMenuForm({ ...menuForm, borderColor: c.value })}
+                        className={`w-6 h-6 rounded-full border transition-all ${
+                          isSelected ? 'ring-2 ring-[var(--primary)] ring-offset-2 scale-110 shadow-xs' : 'border-zinc-300 dark:border-zinc-700 hover:scale-105'
+                        }`}
+                        style={{ backgroundColor: c.value }}
+                        title={c.label}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Live Preview Circle */}
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border border-zinc-200 dark:border-zinc-700 flex items-center gap-4">
+                <div 
+                  className="w-14 h-14 rounded-full border-2 shadow-sm flex items-center justify-center overflow-hidden bg-zinc-100 shrink-0 transition-all relative"
+                  style={{ borderColor: menuForm.borderColor || '#E4E4E7' }}
+                >
+                  {menuForm.icon && (menuForm.icon.startsWith('http') || menuForm.icon.startsWith('data:')) ? (
+                    <img src={menuForm.icon} alt={menuForm.label} className="w-full h-full object-cover scale-[1.15]" />
+                  ) : (
+                    <span className="material-symbols-outlined text-zinc-400 text-xl">
+                      {menuForm.icon || 'fastfood'}
+                    </span>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold text-zinc-700 dark:text-zinc-200">Category Live Border Preview</div>
+                  <div className="text-[11px] text-zinc-500 mt-0.5 truncate">
+                    Circle border will render in {menuForm.borderColor || '#E4E4E7'} on user app.
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">Status</label>
                 <select
@@ -572,7 +693,10 @@ export default function CategoriesManagement() {
             ) : viewCategory ? (
               <div className="space-y-6">
                 <div className="flex flex-col items-center">
-                  <div className="flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full w-24 h-24 mb-4 overflow-hidden shrink-0 shadow-inner">
+                  <div 
+                    className="flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full w-24 h-24 mb-4 overflow-hidden shrink-0 shadow-md border-4 transition-all"
+                    style={{ borderColor: viewCategory.borderColor || '#E4E4E7' }}
+                  >
                     {viewCategory.icon && (viewCategory.icon.startsWith('http') || viewCategory.icon.startsWith('data:')) ? (
                       <img src={viewCategory.icon} alt={viewCategory.label || viewCategory.name} className="w-full h-full object-cover p-2" />
                     ) : (
@@ -587,6 +711,13 @@ export default function CategoriesManagement() {
                   <div className="flex justify-between border-b border-zinc-200 dark:border-zinc-700 pb-2">
                     <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">ID</span>
                     <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{viewCategory.id}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-zinc-200 dark:border-zinc-700 pb-2">
+                    <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Border Color</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded-full border border-black/15 shadow-xs" style={{ backgroundColor: viewCategory.borderColor || '#E4E4E7' }} />
+                      <span className="text-sm font-medium font-mono text-zinc-900 dark:text-zinc-100 uppercase">{viewCategory.borderColor || '#E4E4E7'}</span>
+                    </div>
                   </div>
                   {viewCategory.badge && (
                     <div className="flex justify-between border-b border-zinc-200 dark:border-zinc-700 pb-2">

@@ -432,7 +432,7 @@ export function ShowcaseSections({ onAddToCart, triggerToast, isDarkMode }) {
                     </div>
 
                     {/* Dark Gradient Overlay with Veg Icon, Title, Toppings, Pricing & Red Add Button (Matching Menu Page) */}
-                    <div className="relative z-10 w-full bg-gradient-to-t from-black/95 via-black/80 to-transparent pt-14 pb-3.5 px-3.5 sm:px-4 text-left">
+                    <div className="relative z-10 w-full bg-gradient-to-t from-black/95 via-black/55 to-transparent pt-7 pb-3.5 px-3.5 sm:px-4 text-left">
                       {/* Veg Icon + Product Title */}
                       <div className="flex items-center gap-2">
                         <span className="w-3.5 h-3.5 border-[1.5px] border-[#00C853] flex items-center justify-center shrink-0">

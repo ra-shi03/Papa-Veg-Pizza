@@ -6,6 +6,8 @@ import { locationAPI } from "@/services/api/location";
 import { userAPI } from "@/services/api/userApiModule";
 import { useLocationStore } from "@food/store/locationStore";
 import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
+import { toast } from "sonner";
+import noAddressesImg from "@/assets/no-addresses.png";
 
 export default function LocationSetup() {
   const navigate = useNavigate();
@@ -16,7 +18,7 @@ export default function LocationSetup() {
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
   });
 
-  const [status, setStatus] = useState("checking"); // checking, prompt, manual, map, saving, not_serviceable
+  const [status, setStatus] = useState(() => (locationState?.mode === "my_addresses" ? "my_addresses" : "checking")); // checking, prompt, manual, map, saving, not_serviceable, add_address, my_addresses
   const [address, setAddress] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
@@ -27,8 +29,11 @@ export default function LocationSetup() {
   const [detailedAddress, setDetailedAddress] = useState("Block, 3rd floor, Corporate House, 307 B, Regal Cir, beside DA...");
   const [addressName, setAddressName] = useState("");
   const [isForSomeoneElse, setIsForSomeoneElse] = useState(false);
+  const [recipientName, setRecipientName] = useState("");
+  const [recipientPhone, setRecipientPhone] = useState("");
   const mapRef = useRef(null);
   const [savedAddresses, setSavedAddresses] = useState([]);
+  const [loadingAddresses, setLoadingAddresses] = useState(true);
   const [editingAddressId, setEditingAddressId] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [permissionState, setPermissionState] = useState("");
@@ -37,7 +42,9 @@ export default function LocationSetup() {
 
   // Initialize and check permissions on mount
   useEffect(() => {
-    if (locationState.mode === 'manual') {
+    if (locationState.mode === 'my_addresses') {
+      setStatus("my_addresses");
+    } else if (locationState.mode === 'manual') {
       setStatus("manual");
     } else if (locationState.autoCheck === true) {
       fetchCurrentLocation(false);
@@ -45,9 +52,10 @@ export default function LocationSetup() {
       checkPermissionAndAutoFetch();
     }
     fetchSavedAddresses();
-  }, []);
+  }, [locationState.mode]);
 
   const fetchSavedAddresses = async () => {
+    setLoadingAddresses(true);
     const isAuthenticated = localStorage.getItem("user_authenticated") === "true";
     if (isAuthenticated) {
       try {
@@ -56,7 +64,11 @@ export default function LocationSetup() {
         setSavedAddresses(addrs);
       } catch (err) {
         console.error("Failed to fetch addresses:", err);
+      } finally {
+        setLoadingAddresses(false);
       }
+    } else {
+      setLoadingAddresses(false);
     }
   };
 
@@ -240,19 +252,49 @@ export default function LocationSetup() {
   };
 
   const handleManualSearchSelect = async () => {
+    if (!flatNumber.trim()) {
+      toast.error("Please enter Building / House / Flat / Floor No");
+      return;
+    }
+
+    if (isForSomeoneElse) {
+      if (!recipientName.trim()) {
+        toast.error("Recipient name is required");
+        return;
+      }
+      if (!recipientPhone.trim()) {
+        toast.error("Recipient number is required");
+        return;
+      }
+      const digitsOnly = recipientPhone.replace(/\D/g, "");
+      if (digitsOnly.length < 10) {
+        toast.error("Please enter a valid 10-digit recipient number");
+        return;
+      }
+    }
+
     setStatus("saving");
     try {
       const lat = mapCenter.lat;
       const lng = mapCenter.lng;
 
-      // 1. Check Serviceability
-      const serviceResponse = await locationAPI.checkServiceability(lat, lng);
-      const { isServiceable, storeId, message } = serviceResponse.data.data;
-
-      if (!isServiceable) {
-        setErrorMessage(message);
-        setStatus("not_serviceable");
-        return;
+      // 1. Check Serviceability (optional for profile address management)
+      let storeId = null;
+      try {
+        const serviceResponse = await locationAPI.checkServiceability(lat, lng);
+        if (serviceResponse?.data?.data) {
+          const { isServiceable, storeId: sId, message } = serviceResponse.data.data;
+          storeId = sId;
+          if (!isServiceable && locationState.mode !== "my_addresses") {
+            setErrorMessage(message);
+            setStatus("not_serviceable");
+            return;
+          }
+        }
+      } catch (svcErr) {
+        if (locationState.mode !== "my_addresses") {
+          throw svcErr;
+        }
       }
 
       const parts = detailedAddress.split(',').map(s => s.trim());
@@ -260,13 +302,17 @@ export default function LocationSetup() {
       const cityPart = parts.length > 2 ? parts[parts.length - 2] : "Unknown";
 
       const addressObj = {
-        label: (addressType === "Home" || addressType === "Office") ? addressType : "Other",
+        label: addressType || "Home",
         street: detailedAddress,
         additionalDetails: flatNumber,
         city: cityPart || "Unknown",
         state: statePart || "Unknown",
         latitude: lat,
-        longitude: lng
+        longitude: lng,
+        isForSomeoneElse: !!isForSomeoneElse,
+        recipientName: isForSomeoneElse ? recipientName.trim() : "",
+        recipientPhone: isForSomeoneElse ? recipientPhone.trim() : "",
+        phone: isForSomeoneElse ? recipientPhone.trim() : ""
       };
 
       // 2. Save API (if authenticated)
@@ -284,10 +330,28 @@ export default function LocationSetup() {
         }
       }
 
+      // If user came from My Addresses / Profile management
+      if (locationState.mode === "my_addresses") {
+        toast.success(editingAddressId ? "Address updated successfully" : "Address saved successfully");
+        setEditingAddressId(null);
+        await fetchSavedAddresses();
+        setStatus("my_addresses");
+        return;
+      }
+
       // 3. Save to localStorage & Store (so Header picks it up)
       const fullAddressString = `${flatNumber ? flatNumber + ', ' : ''}${detailedAddress}`;
-      localStorage.setItem("user_location", JSON.stringify({ address: fullAddressString, lat, lng }));
-      localStorage.setItem("user_storeId", storeId);
+      localStorage.setItem("user_location", JSON.stringify({ 
+        address: fullAddressString, 
+        lat, 
+        lng,
+        isForSomeoneElse: !!isForSomeoneElse,
+        recipientName: isForSomeoneElse ? recipientName.trim() : "",
+        recipientPhone: isForSomeoneElse ? recipientPhone.trim() : ""
+      }));
+      if (storeId) {
+        localStorage.setItem("user_storeId", storeId);
+      }
       
       useLocationStore.getState().confirmLocation({
         address: fullAddressString,
@@ -305,10 +369,15 @@ export default function LocationSetup() {
   };
 
   const handleEditAddress = (addr) => {
-    setEditingAddressId(addr._id);
+    const id = addr._id || addr.id;
+    setEditingAddressId(id);
     setAddressType(addr.label || "Home");
+    setAddressName(addr.label || "");
     setDetailedAddress(addr.street || "");
     setFlatNumber(addr.additionalDetails || "");
+    setIsForSomeoneElse(!!addr.isForSomeoneElse);
+    setRecipientName(addr.recipientName || "");
+    setRecipientPhone(addr.recipientPhone || addr.phone || "");
     if (addr.location && addr.location.coordinates) {
       setMapCenter({ lat: addr.location.coordinates[1], lng: addr.location.coordinates[0] });
     }
@@ -319,9 +388,11 @@ export default function LocationSetup() {
     e.stopPropagation();
     try {
       await userAPI.deleteAddress(addrId);
-      setSavedAddresses(prev => prev.filter(a => a._id !== addrId));
+      setSavedAddresses(prev => prev.filter(a => (a._id || a.id) !== addrId));
+      toast.success("Address removed successfully");
     } catch (err) {
       console.error("Failed to delete address", err);
+      toast.error("Failed to delete address");
     }
   };
 
@@ -446,6 +517,186 @@ export default function LocationSetup() {
     );
   }
 
+  if (status === "my_addresses") {
+    const handleBackFromMyAddresses = () => {
+      // If user came specifically from a checkout or cart flow
+      if (
+        locationState.from &&
+        (locationState.from.includes("cart") || locationState.from.includes("checkout"))
+      ) {
+        const backTarget = locationState.from.startsWith("/food")
+          ? locationState.from
+          : `/food${locationState.from}`;
+        navigate(backTarget);
+        return;
+      }
+
+      // Default back navigation is always User Profile Details (never loop back into help or address)
+      const profilePath = window.location.pathname.startsWith("/food")
+        ? "/food/user/account/profile-details"
+        : "/user/account/profile-details";
+      navigate(profilePath);
+    };
+
+    return (
+      <div className="min-h-[100dvh] bg-white dark:bg-zinc-950 flex flex-col font-['Poppins',sans-serif]">
+        {/* Top Header */}
+        <div className="h-14 border-b border-gray-150 dark:border-zinc-800 px-4 flex items-center gap-3 bg-white dark:bg-zinc-900 sticky top-0 z-20">
+          <button
+            type="button"
+            onClick={handleBackFromMyAddresses}
+            className="p-1.5 -ml-1.5 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer bg-transparent border-0 flex items-center justify-center"
+            aria-label="Back"
+          >
+            <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
+          </button>
+          <h1 className="text-[17px] font-bold text-zinc-900 dark:text-white m-0">My Addresses</h1>
+        </div>
+
+        {/* Content */}
+        {loadingAddresses ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-6 gap-3">
+            <div className="w-8 h-8 border-3 border-red-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-xs text-zinc-400">Loading addresses...</p>
+          </div>
+        ) : savedAddresses.length === 0 ? (
+          /* Empty State (1st Image) */
+          <div className="flex-1 flex flex-col items-center justify-center px-6 -mt-10 text-center">
+            <img
+              src={noAddressesImg}
+              alt="No saved addresses"
+              className="w-32 sm:w-36 h-auto object-contain mb-4 select-none drop-shadow-xs"
+            />
+            <h2 className="text-[19px] sm:text-xl font-bold text-zinc-900 dark:text-white mb-1 tracking-tight">
+              No saved addresses found!
+            </h2>
+            <p className="text-xs sm:text-[13px] text-zinc-500 dark:text-zinc-400 mb-8 max-w-xs leading-normal">
+              Add your first address to get started
+            </p>
+
+            <button
+              type="button"
+              onClick={() => {
+                setEditingAddressId(null);
+                setAddressType("Home");
+                setFlatNumber("");
+                setAddressName("");
+                setIsForSomeoneElse(false);
+                setRecipientName("");
+                setRecipientPhone("");
+                setStatus("add_address");
+              }}
+              className="w-full max-w-sm h-12 bg-[#E53935] hover:bg-[#d92d36] text-white font-bold text-sm tracking-wide rounded-xl shadow-md shadow-red-500/25 active:scale-[0.98] transition-all cursor-pointer border-0"
+              style={{ backgroundColor: "var(--accent-red, #EE3A43)" }}
+            >
+              Add Address
+            </button>
+          </div>
+        ) : (
+          /* Saved Addresses List */
+          <div className="flex-1 p-4 max-w-md mx-auto w-full flex flex-col pb-24">
+            <div className="flex items-center justify-between mb-3 px-1">
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                Saved Addresses ({savedAddresses.length})
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingAddressId(null);
+                  setAddressType("Home");
+                  setFlatNumber("");
+                  setAddressName("");
+                  setIsForSomeoneElse(false);
+                  setRecipientName("");
+                  setRecipientPhone("");
+                  setStatus("add_address");
+                }}
+                className="text-xs font-bold text-[#E53935] flex items-center gap-1 active:opacity-75 cursor-pointer bg-transparent border-0"
+              >
+                <Plus className="w-4 h-4" /> Add Address
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {savedAddresses.map((addr) => {
+                const addrId = addr._id || addr.id;
+                return (
+                  <div
+                    key={addrId}
+                    className="p-4 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2xs flex items-start gap-3.5"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-950/40 text-[var(--accent-red,#EE3A43)] flex items-center justify-center shrink-0 mt-0.5">
+                      <MapPin className="w-5 h-5" fill="currentColor" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-[15px] text-zinc-900 dark:text-white capitalize m-0">
+                          {addr.label || "Address"}
+                        </h3>
+                        {addr.isDefault && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-[#E53935] dark:bg-red-950 dark:text-red-300">
+                            Default
+                          </span>
+                        )}
+                      </div>
+                      {addr.additionalDetails && (
+                        <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300 mt-1 line-clamp-1 m-0">
+                          {addr.additionalDetails}
+                        </p>
+                      )}
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 line-clamp-2 leading-relaxed m-0">
+                        {addr.street || [addr.city, addr.state].filter(Boolean).join(", ")}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleEditAddress(addr)}
+                        className="p-2 text-zinc-500 hover:text-blue-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer bg-transparent border-0"
+                        aria-label="Edit address"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteAddress(addrId, e)}
+                        className="p-2 text-zinc-500 hover:text-red-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer bg-transparent border-0"
+                        aria-label="Delete address"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingAddressId(null);
+                  setAddressType("Home");
+                  setFlatNumber("");
+                  setAddressName("");
+                  setIsForSomeoneElse(false);
+                  setRecipientName("");
+                  setRecipientPhone("");
+                  setStatus("add_address");
+                }}
+                className="w-full h-12 bg-[#E53935] hover:bg-[#d92d36] text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-md shadow-red-500/20 active:scale-[0.98] transition-all cursor-pointer border-0"
+                style={{ backgroundColor: "var(--accent-red, #EE3A43)" }}
+              >
+                <Plus className="w-4 h-4" /> Add New Address
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (status === "add_address") {
     const handleMapDragEnd = async () => {
       if (mapRef.current) {
@@ -483,7 +734,17 @@ export default function LocationSetup() {
             <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400 font-medium">Loading Map...</div>
           )}
           
-          <button onClick={() => setStatus("manual")} className="absolute top-4 left-4 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md z-10 active:scale-90">
+          <button 
+            type="button"
+            onClick={() => {
+              if (locationState.mode === "my_addresses") {
+                setStatus("my_addresses");
+              } else {
+                setStatus("manual");
+              }
+            }} 
+            className="absolute top-4 left-4 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md z-10 active:scale-90 cursor-pointer border-0"
+          >
             <ArrowLeft className="w-5 h-5 text-zinc-800" />
           </button>
           
@@ -504,21 +765,30 @@ export default function LocationSetup() {
 
         {/* Form Section */}
         <div className="flex-1 bg-white rounded-t-3xl -mt-4 z-10 p-5 flex flex-col shadow-[0_-4px_15px_rgba(0,0,0,0.05)] overflow-y-auto">
-          {permissionState === "granted" && (
-            <div className="flex justify-between items-start mb-6 pt-1">
-              <div className="flex gap-3 items-start">
-                <MapPin className="w-6 h-6 text-[#E53935] shrink-0 mt-1" fill="currentColor" />
-                <div>
-                  <p className="text-[11px] text-zinc-500 mb-0.5 font-medium">Your Location</p>
-                  <h3 className="text-[17px] font-bold text-[#1a202c]">Current Location</h3>
-                  <p className="text-[13px] text-zinc-500 mt-0.5 leading-tight line-clamp-1">{detailedAddress || "GPS Coordinates"}</p>
-                </div>
+          {/* Aligned Location Header */}
+          <div className="mb-5 pt-1">
+            <p className="text-[11px] text-zinc-500 mb-1.5 font-medium">Your Location</p>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <MapPin className="w-5 h-5 text-[#E53935] shrink-0" fill="currentColor" />
+                <h3 className="text-[17px] font-bold text-[#1a202c] truncate m-0">
+                  {addressType || "Home"}
+                </h3>
               </div>
-              <button className="text-[#0288D1] font-bold text-[13px] mt-1 tracking-wide active:opacity-70">Change</button>
+              <button 
+                type="button"
+                onClick={() => setStatus("manual")}
+                className="text-[#0288D1] font-bold text-[13px] tracking-wide active:opacity-70 bg-transparent border-0 cursor-pointer shrink-0"
+              >
+                Change
+              </button>
             </div>
-          )}
+            <p className="text-[13px] text-zinc-500 mt-1 pl-[30px] leading-tight line-clamp-1 m-0">
+              {detailedAddress || "Regal Circle, South Tukoganj"}
+            </p>
+          </div>
 
-          <div className="space-y-5 flex-1">
+          <div className="space-y-4 flex-1">
             <input 
               type="text" 
               placeholder="Building / House / Flat / Floor No*" 
@@ -540,12 +810,15 @@ export default function LocationSetup() {
 
             <div>
               <p className="text-[12px] text-zinc-500 mb-2 font-medium">Save this address as</p>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 {["Home", "Office"].map(type => (
                   <button 
                     key={type}
-                    onClick={() => setAddressType(type)}
-                    className={`px-4 h-[38px] rounded-lg border text-[13px] transition-colors ${addressType === type ? "border-[#0288D1] text-[#0288D1] bg-[#0288D1]/5 font-bold" : "border-zinc-200 text-zinc-700 bg-white"}`}
+                    type="button"
+                    onClick={() => {
+                      setAddressType(type);
+                    }}
+                    className={`px-4 h-[38px] rounded-lg border text-[13px] font-medium transition-colors cursor-pointer ${addressType === type ? "border-[#0288D1] text-[#0288D1] bg-[#0288D1]/5 font-bold" : "border-zinc-200 text-zinc-700 bg-white"}`}
                   >
                     {type}
                   </button>
@@ -553,15 +826,10 @@ export default function LocationSetup() {
               </div>
             </div>
 
-            <input 
-              type="text" 
-              placeholder="Name" 
-              value={addressName}
-              onChange={e => setAddressName(e.target.value)}
-              className="w-full h-14 px-4 border border-zinc-300 rounded-xl focus:border-zinc-500 outline-none placeholder:text-zinc-400 font-medium"
-            />
-
-            <div className="flex items-center gap-3 pt-1 cursor-pointer" onClick={() => setIsForSomeoneElse(!isForSomeoneElse)}>
+            <div 
+              className="flex items-center gap-3 pt-1 cursor-pointer select-none" 
+              onClick={() => setIsForSomeoneElse(!isForSomeoneElse)}
+            >
               <div 
                 className={`w-11 h-6 rounded-full flex items-center px-[2px] transition-colors duration-300 ${isForSomeoneElse ? 'bg-[#4CAF50]' : 'bg-zinc-400'}`}
               >
@@ -569,11 +837,42 @@ export default function LocationSetup() {
               </div>
               <span className="text-[14px] font-medium text-zinc-700">Ordering for someone else</span>
             </div>
+
+            <AnimatePresence>
+              {isForSomeoneElse && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-4 overflow-hidden pt-1"
+                >
+                  <input 
+                    type="text" 
+                    placeholder="Recipient Name*" 
+                    value={recipientName}
+                    onChange={e => setRecipientName(e.target.value)}
+                    className="w-full h-14 px-4 border border-zinc-300 rounded-xl focus:border-zinc-500 outline-none placeholder:text-zinc-400 font-medium text-[14px]"
+                  />
+                  <input 
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={15}
+                    placeholder="Recipient Number*" 
+                    value={recipientPhone}
+                    onChange={e => setRecipientPhone(e.target.value.replace(/[^0-9+\s-]/g, ''))}
+                    className="w-full h-14 px-4 border border-zinc-300 rounded-xl focus:border-zinc-500 outline-none placeholder:text-zinc-400 font-medium text-[14px]"
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <button 
+            type="button"
             onClick={handleManualSearchSelect}
-            className="w-full h-[52px] bg-[#E53935] hover:bg-red-700 text-white font-bold text-[15px] uppercase tracking-wide rounded-xl mt-6 shadow-lg shadow-red-500/30 active:scale-[0.98] transition-transform"
+            className="w-full h-[52px] bg-[#E53935] hover:bg-red-700 text-white font-bold text-[15px] uppercase tracking-wide rounded-xl mt-6 shadow-lg shadow-red-500/30 active:scale-[0.98] transition-transform cursor-pointer border-0"
+            style={{ backgroundColor: "var(--accent-red, #EE3A43)" }}
           >
             Save Address
           </button>

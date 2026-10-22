@@ -28,7 +28,9 @@ import { addOrderJob } from '../../../../queues/producers/order.producer.js';
 import { fetchPolyline } from '../utils/googleMaps.js';
 import { getFirebaseDB } from '../../../../config/firebase.js';
 import * as foodTransactionService from './foodTransaction.service.js';
-import * as userWalletService from '../../user/services/userWallet.service.js';
+import { reserveFunds, confirmReservation, releaseReservation, rupeesToPaise } from '../../user/services/walletLedger.service.js';
+import { awardOrderPointsSafely, reverseOrderPointsSafely } from '../../user/services/rewards.service.js';
+import { refundCancelledOrderToWallet, recordGatewayRefund } from '../../../../core/payments/refund.service.js';
 import { calculateOrderPricing } from './order-pricing.service.js';
 import * as dispatchService from './order-dispatch.service.js';
 import * as deliveryService from './order-delivery.service.js';
@@ -298,18 +300,41 @@ export async function createOrder(userId, dto) {
     }
   }
 
-  await order.save();
-
+  // Wallet checkout: hold the funds first (atomic, fails on insufficient balance), then save the
+  // order, then confirm the hold. Any failure in between releases the hold so no money is lost.
+  let walletHold = null;
   if (isWallet) {
-    try {
-      await userWalletService.deductWalletBalance(userId, order.pricing.total, `Payment for order #${order.order_id || order._id}`, { orderId: order._id });
-    } catch (err) {
-      // If wallet deduction fails (e.g. insufficient balance), we should not have saved the order or we should delete/cancel it.
-      // But since we already saved it, let's at least throw the error so the user knows.
-      // Ideally this should be in a transaction.
-      await FoodOrder.deleteOne({ _id: order._id });
-      throw err;
+    walletHold = await reserveFunds({
+      userId,
+      amountPaise: rupeesToPaise(order.pricing.total),
+      idempotencyKey: `order:${order._id}:wallet-payment`,
+      orderId: order._id,
+      description: "Wallet used for order",
+    });
+  }
+
+  try {
+    await order.save();
+    if (walletHold) {
+      await confirmReservation({
+        userId,
+        transactionId: walletHold.transaction._id,
+        orderId: order._id,
+        orderRef: order.order_id || "",
+      });
     }
+  } catch (err) {
+    if (walletHold) {
+      await releaseReservation({
+        userId,
+        transactionId: walletHold.transaction._id,
+        note: "Checkout failed",
+      }).catch((releaseErr) =>
+        logger.error(`Wallet hold release failed for order ${order._id}: ${releaseErr.message}`),
+      );
+      await FoodOrder.deleteOne({ _id: order._id }).catch(() => {});
+    }
+    throw err;
   }
 
   // Phase 2: store financials in ledger only.
@@ -468,6 +493,70 @@ export async function verifyPayment(userId, dto) {
     } catch {}
   }
 
+  return { order: normalizeOrderForClient(order), payment: order.payment };
+}
+
+/**
+ * Pay an existing online order (awaiting payment) with funds already reserved via
+ * POST /wallet/payments/reserve. Confirms the hold and marks the order paid exactly once.
+ */
+export async function payOrderWithWallet(userId, walletTransactionId) {
+  const { WalletTransaction } = await import("../../user/models/walletTransaction.model.js");
+  if (!mongoose.isValidObjectId(String(walletTransactionId || ""))) {
+    throw new NotFoundError("Wallet payment not found");
+  }
+  const hold = await WalletTransaction.findOne({
+    _id: new mongoose.Types.ObjectId(String(walletTransactionId)),
+    userId: new mongoose.Types.ObjectId(userId),
+    reason: "ORDER_PAYMENT",
+  }).lean();
+  if (!hold || !hold.orderId) throw new NotFoundError("Wallet payment not found");
+
+  const order = await FoodOrder.findOne({
+    _id: hold.orderId,
+    userId: new mongoose.Types.ObjectId(userId),
+  });
+  if (!order) throw new NotFoundError("Order not found");
+
+  if (hold.status === "COMPLETED" && order.payment?.method === "wallet" && order.payment?.status === "paid") {
+    return { order: normalizeOrderForClient(order), payment: order.payment };
+  }
+  if (String(order.orderStatus).startsWith("cancelled") || order.payment?.status !== "created") {
+    await releaseReservation({ userId, transactionId: hold._id, note: "Order not payable" }).catch(() => {});
+    throw new ValidationError("This order is no longer awaiting payment");
+  }
+  if (hold.amountPaise !== rupeesToPaise(order.pricing?.total || 0)) {
+    await releaseReservation({ userId, transactionId: hold._id, note: "Amount mismatch" }).catch(() => {});
+    throw new ValidationError("Wallet amount does not match the order total");
+  }
+
+  await confirmReservation({
+    userId,
+    transactionId: hold._id,
+    orderId: order._id,
+    orderRef: order.order_id || "",
+  });
+
+  order.payment.method = "wallet";
+  order.payment.status = "paid";
+  order.payment.amountDue = 0;
+  pushStatusHistory(order, {
+    byRole: "USER",
+    byId: userId,
+    from: order.orderStatus,
+    to: order.orderStatus,
+    note: "Paid with wallet",
+  });
+  await order.save();
+
+  await foodTransactionService.updateTransactionStatus(order._id, "captured", {
+    status: "captured",
+    paymentMethod: "wallet",
+    recordedByRole: "USER",
+    recordedById: new mongoose.Types.ObjectId(userId),
+  });
+
+  await notifyStoreNewOrder(order);
   return { order: normalizeOrderForClient(order), payment: order.payment };
 }
 
@@ -726,12 +815,10 @@ export async function cancelOrder(orderId, userId, reason, refundDestination = "
   ) {
     try {
       if (normalizedRefundDestination === "wallet") {
-        await userWalletService.refundWalletBalance(
-          userId,
-          order.pricing.total,
-          `Refund for cancelled order #${order.order_id || order._id}`,
-          { orderId: order._id, source: "order_refund_wallet" },
-        );
+        await refundCancelledOrderToWallet(order, {
+          description: `Refund for cancelled order #${order.order_id || order._id}`,
+          reason: reason || "Order cancelled by customer",
+        });
         order.payment.status = "refunded";
         order.payment.refund = {
           status: "processed",
@@ -763,6 +850,12 @@ export async function cancelOrder(orderId, userId, reason, refundDestination = "
             amount: order.pricing.total
           };
         }
+        await recordGatewayRefund(order, {
+          status: refundResult.success ? "processed" : "failed",
+          gatewayRefundId: refundResult.refundId,
+          reason: reason || "Order cancelled by customer",
+          error: refundResult.error,
+        });
       }
     } catch (err) {
       console.error(`Refund processing error for Order ${orderId}:`, err);
@@ -778,7 +871,10 @@ export async function cancelOrder(orderId, userId, reason, refundDestination = "
     !hasRefundProcessed
   ) {
     try {
-      await userWalletService.refundWalletBalance(userId, order.pricing.total, `Refund for cancelled order #${order.order_id || order._id}`, { orderId: order._id });
+      await refundCancelledOrderToWallet(order, {
+        description: `Refund for cancelled order #${order.order_id || order._id}`,
+        reason: reason || "Order cancelled by customer",
+      });
       order.payment.status = "refunded";
       order.payment.refund = {
         status: "processed",
@@ -793,6 +889,7 @@ export async function cancelOrder(orderId, userId, reason, refundDestination = "
   }
 
   await order.save();
+  reverseOrderPointsSafely(order._id, "Points reversed: order cancelled");
 
   enqueueOrderEvent("order_cancelled_by_user", {
     orderMongoId: order._id?.toString?.(),
@@ -1008,6 +1105,9 @@ export async function updateOrderStatusStore(
   });
   await order.save();
 
+  if (orderStatus === "delivered") awardOrderPointsSafely(order._id);
+  if (String(orderStatus).includes("cancel")) reverseOrderPointsSafely(order._id, "Points reversed: order cancelled");
+
   // Custom messages / titles for status updates
   let title = `Order ${order._id.toString()} updated`;
   let body = `Status changed to ${String(orderStatus).replace(/_/g, " ")}`;
@@ -1191,6 +1291,12 @@ export async function updateOrderStatusStore(
             amount: order.pricing.total
           };
         }
+        await recordGatewayRefund(order, {
+          status: refundResult.success ? "processed" : "failed",
+          gatewayRefundId: refundResult.refundId,
+          reason: "Order cancelled by store",
+          error: refundResult.error,
+        });
       } catch (err) {
         console.error(`Automated refund failed for Order ${order._id.toString()} (Store Cancel):`, err);
         order.payment.refund = { status: "failed", amount: order.pricing.total };
@@ -1204,10 +1310,14 @@ export async function updateOrderStatusStore(
       (!order.payment.refund || order.payment.refund.status !== "processed")
     ) {
       try {
-        await userWalletService.refundWalletBalance(order.userId, order.pricing.total, `Refund for order #${order.order_id || order._id} cancelled by store`, { orderId: order._id });
+        await refundCancelledOrderToWallet(order, {
+          description: `Refund for order #${order.order_id || order._id} cancelled by store`,
+          reason: "Order cancelled by store",
+        });
         order.payment.status = "refunded";
         order.payment.refund = {
           status: "processed",
+          destination: "wallet",
           amount: order.pricing.total,
           processedAt: new Date()
         };

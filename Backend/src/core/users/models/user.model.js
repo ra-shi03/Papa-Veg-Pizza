@@ -56,7 +56,24 @@ const userSchema = new mongoose.Schema({
     lastLoginAt: {
         type: Date,
         default: null
-    }
+    },
+    addresses: [{
+        label: { type: String, default: 'Home' },
+        street: { type: String, default: '' },
+        additionalDetails: { type: String, default: '' },
+        city: { type: String, default: '' },
+        state: { type: String, default: '' },
+        zipCode: { type: String, default: '' },
+        phone: { type: String, default: '' },
+        recipientName: { type: String, default: '' },
+        recipientPhone: { type: String, default: '' },
+        isForSomeoneElse: { type: Boolean, default: false },
+        isDefault: { type: Boolean, default: false },
+        location: {
+            type: { type: String, enum: ['Point'], default: 'Point' },
+            coordinates: { type: [Number], default: [0, 0] }
+        }
+    }]
 }, {
     timestamps: true,
     collection: 'users'

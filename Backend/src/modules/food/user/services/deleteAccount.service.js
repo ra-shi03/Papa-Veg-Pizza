@@ -22,9 +22,9 @@ export async function deleteUserAccount(userId) {
         let walletBalance = 0;
         try {
             const walletDoc = await mongoose.connection.db
-                .collection('food_user_wallets')
-                .findOne({ userId: new mongoose.Types.ObjectId(userId) });
-            walletBalance = walletDoc?.balance || 0;
+                .collection('walletAccounts')
+                .findOne({ userId: new mongoose.Types.ObjectId(userId) }, { session });
+            walletBalance = (Number(walletDoc?.availableBalancePaise) || 0) / 100;
         } catch (_) {}
 
         const orderStats = await FoodOrder.aggregate([
@@ -95,6 +95,7 @@ export async function deleteUserAccount(userId) {
 
         // --- 5. Delete user-specific collections ---
         const collectionsToClean = [
+            'food_addresses',
             'food_user_wallets',
             'food_support_tickets',
             'food_safety_emergency_reports',
@@ -103,6 +104,21 @@ export async function deleteUserAccount(userId) {
             'food_referral_logs',
             'profiles'
         ];
+
+        // Wallet + rewards ledgers are financial/audit records: close the accounts, keep the history.
+        try {
+            const oid = new mongoose.Types.ObjectId(userId);
+            await mongoose.connection.db.collection('walletAccounts').updateMany(
+                { userId: oid },
+                { $set: { status: 'CLOSED', updatedAt: new Date() } },
+                { session }
+            );
+            await mongoose.connection.db.collection('rewardMemberships').updateMany(
+                { userId: oid },
+                { $set: { status: 'QUIT', pointsBalance: 0, quitAt: new Date(), updatedAt: new Date() } },
+                { session }
+            );
+        } catch (_) {}
 
         for (const col of collectionsToClean) {
             try {

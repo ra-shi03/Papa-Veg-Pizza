@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Phone, MessageCircle } from 'lucide-react';
@@ -76,8 +77,7 @@ export default function UserSidebarDrawer({
 
   const handleEditProfile = () => {
     onClose?.();
-    const editPath = isLoggedIn ? '/user/profile/create' : '/user/auth/login';
-    handleNavigate(editPath);
+    handleNavigate('/user/account/profile-details');
   };
 
   const handleLogout = () => {
@@ -94,13 +94,14 @@ export default function UserSidebarDrawer({
     handleNavigate('/user');
   };
 
-  const displayName = user?.name || user?.fullName || 'Welcome';
-  const displayPhone = user?.phone || user?.phoneNumber || user?.email || (isLoggedIn ? '9300990940' : '9300990940');
+  const storedFullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ');
+  const displayName = (isLoggedIn && (user?.name || user?.fullName || storedFullName)) || 'Welcome';
+  const displayPhone = isLoggedIn ? user?.phone || user?.mobile || user?.phoneNumber || user?.email || '' : '';
 
-  return (
+  const drawerContent = (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[120] flex">
+        <div className="fixed inset-0 z-[120] flex overflow-hidden">
           {/* Backdrop Overlay */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -116,7 +117,7 @@ export default function UserSidebarDrawer({
             initial={{ x: '-100%' }}
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
-            transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
             className={`relative z-10 w-[82%] max-w-[310px] h-full shadow-2xl flex flex-col font-['Poppins',sans-serif] select-none transition-colors duration-200 ${
               isDarkMode ? 'bg-[#141416] text-white' : 'bg-white text-zinc-900'
             }`}
@@ -435,5 +436,8 @@ export default function UserSidebarDrawer({
       )}
     </AnimatePresence>
   );
+
+  if (typeof document === 'undefined') return null;
+  return createPortal(drawerContent, document.body);
 }
 

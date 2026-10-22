@@ -57,7 +57,7 @@ export default function Footer() {
       { name: "Terms of Service", href: "/profile/terms" },
     ],
     user: [
-      { name: "My Account", href: "/user/profile" },
+      { name: "My Account", href: "/user/account/profile-details" },
       { name: "My Orders", href: "/user/orders" },
       { name: "Favorites", href: "/user/profile/favorites" },
       { name: "Offers", href: "/user/offers" },

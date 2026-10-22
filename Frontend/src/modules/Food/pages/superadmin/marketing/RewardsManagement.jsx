@@ -158,6 +158,11 @@ export default function RewardsManagement() {
     quitModalDescription: "All your points and progress will be removed. You'll need to enrol again to start earning rewards.",
     quitStayButtonText: 'Stay',
     quitConfirmButtonText: 'Quit Anyway',
+    quitLoadingText: 'Leaving Cheesy Rewards...',
+    enrollLoadingText: 'Enrolling for Cheesy Rewards...',
+    welcomeModalTitle: 'Welcome to Cheesy Rewards!',
+    welcomeModalSubtitle: 'Place your order to earn Reward points',
+    welcomeModalButtonText: 'Order Now',
     rewardProducts: [],
     faqs: [
       {
@@ -253,10 +258,17 @@ export default function RewardsManagement() {
           quitModalDescription: d.quitModalDescription || prev.quitModalDescription || "All your points and progress will be removed. You'll need to enrol again to start earning rewards.",
           quitStayButtonText: d.quitStayButtonText || prev.quitStayButtonText || 'Stay',
           quitConfirmButtonText: d.quitConfirmButtonText || prev.quitConfirmButtonText || 'Quit Anyway',
+          quitLoadingText: d.quitLoadingText || prev.quitLoadingText || 'Leaving Cheesy Rewards...',
+          enrollLoadingText: d.enrollLoadingText || prev.enrollLoadingText || 'Enrolling for Cheesy Rewards...',
+          welcomeModalTitle: d.welcomeModalTitle || prev.welcomeModalTitle || 'Welcome to Cheesy Rewards!',
+          welcomeModalSubtitle: d.welcomeModalSubtitle || prev.welcomeModalSubtitle || 'Place your order to earn Reward points',
+          welcomeModalButtonText: d.welcomeModalButtonText || prev.welcomeModalButtonText || 'Order Now',
           showVegFilter: d.showVegFilter !== undefined ? d.showVegFilter : true,
           showNonVegFilter: d.showNonVegFilter !== undefined ? d.showNonVegFilter : true,
           showSortFilter: d.showSortFilter !== undefined ? d.showSortFilter : true,
           rewardProducts: Array.isArray(d.rewardProducts) ? d.rewardProducts : prev.rewardProducts,
+          howItWorksSteps: Array.isArray(d.howItWorksSteps) ? d.howItWorksSteps : [],
+          walletFaqs: Array.isArray(d.walletFaqs) ? d.walletFaqs : [],
           faqs: Array.isArray(d.faqs) && d.faqs.length > 0 ? d.faqs : prev.faqs,
           terms: Array.isArray(d.terms) && d.terms.length > 0 ? d.terms : prev.terms
         }));
@@ -319,6 +331,103 @@ export default function RewardsManagement() {
       setIsUploading(false);
       if (imageInputRef.current) imageInputRef.current.value = '';
     }
+  };
+
+  const handleFieldImageUpload = async (e, field) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const res = await uploadAPI.uploadMedia(file);
+      const url = res?.data?.data?.url || res?.data?.url;
+      if (url) {
+        setConfig(prev => ({ ...prev, [field]: url }));
+        toast.success('Image uploaded!');
+      } else {
+        toast.error('Failed to get uploaded image URL');
+      }
+    } catch (err) {
+      toast.error('Failed to upload image');
+    } finally {
+      setIsUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const setField = (key, value) => setConfig(prev => ({ ...prev, [key]: value }));
+
+  const renderTextField = (label, key, placeholder = '') => (
+    <div key={key}>
+      <label className="block text-xs font-semibold mb-1 text-zinc-700 dark:text-zinc-300">{label}</label>
+      <input
+        type="text"
+        value={config[key] || ''}
+        onChange={e => setField(key, e.target.value)}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-zinc-800 dark:border-zinc-700 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+      />
+    </div>
+  );
+
+  const renderImageField = (label, key) => (
+    <div>
+      <label className="block text-xs font-semibold mb-1 text-zinc-700 dark:text-zinc-300">{label}</label>
+      <div className="flex items-center gap-3">
+        {config[key] && (
+          <div className="w-14 h-14 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center p-1 border shrink-0">
+            <img src={config[key]} alt="" className="w-full h-full object-contain" />
+          </div>
+        )}
+        <label className="px-3 py-2 border rounded-lg text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center gap-2 cursor-pointer">
+          {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+          Upload Image
+          <input type="file" accept="image/*" className="hidden" onChange={e => handleFieldImageUpload(e, key)} />
+        </label>
+        {config[key] && (
+          <button type="button" onClick={() => setField(key, '')} className="text-xs text-zinc-500 hover:text-red-600 cursor-pointer">
+            Remove
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  // How-it-works steps
+  const handleAddStep = () => {
+    setConfig(prev => ({
+      ...prev,
+      howItWorksSteps: [...(prev.howItWorksSteps || []), { title: '', highlight: '', description: '', note: '', iconUrl: '' }]
+    }));
+  };
+
+  const handleUpdateStep = (index, field, value) => {
+    setConfig(prev => ({
+      ...prev,
+      howItWorksSteps: (prev.howItWorksSteps || []).map((st, i) => (i === index ? { ...st, [field]: value } : st))
+    }));
+  };
+
+  const handleDeleteStep = (index) => {
+    setConfig(prev => ({
+      ...prev,
+      howItWorksSteps: (prev.howItWorksSteps || []).filter((_, i) => i !== index)
+    }));
+  };
+
+  // Wallet FAQs
+  const handleAddWalletFaq = () => {
+    setConfig(prev => ({ ...prev, walletFaqs: [...(prev.walletFaqs || []), { question: '', answer: '' }] }));
+  };
+
+  const handleUpdateWalletFaq = (index, field, value) => {
+    setConfig(prev => ({
+      ...prev,
+      walletFaqs: (prev.walletFaqs || []).map((f, i) => (i === index ? { ...f, [field]: value } : f))
+    }));
+  };
+
+  const handleDeleteWalletFaq = (index) => {
+    setConfig(prev => ({ ...prev, walletFaqs: (prev.walletFaqs || []).filter((_, i) => i !== index) }));
   };
 
   // Products Management Handlers
@@ -516,6 +625,8 @@ export default function RewardsManagement() {
           { id: 'catalogue', label: '10 Products & Filters', icon: Layers },
           { id: 'general', label: 'General & Header', icon: Award },
           { id: 'rules', label: 'Points & Rules', icon: CheckCircle2 },
+          { id: 'rewardsPage', label: 'Rewards Page', icon: Pizza },
+          { id: 'walletPage', label: 'Wallet Page', icon: Layers },
           { id: 'faqs', label: 'FAQs', icon: HelpCircle },
           { id: 'terms', label: 'Terms & Conditions', icon: FileText },
           { id: 'quit', label: 'Quit Program Modal', icon: LogOut }
@@ -997,6 +1108,180 @@ export default function RewardsManagement() {
             </div>
           )}
 
+          {/* TAB: Rewards Page (Cheesy Rewards tab on the user app) */}
+          {activeTab === 'rewardsPage' && (
+            <div className="space-y-6">
+              <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl shadow-xs border border-zinc-200 dark:border-zinc-800 space-y-4">
+                <div className="border-b pb-3 dark:border-zinc-800">
+                  <h3 className="font-bold text-base">Cheesy Rewards Tab</h3>
+                  <p className="text-xs text-zinc-500 mt-0.5">Text and images shown to enrolled users. The logo is set under General & Header.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {renderTextField('Headline', 'rewardsHeadline', 'Your Cheesy Rewards')}
+                  {renderTextField('Sub-headline', 'rewardsSubheadline', 'Collect Points to get Free Pizzas!')}
+                  {renderTextField('Points Card Title', 'pointsCardTitle', 'Your Points')}
+                  {renderTextField('Order Button Text', 'orderButtonText', 'Order & Get points')}
+                  {renderTextField('Rewards Card Title', 'rewardsCardTitle', 'Your Rewards')}
+                  {renderTextField('Free Reward Label', 'freeRewardLabel', 'Free Pizza')}
+                  {renderTextField('Redeem Button Text', 'redeemButtonText', 'Redeem')}
+                  {renderTextField('Redeem Sheet Title', 'redeemSheetTitle', 'Choose your Free Pizza')}
+                  {renderTextField('How it works Title', 'howItWorksTitle', 'How it works')}
+                  {renderTextField('FAQ Section Title', 'faqTitle', 'Frequently Asked Questions')}
+                  {renderTextField('Terms Section Title', 'termsTitle', 'Terms & Conditions')}
+                  {renderTextField('Quit Link Text', 'quitLinkText', 'I want to quit this program')}
+                </div>
+                {renderImageField('Reward Pizza Image (Your Rewards card)', 'rewardImageUrl')}
+              </div>
+
+              <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl shadow-xs border border-zinc-200 dark:border-zinc-800 space-y-4">
+                <div className="flex items-center justify-between border-b pb-3 dark:border-zinc-800">
+                  <div>
+                    <h3 className="font-bold text-base">How it works</h3>
+                    <p className="text-xs text-zinc-500 mt-0.5">The highlighted text is shown in the app accent colour after the title.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddStep}
+                    className="px-3 py-1.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer hover:opacity-90"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add Step
+                  </button>
+                </div>
+                {(config.howItWorksSteps || []).map((step, index) => (
+                  <div key={index} className="p-3 border rounded-xl dark:border-zinc-800 space-y-2 bg-zinc-50/50 dark:bg-zinc-850">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={step.title || ''}
+                        onChange={e => handleUpdateStep(index, 'title', e.target.value)}
+                        placeholder="Title (e.g. 1 Order =)"
+                        className="flex-1 px-2.5 py-1.5 border rounded-md text-xs font-semibold dark:bg-zinc-900 dark:border-zinc-700"
+                      />
+                      <input
+                        type="text"
+                        value={step.highlight || ''}
+                        onChange={e => handleUpdateStep(index, 'highlight', e.target.value)}
+                        placeholder="Highlight (e.g. 100 Points)"
+                        className="flex-1 px-2.5 py-1.5 border rounded-md text-xs font-semibold dark:bg-zinc-900 dark:border-zinc-700"
+                      />
+                      <button type="button" onClick={() => handleDeleteStep(index)} className="p-1.5 text-zinc-400 hover:text-red-600 rounded cursor-pointer">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={step.description || ''}
+                      onChange={e => handleUpdateStep(index, 'description', e.target.value)}
+                      placeholder="Description"
+                      className="w-full px-2.5 py-1.5 border rounded-md text-xs dark:bg-zinc-900 dark:border-zinc-700"
+                    />
+                    <input
+                      type="text"
+                      value={step.note || ''}
+                      onChange={e => handleUpdateStep(index, 'note', e.target.value)}
+                      placeholder="Small note (optional)"
+                      className="w-full px-2.5 py-1.5 border rounded-md text-xs dark:bg-zinc-900 dark:border-zinc-700"
+                    />
+                    <div className="flex items-center gap-2">
+                      {step.iconUrl && <img src={step.iconUrl} alt="" className="w-8 h-8 object-contain rounded-full border" />}
+                      <label className="px-2.5 py-1.5 border rounded-md text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                        <Upload className="w-3 h-3" />
+                        Step Icon
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async e => {
+                            const file = e.target.files?.[0];
+                            e.target.value = '';
+                            if (!file) return;
+                            try {
+                              const res = await uploadAPI.uploadMedia(file);
+                              const url = res?.data?.data?.url || res?.data?.url;
+                              if (url) handleUpdateStep(index, 'iconUrl', url);
+                              else toast.error('Failed to get uploaded image URL');
+                            } catch {
+                              toast.error('Failed to upload image');
+                            }
+                          }}
+                        />
+                      </label>
+                      {step.iconUrl && (
+                        <button type="button" onClick={() => handleUpdateStep(index, 'iconUrl', '')} className="text-[11px] text-zinc-500 hover:text-red-600 cursor-pointer">
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: Wallet Page (Wallet tab + Refund Points history) */}
+          {activeTab === 'walletPage' && (
+            <div className="space-y-6">
+              <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl shadow-xs border border-zinc-200 dark:border-zinc-800 space-y-4">
+                <div className="border-b pb-3 dark:border-zinc-800">
+                  <h3 className="font-bold text-base">Wallet Tab & Refund Points</h3>
+                  <p className="text-xs text-zinc-500 mt-0.5">Balances and transactions come from the live wallet ledger; only the wording and images are edited here.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {renderTextField('Wallet Tab Label', 'walletTabLabel', 'Wallet')}
+                  {renderTextField('Points Badge Label', 'walletPointsLabel', 'Points')}
+                  {renderTextField('Conversion Text', 'walletConversionText', '1 Point = 1 Rupee')}
+                  {renderTextField('Refund Card Title', 'refundCardTitle', 'Refund Points')}
+                  {renderTextField('Earned Column Label', 'earnedColumnLabel', 'Earned')}
+                  {renderTextField('Used Column Label', 'usedColumnLabel', 'Used')}
+                </div>
+                {renderTextField('Refund Card Subtitle', 'refundCardSubtitle', 'Use this to pay for your next order. Unrestricted Usage.')}
+                {renderTextField('Empty History Text', 'walletEmptyText', 'No transactions yet')}
+                {renderImageField('Wallet Banner Illustration', 'walletHeroImageUrl')}
+              </div>
+
+              <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl shadow-xs border border-zinc-200 dark:border-zinc-800 space-y-4">
+                <div className="flex items-center justify-between border-b pb-3 dark:border-zinc-800">
+                  <h3 className="font-bold text-base flex items-center gap-2">
+                    <HelpCircle className="w-5 h-5 text-[var(--primary,#EE3A43)]" />
+                    Wallet FAQs
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={handleAddWalletFaq}
+                    className="px-3 py-1.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer hover:opacity-90"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add FAQ
+                  </button>
+                </div>
+                {(config.walletFaqs || []).map((faq, index) => (
+                  <div key={index} className="p-3 border rounded-xl dark:border-zinc-800 space-y-2 bg-zinc-50/50 dark:bg-zinc-850">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={faq.question || ''}
+                        onChange={e => handleUpdateWalletFaq(index, 'question', e.target.value)}
+                        placeholder="Question..."
+                        className="w-full font-semibold text-xs px-2.5 py-1.5 border rounded-md dark:bg-zinc-900 dark:border-zinc-700"
+                      />
+                      <button type="button" onClick={() => handleDeleteWalletFaq(index)} className="p-1.5 text-zinc-400 hover:text-red-600 rounded cursor-pointer">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <textarea
+                      value={faq.answer || ''}
+                      onChange={e => handleUpdateWalletFaq(index, 'answer', e.target.value)}
+                      placeholder="Answer..."
+                      rows={2}
+                      className="w-full px-3 py-1.5 border rounded-md text-xs dark:bg-zinc-900 dark:border-zinc-700 resize-none"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* TAB: FAQs */}
           {activeTab === 'faqs' && (
             <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl shadow-xs border border-zinc-200 dark:border-zinc-800 space-y-4">
@@ -1178,6 +1463,22 @@ export default function RewardsManagement() {
                       className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-zinc-800 dark:border-zinc-700 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                     />
                   </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase mb-1">
+                      Quit Animated Popup Loading Text
+                    </label>
+                    <input
+                      type="text"
+                      value={config.quitLoadingText || ''}
+                      onChange={e => setConfig(prev => ({ ...prev, quitLoadingText: e.target.value }))}
+                      placeholder="Leaving Cheesy Rewards..."
+                      className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-zinc-800 dark:border-zinc-700 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                    />
+                    <p className="text-[11px] text-zinc-500 mt-1">
+                      Shown under the animated Papa Veg Pizza Rewards logo when the user taps Quit Anyway.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Modal Visual Preview */}
@@ -1185,7 +1486,10 @@ export default function RewardsManagement() {
                   <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">
                     Modal Visual Preview
                   </h4>
-                  <div className="border border-zinc-200 dark:border-zinc-700 rounded-2xl p-5 bg-white dark:bg-zinc-800 max-w-sm mx-auto shadow-sm text-center">
+                  <div 
+                    className="border border-zinc-200 dark:border-zinc-700 rounded-2xl p-5 bg-[#F8F6F2] dark:bg-zinc-800 max-w-sm mx-auto shadow-sm text-center"
+                    style={{ backgroundColor: 'var(--secondary-off-white, #F8F6F2)' }}
+                  >
                     <h4 className="text-base font-black text-zinc-900 dark:text-white">
                       {config.quitModalTitle || 'Quit Cheesy Rewards?'}
                     </h4>
@@ -1193,7 +1497,7 @@ export default function RewardsManagement() {
                       {config.quitModalDescription || "All your points and progress will be removed. You'll need to enrol again to start earning rewards."}
                     </p>
                     <div className="flex gap-3 mt-5">
-                      <div className="flex-1 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-600 font-bold text-xs text-zinc-700 dark:text-zinc-200 text-center">
+                      <div className="flex-1 py-2.5 rounded-xl border border-zinc-900 dark:border-zinc-500 font-bold text-xs text-zinc-900 dark:text-zinc-200 text-center bg-transparent">
                         {config.quitStayButtonText || 'Stay'}
                       </div>
                       <div className="flex-1 py-2.5 rounded-xl bg-[#EE3A43] text-white font-bold text-xs text-center shadow-sm">

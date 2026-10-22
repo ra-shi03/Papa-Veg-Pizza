@@ -163,18 +163,29 @@ export default function UserRouter() {
 
 
           {/* Profile - Protected (require user auth) */}
-          <Route path="account" element={<AccountSettings />} />
+          <Route path="account" element={<Navigate to="/food/user/account/profile-details" replace />} />
+          <Route path="profile" element={<Navigate to="/food/user/account/profile-details" replace />} />
+          <Route path="profile-details" element={<Navigate to="/food/user/account/profile-details" replace />} />
           <Route path="account/track-order" element={<TrackOrder />} />
+          <Route path="profile/track-order" element={<TrackOrder />} />
           <Route
             path="account/profile-details"
+            element={<ProfileDetails />}
+          />
+          <Route
+            path="profile/details"
+            element={<ProfileDetails />}
+          />
+          <Route
+            path="account/profile-details/edit"
             element={
               <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <ProfileDetails />
+                <EditProfile />
               </ProtectedRoute>
             }
           />
           <Route
-            path="account/profile-details/edit"
+            path="profile/edit"
             element={
               <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
                 <EditProfile />
@@ -190,6 +201,38 @@ export default function UserRouter() {
             element={
               <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
                 <Payments />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="profile/payments"
+            element={
+              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
+                <Payments />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="account/profile-details/addresses"
+            element={
+              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
+                <LocationSetup />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="profile/addresses"
+            element={
+              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
+                <LocationSetup />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="addresses"
+            element={
+              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
+                <LocationSetup />
               </ProtectedRoute>
             }
           />

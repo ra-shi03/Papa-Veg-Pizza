@@ -18,6 +18,15 @@ const rewardProductOverrideSchema = new mongoose.Schema({
   sortOrder: { type: Number, default: 0 }
 }, { _id: false });
 
+// One row of the "How it works" list on the user rewards page; `highlight` is appended to the title in the accent colour.
+const howItWorksStepSchema = new mongoose.Schema({
+  title: { type: String, default: '' },
+  highlight: { type: String, default: '' },
+  description: { type: String, default: '' },
+  note: { type: String, default: '' },
+  iconUrl: { type: String, default: '' }
+}, { _id: false });
+
 const rewardConfigSchema = new mongoose.Schema({
   isEnabled: {
     type: Boolean,
@@ -101,7 +110,7 @@ const rewardConfigSchema = new mongoose.Schema({
   },
   quitLinkText: {
     type: String,
-    default: 'Quit Program'
+    default: 'I want to quit this program'
   },
   quitModalTitle: {
     type: String,
@@ -118,6 +127,158 @@ const rewardConfigSchema = new mongoose.Schema({
   quitConfirmButtonText: {
     type: String,
     default: 'Quit Anyway'
+  },
+  quitLoadingText: {
+    type: String,
+    default: 'Leaving Cheesy Rewards...'
+  },
+  enrollLoadingText: {
+    type: String,
+    default: 'Enrolling for Cheesy Rewards...'
+  },
+  welcomeModalTitle: {
+    type: String,
+    default: 'Welcome to Cheesy Rewards!'
+  },
+  welcomeModalSubtitle: {
+    type: String,
+    default: 'Place your order to earn Reward points'
+  },
+  welcomeModalButtonText: {
+    type: String,
+    default: 'Order Now'
+  },
+  // ── User app: Cheesy Rewards tab ──
+  rewardsHeadline: {
+    type: String,
+    default: 'Your Cheesy Rewards'
+  },
+  rewardsSubheadline: {
+    type: String,
+    default: 'Collect Points to get Free Pizzas!'
+  },
+  pointsCardTitle: {
+    type: String,
+    default: 'Your Points'
+  },
+  orderButtonText: {
+    type: String,
+    default: 'Order & Get points'
+  },
+  rewardsCardTitle: {
+    type: String,
+    default: 'Your Rewards'
+  },
+  freeRewardLabel: {
+    type: String,
+    default: 'Free Pizza'
+  },
+  redeemButtonText: {
+    type: String,
+    default: 'Redeem'
+  },
+  redeemSheetTitle: {
+    type: String,
+    default: 'Choose your Free Pizza'
+  },
+  rewardImageUrl: {
+    type: String,
+    default: ''
+  },
+  howItWorksTitle: {
+    type: String,
+    default: 'How it works'
+  },
+  howItWorksSteps: {
+    type: [howItWorksStepSchema],
+    default: [
+      {
+        title: '1 Order =',
+        highlight: '100 Points',
+        description: 'Earn 100 points on every eligible order of ₹349 or more',
+        note: 'Points are credited once your order is delivered'
+      },
+      {
+        title: '600 points =',
+        highlight: 'FREE REGULAR PIZZA',
+        description: 'Redeem 600 points for a Free Regular Pizza',
+        note: ''
+      }
+    ]
+  },
+  faqTitle: {
+    type: String,
+    default: 'Frequently Asked Questions'
+  },
+  termsTitle: {
+    type: String,
+    default: 'Terms & Conditions'
+  },
+  // ── User app: Wallet tab + Refund Points history ──
+  walletTabLabel: {
+    type: String,
+    default: 'Wallet'
+  },
+  walletPointsLabel: {
+    type: String,
+    default: 'Points'
+  },
+  walletConversionText: {
+    type: String,
+    default: '1 Point = 1 Rupee'
+  },
+  walletHeroImageUrl: {
+    type: String,
+    default: ''
+  },
+  refundCardTitle: {
+    type: String,
+    default: 'Refund Points'
+  },
+  refundCardSubtitle: {
+    type: String,
+    default: 'Use this to pay for your next order. Unrestricted Usage.'
+  },
+  earnedColumnLabel: {
+    type: String,
+    default: 'Earned'
+  },
+  usedColumnLabel: {
+    type: String,
+    default: 'Used'
+  },
+  walletEmptyText: {
+    type: String,
+    default: 'No transactions yet'
+  },
+  walletFaqs: {
+    type: [rewardFaqSchema],
+    default: [
+      {
+        question: 'How can I use Papa Veg Wallet?',
+        answer: 'Your Refund Points can be used to pay for your next order on the Papa Veg Pizza app. 1 Point = ₹1.'
+      },
+      {
+        question: 'How can I check my wallet history?',
+        answer: 'Open Rewards & Wallet, go to the Wallet tab and tap the Refund Points card to see every credit and debit with its date.'
+      },
+      {
+        question: 'Does the money in my wallet have any validity?',
+        answer: 'Refund Points do not expire. They stay in your wallet until you use them.'
+      },
+      {
+        question: 'How can I earn money in the Wallet?',
+        answer: 'When an order is cancelled or refunded to your wallet, the refund amount is credited here as Refund Points.'
+      },
+      {
+        question: 'Can I add Money into the Wallet?',
+        answer: 'No, money cannot be added to the wallet directly. Only refunds and promotional credits are added to it.'
+      },
+      {
+        question: 'Can I choose not to use the Wallet?',
+        answer: 'Yes. Using your wallet balance is optional, and unused points stay in your wallet.'
+      }
+    ]
   },
   faqs: {
     type: [rewardFaqSchema],

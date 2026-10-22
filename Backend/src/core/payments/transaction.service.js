@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 import { Transaction } from './models/transaction.model.js';
-import { FoodUserWallet } from '../../modules/food/user/models/userWallet.model.js';
 
 import { FoodDeliveryWallet } from '../../modules/food/delivery/models/deliveryWallet.model.js';
 import { FoodAdminWallet } from '../../modules/food/admin/models/adminWallet.model.js';
@@ -12,10 +11,9 @@ import { logger } from '../../utils/logger.js';
  */
 function resolveWallet(entityType, entityId) {
     switch (entityType) {
-        case 'user': {
-            const id = new mongoose.Types.ObjectId(entityId);
-            return { Model: FoodUserWallet, filter: { userId: id }, idField: 'userId' };
-        }
+        case 'user':
+            // Customer wallets are managed exclusively by walletLedger.service (walletAccounts/walletTransactions).
+            throw new Error('User wallet is managed by walletLedger.service');
 
         case 'deliveryBoy': {
             const id = new mongoose.Types.ObjectId(entityId);

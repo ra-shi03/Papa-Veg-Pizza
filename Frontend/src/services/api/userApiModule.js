@@ -169,6 +169,9 @@ export const userAPI = {
   /** PATCH /food/user/profile (Bearer USER) */
   updateProfile: (body) =>
     userClient.patch("/food/user/profile", body ?? {}),
+  /** GET /food/user/profile (Bearer USER) — uncached; data.account = { name, email, phone, ... } */
+  getMyProfile: () =>
+    userClient.get("/food/user/profile"),
   /** Upload and set user profile image (multipart). Field name: file */
   uploadProfileImage: (file) => {
     if (!file) return Promise.reject(new Error("File is required"));
@@ -206,6 +209,27 @@ export const userAPI = {
   /** POST /food/user/wallet/quit (Bearer USER) */
   quitRewards: () =>
     userClient.post("/food/user/wallet/quit"),
+  /** GET /food/user/rewards/me (Bearer USER) — enrolment + points balance/progress (not cached) */
+  getRewards: () =>
+    userClient.get("/food/user/rewards/me"),
+  /** GET /food/user/rewards/transactions (Bearer USER). Params: { page, limit } */
+  getRewardTransactions: (params) =>
+    userClient.get("/food/user/rewards/transactions", { params }),
+  /** GET /food/user/wallet/me (Bearer USER) — refund wallet balance + status */
+  getWalletMe: () =>
+    userClient.get("/food/user/wallet/me"),
+  /** GET /food/user/wallet/transactions (Bearer USER). Params: { page, limit, type, from, to } */
+  getWalletTransactions: (params) =>
+    userClient.get("/food/user/wallet/transactions", { params }),
+  /** GET /food/user/wallet/transactions/:id (Bearer USER) */
+  getWalletTransaction: (id) =>
+    userClient.get(`/food/user/wallet/transactions/${id}`),
+  /** POST /food/user/refunds (Bearer USER). Body: { orderId, reason, destination: 'wallet' | 'source', amount? } */
+  requestRefund: (body) =>
+    userClient.post("/food/user/refunds", body ?? {}),
+  /** GET /food/user/refunds/:id (Bearer USER) */
+  getRefund: (id) =>
+    userClient.get(`/food/user/refunds/${id}`),
   /** GET /food/user/referrals/stats (Bearer USER) */
   getReferralStats: () =>
     userClient.get("/food/user/referrals/stats"),

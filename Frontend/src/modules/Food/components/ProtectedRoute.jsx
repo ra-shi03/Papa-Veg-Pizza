@@ -1,5 +1,12 @@
 import { Navigate, useLocation } from "react-router-dom";
-import { isModuleAuthenticated, getCurrentUser } from "@food/utils/auth";
+import { isModuleAuthenticated, getCurrentUser, getModuleToken, getRoleFromToken } from "@food/utils/auth";
+
+// Backend issues customer tokens with role "CUSTOMER"; routes ask for "user" (backend treats them as the same role).
+const ROLE_ALIASES = { customer: "user" };
+const normalizeRole = (role) => {
+  const value = String(role || "").toLowerCase().replace(/_/g, "-");
+  return ROLE_ALIASES[value] || value;
+};
 
 /**
  * Role-based Protected Route Component
@@ -17,11 +24,15 @@ export default function ProtectedRoute({ children, requiredRole, module = "user"
 
   // If role check is required
   if (requiredRole) {
+    // The cached user object (from login or /auth/me) may not carry a role, so also accept the
+    // role in the signed token. The backend still enforces roles on every API call.
     const user = getCurrentUser(module);
-    const userRole = String(user?.role || "").toLowerCase().replace(/_/g, "-");
+    const userRoles = [user?.role, getRoleFromToken(getModuleToken(module)), user?.primaryRole]
+      .filter(Boolean)
+      .map(normalizeRole);
     const allowed = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
-    
-    const hasRole = allowed.some(r => String(r).toLowerCase().replace(/_/g, "-") === userRole);
+
+    const hasRole = allowed.some(r => userRoles.includes(normalizeRole(r)));
     if (!hasRole) {
       // Forbidden: authenticated but wrong role. Redirect to login
       return <Navigate to={loginPath} replace />;

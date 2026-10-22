@@ -12,6 +12,7 @@ export { orderAPI, uploadAPI } from "./orderApiModule.js";
 
 export { profileApi } from "./profileApi.js";
 export { myTasksService } from "./myTasksService.js";
+export { faqAPI } from "./faqApi.js";
 
 export default apiClient;
 export { API_ENDPOINTS };

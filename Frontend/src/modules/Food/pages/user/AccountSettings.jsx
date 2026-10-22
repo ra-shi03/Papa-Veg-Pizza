@@ -202,45 +202,6 @@ export default function AccountSettings() {
           </div>
         )}
       </main>
-
-      {/* BottomNavBar */}
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[360px] z-50 rounded-full bg-[#FAF9F6]/90 dark:bg-zinc-950/95 backdrop-blur-xl border border-black/5 dark:border-white/5 shadow-[0_16px_36px_rgba(0,0,0,0.15)] flex justify-around items-center h-[68px] px-2 m-0">
-        <button
-          onClick={() => {
-            navigate("/user")
-            triggerToast("Opening Home")
-          }}
-          className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none group"
-        >
-          <div className="w-14 h-8 rounded-full flex items-center justify-center mb-0.5 transition-all duration-300 bg-transparent text-zinc-500 dark:text-zinc-400 group-hover:bg-black/5 dark:group-hover:bg-white/5">
-            <span className="material-symbols-outlined text-[22px]">home</span>
-          </div>
-          <span className="text-[10px] font-semibold tracking-wide text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-800 dark:group-hover:text-zinc-200">Home</span>
-        </button>
-        <button
-          onClick={() => {
-            navigate("/user/menu")
-            triggerToast("Opening Menu")
-          }}
-          className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none group"
-        >
-          <div className="w-14 h-8 rounded-full flex items-center justify-center mb-0.5 transition-all duration-300 bg-transparent text-zinc-500 dark:text-zinc-400 group-hover:bg-black/5 dark:group-hover:bg-white/5">
-            <span className="material-symbols-outlined text-[22px]">restaurant_menu</span>
-          </div>
-          <span className="text-[10px] font-semibold tracking-wide text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-800 dark:group-hover:text-zinc-200">Menu</span>
-        </button>
-        <button
-          onClick={() => {
-            triggerToast("You are already on Account settings")
-          }}
-          className="flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer bg-transparent border-0 outline-none group"
-        >
-          <div className="w-14 h-8 rounded-full flex items-center justify-center mb-0.5 transition-all duration-300 bg-[#E53935]/10 text-[#E53935] dark:bg-[#E53935]/20">
-            <span className="material-symbols-outlined text-[22px] fill" style={{ fontVariationSettings: " 'FILL' 1 " }}>person</span>
-          </div>
-          <span className="text-[10px] font-bold tracking-wide text-[#E53935]">Account</span>
-        </button>
-      </nav>
     </div>
   )
 }

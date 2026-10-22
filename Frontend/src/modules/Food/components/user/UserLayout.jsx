@@ -135,7 +135,11 @@ export default function UserLayout() {
 
   const isProfileRoot =
     normalizedPath === "/profile" ||
-    normalizedPath === "/user/profile"
+    normalizedPath === "/user/profile" ||
+    normalizedPath === "/account" ||
+    normalizedPath === "/user/account" ||
+    normalizedPath === "/account/profile-details" ||
+    normalizedPath === "/user/account/profile-details"
 
   const showBottomNav = normalizedPath === "/" ||
     normalizedPath === "/user" ||

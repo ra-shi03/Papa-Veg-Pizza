@@ -41,6 +41,20 @@ router.get('/v1/health', (req, res) => {
 router.get('/v1/food/public/env', (req, res) => res.status(200).json({ success: true, data: {} }));
 router.get('/v1/env/public', (req, res) => res.status(200).json({ success: true, data: {} }));
 
+// Public landing settings route for User App (BottomNavigation, Under250, etc.)
+router.get(['/v1/food/landing/settings/public', '/v1/landing/settings/public'], (req, res) => {
+    return res.status(200).json({
+        success: true,
+        message: 'Landing settings fetched successfully',
+        data: {
+            under250PriceLimit: 250,
+            appName: 'Papa Veg Pizza',
+            currency: '₹',
+            currencySymbol: '₹'
+        }
+    });
+});
+
 // Food-prefixed auth routes
 router.use('/v1/food/auth', authRoutes);
 
@@ -70,6 +84,10 @@ router.get('/v1/food/admin/addons/stats/public', addonController.getAddonStats);
 
 // Public rewards config route
 router.get('/v1/food/admin/rewards/public', rewardConfigController.getPublicRewardConfig);
+
+// Public FAQs route
+import * as faqController from '../modules/food/settings/controllers/faq.controller.js';
+router.get('/v1/food/faqs/public', faqController.getPublicFaqs);
 
 // Public category-products routes
 router.get('/v1/food/admin/category-products', categoryProductController.getCategoryProducts);

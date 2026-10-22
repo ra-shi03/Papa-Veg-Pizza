@@ -1,7 +1,8 @@
 import { sendResponse } from '../../utils/response.js';
 import { getPaymentsByOrder } from './payment.service.js';
 import { getTransactionsByOrder } from './transaction.service.js';
-import { getWalletBalance, getWalletWithTransactions, getUserWalletForFrontend } from './wallet.service.js';
+import { getWalletBalance, getWalletWithTransactions } from './wallet.service.js';
+import { getWalletSummary, listWalletTransactions } from '../../modules/food/user/services/walletLedger.service.js';
 import { getRefundsByOrder, listRefunds } from './refund.service.js';
 import { createSettlement, processSettlement, listSettlements } from './settlement.service.js';
 import { logger } from '../../utils/logger.js';
@@ -31,7 +32,7 @@ export const getOrderTransactionsController = async (req, res, next) => {
 export const getUserWalletBalanceController = async (req, res, next) => {
     try {
         const userId = req.user?.userId;
-        const data = await getWalletBalance('user', userId);
+        const data = await getWalletSummary(userId);
         return sendResponse(res, 200, 'Balance fetched', data);
     } catch (err) {
         next(err);
@@ -43,7 +44,7 @@ export const getUserWalletTransactionsController = async (req, res, next) => {
         const userId = req.user?.userId;
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
-        const data = await getWalletWithTransactions('user', userId, { page, limit });
+        const data = await listWalletTransactions(userId, { page, limit });
         return sendResponse(res, 200, 'Wallet transactions fetched', data);
     } catch (err) {
         next(err);

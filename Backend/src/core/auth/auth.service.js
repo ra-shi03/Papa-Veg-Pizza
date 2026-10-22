@@ -664,6 +664,8 @@ export const getProfile = async (userId, role, jwtStoreId = null) => {
            const profileDoc = await Profile.findOne({ userId: id }).lean();
            profile = {
              ...userDoc,
+             name: [profileDoc?.firstName, profileDoc?.lastName].filter(Boolean).join(' ').trim(),
+             phone: userDoc.mobile || null,
              firstName: profileDoc?.firstName || null,
              lastName: profileDoc?.lastName || null,
              email: profileDoc?.email || userDoc.email || null,

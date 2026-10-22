@@ -39,7 +39,10 @@ export const addAddress = async (userId, dto) => {
         city: dto.city,
         state: dto.state,
         zipCode: dto.zipCode || '',
-        phone: dto.phone || '',
+        phone: dto.phone || dto.recipientPhone || '',
+        recipientName: dto.recipientName || '',
+        recipientPhone: dto.recipientPhone || dto.phone || '',
+        isForSomeoneElse: !!dto.isForSomeoneElse,
         location: toGeoPoint(dto),
         isDefault: false
     };
@@ -55,6 +58,9 @@ export const addAddress = async (userId, dto) => {
         existing.state = address.state;
         existing.zipCode = address.zipCode;
         existing.phone = address.phone;
+        existing.recipientName = address.recipientName;
+        existing.recipientPhone = address.recipientPhone;
+        existing.isForSomeoneElse = address.isForSomeoneElse;
         if (address.location) existing.location = address.location;
         await user.save();
         return { address: typeof existing.toObject === 'function' ? existing.toObject() : existing };
@@ -88,6 +94,9 @@ export const updateAddress = async (userId, addressId, dto) => {
     if (dto.state !== undefined) address.state = dto.state;
     if (dto.zipCode !== undefined) address.zipCode = dto.zipCode || '';
     if (dto.phone !== undefined) address.phone = dto.phone || '';
+    if (dto.recipientName !== undefined) address.recipientName = dto.recipientName || '';
+    if (dto.recipientPhone !== undefined) address.recipientPhone = dto.recipientPhone || '';
+    if (dto.isForSomeoneElse !== undefined) address.isForSomeoneElse = !!dto.isForSomeoneElse;
     const location = toGeoPoint(dto);
     if (location) address.location = location;
 

@@ -6,10 +6,11 @@ import mongoose from 'mongoose';
  */
 const refundSchema = new mongoose.Schema(
     {
+        /** Optional: many orders carry only the denormalised order.payment snapshot, not a Payment doc. */
         paymentId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Payment',
-            required: true,
+            default: null,
             index: true
         },
         orderId: {
@@ -32,7 +33,7 @@ const refundSchema = new mongoose.Schema(
 
         status: {
             type: String,
-            enum: ['pending', 'processed', 'failed'],
+            enum: ['pending', 'processing', 'processed', 'failed', 'rejected'],
             default: 'pending',
             index: true
         },
@@ -44,7 +45,16 @@ const refundSchema = new mongoose.Schema(
             default: 'wallet'
         },
 
+        /** Refund-provider reference (Razorpay refund id) for reconciliation. */
         gatewayRefundId: { type: String, default: '', sparse: true },
+
+        /** Who raised it: USER (customer request), SYSTEM (automatic on cancellation), ADMIN. */
+        requestedBy: { type: String, enum: ['USER', 'SYSTEM', 'ADMIN'], default: 'SYSTEM' },
+
+        /** Wallet ledger row created when a wallet refund is credited. */
+        walletTransactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'WalletTransaction', default: null },
+
+        rejectionReason: { type: String, default: '', trim: true },
 
         processedAt: { type: Date, default: null },
         processedBy: { type: mongoose.Schema.Types.ObjectId, default: null },

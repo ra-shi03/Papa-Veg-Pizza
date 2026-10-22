@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Save, Loader2, Image as ImageIcon, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Camera, Save, Loader2, Image as ImageIcon, Plus, Trash2, ArrowUp, ArrowDown, CheckCircle2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { adminClient } from '../../../../../services/api/axios';
 
 export default function WelcomePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccessModal, setSaveSuccessModal] = useState(false);
   const [activeTab, setActiveTab] = useState('welcome');
   
   const [config, setConfig] = useState({
@@ -34,6 +36,8 @@ export default function WelcomePage() {
         setConfig(prev => ({
           ...prev, 
           ...data.data,
+          enableSkipButton: data.data.enableSkipButton !== false && data.data.enableSkipButton !== "false",
+          posterDurationSeconds: data.data.posterDurationSeconds !== undefined ? Number(data.data.posterDurationSeconds) : 10,
           posters: data.data.posters || []
         }));
       }
@@ -143,34 +147,45 @@ export default function WelcomePage() {
         finalLoginImageUrl = await uploadFile(loginImageFile, 'image');
       }
 
+      const parseDate = (d) => {
+        if (!d) return null;
+        const parsed = new Date(d);
+        return isNaN(parsed.getTime()) ? null : parsed;
+      };
+
       // Process poster uploads
       const processedPosters = await Promise.all(
-        config.posters.map(async (poster) => {
+        config.posters.map(async (poster, idx) => {
           let finalImageUrl = poster.imageUrl;
-          if (pendingPosterFiles[poster.id]) {
-            finalImageUrl = await uploadFile(pendingPosterFiles[poster.id], 'image');
+          const posterKey = poster.id || poster._id || `poster_${idx}`;
+          if (pendingPosterFiles[posterKey] || (poster.id && pendingPosterFiles[poster.id])) {
+            const fileToUpload = pendingPosterFiles[posterKey] || pendingPosterFiles[poster.id];
+            finalImageUrl = await uploadFile(fileToUpload, 'image');
           }
           
           return {
-            id: poster.id.startsWith('new_') ? Date.now().toString() + Math.random().toString(36).substr(2, 9) : poster.id,
+            id: (poster.id && !poster.id.startsWith('new_')) ? poster.id : (Date.now().toString() + Math.random().toString(36).substr(2, 9)),
             imageUrl: finalImageUrl,
-            order: poster.order,
-            isActive: poster.isActive,
-            startDate: poster.startDate ? new Date(poster.startDate) : null,
-            endDate: poster.endDate ? new Date(poster.endDate) : null,
-            deepLink: poster.deepLink
+            order: poster.order ?? idx,
+            isActive: poster.isActive !== false,
+            startDate: parseDate(poster.startDate),
+            endDate: parseDate(poster.endDate),
+            deepLink: poster.deepLink || ''
           };
         })
       );
 
       const payload = {
         ...config,
+        posterDurationSeconds: Number(config.posterDurationSeconds) || 5,
+        enableSkipButton: Boolean(config.enableSkipButton),
         loginImage: finalLoginImageUrl,
         posters: processedPosters
       };
 
       await adminClient.put('/settings/welcome', payload);
-      alert('Configuration saved successfully!');
+      toast.success('Welcome screen settings saved successfully!');
+      setSaveSuccessModal(true);
       setConfig({ ...payload, posters: processedPosters });
       
       // Cleanup Object URLs
@@ -181,7 +196,7 @@ export default function WelcomePage() {
       setLoginImagePreview(null);
       setPendingPosterFiles({});
     } catch (error) {
-      alert('Failed to save configuration.');
+      toast.error(error?.response?.data?.message || 'Failed to save configuration. Please try again.');
       console.error(error);
     } finally {
       setIsSaving(false);
@@ -249,7 +264,7 @@ export default function WelcomePage() {
               <input 
                 type="checkbox"
                 name="enableSkipButton"
-                checked={config.enableSkipButton}
+                checked={Boolean(config.enableSkipButton)}
                 onChange={handleChange}
                 className="w-4 h-4 text-[var(--primary)] rounded focus:ring-[var(--primary)]"
               />
@@ -294,7 +309,7 @@ export default function WelcomePage() {
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <label className="cursor-pointer px-3 py-1.5 bg-white text-zinc-900 rounded-md text-xs font-medium hover:bg-zinc-100 transition-colors">
                         Upload
-                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePosterImageChange(index, e, poster.id)} />
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePosterImageChange(index, e, poster.id || poster._id || `poster_${index}`)} />
                       </label>
                     </div>
                   </div>
@@ -455,6 +470,40 @@ export default function WelcomePage() {
           </div>
         </div>
       </div>
+      )}
+
+      {/* Realistic In-App Success Modal (Replaces browser "localhost:5173 says" alert) */}
+      {saveSuccessModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => setSaveSuccessModal(false)}
+        >
+          <div 
+            className="w-full max-w-sm bg-white dark:bg-zinc-900 rounded-2xl p-6 shadow-2xl border border-zinc-200 dark:border-zinc-800 text-center space-y-4 animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-14 h-14 mx-auto rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-inner">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+                Settings Saved Successfully
+              </h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1.5 leading-relaxed">
+                Your welcome screen posters and configuration have been updated and are now live on the User App.
+              </p>
+            </div>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setSaveSuccessModal(false)}
+                className="w-full py-2.5 px-4 bg-[var(--primary,#EE3A43)] hover:opacity-90 text-white text-xs font-semibold rounded-xl shadow-sm transition-transform active:scale-95 cursor-pointer border-0"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

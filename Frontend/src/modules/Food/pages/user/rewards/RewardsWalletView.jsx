@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Lock, ArrowUpDown, Check, ChevronDown, HelpCircle, FileText, X, Sparkles, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Lock, ArrowUpDown, Check, ChevronDown, X, Gift } from 'lucide-react';
 import { toast } from 'sonner';
 import apiClient from '@/services/api/axios';
 import { userAPI } from '@food/api';
-import WalletSection from './WalletSection';
+import rewardsLogo from '@/assets/rewards-logo.png';
+import WalletSection, { AccordionItem } from './WalletSection';
+import RewardsActionLoadingModal from '@food/components/user/RewardsActionLoadingModal';
+import RewardsEnrollWelcomeModal from '@food/components/user/RewardsEnrollWelcomeModal';
 
 // 10 Signature Pizza Products for Rewards Catalogue (matching Reference Screenshot)
 export const FALLBACK_REWARD_PRODUCTS = [
@@ -134,10 +137,17 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
   const [selectedVegFilter, setSelectedVegFilter] = useState('all'); // 'all', 'veg', 'non-veg'
   const [sortBy, setSortBy] = useState('default');
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
-  const [isFaqModalOpen, setIsFaqModalOpen] = useState(false);
-  const [expandedFaqIndex, setExpandedFaqIndex] = useState(null);
+  const [isRedeemOpen, setIsRedeemOpen] = useState(false);
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [isQuitModalOpen, setIsQuitModalOpen] = useState(false);
+  const [actionLoadingState, setActionLoadingState] = useState({
+    isOpen: false,
+    message: '',
+    programName: 'Cheesy Rewards',
+  });
+  const [isEnrollWelcomeOpen, setIsEnrollWelcomeOpen] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(() => {
     return localStorage.getItem('pvp_rewards_enrolled') === 'true';
   });
@@ -203,58 +213,92 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
       setProducts(FALLBACK_REWARD_PRODUCTS);
     }
 
+    // Enrolment + points come from the server (rewards membership), never from localStorage alone.
     try {
-      if (userAPI?.getWallet) {
-        const wRes = await userAPI.getWallet();
-        const w = wRes?.data?.data?.wallet || wRes?.data?.wallet;
-        if (w) {
-          if (w.isEnrolled) {
-            setIsEnrolled(true);
-            localStorage.setItem('pvp_rewards_enrolled', 'true');
-          }
-          if (typeof w.points === 'number') {
-            setUserPoints(w.points);
-          } else if (typeof w.loyaltyPoints === 'number') {
-            setUserPoints(w.loyaltyPoints);
-          }
-        }
+      const rRes = await userAPI.getRewards();
+      const r = rRes?.data?.data?.rewards;
+      if (r) {
+        const enrolled = Boolean(r.isEnrolled);
+        setIsEnrolled(enrolled);
+        setUserPoints(Number(r.points) || 0);
+        const wasEnrolled = localStorage.getItem('pvp_rewards_enrolled') === 'true';
+        if (enrolled) localStorage.setItem('pvp_rewards_enrolled', 'true');
+        else localStorage.removeItem('pvp_rewards_enrolled');
+        if (wasEnrolled !== enrolled) window.dispatchEvent(new Event('pvp_rewards_enrolled_changed'));
       }
+    } catch (_) {}
+
+    try {
+      const wRes = await userAPI.getWalletMe();
+      setWalletBalance(Number(wRes?.data?.data?.wallet?.balance) || 0);
     } catch (_) {}
   };
 
   const handleEnroll = async () => {
+    const programName = rewardsConfig?.programName || 'Cheesy Rewards';
     if (isEnrolled) {
-      toast.info('You are already enrolled in Cheesy Rewards!');
+      toast.info(`You are already enrolled in ${programName}!`);
       return;
     }
+
+    // Only show the enrolled state once the server has actually created the membership.
     try {
-      if (userAPI.enrollInRewards) {
-        await userAPI.enrollInRewards();
-      }
+      await userAPI.enrollInRewards();
     } catch (e) {
-      console.warn('Backend enrollment note:', e?.message || e);
+      toast.error(e?.response?.data?.message || `Could not enroll in ${programName}. Please try again.`);
+      return;
     }
+
     setIsEnrolled(true);
     localStorage.setItem('pvp_rewards_enrolled', 'true');
     window.dispatchEvent(new Event('pvp_rewards_enrolled_changed'));
-    toast.success('🎉 Congratulations! You are now enrolled in Cheesy Rewards.');
+    setIsEnrollWelcomeOpen(true);
     fetchRewardsData();
   };
 
   const handleQuitProgram = async () => {
+    const programName = rewardsConfig?.programName || 'Cheesy Rewards';
+    const quitMsg = rewardsConfig?.quitLoadingText || `Leaving ${programName}...`;
+
+    // Immediately close the confirmation sheet
+    setIsQuitModalOpen(false);
+
+    // Open animated bottom sheet popup matching reference image
+    setActionLoadingState({
+      isOpen: true,
+      message: quitMsg,
+      programName
+    });
+
+    const startTime = Date.now();
+
+    let quitError = null;
     try {
-      if (userAPI.quitRewards) {
-        await userAPI.quitRewards();
-      }
+      await userAPI.quitRewards();
     } catch (e) {
-      console.warn('Backend quit enrollment note:', e?.message || e);
+      quitError = e;
     }
+
+    // Ensure animation displays smoothly for realistic mobile experience
+    const elapsed = Date.now() - startTime;
+    const remainingTime = Math.max(0, 1600 - elapsed);
+    if (remainingTime > 0) {
+      await new Promise(r => setTimeout(r, remainingTime));
+    }
+
+    // Server did not remove the membership — keep the user enrolled.
+    if (quitError) {
+      setActionLoadingState({ isOpen: false, message: '', programName });
+      toast.error(quitError?.response?.data?.message || `Could not leave ${programName}. Please try again.`);
+      return;
+    }
+
     setIsEnrolled(false);
     setUserPoints(0);
     localStorage.removeItem('pvp_rewards_enrolled');
     window.dispatchEvent(new Event('pvp_rewards_enrolled_changed'));
-    setIsQuitModalOpen(false);
-    toast.info('You have left the Cheesy Rewards program.');
+    setActionLoadingState({ isOpen: false, message: '', programName });
+    toast.info(`You have left the ${programName} program.`);
   };
 
   // Filter & Sort Products
@@ -348,10 +392,36 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
     "Wallet Points are valid for a period of 365 days from the day of enrolment in the Cheesy Rewards Loyalty Program. After which points will lapse automatically."
   ];
 
+  const programName = rewardsConfig?.programName || 'Cheesy Rewards';
+  const pointsRequired = Math.max(1, Number(rewardsConfig?.defaultPointsRequired) || 600);
+  const availableRedemptions = Math.floor(userPoints / pointsRequired);
+  const filledSlices = Math.min(6, Math.floor((userPoints / pointsRequired) * 6));
+  const rewardImage = rewardsConfig?.rewardImageUrl || products[0]?.image || '';
+  const walletTabLabel = `${rewardsConfig?.walletTabLabel || 'Wallet'} - ${walletBalance.toLocaleString('en-IN')} Points`;
+  const howItWorksSteps = (Array.isArray(rewardsConfig?.howItWorksSteps) && rewardsConfig.howItWorksSteps.length > 0)
+    ? rewardsConfig.howItWorksSteps
+    : [
+        {
+          title: '1 Order =',
+          highlight: `${rewardsConfig?.pointsPerOrder || 100} Points`,
+          description: `Earn ${rewardsConfig?.pointsPerOrder || 100} points on every eligible order of ₹${rewardsConfig?.minOrderAmount || 349} or more`,
+          note: ''
+        },
+        {
+          title: `${pointsRequired} points =`,
+          highlight: 'FREE PIZZA',
+          description: `Redeem ${pointsRequired} points for a Free Pizza`,
+          note: ''
+        }
+      ];
+
   return (
-    <div className="fixed inset-0 z-50 bg-white dark:bg-zinc-950 flex flex-col font-sans overflow-hidden">
+    <div
+      className="fixed inset-0 z-50 bg-[var(--secondary-off-white,#F8F6F2)] dark:bg-zinc-950 flex flex-col font-sans overflow-hidden"
+      style={{ backgroundColor: 'var(--secondary-off-white, #F8F6F2)' }}
+    >
       {/* ── Fixed Top Header Bar ── */}
-      <div className="h-14 flex items-center px-4 gap-3 bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800 shrink-0 z-30">
+      <div className="h-14 flex items-center px-4 gap-3 bg-[var(--secondary-off-white,#F8F6F2)] dark:bg-zinc-900 shrink-0 z-30">
         <button
           type="button"
           onClick={onBack}
@@ -366,112 +436,121 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
       </div>
 
       {/* ── Main Scroll Area ── */}
-      <div className="flex-1 overflow-y-auto overscroll-contain pb-28">
-        <div className="max-w-md mx-auto px-4 pt-3.5 space-y-4">
-          {/* ── Tab Switcher: [ Cheesy Rewards ] | [ Wallet ] ── */}
-          <div className="bg-zinc-100/90 dark:bg-zinc-800/80 p-1 rounded-2xl flex items-center">
+      <div className={`flex-1 overflow-y-auto overscroll-contain ${activeTab === 'rewards' && !isEnrolled ? 'pb-28' : 'pb-10'}`}>
+        <div className="max-w-md mx-auto px-4 pt-2 space-y-4">
+          {/* ── Tab Switcher: [ Cheesy Rewards ] | [ Wallet - N Points ] ── */}
+          <div className="bg-zinc-200/80 dark:bg-zinc-800/80 p-1 rounded-xl flex items-center border border-zinc-300/60 dark:border-zinc-700">
             <button
               type="button"
               onClick={() => setActiveTab('rewards')}
-              className={`flex-1 py-2 text-xs sm:text-[13px] font-bold rounded-xl transition-all cursor-pointer ${
+              className={`flex-1 py-2.5 text-xs sm:text-[13px] font-semibold rounded-lg transition-all cursor-pointer border-0 ${
                 activeTab === 'rewards'
                   ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs'
-                  : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400'
+                  : 'bg-transparent text-zinc-700 hover:text-zinc-900 dark:text-zinc-400'
               }`}
             >
-              {rewardsConfig?.programName || 'Cheesy Rewards'}
+              {programName}
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('wallet')}
-              className={`flex-1 py-2 text-xs sm:text-[13px] font-bold rounded-xl transition-all cursor-pointer ${
+              className={`flex-1 py-2.5 text-xs sm:text-[13px] font-semibold rounded-lg transition-all cursor-pointer border-0 ${
                 activeTab === 'wallet'
                   ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs'
-                  : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400'
+                  : 'bg-transparent text-zinc-700 hover:text-zinc-900 dark:text-zinc-400'
               }`}
             >
-              Wallet
+              {walletTabLabel}
             </button>
           </div>
 
           {/* ── VIEW 1: CHEESY REWARDS ── */}
           {activeTab === 'rewards' && (
-            <div className="space-y-4">
-              {/* Top Reward Card: Image 1 when enrolled, Image 2 when not enrolled */}
-              {isEnrolled ? (
-                /* ── Enrolled State: Balance & Progress Card (Matching Reference Image 1) ── */
-                <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-150 dark:border-zinc-800 p-4 sm:p-5 shadow-2xs">
-                  {/* Top: Balance + 6-slice pie chart */}
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
-                        Your Balance
-                      </p>
-                      <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mt-0.5">
-                        {userPoints} Points
-                      </h2>
-                    </div>
-
-                    {/* 6-slice pizza pie chart icon */}
-                    <div className="w-11 h-11 relative flex items-center justify-center shrink-0">
-                      <svg viewBox="0 0 40 40" className="w-11 h-11" fill="none">
-                        <circle cx="20" cy="20" r="18" fill="#E4E4E7" className="dark:fill-zinc-700" />
-                        <line x1="20" y1="2" x2="20" y2="38" stroke="#ffffff" className="dark:stroke-zinc-900" strokeWidth="1.8" />
-                        <line x1="4.4" y1="11" x2="35.6" y2="29" stroke="#ffffff" className="dark:stroke-zinc-900" strokeWidth="1.8" />
-                        <line x1="4.4" y1="29" x2="35.6" y2="11" stroke="#ffffff" className="dark:stroke-zinc-900" strokeWidth="1.8" />
-                      </svg>
-                    </div>
-                  </div>
-
-                  {/* Horizontal Progress Track from 0 to 600 */}
-                  <div className="mt-4 mb-1">
-                    <div className="relative flex items-center">
-                      {/* Left red circle dot at 0 */}
-                      <div className="w-3.5 h-3.5 rounded-full bg-[#EE3A43] z-10 shrink-0 ring-2 ring-white dark:ring-zinc-900 shadow-xs" />
-                      
-                      {/* Track line connecting 0 to 600 */}
-                      <div className="flex-1 h-1 bg-zinc-200 dark:bg-zinc-700 mx-0 relative">
-                        <div 
-                          className="h-full bg-[#EE3A43] transition-all duration-300"
-                          style={{ width: `${Math.min(100, Math.max(0, (userPoints / 600) * 100))}%` }}
-                        />
-                      </div>
-
-                      {/* Right red circle dot at 600 */}
-                      <div className="w-3.5 h-3.5 rounded-full bg-[#EE3A43] z-10 shrink-0 ring-2 ring-white dark:ring-zinc-900 shadow-xs" />
-                    </div>
-
-                    {/* Label 600 under right dot */}
-                    <div className="flex justify-end mt-1">
-                      <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-                        600
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Dotted separator line */}
-                  <div className="border-t border-dashed border-zinc-200 dark:border-zinc-700 my-3" />
-
-                  {/* Sub-row: Place your first order to get 100 Points | View Menu */}
-                  <div className="flex items-center justify-between text-xs sm:text-[13px]">
-                    <p className="text-zinc-700 dark:text-zinc-300 m-0">
-                      Place your first order to get{' '}
-                      <span className="font-bold text-zinc-900 dark:text-white">
-                        {rewardsConfig?.pointsPerOrder || 100} Points
-                      </span>
+            <div className="space-y-5">
+              {isEnrolled && (
+                <>
+                  {/* Program logo + headline */}
+                  <div className="flex flex-col items-center text-center pt-1">
+                    <img
+                      src={rewardsConfig?.logoUrl || rewardsLogo}
+                      alt={programName}
+                      className="w-36 h-36 object-contain"
+                    />
+                    <h2 className="text-lg font-bold text-zinc-900 dark:text-white mt-1 m-0">
+                      {rewardsConfig?.rewardsHeadline || 'Your Cheesy Rewards'}
+                    </h2>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5 m-0">
+                      {rewardsConfig?.rewardsSubheadline || 'Collect Points to get Free Pizzas!'}
                     </p>
-                    <button
-                      type="button"
-                      onClick={handleNavigateMenu}
-                      className="text-[#EE3A43] font-bold hover:underline cursor-pointer p-0 bg-transparent border-0 shrink-0 ml-2"
-                      style={{ color: 'var(--accent-red, #EE3A43)' }}
-                    >
-                      View Menu
-                    </button>
                   </div>
-                </div>
-              ) : (
-                /* ── Pre-Enrollment Benefits Card (Matching Reference Image 2) ── */
+
+                  {/* Your Points | Your Rewards */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden flex flex-col shadow-2xs">
+                      <div className="py-2 text-center text-xs text-zinc-600 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-800/60 border-b border-zinc-200 dark:border-zinc-800">
+                        {rewardsConfig?.pointsCardTitle || 'Your Points'}
+                      </div>
+                      <div className="flex-1 flex flex-col items-center justify-center py-5 px-2">
+                        <PizzaPie filled={filledSlices} />
+                        <p className="mt-3 m-0 text-zinc-900 dark:text-white">
+                          <span className="text-xl font-bold">{userPoints}/{pointsRequired}</span>{' '}
+                          <span className="text-xs font-semibold">points</span>
+                        </p>
+                      </div>
+                      <div className="px-3 pb-3">
+                        <button
+                          type="button"
+                          onClick={handleNavigateMenu}
+                          className="w-full py-2.5 bg-[#EE3A43] hover:bg-[#d92d36] text-white font-bold text-[13px] rounded-lg transition-all active:scale-[0.98] cursor-pointer border-0"
+                          style={{ backgroundColor: 'var(--accent-red, #EE3A43)', color: '#ffffff' }}
+                        >
+                          {rewardsConfig?.orderButtonText || 'Order & Get points'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden flex flex-col shadow-2xs">
+                      <div className="py-2 text-center text-xs text-zinc-600 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-800/60 border-b border-zinc-200 dark:border-zinc-800">
+                        {rewardsConfig?.rewardsCardTitle || 'Your Rewards'}
+                      </div>
+                      <div className="flex-1 flex flex-col items-center justify-center py-5 px-2">
+                        <div className="w-24 h-24 rounded-full overflow-hidden bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
+                          {rewardImage ? (
+                            <img src={rewardImage} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <Gift className="w-9 h-9 text-zinc-400" />
+                          )}
+                        </div>
+                        <p className="mt-3 m-0 text-zinc-900 dark:text-white">
+                          <span className="text-xl font-bold">{availableRedemptions}</span>{' '}
+                          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                            {rewardsConfig?.freeRewardLabel || 'Free Pizza'}
+                          </span>
+                        </p>
+                      </div>
+                      <div className="px-3 pb-3">
+                        <button
+                          type="button"
+                          disabled={availableRedemptions < 1}
+                          onClick={() => setIsRedeemOpen(true)}
+                          className={`w-full py-2.5 font-bold text-[13px] rounded-lg flex items-center justify-center gap-1.5 border-0 transition-all ${
+                            availableRedemptions < 1
+                              ? 'bg-zinc-500 text-white cursor-not-allowed'
+                              : 'bg-[#EE3A43] text-white cursor-pointer active:scale-[0.98]'
+                          }`}
+                          style={availableRedemptions >= 1 ? { backgroundColor: 'var(--accent-red, #EE3A43)' } : undefined}
+                        >
+                          {availableRedemptions < 1 && <Lock className="w-3.5 h-3.5" />}
+                          {rewardsConfig?.redeemButtonText || 'Redeem'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {!isEnrolled && (
+                <>
                 <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-150 dark:border-zinc-800 p-4 sm:p-5 shadow-2xs">
                   {/* Benefit 1: 1 Order = 100 Points */}
                   <div className="flex items-center gap-3.5">
@@ -547,11 +626,167 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                     </button>
                   </p>
                 </div>
+                </>
               )}
 
-              {/* ── Sticky Filter & Sort Bar (Matching Screenshot 1 & 2) ── */}
+              {/* ── How it works ── */}
+              <div className="px-1 pt-1">
+                <h3 className="text-[15px] font-bold text-zinc-900 dark:text-white m-0 mb-4">
+                  {rewardsConfig?.howItWorksTitle || 'How it works'}
+                </h3>
+                <div>
+                  {howItWorksSteps.map((step, i) => (
+                    <div key={i} className="flex items-start gap-4">
+                      <div className="flex flex-col items-center shrink-0">
+                        <div className="w-14 h-14 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 flex items-center justify-center overflow-hidden">
+                          {step.iconUrl ? (
+                            <img src={step.iconUrl} alt="" className="w-10 h-10 object-contain" />
+                          ) : (
+                            <PizzaPie filled={i === 0 ? 1 : 6} size={36} />
+                          )}
+                        </div>
+                        {i < howItWorksSteps.length - 1 && (
+                          <div className="w-0 h-6 border-l-2 border-dotted border-zinc-300 dark:border-zinc-700" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 pb-4">
+                        <p className="m-0 text-[17px] font-bold text-zinc-900 dark:text-white leading-snug">
+                          {step.title}{' '}
+                          {step.highlight && (
+                            <span style={{ color: 'var(--accent-red, #EE3A43)' }}>{step.highlight}</span>
+                          )}
+                        </p>
+                        {step.description && (
+                          <p className="m-0 mt-1 text-xs text-zinc-600 dark:text-zinc-400 leading-snug">{step.description}</p>
+                        )}
+                        {step.note && (
+                          <p className="m-0 mt-1 text-xs text-zinc-400 dark:text-zinc-500 leading-snug">{step.note}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── FAQs ── */}
+              <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2xs p-4">
+                <h3 className="text-[15px] font-bold text-zinc-900 dark:text-white m-0 mb-3">
+                  {rewardsConfig?.faqTitle || 'Frequently Asked Questions'}
+                </h3>
+                <div className="space-y-2.5">
+                  {faqs.map((faq, index) => (
+                    <AccordionItem key={index} question={faq.question}>
+                      {faq.answer}
+                    </AccordionItem>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── Terms & Conditions ── */}
+              <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setIsTermsOpen((v) => !v)}
+                  className="w-full flex items-center justify-between px-4 py-4 text-left cursor-pointer bg-transparent border-0"
+                >
+                  <span className="text-[15px] font-bold text-zinc-900 dark:text-white">
+                    {rewardsConfig?.termsTitle || 'Terms & Conditions'}
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${isTermsOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {isTermsOpen && (
+                  <div className="px-4 pb-4 space-y-3">
+                    {terms.map((term, i) => (
+                      <div key={i} className="flex items-start gap-2.5 text-zinc-600 dark:text-zinc-300 text-xs leading-relaxed">
+                        <span className="text-zinc-400 font-bold leading-none mt-0.5 select-none shrink-0">•</span>
+                        <p className="flex-1 m-0">{term}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Quit program ── */}
+              {isEnrolled && (
+                <div className="text-center pb-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsQuitModalOpen(true)}
+                    className="text-[13px] font-semibold hover:underline cursor-pointer bg-transparent border-0 p-0"
+                    style={{ color: 'var(--accent-red, #EE3A43)' }}
+                  >
+                    {rewardsConfig?.quitLinkText || 'I want to quit this program'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── VIEW 2: WALLET (Refund Points & activity) ── */}
+          {activeTab === 'wallet' && (
+            <WalletSection
+              isEnrolled={isEnrolled}
+              onEnroll={handleEnroll}
+              rewardsConfig={rewardsConfig}
+              onBalanceChange={setWalletBalance}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* ── Sticky Enroll bar (only before enrolment) ── */}
+      {activeTab === 'rewards' && !isEnrolled && (
+        <div className="fixed bottom-0 left-0 right-0 z-30 bg-[var(--secondary-off-white,#F8F6F2)]/95 dark:bg-zinc-900/95 backdrop-blur-md border-t border-zinc-200/60 dark:border-zinc-800 p-3 sm:p-4 max-w-md mx-auto shadow-lg">
+          <button
+            type="button"
+            onClick={handleEnroll}
+            className="w-full py-3 bg-[#EE3A43] hover:bg-[#d92d36] text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-red-500/25 active:scale-[0.99] cursor-pointer border-0"
+            style={{ backgroundColor: 'var(--accent-red, #EE3A43)', color: '#ffffff' }}
+          >
+            {rewardsConfig?.buttonText || 'Enroll Now'}
+          </button>
+          <p className="text-center text-[10.5px] text-zinc-500 dark:text-zinc-400 mt-1.5">
+            {rewardsConfig?.termsText || 'By enrolling you agree to our'}{' '}
+            <button
+              type="button"
+              onClick={() => setIsTermsModalOpen(true)}
+              className="text-[var(--accent-red,#EE3A43)] font-semibold hover:underline cursor-pointer bg-transparent border-0 p-0"
+            >
+              {rewardsConfig?.termsLinkText || 'Terms and Conditions'}
+            </button>
+          </p>
+        </div>
+      )}
+
+      {/* ── Redeem sheet: reward catalogue ── */}
+      {isRedeemOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end items-center">
+          <div
+            onClick={() => setIsRedeemOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-[1px] animate-in fade-in duration-200"
+          />
+          <div
+            className="relative z-10 w-full max-w-lg bg-[var(--secondary-off-white,#F8F6F2)] dark:bg-zinc-900 rounded-t-[28px] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-in slide-in-from-bottom duration-250"
+            style={{ backgroundColor: 'var(--secondary-off-white, #F8F6F2)', fontFamily: 'Poppins, sans-serif' }}
+          >
+            <div className="px-6 pt-5 pb-2 flex items-center justify-between">
+              <h3 className="text-[17px] font-bold text-zinc-900 dark:text-white tracking-tight m-0">
+                {rewardsConfig?.redeemSheetTitle || 'Choose your Free Pizza'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsRedeemOpen(false)}
+                aria-label="Close"
+                className="p-1 rounded-full text-zinc-500 hover:bg-zinc-200/60 cursor-pointer bg-transparent border-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-6 pb-4 overflow-y-auto hide-scrollbar">
               {(rewardsConfig?.showVegFilter !== false || rewardsConfig?.showNonVegFilter !== false || rewardsConfig?.showSortFilter !== false) && (
-                <div className="sticky top-0 z-20 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md py-2.5 flex items-center justify-between gap-2 border-b border-zinc-100 dark:border-zinc-800">
+                <div className="sticky top-0 z-20 bg-[var(--secondary-off-white,#F8F6F2)]/95 dark:bg-zinc-950/95 backdrop-blur-md py-2.5 flex items-center justify-between gap-2 border-b border-zinc-200/60 dark:border-zinc-800">
                   <div className="flex items-center gap-2">
                     {/* Veg Only Filter */}
                     {rewardsConfig?.showVegFilter !== false && (
@@ -633,7 +868,6 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                 </div>
               )}
 
-              {/* ── Products List (Fetched from API) ── */}
               <div className="divide-y divide-zinc-100 dark:divide-zinc-800/80">
                 {filteredProducts.map(prod => (
                   <div
@@ -708,166 +942,19 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                   </div>
                 )}
               </div>
-
-              {/* ── Footer FAQs, Terms & Quit Program Links (Matching Reference Image 2) ── */}
-              <div className="pt-6 pb-6 text-left px-1 sm:px-2 text-xs flex items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => setIsFaqModalOpen(true)}
-                  className="font-bold text-[#005b82] dark:text-sky-400 hover:underline cursor-pointer bg-transparent border-0 p-0"
-                >
-                  FAQs
-                </button>
-                <span className="text-zinc-300 dark:text-zinc-700 font-light">|</span>
-                <button
-                  type="button"
-                  onClick={() => setIsTermsModalOpen(true)}
-                  className="font-bold text-[#005b82] dark:text-sky-400 hover:underline cursor-pointer bg-transparent border-0 p-0"
-                >
-                  Terms & Conditions
-                </button>
-                {isEnrolled && (
-                  <>
-                    <span className="text-zinc-300 dark:text-zinc-700 font-light">|</span>
-                    <button
-                      type="button"
-                      onClick={() => setIsQuitModalOpen(true)}
-                      className="font-bold text-[#005b82] dark:text-sky-400 hover:underline cursor-pointer bg-transparent border-0 p-0"
-                    >
-                      {rewardsConfig?.quitLinkText || 'Quit Program'}
-                    </button>
-                  </>
-                )}
-              </div>
             </div>
-          )}
-
-          {/* ── VIEW 2: WALLET (Refund Balance & Dynamic Activity) ── */}
-          {activeTab === 'wallet' && (
-            <div className="pt-1">
-              <WalletSection
-                isEnrolled={isEnrolled}
-                onEnroll={() => {
-                  setIsEnrolled(true);
-                  localStorage.setItem('pvp_rewards_enrolled', 'true');
-                }}
-                onOpenFaqs={() => setIsFaqModalOpen(true)}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Sticky Bottom Action Bar with Enroll Now / View Menu (Matching Reference Image 1 & 2) ── */}
-      {activeTab === 'rewards' && (
-        <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border-t border-zinc-100 dark:border-zinc-800 p-3 sm:p-4 max-w-md mx-auto shadow-lg">
-          {isEnrolled ? (
-            <>
+            <div className="px-6 pb-5 pt-2">
               <button
                 type="button"
-                onClick={handleNavigateMenu}
-                className="w-full py-3 bg-[#EE3A43] hover:bg-[#d92d36] text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-red-500/25 active:scale-[0.99] cursor-pointer border-0"
+                onClick={() => {
+                  setIsRedeemOpen(false);
+                  handleNavigateMenu();
+                }}
+                className="w-full py-3 bg-[#EE3A43] text-white font-bold text-sm rounded-xl active:scale-[0.99] cursor-pointer border-0"
                 style={{ backgroundColor: 'var(--accent-red, #EE3A43)', color: '#ffffff' }}
               >
                 View Menu
               </button>
-              <p className="text-center text-[11px] text-zinc-600 dark:text-zinc-300 mt-2 font-medium">
-                Place your first order to get{' '}
-                <span className="font-bold text-zinc-900 dark:text-white">
-                  {rewardsConfig?.pointsPerOrder || 100} Points
-                </span>
-              </p>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={handleEnroll}
-                className="w-full py-3 bg-[#EE3A43] hover:bg-[#d92d36] text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-red-500/25 active:scale-[0.99] cursor-pointer border-0"
-                style={{ backgroundColor: 'var(--accent-red, #EE3A43)', color: '#ffffff' }}
-              >
-                {rewardsConfig?.buttonText || 'Enroll Now'}
-              </button>
-              <p className="text-center text-[10.5px] text-zinc-500 dark:text-zinc-400 mt-1.5">
-                {rewardsConfig?.termsText || 'By enrolling you agree to our'}{' '}
-                <button
-                  type="button"
-                  onClick={() => setIsTermsModalOpen(true)}
-                  className="text-[var(--accent-red,#EE3A43)] font-semibold hover:underline cursor-pointer bg-transparent border-0 p-0"
-                >
-                  {rewardsConfig?.termsLinkText || 'Terms and Conditions'}
-                </button>
-              </p>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ── Frequently Asked Questions Bottom Sheet Modal (Matching Reference Image) ── */}
-      {isFaqModalOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end items-center">
-          {/* Dimmed backdrop */}
-          <div 
-            onClick={() => setIsFaqModalOpen(false)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-[1px] animate-in fade-in duration-200"
-          />
-
-          {/* Floating circular close button centered directly above bottom sheet */}
-          <div className="relative z-10 mb-3 animate-in zoom-in-95 duration-200">
-            <button
-              type="button"
-              onClick={() => setIsFaqModalOpen(false)}
-              className="w-11 h-11 rounded-full bg-zinc-200/90 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 flex items-center justify-center shadow-lg active:scale-90 transition-transform cursor-pointer border border-white/20"
-              aria-label="Close FAQs"
-            >
-              <X className="w-5 h-5 stroke-[2.5]" />
-            </button>
-          </div>
-
-          {/* Bottom Sheet Card */}
-          <div 
-            className="relative z-10 w-full max-w-lg bg-white dark:bg-zinc-900 rounded-t-[28px] shadow-2xl flex flex-col max-h-[75vh] overflow-hidden animate-in slide-in-from-bottom duration-250"
-            style={{ fontFamily: 'Poppins, sans-serif' }}
-          >
-            {/* Header */}
-            <div className="px-6 pt-5 pb-3.5">
-              <h3 className="text-[17px] sm:text-lg font-bold text-zinc-900 dark:text-white tracking-tight m-0">
-                Frequently Asked Questions
-              </h3>
-            </div>
-
-            {/* Accordion FAQ List */}
-            <div className="px-6 pb-6 overflow-y-auto space-y-2.5 hide-scrollbar">
-              {faqs.map((faq, index) => {
-                const isOpen = expandedFaqIndex === index;
-                return (
-                  <div 
-                    key={index} 
-                    className="rounded-xl border border-zinc-150 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-850/60 overflow-hidden transition-colors"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setExpandedFaqIndex(isOpen ? null : index)}
-                      className="w-full px-4 py-3.5 flex items-center justify-between text-left gap-3 cursor-pointer select-none"
-                    >
-                      <span className="text-xs sm:text-[13px] font-medium text-zinc-800 dark:text-zinc-200 leading-snug">
-                        {faq.question}
-                      </span>
-                      <ChevronDown 
-                        className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform duration-200 ${
-                          isOpen ? 'rotate-180 text-[var(--accent-red,#EE3A43)]' : ''
-                        }`} 
-                      />
-                    </button>
-
-                    {isOpen && (
-                      <div className="px-4 pb-3.5 pt-1 text-xs sm:text-[12.5px] text-zinc-600 dark:text-zinc-400 leading-relaxed border-t border-zinc-150/60 dark:border-zinc-800/80">
-                        {faq.answer}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
             </div>
           </div>
         </div>
@@ -896,8 +983,8 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
 
           {/* Bottom Sheet Card */}
           <div 
-            className="relative z-10 w-full max-w-lg bg-white dark:bg-zinc-900 rounded-t-[28px] shadow-2xl flex flex-col max-h-[75vh] overflow-hidden animate-in slide-in-from-bottom duration-250"
-            style={{ fontFamily: 'Poppins, sans-serif' }}
+            className="relative z-10 w-full max-w-lg bg-[var(--secondary-off-white,#F8F6F2)] dark:bg-zinc-900 rounded-t-[28px] shadow-2xl flex flex-col max-h-[75vh] overflow-hidden animate-in slide-in-from-bottom duration-250 border-t border-zinc-200/60 dark:border-zinc-800"
+            style={{ backgroundColor: 'var(--secondary-off-white, #F8F6F2)', fontFamily: 'Poppins, sans-serif' }}
           >
             <div className="px-6 pt-5 pb-3">
               <h3 className="text-[17px] sm:text-lg font-bold text-zinc-900 dark:text-white tracking-tight m-0">
@@ -927,8 +1014,8 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
 
           {/* Bottom Sheet Card */}
           <div 
-            className="relative z-10 w-full max-w-md bg-white dark:bg-zinc-900 rounded-t-[28px] shadow-2xl p-6 pb-8 animate-in slide-in-from-bottom duration-250"
-            style={{ fontFamily: "'Poppins', sans-serif" }}
+            className="relative z-10 w-full max-w-md bg-[var(--secondary-off-white,#F8F6F2)] dark:bg-zinc-900 rounded-t-[28px] shadow-2xl p-6 pb-8 animate-in slide-in-from-bottom duration-250 border-t border-zinc-200/60 dark:border-zinc-800"
+            style={{ backgroundColor: 'var(--secondary-off-white, #F8F6F2)', fontFamily: "'Poppins', sans-serif" }}
           >
             {/* Title */}
             <h3 className="text-lg sm:text-xl font-bold text-zinc-900 dark:text-white tracking-tight mb-2">
@@ -946,7 +1033,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
               <button
                 type="button"
                 onClick={() => setIsQuitModalOpen(false)}
-                className="w-full py-3 px-4 rounded-xl border border-zinc-900 dark:border-zinc-300 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-bold text-sm hover:bg-zinc-50 dark:hover:bg-zinc-700 active:scale-[0.98] transition-all cursor-pointer"
+                className="w-full py-3 px-4 rounded-xl border border-zinc-900 dark:border-zinc-300 bg-transparent text-zinc-900 dark:text-white font-bold text-sm hover:bg-black/5 dark:hover:bg-white/5 active:scale-[0.98] transition-all cursor-pointer"
               >
                 {rewardsConfig?.quitStayButtonText || 'Stay'}
               </button>
@@ -964,6 +1051,52 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
           </div>
         </div>
       )}
+
+      {/* ── Animated Action Loading Bottom Sheet (Matching Reference Images 1 & 2) ── */}
+      <RewardsActionLoadingModal
+        isOpen={actionLoadingState.isOpen}
+        message={actionLoadingState.message}
+        programName={actionLoadingState.programName}
+        logoSrc={rewardsConfig?.logoUrl || undefined}
+      />
+
+      {/* ── Welcome To Rewards Bottom Sheet Modal (Matching Reference Image 2) ── */}
+      <RewardsEnrollWelcomeModal
+        isOpen={isEnrollWelcomeOpen}
+        onClose={() => setIsEnrollWelcomeOpen(false)}
+        onOrderNow={() => {
+          setIsEnrollWelcomeOpen(false);
+          handleNavigateMenu();
+        }}
+        programName={rewardsConfig?.programName || 'Cheesy Rewards'}
+        title={rewardsConfig?.welcomeModalTitle}
+        subtitle={rewardsConfig?.welcomeModalSubtitle}
+        buttonText={rewardsConfig?.welcomeModalButtonText || 'Order Now'}
+      />
     </div>
+  );
+}
+
+/** 6-slice pizza meter: `filled` slices are painted in the theme accent colour. */
+function PizzaPie({ filled = 0, size = 80 }) {
+  const slices = Array.from({ length: 6 }, (_, i) => {
+    const a0 = ((-90 + i * 60) * Math.PI) / 180;
+    const a1 = ((-90 + (i + 1) * 60) * Math.PI) / 180;
+    const p = (a) => `${(50 + 46 * Math.cos(a)).toFixed(2)} ${(50 + 46 * Math.sin(a)).toFixed(2)}`;
+    return `M50 50 L${p(a0)} A46 46 0 0 1 ${p(a1)} Z`;
+  });
+  return (
+    <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
+      {slices.map((d, i) => (
+        <path
+          key={i}
+          d={d}
+          fill={i < filled ? 'var(--accent-red, #EE3A43)' : '#E4E7EC'}
+          fillOpacity={i < filled ? 0.9 : 0.7}
+          stroke="#ffffff"
+          strokeWidth="2.5"
+        />
+      ))}
+    </svg>
   );
 }

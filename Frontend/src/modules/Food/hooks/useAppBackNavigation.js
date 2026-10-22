@@ -32,7 +32,7 @@ const resolveBackPath = ({ pathname, search, state }) => {
   }
 
   if (
-    /^\/user\/(profile\/(favorites|support|coupons|about|report-safety-emergency|accessibility|logout|refer-earn)|account\/profile-details\/(edit|payments))$/.test(
+    /^\/user\/(profile\/(favorites|support|coupons|about|report-safety-emergency|accessibility|logout|refer-earn|addresses)|account\/profile-details\/(edit|payments|addresses)|addresses)$/.test(
       normalizedPath,
     )
   ) {
@@ -44,11 +44,22 @@ const resolveBackPath = ({ pathname, search, state }) => {
       normalizedPath,
     )
   ) {
-    return explicitBackPath || "/food/user/profile"
+    return explicitBackPath || "/food/user/account/profile-details"
   }
 
-  if (normalizedPath === "/user/wallet") {
-    return "/food/user/profile"
+  if (normalizedPath === "/user/wallet" || normalizedPath === "/user/rewards") {
+    return explicitBackPath || "/food/user/account/profile-details"
+  }
+
+  if (normalizedPath === "/user/help" || normalizedPath === "/help") {
+    return "/food/user/account/profile-details"
+  }
+
+  if (normalizedPath === "/user/location/setup" || normalizedPath === "/location/setup") {
+    if (state?.from && (state.from.includes("cart") || state.from.includes("checkout"))) {
+      return toFoodPath(state.from) || "/food/user/cart"
+    }
+    return "/food/user/account/profile-details"
   }
 
   if (normalizedPath === "/user/notifications") {

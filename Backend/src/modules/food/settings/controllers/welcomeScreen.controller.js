@@ -24,6 +24,15 @@ export const updateWelcomeScreenConfig = async (req, res, next) => {
             Object.assign(config, rest);
             if (posters !== undefined) {
                 config.posters = posters;
+                config.markModified('posters');
+            }
+            if (rest.enableSkipButton !== undefined) {
+                config.enableSkipButton = Boolean(rest.enableSkipButton);
+                config.markModified('enableSkipButton');
+            }
+            if (rest.posterDurationSeconds !== undefined) {
+                config.posterDurationSeconds = Number(rest.posterDurationSeconds);
+                config.markModified('posterDurationSeconds');
             }
             await config.save();
         }

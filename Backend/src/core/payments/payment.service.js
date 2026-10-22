@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 import { Payment } from './models/payment.model.js';
-import { recordTransaction } from './transaction.service.js';
 import { logger } from '../../utils/logger.js';
 
 /**
@@ -27,29 +26,8 @@ export async function createPayment({
 
     logger.info(`Payment created: ${doc._id} method=${method} status=${status} amount=${amount}`);
 
-    // For wallet payments, immediately debit user wallet
-    if (method === 'wallet' && status === 'success') {
-        try {
-            await recordTransaction({
-                entityType: 'user',
-                entityId: String(userId),
-                type: 'debit',
-                amount: Number(amount),
-                description: `Order payment - wallet debit`,
-                category: 'order_payment',
-                orderId: String(orderId),
-                paymentId: String(doc._id),
-                metadata: { method: 'wallet' }
-            });
-        } catch (err) {
-            // If wallet debit fails (insufficient balance), mark payment as failed
-            doc.status = 'failed';
-            doc.rawResponse = { error: err.message };
-            await doc.save();
-            throw err;
-        }
-    }
-
+    // Wallet payments are debited by walletLedger.service during checkout (reserve → confirm);
+    // this record is audit only, so the wallet is never debited twice.
     return doc.toObject();
 }
 

@@ -2126,7 +2126,7 @@ export default function MenuList() {
                       )}
 
                       {/* Dark Gradient Overlay with Veg Icon, Title, Toppings, Pricing & Red Add Button */}
-                      <div className="relative z-10 w-full bg-gradient-to-t from-black/95 via-black/80 to-transparent pt-14 pb-3.5 px-4 text-left">
+                      <div className="relative z-10 w-full bg-gradient-to-t from-black/95 via-black/55 to-transparent pt-7 pb-3.5 px-4 text-left">
                         {/* Veg Icon + Product Title */}
                         <div className="flex items-center gap-2">
                           <span className="veg-box scale-90 shrink-0 shadow-xs">

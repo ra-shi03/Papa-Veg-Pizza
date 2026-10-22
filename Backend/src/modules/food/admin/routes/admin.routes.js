@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireAdmin } from '../../../../core/auth/auth.middleware.js';
+import { requireAdmin, requireSuperAdmin } from '../../../../core/auth/auth.middleware.js';
 import * as adminController from '../controllers/admin.controller.js';
 import * as staffController from '../controllers/staff.controller.js';
 import * as foodApprovalController from '../controllers/foodApproval.controller.js';
@@ -17,6 +17,7 @@ import * as addonController from '../controllers/addon.controller.js';
 import * as addonTypeController from '../controllers/addonType.controller.js';
 
 import * as orderController from '../../orders/controllers/order.controller.js';
+import * as refundAdminController from '../controllers/refundAdmin.controller.js';
 import { getAdminPageController, upsertAdminPageController } from '../controllers/pageContent.controller.js';
 import { upload } from '../../../../middleware/upload.js';
 
@@ -273,6 +274,11 @@ router.delete('/territories/:id', geographyController.deleteTerritory);
 router.get('/orders', orderController.listOrdersAdminController);
 router.get('/orders/:orderId', orderController.getOrderByIdAdminController);
 router.delete('/orders/:orderId', orderController.deleteOrderAdminController);
+
+// ----- Refunds (Super Admin only: approval credits the wallet or refunds the original payment method) -----
+router.get('/refunds', requireSuperAdmin, refundAdminController.listRefundsAdminController);
+router.post('/refunds/:id/approve', requireSuperAdmin, refundAdminController.approveRefundAdminController);
+router.post('/refunds/:id/reject', requireSuperAdmin, refundAdminController.rejectRefundAdminController);
 
 // ----- CMS Pages (About + legal) -----
 router.get('/pages-social-media/:key', getAdminPageController);

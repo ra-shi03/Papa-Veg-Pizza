@@ -61,13 +61,14 @@ export default function Home() {
   useEffect(() => {
     const checkWalletEnrollment = async () => {
       try {
-        if (userAPI?.getWallet) {
-          const res = await userAPI.getWallet();
-          const wallet = res?.data?.data?.wallet || res?.data?.wallet;
-          if (wallet?.isEnrolled) {
-            setIsRewardsEnrolled(true);
-            localStorage.setItem('pvp_rewards_enrolled', 'true');
-          }
+        // Server rewards membership is the source of truth (covers enrol/quit on another device).
+        const res = await userAPI.getRewards();
+        const rewards = res?.data?.data?.rewards;
+        if (rewards) {
+          const enrolled = Boolean(rewards.isEnrolled);
+          setIsRewardsEnrolled(enrolled);
+          if (enrolled) localStorage.setItem('pvp_rewards_enrolled', 'true');
+          else localStorage.removeItem('pvp_rewards_enrolled');
         }
       } catch (_) {}
     };
@@ -375,6 +376,7 @@ export default function Home() {
               slug: slug,
               label: labelRaw,
               icon: c.icon || c.image || 'local_pizza',
+              borderColor: c.borderColor || '',
               sort: Number(c.sort !== undefined && c.sort !== null ? c.sort : (c.order !== undefined && c.order !== null ? c.order : 999))
             };
           });
@@ -613,10 +615,14 @@ export default function Home() {
                 slug: slug,
                 label: label,
                 icon: c.icon || c.image || 'local_pizza',
+                borderColor: c.borderColor || '',
                 sort: Number(c.sort !== undefined && c.sort !== null ? c.sort : (c.order !== undefined && c.order !== null ? c.order : 999))
               });
             } else {
               const existing = uniqueCatsMap.get(label);
+              if (c.borderColor && !existing.borderColor) {
+                existing.borderColor = c.borderColor;
+              }
               const newIcon = c.icon || c.image;
               if (newIcon && newIcon.startsWith('http') && existing.icon && !existing.icon.startsWith('http')) {
                 existing.icon = newIcon;
@@ -1046,6 +1052,7 @@ export default function Home() {
                   slug: slug,
                   label: label,
                   icon: c.icon || c.image || 'local_pizza',
+                  borderColor: c.borderColor || '',
                   sort: Number(c.sort !== undefined && c.sort !== null ? c.sort : (c.order !== undefined && c.order !== null ? c.order : 999))
                 });
               }
@@ -1385,16 +1392,19 @@ export default function Home() {
                       });
                     }}
                   >
-                    <div className="w-[104px] h-[104px] sm:w-[116px] sm:h-[116px] rounded-full border border-zinc-200 shadow-sm flex items-center justify-center p-1 bg-white mx-auto">
-                      <div className="w-full h-full rounded-full overflow-hidden bg-zinc-100 flex items-center justify-center relative">
-                        {cat.icon && cat.icon.startsWith('http') ? (
-                          <img src={cat.icon} alt={cat.label} className="w-full h-full object-cover absolute inset-0 scale-[1.15]" />
-                        ) : (
-                          <span className="material-symbols-outlined text-zinc-400 text-4xl">
-                            {cat.icon || 'fastfood'}
-                          </span>
-                        )}
-                      </div>
+                    <div 
+                      className="w-[104px] h-[104px] sm:w-[116px] sm:h-[116px] rounded-full overflow-hidden shadow-sm flex items-center justify-center bg-zinc-100 mx-auto transition-all relative border-[3.5px]"
+                      style={{ 
+                        borderColor: cat.borderColor || '#e4e4e7'
+                      }}
+                    >
+                      {cat.icon && cat.icon.startsWith('http') ? (
+                        <img src={cat.icon} alt={cat.label} className="w-full h-full object-cover absolute inset-0 scale-[1.15]" />
+                      ) : (
+                        <span className="material-symbols-outlined text-zinc-400 text-4xl">
+                          {cat.icon || 'fastfood'}
+                        </span>
+                      )}
                     </div>
                     <span 
                       style={{ fontFamily: "'Poppins', sans-serif" }}
@@ -1606,7 +1616,7 @@ export default function Home() {
               style={{
                 backgroundColor: isDarkMode ? '#1a1a1a' : 'var(--secondary-off-white, #F8F6F2)'
               }}
-              className={`fixed ${deliveryCardData && deliveryCardData.enabled !== false ? 'bottom-[122px]' : 'bottom-22 sm:bottom-24'} left-3.5 sm:left-5 z-40 w-11 h-11 rounded-full border border-zinc-200/90 dark:border-zinc-700 shadow-lg shadow-black/15 flex items-center justify-center text-zinc-700 dark:text-zinc-200 hover:text-[var(--accent-red,#EE3A43)] dark:hover:text-red-400 hover:scale-105 active:scale-95 transition-all cursor-pointer`}
+              className={`fixed ${deliveryCardData && deliveryCardData.enabled !== false ? 'bottom-[118px]' : 'bottom-22 sm:bottom-24'} left-3.5 sm:left-5 z-40 w-11 h-11 rounded-full border border-zinc-200/90 dark:border-zinc-700 shadow-lg shadow-black/15 flex items-center justify-center text-zinc-700 dark:text-zinc-200 hover:text-[var(--accent-red,#EE3A43)] dark:hover:text-red-400 hover:scale-105 active:scale-95 transition-all cursor-pointer`}
               title="Scroll to Top"
             >
               <ChevronsUp size={22} strokeWidth={2.4} />

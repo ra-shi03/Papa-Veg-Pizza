@@ -17,7 +17,20 @@ import {
     createWalletTopupOrderController,
     verifyWalletTopupPaymentController,
     enrollUserInRewardsController,
-    quitUserRewardsController
+    quitUserRewardsController,
+    getMyWalletController,
+    listMyWalletTransactionsController,
+    getMyWalletTransactionController,
+    reserveWalletPaymentController,
+    confirmWalletPaymentController,
+    releaseWalletPaymentController,
+    getMyRewardsController,
+    listMyRewardTransactionsController,
+    enrollRewardsController,
+    quitRewardsController,
+    requestRefundController,
+    listMyRefundsController,
+    getMyRefundController
 } from '../controllers/userWallet.controller.js';
 import {
     getUserReferralDetailsController,
@@ -45,6 +58,25 @@ router.post('/wallet/enroll', enrollUserInRewardsController);
 router.post('/wallet/quit', quitUserRewardsController);
 router.post('/wallet/topup/order', createWalletTopupOrderController);
 router.post('/wallet/topup/verify', verifyWalletTopupPaymentController);
+
+// Refund wallet (money) — scoped to the authenticated user only
+router.get('/wallet/me', getMyWalletController);
+router.get('/wallet/transactions', listMyWalletTransactionsController);
+router.get('/wallet/transactions/:id', getMyWalletTransactionController);
+router.post('/wallet/payments/reserve', reserveWalletPaymentController);
+router.post('/wallet/payments/:id/confirm', confirmWalletPaymentController);
+router.post('/wallet/payments/:id/release', releaseWalletPaymentController);
+
+// Cheesy Rewards (points) — separate from the wallet
+router.get('/rewards/me', getMyRewardsController);
+router.get('/rewards/transactions', listMyRewardTransactionsController);
+router.post('/rewards/enroll', enrollRewardsController);
+router.post('/rewards/quit', quitRewardsController);
+
+// Refund requests (approval + crediting happen only in the admin workflow)
+router.post('/refunds', requestRefundController);
+router.get('/refunds', listMyRefundsController);
+router.get('/refunds/:id', getMyRefundController);
 
 // Referral stats (Bearer USER)
 router.get('/referrals/stats', getUserReferralStatsController);

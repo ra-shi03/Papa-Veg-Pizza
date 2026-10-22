@@ -19,6 +19,21 @@ export function HomeHeader({
   const [isFocused, setIsFocused] = useState(false);
   const [searchValue, setSearchValue] = useState(propSearchValue || '');
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    return localStorage.getItem("user_authenticated") === "true" || !!localStorage.getItem("user_accessToken");
+  });
+
+  useEffect(() => {
+    const checkAuth = () => {
+      setIsLoggedIn(localStorage.getItem("user_authenticated") === "true" || !!localStorage.getItem("user_accessToken"));
+    };
+    window.addEventListener("userAuthChanged", checkAuth);
+    window.addEventListener("storage", checkAuth);
+    return () => {
+      window.removeEventListener("userAuthChanged", checkAuth);
+      window.removeEventListener("storage", checkAuth);
+    };
+  }, []);
 
   useEffect(() => {
     setSearchValue(propSearchValue || '');
@@ -84,7 +99,7 @@ export function HomeHeader({
 
   return (
     <div 
-      className={`w-full transition-all duration-300 ${
+      className={`w-full transition-[padding,box-shadow,background-color] duration-200 ${
         isSearchActive 
           ? 'py-2 shadow-xs bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800' 
           : (isScrolled ? 'pt-3 pb-3 shadow-md' : 'pb-3')
@@ -214,6 +229,28 @@ export function HomeHeader({
               </div>
             </div>
           </motion.div>
+
+          {/* ── Unauthenticated Login Promo Card (Matching Image 2) ── */}
+          {!isLoggedIn && (
+            <div className="mx-4 mb-2.5 px-4 py-2.5 rounded-2xl bg-black/15 dark:bg-black/30 border border-white/10 flex items-center justify-between gap-3 shadow-inner">
+              <p className="text-[12px] sm:text-[13px] text-white/95 font-medium leading-tight m-0">
+                Login for saved addresses, previous orders &amp;
+                <br className="hidden xs:inline" /> rewards points.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const target = window.location.pathname.startsWith('/food')
+                    ? '/food/user/auth/login'
+                    : '/user/auth/login';
+                  navigate(target, { state: { from: window.location.pathname } });
+                }}
+                className="shrink-0 px-4 py-2 rounded-xl bg-[#C62828] hover:bg-[#B71C1C] text-white font-extrabold text-xs uppercase tracking-wider shadow-sm active:scale-95 transition-all cursor-pointer border-0"
+              >
+                LOGIN
+              </button>
+            </div>
+          )}
 
           {/* ── SEARCH BAR + TRAIN BUTTON ── */}
           <div className="px-4 flex items-center gap-2">

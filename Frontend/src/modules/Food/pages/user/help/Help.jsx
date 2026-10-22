@@ -1,447 +1,399 @@
-import { useState } from "react"
-import { Link } from "react-router-dom"
+import { useState, useEffect, useMemo, useRef } from "react"
+import { Link, useNavigate, useLocation } from "react-router-dom"
 import {
+  ArrowLeft,
   Search,
   HelpCircle,
   Package,
   CreditCard,
   User,
   Truck,
-  MessageCircle,
   Phone,
   Mail,
   ChevronDown,
   ChevronRight,
-  ArrowRight,
-  FileText,
-  Shield,
   Clock,
-  MapPin
+  MapPin,
+  Shield,
+  Loader2,
+  X
 } from "lucide-react"
 import AnimatedPage from "@food/components/user/AnimatedPage"
-import ScrollReveal from "@food/components/user/ScrollReveal"
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@food/components/ui/card"
-import { Button } from "@food/components/ui/button"
-import { Input } from "@food/components/ui/input"
-import { Badge } from "@food/components/ui/badge"
+import { faqAPI } from "@/services/api"
 
-const helpCategories = [
-  {
-    id: "ordering",
-    title: "Ordering",
-    icon: Package,
-    color: "text-[#7e3866]",
-    bgColor: "bg-orange-50",
-    description: "Learn how to place and manage orders",
-    topics: [
-      {
-        question: "How do I place an order?",
-        answer: "To place an order, browse restaurants, add items to your cart, and proceed to checkout. Select your delivery address and payment method, then confirm your order."
-      },
-      {
-        question: "Can I modify or cancel my order?",
-        answer: "You can modify or cancel your order within 5 minutes of placing it. After that, please contact support for assistance."
-      },
-      {
-        question: "How do I track my order?",
-        answer: "Go to 'My Orders' in your profile, select the order you want to track, and you'll see real-time updates on your order status."
-      },
-      {
-        question: "What is the minimum order amount?",
-        answer: "The minimum order amount varies by restaurant, typically ranging from $10 to $15. This information is displayed on each restaurant's page."
-      }
-    ]
-  },
-  {
-    id: "payments",
-    title: "Payments",
-    icon: CreditCard,
-    color: "text-[#7e3866]",
-    bgColor: "bg-orange-50",
-    description: "Payment methods and billing questions",
-    topics: [
-      {
-        question: "What payment methods do you accept?",
-        answer: "We accept all major credit cards, debit cards, digital wallets (Apple Pay, Google Pay), and cash on delivery in select areas."
-      },
-      {
-        question: "Is my payment information secure?",
-        answer: "Yes, we use industry-standard encryption to protect your payment information. We never store your full card details."
-      },
-      {
-        question: "Can I get a refund?",
-        answer: "Refunds are processed for cancelled orders, incorrect items, or quality issues. Contact support within 24 hours of delivery for assistance."
-      },
-      {
-        question: "Why was my payment declined?",
-        answer: "Payment can be declined due to insufficient funds, incorrect card details, or bank restrictions. Please verify your payment method and try again."
-      }
-    ]
-  },
-  {
-    id: "delivery",
-    title: "Delivery",
-    icon: Truck,
-    color: "text-#55254b",
-    bgColor: "bg-orange-50",
-    description: "Delivery times, fees, and tracking",
-    topics: [
-      {
-        question: "What are your delivery times?",
-        answer: "Delivery times typically range from 30-60 minutes, depending on the restaurant and your location. Estimated time is shown before checkout."
-      },
-      {
-        question: "How much is the delivery fee?",
-        answer: "Delivery fees vary by restaurant and distance, typically ranging from $2.99 to $5.99. The exact fee is shown before you place your order."
-      },
-      {
-        question: "Can I schedule a delivery for later?",
-        answer: "Yes, you can schedule orders for up to 7 days in advance during checkout. Select your preferred delivery time."
-      },
-      {
-        question: "What if my order is late?",
-        answer: "If your order is significantly delayed, contact support. We'll investigate and may provide compensation or a refund."
-      }
-    ]
-  },
-  {
-    id: "account",
-    title: "Account & Profile",
-    icon: User,
-    color: "text-[#7e3866]",
-    bgColor: "bg-orange-50",
-    description: "Manage your account and preferences",
-    topics: [
-      {
-        question: "How do I update my profile?",
-        answer: "Go to 'Profile' in the menu, then select 'Edit Profile' to update your name, email, phone number, and other information."
-      },
-      {
-        question: "How do I change my password?",
-        answer: "Go to Profile > Settings > Security to change your password. You'll need to verify your current password first."
-      },
-      {
-        question: "How do I manage my addresses?",
-        answer: "Navigate to Profile > Addresses to view, add, edit, or delete delivery addresses. Set a default address for faster checkout."
-      },
-      {
-        question: "How do I save my favorite restaurants?",
-        answer: "Click the heart icon on any restaurant page to add it to your favorites. View all favorites in Profile > Favorites."
-      }
-    ]
-  },
-  {
-    id: "refunds",
-    title: "Refunds & Returns",
-    icon: Shield,
-    color: "text-[#7e3866]",
-    bgColor: "bg-orange-50",
-    description: "Refund policy and return process",
-    topics: [
-      {
-        question: "What is your refund policy?",
-        answer: "We offer full refunds for cancelled orders, incorrect items, or quality issues reported within 24 hours of delivery."
-      },
-      {
-        question: "How long do refunds take?",
-        answer: "Refunds are typically processed within 5-7 business days, depending on your payment method. You'll receive a confirmation email."
-      },
-      {
-        question: "Can I return food items?",
-        answer: "Due to food safety regulations, we cannot accept returns of food items. However, we'll provide a full refund for quality issues."
-      },
-      {
-        question: "What if I received the wrong order?",
-        answer: "Contact support immediately with your order number. We'll arrange a replacement or full refund, and you can keep the incorrect order."
-      }
-    ]
-  },
-  {
-    id: "general",
-    title: "General Questions",
-    icon: HelpCircle,
-    color: "text-gray-600",
-    bgColor: "bg-gray-50",
-    description: "Other frequently asked questions",
-    topics: [
-      {
-        question: "Do you offer discounts or promotions?",
-        answer: "Yes! Check the 'Offers' section for current promotions, discount codes, and special deals from restaurants."
-      },
-      {
-        question: "How do I contact customer support?",
-        answer: "You can contact us via phone, email, or live chat. Visit the 'Contact Support' section below for all contact options."
-      },
-      {
-        question: "Is there a mobile app?",
-        answer: "Yes, our mobile app is available for iOS and Android. Download it from the App Store or Google Play for the best experience."
-      },
-      {
-        question: "Do you deliver to my area?",
-        answer: "Enter your delivery address to see available restaurants in your area. We're constantly expanding our delivery zones."
-      }
-    ]
+// Category icon & styling helper
+const getCategoryMeta = (catName = "") => {
+  const norm = String(catName).toLowerCase()
+  if (norm.includes("order")) {
+    return { icon: Package, color: "text-[#E53935]", bgColor: "bg-red-50 dark:bg-red-950/40" }
   }
-]
+  if (norm.includes("pay") || norm.includes("wallet") || norm.includes("billing")) {
+    return { icon: CreditCard, color: "text-amber-600", bgColor: "bg-amber-50 dark:bg-amber-950/40" }
+  }
+  if (norm.includes("deliver") || norm.includes("track") || norm.includes("train")) {
+    return { icon: Truck, color: "text-blue-600", bgColor: "bg-blue-50 dark:bg-blue-950/40" }
+  }
+  if (norm.includes("account") || norm.includes("profile")) {
+    return { icon: User, color: "text-purple-600", bgColor: "bg-purple-50 dark:bg-purple-950/40" }
+  }
+  if (norm.includes("refund") || norm.includes("return") || norm.includes("policy")) {
+    return { icon: Shield, color: "text-emerald-600", bgColor: "bg-emerald-50 dark:bg-emerald-950/40" }
+  }
+  return { icon: HelpCircle, color: "text-zinc-600 dark:text-zinc-300", bgColor: "bg-zinc-100 dark:bg-zinc-800" }
+}
 
 export default function Help() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [faqs, setFaqs] = useState([])
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [expandedCategory, setExpandedCategory] = useState(null)
-  const [expandedQuestion, setExpandedQuestion] = useState(null)
+  const [selectedCategory, setSelectedCategory] = useState("All")
+  const [expandedFaqId, setExpandedFaqId] = useState(null)
+  const contactSectionRef = useRef(null)
 
-  const filteredCategories = helpCategories.filter(category =>
-    category.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    category.topics.some(topic =>
-      topic.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      topic.answer.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  )
-
-  const toggleCategory = (categoryId) => {
-    setExpandedCategory(expandedCategory === categoryId ? null : categoryId)
-    setExpandedQuestion(null)
+  const handleBack = () => {
+    // If an explicit 'from' is provided and is NOT a looping route (location, address, help)
+    if (
+      location.state?.from &&
+      !location.state.from.includes("location") &&
+      !location.state.from.includes("address") &&
+      !location.state.from.includes("help")
+    ) {
+      const target =
+        location.state.from.startsWith("/food") || !window.location.pathname.startsWith("/food")
+          ? location.state.from
+          : `/food${location.state.from}`
+      navigate(target)
+    } else {
+      const profilePath = window.location.pathname.startsWith("/food")
+        ? "/food/user/account/profile-details"
+        : "/user/account/profile-details"
+      navigate(profilePath)
+    }
   }
 
-  const toggleQuestion = (questionIndex) => {
-    setExpandedQuestion(expandedQuestion === questionIndex ? null : questionIndex)
+  // Load dynamic FAQs from backend
+  useEffect(() => {
+    let cancelled = false
+    const fetchFaqs = async () => {
+      try {
+        const res = await faqAPI.getPublicFaqs()
+        if (cancelled) return
+        const list = res?.data?.data || []
+        setFaqs(list)
+      } catch (err) {
+        console.error("Failed to fetch public FAQs:", err)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    fetchFaqs()
+    return () => { cancelled = true }
+  }, [])
+
+  // Categories extracted from dynamic FAQs
+  const categories = useMemo(() => {
+    const cats = Array.from(new Set(faqs.map(f => f.category).filter(Boolean)))
+    return ["All", ...cats]
+  }, [faqs])
+
+  // Filtered FAQs
+  const filteredFaqs = useMemo(() => {
+    return faqs.filter(faq => {
+      const matchCat = selectedCategory === "All" || faq.category === selectedCategory
+      const q = searchQuery.toLowerCase().trim()
+      const matchQuery = !q ||
+        (faq.title && faq.title.toLowerCase().includes(q)) ||
+        (faq.content && faq.content.toLowerCase().includes(q)) ||
+        (faq.category && faq.category.toLowerCase().includes(q))
+      return matchCat && matchQuery
+    })
+  }, [faqs, selectedCategory, searchQuery])
+
+  // Group filtered FAQs by Category
+  const groupedFaqs = useMemo(() => {
+    const map = {}
+    filteredFaqs.forEach(faq => {
+      const cat = faq.category || "General"
+      if (!map[cat]) map[cat] = []
+      map[cat].push(faq)
+    })
+    return map
+  }, [filteredFaqs])
+
+  const toggleFaq = (id) => {
+    setExpandedFaqId(prev => (prev === id ? null : id))
+  }
+
+  const scrollToContact = () => {
+    contactSectionRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
   return (
-    <AnimatedPage className="min-h-screen bg-gradient-to-b from-yellow-50/30 via-white to-orange-50/20 dark:from-[#0a0a0a] dark:via-[#0a0a0a] dark:to-[#0a0a0a] p-4 md:p-6 lg:p-8">
-      <div className="max-w-md md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto space-y-4 md:space-y-5 lg:space-y-6">
-        <ScrollReveal>
-          <div className="text-center space-y-3 md:space-y-4 mb-6 md:mb-8">
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold">Help Center</h1>
-            <p className="text-base md:text-lg lg:text-xl text-muted-foreground">
-              Find answers to common questions or contact our support team
-            </p>
-          </div>
-        </ScrollReveal>
+    <AnimatedPage className="min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] flex flex-col font-sans pb-16">
+      {/* Sticky Header with Back Button */}
+      <div className="bg-white dark:bg-[#121212] px-4 py-3.5 flex items-center justify-between shadow-xs sticky top-0 z-20 border-b border-gray-100 dark:border-gray-800">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="p-1.5 -ml-1.5 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer bg-transparent border-0 flex items-center justify-center"
+            aria-label="Back"
+          >
+            <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
+          </button>
+          <h1 className="text-[17px] sm:text-lg font-bold text-gray-900 dark:text-white m-0">
+            Need Help
+          </h1>
+        </div>
+      </div>
 
-        {/* Search Bar */}
-        <ScrollReveal delay={0.1}>
-          <Card className="shadow-lg">
-            <CardContent className="p-4 md:p-5 lg:p-6">
-              <div className="relative">
-                <Search className="absolute left-3 md:left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 md:h-6 md:w-6 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Search for help topics, questions, or keywords..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 md:pl-12 h-12 md:h-14 text-base md:text-lg"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </ScrollReveal>
-
-        {/* Quick Actions */}
-        <ScrollReveal delay={0.2}>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 lg:gap-6">
-            <Link to="/user/orders">
-              <CardContent className="p-4 md:p-5 lg:p-6">
-                <div className="flex items-center gap-3 md:gap-4">
-                  <div className="p-2 md:p-3 bg-yellow-100 rounded-lg">
-                    <Package className="h-5 w-5 md:h-6 md:w-6 text-[#7e3866]" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm md:text-base font-semibold">Track Your Order</h3>
-                    <p className="text-xs md:text-sm text-muted-foreground">View order status</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Link>
-            <Link to="/user/profile">
-              <CardContent className="p-4 md:p-5 lg:p-6">
-                <div className="flex items-center gap-3 md:gap-4">
-                  <div className="p-2 md:p-3 bg-orange-100 rounded-lg">
-                    <User className="h-5 w-5 md:h-6 md:w-6 text-[#7e3866]" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm md:text-base font-semibold">Manage Account</h3>
-                    <p className="text-xs md:text-sm text-muted-foreground">Update profile & settings</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Link>
-            <CardContent className="p-4 md:p-5 lg:p-6">
-              <div className="flex items-center gap-3 md:gap-4">
-                <div className="p-2 md:p-3 bg-orange-100 rounded-lg">
-                  <MessageCircle className="h-5 w-5 md:h-6 md:w-6 text-[#7e3866]" />
-                </div>
-                <div>
-                  <h3 className="text-sm md:text-base font-semibold">Contact Support</h3>
-                  <p className="text-xs md:text-sm text-muted-foreground">Get help from our team</p>
-                </div>
-              </div>
-            </CardContent>
-          </div>
-        </ScrollReveal>
-
-        {/* Help Categories */}
-        <ScrollReveal delay={0.3}>
-          <div className="space-y-4 md:space-y-5 lg:space-y-6">
-            <h2 className="text-xl md:text-2xl lg:text-3xl font-bold">Browse by Category</h2>
-            {filteredCategories.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <HelpCircle className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-lg font-semibold mb-2">No results found</p>
-                  <p className="text-muted-foreground mb-4">
-                    Try searching with different keywords
-                  </p>
-                  <Button
-                    variant="outline"
-                    onClick={() => setSearchQuery("")}
-                  >
-                    Clear Search
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              filteredCategories.map((category, categoryIndex) => {
-                const Icon = category.icon
-                const isExpanded = expandedCategory === category.id
-
-                return (
-                  <Card key={category.id} className="shadow-lg">
-                    <CardHeader
-                      onClick={() => toggleCategory(category.id)}
-                      className="p-4 md:p-5 lg:p-6"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 md:gap-4">
-                          <div className={`p-2 md:p-3 ${category.bgColor} rounded-lg`}>
-                            <Icon className={`h-5 w-5 md:h-6 md:w-6 ${category.color}`} />
-                          </div>
-                          <div>
-                            <CardTitle className="text-lg md:text-xl lg:text-2xl">{category.title}</CardTitle>
-                            <CardDescription className="text-sm md:text-base">{category.description}</CardDescription>
-                          </div>
-                        </div>
-                        {isExpanded ? (
-                          <ChevronDown className="h-5 w-5 md:h-6 md:w-6 text-muted-foreground flex-shrink-0" />
-                        ) : (
-                          <ChevronRight className="h-5 w-5 md:h-6 md:w-6 text-muted-foreground flex-shrink-0" />
-                        )}
-                      </div>
-                    </CardHeader>
-                    {isExpanded && (
-                      <CardContent className="space-y-3 md:space-y-4 pt-0 p-4 md:p-5 lg:p-6">
-                        {category.topics.map((topic, topicIndex) => {
-                          const questionIndex = `${category.id}-${topicIndex}`
-                          const isQuestionExpanded = expandedQuestion === questionIndex
-
-                          return (
-                            <div
-                              key={topicIndex}
-                              className="border rounded-lg overflow-hidden"
-                            >
-                              <button
-                                onClick={() => toggleQuestion(questionIndex)}
-                              >
-                                <span className="font-semibold pr-4">{topic.question}</span>
-                                {isQuestionExpanded ? (
-                                  <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                )}
-                              </button>
-                              {isQuestionExpanded && (
-                                <div className="p-4 text-muted-foreground border-t bg-muted/30">
-                                  <p>{topic.answer}</p>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </CardContent>
-                    )}
-                  </Card>
-                )
-              })
+      <div className="max-w-2xl mx-auto w-full px-4 pt-4 sm:pt-6 space-y-4">
+        {/* Search Card */}
+        <div className="bg-white dark:bg-zinc-900 p-2 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
+          <div className="relative flex items-center">
+            <Search className="w-5 h-5 text-zinc-400 absolute left-3.5" />
+            <input
+              type="text"
+              placeholder="Search help topics, questions, keywords..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-9 py-2.5 bg-transparent text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 outline-none font-medium"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 p-1 text-zinc-400 hover:text-zinc-600 rounded-full bg-transparent border-0 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
             )}
           </div>
-        </ScrollReveal>
+        </div>
 
-        {/* Contact Support Section */}
-        <ScrollReveal delay={0.4}>
-          <Card className="bg-gradient-to-br from-yellow-50 to-orange-50 border-yellow-200 shadow-lg">
-            <CardHeader className="p-4 md:p-5 lg:p-6">
-              <CardTitle className="text-xl md:text-2xl lg:text-3xl flex items-center gap-2">
-                <MessageCircle className="h-5 w-5 md:h-6 md:w-6 text-[#7e3866]" />
-                Still Need Help?
-              </CardTitle>
-              <CardDescription className="text-sm md:text-base">
-                Our support team is here to assist you 24/7
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 md:space-y-5 lg:space-y-6 p-4 md:p-5 lg:p-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 lg:gap-6">
-                <div className="flex items-start gap-3 p-4 bg-white rounded-lg">
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <Phone className="h-5 w-5 text-[#7e3866]" />
+        {/* Quick Action Cards */}
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+          <Link
+            to={window.location.pathname.startsWith("/food") ? "/food/user/orders" : "/user/orders"}
+            state={{ from: "/user/account/profile-details" }}
+            className="bg-white dark:bg-zinc-900 p-3 rounded-xl border border-zinc-200/70 dark:border-zinc-800 flex flex-col items-center text-center hover:border-red-300 dark:hover:border-red-900 transition-all group no-underline"
+          >
+            <div className="w-9 h-9 rounded-full bg-red-50 dark:bg-red-950/40 text-[#E53935] flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
+              <Package className="w-4.5 h-4.5" />
+            </div>
+            <span className="text-[11px] sm:text-xs font-bold text-zinc-800 dark:text-zinc-200 leading-tight">
+              Track Order
+            </span>
+            <span className="text-[10px] text-zinc-400 hidden sm:block mt-0.5">
+              Order status
+            </span>
+          </Link>
+
+          <Link
+            to={window.location.pathname.startsWith("/food") ? "/food/user/location/setup" : "/user/location/setup"}
+            state={{ mode: "my_addresses", from: "/user/account/profile-details" }}
+            className="bg-white dark:bg-zinc-900 p-3 rounded-xl border border-zinc-200/70 dark:border-zinc-800 flex flex-col items-center text-center hover:border-red-300 dark:hover:border-red-900 transition-all group no-underline"
+          >
+            <div className="w-9 h-9 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
+              <MapPin className="w-4.5 h-4.5" />
+            </div>
+            <span className="text-[11px] sm:text-xs font-bold text-zinc-800 dark:text-zinc-200 leading-tight">
+              My Addresses
+            </span>
+            <span className="text-[10px] text-zinc-400 hidden sm:block mt-0.5">
+              Saved locations
+            </span>
+          </Link>
+
+          <button
+            type="button"
+            onClick={scrollToContact}
+            className="bg-white dark:bg-zinc-900 p-3 rounded-xl border border-zinc-200/70 dark:border-zinc-800 flex flex-col items-center text-center hover:border-red-300 dark:hover:border-red-900 transition-all group cursor-pointer"
+          >
+            <div className="w-9 h-9 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
+              <Phone className="w-4.5 h-4.5" />
+            </div>
+            <span className="text-[11px] sm:text-xs font-bold text-zinc-800 dark:text-zinc-200 leading-tight">
+              Support
+            </span>
+            <span className="text-[10px] text-zinc-400 hidden sm:block mt-0.5">
+              Phone & Email
+            </span>
+          </button>
+        </div>
+
+        {/* Category Filter Pills */}
+        {categories.length > 1 && (
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-1">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold tracking-wide transition-all cursor-pointer border-0 ${
+                  selectedCategory === cat
+                    ? "bg-[#E53935] text-white shadow-xs"
+                    : "bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* FAQs Section */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 m-0">
+              Frequently Asked Questions
+            </h2>
+            <span className="text-xs text-zinc-400 font-medium">
+              {filteredFaqs.length} {filteredFaqs.length === 1 ? "result" : "results"}
+            </span>
+          </div>
+
+          {loading ? (
+            <div className="py-16 flex flex-col items-center justify-center gap-3">
+              <Loader2 className="w-7 h-7 text-[#E53935] animate-spin" />
+              <p className="text-xs text-zinc-400">Loading help topics...</p>
+            </div>
+          ) : filteredFaqs.length === 0 ? (
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-10 text-center">
+              <HelpCircle className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />
+              <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-200 mb-1">
+                No questions found
+              </h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
+                Try searching with a different term or clear your filters.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("")
+                  setSelectedCategory("All")
+                }}
+                className="px-4 py-2 bg-[#E53935] text-white rounded-xl text-xs font-bold cursor-pointer border-0"
+              >
+                View All FAQs
+              </button>
+            </div>
+          ) : (
+            Object.entries(groupedFaqs).map(([categoryName, faqItems]) => {
+              const meta = getCategoryMeta(categoryName)
+              const CatIcon = meta.icon
+
+              return (
+                <div
+                  key={categoryName}
+                  className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs overflow-hidden"
+                >
+                  {/* Category Header */}
+                  <div className="p-3.5 sm:p-4 bg-zinc-50/70 dark:bg-zinc-900/60 border-b border-zinc-100 dark:border-zinc-800/80 flex items-center gap-2.5">
+                    <div className={`w-8 h-8 rounded-lg ${meta.bgColor} ${meta.color} flex items-center justify-center shrink-0`}>
+                      <CatIcon className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white m-0">
+                      {categoryName}
+                    </h3>
                   </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Phone Support</h3>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Call us anytime
-                    </p>
-                    <a
-                      href="tel:+1-800-123-4567"
-                      className="text-sm text-primary hover:underline font-medium"
-                    >
-                      +1 (800) 123-4567
-                    </a>
+
+                  {/* FAQ Items in this Category */}
+                  <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                    {faqItems.map((faq) => {
+                      const id = faq._id || faq.id
+                      const isExpanded = expandedFaqId === id
+
+                      return (
+                        <div key={id} className="transition-colors">
+                          <button
+                            type="button"
+                            onClick={() => toggleFaq(id)}
+                            className="w-full px-4 py-3.5 text-left flex items-center justify-between gap-3 cursor-pointer bg-transparent border-0 hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30 transition-colors"
+                          >
+                            <span className="text-[13.5px] font-semibold text-zinc-800 dark:text-zinc-200 leading-snug">
+                              {faq.title}
+                            </span>
+                            {isExpanded ? (
+                              <ChevronDown className="w-4 h-4 text-zinc-500 shrink-0" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 text-zinc-400 shrink-0" />
+                            )}
+                          </button>
+
+                          {isExpanded && (
+                            <div className="px-4 pb-4 pt-1 animate-in fade-in duration-200">
+                              <p className="text-[13px] text-zinc-600 dark:text-zinc-400 leading-relaxed m-0 whitespace-pre-line bg-zinc-50 dark:bg-zinc-800/40 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800/60">
+                                {faq.content}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
-                <div className="flex items-start gap-3 p-4 bg-white rounded-lg">
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <Mail className="h-5 w-5 text-[#7e3866]" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Email Support</h3>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      We'll respond within 24 hours
-                    </p>
-                    <a
-                      href="mailto:support@papavegpizza.com"
-                      className="text-sm text-primary hover:underline font-medium"
-                    >
-                      support@papavegpizza.com
-                    </a>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-4 bg-white rounded-lg">
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <MessageCircle className="h-5 w-5 text-[#7e3866]" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Live Chat</h3>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Available 24/7
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-1"
-                      onClick={() => alert("Live chat would open here")}
-                    >
-                      Start Chat
-                    </Button>
-                  </div>
-                </div>
+              )
+            })
+          )}
+        </div>
+
+        {/* Contact Support Section (NO Chat with Us) */}
+        <div
+          ref={contactSectionRef}
+          className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs p-4 sm:p-5 space-y-4"
+        >
+          <div>
+            <h3 className="text-base font-bold text-zinc-900 dark:text-white m-0 flex items-center gap-2">
+              <Phone className="w-4.5 h-4.5 text-[#E53935]" />
+              Customer Support
+            </h3>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 m-0">
+              Have an issue with your order or questions about our menu? Get in touch directly:
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Phone Support */}
+            <a
+              href="tel:+919300990940"
+              className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-red-400 dark:hover:border-red-900 bg-zinc-50/60 dark:bg-zinc-800/30 flex items-center gap-3 transition-colors no-underline group"
+            >
+              <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-950/40 text-[#E53935] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <Phone className="w-5 h-5" />
               </div>
-              <div className="pt-4 border-t">
-                <p className="text-sm text-muted-foreground mb-3">
-                  <Clock className="h-4 w-4 inline mr-1" />
-                  Average response time: Less than 5 minutes
+              <div className="min-w-0">
+                <p className="text-[11px] text-zinc-400 font-medium m-0">Phone Support</p>
+                <p className="text-[13px] font-bold text-zinc-900 dark:text-white mt-0.5 m-0 truncate">
+                  +91 9300990940
                 </p>
               </div>
-            </CardContent>
-          </Card>
-        </ScrollReveal>
+            </a>
+
+            {/* Email Support */}
+            <a
+              href="mailto:papafoodcorporation@gmail.com"
+              className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-red-400 dark:hover:border-red-900 bg-zinc-50/60 dark:bg-zinc-800/30 flex items-center gap-3 transition-colors no-underline group"
+            >
+              <div className="w-10 h-10 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <Mail className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] text-zinc-400 font-medium m-0">Email Support</p>
+                <p className="text-[13px] font-bold text-zinc-900 dark:text-white mt-0.5 m-0 truncate">
+                  papafoodcorporation@gmail.com
+                </p>
+              </div>
+            </a>
+          </div>
+
+          <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center gap-2 text-zinc-500 dark:text-zinc-400 text-xs">
+            <Clock className="w-3.5 h-3.5 text-[#E53935] shrink-0" />
+            <span>Support Hours: 10:00 AM – 11:30 PM Everyday</span>
+          </div>
+        </div>
       </div>
     </AnimatedPage>
   )

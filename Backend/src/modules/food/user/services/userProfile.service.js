@@ -11,11 +11,35 @@ const parseIsoDateOrNull = (value) => {
     return Number.isNaN(d.getTime()) ? null : d;
 };
 
+const lastTenDigits = (value) => String(value || '').replace(/\D/g, '').slice(-10);
+
+// Profile.gender enum is MALE | FEMALE | OTHER; the DTO also accepts "prefer-not-to-say".
+const GENDER_TO_PROFILE = { male: 'MALE', female: 'FEMALE', other: 'OTHER', 'prefer-not-to-say': null };
+
+/**
+ * Single normalized view of the customer's account for the My Profile screen.
+ * Name/email live in `profiles`; the phone is the login mobile on `users`.
+ */
+const buildAccount = (user, profile) => {
+    const name = [profile?.firstName, profile?.lastName].filter(Boolean).join(' ').trim();
+    return {
+        id: String(user._id),
+        name,
+        firstName: profile?.firstName || null,
+        lastName: profile?.lastName || null,
+        email: profile?.email || null,
+        emailVerified: Boolean(user.emailVerified),
+        phone: user.mobile || profile?.phone || null,
+        profileImage: profile?.profilePhoto || null,
+        profileCompleted: Boolean(profile?.profileCompleted)
+    };
+};
+
 export const getCurrentUserProfile = async (userId) => {
     const user = await FoodUser.findById(userId).lean();
     if (!user) throw new AuthError('Profile not found');
     const profile = await Profile.findOne({ userId }).lean();
-    return { user, profile: profile || {} };
+    return { user, profile: profile || {}, account: buildAccount(user, profile) };
 };
 
 export const updateCurrentUserProfile = async (userId, body) => {
@@ -23,15 +47,19 @@ export const updateCurrentUserProfile = async (userId, body) => {
     if (!user) throw new AuthError('Profile not found');
 
     if (body.phone !== undefined) {
-        const nextPhone = String(body.phone || '').trim();
-        const currentPhone = String(user.phone || '').trim();
-        // OTP login is phone-based in this project; don't allow changing it from profile edit.
-        if (nextPhone && nextPhone !== currentPhone) {
+        // OTP login is phone-based (users.mobile); don't allow changing it from profile edit.
+        const nextPhone = lastTenDigits(body.phone);
+        if (nextPhone && nextPhone !== lastTenDigits(user.mobile)) {
             throw new ValidationError('Phone number cannot be changed');
         }
     }
 
-    if (body.name !== undefined) user.name = body.name ? String(body.name).trim() : null;
+    if (body.name !== undefined) {
+        const trimmedName = String(body.name || '').trim().replace(/\s+/g, ' ');
+        if (!trimmedName) throw new ValidationError('Name cannot be empty');
+        body.name = trimmedName;
+        user.name = trimmedName;
+    }
     let emailUpdate = undefined;
     if (body.email !== undefined) {
         emailUpdate = body.email ? String(body.email).trim().toLowerCase() : null;
@@ -55,7 +83,7 @@ export const updateCurrentUserProfile = async (userId, body) => {
         }
     }
     // ensure gender/dob match if they were provided
-    if (body.gender !== undefined) profileUpdates.gender = body.gender ? String(body.gender).trim().toUpperCase() : null;
+    if (body.gender !== undefined) profileUpdates.gender = body.gender ? (GENDER_TO_PROFILE[String(body.gender).trim().toLowerCase()] ?? null) : null;
     if (dob !== undefined) profileUpdates.dob = dob;
     
     if (body.profileImage !== undefined) profileUpdates.profilePhoto = body.profileImage ? String(body.profileImage).trim() : null;
@@ -72,32 +100,32 @@ export const updateCurrentUserProfile = async (userId, body) => {
         profileUpdates.lastName = parts.slice(1).join(' ') || null;
     }
     
-    // Auto-compute profile completion if not explicitly provided as false
-    const isComplete = Boolean(
-        profileUpdates.firstName && 
-        profileUpdates.lastName && 
-        profileUpdates.email
-    );
-    
-    if (body.profileCompleted !== undefined) {
-        profileUpdates.profileCompleted = body.profileCompleted;
-        if (body.profileCompleted && !profileUpdates.profileCompletedAt) {
-            profileUpdates.profileCompletedAt = new Date();
-        }
-    } else if (isComplete) {
-        profileUpdates.profileCompleted = true;
-        profileUpdates.profileCompletedAt = new Date();
-    }
-
     let profile = await Profile.findOne({ userId });
+    const previousEmail = profile?.email || null;
     if (!profile) {
         profile = new Profile({ userId, ...profileUpdates });
     } else {
         Object.assign(profile, profileUpdates);
     }
+
+    // A changed email has not been verified yet.
+    if (emailUpdate !== undefined && emailUpdate !== previousEmail && user.emailVerified) {
+        user.emailVerified = false;
+        await user.save();
+    }
+
+    // Completion is judged on the saved profile (not just this request's fields), and is never undone.
+    if (body.profileCompleted !== undefined) {
+        profile.profileCompleted = body.profileCompleted;
+        if (body.profileCompleted && !profile.profileCompletedAt) profile.profileCompletedAt = new Date();
+    } else if (!profile.profileCompleted && profile.firstName && profile.lastName && profile.email) {
+        profile.profileCompleted = true;
+        profile.profileCompletedAt = new Date();
+    }
     await profile.save();
 
-    return { user: user.toObject(), profile: profile.toObject() };
+    const profileObj = profile.toObject();
+    return { user: user.toObject(), profile: profileObj, account: buildAccount(user, profileObj) };
 };
 
 export const uploadCurrentUserProfileImage = async (userId, file) => {

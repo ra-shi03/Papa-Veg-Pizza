@@ -4,6 +4,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
+html {
+  scrollbar-gutter: stable;
+}
+
 :root {
   font-family: 'Poppins', sans-serif;
   --font-poppins: 'Poppins', sans-serif;

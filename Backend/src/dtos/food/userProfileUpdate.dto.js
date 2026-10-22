@@ -8,8 +8,8 @@ const isoDate = z
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (expected YYYY-MM-DD)');
 
 const schema = z.object({
-    name: z.string().max(200).nullable().optional(),
-    email: z.string().email().max(200).nullable().optional(),
+    name: z.string().trim().max(200, 'Name is too long').nullable().optional(),
+    email: z.string().trim().toLowerCase().email('Please enter a valid email address').max(200).nullable().optional(),
     phone: z.string().max(30).nullable().optional(),
     profileImage: z.string().max(2000).nullable().optional(),
     dateOfBirth: isoDate.nullable().optional(),
