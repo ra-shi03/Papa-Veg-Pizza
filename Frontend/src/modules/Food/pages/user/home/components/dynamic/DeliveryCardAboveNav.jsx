@@ -200,7 +200,7 @@ export default function DeliveryCardAboveNav({ config, isDarkMode = false }) {
 
           {/* Center Content: Title & Subtitle */}
           <div className="flex-1 min-w-0">
-            <h4 className="text-[12.5px] sm:text-[13.5px] font-bold text-zinc-900 dark:text-white leading-tight tracking-tight truncate m-0">
+            <h4 className="text-[12.5px] sm:text-[13.5px] font-semibold text-zinc-900 dark:text-white leading-tight tracking-tight truncate m-0">
               {titleText}
             </h4>
 

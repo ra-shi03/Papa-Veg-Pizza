@@ -476,7 +476,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                       alt={programName}
                       className="w-36 h-36 object-contain"
                     />
-                    <h2 className="text-lg font-bold text-zinc-900 dark:text-white mt-1 m-0">
+                    <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mt-1 m-0">
                       {rewardsConfig?.rewardsHeadline || 'Your Cheesy Rewards'}
                     </h2>
                     <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5 m-0">
@@ -493,7 +493,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                       <div className="flex-1 flex flex-col items-center justify-center py-5 px-2">
                         <PizzaPie filled={filledSlices} />
                         <p className="mt-3 m-0 text-zinc-900 dark:text-white">
-                          <span className="text-xl font-bold">{userPoints}/{pointsRequired}</span>{' '}
+                          <span className="text-xl font-semibold">{userPoints}/{pointsRequired}</span>{' '}
                           <span className="text-xs font-semibold">points</span>
                         </p>
                       </div>
@@ -501,7 +501,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                         <button
                           type="button"
                           onClick={handleNavigateMenu}
-                          className="w-full py-2.5 bg-[#EE3A43] hover:bg-[#d92d36] text-white font-bold text-[13px] rounded-lg transition-all active:scale-[0.98] cursor-pointer border-0"
+                          className="w-full py-2.5 bg-[#EE3A43] hover:bg-[#d92d36] text-white font-semibold text-[13px] rounded-lg transition-all active:scale-[0.98] cursor-pointer border-0"
                           style={{ backgroundColor: 'var(--accent-red, #EE3A43)', color: '#ffffff' }}
                         >
                           {rewardsConfig?.orderButtonText || 'Order & Get points'}
@@ -522,7 +522,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                           )}
                         </div>
                         <p className="mt-3 m-0 text-zinc-900 dark:text-white">
-                          <span className="text-xl font-bold">{availableRedemptions}</span>{' '}
+                          <span className="text-xl font-semibold">{availableRedemptions}</span>{' '}
                           <span className="text-xs text-zinc-500 dark:text-zinc-400">
                             {rewardsConfig?.freeRewardLabel || 'Free Pizza'}
                           </span>
@@ -533,7 +533,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                           type="button"
                           disabled={availableRedemptions < 1}
                           onClick={() => setIsRedeemOpen(true)}
-                          className={`w-full py-2.5 font-bold text-[13px] rounded-lg flex items-center justify-center gap-1.5 border-0 transition-all ${
+                          className={`w-full py-2.5 font-semibold text-[13px] rounded-lg flex items-center justify-center gap-1.5 border-0 transition-all ${
                             availableRedemptions < 1
                               ? 'bg-zinc-500 text-white cursor-not-allowed'
                               : 'bg-[#EE3A43] text-white cursor-pointer active:scale-[0.98]'
@@ -565,7 +565,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                       </svg>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-[15px] sm:text-base text-zinc-900 dark:text-white leading-snug">
+                      <h3 className="font-semibold text-[15px] sm:text-base text-zinc-900 dark:text-white leading-snug">
                         {rewardsConfig?.orderPointsTitle || '1 Order = 100 Points'}
                       </h3>
                       <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
@@ -596,7 +596,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                       </svg>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-[15px] sm:text-base text-zinc-900 dark:text-white leading-snug">
+                      <h3 className="font-semibold text-[15px] sm:text-base text-zinc-900 dark:text-white leading-snug">
                         {rewardsConfig?.freeItemsTitle || 'Unlock Free Items'}
                       </h3>
                       <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
@@ -609,7 +609,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                   <button
                     type="button"
                     onClick={handleEnroll}
-                    className="w-full mt-4 py-2.5 sm:py-3 bg-[#EE3A43] hover:bg-[#d92d36] text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-red-500/25 active:scale-[0.99] cursor-pointer border-0"
+                    className="w-full mt-4 py-2.5 sm:py-3 bg-[#EE3A43] hover:bg-[#d92d36] text-white font-semibold text-sm rounded-xl transition-all shadow-md shadow-red-500/25 active:scale-[0.99] cursor-pointer border-0"
                     style={{ backgroundColor: 'var(--accent-red, #EE3A43)', color: '#ffffff' }}
                   >
                     {rewardsConfig?.buttonText || 'Enroll Now'}
@@ -631,7 +631,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
 
               {/* ── How it works ── */}
               <div className="px-1 pt-1">
-                <h3 className="text-[15px] font-bold text-zinc-900 dark:text-white m-0 mb-4">
+                <h3 className="text-[15px] font-semibold text-zinc-900 dark:text-white m-0 mb-4">
                   {rewardsConfig?.howItWorksTitle || 'How it works'}
                 </h3>
                 <div>
@@ -650,7 +650,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                         )}
                       </div>
                       <div className="flex-1 min-w-0 pb-4">
-                        <p className="m-0 text-[17px] font-bold text-zinc-900 dark:text-white leading-snug">
+                        <p className="m-0 text-[17px] font-semibold text-zinc-900 dark:text-white leading-snug">
                           {step.title}{' '}
                           {step.highlight && (
                             <span style={{ color: 'var(--accent-red, #EE3A43)' }}>{step.highlight}</span>
@@ -670,7 +670,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
 
               {/* ── FAQs ── */}
               <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2xs p-4">
-                <h3 className="text-[15px] font-bold text-zinc-900 dark:text-white m-0 mb-3">
+                <h3 className="text-[15px] font-semibold text-zinc-900 dark:text-white m-0 mb-3">
                   {rewardsConfig?.faqTitle || 'Frequently Asked Questions'}
                 </h3>
                 <div className="space-y-2.5">
@@ -689,7 +689,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                   onClick={() => setIsTermsOpen((v) => !v)}
                   className="w-full flex items-center justify-between px-4 py-4 text-left cursor-pointer bg-transparent border-0"
                 >
-                  <span className="text-[15px] font-bold text-zinc-900 dark:text-white">
+                  <span className="text-[15px] font-semibold text-zinc-900 dark:text-white">
                     {rewardsConfig?.termsTitle || 'Terms & Conditions'}
                   </span>
                   <ChevronDown
@@ -700,7 +700,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                   <div className="px-4 pb-4 space-y-3">
                     {terms.map((term, i) => (
                       <div key={i} className="flex items-start gap-2.5 text-zinc-600 dark:text-zinc-300 text-xs leading-relaxed">
-                        <span className="text-zinc-400 font-bold leading-none mt-0.5 select-none shrink-0">•</span>
+                        <span className="text-zinc-400 font-semibold leading-none mt-0.5 select-none shrink-0">•</span>
                         <p className="flex-1 m-0">{term}</p>
                       </div>
                     ))}
@@ -742,7 +742,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
           <button
             type="button"
             onClick={handleEnroll}
-            className="w-full py-3 bg-[#EE3A43] hover:bg-[#d92d36] text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-red-500/25 active:scale-[0.99] cursor-pointer border-0"
+            className="w-full py-3 bg-[#EE3A43] hover:bg-[#d92d36] text-white font-semibold text-sm rounded-xl transition-all shadow-md shadow-red-500/25 active:scale-[0.99] cursor-pointer border-0"
             style={{ backgroundColor: 'var(--accent-red, #EE3A43)', color: '#ffffff' }}
           >
             {rewardsConfig?.buttonText || 'Enroll Now'}
@@ -772,7 +772,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
             style={{ backgroundColor: 'var(--secondary-off-white, #F8F6F2)', fontFamily: 'Poppins, sans-serif' }}
           >
             <div className="px-6 pt-5 pb-2 flex items-center justify-between">
-              <h3 className="text-[17px] font-bold text-zinc-900 dark:text-white tracking-tight m-0">
+              <h3 className="text-[17px] font-semibold text-zinc-900 dark:text-white tracking-tight m-0">
                 {rewardsConfig?.redeemSheetTitle || 'Choose your Free Pizza'}
               </h3>
               <button
@@ -854,7 +854,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                                 setIsSortDropdownOpen(false);
                               }}
                               className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800 ${
-                                sortBy === opt.id ? 'text-[#EE3A43] font-bold bg-zinc-50 dark:bg-zinc-800' : 'text-zinc-700 dark:text-zinc-300'
+                                sortBy === opt.id ? 'text-[#EE3A43] font-semibold bg-zinc-50 dark:bg-zinc-800' : 'text-zinc-700 dark:text-zinc-300'
                               }`}
                             >
                               <span>{opt.label}</span>
@@ -897,7 +897,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                               <span className="w-0 h-0 border-l-[3px] border-l-transparent border-r-[3px] border-r-transparent border-b-[5px] border-b-amber-800 dark:border-b-red-500" />
                             </span>
                           )}
-                          <h4 className="font-bold text-sm sm:text-[15px] text-zinc-900 dark:text-white truncate">
+                          <h4 className="font-semibold text-sm sm:text-[15px] text-zinc-900 dark:text-white truncate">
                             {prod.name}
                           </h4>
                         </div>
@@ -913,7 +913,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
 
                       <div className="flex items-center justify-between pt-2">
                         <div className="flex items-baseline gap-1.5">
-                          <span className="font-bold text-sm text-zinc-900 dark:text-white">
+                          <span className="font-semibold text-sm text-zinc-900 dark:text-white">
                             {prod.requiredPoints || rewardsConfig?.defaultPointsRequired || 600} Points
                           </span>
                           {prod.originalPrice > 0 && (
@@ -950,7 +950,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
                   setIsRedeemOpen(false);
                   handleNavigateMenu();
                 }}
-                className="w-full py-3 bg-[#EE3A43] text-white font-bold text-sm rounded-xl active:scale-[0.99] cursor-pointer border-0"
+                className="w-full py-3 bg-[#EE3A43] text-white font-semibold text-sm rounded-xl active:scale-[0.99] cursor-pointer border-0"
                 style={{ backgroundColor: 'var(--accent-red, #EE3A43)', color: '#ffffff' }}
               >
                 View Menu
@@ -987,7 +987,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
             style={{ backgroundColor: 'var(--secondary-off-white, #F8F6F2)', fontFamily: 'Poppins, sans-serif' }}
           >
             <div className="px-6 pt-5 pb-3">
-              <h3 className="text-[17px] sm:text-lg font-bold text-zinc-900 dark:text-white tracking-tight m-0">
+              <h3 className="text-[17px] sm:text-lg font-semibold text-zinc-900 dark:text-white tracking-tight m-0">
                 Terms & Conditions
               </h3>
             </div>
@@ -995,7 +995,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
             <div className="px-6 pb-6 overflow-y-auto space-y-3.5 hide-scrollbar">
               {terms.map((term, i) => (
                 <div key={i} className="flex items-start gap-2.5 text-zinc-600 dark:text-zinc-300 text-xs sm:text-[13px] leading-relaxed">
-                  <span className="text-zinc-400 font-bold text-sm leading-none mt-0.5 select-none shrink-0">•</span>
+                  <span className="text-zinc-400 font-semibold text-sm leading-none mt-0.5 select-none shrink-0">•</span>
                   <p className="flex-1 m-0">{term}</p>
                 </div>
               ))}
@@ -1018,7 +1018,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
             style={{ backgroundColor: 'var(--secondary-off-white, #F8F6F2)', fontFamily: "'Poppins', sans-serif" }}
           >
             {/* Title */}
-            <h3 className="text-lg sm:text-xl font-bold text-zinc-900 dark:text-white tracking-tight mb-2">
+            <h3 className="text-lg sm:text-xl font-semibold text-zinc-900 dark:text-white tracking-tight mb-2">
               {rewardsConfig?.quitModalTitle || `Quit ${rewardsConfig?.programName || 'Cheesy Rewards'}?`}
             </h3>
 
@@ -1033,7 +1033,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
               <button
                 type="button"
                 onClick={() => setIsQuitModalOpen(false)}
-                className="w-full py-3 px-4 rounded-xl border border-zinc-900 dark:border-zinc-300 bg-transparent text-zinc-900 dark:text-white font-bold text-sm hover:bg-black/5 dark:hover:bg-white/5 active:scale-[0.98] transition-all cursor-pointer"
+                className="w-full py-3 px-4 rounded-xl border border-zinc-900 dark:border-zinc-300 bg-transparent text-zinc-900 dark:text-white font-semibold text-sm hover:bg-black/5 dark:hover:bg-white/5 active:scale-[0.98] transition-all cursor-pointer"
               >
                 {rewardsConfig?.quitStayButtonText || 'Stay'}
               </button>
@@ -1042,7 +1042,7 @@ export default function RewardsWalletView({ onBack, initialTab = 'rewards', rewa
               <button
                 type="button"
                 onClick={handleQuitProgram}
-                className="w-full py-3 px-4 rounded-xl bg-[#EE3A43] hover:bg-[#d92d36] text-white font-bold text-sm shadow-md shadow-red-500/20 active:scale-[0.98] transition-all cursor-pointer border-0"
+                className="w-full py-3 px-4 rounded-xl bg-[#EE3A43] hover:bg-[#d92d36] text-white font-semibold text-sm shadow-md shadow-red-500/20 active:scale-[0.98] transition-all cursor-pointer border-0"
                 style={{ backgroundColor: 'var(--accent-red, #EE3A43)', color: '#ffffff' }}
               >
                 {rewardsConfig?.quitConfirmButtonText || 'Quit Anyway'}

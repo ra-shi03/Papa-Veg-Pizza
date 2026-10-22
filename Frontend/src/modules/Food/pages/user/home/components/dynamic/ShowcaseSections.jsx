@@ -361,11 +361,11 @@ export function ShowcaseSections({ onAddToCart, triggerToast, isDarkMode }) {
                     />
                   </div>
                 ) : section.badgeText ? (
-                  <span className="font-extrabold text-xs sm:text-[13px] tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#EE3A43] to-[#C8232C]">
+                  <span className="font-semibold text-xs sm:text-[13px] tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#EE3A43] to-[#C8232C]">
                     {toTitleCase(section.badgeText)}
                   </span>
                 ) : (
-                  <span className="font-extrabold text-xs tracking-tight text-[#EE3A43]">
+                  <span className="font-semibold text-xs tracking-tight text-[#EE3A43]">
                     {toTitleCase(section.name)}
                   </span>
                 )}
@@ -374,7 +374,7 @@ export function ShowcaseSections({ onAddToCart, triggerToast, isDarkMode }) {
               </div>
 
               {/* Title - First Letter Uppercase, Rest Lowercase in Each Word */}
-              <h2 className="text-[17px] sm:text-[19px] font-bold tracking-tight text-zinc-900 dark:text-white leading-tight m-0">
+              <h2 className="text-[17px] sm:text-[19px] font-semibold tracking-tight text-zinc-900 dark:text-white leading-tight m-0">
                 {toTitleCase(section.title)}
               </h2>
 
@@ -415,17 +415,17 @@ export function ShowcaseSections({ onAddToCart, triggerToast, isDarkMode }) {
                     {/* Top Badges - dynamic from superadmin / product (Matching Menu Page) */}
                     <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between z-10 pointer-events-none">
                       {Boolean(product.badge && product.badge.trim()) ? (
-                        <span className="bg-[#E53935] text-white text-[9px] font-bold px-2.5 py-0.5 rounded-full tracking-wider shadow-sm">
+                        <span className="bg-[#E53935] text-white text-[9px] font-semibold px-2.5 py-0.5 rounded-full tracking-wider shadow-sm">
                           {toTitleCase(product.badge)}
                         </span>
                       ) : <span />}
 
                       {Boolean(product.saveText && product.saveText.trim()) ? (
-                        <span className="bg-[#169B45] text-white text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded shadow-sm">
+                        <span className="bg-[#169B45] text-white text-[9px] sm:text-[10px] font-semibold px-2 py-0.5 rounded shadow-sm">
                           {toTitleCase(product.saveText)}
                         </span>
                       ) : hasDiscount && saveAmount > 0 ? (
-                        <span className="bg-[#169B45] text-white text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded shadow-sm">
+                        <span className="bg-[#169B45] text-white text-[9px] sm:text-[10px] font-semibold px-2 py-0.5 rounded shadow-sm">
                           Save ₹{saveAmount}
                         </span>
                       ) : null}
@@ -438,7 +438,7 @@ export function ShowcaseSections({ onAddToCart, triggerToast, isDarkMode }) {
                         <span className="w-3.5 h-3.5 border-[1.5px] border-[#00C853] flex items-center justify-center shrink-0">
                           <span className="w-1.5 h-1.5 rounded-full bg-[#00C853]"></span>
                         </span>
-                        <h3 className="text-white text-sm sm:text-base font-bold leading-snug truncate drop-shadow-md font-['Poppins',sans-serif] m-0">
+                        <h3 className="text-white text-sm sm:text-base font-semibold leading-snug truncate drop-shadow-md font-['Poppins',sans-serif] m-0">
                           {toTitleCase(product.title)}
                         </h3>
                       </div>
@@ -455,7 +455,7 @@ export function ShowcaseSections({ onAddToCart, triggerToast, isDarkMode }) {
                         <div className="flex flex-col gap-0.5 min-w-0">
                           {/* Price, Strikethrough MRP, and Green Save Tag */}
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-white font-bold text-base sm:text-lg font-['Poppins',sans-serif] drop-shadow-sm leading-none">
+                            <span className="text-white font-semibold text-base sm:text-lg font-['Poppins',sans-serif] drop-shadow-sm leading-none">
                               ₹{product.price}
                             </span>
                             {hasDiscount && (
@@ -479,10 +479,10 @@ export function ShowcaseSections({ onAddToCart, triggerToast, isDarkMode }) {
                             e.stopPropagation();
                             handleActionClick(product);
                           }}
-                          className="shrink-0 h-9 sm:h-10 px-4 sm:px-5 bg-[var(--accent-red,#EE3A43)] hover:opacity-95 active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-lg shadow-[var(--accent-red,#EE3A43)]/30 cursor-pointer flex items-center gap-1.5 select-none font-['Poppins',sans-serif] border-0"
+                          className="shrink-0 h-9 sm:h-10 px-4 sm:px-5 bg-[var(--accent-red,#EE3A43)] hover:opacity-95 active:scale-95 text-white font-semibold text-xs sm:text-sm rounded-xl transition-all shadow-lg shadow-[var(--accent-red,#EE3A43)]/30 cursor-pointer flex items-center gap-1.5 select-none font-['Poppins',sans-serif] border-0"
                         >
                           <span>{toTitleCase(product.buttonText || 'Add')}</span>
-                          <span className="text-base leading-none font-bold">+</span>
+                          <span className="text-base leading-none font-semibold">+</span>
                         </button>
                       </div>
                     </div>

@@ -29,7 +29,7 @@ export function OfferCard({ offer, onActionClick, isDarkMode }) {
         </div>
         
         <div className="flex flex-col flex-1 min-w-0 justify-center">
-          <h4 className="font-bold text-[12px] sm:text-[13px] leading-tight m-0 line-clamp-1">
+          <h4 className="font-semibold text-[12px] sm:text-[13px] leading-tight m-0 line-clamp-1">
             {offer.title}
           </h4>
           {offer.subtitle && (
@@ -43,7 +43,7 @@ export function OfferCard({ offer, onActionClick, isDarkMode }) {
       <div className="flex justify-end shrink-0 pl-2">
         <button
           onClick={() => onActionClick(offer)}
-          className="border border-primary text-primary rounded-md px-3 py-1 text-[11px] font-bold active:scale-95 transition-transform whitespace-nowrap bg-primary/5 hover:bg-primary/10"
+          className="border border-primary text-primary rounded-md px-3 py-1 text-[11px] font-semibold active:scale-95 transition-transform whitespace-nowrap bg-primary/5 hover:bg-primary/10"
           aria-label={`View offer: ${offer.title}`}
         >
           {offer.buttonText || 'View'}
@@ -63,7 +63,7 @@ export function OfferSection({ offers = [], isLoading = false, onActionClick, is
     <section className="mt-4 mb-2">
       <div className="px-2 sm:px-3 mb-3">
         <h3
-          className="font-headline-lg-mobile font-bold text-[16px]"
+          className="font-headline-lg-mobile font-semibold text-[16px]"
           style={{ color: isDarkMode ? '#fff' : 'var(--primary-gray)', margin: 0 }}
         >
           Offers for you

@@ -86,7 +86,7 @@ export function BottomNavBar({
           >
             {/* Optional Top Badge (e.g. "NEW" from screenshot) */}
             {item.badge && (
-              <span className="absolute -top-1 left-1/2 -translate-x-1/2 bg-[#E53935] text-white text-[7.5px] font-black px-1.5 py-[1px] rounded-full uppercase tracking-tighter shadow-2xs leading-none z-10 scale-90">
+              <span className="absolute -top-1 left-1/2 -translate-x-1/2 bg-[#E53935] text-white text-[7.5px] font-semibold px-1.5 py-[1px] rounded-full uppercase tracking-tighter shadow-2xs leading-none z-10 scale-90">
                 {item.badge}
               </span>
             )}
@@ -103,7 +103,7 @@ export function BottomNavBar({
                 <span 
                   className={`material-symbols-outlined text-[24px] transition-colors ${
                     isCurrentActive 
-                      ? 'text-[#E53935] dark:text-[#E53935] font-bold' 
+                      ? 'text-[#E53935] dark:text-[#E53935] font-semibold' 
                       : 'text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-200'
                   }`}
                   style={isCurrentActive ? { fontVariationSettings: "'FILL' 1" } : { fontVariationSettings: "'FILL' 0" }}
@@ -114,7 +114,7 @@ export function BottomNavBar({
 
               {/* Shopping / Cart count badge */}
               {showCartBadge && (
-                <div className="absolute -top-1.5 -right-2 w-4 h-4 bg-[#E53935] text-white rounded-full text-[9px] font-black flex items-center justify-center border-2 border-white dark:border-[#121212] shadow-xs animate-scale-in">
+                <div className="absolute -top-1.5 -right-2 w-4 h-4 bg-[#E53935] text-white rounded-full text-[9px] font-semibold flex items-center justify-center border-2 border-white dark:border-[#121212] shadow-xs animate-scale-in">
                   {totalCartCount}
                 </div>
               )}
@@ -124,7 +124,7 @@ export function BottomNavBar({
             <span 
               className={`text-[10px] tracking-tight mt-1 transition-colors leading-none truncate max-w-[64px] ${
                 isCurrentActive 
-                  ? 'font-bold text-[#E53935] dark:text-[#E53935]' 
+                  ? 'font-semibold text-[#E53935] dark:text-[#E53935]' 
                   : 'font-medium text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-200'
               }`}
             >

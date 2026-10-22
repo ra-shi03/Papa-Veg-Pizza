@@ -21,14 +21,14 @@ export const InCarModal = ({ showCarModal, setShowCarModal, carNumber, setCarNum
 
         {/* Input field */}
         <div className="space-y-1.5">
-          <span className="text-[10px] uppercase opacity-50 font-bold tracking-wider text-white">Car Number</span>
+          <span className="text-[10px] uppercase opacity-50 font-semibold tracking-wider text-white">Car Number</span>
           <div className="relative">
             <input
               type="text"
               placeholder="e.g. DL 3C AB 1234"
               value={carNumber}
               onChange={(e) => setCarNumber(e.target.value)}
-              className="w-full h-11 bg-white/5 border border-white/10 rounded-xl px-4 text-xs font-bold text-white outline-none"
+              className="w-full h-11 bg-white/5 border border-white/10 rounded-xl px-4 text-xs font-semibold text-white outline-none"
             />
             <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-white/50 text-sm">
               directions_car
@@ -52,7 +52,7 @@ export const InCarModal = ({ showCarModal, setShowCarModal, carNumber, setCarNum
             setShowCarModal(false)
             triggerToast("Car details confirmed!")
           }}
-          className="w-full h-11 bg-primary text-on-primary font-bold rounded-xl text-xs uppercase cursor-pointer border-0 shadow-lg active:scale-95 transition-all"
+          className="w-full h-11 bg-primary text-on-primary font-semibold rounded-xl text-xs uppercase cursor-pointer border-0 shadow-lg active:scale-95 transition-all"
         >
           Confirm Vehicle
         </button>

@@ -178,7 +178,7 @@ export function PapaVegPromiseSection({ isDarkMode }) {
           {isPricing ? (
             /* Scalloped Rupee Medallion matching screenshot */
             <div className="relative w-12 h-12 rounded-full bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 flex items-center justify-center shadow-md">
-              <span className="text-white font-black text-xl leading-none">₹</span>
+              <span className="text-white font-semibold text-xl leading-none">₹</span>
               <div className="absolute -bottom-1 -left-0.5 w-3 h-3 bg-amber-600 rotate-45 rounded-xs" />
               <div className="absolute -bottom-1 -right-0.5 w-3 h-3 bg-amber-600 rotate-45 rounded-xs" />
             </div>
@@ -203,7 +203,7 @@ export function PapaVegPromiseSection({ isDarkMode }) {
       {/* ── Section Header (Brand Theme) ── */}
       <div className="px-2 sm:px-3 mb-3">
         <div className="flex items-center gap-1.5">
-          <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[var(--accent-red,#EE3A43)] leading-tight m-0">
+          <h2 className="text-lg sm:text-xl font-semibold tracking-tight text-[var(--accent-red,#EE3A43)] leading-tight m-0">
             {headerTitle}
           </h2>
           <span className="text-amber-400 text-base select-none">✨</span>
@@ -228,7 +228,7 @@ export function PapaVegPromiseSection({ isDarkMode }) {
           >
             {/* Top Amber Pill Badge */}
             <div className="w-full flex justify-center">
-              <span className="inline-block bg-amber-100/80 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 font-black text-[9px] px-3 py-1 rounded-full uppercase tracking-wider shadow-2xs">
+              <span className="inline-block bg-amber-100/80 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 font-semibold text-[9px] px-3 py-1 rounded-full uppercase tracking-wider shadow-2xs">
                 {item.badge || 'ONLY ON PAPA VEG PIZZA APP!'}
               </span>
             </div>
@@ -238,7 +238,7 @@ export function PapaVegPromiseSection({ isDarkMode }) {
 
             {/* Content Details */}
             <div className="w-full mt-1">
-              <h3 className="text-sm sm:text-[15px] font-bold text-zinc-900 dark:text-white leading-snug truncate m-0 font-['Poppins',sans-serif]">
+              <h3 className="text-sm sm:text-[15px] font-semibold text-zinc-900 dark:text-white leading-snug truncate m-0 font-['Poppins',sans-serif]">
                 {item.title}
               </h3>
               <p className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 font-normal mt-1 leading-relaxed line-clamp-2 m-0 font-['Poppins',sans-serif]">
@@ -249,7 +249,7 @@ export function PapaVegPromiseSection({ isDarkMode }) {
             {/* Action Link: Know More */}
             <div className="w-full mt-3 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/80 flex items-center justify-center">
               <span 
-                className="text-[var(--accent-red,#EE3A43)] font-bold text-xs underline underline-offset-4 decoration-dotted decoration-[var(--accent-red,#EE3A43)]/60 group-hover:decoration-solid flex items-center gap-1 transition-all"
+                className="text-[var(--accent-red,#EE3A43)] font-semibold text-xs underline underline-offset-4 decoration-dotted decoration-[var(--accent-red,#EE3A43)]/60 group-hover:decoration-solid flex items-center gap-1 transition-all"
               >
                 Know More
               </span>

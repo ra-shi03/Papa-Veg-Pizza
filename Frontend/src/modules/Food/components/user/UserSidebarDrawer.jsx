@@ -149,7 +149,7 @@ export default function UserSidebarDrawer({
 
                 {/* Name & Phone Number */}
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-bold text-sm truncate leading-snug text-zinc-900 dark:text-white group-hover:text-[#E53935] transition-colors">
+                  <h3 className="font-semibold text-sm truncate leading-snug text-zinc-900 dark:text-white group-hover:text-[#E53935] transition-colors">
                     {displayName}
                   </h3>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium truncate mt-0.5">
@@ -162,7 +162,7 @@ export default function UserSidebarDrawer({
               <button
                 type="button"
                 onClick={handleEditProfile}
-                className="text-xs font-bold text-[#E53935] hover:text-[#D32F2F] hover:underline cursor-pointer ml-2 px-1 py-0.5 border-0 bg-transparent shrink-0"
+                className="text-xs font-semibold text-[#E53935] hover:text-[#D32F2F] hover:underline cursor-pointer ml-2 px-1 py-0.5 border-0 bg-transparent shrink-0"
               >
                 Edit
               </button>
@@ -240,7 +240,7 @@ export default function UserSidebarDrawer({
                     </span>
                   </div>
                   {/* Badge matching app theme color */}
-                  <span className="bg-[#E53935] text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shadow-2xs shrink-0">
+                  <span className="bg-[#E53935] text-white text-[9px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-2xs shrink-0">
                     New
                   </span>
                 </button>
@@ -360,7 +360,7 @@ export default function UserSidebarDrawer({
                     <span className="material-symbols-outlined text-[22px] text-[#E53935] shrink-0">
                       logout
                     </span>
-                    <span className="text-sm font-bold text-[#E53935]">
+                    <span className="text-sm font-semibold text-[#E53935]">
                       Log Out
                     </span>
                   </button>
@@ -393,7 +393,7 @@ export default function UserSidebarDrawer({
                     <span className="w-8 h-8 rounded-full bg-red-50 dark:bg-red-950/40 text-[#E53935] flex items-center justify-center">
                       <span className="material-symbols-outlined text-[20px]">groups</span>
                     </span>
-                    <h3 className="font-bold text-base text-zinc-900 dark:text-white">
+                    <h3 className="font-semibold text-base text-zinc-900 dark:text-white">
                       Bulk & Party Orders
                     </h3>
                   </div>
@@ -412,7 +412,7 @@ export default function UserSidebarDrawer({
                 <div className="space-y-2 pt-2">
                   <a
                     href="tel:+919300990940"
-                    className="w-full py-2.5 px-4 bg-[#E53935] hover:bg-[#D32F2F] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-95 no-underline"
+                    className="w-full py-2.5 px-4 bg-[#E53935] hover:bg-[#D32F2F] text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-95 no-underline"
                   >
                     <Phone size={15} />
                     <span>Call Catering Desk (+91 9300990940)</span>
@@ -422,7 +422,7 @@ export default function UserSidebarDrawer({
                     href="https://wa.me/919300990940?text=Hello%20Papa%20Veg%20Pizza%2C%20I%20want%20to%20inquire%20about%20a%20Bulk%20Party%20Order"
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-95 no-underline"
+                    className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-95 no-underline"
                   >
                     <MessageCircle size={15} />
                     <span>Chat on WhatsApp</span>

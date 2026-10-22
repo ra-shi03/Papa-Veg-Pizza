@@ -175,10 +175,10 @@ export function HomeHeader({
                     boxShadow: 'none'
                   }}
                 >
-                  <span style={{ fontSize: 16, fontWeight: 900, color: '#FFFFFF', fontFamily: 'Poppins,sans-serif', lineHeight: 1 }}>
+                  <span style={{ fontSize: 16, fontWeight: 600, color: '#FFFFFF', fontFamily: 'Poppins,sans-serif', lineHeight: 1 }}>
                     {deliveryTime ?? 30}
                   </span>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.7)', fontFamily: 'Poppins,sans-serif', textTransform: 'uppercase', letterSpacing: '0.02em', marginTop: 2 }}>
+                  <span style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.7)', fontFamily: 'Poppins,sans-serif', textTransform: 'uppercase', letterSpacing: '0.02em', marginTop: 2 }}>
                     {deliveryLabel || 'mins'}
                   </span>
                 </motion.div>
@@ -192,7 +192,7 @@ export function HomeHeader({
                 >
                   <div className="flex items-center gap-1">
                     <span style={{ fontSize: 14, fontWeight: 600, color: '#FFFFFF', fontFamily: 'Poppins,sans-serif' }}>Delivery at</span>
-                    <span className="truncate" style={{ fontSize: 14, fontWeight: 800, color: '#FFFFFF', fontFamily: 'Poppins,sans-serif' }}>
+                    <span className="truncate" style={{ fontSize: 14, fontWeight: 600, color: '#FFFFFF', fontFamily: 'Poppins,sans-serif' }}>
                       Home
                     </span>
                     <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#FFFFFF' }}>expand_more</span>
@@ -245,7 +245,7 @@ export function HomeHeader({
                     : '/user/auth/login';
                   navigate(target, { state: { from: window.location.pathname } });
                 }}
-                className="shrink-0 px-4 py-2 rounded-xl bg-[#C62828] hover:bg-[#B71C1C] text-white font-extrabold text-xs uppercase tracking-wider shadow-sm active:scale-95 transition-all cursor-pointer border-0"
+                className="shrink-0 px-4 py-2 rounded-xl bg-[#C62828] hover:bg-[#B71C1C] text-white font-semibold text-xs uppercase tracking-wider shadow-sm active:scale-95 transition-all cursor-pointer border-0"
               >
                 LOGIN
               </button>
@@ -303,12 +303,12 @@ export function HomeHeader({
                             animate={{ y: 0, opacity: 1 }}
                             exit={{ y: -20, opacity: 0 }}
                             transition={{ duration: 0.3 }}
-                            className="font-bold text-gray-700 truncate absolute left-0"
+                            className="font-semibold text-gray-700 truncate absolute left-0"
                           >
                             {categories[currentCatIndex]?.label || categories[currentCatIndex]?.name || 'Pizza'}
                           </motion.span>
                         ) : (
-                          <span className="font-bold text-gray-700 truncate absolute left-0">Pizza</span>
+                          <span className="font-semibold text-gray-700 truncate absolute left-0">Pizza</span>
                         )}
                       </AnimatePresence>
                     </div>
@@ -339,7 +339,7 @@ export function HomeHeader({
                   </span>
                   <span className="flex flex-col text-left shrink-0" style={{ lineHeight: 1.1 }}>
                     <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--primary-gray)', fontFamily: 'Poppins,sans-serif' }}>Deliver</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary-gray)', fontFamily: 'Poppins,sans-serif' }}>on Train</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary-gray)', fontFamily: 'Poppins,sans-serif' }}>on Train</span>
                   </span>
                 </motion.button>
               )}

@@ -54,7 +54,7 @@ function OfferCard({ offer, onClaimOffer, isDarkMode }) {
               background: 'var(--accent-red)',
               color: '#fff',
               fontSize: 9,
-              fontWeight: 800,
+              fontWeight: 600,
               fontFamily: 'Poppins,sans-serif',
               textTransform: 'uppercase',
               letterSpacing: '0.06em',
@@ -88,7 +88,7 @@ function OfferCard({ offer, onClaimOffer, isDarkMode }) {
         <h4
           style={{
             fontSize: 13,
-            fontWeight: 700,
+            fontWeight: 600,
             fontFamily: 'Poppins,sans-serif',
             color: titleColor,
             lineHeight: 1.3,
@@ -176,7 +176,7 @@ function OfferCard({ offer, onClaimOffer, isDarkMode }) {
               border: 'none',
               borderRadius: 10,
               fontSize: 11,
-              fontWeight: 700,
+              fontWeight: 600,
               fontFamily: 'Poppins,sans-serif',
               letterSpacing: '0.05em',
               textTransform: 'uppercase',
@@ -293,7 +293,7 @@ export function HomeSections({
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 4 }}>
                         <h4
                           style={{
-                            fontSize: 11, fontWeight: 700,
+                            fontSize: 11, fontWeight: 600,
                             fontFamily: 'Poppins,sans-serif',
                             color: isDarkMode ? '#f5f5f5' : 'var(--primary-gray)',
                             lineHeight: 1.3, margin: 0,
@@ -309,7 +309,7 @@ export function HomeSections({
                           >
                             star
                           </span>
-                          <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--muted-gray)', fontFamily: 'Poppins,sans-serif' }}>
+                          <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--muted-gray)', fontFamily: 'Poppins,sans-serif' }}>
                             {product.rating}
                           </span>
                         </div>
@@ -327,7 +327,7 @@ export function HomeSections({
                       </p>
 
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent-red)', fontFamily: 'Poppins,sans-serif' }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-red)', fontFamily: 'Poppins,sans-serif' }}>
                           ₹{product.price}
                         </span>
                         <button
@@ -336,7 +336,7 @@ export function HomeSections({
                             height: 26, padding: '0 12px',
                             background: 'var(--accent-red)',
                             color: '#fff', border: 'none', outline: 'none',
-                            borderRadius: 999, fontSize: 10, fontWeight: 700,
+                            borderRadius: 999, fontSize: 10, fontWeight: 600,
                             fontFamily: 'Poppins,sans-serif',
                             letterSpacing: '0.04em', textTransform: 'uppercase',
                             cursor: 'pointer'

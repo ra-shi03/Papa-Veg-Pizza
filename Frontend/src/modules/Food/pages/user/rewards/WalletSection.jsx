@@ -147,7 +147,7 @@ export default function WalletSection({ isEnrolled: propIsEnrolled, onEnroll, re
 
   const faqList = walletFaqs.length > 0 && (
     <div className="mt-6">
-      <h3 className="text-[15px] font-bold text-zinc-900 dark:text-white mb-3 px-1">
+      <h3 className="text-[15px] font-semibold text-zinc-900 dark:text-white mb-3 px-1">
         {cfg.faqTitle || "Frequently Asked Questions"}
       </h3>
       <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-150 dark:border-zinc-800 shadow-2xs p-3 space-y-2.5">
@@ -177,7 +177,7 @@ export default function WalletSection({ isEnrolled: propIsEnrolled, onEnroll, re
           <div className="w-14 h-14 mx-auto rounded-full bg-red-50 dark:bg-red-950/40 flex items-center justify-center text-[var(--accent-red,#EE3A43)] mb-4">
             <Award className="w-7 h-7" />
           </div>
-          <h3 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white">
+          <h3 className="text-base sm:text-lg font-semibold text-zinc-900 dark:text-white">
             Enroll to Activate Your Wallet
           </h3>
           <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-2 max-w-xs mx-auto leading-relaxed">
@@ -186,7 +186,7 @@ export default function WalletSection({ isEnrolled: propIsEnrolled, onEnroll, re
           <button
             type="button"
             onClick={handleEnrollClick}
-            className="w-full mt-6 py-3 bg-[#EE3A43] hover:bg-[#d92d36] text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-red-500/25 active:scale-[0.99] cursor-pointer border-0"
+            className="w-full mt-6 py-3 bg-[#EE3A43] hover:bg-[#d92d36] text-white font-semibold text-sm rounded-xl transition-all shadow-md shadow-red-500/25 active:scale-[0.99] cursor-pointer border-0"
             style={{ backgroundColor: "var(--accent-red, #EE3A43)", color: "#ffffff" }}
           >
             {cfg.buttonText || "Enroll Now"}
@@ -207,7 +207,7 @@ export default function WalletSection({ isEnrolled: propIsEnrolled, onEnroll, re
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-end gap-2">
-              <span className="text-5xl font-bold leading-none">{balanceText}</span>
+              <span className="text-5xl font-semibold leading-none">{balanceText}</span>
               <span className="mb-1 px-2.5 py-0.5 rounded-full bg-white/90 text-[12px] font-semibold text-[var(--accent-red,#EE3A43)]">
                 {pointsLabel}
               </span>
@@ -236,12 +236,12 @@ export default function WalletSection({ isEnrolled: propIsEnrolled, onEnroll, re
           <RotateCcw className="w-6 h-6" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-[15px] text-zinc-900 dark:text-white">{refundTitle}</p>
+          <p className="font-semibold text-[15px] text-zinc-900 dark:text-white">{refundTitle}</p>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 leading-snug">
             {cfg.refundCardSubtitle || "Use this to pay for your next order. Unrestricted Usage."}
           </p>
         </div>
-        <span className="font-bold text-base text-zinc-900 dark:text-white">{balanceText}</span>
+        <span className="font-semibold text-base text-zinc-900 dark:text-white">{balanceText}</span>
         <ChevronRight className="w-4 h-4 text-zinc-400 shrink-0" />
       </button>
 
@@ -266,7 +266,7 @@ export default function WalletSection({ isEnrolled: propIsEnrolled, onEnroll, re
               <div className="flex items-center justify-between gap-3 pl-1">
                 <div className="min-w-0">
                   <div className="flex items-end gap-2">
-                    <span className="text-4xl font-bold leading-none">{balanceText}</span>
+                    <span className="text-4xl font-semibold leading-none">{balanceText}</span>
                     <span className="mb-0.5 px-2.5 py-0.5 rounded-full bg-white/90 text-[12px] font-semibold text-[var(--accent-red,#EE3A43)]">
                       {pointsLabel}
                     </span>
@@ -305,7 +305,7 @@ export default function WalletSection({ isEnrolled: propIsEnrolled, onEnroll, re
                     className="flex items-start justify-between py-4 border-b border-zinc-200 dark:border-zinc-800"
                   >
                     <div className="min-w-0 pr-2">
-                      <p className="font-bold text-[15px] text-zinc-800 dark:text-zinc-100 m-0">
+                      <p className="font-semibold text-[15px] text-zinc-800 dark:text-zinc-100 m-0">
                         {formatRowDate(tx.createdAt || tx.date)}
                       </p>
                       {tx.description && (
@@ -319,7 +319,7 @@ export default function WalletSection({ isEnrolled: propIsEnrolled, onEnroll, re
                       <div className="w-20 text-center">
                         {isEarned ? (
                           <>
-                            <span className="font-bold text-[15px] text-green-600 dark:text-green-500">+ {amount}</span>
+                            <span className="font-semibold text-[15px] text-green-600 dark:text-green-500">+ {amount}</span>
                             {expiryDate && (
                               <p className="text-[11px] text-zinc-400 mt-0.5 leading-tight m-0">
                                 Exp : {formatRowDate(expiryDate)}
@@ -327,14 +327,14 @@ export default function WalletSection({ isEnrolled: propIsEnrolled, onEnroll, re
                             )}
                           </>
                         ) : (
-                          <span className="font-bold text-lg text-green-600 dark:text-green-500 leading-none">-</span>
+                          <span className="font-semibold text-lg text-green-600 dark:text-green-500 leading-none">-</span>
                         )}
                       </div>
                       <div className="w-20 text-center">
                         {isUsed ? (
-                          <span className="font-bold text-[15px] text-red-700 dark:text-red-500">- {amount}</span>
+                          <span className="font-semibold text-[15px] text-red-700 dark:text-red-500">- {amount}</span>
                         ) : (
-                          <span className="font-bold text-lg text-red-700 dark:text-red-500 leading-none">-</span>
+                          <span className="font-semibold text-lg text-red-700 dark:text-red-500 leading-none">-</span>
                         )}
                       </div>
                     </div>

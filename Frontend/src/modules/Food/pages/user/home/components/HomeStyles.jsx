@@ -47,9 +47,9 @@ export const HomeStyles = ({ isDarkMode }) => (
       .font-body-md, .font-label-sm, .font-price-xl {
         font-family: 'Poppins', sans-serif !important;
       }
-      .font-headline-lg-mobile { font-size: 20px !important; font-weight: 700 !important; line-height: 1.3 !important; }
+      .font-headline-lg-mobile { font-size: 20px !important; font-weight: 600 !important; line-height: 1.3 !important; }
       .font-label-sm           { font-size: 12px !important; font-weight: 600 !important; letter-spacing: 0.04em !important; }
-      .font-price-xl           { font-size: 22px !important; font-weight: 700 !important; }
+      .font-price-xl           { font-size: 22px !important; font-weight: 600 !important; }
 
       /* ── Spacing ── */
       .px-margin-mobile { padding-left: 20px !important; padding-right: 20px !important; }

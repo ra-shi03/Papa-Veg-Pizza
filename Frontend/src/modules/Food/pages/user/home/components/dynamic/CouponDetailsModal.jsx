@@ -160,7 +160,7 @@ export function CouponDetailsModal({ offer, isOpen, onClose, onApply, isDarkMode
               ) : (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-50 dark:bg-red-950/40 text-[var(--accent-red,#EE3A43)]">
                   <span className="material-symbols-outlined text-[18px]">local_pizza</span>
-                  <span className="text-xs font-bold tracking-tight">Papa Veg Pizza</span>
+                  <span className="text-xs font-semibold tracking-tight">Papa Veg Pizza</span>
                 </div>
               )}
             </div>
@@ -176,7 +176,7 @@ export function CouponDetailsModal({ offer, isOpen, onClose, onApply, isDarkMode
           {/* Body Content */}
           <div className="flex-1 overflow-y-auto px-5 py-4 hide-scrollbar">
             {/* Title & Subtitle */}
-            <h3 className="font-bold text-lg sm:text-[19px] text-zinc-900 dark:text-white leading-tight m-0">
+            <h3 className="font-semibold text-lg sm:text-[19px] text-zinc-900 dark:text-white leading-tight m-0">
               {offer.title}
             </h3>
             <p className={`text-xs mt-1.5 leading-relaxed ${isDarkMode ? 'text-zinc-400' : 'text-zinc-500'}`}>
@@ -191,7 +191,7 @@ export function CouponDetailsModal({ offer, isOpen, onClose, onApply, isDarkMode
             }`}>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium">Coupon Code:</span>
-                <span className="text-sm font-bold font-mono tracking-widest text-[var(--accent-red,#EE3A43)]">
+                <span className="text-sm font-semibold font-mono tracking-widest text-[var(--accent-red,#EE3A43)]">
                   {code}
                 </span>
               </div>
@@ -211,7 +211,7 @@ export function CouponDetailsModal({ offer, isOpen, onClose, onApply, isDarkMode
             <div className={`border-t my-4 ${isDarkMode ? 'border-white/10' : 'border-zinc-100'}`} />
 
             {/* Offer Details Section Header */}
-            <h4 className="font-bold text-sm text-zinc-900 dark:text-white mb-3 tracking-tight">
+            <h4 className="font-semibold text-sm text-zinc-900 dark:text-white mb-3 tracking-tight">
               Offer Details::
             </h4>
             

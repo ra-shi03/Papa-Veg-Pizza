@@ -290,7 +290,7 @@ export default function ProductCustomizeModal({
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 block" />
             </span>
             <div className="min-w-0">
-              <h3 className="font-bold text-base text-zinc-900 dark:text-white truncate">
+              <h3 className="font-semibold text-base text-zinc-900 dark:text-white truncate">
                 {itemTitle}
               </h3>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 line-clamp-1 font-medium">
@@ -314,7 +314,7 @@ export default function ProductCustomizeModal({
           {/* 1. Change Size Section (Reference Image 3: side-by-side selectable cards with checkmarks & discounts) */}
           {parsedSizes.length > 0 && (
             <div>
-              <h4 className="text-sm font-bold text-zinc-900 dark:text-white mb-2.5">
+              <h4 className="text-sm font-semibold text-zinc-900 dark:text-white mb-2.5">
                 Change Size
               </h4>
               <div className={`grid ${parsedSizes.length > 2 ? 'grid-cols-3' : 'grid-cols-2'} gap-2.5`}>
@@ -340,11 +340,11 @@ export default function ProductCustomizeModal({
                         </div>
                       )}
                       <div>
-                        <div className="font-bold text-sm text-zinc-900 dark:text-white">
+                        <div className="font-semibold text-sm text-zinc-900 dark:text-white">
                           {sizeObj.name}
                         </div>
                         <div className="flex items-baseline gap-1.5 mt-1 flex-wrap">
-                          <span className="font-bold text-sm text-zinc-900 dark:text-zinc-100">
+                          <span className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
                             ₹{sizeObj.price}
                           </span>
                           {hasDiscount && (
@@ -354,7 +354,7 @@ export default function ProductCustomizeModal({
                           )}
                         </div>
                         {hasDiscount && savings > 0 && (
-                          <span className="inline-block mt-1 bg-[#169B45] text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-2xs">
+                          <span className="inline-block mt-1 bg-[#169B45] text-white text-[9px] font-semibold px-1.5 py-0.5 rounded shadow-2xs">
                             Save ₹{savings}
                           </span>
                         )}
@@ -372,7 +372,7 @@ export default function ProductCustomizeModal({
           {/* 2. Change Crust Section (Image 3: crust cards with image, desc, size-based price and checkmark) */}
           {currentItemCrusts.length > 0 && (
             <div>
-              <h4 className="text-sm font-bold text-zinc-900 dark:text-white mb-2.5">
+              <h4 className="text-sm font-semibold text-zinc-900 dark:text-white mb-2.5">
                 Change Crust
               </h4>
               <div className="space-y-2.5">
@@ -398,7 +398,7 @@ export default function ProductCustomizeModal({
                         loading="lazy"
                       />
                       <div className="flex-1 min-w-0 pr-4">
-                        <div className="font-bold text-xs text-zinc-900 dark:text-white truncate">
+                        <div className="font-semibold text-xs text-zinc-900 dark:text-white truncate">
                           {crust.name}
                         </div>
                         <div className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 leading-tight line-clamp-1">
@@ -411,7 +411,7 @@ export default function ProductCustomizeModal({
                             <Check size={12} strokeWidth={3} />
                           </div>
                         )}
-                        <span className="font-bold text-xs text-zinc-800 dark:text-zinc-200">
+                        <span className="font-semibold text-xs text-zinc-800 dark:text-zinc-200">
                           {crustPrice > 0 ? `+ ₹${crustPrice}` : "₹0"}
                         </span>
                       </div>
@@ -426,7 +426,7 @@ export default function ProductCustomizeModal({
           {currentItemToppings.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-2.5">
-                <h4 className="text-sm font-bold text-zinc-900 dark:text-white">
+                <h4 className="text-sm font-semibold text-zinc-900 dark:text-white">
                   Toppings
                 </h4>
                 <span className="text-[11px] text-zinc-400 font-medium">
@@ -459,7 +459,7 @@ export default function ProductCustomizeModal({
                         </span>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-xs font-bold text-zinc-600 dark:text-zinc-300">
+                        <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
                           + ₹{topPrice}
                         </span>
                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
@@ -481,7 +481,7 @@ export default function ProductCustomizeModal({
           {currentItemDips.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-2.5">
-                <h4 className="text-sm font-bold text-zinc-900 dark:text-white">
+                <h4 className="text-sm font-semibold text-zinc-900 dark:text-white">
                   Dips & Extras
                 </h4>
               </div>
@@ -508,7 +508,7 @@ export default function ProductCustomizeModal({
                         </span>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-xs font-bold text-zinc-600 dark:text-zinc-300">
+                        <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
                           + ₹{dipPrice}
                         </span>
                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
@@ -537,12 +537,12 @@ export default function ProductCustomizeModal({
           <button
             type="button"
             onClick={handleAddCustomized}
-            className="w-full h-12 bg-[#E53935] hover:bg-[#D32F2F] active:scale-[0.99] text-white font-bold text-sm tracking-wide rounded-xl shadow-lg shadow-[#E53935]/20 transition-all flex items-center justify-center gap-2 cursor-pointer uppercase select-none border-0"
+            className="w-full h-12 bg-[#E53935] hover:bg-[#D32F2F] active:scale-[0.99] text-white font-semibold text-sm tracking-wide rounded-xl shadow-lg shadow-[#E53935]/20 transition-all flex items-center justify-center gap-2 cursor-pointer uppercase select-none border-0"
           >
             <span>₹{calculateTotalPrice()}</span>
             <span className="opacity-60">|</span>
             <span>Add</span>
-            <span className="text-base leading-none font-bold">+</span>
+            <span className="text-base leading-none font-semibold">+</span>
           </button>
         </div>
 

@@ -1332,12 +1332,12 @@ export default function Home() {
                       {(b.title || b.subtitle) && (
                         <div className="absolute inset-0 flex flex-col justify-end p-5 pointer-events-none">
                           {b.bannerType && (
-                            <span className="bg-[var(--accent-red)] text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-md w-fit mb-1.5 shadow-sm">
+                            <span className="bg-[var(--accent-red)] text-white text-[8px] font-semibold uppercase tracking-widest px-2.5 py-0.5 rounded-md w-fit mb-1.5 shadow-sm">
                               {b.bannerType}
                             </span>
                           )}
                           {b.title && (
-                            <h2 className="font-headline-lg-mobile text-white text-base font-black leading-tight" style={{ textShadow: "0 2px 4px rgba(0,0,0,0.8)" }}>
+                            <h2 className="font-headline-lg-mobile text-white text-base font-semibold leading-tight" style={{ textShadow: "0 2px 4px rgba(0,0,0,0.8)" }}>
                               {b.title}
                             </h2>
                           )}
@@ -1371,7 +1371,7 @@ export default function Home() {
           {/* What are you craving for section */}
           {categories && categories.length > 0 && (
             <div className="pt-4 pb-2 pl-4 !mt-0">
-              <h3 className="font-bold text-zinc-900 text-[16px] mb-4 font-headline-sm-mobile">
+              <h3 className="font-semibold text-zinc-900 text-[16px] mb-4 font-headline-sm-mobile">
                 {cravingHeading}
               </h3>
               <div className="grid grid-cols-3 gap-x-2.5 sm:gap-x-4 gap-y-6 pb-2 pr-4">
@@ -1444,7 +1444,7 @@ export default function Home() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 
-                        className="text-zinc-900 dark:text-white font-bold text-[14px] sm:text-[15px] leading-snug mb-2 tracking-tight cursor-pointer"
+                        className="text-zinc-900 dark:text-white font-semibold text-[14px] sm:text-[15px] leading-snug mb-2 tracking-tight cursor-pointer"
                         onClick={handleStartRewardsFlow}
                         style={{ fontFamily: 'Poppins, sans-serif' }}
                       >
@@ -1456,7 +1456,7 @@ export default function Home() {
                           const menuPath = window.location.pathname.startsWith('/food') ? '/food/user/menu' : '/user/menu';
                           navigate(menuPath);
                         }}
-                        className="text-[var(--accent-red,#EE3A43)] font-bold text-sm sm:text-[15px] hover:underline flex items-center gap-1 p-0 bg-transparent border-0 cursor-pointer"
+                        className="text-[var(--accent-red,#EE3A43)] font-semibold text-sm sm:text-[15px] hover:underline flex items-center gap-1 p-0 bg-transparent border-0 cursor-pointer"
                         style={{ fontFamily: 'Poppins, sans-serif' }}
                       >
                         <span>Order Now</span>
@@ -1521,7 +1521,7 @@ export default function Home() {
           {coupons && coupons.length > 0 && (
             <div className="mt-3 mb-4 select-none" style={{ fontFamily: 'Poppins, sans-serif' }}>
               <div className="px-2 sm:px-3 mb-2.5">
-                <h3 className="font-bold text-zinc-900 dark:text-white text-[16px] sm:text-[17px] tracking-tight m-0 font-headline-sm-mobile">
+                <h3 className="font-semibold text-zinc-900 dark:text-white text-[16px] sm:text-[17px] tracking-tight m-0 font-headline-sm-mobile">
                   Offers for you
                 </h3>
               </div>
@@ -1548,11 +1548,11 @@ export default function Home() {
                         <div className="flex items-center gap-1.5">
                           {/* Scalloped Stamp Badge Icon (matching Image 2) */}
                           <div className="w-5 h-5 rounded-md bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
-                            <span className="material-symbols-outlined text-white text-[15px] font-bold">
+                            <span className="material-symbols-outlined text-white text-[15px] font-semibold">
                               percent
                             </span>
                           </div>
-                          <h4 className="font-bold text-white text-sm sm:text-[15px] tracking-tight leading-tight truncate m-0">
+                          <h4 className="font-semibold text-white text-sm sm:text-[15px] tracking-tight leading-tight truncate m-0">
                             {titleText}
                           </h4>
                         </div>
@@ -1801,7 +1801,7 @@ export default function Home() {
                 style={{ fontFamily: 'Poppins, sans-serif' }}
               >
                 <div className="px-6 pt-5 pb-3">
-                  <h3 className="text-[17px] sm:text-lg font-bold text-zinc-900 dark:text-white tracking-tight m-0">
+                  <h3 className="text-[17px] sm:text-lg font-semibold text-zinc-900 dark:text-white tracking-tight m-0">
                     Terms & Conditions
                   </h3>
                 </div>
@@ -1812,7 +1812,7 @@ export default function Home() {
                     : DEFAULT_REWARD_TERMS
                   ).map((term, idx) => (
                     <div key={idx} className="flex items-start gap-2.5 text-zinc-600 dark:text-zinc-300 text-xs sm:text-[13px] leading-relaxed">
-                      <span className="text-zinc-400 font-bold text-sm leading-none mt-0.5 select-none shrink-0">•</span>
+                      <span className="text-zinc-400 font-semibold text-sm leading-none mt-0.5 select-none shrink-0">•</span>
                       <p className="flex-1 m-0">{term}</p>
                     </div>
                   ))}
