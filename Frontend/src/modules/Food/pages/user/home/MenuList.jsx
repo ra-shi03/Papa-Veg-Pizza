@@ -6,6 +6,7 @@ import DeliveryMapModal from "@food/components/user/DeliveryMapModal"
 import DeliveryOrCollectionModal from "@food/components/user/DeliveryOrCollectionModal"
 import { useLocationStore } from "@food/store/locationStore"
 import { useLocationGuard } from "@food/hooks/useLocationGuard"
+import { useScrollLock } from "@food/hooks/useScrollLock"
 import logoNew from "@/assets/logo1.png"
 import { renderFormattedText } from "@food/utils/formatText"
 import MenuSearchOverlay from "@food/components/user/MenuSearchOverlay"
@@ -62,7 +63,7 @@ export default function MenuList() {
     if (stateCat) return stateCat;
     try {
       const searchParams = new URLSearchParams(location.search);
-      const queryCat = searchParams.get("category") || searchParams.get("cat");
+      const queryCat = searchParams.get("category") || searchParams.get("cat") || searchParams.get("search") || searchParams.get("q");
       if (queryCat) return queryCat;
     } catch (_) {}
     return null;
@@ -74,6 +75,15 @@ export default function MenuList() {
     const targetStr = String(target).trim().toLowerCase();
     const targetClean = targetStr.replace(/[^a-z0-9]/g, '');
     const targetNoU = targetClean.replace(/u/g, ''); // Handles flavour vs flavor
+
+    // 0. Explicit match for Wow 4-in-1 / 4 in 1 / Big Big
+    if (targetClean.includes('4in1') || targetClean.includes('wow') || targetClean.includes('big')) {
+      const fourInOneCat = categoryList.find(c => {
+        const clean = String(c.label || c.name || c.id || c.slug || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        return clean.includes('4in1') || (clean.includes('wow') && clean.includes('4')) || (targetClean.includes('big') && clean.includes('4in1'));
+      });
+      if (fourInOneCat) return fourInOneCat.id;
+    }
 
     // 1. Direct match on id, _id, or slug
     const directMatch = categoryList.find(c => {
@@ -261,6 +271,86 @@ export default function MenuList() {
       rawProduct: p
     };
   };
+
+  // Helper to format a superadmin combo (Meal for 1 / 2 / 4) into the same card shape as products
+  const formatComboForMenu = (c) => {
+    const price = Number(c.price) || 0;
+    const originalPrice = Number(c.originalPrice) > price ? Number(c.originalPrice) : null;
+    // When superadmin adds customer choices to an item, the item itself (e.g. Coke, Single Corn) is also one of the options
+    const comboItems = (c.items || []).map(it => {
+      // Add-ons (dips, toppings) are not sized like menu items, so their "Regular" placeholder is not shown
+      const extra = (it.choices || []).map(ch => ({ _id: String(ch._id || ch.name), name: ch.name, size: ch.addonId ? "" : (ch.size || "") }));
+      const baseName = String(it.name || "").trim().toLowerCase();
+      const choices = extra.length > 0 && !extra.some(ch => ch.name.trim().toLowerCase() === baseName)
+        ? [{ _id: `base-${it._id || it.name}`, name: it.name, size: it.addonId ? "" : (it.size || "") }, ...extra]
+        : extra;
+      return {
+        _id: String(it._id || it.name),
+        name: it.name,
+        size: it.addonId ? "" : (it.size || ""),
+        quantity: Number(it.quantity) || 1,
+        choices
+      };
+    });
+    const itemsLine = comboItems
+      .map(it => `${it.quantity > 1 ? `${it.quantity} x ` : ""}${it.choices.length > 0 ? it.choices.map(ch => ch.name).join(" / ") : it.name}`)
+      .join(" + ");
+    const summary = c.description || itemsLine;
+    const cat = c.categoryId && typeof c.categoryId === "object" ? c.categoryId : null;
+
+    return {
+      id: String(c._id),
+      _id: String(c._id),
+      name: c.name || "",
+      title: c.name || "",
+      price,
+      originalPrice,
+      saveAmount: originalPrice ? originalPrice - price : 0,
+      badge: (c.badge || "").trim(),
+      image: c.image || "",
+      description: summary,
+      toppingsSummary: c.availabilityLabel ? `${c.availabilityLabel.replace(/^Available /, "")} • ${summary}` : summary,
+      defaultCrust: "",
+      showCrust: false,
+      crusts: [],
+      sizes: [{ name: "Meal", size: "Meal", price, originalPrice, discount: 0, discountType: "flat", saveAmount: originalPrice ? originalPrice - price : 0, description: "" }],
+      toppings: [],
+      isVeg: true,
+      rating: 4.8,
+      ratingCount: 28,
+      status: "Active",
+      category: cat?.label || "",
+      categoryLabel: cat?.label || "",
+      categoryId: cat?._id ? String(cat._id) : String(c.categoryId || ""),
+      isCombo: true,
+      comboItems,
+      availableNow: c.availableNow !== false,
+      availabilityLabel: c.availabilityLabel || ""
+    };
+  };
+
+  // Superadmin combos grouped by their menu category _id
+  const [comboMenuMap, setComboMenuMap] = useState({});
+
+  useEffect(() => {
+    const fetchCombos = async () => {
+      try {
+        const res = await apiClient.get('/food/combos/public');
+        const list = Array.isArray(res?.data?.data) ? res.data.data : [];
+        const map = {};
+        list.forEach(c => {
+          const formatted = formatComboForMenu(c);
+          if (!formatted.categoryId) return;
+          if (!map[formatted.categoryId]) map[formatted.categoryId] = [];
+          map[formatted.categoryId].push(formatted);
+        });
+        setComboMenuMap(map);
+      } catch (e) {
+        console.warn("Failed to load combos:", e);
+      }
+    };
+    fetchCombos();
+  }, []);
 
   // Dynamic Categories State
   const [categories, setCategories] = useState(() => {
@@ -709,11 +799,18 @@ export default function MenuList() {
     return () => window.removeEventListener("pvp_addons_changed", handleToppingsSync);
   }, []);
 
-  const getMergedMenuItems = () => {
-    return productsMap || {};
-  };
-  
-  const currentMenuItems = getMergedMenuItems();
+  // Combos are keyed by category _id, so Meal for 1 / 2 / 4 sections pick them up like regular products
+  const currentMenuItems = useMemo(() => {
+    const merged = { ...(productsMap || {}) };
+    Object.entries(comboMenuMap).forEach(([catId, combos]) => {
+      const cat = categories.find(c => String(c._id) === catId);
+      // Products are stored under both the category slug and its _id; mirror that for combos
+      [...new Set([catId, cat?.id].filter(Boolean))].forEach(key => {
+        merged[key] = [...combos, ...(merged[key] || [])];
+      });
+    });
+    return merged;
+  }, [productsMap, comboMenuMap, categories]);
 
   const userManuallySelectedCategoryRef = useRef(false);
   const activeTabButtonRef = useRef(null);
@@ -794,9 +891,13 @@ export default function MenuList() {
   const [showScrollToTop, setShowScrollToTop] = useState(false);
   const anchorScrollYRef = useRef(0);
   const lastScrollYRef = useRef(0);
+  // Collapsing the header changes the page height; ignore the scroll events that shift causes so it doesn't flip back and forth
+  const headerToggleAtRef = useRef(0);
 
   useEffect(() => {
     let ticking = false;
+    const prevOverflowAnchor = document.documentElement.style.overflowAnchor;
+    document.documentElement.style.overflowAnchor = "none";
     const handleScroll = () => {
       if (!ticking) {
         window.requestAnimationFrame(() => {
@@ -810,22 +911,33 @@ export default function MenuList() {
           // Scrolling down slightly -> hide menu & collapse into compact header (Image 2)
           // Scrolling up slightly (to top side) -> show menu & expand header (Image 1)
           if (!isProgrammaticScrollRef.current) {
-            if (scrollY <= 20) {
+            if (Date.now() - headerToggleAtRef.current < 450) {
+              anchorScrollYRef.current = scrollY;
+            } else if (scrollY <= 20) {
               // Always show full menu when at or near top
-              setIsScrolled(false);
+              setIsScrolled(prev => {
+                if (prev) headerToggleAtRef.current = Date.now();
+                return false;
+              });
               anchorScrollYRef.current = scrollY;
             } else {
               const diff = scrollY - anchorScrollYRef.current;
 
               // Scrolling down by threshold (>= 12px)
-              if (diff >= 12) {
-                setIsScrolled(true);
+              if (diff >= 24) {
+                setIsScrolled(prev => {
+                  if (!prev) headerToggleAtRef.current = Date.now();
+                  return true;
+                });
                 setShowSortMenu(false);
                 anchorScrollYRef.current = scrollY;
               } 
               // Scrolling up towards top side by threshold (<= -10px)
-              else if (diff <= -10) {
-                setIsScrolled(false);
+              else if (diff <= -24) {
+                setIsScrolled(prev => {
+                  if (prev) headerToggleAtRef.current = Date.now();
+                  return false;
+                });
                 anchorScrollYRef.current = scrollY;
               }
             }
@@ -883,6 +995,7 @@ export default function MenuList() {
     handleScroll();
 
     return () => {
+      document.documentElement.style.overflowAnchor = prevOverflowAnchor;
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("wheel", handleUserInterrupt);
       window.removeEventListener("touchmove", handleUserInterrupt);
@@ -1015,7 +1128,19 @@ export default function MenuList() {
   const [selectedExtraCheese, setSelectedExtraCheese] = useState(false)
   const [selectedMealOptions, setSelectedMealOptions] = useState([])
   const [selectedToppingsList, setSelectedToppingsList] = useState([])
+  const [selectedComboChoices, setSelectedComboChoices] = useState({}) // combo item _id -> chosen option name
   const [quantity, setQuantity] = useState(1)
+
+  // Block background page scroll when any modal/sheet is open
+  const isAnyModalOpen = Boolean(
+    customizeItem ||
+    showQuickMenuModal ||
+    showMapModal ||
+    showServiceSelector ||
+    showStoreModal ||
+    showCarModal
+  );
+  useScrollLock(isAnyModalOpen);
 
   const getItemAssignedAddons = (item) => {
     if (!item || !Array.isArray(item.toppings) || item.toppings.length === 0) {
@@ -1128,6 +1253,11 @@ export default function MenuList() {
     setSelectedExtraCheese(false);
     setSelectedMealOptions([]);
     setSelectedToppingsList([]);
+    setSelectedComboChoices(
+      item.isCombo
+        ? Object.fromEntries((item.comboItems || []).filter(it => it.choices.length > 0).map(it => [it._id, it.choices[0].name]))
+        : {}
+    );
     setQuantity(1);
   };
 
@@ -1345,12 +1475,36 @@ export default function MenuList() {
     return base * (quantity || 1);
   };
 
+  // Human-readable list of what the chosen meal contains, e.g. "Classic Margherita (Regular), 2 x Aloo Tikki Taco, Coke"
+  const describeComboSelection = (item) =>
+    (item.comboItems || []).map(it => {
+      const label = it.choices.length > 0 ? (selectedComboChoices[it._id] || it.choices[0].name) : it.name;
+      const size = it.choices.find(ch => ch.name === label)?.size ?? it.size;
+      return `${it.quantity > 1 ? `${it.quantity} x ` : ""}${label}${size ? ` (${size})` : ""}`;
+    }).join(", ");
+
   const addCustomizedToCart = () => {
+    if (customizeItem.isCombo && !customizeItem.availableNow) {
+      triggerToast(customizeItem.availabilityLabel || "This meal is not available right now");
+      return;
+    }
+
     const toppingsKey = selectedToppingsList.sort().join("-");
     const mealsKey = selectedMealOptions.sort().join("-");
-    const key = `${customizeItem.id}-${selectedSizeOption.name}-${selectedCrust}-${selectedExtraCheese ? 'cheese' : 'no'}-${toppingsKey}-${mealsKey}`;
-    
-    const customizedItemDetails = {
+    const key = customizeItem.isCombo
+      ? `${customizeItem.id}-meal-${Object.keys(selectedComboChoices).sort().map(k => selectedComboChoices[k]).join("-")}`
+      : `${customizeItem.id}-${selectedSizeOption.name}-${selectedCrust}-${selectedExtraCheese ? 'cheese' : 'no'}-${toppingsKey}-${mealsKey}`;
+
+    const customizedItemDetails = customizeItem.isCombo ? {
+      ...customizeItem,
+      id: customizeItem.id,
+      title: customizeItem.title,
+      price: calculateTotalPrice() / quantity,
+      description: describeComboSelection(customizeItem),
+      customized: true,
+      selectedSize: "",
+      comboChoices: selectedComboChoices
+    } : {
       ...customizeItem,
       id: customizeItem.id,
       title: `${customizeItem.title} (${selectedSizeOption.name})`,
@@ -1363,7 +1517,14 @@ export default function MenuList() {
       crust: selectedCrust,
       extraCheese: selectedExtraCheese
     };
-    
+
+    // Persist the full line spec so Cart.jsx resolves the exact price / selections (same contract as Home)
+    try {
+      const customMap = JSON.parse(localStorage.getItem("pvp_customized_items") || "{}")
+      customMap[key] = customizedItemDetails
+      localStorage.setItem("pvp_customized_items", JSON.stringify(customMap))
+    } catch (_) {}
+
     setCart(prev => {
       const existing = prev[key]
       const newQty = existing ? existing.quantity + quantity : quantity
@@ -2125,70 +2286,81 @@ export default function MenuList() {
                         </div>
                       )}
 
-                      {/* Dark Gradient Overlay with Veg Icon, Title, Toppings, Pricing & Red Add Button */}
-                      <div className="relative z-10 w-full bg-gradient-to-t from-black/95 via-black/55 to-transparent pt-7 pb-3.5 px-4 text-left">
-                        {/* Veg Icon + Product Title */}
+                      {/* Meal availability window (e.g. Lunch Treats 11 AM - 4 PM) */}
+                      {item.isCombo && item.availabilityLabel && (
+                        <div className="absolute top-3 right-3 z-10">
+                          <span className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm backdrop-blur-sm ${item.availableNow ? "bg-white/90 text-zinc-800" : "bg-black/70 text-amber-300"}`}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>schedule</span>
+                            {item.availabilityLabel.replace(/^Available /, "")}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Title + description sit on the image; price / variant / Add live in a solid footer bar */}
+                      <div className="relative z-10 w-full bg-gradient-to-t from-black/90 via-black/50 to-transparent pt-16 pb-3 px-4 text-left">
                         <div className="flex items-center gap-2">
                           <span className="veg-box scale-90 shrink-0 shadow-xs">
                             <span className="veg-circle"></span>
                           </span>
-                          <h3 className="text-white text-base sm:text-lg font-bold leading-snug truncate drop-shadow-md font-['Poppins',sans-serif]">
+                          <h3 className="text-white text-lg sm:text-xl font-semibold leading-snug drop-shadow-md font-['Poppins',sans-serif]">
                             {item.title}
                           </h3>
                         </div>
 
-                        {/* Toppings Summary Line */}
                         {toppingsLine && (
-                          <p className="text-zinc-300 text-xs mt-1 truncate font-medium font-['Poppins',sans-serif] drop-shadow-sm">
+                          <p className="text-zinc-200 text-[13px] mt-1.5 line-clamp-2 leading-snug font-normal font-['Poppins',sans-serif] drop-shadow-sm">
                             {toppingsLine}
                           </p>
                         )}
+                      </div>
 
-                        {/* Pricing Row & Add Button (Directly over image overlay, no white footer) */}
-                        <div className="mt-3 flex items-center justify-between gap-3">
-                          <div className="flex flex-col gap-1 min-w-0">
-                            {/* Price, Strikethrough MRP, and Green Save Tag */}
+                      <div className="relative z-10 w-full bg-gradient-to-b from-[#4a4a4d] via-[#2b2b2d] to-[#0e0e0f] border-t border-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] px-4 py-3 text-left">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex flex-col gap-1.5 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-white font-bold text-lg sm:text-xl font-['Poppins',sans-serif] drop-shadow-sm">
+                              <span className="text-white font-bold text-xl font-['Poppins',sans-serif]">
                                 ₹{item.price}
                               </span>
                               {hasDiscount && (
                                 <>
-                                  <span className="text-zinc-400 line-through text-xs sm:text-sm font-medium">
+                                  <span className="text-zinc-400 line-through text-sm font-medium">
                                     ₹{item.originalPrice}
                                   </span>
-                                  <span className="bg-[#169B45] text-white text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded shadow-xs">
+                                  <span className="bg-[#169B45] text-white text-[11px] font-semibold pl-2.5 pr-2 py-0.5 rounded-[3px] border border-[#2fbf64] whitespace-nowrap">
                                     Save ₹{saveAmount}
                                   </span>
                                 </>
                               )}
                             </div>
 
-                            {/* Variant Selector Link */}
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 checkLocation(() => openCustomizeModal(item));
                               }}
-                              className="flex items-center gap-1 text-[11px] sm:text-xs text-zinc-300 hover:text-white border-b border-dashed border-zinc-400 w-fit cursor-pointer transition-colors pb-0.5 text-left font-medium select-none bg-transparent p-0"
+                              className="flex flex-col items-start w-full max-w-[210px] cursor-pointer text-left select-none bg-transparent border-0 p-0"
                             >
-                              <span>Regular | {item.defaultCrust || "New Hand Tossed"}</span>
-                              <ChevronRight size={13} className="text-zinc-400 shrink-0" />
+                              <span className="flex items-center gap-1 text-xs sm:text-[13px] text-white font-medium pb-1">
+                                {item.isCombo
+                                  ? ((item.comboItems || []).some(it => it.choices.length > 0) ? "Choose your items" : "View meal items")
+                                  : `Regular | ${item.defaultCrust || "New Hand Tossed"}`}
+                                <ChevronRight size={13} className="text-white shrink-0" />
+                              </span>
+                              <span className="w-full border-b-[1.5px] border-dashed border-white/80"></span>
                             </button>
                           </div>
 
-                          {/* Bright Red Add Button */}
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               checkLocation(() => openCustomizeModal(item));
                             }}
-                            className="shrink-0 h-10 px-5 bg-[var(--accent-red,#EE3A43)] hover:opacity-95 active:scale-95 text-white font-bold text-sm rounded-xl transition-all shadow-lg shadow-[var(--accent-red,#EE3A43)]/30 cursor-pointer flex items-center gap-1.5 select-none uppercase font-['Poppins',sans-serif] border-0"
+                            className="shrink-0 h-11 px-6 bg-[var(--accent-red,#EE3A43)] hover:opacity-95 active:scale-95 text-white font-semibold text-lg rounded-lg transition-all cursor-pointer flex items-center gap-1.5 select-none font-['Poppins',sans-serif] border-0"
                           >
                             <span>Add</span>
-                            <span className="text-lg leading-none font-bold">+</span>
+                            <span className="text-xl leading-none">+</span>
                           </button>
                         </div>
                       </div>
@@ -2203,12 +2375,18 @@ export default function MenuList() {
 
       {/* Floating Modern Customization Sheet (matching Reference Image 2) */}
       {customizeItem && (
-        <div className="fixed inset-0 z-55 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div 
+          onClick={() => setCustomizeItem(null)}
+          className="fixed inset-0 z-55 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm touch-none"
+        >
           {/* Modal Container */}
-          <div className="w-full max-w-md bg-white dark:bg-[#18181a] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[90vh] overflow-hidden transition-colors duration-300 slide-up-modal font-['Poppins',sans-serif]">
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white dark:bg-[#18181a] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[90vh] overflow-hidden transition-colors duration-300 slide-up-modal font-['Poppins',sans-serif] touch-auto"
+          >
             
             {/* Header: Sticky Top with Veg Icon, Title, Toppings summary, and Close button */}
-            <div className="bg-white dark:bg-[#1f1f22] px-5 py-4 flex items-start justify-between border-b border-zinc-200/70 dark:border-white/5 shrink-0">
+            <div className="bg-white dark:bg-[#1f1f22] px-5 py-4 flex items-start justify-between border-b border-zinc-200/70 dark:border-white/5 shrink-0 select-none">
               <div className="flex items-start gap-2.5 text-left min-w-0 pr-2">
                 <span className="veg-box scale-90 shrink-0 mt-1">
                   <span className="veg-circle"></span>
@@ -2233,9 +2411,73 @@ export default function MenuList() {
             </div>
 
             {/* Scrollable Content Area */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-5 text-left">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-5 text-left">
               
+              {/* Meal (combo) contents & choices - replaces size / crust / toppings for Meal for 1 / 2 / 4 items */}
+              {customizeItem.isCombo && (
+                <>
+                  <div>
+                    <h4 className="text-sm font-bold text-zinc-900 dark:text-white mb-2.5">
+                      What's in your meal
+                    </h4>
+                    <div className="bg-white dark:bg-[#1f1f22] rounded-2xl p-3 shadow-xs border border-zinc-200/80 dark:border-zinc-800 divide-y divide-zinc-100 dark:divide-zinc-800">
+                      {(customizeItem.comboItems || []).map(it => (
+                        <div key={it._id} className="flex items-center justify-between py-2.5 first:pt-1 last:pb-1">
+                          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                            <span className="veg-box scale-75 shrink-0">
+                              <span className="veg-circle"></span>
+                            </span>
+                            <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+                              {it.choices.length > 0 ? (selectedComboChoices[it._id] || it.choices[0].name) : it.name}
+                              {(it.choices.find(ch => ch.name === (selectedComboChoices[it._id] || it.choices[0]?.name))?.size ?? it.size) ? ` (${it.choices.find(ch => ch.name === (selectedComboChoices[it._id] || it.choices[0]?.name))?.size ?? it.size})` : ""}
+                            </span>
+                          </div>
+                          <span className="text-xs font-bold text-zinc-600 dark:text-zinc-300 shrink-0">x{it.quantity}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {(customizeItem.comboItems || []).filter(it => it.choices.length > 0).map(it => (
+                    <div key={`choice-${it._id}`}>
+                      <div className="flex items-center justify-between mb-2.5">
+                        <h4 className="text-sm font-bold text-zinc-900 dark:text-white">
+                          Choose {it.name}
+                        </h4>
+                        <span className="text-[11px] text-zinc-400 font-medium">Pick 1</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {it.choices.map(ch => {
+                          const isSelected = (selectedComboChoices[it._id] || it.choices[0].name) === ch.name;
+                          return (
+                            <div
+                              key={ch._id}
+                              onClick={() => setSelectedComboChoices(prev => ({ ...prev, [it._id]: ch.name }))}
+                              className={`relative p-3 rounded-2xl border-2 transition-all cursor-pointer ${
+                                isSelected
+                                  ? "border-zinc-800 dark:border-white bg-zinc-50/80 dark:bg-zinc-800/60 shadow-xs"
+                                  : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-900"
+                              }`}
+                            >
+                              {isSelected && (
+                                <div className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-[#0066CC] dark:bg-[#3B82F6] text-white flex items-center justify-center shadow-xs">
+                                  <Check size={12} strokeWidth={3} />
+                                </div>
+                              )}
+                              <div className="font-bold text-xs text-zinc-900 dark:text-white pr-6 leading-snug">
+                                {ch.name}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+
               {/* 1. Change Size Section (Reference Image 2: side-by-side selectable cards with checkmarks & discounts) */}
+              {!customizeItem.isCombo && (
               <div>
                 <h4 className="text-sm font-bold text-zinc-900 dark:text-white mb-2.5">
                   Change Size
@@ -2290,6 +2532,7 @@ export default function MenuList() {
                   })}
                 </div>
               </div>
+              )}
 
               {/* 2. Change Crust Section (Image 2: crust cards with image, desc, size-based price and checkmark) */}
               {currentItemCrusts.length > 0 && (
@@ -2450,20 +2693,36 @@ export default function MenuList() {
             </div>
 
             {/* Sticky Bottom Footer (matching Reference Image 2) */}
-            <div className="bg-white dark:bg-[#1f1f22] p-4 border-t border-zinc-200/80 dark:border-white/5 shrink-0 space-y-2">
+            <div className="bg-white dark:bg-[#1f1f22] p-4 border-t border-zinc-200/80 dark:border-white/5 shrink-0 space-y-2 select-none">
               <div className="text-xs text-zinc-600 dark:text-zinc-400 text-left truncate font-medium">
-                {selectedSizeOption.name} {selectedCrust ? `| ${selectedCrust}` : ""}
-                {selectedToppingsList.length > 0 && ` • ${selectedToppingsList.length} Toppings`}
+                {customizeItem.isCombo ? (
+                  <>
+                    Meal • {(customizeItem.comboItems || []).length} Items
+                    {customizeItem.originalPrice ? ` • Save ₹${customizeItem.saveAmount}` : ""}
+                  </>
+                ) : (
+                  <>
+                    {selectedSizeOption.name} {selectedCrust ? `| ${selectedCrust}` : ""}
+                    {selectedToppingsList.length > 0 && ` • ${selectedToppingsList.length} Toppings`}
+                  </>
+                )}
               </div>
               <button
                 type="button"
                 onClick={addCustomizedToCart}
-                className="w-full h-12 bg-[var(--accent-red,#EE3A43)] hover:opacity-95 active:scale-[0.99] text-white font-bold text-sm tracking-wide rounded-xl shadow-lg shadow-[var(--accent-red,#EE3A43)]/20 transition-all flex items-center justify-center gap-2 cursor-pointer uppercase select-none"
+                disabled={customizeItem.isCombo && !customizeItem.availableNow}
+                className="w-full h-12 bg-[var(--accent-red,#EE3A43)] hover:opacity-95 active:scale-[0.99] text-white font-bold text-sm tracking-wide rounded-xl shadow-lg shadow-[var(--accent-red,#EE3A43)]/20 transition-all flex items-center justify-center gap-2 cursor-pointer uppercase select-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span>₹{calculateTotalPrice()}</span>
-                <span className="opacity-60">|</span>
-                <span>Add</span>
-                <span className="text-base leading-none font-bold">+</span>
+                {customizeItem.isCombo && !customizeItem.availableNow ? (
+                  <span className="normal-case">{customizeItem.availabilityLabel || "Not available right now"}</span>
+                ) : (
+                  <>
+                    <span>₹{calculateTotalPrice()}</span>
+                    <span className="opacity-60">|</span>
+                    <span>Add</span>
+                    <span className="text-base leading-none font-bold">+</span>
+                  </>
+                )}
               </button>
             </div>
 
@@ -2511,8 +2770,14 @@ export default function MenuList() {
 
       {/* Takeaway Store Finder Modal */}
       {showStoreModal && (
-        <div className="fixed inset-0 z-55 flex items-center justify-center p-5 bg-black/60 backdrop-blur-sm dark">
-          <div className="w-full max-w-sm glass-card rounded-3xl p-6 space-y-4 text-left bg-[#131313] border border-white/10">
+        <div 
+          onClick={() => setShowStoreModal(false)}
+          className="fixed inset-0 z-55 flex items-center justify-center p-5 bg-black/60 backdrop-blur-sm dark touch-none"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm glass-card rounded-3xl p-6 space-y-4 text-left bg-[#131313] border border-white/10 touch-auto overflow-y-auto overscroll-contain max-h-[85vh]"
+          >
             <div className="flex justify-between items-center">
               <h3 className="font-headline-lg-mobile text-lg text-white">Find your nearest hut</h3>
               <button
@@ -2568,8 +2833,14 @@ export default function MenuList() {
 
       {/* In-Car Details Modal */}
       {showCarModal && (
-        <div className="fixed inset-0 z-55 flex items-center justify-center p-5 bg-black/60 backdrop-blur-sm dark">
-          <div className="w-full max-w-sm glass-card rounded-3xl p-6 space-y-4 text-left bg-[#131313] border border-white/10">
+        <div 
+          onClick={() => setShowCarModal(false)}
+          className="fixed inset-0 z-55 flex items-center justify-center p-5 bg-black/60 backdrop-blur-sm dark touch-none"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm glass-card rounded-3xl p-6 space-y-4 text-left bg-[#131313] border border-white/10 touch-auto overflow-y-auto overscroll-contain max-h-[85vh]"
+          >
             <div className="flex justify-between items-center">
               <h3 className="font-headline-lg-mobile text-lg text-white">In-Car Dining</h3>
               <button
@@ -2676,11 +2947,11 @@ export default function MenuList() {
       {showQuickMenuModal && (
         <div 
           onClick={() => setShowQuickMenuModal(false)}
-          className="fixed inset-0 z-55 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+          className="fixed inset-0 z-55 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 touch-none"
         >
           <div 
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md bg-white dark:bg-[#18181a] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden p-5 max-h-[75vh] flex flex-col slide-up-modal font-['Poppins',sans-serif]"
+            className="w-full max-w-md bg-white dark:bg-[#18181a] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden p-5 max-h-[75vh] flex flex-col slide-up-modal font-['Poppins',sans-serif] touch-auto"
           >
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
               <h3 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
@@ -2696,7 +2967,7 @@ export default function MenuList() {
               </button>
             </div>
 
-            <div className="overflow-y-auto py-2 divide-y divide-zinc-100 dark:divide-zinc-800/60 max-h-[60vh]">
+            <div className="overflow-y-auto overscroll-contain py-2 divide-y divide-zinc-100 dark:divide-zinc-800/60 max-h-[60vh]">
               {categorySectionsWithItems.map(({ category, items }) => {
                 const isActive = activeTab === category.id || String(category._id) === activeTab;
                 return (

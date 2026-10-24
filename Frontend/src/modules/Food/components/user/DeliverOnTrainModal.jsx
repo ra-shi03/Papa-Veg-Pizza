@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import IrctcOrderHistoryModal from "@food/components/user/IrctcOrderHistoryModal"
+import { useScrollLock } from "@food/hooks/useScrollLock"
 
 export default function DeliverOnTrainModal({ show, onClose }) {
   const navigate = useNavigate()
+
+  // Lock background scroll when open
+  useScrollLock(Boolean(show))
   
   // Theme state synced with local storage or default to dark
   const [isDarkMode, setIsDarkMode] = useState(() => {

@@ -1,9 +1,10 @@
-﻿import mongoose from 'mongoose';
+import mongoose from 'mongoose';
 import { FoodOrder } from '../models/order.model.js';
 import { FoodStore as FoodStore } from '../../store/models/store.model.js';
 import { FoodFeeSettings } from '../../admin/models/feeSettings.model.js';
 import { FoodOffer } from '../../admin/models/offer.model.js';
 import { FoodOfferUsage } from '../../admin/models/offerUsage.model.js';
+import { FoodAppConfig } from '../../settings/models/appConfig.model.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { haversineKm } from './order.helpers.js';
 
@@ -124,6 +125,10 @@ export async function calculateOrderPricing(userId, dto) {
     : "";
 
   if (codeRaw) {
+    const appConfig = await FoodAppConfig.findOne().lean();
+    if (appConfig && appConfig.couponEnabled === false) {
+      throw new ValidationError("Coupon system is currently disabled globally");
+    }
     const now = new Date();
     const offer = await FoodOffer.findOne({ couponCode: codeRaw }).lean();
     if (offer) {

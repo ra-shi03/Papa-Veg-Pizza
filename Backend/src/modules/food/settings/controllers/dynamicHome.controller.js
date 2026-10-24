@@ -1,5 +1,6 @@
 import { HomeSection } from '../models/homeSection.model.js';
 import { FoodCoupon } from '../models/foodCoupon.model.js';
+import { FoodAppConfig } from '../models/appConfig.model.js';
 import { sendResponse, sendError } from '../../../../utils/response.js';
 import { uploadImageBufferDetailed } from '../../../../services/cloudinary.service.js';
 import cloudinary from 'cloudinary';
@@ -24,22 +25,25 @@ export const getHomeLayout = async (req, res) => {
         res.setHeader('Cache-Control', 'public, max-age=300');
 
         const populatedSections = [];
+        const config = await FoodAppConfig.findOne().lean();
 
-        // 1. Auto-map Offers Section
-        const rawCoupons = await FoodCoupon.find({ showOnHome: true, isActive: true, ...currentDateQuery() }).sort({ createdAt: -1 }).lean();
-        const offers = rawCoupons.map(coupon => ({
-            _id: coupon._id,
-            title: coupon.title,
-            subtitle: coupon.description,
-            buttonText: 'View'
-        }));
-        if (offers && offers.length > 0) {
-            populatedSections.push({
-                _id: 'auto-offers',
-                type: 'offers',
-                isActive: true,
-                data: offers
-            });
+        // 1. Auto-map Offers Section (only if coupons are enabled globally)
+        if (!config || config.couponEnabled !== false) {
+            const rawCoupons = await FoodCoupon.find({ showOnHome: true, isActive: true, ...currentDateQuery() }).sort({ createdAt: -1 }).lean();
+            const offers = rawCoupons.map(coupon => ({
+                _id: coupon._id,
+                title: coupon.title,
+                subtitle: coupon.description,
+                buttonText: 'View'
+            }));
+            if (offers && offers.length > 0) {
+                populatedSections.push({
+                    _id: 'auto-offers',
+                    type: 'offers',
+                    isActive: true,
+                    data: offers
+                });
+            }
         }
 
         return sendResponse(res, 200, 'Home layout fetched successfully', populatedSections);
@@ -50,6 +54,10 @@ export const getHomeLayout = async (req, res) => {
 
 export const getActiveOffers = async (req, res) => {
     try {
+        const config = await FoodAppConfig.findOne().lean();
+        if (config && config.couponEnabled === false) {
+            return sendResponse(res, 200, 'Offers fetched successfully', []);
+        }
         res.setHeader('Cache-Control', 'public, max-age=300');
         const offers = await UiOffer.find(currentDateQuery())
             .sort({ sortOrder: 1 })

@@ -1,9 +1,8 @@
 import React from "react";
 import useAppBackNavigation from "@food/hooks/useAppBackNavigation";
-import RewardsWalletView from "./rewards/RewardsWalletView";
+import PreviousRewardsView from "./rewards/PreviousRewardsView";
 
 export default function Rewards() {
   const goBack = useAppBackNavigation();
-  return <RewardsWalletView onBack={goBack} initialTab="cheesy" />;
+  return <PreviousRewardsView onBack={goBack} initialTab="rewards" />;
 }
-

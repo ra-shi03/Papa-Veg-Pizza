@@ -7,6 +7,7 @@ import AuthInitializer from "@food/components/AuthInitializer"
 import PushSoundEnableButton from "@food/components/PushSoundEnableButton"
 import { registerWebPushForCurrentModule } from "@food/utils/firebaseMessaging"
 import { isModuleAuthenticated } from "@food/utils/auth"
+import { AppConfigProvider } from "@food/context/AppConfigContext"
 
 // Lazy Loading Components
 const UserRouter = lazy(() => import("@food/components/user/UserRouter"))
@@ -46,26 +47,28 @@ export default function App() {
       <>
         <ScrollToTop />
         <PushSoundEnableButton />
-        <Suspense fallback={<Loader />}>
-          <Routes>
-            {/* Super Admin Module */}
-            <Route
-              path="superadmin/*"
-              element={<SuperAdminRouter />}
-            />
+        <AppConfigProvider>
+          <Suspense fallback={<Loader />}>
+            <Routes>
+              {/* Super Admin Module */}
+              <Route
+                path="superadmin/*"
+                element={<SuperAdminRouter />}
+              />
 
-            {/* User Module - Explicitly mapped to /user and the catch-all for /food/ and / */}
-            {/* NOTE: /user/food is a common mis-navigation - redirect to correct /food/user home */}
-            <Route path="user/food" element={<Navigate to="/food/user" replace />} />
-            <Route
-              path="user/*"
-              element={<UserRouter />}
-            />
+              {/* User Module - Explicitly mapped to /user and the catch-all for /food/ and / */}
+              {/* NOTE: /user/food is a common mis-navigation - redirect to correct /food/user home */}
+              <Route path="user/food" element={<Navigate to="/food/user" replace />} />
+              <Route
+                path="user/*"
+                element={<UserRouter />}
+              />
 
-            {/* Make UserRouter the default for all other paths to handle / and /food/ as user home */}
-            <Route path="/*" element={<UserRouter />} />
-          </Routes>
-        </Suspense>
+              {/* Make UserRouter the default for all other paths to handle / and /food/ as user home */}
+              <Route path="/*" element={<UserRouter />} />
+            </Routes>
+          </Suspense>
+        </AppConfigProvider>
       </>
     </AuthInitializer>
   )

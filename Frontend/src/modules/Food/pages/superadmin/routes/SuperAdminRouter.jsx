@@ -26,6 +26,7 @@ const CategoriesManagement = lazy(() => import("../productsManagement/Categories
 const Addons = lazy(() => import("../productsManagement/Addons"))
 const ComboDeals = lazy(() => import("../productsManagement/ComboDeals"))
 const AllOrders = lazy(() => import("../orderManagement/AllOrders"))
+const BulkOrdersManagement = lazy(() => import("../orderManagement/BulkOrdersManagement"))
 const OrderTracking = lazy(() => import("../orderManagement/OrderTracking"))
 const RefundRequests = lazy(() => import("../orderManagement/RefundRequests"))
 const Disputes = lazy(() => import("../orderManagement/Disputes"))
@@ -102,6 +103,8 @@ function SuperAdminLayout() {
     activeItem = "Combos & Deals"
   } else if (location.pathname.includes("/order-tracking")) {
     activeItem = "Order Tracking"
+  } else if (location.pathname.includes("/bulk-orders")) {
+    activeItem = "Bulk Orders"
   } else if (location.pathname.includes("/orders")) {
     activeItem = "All Orders"
   } else if (location.pathname.includes("/disputes")) {
@@ -244,6 +247,7 @@ export default function SuperAdminRouter() {
             <Route path="/combos-deals" element={<ComboDeals />} />
             <Route path="/orders" element={<AllOrders />} />
             <Route path="/order-tracking" element={<OrderTracking />} />
+            <Route path="/bulk-orders" element={<BulkOrdersManagement />} />
             <Route path="/disputes" element={<Disputes />} />
             <Route path="/refund-requests" element={<RefundRequests />} />
 

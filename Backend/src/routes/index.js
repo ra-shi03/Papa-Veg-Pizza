@@ -12,6 +12,7 @@ import { authMiddleware } from '../core/auth/auth.middleware.js';
 import * as businessSettingsController from '../modules/food/admin/controllers/businessSettings.controller.js';
 import * as productController from '../modules/food/admin/controllers/product.controller.js';
 import * as addonController from '../modules/food/admin/controllers/addon.controller.js';
+import * as comboController from '../modules/food/admin/controllers/combo.controller.js';
 import * as rewardConfigController from '../modules/food/admin/controllers/rewardConfig.controller.js';
 import * as categoryProductController from '../modules/food/admin/controllers/categoryProduct.controller.js';
 import * as adminController from '../modules/food/admin/controllers/admin.controller.js';
@@ -23,8 +24,19 @@ import franchiseStoreRoutes from '../modules/food/franchise/routes/store.routes.
 import franchiseStoreManagerRoutes from '../modules/food/franchise/routes/storeManager.routes.js';
 import franchiseStoreApprovalRoutes from '../modules/food/franchise/routes/storeApproval.routes.js';
 import kitchenStaffRoutes from '../modules/food/store/routes/kitchenStaff.routes.js';
+import { trackOrderPublicController, getOrderHistoryPublicController, getOrderMethodsController } from '../modules/food/orders/controllers/order.controller.js';
+import {
+  submitInquiryPublic,
+  getConfigPublic,
+  listInquiriesAdmin,
+  updateInquiryStatusAdmin,
+  deleteInquiryAdmin,
+  updateConfigAdmin
+} from '../modules/food/orders/controllers/bulkOrder.controller.js';
 import settingsRoutes from '../modules/food/settings/routes/settings.routes.js';
 import dynamicHomeRoutes from '../modules/food/settings/routes/dynamicHome.routes.js';
+import * as appConfigController from '../modules/food/settings/controllers/appConfig.controller.js';
+import { getPublicPageController } from '../modules/food/admin/controllers/pageContent.controller.js';
 
 const router = express.Router();
 
@@ -77,6 +89,9 @@ router.get('/v1/food/admin/products', productController.getProducts);
 router.get('/v1/food/admin/products/public', productController.getPublicProducts);
 router.get('/v1/food/products/public', productController.getPublicProducts);
 
+// Public combos (Meal for 1 / 2 / 4) route
+router.get(['/v1/food/combos/public', '/v1/food/admin/combos/public'], comboController.getPublicCombos);
+
 // Public addons route
 router.get('/v1/food/admin/addons/public', addonController.getAddons);
 router.get('/v1/food/admin/addons/stats', addonController.getAddonStats);
@@ -100,6 +115,28 @@ router.get('/v1/food/admin/categories/public', categoryProductController.getCate
 router.get('/v1/food/categories/public', categoryProductController.getCategoryProducts);
 router.get('/v1/food/categories', categoryProductController.getCategoryProducts);
 
+// Public Order Tracking route (No Auth Required)
+router.post(['/v1/food/orders/track', '/v1/orders/track', '/v1/food/orders/track-public'], trackOrderPublicController);
+router.get(['/v1/food/orders/track', '/v1/orders/track', '/v1/food/orders/track-public'], trackOrderPublicController);
+
+// Public Order History route (No Auth Required)
+router.post(['/v1/food/orders/history', '/v1/orders/history', '/v1/food/orders/history-lookup', '/v1/orders/history-lookup'], getOrderHistoryPublicController);
+router.get(['/v1/food/orders/history', '/v1/orders/history', '/v1/food/orders/history-lookup', '/v1/orders/history-lookup'], getOrderHistoryPublicController);
+
+// Public Order Methods route (No Auth Required)
+router.get(['/v1/food/orders/methods', '/v1/orders/methods', '/v1/food/order-methods', '/v1/order-methods'], getOrderMethodsController);
+
+// Public Bulk Order routes (No Auth Required)
+router.post(['/v1/food/bulk-order/inquiry', '/v1/bulk-order/inquiry'], submitInquiryPublic);
+router.get(['/v1/food/bulk-order/config', '/v1/bulk-order/config'], getConfigPublic);
+
+// Admin Bulk Order routes
+router.get(['/v1/food/admin/bulk-orders', '/v1/admin/bulk-orders'], authMiddleware, requireRoles('ADMIN', 'SUPERADMIN', 'SUPER_ADMIN'), listInquiriesAdmin);
+router.patch(['/v1/food/admin/bulk-orders/:id/status', '/v1/admin/bulk-orders/:id/status'], authMiddleware, requireRoles('ADMIN', 'SUPERADMIN', 'SUPER_ADMIN'), updateInquiryStatusAdmin);
+router.delete(['/v1/food/admin/bulk-orders/:id', '/v1/admin/bulk-orders/:id'], authMiddleware, requireRoles('ADMIN', 'SUPERADMIN', 'SUPER_ADMIN'), deleteInquiryAdmin);
+router.get(['/v1/food/admin/bulk-orders/config', '/v1/admin/bulk-orders/config'], authMiddleware, requireRoles('ADMIN', 'SUPERADMIN', 'SUPER_ADMIN'), getConfigPublic);
+router.put(['/v1/food/admin/bulk-orders/config', '/v1/admin/bulk-orders/config'], authMiddleware, requireRoles('ADMIN', 'SUPERADMIN', 'SUPER_ADMIN'), updateConfigAdmin);
+
 router.use('/v1/food/admin', authMiddleware, requireRoles('ADMIN'), storeAdminRoutes);
 router.use('/v1/food/user', authMiddleware, requireRoles('USER'), userRoutes);
 router.use('/v1/food/notifications', authMiddleware, requireRoles('USER', 'STORE', 'DELIVERY_PARTNER'), notificationRoutes);
@@ -111,6 +148,15 @@ router.use('/v1/fcm-tokens', fcmRoutes);
 router.use('/fcm-tokens', fcmRoutes);
 
 router.get('/v1/admin/queues', authMiddleware, requireRoles('ADMIN'), getQueuesController);
+
+// App Configuration public & admin aliases
+router.get(['/v1/food/app-config/public', '/v1/app-config/public'], appConfigController.getAppConfigPublic);
+router.get(['/v1/food/admin/app-config', '/v1/admin/app-config'], authMiddleware, requireRoles('ADMIN', 'SUPERADMIN', 'SUPER_ADMIN'), appConfigController.getAppConfigAdmin);
+router.put(['/v1/food/admin/app-config', '/v1/admin/app-config'], authMiddleware, requireRoles('ADMIN', 'SUPERADMIN', 'SUPER_ADMIN'), appConfigController.updateAppConfigAdmin);
+router.patch(['/v1/food/admin/app-config/feature', '/v1/admin/app-config/feature'], authMiddleware, requireRoles('ADMIN', 'SUPERADMIN', 'SUPER_ADMIN'), appConfigController.updateFeatureToggleAdmin);
+
+// Public CMS Pages (About, Terms, Privacy, Refund, Shipping, Cancellation)
+router.get(['/v1/food/pages/:key', '/v1/pages/:key', '/food/pages/:key', '/pages/:key'], getPublicPageController);
 
 router.use('/v1/settings', settingsRoutes);
 router.use('/v1/dynamic-home', dynamicHomeRoutes);

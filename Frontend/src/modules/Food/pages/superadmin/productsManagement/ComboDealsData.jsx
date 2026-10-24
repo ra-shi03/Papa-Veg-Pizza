@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
-  ChevronDown, MoreVertical, Eye, Edit, Copy, Archive, Trash2, CheckCircle,
-  XCircle, ArrowUpDown, Calendar, HelpCircle, ShoppingBag, ExternalLink, RefreshCw,
+  ChevronDown, MoreVertical, Eye, Edit, Archive, Trash2, CheckCircle,
+  XCircle, ArrowUpDown, Calendar, HelpCircle, ShoppingBag, RefreshCw,
   Search, Filter, RotateCcw, FileDown
 } from "lucide-react";
 
@@ -9,9 +10,10 @@ export default function ComboDealsData({
   combos = [],
   comboItems = [],
   products = [],
+  franchises = [],
+  stores = [],
   onView,
   onEdit,
-  onDuplicate,
   onDelete,
   onStatusChange,
   onBulkAction,
@@ -39,27 +41,22 @@ export default function ComboDealsData({
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const [activeDropdown, setActiveDropdown] = useState(null);
+  const [menuPos, setMenuPos] = useState(null);
 
-  const franchisesList = [
-    "Franchise North India",
-    "Franchise South India",
-    "Franchise West India",
-    "Franchise East India"
-  ];
-
-  const storesList = [
-    "Store Delhi-Connaught Place",
-    "Store Mumbai-Andheri",
-    "Store Bangalore-Indiranagar",
-    "Store Chennai-Adyar",
-    "Store Pune-Kothrud"
-  ];
+  const namesFor = (ids, list) => ids.map(id => list.find(o => o.id === id)?.name || id).join(", ");
 
   // Close dropdown on click outside
   useEffect(() => {
     const handleClose = () => setActiveDropdown(null);
     document.addEventListener("click", handleClose);
-    return () => document.removeEventListener("click", handleClose);
+    // The menu is fixed-positioned, so it must close when the page or table moves under it
+    window.addEventListener("scroll", handleClose, true);
+    window.addEventListener("resize", handleClose);
+    return () => {
+      document.removeEventListener("click", handleClose);
+      window.removeEventListener("scroll", handleClose, true);
+      window.removeEventListener("resize", handleClose);
+    };
   }, []);
 
   // Debouncing Search (300ms)
@@ -330,8 +327,8 @@ export default function ComboDealsData({
                 className="px-2.5 py-1.5 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs bg-zinc-50 dark:bg-zinc-950 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] text-zinc-800 dark:text-zinc-200"
               >
                 <option value="">All Franchises</option>
-                {franchisesList.map(item => (
-                  <option key={item} value={item}>{item}</option>
+                {franchises.map(item => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
                 ))}
               </select>
             </div>
@@ -345,8 +342,8 @@ export default function ComboDealsData({
                 className="px-2.5 py-1.5 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs bg-zinc-50 dark:bg-zinc-950 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] text-zinc-800 dark:text-zinc-200"
               >
                 <option value="">All Stores</option>
-                {storesList.map(item => (
-                  <option key={item} value={item}>{item}</option>
+                {stores.map(item => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
                 ))}
               </select>
             </div>
@@ -487,7 +484,7 @@ export default function ComboDealsData({
                               const prod = products.find(p => p.id === ci.productId);
                               return (
                                 <span key={ci._id} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded font-bold text-[9px]">
-                                  {prod ? prod.name : ci.productId}
+                                  {ci.choices?.length > 0 ? ci.choices.map(ch => ch.name).join(" / ") : (ci.name || (prod ? prod.name : ci.productId))}
                                   <span className="text-[var(--primary)]">x{ci.quantity}</span>
                                 </span>
                               );
@@ -507,6 +504,11 @@ export default function ComboDealsData({
                         }`}>
                           {item.comboType}
                         </span>
+                        {item.categoryLabel && (
+                          <span className="block text-[9px] font-bold text-zinc-400 mt-1 truncate" title="Menu section in user app">
+                            {item.categoryLabel}
+                          </span>
+                        )}
                       </td>
 
                       {/* Combo Selling Price */}
@@ -541,12 +543,12 @@ export default function ComboDealsData({
                             <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold block">All Stores</span>
                           )}
                           {item.applicabilityType === "franchises" && (
-                            <span className="text-[9px] font-bold text-zinc-500 block truncate" title={item.applicableFranchises.join(", ")}>
+                            <span className="text-[9px] font-bold text-zinc-500 block truncate" title={namesFor(item.applicableFranchises, franchises)}>
                               Franchises ({item.applicableFranchises.length})
                             </span>
                           )}
                           {item.applicabilityType === "stores" && (
-                            <span className="text-[9px] font-bold text-zinc-500 block truncate" title={item.applicableStores.join(", ")}>
+                            <span className="text-[9px] font-bold text-zinc-500 block truncate" title={namesFor(item.applicableStores, stores)}>
                               Stores ({item.applicableStores.length})
                             </span>
                           )}
@@ -580,6 +582,13 @@ export default function ComboDealsData({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
+                              const r = e.currentTarget.getBoundingClientRect();
+                              const MENU_HEIGHT = 300;
+                              const openUp = window.innerHeight - r.bottom < MENU_HEIGHT && r.top > MENU_HEIGHT;
+                              setMenuPos({
+                                right: Math.max(window.innerWidth - r.right, 8),
+                                ...(openUp ? { bottom: window.innerHeight - r.top + 6 } : { top: r.bottom + 6 })
+                              });
                               setActiveDropdown(prev => (prev === item._id ? null : item._id));
                             }}
                             className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 hover:text-black dark:hover:text-white transition-all cursor-pointer"
@@ -587,113 +596,55 @@ export default function ComboDealsData({
                             <MoreVertical size={14} />
                           </button>
 
-                          {activeDropdown === item._id && (
-                            <div className="absolute right-0 bottom-full md:bottom-auto md:top-full mt-1 w-48 bg-white dark:bg-zinc-955 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl z-50 overflow-hidden divide-y divide-zinc-100 dark:divide-zinc-855 animate-in fade-in slide-in-from-top-1 text-zinc-700 dark:text-zinc-300">
-                              <div className="py-0.5">
-                                {/* View Action */}
-                                <button
-                                  type="button"
-                                  onClick={() => onView(item)}
-                                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-zinc-105 dark:hover:bg-zinc-900 text-left cursor-pointer text-xs"
-                                >
-                                  <Eye size={12} />
-                                  View Details
-                                </button>
-                                
-                                {/* Edit Action */}
-                                <button
-                                  type="button"
-                                  onClick={() => onEdit(item)}
-                                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-zinc-105 dark:hover:bg-zinc-900 text-left cursor-pointer text-xs"
-                                >
-                                  <Edit size={12} />
-                                  Edit Combo
-                                </button>
-                                
-                                {/* Duplicate Action */}
-                                <button
-                                  type="button"
-                                  onClick={() => onDuplicate(item)}
-                                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-zinc-105 dark:hover:bg-zinc-900 text-left cursor-pointer text-xs"
-                                >
-                                  <Copy size={12} />
-                                  Duplicate
-                                </button>
+                          {activeDropdown === item._id && menuPos && createPortal(
+                            <div
+                              style={{ position: "fixed", zIndex: 200, ...menuPos }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-56 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl ring-1 ring-black/5 overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-zinc-700 dark:text-zinc-300"
+                            >
+                              <div className="px-3 py-2.5 bg-zinc-50 dark:bg-zinc-950 border-b border-zinc-100 dark:border-zinc-800">
+                                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Actions</p>
+                                <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate mt-0.5">{item.name}</p>
                               </div>
 
-                              <div className="py-0.5">
-                                {/* Status Toggle Activations */}
-                                {item.status !== "active" && (
-                                  <button
-                                    type="button"
-                                    onClick={() => onStatusChange(item._id, "active")}
-                                    className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-zinc-105 dark:hover:bg-zinc-900 text-left text-emerald-650 dark:text-emerald-400 cursor-pointer text-xs"
-                                  >
-                                    <CheckCircle size={12} />
-                                    Activate
+                              <div className="p-1">
+                                {[
+                                  { label: "View Details", icon: Eye, onClick: () => onView(item), tone: "text-zinc-700 dark:text-zinc-200", iconTone: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300" },
+                                  { label: "Edit Combo", icon: Edit, onClick: () => onEdit(item), tone: "text-zinc-700 dark:text-zinc-200", iconTone: "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400" }
+                                ].map(a => (
+                                  <button key={a.label} type="button" onClick={() => { setActiveDropdown(null); a.onClick(); }} className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-left cursor-pointer text-xs font-semibold transition-colors ${a.tone}`}>
+                                    <span className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${a.iconTone}`}><a.icon size={13} /></span>
+                                    {a.label}
                                   </button>
-                                )}
-                                
-                                {item.status === "active" && (
-                                  <button
-                                    type="button"
-                                    onClick={() => onStatusChange(item._id, "inactive")}
-                                    className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-zinc-105 dark:hover:bg-zinc-900 text-left text-zinc-550 cursor-pointer text-xs"
-                                  >
-                                    <XCircle size={12} />
-                                    Deactivate
-                                  </button>
-                                )}
-                                
-                                {item.status !== "scheduled" && (
-                                  <button
-                                    type="button"
-                                    onClick={() => onStatusChange(item._id, "scheduled")}
-                                    className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-zinc-105 dark:hover:bg-zinc-900 text-left text-blue-500 cursor-pointer text-xs"
-                                  >
-                                    <Calendar size={12} />
-                                    Schedule
-                                  </button>
-                                )}
-
-                                {item.status !== "archived" && (
-                                  <button
-                                    type="button"
-                                    onClick={() => onStatusChange(item._id, "archived")}
-                                    className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-zinc-105 dark:hover:bg-zinc-900 text-left text-zinc-400 cursor-pointer text-xs"
-                                  >
-                                    <Archive size={12} />
-                                    Archive
-                                  </button>
-                                )}
+                                ))}
                               </div>
 
-                              {/* Customer View Preview trigger */}
-                              <div className="py-0.5">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    alert(`Customer Mobile View Mockup:\n-------------------------\nCombo Offer: ${item.name}\nPrice: ₹${item.price}\nIncludes: ${item.description}`);
-                                  }}
-                                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-zinc-105 dark:hover:bg-zinc-900 text-left text-amber-650 dark:text-amber-400 cursor-pointer text-xs"
-                                >
-                                  <ExternalLink size={12} />
-                                  Customer Preview
-                                </button>
+                              <div className="p-1 border-t border-zinc-100 dark:border-zinc-800">
+                                {[
+                                  { show: item.status !== "active", label: "Activate", icon: CheckCircle, status: "active", iconTone: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400" },
+                                  { show: item.status === "active", label: "Deactivate", icon: XCircle, status: "inactive", iconTone: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400" },
+                                  { show: item.status !== "scheduled", label: "Schedule", icon: Calendar, status: "scheduled", iconTone: "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400" },
+                                  { show: item.status !== "archived", label: "Archive", icon: Archive, status: "archived", iconTone: "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400" }
+                                ].filter(a => a.show).map(a => (
+                                  <button key={a.label} type="button" onClick={() => { setActiveDropdown(null); onStatusChange(item._id, a.status); }} className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-left cursor-pointer text-xs font-semibold text-zinc-700 dark:text-zinc-200 transition-colors">
+                                    <span className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${a.iconTone}`}><a.icon size={13} /></span>
+                                    {a.label}
+                                  </button>
+                                ))}
                               </div>
 
-                              {/* Delete Action */}
-                              <div className="py-0.5">
+                              <div className="p-1 border-t border-zinc-100 dark:border-zinc-800">
                                 <button
                                   type="button"
-                                  onClick={() => onDelete(item)}
-                                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-red-50 hover:text-red-650 dark:hover:bg-red-950/20 dark:hover:text-red-400 text-left cursor-pointer font-bold text-red-500 text-xs"
+                                  onClick={() => { setActiveDropdown(null); onDelete(item); }}
+                                  className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-left cursor-pointer font-bold text-red-600 dark:text-red-400 text-xs transition-colors"
                                 >
-                                  <Trash2 size={12} />
+                                  <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-red-50 dark:bg-red-950/40"><Trash2 size={13} /></span>
                                   Delete Record
                                 </button>
                               </div>
-                            </div>
+                            </div>,
+                            document.body
                           )}
                         </div>
                       </td>

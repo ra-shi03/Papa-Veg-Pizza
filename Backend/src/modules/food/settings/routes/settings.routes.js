@@ -79,6 +79,7 @@ router.put('/search-config/tabs/:id', authMiddleware, requireSuperAdmin, searchP
 router.delete('/search-config/tabs/:id', authMiddleware, requireSuperAdmin, searchPageConfigController.deleteSearchByTab);
 
 import * as faqController from '../controllers/faq.controller.js';
+import * as appConfigController from '../controllers/appConfig.controller.js';
 
 // FAQ Routes
 router.get('/faqs/public', faqController.getPublicFaqs);
@@ -87,6 +88,12 @@ router.post('/faqs', authMiddleware, requireSuperAdmin, faqController.createFaq)
 router.put('/faqs/:id', authMiddleware, requireSuperAdmin, faqController.updateFaq);
 router.delete('/faqs/:id', authMiddleware, requireSuperAdmin, faqController.deleteFaq);
 router.patch('/faqs/:id/toggle', authMiddleware, requireSuperAdmin, faqController.toggleFaqStatus);
+
+// App Configuration Routes (Global Feature Flags & Specs)
+router.get(['/app-config/public', '/app-configurations/public'], appConfigController.getAppConfigPublic);
+router.get(['/app-config', '/app-configurations'], authMiddleware, requireSuperAdmin, appConfigController.getAppConfigAdmin);
+router.put(['/app-config', '/app-configurations'], authMiddleware, requireSuperAdmin, appConfigController.updateAppConfigAdmin);
+router.patch(['/app-config/feature', '/app-configurations/feature'], authMiddleware, requireSuperAdmin, appConfigController.updateFeatureToggleAdmin);
 
 export default router;
 

@@ -25,6 +25,7 @@ const AddressSelectorPage = lazy(() => import("@food/pages/user/cart/AddressSele
 
 // Orders
 const Orders = lazy(() => import("@food/pages/user/orders/Orders"))
+const OrderHistory = lazy(() => import("@food/pages/user/profile/OrderHistory"))
 const OrderTracking = lazy(() => import("@food/pages/user/orders/OrderTracking"))
 const OrderInvoice = lazy(() => import("@food/pages/user/orders/OrderInvoice"))
 const UserOrderDetails = lazy(() => import("@food/pages/user/orders/UserOrderDetails"))
@@ -32,6 +33,7 @@ const UserOrderDetails = lazy(() => import("@food/pages/user/orders/UserOrderDet
 // Offers & Promise
 const Offers = lazy(() => import("@food/pages/user/Offers"))
 const PromisePage = lazy(() => import("@food/pages/user/PromisePage"))
+const BulkOrder = lazy(() => import("@food/pages/user/BulkOrder"))
 
 // Gourmet
 const Gourmet = lazy(() => import("@food/pages/user/Gourmet"))
@@ -115,15 +117,11 @@ export default function UserRouter() {
           <Route path="cart/select-address" element={<LocationRequiredGuard><SelectAddress /></LocationRequiredGuard>} />
           <Route path="address-selector" element={<LocationRequiredGuard><AddressSelectorPage /></LocationRequiredGuard>} />
 
-          {/* Orders - Protected (require user auth) */}
-          <Route
-            path="orders"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <Orders />
-              </ProtectedRoute>
-            }
-          />
+          {/* Orders / Reorder / Order History */}
+          <Route path="orders" element={<Orders />} />
+          <Route path="order-history" element={<Orders />} />
+          <Route path="account/order-history" element={<Orders />} />
+          <Route path="profile/order-history" element={<Orders />} />
           <Route
             path="orders/:orderId"
             element={
@@ -149,8 +147,11 @@ export default function UserRouter() {
             }
           />
 
-          {/* Offers */}
-          <Route path="offers" element={<LocationRequiredGuard><Offers /></LocationRequiredGuard>} />
+          {/* Offers & Coupons */}
+          <Route path="offers" element={<Coupons />} />
+          <Route path="coupons" element={<Coupons />} />
+          <Route path="bulk-order" element={<BulkOrder />} />
+          <Route path="bulk-orders" element={<BulkOrder />} />
 
           {/* Gourmet */}
           <Route path="gourmet" element={<Gourmet />} />
@@ -166,6 +167,7 @@ export default function UserRouter() {
           <Route path="account" element={<Navigate to="/food/user/account/profile-details" replace />} />
           <Route path="profile" element={<Navigate to="/food/user/account/profile-details" replace />} />
           <Route path="profile-details" element={<Navigate to="/food/user/account/profile-details" replace />} />
+          <Route path="track-order" element={<TrackOrder />} />
           <Route path="account/track-order" element={<TrackOrder />} />
           <Route path="profile/track-order" element={<TrackOrder />} />
           <Route
@@ -268,22 +270,9 @@ export default function UserRouter() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="account/coupons"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <Coupons />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="account/coupons/all"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <AllCoupons />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="account/coupons" element={<Coupons />} />
+          <Route path="account/coupons/all" element={<Coupons />} />
+          <Route path="profile/coupons" element={<Coupons />} />
           <Route
             path="profile/about"
             element={
@@ -359,23 +348,9 @@ export default function UserRouter() {
             }
           />
 
-          {/* Wallet & Rewards - Protected (user auth) */}
-          <Route
-            path="wallet"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <Wallet />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="rewards"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <Rewards />
-              </ProtectedRoute>
-            }
-          />
+          {/* Wallet & Rewards */}
+          <Route path="wallet" element={<Wallet />} />
+          <Route path="rewards" element={<Rewards />} />
 
           {/* Complaints - Protected (user auth) */}
           <Route

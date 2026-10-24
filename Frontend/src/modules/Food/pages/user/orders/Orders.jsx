@@ -1,20 +1,32 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Link, useNavigate, useLocation } from "react-router-dom"
-import { ArrowLeft, Search, MoreVertical, ChevronRight, Star, RotateCcw, AlertCircle, Loader2, Clock, X, Share2, MessageCircle, Send, Copy, Mail, MessagesSquare, Link2 } from "lucide-react"
+import { ArrowLeft, Search, MoreVertical, ChevronRight, Star, RotateCcw, AlertCircle, Loader2, Clock, X, Share2, MessageCircle, Send, Copy, Mail, MessagesSquare, Link2, Plus, ShoppingCart, Check } from "lucide-react"
 import { orderAPI } from "@food/api"
 import { useCart } from "@food/context/CartContext"
 import { toast } from "sonner"
 import { getCompanyNameAsync } from "@food/utils/businessSettings"
 import noOrdersImg from "@/assets/no-orders.png"
+import useAppBackNavigation from "@food/hooks/useAppBackNavigation"
 const debugLog = (...args) => { }
 const debugWarn = (...args) => { }
 const debugError = (...args) => { }
+
+const DEFAULT_FILTER_OPTIONS = [
+  { id: "all", label: "All" },
+  { id: "favourite", label: "Favourite" },
+  { id: "delivery", label: "Delivery" },
+  { id: "dine_in", label: "Dine-In" },
+  { id: "takeaway", label: "Takeaway" },
+  { id: "train", label: "Delivery on Train" },
+  { id: "incar", label: "In-Car" },
+]
 
 
 export default function Orders() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { replaceCart } = useCart()
+  const goBack = useAppBackNavigation()
+  const { replaceCart, addToCart } = useCart()
 
   const handleBack = () => {
     if (
@@ -24,12 +36,37 @@ export default function Orders() {
       navigate(location.state.from)
       return
     }
-    const profilePath = window.location.pathname.startsWith("/food")
-      ? "/food/user/account/profile-details"
-      : "/user/account/profile-details"
-    navigate(profilePath)
+    goBack()
   }
 
+  const [activeTab, setActiveTab] = useState(() => {
+    return location.state?.tab || "order_history"
+  })
+  const [selectedFilter, setSelectedFilter] = useState("all")
+  const [filterOptions, setFilterOptions] = useState(() => {
+    try {
+      const stored = localStorage.getItem("pvp_order_methods")
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const dynamicChips = parsed
+            .filter((m) => m.enabled !== false)
+            .map((m) => ({
+              id: m.id === "dinein" ? "dine_in" : m.id,
+              label: m.label || m.name,
+            }))
+          if (dynamicChips.length > 0) {
+            return [
+              { id: "all", label: "All" },
+              { id: "favourite", label: "Favourite" },
+              ...dynamicChips,
+            ]
+          }
+        }
+      }
+    } catch (_) {}
+    return DEFAULT_FILTER_OPTIONS
+  })
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -61,6 +98,69 @@ export default function Orders() {
       debugError('Error saving shownRatingForOrders to localStorage:', error)
     }
   }, [shownRatingForOrders])
+
+  // Dynamically fetch order methods through API
+  useEffect(() => {
+    let isMounted = true
+    const fetchOrderMethods = async () => {
+      try {
+        const methods = await orderAPI.getOrderMethods()
+        if (isMounted && Array.isArray(methods) && methods.length > 0) {
+          const dynamicChips = methods
+            .filter((m) => m.enabled !== false)
+            .map((m) => ({
+              id: m.id === "dinein" ? "dine_in" : m.id,
+              label: m.label || m.name,
+            }))
+          if (dynamicChips.length > 0) {
+            setFilterOptions([
+              { id: "all", label: "All" },
+              { id: "favourite", label: "Favourite" },
+              ...dynamicChips,
+            ])
+          }
+        }
+      } catch (err) {
+        debugWarn("Failed to fetch order methods via API:", err)
+      }
+    }
+
+    fetchOrderMethods()
+
+    const handleMethodsChanged = (e) => {
+      let updated = e?.detail
+      if (!updated) {
+        try {
+          const stored = localStorage.getItem("pvp_order_methods")
+          if (stored) updated = JSON.parse(stored)
+        } catch (_) {}
+      }
+      if (Array.isArray(updated) && updated.length > 0) {
+        const dynamicChips = updated
+          .filter((m) => m.enabled !== false)
+          .map((m) => ({
+            id: m.id === "dinein" ? "dine_in" : m.id,
+            label: m.label || m.name,
+          }))
+        if (dynamicChips.length > 0) {
+          setFilterOptions([
+            { id: "all", label: "All" },
+            { id: "favourite", label: "Favourite" },
+            ...dynamicChips,
+          ])
+        }
+      }
+    }
+
+    window.addEventListener("pvp_order_methods_changed", handleMethodsChanged)
+    window.addEventListener("storage", handleMethodsChanged)
+
+    return () => {
+      isMounted = false
+      window.removeEventListener("pvp_order_methods_changed", handleMethodsChanged)
+      window.removeEventListener("storage", handleMethodsChanged)
+    }
+  }, [])
 
   // Calculate countdown for an order
   const calculateCountdown = (order) => {
@@ -406,18 +506,119 @@ export default function Orders() {
     return `${day} ${month}, ${displayHours}:${minutes}${ampm}`
   }
 
-  // Filter orders based on search query
-  const filteredOrders = orders.filter(order => {
-    if (!searchQuery.trim()) return true
+  // Filter orders based on search query and selected filter chip
+  const filteredOrders = useMemo(() => {
+    return orders.filter(order => {
+      // 1. Search Query
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim()
+        const restaurantMatch = (order.restaurant || '').toLowerCase().includes(query)
+        const itemsMatch = (order.items || []).some(item =>
+          (item.name || item.foodName || '').toLowerCase().includes(query)
+        )
+        const orderIdMatch = String(order.orderId || order.id || '').toLowerCase().includes(query)
+        if (!restaurantMatch && !itemsMatch && !orderIdMatch) return false
+      }
 
-    const query = searchQuery.toLowerCase()
-    const restaurantMatch = order.restaurant?.toLowerCase().includes(query)
-    const itemsMatch = order.items.some(item =>
-      (item.name || item.foodName || '').toLowerCase().includes(query)
-    )
+      // 2. Filter Chip
+      if (selectedFilter === "all") return true
+      if (selectedFilter === "favourite") {
+        return (
+          Number(order.restaurantRating) >= 4 ||
+          order.isFavourite === true ||
+          (order.ratings?.restaurant?.rating || 0) >= 4
+        )
+      }
+      const type = (order.deliveryType || order.orderType || (order.deliveryAddress ? 'delivery' : '')).toLowerCase()
+      if (selectedFilter === "delivery") {
+        return type === 'delivery' || (!type.includes('dine') && !type.includes('takeaway') && !type.includes('pickup') && !type.includes('train') && !type.includes('car'))
+      }
+      if (selectedFilter === "dine_in" || selectedFilter === "dinein") {
+        return type.includes('dine') || type.includes('table')
+      }
+      if (selectedFilter === "takeaway" || selectedFilter === "pickup") {
+        return type.includes('takeaway') || type.includes('pickup')
+      }
+      if (selectedFilter === "train" || selectedFilter === "delivery_on_train") {
+        return type.includes('train') || type.includes('irctc')
+      }
+      if (selectedFilter === "incar" || selectedFilter === "in_car") {
+        return type.includes('car') || type.includes('drive')
+      }
+      const normFilter = selectedFilter.toLowerCase().replace(/[-_\s]/g, '')
+      const normType = type.replace(/[-_\s]/g, '')
+      return normType.includes(normFilter) || normFilter.includes(normType)
+    })
+  }, [orders, searchQuery, selectedFilter])
 
-    return restaurantMatch || itemsMatch
-  })
+  // Extract unique dishes from past orders for Previously Ordered tab
+  const previouslyOrderedDishes = useMemo(() => {
+    const dishMap = new Map()
+    orders.forEach(order => {
+      (order.items || []).forEach(item => {
+        const key = item.name || item.foodName || item.itemId || item.id
+        if (key && !dishMap.has(key)) {
+          dishMap.set(key, {
+            ...item,
+            orderId: order.orderId || order.id,
+            orderDate: order.createdAt,
+            restaurant: order.restaurant,
+            restaurantId: order.restaurantId,
+            restaurantSlug: order.restaurantSlug,
+            deliveryType: order.deliveryType || order.orderType || 'delivery',
+          })
+        }
+      })
+    })
+    return Array.from(dishMap.values())
+  }, [orders])
+
+  const filteredDishes = useMemo(() => {
+    return previouslyOrderedDishes.filter(dish => {
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim()
+        const nameMatch = (dish.name || dish.foodName || '').toLowerCase().includes(query)
+        const restMatch = (dish.restaurant || '').toLowerCase().includes(query)
+        if (!nameMatch && !restMatch) return false
+      }
+      if (selectedFilter === "all") return true
+      if (selectedFilter === "favourite") return true
+      const type = String(dish.deliveryType || dish.orderType || '').toLowerCase()
+      if (selectedFilter === "delivery") {
+        return type === 'delivery' || (!type.includes('dine') && !type.includes('takeaway') && !type.includes('pickup') && !type.includes('train') && !type.includes('car'))
+      }
+      if (selectedFilter === "dine_in" || selectedFilter === "dinein") {
+        return type.includes('dine') || type.includes('table')
+      }
+      if (selectedFilter === "takeaway" || selectedFilter === "pickup") {
+        return type.includes('takeaway') || type.includes('pickup')
+      }
+      if (selectedFilter === "train" || selectedFilter === "delivery_on_train") {
+        return type.includes('train') || type.includes('irctc')
+      }
+      if (selectedFilter === "incar" || selectedFilter === "in_car") {
+        return type.includes('car') || type.includes('drive')
+      }
+      const normFilter = selectedFilter.toLowerCase().replace(/[-_\s]/g, '')
+      const normType = type.replace(/[-_\s]/g, '')
+      return normType.includes(normFilter) || normFilter.includes(normType)
+    })
+  }, [previouslyOrderedDishes, searchQuery, selectedFilter])
+
+  const handleAddSingleDish = (dish) => {
+    addToCart({
+      id: dish.id || dish.itemId || dish._id,
+      name: dish.name || dish.foodName || "Item",
+      price: Number(dish.price) || 0,
+      image: dish.image || "",
+      restaurant: dish.restaurant || "Papa Veg Pizza",
+      restaurantId: dish.restaurantId,
+      description: dish.description || "",
+      isVeg: dish.isVeg !== false,
+      quantity: 1,
+    })
+    toast.success(`${dish.name || "Item"} added to cart`)
+  }
 
   const ratingModalHasDeliveryPartner = !!(ratingModal.order?.deliveryPartnerId || ratingModal.order?.deliveryPartnerName)
   const ratingSubmitDisabled = submittingRating ||
@@ -675,10 +876,11 @@ Order again from this restaurant in the ${companyName} app.`
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] pb-10 font-sans">
-        <div className="bg-white dark:bg-[#121212] px-4 py-3.5 flex items-center shadow-xs sticky top-0 z-10 border-b border-gray-100 dark:border-gray-800">
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] pb-10 font-sans flex flex-col">
+      {/* Header - Matches Image 2 */}
+      <div className="bg-white dark:bg-[#121212] sticky top-0 z-20 border-b border-gray-100 dark:border-gray-800 shadow-xs">
+        <div className="px-4 py-3.5 flex items-center">
           <button
             type="button"
             onClick={handleBack}
@@ -687,37 +889,69 @@ Order again from this restaurant in the ${companyName} app.`
           >
             <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
           </button>
-          <h1 className="ml-3 text-[17px] sm:text-lg font-bold text-gray-900 dark:text-white m-0">
-            My Orders
+          <h1 className="ml-3 text-[18px] sm:text-[19px] font-bold text-gray-900 dark:text-white m-0 tracking-tight">
+            Reorder
           </h1>
         </div>
-        <div className="flex items-center justify-center py-24">
-          <Loader2 className="w-8 h-8 text-[var(--accent-red,#EE3A43)] animate-spin" />
+
+        {/* Two Tabs Segment Control: Previously Ordered | Order History */}
+        <div className="px-4 pb-2.5">
+          <div className="grid grid-cols-2 p-1 bg-gray-100 dark:bg-zinc-800 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setActiveTab("previously_ordered")}
+              className={`py-2 text-[13px] sm:text-sm font-semibold rounded-lg transition-all cursor-pointer border-0 ${
+                activeTab === "previously_ordered"
+                  ? "bg-white dark:bg-zinc-900 text-gray-900 dark:text-white shadow-xs"
+                  : "bg-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+              }`}
+            >
+              Previously Ordered
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("order_history")}
+              className={`py-2 text-[13px] sm:text-sm font-semibold rounded-lg transition-all cursor-pointer border-0 ${
+                activeTab === "order_history"
+                  ? "bg-white dark:bg-zinc-900 text-gray-900 dark:text-white shadow-xs"
+                  : "bg-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+              }`}
+            >
+              Order History
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Chips: All | Favourite | Dynamic Order Methods (Delivery, Dine-In, Takeaway, Train, etc.) */}
+        <div className="px-4 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar border-t border-gray-100 dark:border-gray-800/60">
+          {filterOptions.map((filter) => {
+            const isSelected = selectedFilter === filter.id
+            return (
+              <button
+                key={filter.id}
+                type="button"
+                onClick={() => setSelectedFilter(filter.id)}
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer border ${
+                  isSelected
+                    ? "bg-white dark:bg-zinc-900 text-[#E53935] border-[#E53935] shadow-xs"
+                    : "bg-white dark:bg-zinc-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-700"
+                }`}
+              >
+                {filter.label}
+              </button>
+            )
+          })}
         </div>
       </div>
-    )
-  }
 
-  if (orders.length === 0) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-[#0a0a0a] flex flex-col font-sans">
-        {/* Header */}
-        <div className="bg-white dark:bg-[#121212] px-4 py-3.5 flex items-center shadow-xs sticky top-0 z-10 border-b border-gray-100 dark:border-gray-800">
-          <button
-            type="button"
-            onClick={handleBack}
-            className="p-1.5 -ml-1.5 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer bg-transparent border-0 flex items-center justify-center"
-            aria-label="Back"
-          >
-            <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
-          </button>
-          <h1 className="ml-3 text-[17px] sm:text-lg font-bold text-gray-900 dark:text-white m-0">
-            My Orders
-          </h1>
+      {/* Main Content Area */}
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center py-28">
+          <Loader2 className="w-8 h-8 text-[var(--accent-red,#EE3A43)] animate-spin" />
         </div>
-
-        {/* Empty State (2nd Image) */}
-        <div className="flex-1 flex flex-col items-center justify-center px-6 -mt-8 sm:-mt-12 text-center">
+      ) : orders.length === 0 ? (
+        /* Empty State (2nd Image) */
+        <div className="flex-1 flex flex-col items-center justify-center px-6 py-16 text-center">
           <img
             src={noOrdersImg}
             alt="No orders found"
@@ -738,49 +972,124 @@ Order again from this restaurant in the ${companyName} app.`
             Explore Menu
           </button>
         </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] pb-10 font-sans">
-      {/* Header */}
-      <div className="bg-white dark:bg-[#121212] px-4 py-3.5 flex items-center shadow-xs sticky top-0 z-10 border-b border-gray-100 dark:border-gray-800">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="p-1.5 -ml-1.5 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer bg-transparent border-0 flex items-center justify-center"
-          aria-label="Back"
-        >
-          <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
-        </button>
-        <h1 className="ml-3 text-[17px] sm:text-lg font-bold text-gray-900 dark:text-white m-0">
-          My Orders
-        </h1>
-      </div>
-
-      {/* Search Bar */}
-      <div className="p-4 bg-white dark:bg-[#121212] mt-1 border-b dark:border-gray-800">
-        <div className="flex items-center bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2 shadow-sm">
-          <Search className="w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search by restaurant or dish"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 ml-3 bg-transparent outline-none text-gray-600 dark:text-gray-300 placeholder-gray-400"
-          />
-        </div>
-      </div>
-
-      {/* Orders List */}
-      <div className="px-4 py-2 space-y-4">
-        {filteredOrders.length === 0 ? (
-          <div className="bg-white dark:bg-[#121212] rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-8 text-center">
-            <p className="text-gray-600 dark:text-gray-400">No orders found matching your search</p>
+      ) : activeTab === "previously_ordered" ? (
+        /* Previously Ordered Content */
+        <div className="flex-1">
+          {/* Search Bar */}
+          <div className="p-4 bg-white dark:bg-[#121212] border-b dark:border-gray-800">
+            <div className="flex items-center bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2 shadow-xs">
+              <Search className="w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search previously ordered dishes"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1 ml-3 bg-transparent outline-none text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400"
+              />
+              {searchQuery && (
+                <button type="button" onClick={() => setSearchQuery("")} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
-        ) : (
-          filteredOrders.map((order) => {
+
+          <div className="px-4 py-4 space-y-3">
+            {filteredDishes.length === 0 ? (
+              <div className="bg-white dark:bg-[#121212] rounded-xl shadow-xs border border-gray-100 dark:border-gray-800 p-8 text-center">
+                <p className="text-gray-600 dark:text-gray-400 text-sm">No items found matching your filter</p>
+                <button
+                  type="button"
+                  onClick={() => { setSelectedFilter("all"); setSearchQuery(""); }}
+                  className="mt-3 text-xs text-[#E53935] font-semibold hover:underline"
+                >
+                  Clear filter
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {filteredDishes.map((dish, idx) => (
+                  <div
+                    key={`${dish.id || dish.itemId || idx}-${dish.orderId}`}
+                    className="bg-white dark:bg-[#121212] rounded-xl p-3 border border-gray-100 dark:border-gray-800 shadow-xs flex items-center justify-between gap-3 hover:border-red-200 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-14 h-14 rounded-lg bg-gray-100 dark:bg-zinc-800 overflow-hidden shrink-0">
+                        <img
+                          src={dish.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=150&q=80"}
+                          alt={dish.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.src = "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=150&q=80"
+                          }}
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block shrink-0" />
+                          <h4 className="font-semibold text-sm text-gray-900 dark:text-white truncate">
+                            {dish.name}
+                          </h4>
+                        </div>
+                        {dish.variantName && (
+                          <p className="text-[11px] text-gray-500 truncate">{dish.variantName}</p>
+                        )}
+                        <p className="text-xs font-bold text-gray-900 dark:text-gray-100 mt-0.5">
+                          ₹{dish.price}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleAddSingleDish(dish)}
+                      className="px-3.5 py-1.5 bg-[#E53935] hover:bg-[#d92d36] text-white text-xs font-bold rounded-lg shadow-xs active:scale-95 transition-all shrink-0 flex items-center gap-1 cursor-pointer border-0"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* Order History Tab */
+        <div className="flex-1">
+          {/* Search Bar */}
+          <div className="p-4 bg-white dark:bg-[#121212] border-b dark:border-gray-800">
+            <div className="flex items-center bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2 shadow-xs">
+              <Search className="w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by restaurant, dish or order ID"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1 ml-3 bg-transparent outline-none text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400"
+              />
+              {searchQuery && (
+                <button type="button" onClick={() => setSearchQuery("")} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Orders List */}
+          <div className="px-4 py-3 space-y-4">
+            {filteredOrders.length === 0 ? (
+              <div className="bg-white dark:bg-[#121212] rounded-xl shadow-xs border border-gray-100 dark:border-gray-800 p-8 text-center">
+                <p className="text-gray-600 dark:text-gray-400 text-sm">No orders found matching your search</p>
+                <button
+                  type="button"
+                  onClick={() => { setSelectedFilter("all"); setSearchQuery(""); }}
+                  className="mt-3 text-xs text-[#E53935] font-semibold hover:underline"
+                >
+                  Clear filter
+                </button>
+              </div>
+            ) : (
+              filteredOrders.map((order) => {
             // Check payment method - COD/wallet orders have 'pending' status which is normal
             const isCodOrWallet = order.payment?.method === 'cash' ||
               order.payment?.method === 'cod' ||
@@ -836,7 +1145,7 @@ Order again from this restaurant in the ${companyName} app.`
                         </p>
                       )}
                       <Link to="/food/user/menu">
-                        <button className="text-xs text-[#7e3866] font-medium flex items-center mt-1 hover:text-[#55254b]">
+                        <button className="text-xs text-[#E53935] font-semibold flex items-center mt-1 hover:text-[#d92d36]">
                           View menu <span className="ml-0.5">&gt;</span>
                         </button>
                       </Link>
@@ -1023,7 +1332,7 @@ Order again from this restaurant in the ${companyName} app.`
                   </div>
                   <div className="flex items-center ml-4">
                     <Link to={(isDelivered || isCancelled) ? `/user/orders/${order.id}/details` : `/user/orders/${order.id}`}>
-                      <button className="text-xs text-[#7e3866] font-medium hover:text-[#55254b] flex items-center gap-1">
+                      <button className="text-xs text-[#E53935] font-semibold hover:text-[#d92d36] flex items-center gap-1">
                         View Details
                         <ChevronRight className="w-4 h-4" />
                       </button>
@@ -1077,7 +1386,7 @@ Order again from this restaurant in the ${companyName} app.`
                       <button
                         type="button"
                         onClick={() => handleOpenRating(order)}
-                        className="text-xs text-[#7e3866] font-medium mt-0.5 flex items-center"
+                        className="text-xs text-[#E53935] font-medium mt-0.5 flex items-center hover:underline"
                       >
                         Rate restaurant & delivery <span className="ml-0.5">&gt;</span>
                       </button>
@@ -1087,7 +1396,7 @@ Order again from this restaurant in the ${companyName} app.`
                       <p className="text-xs text-gray-500">{order.status === 'preparing' ? 'Preparing' : order.status === 'outForDelivery' ? 'Out for delivery' : order.status === 'confirmed' ? 'Order confirmed' : ''}</p>
                       {/* Countdown Timer */}
                       {countdowns[order.id] && countdowns[order.id] > 0 && (
-                        <div className="flex items-center gap-1 mt-1 text-xs text-[#7e3866] font-medium">
+                        <div className="flex items-center gap-1 mt-1 text-xs text-[#E53935] font-medium">
                           <Clock size={12} />
                           <span>{countdowns[order.id]} min{countdowns[order.id] !== 1 ? 's' : ''} remaining</span>
                         </div>
@@ -1099,7 +1408,7 @@ Order again from this restaurant in the ${companyName} app.`
                   {isDelivered && !paymentFailed && (
                     <button
                       onClick={() => handleReorder(order)}
-                      className="bg-[#7e3866] hover:bg-[#55254b] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1 shadow-sm transition-colors"
+                      className="bg-[#E53935] hover:bg-[#d92d36] text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-1 shadow-sm shadow-red-500/20 transition-colors"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
                       Reorder
@@ -1110,7 +1419,9 @@ Order again from this restaurant in the ${companyName} app.`
             )
           })
         )}
-      </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer Branding */}
       <div className="flex justify-center mt-8 mb-4">
@@ -1122,7 +1433,7 @@ Order again from this restaurant in the ${companyName} app.`
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 animate-in fade-in duration-200">
           <div className="w-full max-w-md rounded-3xl bg-white dark:bg-[#121212] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border dark:border-gray-800">
             {/* Header with gradient */}
-            <div className="bg-gradient-to-r from-[#7e3866] to-[#55254b] px-6 py-5">
+            <div className="bg-gradient-to-r from-[#E53935] to-[#d92d36] px-6 py-5">
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                   <Star className="w-5 h-5 fill-white" />
@@ -1168,7 +1479,7 @@ Order again from this restaurant in the ${companyName} app.`
                   rows={2}
                   value={restaurantFeedbackText}
                   onChange={(e) => setRestaurantFeedbackText(e.target.value)}
-                  className="w-full rounded-xl border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1a1a1a] px-4 py-2 text-sm text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#7e3866] focus:border-[#7e3866] resize-none transition-all"
+                  className="w-full rounded-xl border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1a1a1a] px-4 py-2 text-sm text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#E53935] focus:border-[#E53935] resize-none transition-all"
                   placeholder="Restaurant feedback (optional)"
                 />
               </div>
@@ -1202,7 +1513,7 @@ Order again from this restaurant in the ${companyName} app.`
                     rows={2}
                     value={deliveryFeedbackText}
                     onChange={(e) => setDeliveryFeedbackText(e.target.value)}
-                    className="w-full rounded-xl border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1a1a1a] px-4 py-2 text-sm text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#7e3866] focus:border-[#7e3866] resize-none transition-all"
+                    className="w-full rounded-xl border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1a1a1a] px-4 py-2 text-sm text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#E53935] focus:border-[#E53935] resize-none transition-all"
                     placeholder="Delivery partner feedback (optional)"
                   />
                 </div>
@@ -1213,7 +1524,7 @@ Order again from this restaurant in the ${companyName} app.`
                 type="button"
                 disabled={ratingSubmitDisabled}
                 onClick={handleSubmitRating}
-                className="w-full rounded-xl bg-gradient-to-r from-[#7e3866] to-[#55254b] text-white text-base font-bold py-3.5 hover:from-[#55254b] hover:to-[#C44409] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-[#7e3866]/30 flex items-center justify-center gap-2"
+                className="w-full rounded-xl bg-gradient-to-r from-[#E53935] to-[#d92d36] text-white text-base font-bold py-3.5 hover:from-[#d92d36] hover:to-[#b71c1c] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-red-500/25 flex items-center justify-center gap-2"
               >
                 {submittingRating ? (
                   <>
@@ -1259,7 +1570,7 @@ Order again from this restaurant in the ${companyName} app.`
                 <button
                   type="button"
                   onClick={handleSystemShareFromModal}
-                  className="w-full rounded-2xl bg-[#7e3866] px-4 py-3 text-sm font-semibold text-white flex items-center justify-center gap-2 hover:bg-[#55254b] transition-colors"
+                  className="w-full rounded-2xl bg-[#E53935] px-4 py-3 text-sm font-semibold text-white flex items-center justify-center gap-2 hover:bg-[#d92d36] transition-colors"
                 >
                   <Share2 className="w-4 h-4" />
                   Share via apps

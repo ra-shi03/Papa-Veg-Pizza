@@ -21,7 +21,8 @@ const GENDER_TO_PROFILE = { male: 'MALE', female: 'FEMALE', other: 'OTHER', 'pre
  * Name/email live in `profiles`; the phone is the login mobile on `users`.
  */
 const buildAccount = (user, profile) => {
-    const name = [profile?.firstName, profile?.lastName].filter(Boolean).join(' ').trim();
+    const profileName = [profile?.firstName, profile?.lastName].filter(Boolean).join(' ').trim();
+    const name = profileName || user.name || user.fullName || '';
     return {
         id: String(user._id),
         name,
@@ -29,7 +30,7 @@ const buildAccount = (user, profile) => {
         lastName: profile?.lastName || null,
         email: profile?.email || null,
         emailVerified: Boolean(user.emailVerified),
-        phone: user.mobile || profile?.phone || null,
+        phone: user.mobile || profile?.phone || user.phone || null,
         profileImage: profile?.profilePhoto || null,
         profileCompleted: Boolean(profile?.profileCompleted)
     };

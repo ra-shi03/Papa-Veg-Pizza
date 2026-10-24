@@ -1,6 +1,7 @@
 import { sendResponse } from '../../../../utils/response.js';
 import * as orderService from '../services/order.service.js';
 import * as foodOrderPaymentService from '../services/foodOrderPayment.service.js';
+import { HomePage } from '../../settings/models/homePage.model.js';
 import {
     validateCalculateOrderDto,
     validateCreateOrderDto,
@@ -371,6 +372,88 @@ export async function resendDeliveryNotificationStoreController(req, res, next) 
         const orderId = req.params.orderId;
         const result = await orderService.resendDeliveryNotificationStore(orderId, storeId);
         return sendResponse(res, 200, 'Notification resent successfully', result);
+    } catch (err) {
+        next(err);
+    }
+}
+
+export async function trackOrderPublicController(req, res, next) {
+    try {
+        const phone = req.body?.phone || req.body?.mobileNumber || req.query?.phone || req.query?.mobileNumber;
+        const orderId = req.body?.orderId || req.body?.order_id || req.query?.orderId || req.query?.order_id;
+
+        if (!phone || !orderId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Both Mobile Number and Order ID are required.'
+            });
+        }
+
+        const result = await orderService.trackOrderPublic(phone, orderId);
+        return sendResponse(res, 200, 'Order tracking details retrieved successfully', result);
+    } catch (err) {
+        if (err.statusCode || err.status) {
+            return res.status(err.statusCode || err.status).json({
+                success: false,
+                message: err.message
+            });
+        }
+        return res.status(err.name === 'NotFoundError' ? 404 : 400).json({
+            success: false,
+            message: err.message || 'Unable to track order. Please check your details.'
+        });
+    }
+}
+
+export async function getOrderHistoryPublicController(req, res, next) {
+    try {
+        const phone = req.body?.phone || req.body?.mobileNumber || req.query?.phone || req.query?.mobileNumber;
+        const orderId = req.body?.orderId || req.body?.order_id || req.query?.orderId || req.query?.order_id;
+
+        if (!orderId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Order ID is required.'
+            });
+        }
+
+        const result = await orderService.getOrderHistoryPublic(phone, orderId);
+        return sendResponse(res, 200, 'Order history retrieved successfully', result);
+    } catch (err) {
+        if (err.statusCode || err.status) {
+            return res.status(err.statusCode || err.status).json({
+                success: false,
+                message: err.message
+            });
+        }
+        return res.status(err.name === 'NotFoundError' ? 404 : 400).json({
+            success: false,
+            message: err.message || 'Unable to retrieve order history. Please check your details.'
+        });
+    }
+}
+
+export async function getOrderMethodsController(req, res, next) {
+    try {
+        let config = await HomePage.findOne().lean();
+        let methods = config?.orderMethods;
+        if (!methods || !Array.isArray(methods) || methods.length === 0) {
+            methods = [
+                { id: 'delivery', label: 'Delivery', icon: 'moped', enabled: true },
+                { id: 'dine_in', label: 'Dine-In', icon: 'restaurant', enabled: true },
+                { id: 'takeaway', label: 'Takeaway', icon: 'store', enabled: true },
+                { id: 'train', label: 'Delivery on Train', icon: 'train', enabled: true },
+                { id: 'incar', label: 'In-Car', icon: 'directions_car', enabled: true }
+            ];
+        }
+        return sendResponse(res, 200, 'Order methods retrieved successfully', {
+            methods: methods.map(m => ({
+                id: m.id === 'dinein' ? 'dine_in' : m.id,
+                label: m.label,
+                icon: m.icon || '',
+                enabled: m.enabled !== false
+            }))
+        });
     } catch (err) {
         next(err);
     }

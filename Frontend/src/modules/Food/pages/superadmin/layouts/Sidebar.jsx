@@ -107,6 +107,7 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
       items: [
         { name: "All Orders", icon: ClipboardList },
         { name: "Order Tracking", icon: Truck },
+        { name: "Bulk Orders", icon: Users },
         { name: "Refund Requests", icon: FileX },
         { name: "Disputes", icon: Activity }
       ]
@@ -358,6 +359,8 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
                                 navigate("/food/superadmin/orders")
                               } else if (item.name === "Order Tracking") {
                                 navigate("/food/superadmin/order-tracking")
+                              } else if (item.name === "Bulk Orders") {
+                                navigate("/food/superadmin/bulk-orders")
                               } else if (item.name === "Disputes") {
                                 navigate("/food/superadmin/disputes")
                               } else if (item.name === "Refund Requests") {

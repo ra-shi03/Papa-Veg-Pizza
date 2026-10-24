@@ -23,9 +23,12 @@ export const locationAPI = {
   },
 
   // Fetch nearby stores
-  getNearbyStores: async (lat, lng) => {
+  getNearbyStores: async (lat, lng, q = '') => {
     try {
-      const response = await axiosInstance.get(`/food/search/nearby-stores?lat=${lat}&lng=${lng}`);
+      const url = q
+        ? `/food/search/nearby-stores?lat=${lat}&lng=${lng}&q=${encodeURIComponent(q)}`
+        : `/food/search/nearby-stores?lat=${lat}&lng=${lng}`;
+      const response = await axiosInstance.get(url);
       return response;
     } catch (error) {
       console.error("Fetching nearby stores failed:", error);

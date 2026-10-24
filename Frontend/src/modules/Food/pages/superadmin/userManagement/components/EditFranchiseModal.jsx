@@ -147,7 +147,17 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = "Invalid email format"
     }
-    if (!formData.phone.trim()) newErrors.phone = "Phone is required"
+    if (!formData.phone.trim()) {
+      newErrors.phone = "Phone is required"
+    } else if (formData.phone.replace(/\D/g, "").length !== 10) {
+      newErrors.phone = "Phone number must be exactly 10 digits"
+    }
+    if (formData.gstNumber && formData.gstNumber.trim().length > 0 && formData.gstNumber.trim().length !== 15) {
+      newErrors.gstNumber = "GST number must be 15 characters"
+    }
+    if (formData.panNumber && formData.panNumber.trim().length > 0 && formData.panNumber.trim().length !== 10) {
+      newErrors.panNumber = "PAN number must be 10 characters"
+    }
     if (!formData.franchiseName.trim()) newErrors.franchiseName = "Franchise name is required"
     if (!formData.franchiseCode.trim()) newErrors.franchiseCode = "Franchise code is required"
     if (!formData.regionId) newErrors.regionId = "Region is required"
@@ -319,15 +329,31 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
                         <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                         <input
                           type="text"
+                          maxLength={10}
                           value={formData.phone}
-                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                          placeholder="e.g. +1 234 567 890"
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                            setFormData({ ...formData, phone: val });
+                            if (errors.phone) setErrors({ ...errors, phone: null });
+                          }}
+                          placeholder="e.g. 9876543210"
                           className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
                             errors.phone ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
                           }`}
                         />
                       </div>
-                      {errors.phone && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.phone}</p>}
+                      <div className="flex justify-between items-center mt-1">
+                        {errors.phone ? (
+                          <p className="text-[9px] text-rose-500 font-bold m-0">{errors.phone}</p>
+                        ) : <span />}
+                        <span className={`text-[9px] font-bold ml-auto transition-colors ${
+                          (formData.phone || "").length === 10
+                            ? "text-emerald-500 dark:text-emerald-400"
+                            : "text-zinc-400 dark:text-zinc-500"
+                        }`}>
+                          ({(formData.phone || "").length}/10)
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -338,15 +364,31 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
                         <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                         <input
                           type="text"
+                          maxLength={15}
                           value={formData.gstNumber}
-                          onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value })}
+                          onChange={(e) => {
+                            const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 15);
+                            setFormData({ ...formData, gstNumber: val });
+                            if (errors.gstNumber) setErrors({ ...errors, gstNumber: null });
+                          }}
                           placeholder="e.g. 22AAAAA0000A1Z5"
                           className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
                             errors.gstNumber ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
                           }`}
                         />
                       </div>
-                      {errors.gstNumber && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.gstNumber}</p>}
+                      <div className="flex justify-between items-center mt-1">
+                        {errors.gstNumber ? (
+                          <p className="text-[9px] text-rose-500 font-bold m-0">{errors.gstNumber}</p>
+                        ) : <span />}
+                        <span className={`text-[9px] font-bold ml-auto transition-colors ${
+                          (formData.gstNumber || "").length === 15
+                            ? "text-emerald-500 dark:text-emerald-400"
+                            : "text-zinc-400 dark:text-zinc-500"
+                        }`}>
+                          ({(formData.gstNumber || "").length}/15)
+                        </span>
+                      </div>
                     </div>
 
                     <div>
@@ -355,11 +397,30 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
                         <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                         <input
                           type="text"
+                          maxLength={10}
                           value={formData.panNumber}
-                          onChange={(e) => setFormData({ ...formData, panNumber: e.target.value })}
+                          onChange={(e) => {
+                            const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+                            setFormData({ ...formData, panNumber: val });
+                            if (errors.panNumber) setErrors({ ...errors, panNumber: null });
+                          }}
                           placeholder="e.g. ABCDE1234F"
-                          className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all border-zinc-200 dark:border-zinc-800`}
+                          className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
+                            errors.panNumber ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
+                          }`}
                         />
+                      </div>
+                      <div className="flex justify-between items-center mt-1">
+                        {errors.panNumber ? (
+                          <p className="text-[9px] text-rose-500 font-bold m-0">{errors.panNumber}</p>
+                        ) : <span />}
+                        <span className={`text-[9px] font-bold ml-auto transition-colors ${
+                          (formData.panNumber || "").length === 10
+                            ? "text-emerald-500 dark:text-emerald-400"
+                            : "text-zinc-400 dark:text-zinc-500"
+                        }`}>
+                          ({(formData.panNumber || "").length}/10)
+                        </span>
                       </div>
                     </div>
                   </div>

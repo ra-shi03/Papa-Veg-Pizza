@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { ChevronLeft, Send, CreditCard, Wallet, Landmark, Banknote } from "lucide-react"
+import { ChevronLeft, Send, CreditCard, Wallet, Landmark, Banknote, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
 import AnimatedPage from "@food/components/user/AnimatedPage"
+import { useAppConfig } from "@food/context/AppConfigContext"
 
 export default function Payments() {
   const navigate = useNavigate()
@@ -17,7 +18,14 @@ export default function Payments() {
     return localStorage.getItem("preferred_payment_method") || "upi"
   })
 
+  const { config: appConfig } = useAppConfig()
+  const isPaymentDisabled = appConfig?.paymentOptionEnabled === false
+
   const handleSave = () => {
+    if (isPaymentDisabled) {
+      toast.error("Payment options are currently disabled by administrator.")
+      return
+    }
     try {
       localStorage.setItem("preferred_payment_method", selectedMethod)
       toast.success("Preferred payment method saved successfully!")
@@ -163,7 +171,12 @@ export default function Payments() {
 
         <button
           onClick={handleSave}
-          className="text-[#E53935] hover:text-red-700 font-bold text-sm px-3 py-1.5 rounded-lg active:scale-95 cursor-pointer bg-transparent border-0 outline-none transition-all font-sans"
+          disabled={isPaymentDisabled}
+          className={`font-bold text-sm px-3 py-1.5 rounded-lg active:scale-95 cursor-pointer bg-transparent border-0 outline-none transition-all font-sans ${
+            isPaymentDisabled 
+              ? "text-zinc-400 dark:text-zinc-600 cursor-not-allowed opacity-60" 
+              : "text-[#E53935] hover:text-red-700"
+          }`}
         >
           Save
         </button>
@@ -171,11 +184,31 @@ export default function Payments() {
 
       {/* Main Options List */}
       <main className="mt-20 flex-1 flex flex-col max-w-md mx-auto w-full select-none">
-        {paymentOptions.map((option) => (
+        {isPaymentDisabled && (
+          <div className="mx-4 mb-4 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-800 dark:text-amber-300 flex items-start gap-2.5 text-xs font-semibold animate-fade">
+            <AlertTriangle size={18} className="shrink-0 text-amber-500 mt-0.5" />
+            <div>
+              <p className="font-bold">Payment Options Disabled</p>
+              <p className="text-[11px] opacity-90 mt-0.5">Online customer payment options are currently turned off globally by store administrator.</p>
+            </div>
+          </div>
+        )}
+
+        {paymentOptions
+          .filter(option => option.id !== 'wallet' || appConfig?.walletEnabled !== false)
+          .map((option) => (
           <div
             key={option.id}
-            onClick={() => setSelectedMethod(option.id)}
-            className={`flex items-start justify-between px-6 py-5 cursor-pointer border-b transition-colors ${
+            onClick={() => {
+              if (!isPaymentDisabled) {
+                setSelectedMethod(option.id);
+              }
+            }}
+            className={`flex items-start justify-between px-6 py-5 border-b transition-colors ${
+              isPaymentDisabled 
+                ? "opacity-50 cursor-not-allowed" 
+                : "cursor-pointer"
+            } ${
               isDarkMode 
                 ? "border-white/5 hover:bg-white/[0.02]" 
                 : "border-zinc-100 hover:bg-zinc-50/50"

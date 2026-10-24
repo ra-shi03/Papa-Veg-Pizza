@@ -40,7 +40,13 @@ const resolveBackPath = ({ pathname, search, state }) => {
   }
 
   if (
-    /^\/user\/profile\/(terms|privacy|refund|shipping|cancellation)$/.test(
+    /^\/user\/(profile|account)\/terms$/.test(normalizedPath)
+  ) {
+    return explicitBackPath || "/food/user"
+  }
+
+  if (
+    /^\/user\/(profile|account)\/(privacy|refund|shipping|cancellation|faqs|nutrition|feedback)$/.test(
       normalizedPath,
     )
   ) {
@@ -48,7 +54,7 @@ const resolveBackPath = ({ pathname, search, state }) => {
   }
 
   if (normalizedPath === "/user/wallet" || normalizedPath === "/user/rewards") {
-    return explicitBackPath || "/food/user/account/profile-details"
+    return explicitBackPath || "/food/user"
   }
 
   if (normalizedPath === "/user/help" || normalizedPath === "/help") {
@@ -98,6 +104,14 @@ const resolveBackPath = ({ pathname, search, state }) => {
   }
 
   if (
+    normalizedPath === "/user/track-order" ||
+    normalizedPath === "/user/account/track-order" ||
+    normalizedPath === "/user/order-history" ||
+    normalizedPath === "/user/account/order-history" ||
+    normalizedPath === "/user/orders" ||
+    normalizedPath === "/user/bulk-order" ||
+    normalizedPath === "/user/bulk-orders" ||
+    normalizedPath === "/user/coupons" ||
     normalizedPath === "/user/offers" ||
     normalizedPath === "/user/gourmet"
   ) {

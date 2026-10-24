@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit2, Trash2, Eye, GripVertical, Check, X, HelpCircle, Loader2 } from 'lucide-react';
-import { faqAPI } from '@/services/api';
+import { Plus, Search, Edit2, Trash2, Eye, GripVertical, Check, X, HelpCircle, Loader2, Phone, Mail, Clock, PhoneCall } from 'lucide-react';
+import api, { faqAPI } from '@/services/api';
 import { toast } from 'sonner';
 
 const DEFAULT_CATEGORIES = [
@@ -13,12 +13,26 @@ const DEFAULT_CATEGORIES = [
   'General'
 ];
 
+const DEFAULT_SUPPORT_SETTINGS = {
+  title: 'Customer Support',
+  description: 'Have an issue with your order or questions about our menu? Get in touch directly:',
+  phone: '+91 9300990940',
+  email: 'papafoodcorporation@gmail.com',
+  hours: 'Support Hours: 10:00 AM – 11:30 PM Everyday'
+};
+
 export default function FaqManagement() {
   const [faqs, setFaqs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('All Categories');
   const [searchQuery, setSearchQuery] = useState('');
   
+  // Customer Support card state
+  const [supportData, setSupportData] = useState(DEFAULT_SUPPORT_SETTINGS);
+  const [supportModalOpen, setSupportModalOpen] = useState(false);
+  const [supportFormData, setSupportFormData] = useState(DEFAULT_SUPPORT_SETTINGS);
+  const [savingSupport, setSavingSupport] = useState(false);
+
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingFaq, setEditingFaq] = useState(null);
@@ -33,7 +47,67 @@ export default function FaqManagement() {
 
   useEffect(() => {
     fetchFaqs();
+    fetchSupportData();
   }, []);
+
+  const fetchSupportData = async () => {
+    try {
+      const res = await api.get('/food/admin/pages-social-media/support', { contextModule: 'admin' });
+      const data = res?.data?.data || res?.data;
+      if (data) {
+        const phone = data.contactInfo?.phone || data.phone || DEFAULT_SUPPORT_SETTINGS.phone;
+        const email = data.contactInfo?.email || data.email || DEFAULT_SUPPORT_SETTINGS.email;
+        const hours = data.contactInfo?.hours || data.hours || DEFAULT_SUPPORT_SETTINGS.hours;
+        const title = data.title || DEFAULT_SUPPORT_SETTINGS.title;
+        const description = data.description || DEFAULT_SUPPORT_SETTINGS.description;
+        const mapped = { title, description, phone, email, hours };
+        setSupportData(mapped);
+        setSupportFormData(mapped);
+      }
+    } catch (err) {
+      console.error('Failed to fetch support data:', err);
+    }
+  };
+
+  const handleSaveSupport = async (e) => {
+    e.preventDefault();
+    if (!supportFormData.phone.trim()) {
+      toast.error('Please enter a support phone number');
+      return;
+    }
+    if (!supportFormData.email.trim()) {
+      toast.error('Please enter a support email');
+      return;
+    }
+    setSavingSupport(true);
+    try {
+      const payload = {
+        title: supportFormData.title.trim() || DEFAULT_SUPPORT_SETTINGS.title,
+        description: supportFormData.description.trim() || DEFAULT_SUPPORT_SETTINGS.description,
+        contactInfo: {
+          phone: supportFormData.phone.trim(),
+          email: supportFormData.email.trim(),
+          hours: supportFormData.hours.trim() || DEFAULT_SUPPORT_SETTINGS.hours
+        },
+        phone: supportFormData.phone.trim(),
+        email: supportFormData.email.trim(),
+        hours: supportFormData.hours.trim() || DEFAULT_SUPPORT_SETTINGS.hours
+      };
+      const res = await api.put('/food/admin/pages-social-media/support', payload, { contextModule: 'admin' });
+      if (res?.data?.success || res?.status === 200) {
+        setSupportData({ ...supportFormData });
+        toast.success('Customer Support details updated successfully');
+        setSupportModalOpen(false);
+      } else {
+        toast.error(res?.data?.message || 'Failed to update support details');
+      }
+    } catch (err) {
+      console.error('Failed to update support details:', err);
+      toast.error(err?.response?.data?.message || 'Failed to update support details');
+    } finally {
+      setSavingSupport(false);
+    }
+  };
 
   const fetchFaqs = async () => {
     setLoading(true);
@@ -165,14 +239,103 @@ export default function FaqManagement() {
             Create, organize and manage dynamic Help Center FAQs shown to users
           </p>
         </div>
-        <button 
-          type="button"
-          onClick={handleOpenAddModal}
-          className="bg-[#E53935] hover:bg-[#d92d36] text-white px-4 py-2 rounded-xl text-xs font-bold tracking-wide flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md shadow-red-500/20 cursor-pointer border-0"
-        >
-          <Plus size={16} />
-          Add FAQ
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            type="button"
+            onClick={() => {
+              setSupportFormData({ ...supportData });
+              setSupportModalOpen(true);
+            }}
+            className="bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700/80 px-3.5 py-2 rounded-xl text-xs font-bold tracking-wide flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xs cursor-pointer"
+          >
+            <PhoneCall size={14} className="text-[#E53935]" />
+            <span>Support Contacts</span>
+          </button>
+          <button 
+            type="button"
+            onClick={handleOpenAddModal}
+            className="bg-[#E53935] hover:bg-[#d92d36] text-white px-4 py-2 rounded-xl text-xs font-bold tracking-wide flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md shadow-red-500/20 cursor-pointer border-0"
+          >
+            <Plus size={16} />
+            <span>Add FAQ</span>
+          </button>
+        </div>
+      </section>
+
+      {/* Customer Support Card Live Overview (Editable) */}
+      <section className="mb-5 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 p-4 sm:p-5 shadow-2xs relative">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-zinc-100 dark:border-zinc-800">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-red-50 dark:bg-red-950/50 text-[#E53935] flex items-center justify-center shrink-0">
+              <PhoneCall size={18} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-white m-0">
+                  {supportData.title || "Customer Support"}
+                </h3>
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
+                  Live on User App
+                </span>
+              </div>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 m-0">
+                {supportData.description || "Have an issue with your order or questions about our menu? Get in touch directly:"}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setSupportFormData({ ...supportData });
+              setSupportModalOpen(true);
+            }}
+            className="self-start sm:self-auto px-3.5 py-1.5 bg-red-50 dark:bg-red-950/40 text-[#E53935] hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border border-red-200/60 dark:border-red-900/50"
+          >
+            <Edit2 size={13} />
+            Edit Support Info
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3.5">
+          {/* Phone Support */}
+          <div className="p-3 rounded-xl bg-zinc-50/80 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-red-50 dark:bg-red-950/40 text-[#E53935] flex items-center justify-center shrink-0">
+              <Phone size={15} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider m-0">Phone Support</p>
+              <p className="text-xs font-bold text-zinc-900 dark:text-white mt-0.5 m-0 truncate">
+                {supportData.phone}
+              </p>
+            </div>
+          </div>
+
+          {/* Email Support */}
+          <div className="p-3 rounded-xl bg-zinc-50/80 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center shrink-0">
+              <Mail size={15} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider m-0">Email Support</p>
+              <p className="text-xs font-bold text-zinc-900 dark:text-white mt-0.5 m-0 truncate">
+                {supportData.email}
+              </p>
+            </div>
+          </div>
+
+          {/* Operational Hours */}
+          <div className="p-3 rounded-xl bg-zinc-50/80 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 flex items-center justify-center shrink-0">
+              <Clock size={15} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider m-0">Operational Hours</p>
+              <p className="text-xs font-bold text-zinc-900 dark:text-white mt-0.5 m-0 truncate">
+                {supportData.hours}
+              </p>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* Search Bar */}
@@ -412,6 +575,123 @@ export default function FaqManagement() {
                 >
                   {submitting && <Loader2 size={13} className="animate-spin" />}
                   {editingFaq ? 'Save Changes' : 'Create FAQ'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Edit Customer Support Modal */}
+      {supportModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 w-full max-w-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <PhoneCall size={18} className="text-[#E53935]" />
+                <h3 className="text-base font-bold text-zinc-900 dark:text-white m-0">
+                  Customer Support Contact Settings
+                </h3>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setSupportModalOpen(false)}
+                className="p-1.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-lg bg-transparent border-0 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSupport} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Card Title <span className="text-red-500">*</span>
+                </label>
+                <input 
+                  type="text"
+                  required
+                  placeholder="e.g. Customer Support"
+                  value={supportFormData.title}
+                  onChange={e => setSupportFormData(prev => ({ ...prev, title: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 text-xs bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:border-red-500 font-medium text-zinc-800 dark:text-zinc-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Description / Subtitle <span className="text-red-500">*</span>
+                </label>
+                <textarea 
+                  rows={2}
+                  required
+                  placeholder="e.g. Have an issue with your order or questions about our menu? Get in touch directly:"
+                  value={supportFormData.description}
+                  onChange={e => setSupportFormData(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full p-3 text-xs bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:border-red-500 font-medium text-zinc-800 dark:text-zinc-100 resize-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1 flex items-center gap-1.5">
+                    <Phone size={13} className="text-[#E53935]" />
+                    Support Phone Number <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    type="text"
+                    required
+                    placeholder="e.g. +91 9300990940"
+                    value={supportFormData.phone}
+                    onChange={e => setSupportFormData(prev => ({ ...prev, phone: e.target.value }))}
+                    className="w-full px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:border-red-500 font-medium text-zinc-800 dark:text-zinc-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1 flex items-center gap-1.5">
+                    <Mail size={13} className="text-amber-600" />
+                    Support Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    type="email"
+                    required
+                    placeholder="e.g. papafoodcorporation@gmail.com"
+                    value={supportFormData.email}
+                    onChange={e => setSupportFormData(prev => ({ ...prev, email: e.target.value }))}
+                    className="w-full px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:border-red-500 font-medium text-zinc-800 dark:text-zinc-100"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1 flex items-center gap-1.5">
+                  <Clock size={13} className="text-blue-600" />
+                  Operational Support Hours <span className="text-red-500">*</span>
+                </label>
+                <input 
+                  type="text"
+                  required
+                  placeholder="e.g. Support Hours: 10:00 AM – 11:30 PM Everyday"
+                  value={supportFormData.hours}
+                  onChange={e => setSupportFormData(prev => ({ ...prev, hours: e.target.value }))}
+                  className="w-full px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:border-red-500 font-medium text-zinc-800 dark:text-zinc-100"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setSupportModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer bg-transparent border-0"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingSupport}
+                  className="px-5 py-2 text-xs font-bold text-white bg-[#E53935] hover:bg-[#d92d36] rounded-xl flex items-center gap-1.5 shadow-md shadow-red-500/20 active:scale-95 transition-all cursor-pointer border-0 disabled:opacity-50"
+                >
+                  {savingSupport && <Loader2 size={13} className="animate-spin" />}
+                  Save Support Settings
                 </button>
               </div>
             </form>

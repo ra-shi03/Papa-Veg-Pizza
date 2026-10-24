@@ -3,16 +3,54 @@ import { useNavigate } from "react-router-dom"
 import { ArrowLeft, Loader2, X, Pencil, Phone, Mail, User } from "lucide-react"
 import { toast } from "sonner"
 import { useProfile } from "@food/context/ProfileContext"
+import { useAppConfig } from "@food/context/AppConfigContext"
 import AnimatedPage from "@food/components/user/AnimatedPage"
 import DeleteAccountModal from "./DeleteAccountModal"
 import LogoutConfirmationModal from "./LogoutConfirmationModal"
 import { userAPI, authAPI } from "@food/api"
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const USER_STORAGE_KEYS = ["user_user", "currentUser", "userProfile"]
+const USER_STORAGE_KEYS = ["user_user", "currentUser", "userProfile", "user_profile"]
 
 const apiErrorMessage = (err, fallback) =>
   err?.response?.data?.message || err?.response?.data?.error || fallback
+
+/** Get stored customer profile from localStorage across possible storage keys */
+const getStoredUser = () => {
+  for (const key of USER_STORAGE_KEYS) {
+    try {
+      const raw = localStorage.getItem(key)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed && (parsed.name || parsed.phone || parsed.mobile || parsed.email || parsed.id || parsed._id)) {
+          const name = (parsed.name || [parsed.firstName, parsed.lastName].filter(Boolean).join(" ")).trim()
+          const phone = parsed.phone || parsed.mobile || parsed.phoneNumber || ""
+          return {
+            id: parsed.id || parsed._id,
+            name,
+            firstName: parsed.firstName || "",
+            lastName: parsed.lastName || "",
+            email: parsed.email || "",
+            phone,
+            profileImage: parsed.profileImage || parsed.avatar || parsed.photoURL || null,
+            profileCompleted: Boolean(parsed.profileCompleted),
+            ...parsed,
+          }
+        }
+      }
+    } catch (_) {}
+  }
+  return null
+}
+
+/** Check if customer is authenticated via flags, tokens, or active cached profile */
+const checkIsAuthenticated = () => {
+  if (localStorage.getItem("customer_logged_out") === "true") return false
+  if (localStorage.getItem("user_authenticated") === "true") return true
+  if (Boolean(localStorage.getItem("user_accessToken"))) return true
+  if (Boolean(getStoredUser())) return true
+  return false
+}
 
 /** Keep cached user objects (sidebar, header, etc.) in sync after an edit. */
 const syncStoredUser = (account) => {
@@ -30,6 +68,7 @@ const syncStoredUser = (account) => {
           lastName: account.lastName,
           email: account.email,
           phone: account.phone || parsed.phone,
+          profileImage: account.profileImage || parsed.profileImage,
         }),
       )
     } catch (_) {}
@@ -45,6 +84,7 @@ const clearSession = () => {
     "currentUser",
     "user_user",
     "userProfile",
+    "user_profile",
     "pvp_rewards_enrolled"
   ].forEach(
     (key) => localStorage.removeItem(key),
@@ -56,17 +96,21 @@ const clearSession = () => {
 export default function ProfileDetails() {
   const navigate = useNavigate()
   const { updateUserProfile } = useProfile()
+  const { config: appConfig } = useAppConfig()
 
   const [isDarkMode] = useState(() => localStorage.getItem("appTheme") === "dark")
-  const [account, setAccount] = useState(null)
-  const [loading, setLoading] = useState(true)
+  
+  // Initialize with cached user immediately so there is no false unauthenticated flash
+  const [account, setAccount] = useState(() => getStoredUser())
+  const [isAuthenticated, setIsAuthenticated] = useState(() => checkIsAuthenticated())
+  const [loading, setLoading] = useState(() => !getStoredUser())
   const [points, setPoints] = useState(0)
 
   // Editing states for Name and Email
   const [isEditingName, setIsEditingName] = useState(false)
   const [isEditingEmail, setIsEditingEmail] = useState(false)
-  const [nameDraft, setNameDraft] = useState("")
-  const [emailDraft, setEmailDraft] = useState("")
+  const [nameDraft, setNameDraft] = useState(() => getStoredUser()?.name || "")
+  const [emailDraft, setEmailDraft] = useState(() => getStoredUser()?.email || "")
   const [saving, setSaving] = useState(false)
 
   const nameInputRef = useRef(null)
@@ -81,10 +125,6 @@ export default function ProfileDetails() {
   const [benefitIndex, setBenefitIndex] = useState(0)
   const LOGIN_BENEFITS = useMemo(() => ["Saved addresses", "Previous orders", "Cheesy Rewards", "Exclusive offers"], [])
 
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return localStorage.getItem("user_authenticated") === "true" || !!localStorage.getItem("user_accessToken")
-  })
-
   const go = (path, state) => {
     const target =
       window.location.pathname.startsWith("/food") && !path.startsWith("/food") ? `/food${path}` : path
@@ -94,11 +134,19 @@ export default function ProfileDetails() {
   // Listen to auth state changes in storage
   useEffect(() => {
     const handleAuthChange = () => {
-      const isAuth = localStorage.getItem("user_authenticated") === "true" || !!localStorage.getItem("user_accessToken")
+      const isAuth = checkIsAuthenticated()
       setIsAuthenticated(isAuth)
       if (!isAuth) {
         setAccount(null)
         setLoading(false)
+      } else {
+        const cached = getStoredUser()
+        if (cached) {
+          setAccount(cached)
+          setNameDraft(cached.name || "")
+          setEmailDraft(cached.email || "")
+          setLoading(false)
+        }
       }
     }
     window.addEventListener("userAuthChanged", handleAuthChange)
@@ -121,7 +169,7 @@ export default function ProfileDetails() {
   useEffect(() => {
     let cancelled = false
     const load = async () => {
-      const isAuth = localStorage.getItem("user_authenticated") === "true" || !!localStorage.getItem("user_accessToken")
+      const isAuth = checkIsAuthenticated()
       if (!isAuth) {
         if (!cancelled) {
           setAccount(null)
@@ -131,18 +179,57 @@ export default function ProfileDetails() {
         return
       }
 
+      const cached = getStoredUser()
+      if (cached && !cancelled) {
+        setAccount(cached)
+        setIsAuthenticated(true)
+        setNameDraft(cached.name || "")
+        setEmailDraft(cached.email || "")
+        setLoading(false)
+      }
+
       try {
         const res = await userAPI.getMyProfile()
         if (!cancelled) {
-          const acc = res?.data?.data?.account || null
-          setAccount(acc)
-          setIsAuthenticated(Boolean(acc))
-          setNameDraft(acc?.name || "")
-          setEmailDraft(acc?.email || "")
+          const rawData = res?.data?.data || res?.data || {}
+          const userOrAccount = rawData.account || rawData.user || rawData
+
+          if (userOrAccount && (userOrAccount.name || userOrAccount.phone || userOrAccount.mobile || userOrAccount.email || userOrAccount.id)) {
+            const name = (userOrAccount.name || [userOrAccount.firstName, userOrAccount.lastName].filter(Boolean).join(" ")).trim() || cached?.name || ""
+            const phone = userOrAccount.phone || userOrAccount.mobile || userOrAccount.phoneNumber || cached?.phone || ""
+            const email = userOrAccount.email || cached?.email || ""
+
+            const normalized = {
+              ...(cached || {}),
+              ...userOrAccount,
+              id: userOrAccount.id || userOrAccount._id || cached?.id,
+              name,
+              firstName: userOrAccount.firstName || cached?.firstName || "",
+              lastName: userOrAccount.lastName || cached?.lastName || "",
+              email,
+              phone,
+              profileImage: userOrAccount.profileImage || userOrAccount.avatar || userOrAccount.photoURL || cached?.profileImage || null,
+              profileCompleted: Boolean(userOrAccount.profileCompleted ?? cached?.profileCompleted),
+            }
+            setAccount(normalized)
+            setIsAuthenticated(true)
+            setNameDraft(normalized.name || "")
+            setEmailDraft(normalized.email || "")
+            syncStoredUser(normalized)
+          } else if (cached) {
+            setAccount(cached)
+            setIsAuthenticated(true)
+          }
         }
       } catch (err) {
         if (!cancelled) {
-          if (err?.response?.status === 401 || err?.response?.status === 403) {
+          if (cached) {
+            // Keep local user profile if API fails or in offline/mock mode
+            setAccount(cached)
+            setIsAuthenticated(true)
+            setNameDraft(cached.name || "")
+            setEmailDraft(cached.email || "")
+          } else if (err?.response?.status === 401 || err?.response?.status === 403) {
             clearSession()
             setAccount(null)
             setIsAuthenticated(false)
@@ -153,6 +240,7 @@ export default function ProfileDetails() {
       } finally {
         if (!cancelled) setLoading(false)
       }
+
       try {
         const rRes = await userAPI.getRewards()
         if (!cancelled) setPoints(Number(rRes?.data?.data?.rewards?.points) || 0)
@@ -273,18 +361,18 @@ export default function ProfileDetails() {
   const initial = (account?.name || nameDraft || "").trim().charAt(0).toUpperCase()
 
   const authenticatedMenuItems = [
-    { key: "cards", label: "My Saved Cards", icon: "credit_card", onClick: () => go("/user/account/profile-details/payments") },
-    { key: "wallet", label: "Papa Veg Wallet", icon: "account_balance_wallet", badge: `${points} Points`, onClick: () => go("/user/wallet") },
+    ...(appConfig?.paymentOptionEnabled !== false ? [{ key: "cards", label: "My Saved Cards", icon: "credit_card", onClick: () => go("/user/account/profile-details/payments") }] : []),
+    ...(appConfig?.walletEnabled !== false ? [{ key: "wallet", label: "Papa Veg Wallet", icon: "account_balance_wallet", badge: `${points} Points`, onClick: () => go("/user/wallet") }] : []),
     { key: "addresses", label: "My Addresses", icon: "location_on", onClick: () => go("/user/location/setup", { mode: "my_addresses", from: "/user/account/profile-details" }) },
-    { key: "orders", label: "My Orders", icon: "receipt_long", onClick: () => go("/user/orders") },
+    { key: "orders", label: "My Orders", icon: "receipt_long", onClick: () => go("/user/order-history") },
     { key: "help", label: "Need Help", icon: "support_agent", onClick: () => go("/user/help") },
     { key: "delete", label: "Delete my account", icon: "person_remove", onClick: () => setShowDeleteModal(true) },
     { key: "logout", label: "Logout", icon: "power_settings_new", onClick: () => setShowLogoutModal(true), danger: true },
   ]
 
   const unauthenticatedMenuItems = [
-    { key: "cards", label: "My Saved Cards", icon: "credit_card", onClick: () => go("/user/auth/login", { from: "/user/account/profile-details" }) },
-    { key: "wallet", label: "Papa Veg Wallet", icon: "account_balance_wallet", onClick: () => go("/user/auth/login", { from: "/user/account/profile-details" }) },
+    ...(appConfig?.paymentOptionEnabled !== false ? [{ key: "cards", label: "My Saved Cards", icon: "credit_card", onClick: () => go("/user/auth/login", { from: "/user/account/profile-details" }) }] : []),
+    ...(appConfig?.walletEnabled !== false ? [{ key: "wallet", label: "Papa Veg Wallet", icon: "account_balance_wallet", onClick: () => go("/user/auth/login", { from: "/user/account/profile-details" }) }] : []),
     { key: "addresses", label: "My Addresses", icon: "location_on", onClick: () => go("/user/auth/login", { from: "/user/account/profile-details" }) },
     { key: "orders", label: "My Orders", icon: "receipt_long", onClick: () => go("/user/auth/login", { from: "/user/account/profile-details" }) },
     { key: "help", label: "Need Help", icon: "support_agent", onClick: () => go("/user/help") },
@@ -313,7 +401,7 @@ export default function ProfileDetails() {
                   setIsEditingName(false)
                   setIsEditingEmail(false)
                 }
-                navigate(-1)
+                go("/user")
               }}
               aria-label="Go Back"
               className="p-1 -ml-1 text-zinc-800 dark:text-zinc-200 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer border-0 bg-transparent"

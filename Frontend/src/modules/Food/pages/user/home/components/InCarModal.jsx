@@ -1,11 +1,20 @@
 import React from 'react';
+import { useScrollLock } from "@food/hooks/useScrollLock";
 
 export const InCarModal = ({ showCarModal, setShowCarModal, carNumber, setCarNumber, confirmLocation, triggerToast }) => {
+  useScrollLock(Boolean(showCarModal));
+
   if (!showCarModal) return null;
 
   return (
-    <div className="fixed inset-0 z-55 flex items-center justify-center p-5 bg-black/60 backdrop-blur-sm dark">
-      <div className="w-full max-w-sm glass-card rounded-3xl p-6 space-y-4 text-left">
+    <div 
+      onClick={() => setShowCarModal(false)}
+      className="fixed inset-0 z-55 flex items-center justify-center p-5 bg-black/60 backdrop-blur-sm dark touch-none"
+    >
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm glass-card rounded-3xl p-6 space-y-4 text-left touch-auto overscroll-contain overflow-y-auto max-h-[85vh]"
+      >
         <div className="flex justify-between items-center">
           <h3 className="font-headline-lg-mobile text-lg text-white">In-Car Dining</h3>
           <button

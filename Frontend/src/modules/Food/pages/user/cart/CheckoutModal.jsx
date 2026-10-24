@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft, MapPin, Check, User, Clock, Gift, ShieldCheck, CreditCard, ChevronRight } from "lucide-react"
+import { ArrowLeft, MapPin, Check, User, Clock, Gift, ShieldCheck, CreditCard, ChevronRight, AlertTriangle } from "lucide-react"
 import { useCart } from "@food/context/CartContext"
 import { useProfile } from "@food/context/ProfileContext"
 import { useOrders } from "@food/context/OrdersContext"
+import { useAppConfig } from "@food/context/AppConfigContext"
 import { motion, AnimatePresence } from "framer-motion"
 import RazorpayPayment from "./RazorpayPayment"
 
@@ -23,6 +24,10 @@ export default function CheckoutModal({
   const { replaceCart, clearCart } = useCart()
   const { addAddress, paymentMethods } = useProfile()
   const { createOrder } = useOrders()
+  const { config: appConfig } = useAppConfig()
+  const isPaymentOptionDisabled = appConfig?.paymentOptionEnabled === false
+  const isLoggedIn = localStorage.getItem("user_authenticated") === "true" || !!localStorage.getItem("user_accessToken")
+  const isGuestCheckoutBlocked = appConfig?.guestCheckoutEnabled === false && !isLoggedIn
 
   // Navigation / View state: "address", "checkout", "contact_edit", "timeslot_edit"
   const [modalView, setModalView] = useState("address")
@@ -430,14 +435,16 @@ export default function CheckoutModal({
                   <div className="p-4 flex items-start gap-3">
                     <Clock className="w-5 h-5 text-zinc-450 dark:text-zinc-550 shrink-0 mt-0.5" />
                     <div className="flex-1 text-left">
-                      <p className="text-xs font-semibold leading-normal">Order for {timeOption}</p>
+                      <p className="text-xs font-semibold leading-normal">Order for {appConfig?.scheduledOrdersEnabled === false ? "ASAP" : timeOption}</p>
                     </div>
-                    <button 
-                      onClick={() => setModalView("timeslot_edit")}
-                      className="text-xs font-black text-primary hover:text-primary-hover bg-transparent border-0 outline-none cursor-pointer"
-                    >
-                      Change
-                    </button>
+                    {appConfig?.scheduledOrdersEnabled !== false && (
+                      <button 
+                        onClick={() => setModalView("timeslot_edit")}
+                        className="text-xs font-black text-primary hover:text-primary-hover bg-transparent border-0 outline-none cursor-pointer"
+                      >
+                        Change
+                      </button>
+                    )}
                   </div>
 
                   {/* Row 3: Delivery Address */}
@@ -473,22 +480,34 @@ export default function CheckoutModal({
 
                   {/* Row 5: Payment (UPI / Credit Card) */}
                   <div className="p-4 flex items-start gap-3">
-                    <svg className="w-5 h-5 text-zinc-450 dark:text-zinc-550 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <path d="M12 2L2 22h20L12 2z" />
-                      <path d="M12 8l-4 8h8l-4-8z" />
-                    </svg>
+                    <CreditCard className={`w-5 h-5 shrink-0 mt-0.5 ${isPaymentOptionDisabled ? "text-amber-500" : "text-zinc-450 dark:text-zinc-550"}`} />
                     <div className="flex-1 text-left">
-                      <p className="text-xs font-semibold leading-normal">UPI</p>
+                      {isPaymentOptionDisabled ? (
+                        <>
+                          <p className="text-xs font-bold leading-normal text-amber-600 dark:text-amber-400">
+                            Online Payments Disabled
+                          </p>
+                          <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 font-medium">
+                            {appConfig?.codEnabled !== false 
+                              ? "Order will be placed via Cash on Delivery" 
+                              : "Store payment options currently unavailable"}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-xs font-semibold leading-normal">UPI</p>
+                      )}
                     </div>
-                    <button 
-                      onClick={() => {
-                        onClose()
-                        navigate("/user/account/profile-details/payments")
-                      }}
-                      className="text-xs font-black text-primary hover:text-primary-hover bg-transparent border-0 outline-none cursor-pointer"
-                    >
-                      Change
-                    </button>
+                    {!isPaymentOptionDisabled && (
+                      <button 
+                        onClick={() => {
+                          onClose()
+                          navigate("/user/account/profile-details/payments")
+                        }}
+                        className="text-xs font-black text-primary hover:text-primary-hover bg-transparent border-0 outline-none cursor-pointer"
+                      >
+                        Change
+                      </button>
+                    )}
                   </div>
 
                   {/* Row 6: Consent Checkbox */}
@@ -517,12 +536,45 @@ export default function CheckoutModal({
                     </span>
                   </div>
 
-                  <button 
-                    onClick={() => setModalView("payment")}
-                    className="w-full h-12 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border-0 bg-primary hover:bg-primary-hover text-white active:scale-95 cursor-pointer shadow-md shadow-primary/10"
-                  >
-                    Continue to payment
-                  </button>
+                  {isGuestCheckoutBlocked ? (
+                    <button 
+                      onClick={() => {
+                        onClose?.();
+                        navigate("/user/auth/login", { state: { from: "/user/cart" } });
+                      }}
+                      className="w-full h-12 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border-0 bg-primary hover:bg-primary-hover text-white active:scale-95 cursor-pointer shadow-md shadow-primary/10 flex items-center justify-center gap-2"
+                    >
+                      <span>Sign In to Place Order</span>
+                    </button>
+                  ) : isPaymentOptionDisabled ? (
+                    appConfig?.codEnabled !== false ? (
+                      <button 
+                        onClick={handleSaveAddressAndCheckout}
+                        className="w-full h-12 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border-0 bg-primary hover:bg-primary-hover text-white active:scale-95 cursor-pointer shadow-md shadow-primary/10 flex items-center justify-center gap-2"
+                      >
+                        <span>Place Order (Cash On Delivery)</span>
+                      </button>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 text-center text-[11px] font-bold">
+                          Store payment options are temporarily disabled.
+                        </div>
+                        <button 
+                          disabled
+                          className="w-full h-12 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border-0 bg-zinc-200 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed"
+                        >
+                          Checkout Disabled
+                        </button>
+                      </div>
+                    )
+                  ) : (
+                    <button 
+                      onClick={() => setModalView("payment")}
+                      className="w-full h-12 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border-0 bg-primary hover:bg-primary-hover text-white active:scale-95 cursor-pointer shadow-md shadow-primary/10"
+                    >
+                      Continue to payment
+                    </button>
+                  )}
                 </div>
               </>
             )}
@@ -677,12 +729,26 @@ export default function CheckoutModal({
             )}
 
             {modalView === "payment" && (
-              <RazorpayPayment
-                total={total}
-                restaurantName={cartItems[0]?.restaurant || "Papa Veg Pizza"}
-                onClose={() => setModalView("checkout")}
-                onPaymentSuccess={handleSaveAddressAndCheckout}
-              />
+              isPaymentOptionDisabled ? (
+                <div className="p-6 text-center space-y-3">
+                  <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto" />
+                  <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">Online Payments Temporarily Disabled</p>
+                  <p className="text-xs text-zinc-500">Please choose Cash on Delivery or contact store support.</p>
+                  <button 
+                    onClick={() => setModalView("checkout")}
+                    className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-lg"
+                  >
+                    Back to Checkout
+                  </button>
+                </div>
+              ) : (
+                <RazorpayPayment
+                  total={total}
+                  restaurantName={cartItems[0]?.restaurant || "Papa Veg Pizza"}
+                  onClose={() => setModalView("checkout")}
+                  onPaymentSuccess={handleSaveAddressAndCheckout}
+                />
+              )
             )}
           </motion.div>
         </div>

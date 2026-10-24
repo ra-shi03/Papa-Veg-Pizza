@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Phone, MessageCircle } from 'lucide-react';
+import { useAppConfig } from "@food/context/AppConfigContext";
 
 export default function UserSidebarDrawer({
   isOpen,
@@ -11,6 +12,7 @@ export default function UserSidebarDrawer({
   onOpenDeliverOnTrain
 }) {
   const navigate = useNavigate();
+  const { config: appConfig } = useAppConfig();
 
   // User State
   const [user, setUser] = useState(() => {
@@ -64,14 +66,14 @@ export default function UserSidebarDrawer({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  const handleNavigate = (path) => {
+  const handleNavigate = (path, state) => {
     onClose?.();
     if (path) {
       let target = path;
       if (window.location.pathname.startsWith('/food') && !target.startsWith('/food')) {
         target = `/food${target}`;
       }
-      navigate(target);
+      navigate(target, state ? { state } : undefined);
     }
   };
 
@@ -189,29 +191,26 @@ export default function UserSidebarDrawer({
                 </button>
 
                 {/* Deals & Offers */}
-                <button
-                  type="button"
-                  onClick={() => handleNavigate('/user/offers')}
-                  className="w-full flex items-center gap-3.5 px-5 py-3 hover:bg-red-50/50 dark:hover:bg-zinc-800/50 active:bg-red-100/40 transition-colors cursor-pointer border-0 bg-transparent text-left"
-                >
-                  <span className="material-symbols-outlined text-[22px] text-zinc-700 dark:text-zinc-300 shrink-0">
-                    confirmation_number
-                  </span>
-                  <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                    Deals & Offers
-                  </span>
-                </button>
+                {appConfig?.couponEnabled !== false && (
+                  <button
+                    type="button"
+                    onClick={() => handleNavigate('/user/coupons')}
+                    className="w-full flex items-center gap-3.5 px-5 py-3 hover:bg-red-50/50 dark:hover:bg-zinc-800/50 active:bg-red-100/40 transition-colors cursor-pointer border-0 bg-transparent text-left"
+                  >
+                    <span className="material-symbols-outlined text-[22px] text-zinc-700 dark:text-zinc-300 shrink-0">
+                      confirmation_number
+                    </span>
+                    <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                      Deals & Offers
+                    </span>
+                  </button>
+                )}
 
                 {/* Deliver On Train */}
                 <button
                   type="button"
                   onClick={() => {
-                    onClose?.();
-                    if (onOpenDeliverOnTrain) {
-                      onOpenDeliverOnTrain();
-                    } else {
-                      handleNavigate('/user/deliver-on-train');
-                    }
+                    handleNavigate('/user/delivery-location', { activeService: 'train' });
                   }}
                   className="w-full flex items-center gap-3.5 px-5 py-3 hover:bg-red-50/50 dark:hover:bg-zinc-800/50 active:bg-red-100/40 transition-colors cursor-pointer border-0 bg-transparent text-left"
                 >
@@ -226,10 +225,11 @@ export default function UserSidebarDrawer({
 
               {/* Group 2: Papa Veg Rewards, Track Order, Order History, Papa Veg Wallet */}
               <div className="py-1">
-                {/* Papa Veg Rewards with NEW badge */}
+                {/* Papa Veg Rewards with NEW badge (Commented out for now) */}
+                {/*
                 <button
                   type="button"
-                  onClick={() => handleNavigate('/user/wallet')}
+                  onClick={() => handleNavigate('/user/rewards')}
                   className="w-full flex items-center justify-between px-5 py-3 hover:bg-red-50/50 dark:hover:bg-zinc-800/50 active:bg-red-100/40 transition-colors cursor-pointer border-0 bg-transparent text-left group"
                 >
                   <div className="flex items-center gap-3.5 min-w-0">
@@ -240,16 +240,16 @@ export default function UserSidebarDrawer({
                       Papa Veg Rewards
                     </span>
                   </div>
-                  {/* Badge matching app theme color */}
                   <span className="bg-[#E53935] text-white text-[9px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-2xs shrink-0">
                     New
                   </span>
                 </button>
+                */}
 
                 {/* Track Order */}
                 <button
                   type="button"
-                  onClick={() => handleNavigate('/user/orders')}
+                  onClick={() => handleNavigate('/user/track-order')}
                   className="w-full flex items-center gap-3.5 px-5 py-3 bg-red-50/30 dark:bg-zinc-800/40 hover:bg-red-50/70 dark:hover:bg-zinc-800/70 active:bg-red-100/50 transition-colors cursor-pointer border-0 text-left"
                 >
                   <span className="material-symbols-outlined text-[22px] text-[#E53935] shrink-0">
@@ -263,7 +263,7 @@ export default function UserSidebarDrawer({
                 {/* Order History */}
                 <button
                   type="button"
-                  onClick={() => handleNavigate('/user/orders')}
+                  onClick={() => handleNavigate('/user/order-history')}
                   className="w-full flex items-center gap-3.5 px-5 py-3 hover:bg-red-50/50 dark:hover:bg-zinc-800/50 active:bg-red-100/40 transition-colors cursor-pointer border-0 bg-transparent text-left"
                 >
                   <span className="material-symbols-outlined text-[22px] text-zinc-700 dark:text-zinc-300 shrink-0">
@@ -275,25 +275,27 @@ export default function UserSidebarDrawer({
                 </button>
 
                 {/* Papa Veg Wallet */}
-                <button
-                  type="button"
-                  onClick={() => handleNavigate('/user/wallet')}
-                  className="w-full flex items-center gap-3.5 px-5 py-3 hover:bg-red-50/50 dark:hover:bg-zinc-800/50 active:bg-red-100/40 transition-colors cursor-pointer border-0 bg-transparent text-left"
-                >
-                  <span className="material-symbols-outlined text-[22px] text-zinc-700 dark:text-zinc-300 shrink-0">
-                    account_balance_wallet
-                  </span>
-                  <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                    Papa Veg Wallet
-                  </span>
-                </button>
+                {appConfig?.walletEnabled !== false && (
+                  <button
+                    type="button"
+                    onClick={() => handleNavigate('/user/wallet')}
+                    className="w-full flex items-center gap-3.5 px-5 py-3 hover:bg-red-50/50 dark:hover:bg-zinc-800/50 active:bg-red-100/40 transition-colors cursor-pointer border-0 bg-transparent text-left"
+                  >
+                    <span className="material-symbols-outlined text-[22px] text-zinc-700 dark:text-zinc-300 shrink-0">
+                      account_balance_wallet
+                    </span>
+                    <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                      Papa Veg Wallet
+                    </span>
+                  </button>
+                )}
               </div>
 
               {/* Group 3: Bulk Order */}
               <div className="py-1">
                 <button
                   type="button"
-                  onClick={() => setShowBulkModal(true)}
+                  onClick={() => handleNavigate('/user/bulk-order')}
                   className="w-full flex items-center gap-3.5 px-5 py-3 hover:bg-red-50/50 dark:hover:bg-zinc-800/50 active:bg-red-100/40 transition-colors cursor-pointer border-0 bg-transparent text-left"
                 >
                   <span className="material-symbols-outlined text-[22px] text-zinc-700 dark:text-zinc-300 shrink-0">

@@ -16,7 +16,7 @@ export default function ForceUpdateModal({ isOpen, onClose, currentVersions, onS
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.androidVersion.trim() || !formData.iosVersion.trim()) {
       setError('Android and iOS target versions are required.');
@@ -26,12 +26,16 @@ export default function ForceUpdateModal({ isOpen, onClose, currentVersions, onS
     setIsSaving(true);
     setError('');
 
-    // Simulate API request (PUT /api/configurations)
-    setTimeout(() => {
-      setIsSaving(false);
-      onSave(formData);
+    try {
+      if (onSave) {
+        await onSave(formData);
+      }
       onClose();
-    }, 1500);
+    } catch (err) {
+      setError(err?.message || 'Failed to publish force update rules.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (

@@ -15,6 +15,7 @@ import * as rewardConfigController from '../controllers/rewardConfig.controller.
 import * as productController from '../controllers/product.controller.js';
 import * as addonController from '../controllers/addon.controller.js';
 import * as addonTypeController from '../controllers/addonType.controller.js';
+import * as comboController from '../controllers/combo.controller.js';
 
 import * as orderController from '../../orders/controllers/order.controller.js';
 import * as refundAdminController from '../controllers/refundAdmin.controller.js';
@@ -38,6 +39,7 @@ router.get('/menu/public', productController.getPublicMenu);
 router.get('/addons/public', addonController.getAddons);
 router.get('/addons/stats/public', addonController.getAddonStats);
 router.get('/addon-types/public', addonTypeController.getAddonTypes);
+router.get('/combos/public', comboController.getPublicCombos);
 
 // ----- Public Categories -----
 router.get('/categories', categoryProductController.getCategoryProducts);
@@ -179,6 +181,17 @@ router.post('/products', productController.createProduct);
 router.patch('/products/:id', productController.updateProduct);
 router.put('/products/:id', productController.updateProduct);
 router.delete('/products/:id', productController.deleteProduct);
+
+// ----- Combos & Deals (Meal for 1 / 2 / 4 bundles) -----
+router.get('/combos', comboController.getCombos);
+router.get('/combos/stats', comboController.getComboStats);
+router.patch('/combos/bulk', comboController.bulkUpdateCombos);
+router.get('/combos/:id', comboController.getComboById);
+router.post('/combos', comboController.createCombo);
+router.patch('/combos/:id', comboController.updateCombo);
+router.put('/combos/:id', comboController.updateCombo);
+router.patch('/combos/:id/status', comboController.updateComboStatus);
+router.delete('/combos/:id', comboController.deleteCombo);
 
 // ----- Offers & Coupons -----
 router.get('/offers', adminController.getAllOffers);

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import apiClient from '@/services/api/axios';
 import {
   Settings as SettingsIcon,
   RefreshCw,
@@ -43,6 +44,7 @@ import {
   Heart,
   Grid,
   Check,
+  CreditCard,
   X
 } from 'lucide-react';
 import UpdateFeatureModal from './UpdateFeatureModal';
@@ -88,6 +90,7 @@ export default function AppConfiguration() {
     androidVersion: '2.4.1',
     iosVersion: '2.4.0',
     forceUpdate: false,
+    paymentOptionEnabled: true,
     walletEnabled: true,
     loyaltyEnabled: true,
     couponEnabled: true,
@@ -108,7 +111,8 @@ export default function AppConfiguration() {
     pushNotificationsEnabled: true,
     inventorySyncEnabled: true,
     updatedBy: 'Rohan Sharma (Super Admin)',
-    updatedAt: '2026-06-19T17:01:00Z'
+    updatedAt: new Date().toISOString(),
+    versionHistory: []
   });
 
   // Track unsaved edits
@@ -128,86 +132,67 @@ export default function AppConfiguration() {
     setHasUnsavedChanges(changed);
   }, [config, originalConfig]);
 
-  // API mock hooks
-  const useConfigurations = () => ({
-    data: config,
-    loading: isLoading,
-    refetch: () => {
-      setIsLoading(true);
+  // Fetch from database API
+  const fetchConfigData = useCallback(async (isManualRefresh = false) => {
+    setIsLoading(true);
+    if (isManualRefresh) {
       addToast('Syncing latest configurations from cluster...', 'info');
-      setTimeout(() => {
-        setIsLoading(false);
-        addToast('Configuration fully updated!', 'success');
-      }, 1000);
     }
-  });
-
-  const useUpdateConfigurations = () => ({
-    mutateAsync: async (newValues) => {
-      setIsSavingAll(true);
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          setConfig(prev => ({
-            ...prev,
-            ...newValues,
-            updatedBy: 'Rohan Sharma (Super Admin)',
-            updatedAt: new Date().toISOString()
-          }));
-          setIsSavingAll(false);
-          resolve(true);
-        }, 1200);
-      });
+    try {
+      const res = await apiClient.get('/food/admin/app-config', { contextModule: 'admin' }).catch(() =>
+        apiClient.get('/settings/app-config', { contextModule: 'admin' })
+      );
+      const data = res?.data?.data || res?.data;
+      if (data && typeof data === 'object') {
+        const merged = { ...config, ...data };
+        setConfig(merged);
+        setOriginalConfig(merged);
+        try {
+          localStorage.setItem('pvp_app_config', JSON.stringify(merged));
+        } catch {}
+        if (isManualRefresh) {
+          addToast('Configuration fully updated from database!', 'success');
+        }
+      }
+    } catch (err) {
+      console.warn('Using default app configuration state', err);
+      if (isManualRefresh) {
+        addToast('Synced with default configuration.', 'info');
+      }
+    } finally {
+      setIsLoading(false);
     }
-  });
+  }, []);
 
-  const useUpdateFeature = () => ({
-    mutateAsync: async (updatedFeat) => {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          setConfig(prev => ({
-            ...prev,
-            [updatedFeat.key]: updatedFeat.enabled,
-            updatedBy: 'Rohan Sharma (Super Admin)',
-            updatedAt: new Date().toISOString()
-          }));
-          resolve(true);
-        }, 800);
-      });
-    }
-  });
+  useEffect(() => {
+    fetchConfigData(false);
+  }, [fetchConfigData]);
 
-  const useForceUpdate = () => ({
-    mutateAsync: async (updateDetails) => {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          setConfig(prev => ({
-            ...prev,
-            customerAppVersion: updateDetails.customerAppVersion,
-            androidVersion: updateDetails.androidVersion,
-            iosVersion: updateDetails.iosVersion,
-            forceUpdate: updateDetails.forceUpdate,
-            updatedBy: 'Rohan Sharma (Super Admin)',
-            updatedAt: new Date().toISOString()
-          }));
-          resolve(true);
-        }, 1200);
-      });
-    }
-  });
-
-  const { refetch } = useConfigurations();
-  const updateConfigHook = useUpdateConfigurations();
-  const updateFeatureHook = useUpdateFeature();
-  const forceUpdateHook = useForceUpdate();
+  const refetch = () => {
+    fetchConfigData(true);
+  };
 
   // Handlers
   const handleSaveTabChanges = async (tabName) => {
+    setIsSavingAll(true);
     try {
-      await updateConfigHook.mutateAsync(config);
-      setOriginalConfig({ ...config });
+      const res = await apiClient.put('/food/admin/app-config', config, { contextModule: 'admin' }).catch(() =>
+        apiClient.put('/settings/app-config', config, { contextModule: 'admin' })
+      );
+      const updated = res?.data?.data || res?.data || config;
+      const merged = { ...config, ...updated, updatedAt: new Date().toISOString() };
+      setConfig(merged);
+      setOriginalConfig(merged);
+      try {
+        localStorage.setItem('pvp_app_config', JSON.stringify(merged));
+        window.dispatchEvent(new CustomEvent('appConfigUpdated', { detail: merged }));
+      } catch {}
       addToast(`Saved ${tabName} configurations to database.`, 'success');
     } catch (e) {
-      addToast('Failed to save settings.', 'error');
+      console.error(e);
+      addToast('Failed to save settings to database.', 'error');
+    } finally {
+      setIsSavingAll(false);
     }
   };
 
@@ -217,12 +202,25 @@ export default function AppConfiguration() {
   };
 
   const handleSaveAllChanges = async () => {
+    setIsSavingAll(true);
     try {
-      await updateConfigHook.mutateAsync(config);
-      setOriginalConfig({ ...config });
-      addToast('All system configurations updated successfully!', 'success');
+      const res = await apiClient.put('/food/admin/app-config', config, { contextModule: 'admin' }).catch(() =>
+        apiClient.put('/settings/app-config', config, { contextModule: 'admin' })
+      );
+      const updated = res?.data?.data || res?.data || config;
+      const merged = { ...config, ...updated, updatedAt: new Date().toISOString() };
+      setConfig(merged);
+      setOriginalConfig(merged);
+      try {
+        localStorage.setItem('pvp_app_config', JSON.stringify(merged));
+        window.dispatchEvent(new CustomEvent('appConfigUpdated', { detail: merged }));
+      } catch {}
+      addToast('All system configurations updated successfully in database!', 'success');
     } catch (e) {
-      addToast('Failed to update configurations.', 'error');
+      console.error(e);
+      addToast('Failed to update configurations in database.', 'error');
+    } finally {
+      setIsSavingAll(false);
     }
   };
 
@@ -244,25 +242,59 @@ export default function AppConfiguration() {
 
   const handleSaveFeatureConfirm = async (updatedData) => {
     try {
-      await updateFeatureHook.mutateAsync(updatedData);
+      const res = await apiClient.patch('/food/admin/app-config/feature', updatedData, { contextModule: 'admin' }).catch(() =>
+        apiClient.patch('/settings/app-config/feature', updatedData, { contextModule: 'admin' })
+      );
+      const updated = res?.data?.data || res?.data;
+      if (updated && typeof updated === 'object') {
+        const merged = { ...config, ...updated };
+        setConfig(merged);
+        setOriginalConfig(merged);
+        try {
+          localStorage.setItem('pvp_app_config', JSON.stringify(merged));
+          window.dispatchEvent(new CustomEvent('appConfigUpdated', { detail: merged }));
+        } catch {}
+      } else {
+        const updatedConfig = { ...config, [updatedData.key]: updatedData.enabled };
+        setConfig(updatedConfig);
+        setOriginalConfig(updatedConfig);
+        try {
+          localStorage.setItem('pvp_app_config', JSON.stringify(updatedConfig));
+          window.dispatchEvent(new CustomEvent('appConfigUpdated', { detail: updatedConfig }));
+        } catch {}
+      }
       addToast(`Feature flag "${updatedData.name}" updated successfully!`, 'success');
     } catch (e) {
-      addToast('Failed to update feature flag.', 'error');
+      console.error(e);
+      addToast('Failed to update feature flag in database.', 'error');
     }
   };
 
   const handleForceUpdateConfirm = async (updateDetails) => {
     try {
-      await forceUpdateHook.mutateAsync(updateDetails);
+      const payload = { ...config, ...updateDetails };
+      const res = await apiClient.put('/food/admin/app-config', payload, { contextModule: 'admin' }).catch(() =>
+        apiClient.put('/settings/app-config', payload, { contextModule: 'admin' })
+      );
+      const updated = res?.data?.data || res?.data || payload;
+      const merged = { ...config, ...updated };
+      setConfig(merged);
+      setOriginalConfig(merged);
+      try {
+        localStorage.setItem('pvp_app_config', JSON.stringify(merged));
+        window.dispatchEvent(new CustomEvent('appConfigUpdated', { detail: merged }));
+      } catch {}
       addToast('New application builds published successfully!', 'success');
       addToast(`Current App version pushed: v${updateDetails.customerAppVersion}`, 'warning');
     } catch (e) {
+      console.error(e);
       addToast('Failed to publish force update rules.', 'error');
     }
   };
 
   // Define Feature items structured logically for Tabs
   const customerFeaturesList = [
+    { name: 'Payment Option', key: 'paymentOptionEnabled', desc: 'Allows customer payments and online payment methods across app & checkout.', icon: CreditCard, badge: 'Digital Payments' },
     { name: 'Wallet Enabled', key: 'walletEnabled', desc: 'Allows customers to deposit and transact using digital credits.', icon: DollarSign, badge: 'Digital Payments' },
     { name: 'Referral Program', key: 'referralEnabled', desc: 'Toggles customer-to-customer sharing bonus rewards.', icon: Gift, badge: 'Marketing Campaign' },
     { name: 'Coupon System', key: 'couponEnabled', desc: 'Enables checkout promotional codes and vouchers.', icon: Percent, badge: 'Checkout Options' },
@@ -447,13 +479,13 @@ export default function AppConfiguration() {
 
         {/* KPI 4 */}
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 p-2.5 rounded-xl shadow-sm hover:shadow-md transition-all">
-          <span className="text-[8px] font-bold text-black dark:text-zinc-100 dark:text-black dark:text-zinc-100 uppercase tracking-wider block">Wallet Status</span>
+          <span className="text-[8px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">Payment Option</span>
           <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full inline-block mt-1 ${
-            config.walletEnabled 
+            config.paymentOptionEnabled 
               ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' 
               : 'bg-zinc-100 dark:bg-zinc-800 text-black dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700'
           }`}>
-            {config.walletEnabled ? 'Active' : 'Inactive'}
+            {config.paymentOptionEnabled ? 'Active' : 'Inactive'}
           </span>
         </div>
 
@@ -930,20 +962,20 @@ export default function AppConfiguration() {
             </div>
 
             <div className="p-3.5 space-y-4 flex-1 overflow-y-auto max-h-[350px] scrollbar-none">
-              {[
+              {(config.versionHistory?.length ? config.versionHistory : [
                 { version: 'v2.4.2', notes: 'Patch: UPI auto-routing updates', time: '10 mins ago', user: 'Rohan Sharma' },
                 { version: 'v2.4.1', notes: 'Minor: Referral program activation', time: '2 hours ago', user: 'Rohan Sharma' },
                 { version: 'v2.4.0', notes: 'Feature: Multi-store regional routing', time: '1 day ago', user: 'Aman Verma' },
                 { version: 'v2.3.9', notes: 'Fix: Invoice sequence prefix alignment', time: '3 days ago', user: 'Sarah D.' }
-              ].map((log, index) => (
+              ]).map((log, index, arr) => (
                 <div key={index} className="flex gap-2.5 relative group">
-                  {index !== 3 && (
+                  {index !== arr.length - 1 && (
                     <div className="absolute left-[3px] top-3.5 bottom-0 w-[1px] bg-zinc-200 dark:bg-zinc-800 group-hover:bg-[var(--primary)]/30 transition-colors" />
                   )}
                   <div className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] mt-1.5 shrink-0" />
                   <div className="space-y-0.5">
                     <p className="text-xs font-bold text-zinc-900 dark:text-zinc-150">{log.version} - {log.notes}</p>
-                    <p className="text-[9px] text-black dark:text-zinc-100 font-semibold">{log.user} • {log.time}</p>
+                    <p className="text-[9px] text-black dark:text-zinc-100 font-semibold">{log.user} • {log.time || new Date(log.date || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                   </div>
                 </div>
               ))}

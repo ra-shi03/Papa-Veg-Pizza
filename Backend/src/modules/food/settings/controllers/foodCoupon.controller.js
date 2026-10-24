@@ -1,4 +1,5 @@
 import { FoodCoupon } from '../models/foodCoupon.model.js';
+import { FoodAppConfig } from '../models/appConfig.model.js';
 
 const defaultSeedCoupons = [
     {
@@ -81,6 +82,10 @@ export const getAllCoupons = async (req, res) => {
 
 export const getActivePublicCoupons = async (req, res) => {
     try {
+        const config = await FoodAppConfig.findOne().lean();
+        if (config && config.couponEnabled === false) {
+            return res.status(200).json({ success: true, data: [] });
+        }
         let count = await FoodCoupon.countDocuments();
         if (count === 0) {
             await FoodCoupon.insertMany(defaultSeedCoupons);

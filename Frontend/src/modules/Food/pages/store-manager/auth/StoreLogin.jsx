@@ -189,7 +189,7 @@ export default function StoreLogin() {
                     onBlur={() => setFocusedField(null)}
                     onChange={(e) => setIdentifier(e.target.value)}
                     className="input-3d block w-full pl-11 pr-4 py-3 text-gray-900 dark:text-white rounded-xl outline-none placeholder:text-gray-400 font-medium text-sm"
-                    placeholder="manager@papavegpizza.com"
+                    placeholder="Enter your email or mobile"
                   />
                 </div>
               </div>
@@ -210,7 +210,7 @@ export default function StoreLogin() {
                     onBlur={() => setFocusedField(null)}
                     onChange={(e) => setPassword(e.target.value)}
                     className="input-3d block w-full pl-11 pr-11 py-3 text-gray-900 dark:text-white rounded-xl outline-none placeholder:text-gray-400 font-medium text-sm"
-                    placeholder="••••••••"
+                    placeholder="Enter your password"
                   />
                   <button
                     type="button"
@@ -238,31 +238,6 @@ export default function StoreLogin() {
                 </button>
               </div>
             </form>
-
-            {/* Quick Info / Role Map */}
-            <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800 text-[10px]">
-              <h4 className="font-semibold text-gray-500 dark:text-gray-400 mb-1 text-[9px] uppercase tracking-wider">Simulated Credentials</h4>
-              <div className="space-y-0.5 text-[10px]">
-                <div 
-                  className="flex justify-between cursor-pointer hover:bg-white dark:hover:bg-gray-800 p-1 rounded-md transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-700"
-                  onClick={() => { setIdentifier("manager@papavegpizza.com"); setPassword("12345678"); }}
-                >
-                  <span className="text-gray-500">Manager:</span> <code className="text-gray-700 dark:text-gray-300 font-semibold truncate ml-2">manager@papavegpizza.com</code>
-                </div>
-                <div 
-                  className="flex justify-between cursor-pointer hover:bg-white dark:hover:bg-gray-800 p-1 rounded-md transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-700"
-                  onClick={() => { setIdentifier("supervisor@papavegpizza.com"); setPassword("12345678"); }}
-                >
-                  <span className="text-gray-500">Supervisor:</span> <code className="text-gray-700 dark:text-gray-300 font-semibold truncate ml-2">supervisor@papavegpizza.com</code>
-                </div>
-                <div 
-                  className="flex justify-between cursor-pointer hover:bg-white dark:hover:bg-gray-800 p-1 rounded-md transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-700"
-                  onClick={() => { setIdentifier("staff@papavegpizza.com"); setPassword("12345678"); }}
-                >
-                  <span className="text-gray-500">Staff:</span> <code className="text-gray-700 dark:text-gray-300 font-semibold truncate ml-2">staff@papavegpizza.com</code>
-                </div>
-              </div>
-            </div>
 
             <div className="mt-4 flex flex-col items-center text-[11px] font-medium">
               <Link 

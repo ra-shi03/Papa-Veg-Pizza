@@ -6,23 +6,29 @@ export default function ComboDetails({
   onClose,
   combo,
   comboItems = [],
-  products = []
+  products = [],
+  franchises = [],
+  stores = []
 }) {
   if (!isOpen || !combo) return null;
 
-  // Calculate items breakdown and original prices sum
+  const nameFor = (id, list) => list.find(o => o.id === id)?.name || id;
+
+  // Calculate items breakdown and original prices sum (unit prices are snapshotted on the combo)
   let originalSum = 0;
   const itemsBreakdown = comboItems.map(ci => {
     const prod = products.find(p => p.id === ci.productId);
-    const unitPrice = prod ? prod.price : 0;
+    const unitPrice = Number(ci.unitPrice ?? (prod ? prod.price : 0)) || 0;
     const subtotal = unitPrice * ci.quantity;
     originalSum += subtotal;
 
     return {
       ...ci,
-      name: prod ? prod.name : ci.productId,
-      image: prod ? prod.image : "https://images.unsplash.com/photo-1513104890138-7c749659a591?fm=webp&fit=crop&w=100&q=80",
-      sku: prod ? prod.id : "N/A",
+      name: ci.name || (prod ? prod.name : ci.productId),
+      image: prod?.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591?fm=webp&fit=crop&w=100&q=80",
+      sku: ci.choices?.length > 0
+        ? `Choice: ${ci.choices.map(ch => ch.name).join(" / ")}`
+        : [ci.size, prod ? "Menu item" : "Custom item"].filter(Boolean).join(" · "),
       unitPrice,
       subtotal
     };
@@ -142,7 +148,7 @@ export default function ComboDetails({
             <div className="pt-2 border-t border-zinc-200 dark:border-zinc-850 flex items-center justify-between text-[10px] font-bold text-zinc-500">
               <span>Discount Rule Applied:</span>
               <span className="text-zinc-800 dark:text-zinc-200 font-black">
-                {combo.discountType === "percentage" ? `${combo.discountValue}% Percentage` : `Flat ₹${combo.discountValue} Off`}
+                {combo.discountType === "percentage" ? `${combo.discountValue}% Percentage` : combo.discountType === "fixed" ? "Fixed Combo Price" : `Flat ₹${combo.discountValue} Off`}
               </span>
             </div>
           </div>
@@ -171,7 +177,7 @@ export default function ComboDetails({
                           <img src={item.image} alt={item.name} className="w-6 h-6 rounded object-cover shrink-0 border border-zinc-150 dark:border-zinc-800" />
                           <div>
                             <span className="font-bold text-zinc-900 dark:text-zinc-100 block truncate max-w-[150px]">{item.name}</span>
-                            <span className="text-[8px] text-zinc-400 font-mono block">{item.sku}</span>
+                            <span className="text-[8px] text-zinc-400 font-mono block truncate max-w-[180px]" title={item.sku}>{item.sku}</span>
                           </div>
                         </div>
                       </td>
@@ -203,6 +209,15 @@ export default function ComboDetails({
                   {combo.validTo ? new Date(combo.validTo).toLocaleString("en-IN") : "Indefinite"}
                 </p>
               </div>
+              {(combo.timeWindowStart || combo.weeklyRestrictions?.length > 0) && (
+                <div className="col-span-2">
+                  <p className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest">Daily Window / Days</p>
+                  <p className="text-zinc-800 dark:text-zinc-200 font-mono mt-0.5">
+                    {combo.timeWindowStart ? `${combo.timeWindowStart} – ${combo.timeWindowEnd}` : "All day"}
+                    {combo.weeklyRestrictions?.length > 0 ? ` · ${combo.weeklyRestrictions.join(", ")}` : " · Every day"}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -223,7 +238,7 @@ export default function ComboDetails({
                   <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block mb-1">Assigned Franchises</span>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {combo.applicableFranchises.map(item => (
-                      <span key={item} className="px-2 py-0.5 bg-zinc-150 dark:bg-zinc-800 text-[10px] rounded border border-zinc-200 dark:border-zinc-700 block">{item}</span>
+                      <span key={item} className="px-2 py-0.5 bg-zinc-150 dark:bg-zinc-800 text-[10px] rounded border border-zinc-200 dark:border-zinc-700 block">{nameFor(item, franchises)}</span>
                     ))}
                   </div>
                 </div>
@@ -234,7 +249,7 @@ export default function ComboDetails({
                   <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block mb-1">Assigned Outlets</span>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {combo.applicableStores.map(item => (
-                      <span key={item} className="px-2 py-0.5 bg-zinc-150 dark:bg-zinc-800 text-[10px] rounded border border-zinc-200 dark:border-zinc-700 block">{item}</span>
+                      <span key={item} className="px-2 py-0.5 bg-zinc-150 dark:bg-zinc-800 text-[10px] rounded border border-zinc-200 dark:border-zinc-700 block">{nameFor(item, stores)}</span>
                     ))}
                   </div>
                 </div>

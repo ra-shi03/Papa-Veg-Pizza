@@ -9,10 +9,14 @@ import {
     cancelOrderController,
     submitOrderRatingsController,
     getOrderDropOtpUserController,
-    updateOrderInstructionsController
+    updateOrderInstructionsController,
+    getOrderMethodsController
 } from '../controllers/order.controller.js';
 
 const router = express.Router();
+
+router.get('/methods', getOrderMethodsController);
+router.get('/order-methods', getOrderMethodsController);
 
 router.post('/calculate', calculateOrderController);
 router.post('/', createOrderController);

@@ -12,7 +12,16 @@ export default function DeliveryLocation() {
   const locationState = useLocationStore((state) => state);
   const currentAddress = locationState.address || "Regal Circle, South Tukoganj";
 
-  const [activeService, setActiveService] = useState(location.state?.activeService || 'delivery');
+  const searchParams = new URLSearchParams(location.search);
+  const serviceFromQuery = searchParams.get('tab') || searchParams.get('service') || searchParams.get('activeService');
+  const [activeService, setActiveService] = useState(location.state?.activeService || serviceFromQuery || 'delivery');
+
+  useEffect(() => {
+    const s = location.state?.activeService || serviceFromQuery;
+    if (s) {
+      setActiveService(s);
+    }
+  }, [location.state?.activeService, serviceFromQuery]);
   const [nearbyStores, setNearbyStores] = useState([]);
   const [isLoadingStores, setIsLoadingStores] = useState(false);
   const [pnr, setPnr] = useState('');

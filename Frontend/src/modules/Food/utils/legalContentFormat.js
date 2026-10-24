@@ -92,12 +92,17 @@ export const legalHtmlToPlainText = (html) => {
 
   let text = String(html);
 
+  // Convert headings to markdown # prefixes before stripping
+  text = text.replace(/<h1[^>]*>/gi, "\n# ");
+  text = text.replace(/<h2[^>]*>/gi, "\n## ");
+  text = text.replace(/<h3[^>]*>/gi, "\n### ");
+  text = text.replace(/<\/(h1|h2|h3)>/gi, "\n");
+  text = text.replace(/<(h1|h2|h3)[^>]*>/gi, "");
+
   // Replace paragraph/div breaks with newlines
   text = text.replace(/<p[^>]*>/gi, "").replace(/<\/p>/gi, "\n");
   text = text.replace(/<br\s*\/?>/gi, "\n");
   text = text.replace(/<div[^>]*>/gi, "").replace(/<\/div>/gi, "\n");
-  text = text.replace(/<\/(h1|h2|h3)>/gi, "\n");
-  text = text.replace(/<(h1|h2|h3)[^>]*>/gi, "");
   text = text.replace(/<\/li>/gi, "\n");
   text = text.replace(/<li[^>]*>/gi, "- ");
   text = text.replace(/<\/ul>/gi, "\n").replace(/<ul[^>]*>/gi, "");

@@ -9,10 +9,10 @@ import SearchConfig from './SearchConfig';
 
 const DEFAULT_BOTTOM_NAV = [
   { id: 'menu', label: 'Menu', icon: 'local_pizza', iconType: 'material', iconUrl: '', badge: '', link: '/user/menu', enabled: true, sortOrder: 1 },
-  { id: 'reorder', label: 'Reorder', icon: 'shopping_bag', iconType: 'material', iconUrl: '', badge: '', link: '/user/orders', enabled: true, sortOrder: 2 },
-  { id: 'big-big', label: 'Big Big', icon: 'local_pizza', iconType: 'material', iconUrl: '', badge: 'NEW', link: '/user/menu?search=big', enabled: true, sortOrder: 3 },
+  { id: 'reorder', label: 'Reorder', icon: 'shopping_bag', iconType: 'material', iconUrl: '', badge: '', link: '/user/order-history', enabled: true, sortOrder: 2 },
+  { id: 'big-big', label: 'Big Big', icon: 'local_pizza', iconType: 'material', iconUrl: '', badge: 'NEW', link: '/user/menu?category=wow-4-in-1-pizza', enabled: true, sortOrder: 3 },
   { id: 'combos', label: 'Combos', icon: 'lunch_dining', iconType: 'material', iconUrl: '', badge: '', link: '/user/offers', enabled: true, sortOrder: 4 },
-  { id: 'rewards', label: 'Rewards', icon: 'stars', iconType: 'material', iconUrl: '', badge: '', link: '/user/wallet', enabled: true, sortOrder: 5 }
+  { id: 'rewards', label: 'Rewards', icon: 'stars', iconType: 'material', iconUrl: '', badge: '', link: '/user/rewards', enabled: true, sortOrder: 5 }
 ];
 
 function BannerCategorySelect({
@@ -203,6 +203,212 @@ function BannerCategorySelect({
   );
 }
 
+function NavCategorySelect({
+  value,
+  categories = [],
+  isOpen,
+  onToggle,
+  onClose,
+  onChange
+}) {
+  const [search, setSearch] = useState('');
+  const dropdownRef = useRef(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        onClose();
+      }
+    }
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSearch('');
+      const t = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(t);
+    }
+  }, [isOpen]);
+
+  // Extract category slug or ID from route link (e.g. "/user/menu?category=wow-4-in-1-pizza")
+  const currentCatVal = React.useMemo(() => {
+    if (!value || typeof value !== 'string') return '';
+    if (value.includes('category=')) {
+      return decodeURIComponent(value.split('category=')[1]?.split('&')[0] || '');
+    }
+    if (value.includes('cat=')) {
+      return decodeURIComponent(value.split('cat=')[1]?.split('&')[0] || '');
+    }
+    return '';
+  }, [value]);
+
+  const selectedCat = React.useMemo(() => {
+    if (!currentCatVal) return null;
+    const cleanVal = currentCatVal.trim().toLowerCase();
+    return categories.find(c => {
+      const cSlug = String(c.slug || c.id || '').toLowerCase();
+      const cLabel = String(c.label || c.name || '').toLowerCase();
+      return cSlug === cleanVal || cLabel === cleanVal || String(c._id) === cleanVal;
+    });
+  }, [categories, currentCatVal]);
+
+  const displayName = selectedCat ? (selectedCat.label || selectedCat.name) : (currentCatVal ? currentCatVal : '');
+  const hasValue = Boolean(displayName);
+
+  const query = search.trim().toLowerCase();
+  const filteredCategories = categories.filter(c => {
+    if (!query) return true;
+    const label = String(c.label || c.name || c.title || '').toLowerCase();
+    const slug = String(c.slug || '').toLowerCase();
+    return label.includes(query) || slug.includes(query);
+  });
+
+  return (
+    <div className="relative flex-1" ref={dropdownRef}>
+      {/* Trigger Button */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className={`w-full flex items-center justify-between gap-2 text-xs py-2 px-3 bg-white dark:bg-zinc-900 border ${
+          isOpen 
+            ? 'border-primary ring-1 ring-primary shadow-xs' 
+            : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
+        } rounded-lg text-zinc-900 dark:text-zinc-100 font-medium transition-all cursor-pointer`}
+      >
+        <span className={`truncate text-left flex-1 ${!hasValue ? 'text-zinc-400 dark:text-zinc-500 font-normal' : 'text-zinc-800 dark:text-zinc-100 font-semibold'}`}>
+          {hasValue ? `🍕 ${displayName}` : '-- Choose Category (e.g. Wow! 4 in 1 pizza) --'}
+        </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {hasValue && (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange('');
+                onClose();
+              }}
+              title="Clear category link"
+              className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </span>
+          )}
+          <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-200 ${isOpen ? 'rotate-180 text-primary' : ''}`} />
+        </div>
+      </button>
+
+      {/* Dropdown Menu with Search */}
+      {isOpen && (
+        <div className="absolute z-50 left-0 right-0 top-full mt-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl overflow-hidden flex flex-col text-xs animate-in fade-in-50 duration-100 min-w-[260px]">
+          {/* Search Box Header */}
+          <div className="p-2.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850 flex items-center gap-2">
+            <Search className="w-4 h-4 text-zinc-400 shrink-0" />
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder="Search category (e.g. Wow 4 in 1, Pizza)..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  onClose();
+                } else if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (filteredCategories.length > 0) {
+                    const first = filteredCategories[0];
+                    const cSlug = first.slug || first.id || String(first.label || first.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
+                    onChange(`/user/menu?category=${cSlug}`);
+                    onClose();
+                  }
+                }
+              }}
+              className="w-full bg-transparent text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="p-0.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Options List */}
+          <div className="max-h-60 overflow-y-auto divide-y divide-zinc-50 dark:divide-zinc-800/40">
+            {/* "None" option */}
+            {(!query || 'none clear remove general menu all'.includes(query)) && (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange('/user/menu');
+                  onClose();
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2 text-left transition-colors cursor-pointer ${
+                  !hasValue 
+                    ? 'bg-primary/10 text-primary font-semibold dark:bg-primary/20' 
+                    : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <span className="truncate italic">None / General Menu (/user/menu)</span>
+                {!hasValue && <Check className="w-4 h-4 text-primary shrink-0" />}
+              </button>
+            )}
+
+            {filteredCategories.map((cat) => {
+              const cSlug = cat.slug || cat.id || String(cat.label || cat.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
+              const cRoute = `/user/menu?category=${cSlug}`;
+              const label = cat.label || cat.name || cat.title || cSlug;
+              const isSelected = selectedCat && (selectedCat.id === cat.id || selectedCat._id === cat._id || selectedCat.slug === cat.slug);
+
+              return (
+                <button
+                  key={cat._id || cat.id || cSlug}
+                  type="button"
+                  onClick={() => {
+                    onChange(cRoute);
+                    onClose();
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 text-left transition-colors cursor-pointer ${
+                    isSelected 
+                      ? 'bg-rose-50 text-rose-700 font-bold dark:bg-rose-950/40 dark:text-rose-300' 
+                      : 'text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 truncate flex-1 min-w-0">
+                    <span className="truncate">{label}</span>
+                    {cat.badge && (
+                      <span className="bg-[#E53935] text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase leading-none shrink-0">
+                        {cat.badge}
+                      </span>
+                    )}
+                  </div>
+                  {isSelected && <Check className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 ml-2" />}
+                </button>
+              );
+            })}
+
+            {filteredCategories.length === 0 && (
+              <div className="px-3 py-5 text-center text-zinc-400 text-xs">
+                No categories found matching "{search}"
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function HomePageConfig() {
   const [deliveryMinutes, setDeliveryMinutes] = useState(30);
   const [promoText, setPromoText] = useState('LOWEST PRICES ONLY ON APP | FREE DELIVERY ABOVE ₹99');
@@ -210,6 +416,7 @@ export default function HomePageConfig() {
   const [banners, setBanners] = useState([]);
   const [categories, setCategories] = useState([]);
   const [openBannerDropdownId, setOpenBannerDropdownId] = useState(null);
+  const [openNavCategoryDropdownIndex, setOpenNavCategoryDropdownIndex] = useState(null);
   const [isSavingBanners, setIsSavingBanners] = useState(false);
   const [isTrainConfigOpen, setIsTrainConfigOpen] = useState(false);
   const [adPopup, setAdPopup] = useState({
@@ -906,6 +1113,7 @@ export default function HomePageConfig() {
       localStorage.setItem('pvp_bottom_nav', JSON.stringify(bottomNav));
       try {
         const homeCfg = localStorage.getItem('pvp_home_config');
+        const parsedHome = homeCfg ? JSON.parse(homeCfg) : {};
         parsedHome.bottomNav = bottomNav;
         localStorage.setItem('pvp_home_config', JSON.stringify(parsedHome));
         window.dispatchEvent(new Event('pvp_home_config_changed'));
@@ -1971,7 +2179,7 @@ export default function HomePageConfig() {
                 </div>
 
                 {/* Navbar Bar Strip Preview */}
-                <div className="h-14 bg-white dark:bg-[#121212] flex items-center justify-around px-1 select-none">
+                <div className="h-[62px] bg-white dark:bg-[#121212] flex items-center justify-around px-1 select-none">
                   {bottomNav.filter(item => item.enabled !== false).map((item, idx) => {
                     const isFirst = idx === 0;
                     return (
@@ -1980,14 +2188,14 @@ export default function HomePageConfig() {
                         className="flex-1 flex flex-col items-center justify-center relative py-1 px-0.5"
                       >
                         {item.badge && (
-                          <span className="absolute -top-1 left-1/2 -translate-x-1/2 bg-[#E53935] text-white text-[7px] font-black px-1.5 py-[1px] rounded-full uppercase tracking-tighter leading-none scale-90 shadow-2xs">
+                          <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 bg-[#E53935] text-white text-[7.5px] font-black px-1.5 py-[1px] rounded-full uppercase tracking-tighter leading-none scale-90 shadow-2xs">
                             {item.badge}
                           </span>
                         )}
 
-                        <div className="relative flex items-center justify-center h-5 w-5 mb-0.5">
+                        <div className="relative flex items-center justify-center h-7 w-auto min-w-[26px] max-w-[40px] mb-0.5">
                           {item.iconType === 'image' && item.iconUrl ? (
-                            <img src={item.iconUrl} alt={item.label} className="w-5 h-5 object-contain" />
+                            <img src={item.iconUrl} alt={item.label} className="h-7 w-auto max-w-[38px] object-contain drop-shadow-[0_1px_2px_rgba(0,0,0,0.06)]" style={{ imageRendering: '-webkit-optimize-contrast' }} />
                           ) : (
                             <span 
                               className={`material-symbols-outlined text-[22px] ${isFirst ? 'text-[#E53935]' : 'text-zinc-500 dark:text-zinc-400'}`}
@@ -2165,14 +2373,18 @@ export default function HomePageConfig() {
                               });
                             }}
                             className="w-full px-3 py-1.5 border border-zinc-200 dark:border-zinc-700 rounded-md text-sm bg-white dark:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-primary"
-                            placeholder="e.g. /user/menu"
+                            placeholder="e.g. /user/menu?category=wow-4-in-1-pizza"
                           />
-                          <div className="flex flex-wrap gap-1 mt-1.5">
+
+                          {/* Quick Route Presets */}
+                          <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                            <span className="text-[10px] text-zinc-400 font-medium mr-1">Routes:</span>
                             {[
                               { label: 'Menu', route: '/user/menu' },
-                              { label: 'Orders', route: '/user/orders' },
+                              { label: 'Orders', route: '/user/order-history' },
                               { label: 'Combos', route: '/user/offers' },
-                              { label: 'Rewards', route: '/user/wallet' },
+                              { label: 'Rewards', route: '/user/rewards' },
+                              { label: 'Wallet', route: '/user/wallet' },
                               { label: 'Cart', route: '/user/cart' }
                             ].map(preset => (
                               <button
@@ -2185,11 +2397,69 @@ export default function HomePageConfig() {
                                     return updated;
                                   });
                                 }}
-                                className="text-[10px] bg-zinc-200/70 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                                className={`text-[10px] px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
+                                  item.link === preset.route
+                                    ? 'bg-primary text-white font-semibold'
+                                    : 'bg-zinc-200/70 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300'
+                                }`}
                               >
                                 {preset.label}
                               </button>
                             ))}
+                          </div>
+
+                          {/* Dynamic Menu Category Link Selector */}
+                          <div className="mt-2.5 pt-2 border-t border-zinc-100 dark:border-zinc-800/80">
+                            <label className="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1">
+                              Link to Menu Category (Dynamic):
+                            </label>
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                              <NavCategorySelect
+                                value={item.link || ''}
+                                categories={categories}
+                                isOpen={openNavCategoryDropdownIndex === index}
+                                onToggle={() => setOpenNavCategoryDropdownIndex(prev => prev === index ? null : index)}
+                                onClose={() => setOpenNavCategoryDropdownIndex(null)}
+                                onChange={(newRoute) => {
+                                  setBottomNav(prev => {
+                                    const updated = [...prev];
+                                    updated[index] = { ...updated[index], link: newRoute };
+                                    return updated;
+                                  });
+                                }}
+                              />
+
+                              {/* Highlight shortcut for Wow 4 in 1 pizza */}
+                              {(() => {
+                                const fourInOne = categories.find(c => {
+                                  const clean = String(c.label || c.name || c.slug || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                                  return clean.includes('4in1') || (clean.includes('wow') && clean.includes('4'));
+                                });
+                                const fourInOneSlug = fourInOne ? (fourInOne.slug || fourInOne.id || 'wow-4-in-1-pizza') : 'wow-4-in-1-pizza';
+                                const fourInOneRoute = `/user/menu?category=${fourInOneSlug}`;
+                                const isSelected = item.link === fourInOneRoute || (item.link && (item.link.includes('4-in-1') || item.link.includes('wow') || item.link.includes('4in1')));
+
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setBottomNav(prev => {
+                                        const updated = [...prev];
+                                        updated[index] = { ...updated[index], link: fourInOneRoute };
+                                        return updated;
+                                      });
+                                    }}
+                                    className={`px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1 border ${
+                                      isSelected
+                                        ? 'bg-rose-600 text-white border-rose-600 shadow-2xs'
+                                        : 'bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 border-rose-200 dark:border-rose-900/60'
+                                    }`}
+                                  >
+                                    🍕 {fourInOne?.label || 'Wow! 4 in 1 pizza'}
+                                  </button>
+                                );
+                              })()}
+                            </div>
                           </div>
                         </div>
 

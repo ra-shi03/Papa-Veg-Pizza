@@ -28,17 +28,21 @@ export default function UpdateFeatureModal({ isOpen, onClose, feature, onSave })
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSaving(true);
     setError('');
 
-    // Simulate API request (PUT /api/configurations/features)
-    setTimeout(() => {
-      setIsSaving(false);
-      onSave(formData);
+    try {
+      if (onSave) {
+        await onSave(formData);
+      }
       onClose();
-    }, 1200);
+    } catch (err) {
+      setError(err?.message || 'Failed to update feature');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (

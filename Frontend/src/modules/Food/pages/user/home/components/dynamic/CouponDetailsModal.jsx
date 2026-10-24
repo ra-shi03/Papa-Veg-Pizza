@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import logoNew from '@/assets/logo1.png';
+import { useScrollLock } from "@food/hooks/useScrollLock";
 
 export function CouponDetailsModal({ offer, isOpen, onClose, onApply, isDarkMode }) {
   const [copied, setCopied] = useState(false);
   const [logoSrc, setLogoSrc] = useState(() => localStorage.getItem("sa_logo") || logoNew);
+
+  // Lock background scroll when open
+  useScrollLock(Boolean(isOpen && offer));
 
   if (!isOpen || !offer) return null;
 
@@ -121,7 +125,7 @@ export function CouponDetailsModal({ offer, isOpen, onClose, onApply, isDarkMode
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4 select-none font-['Poppins',sans-serif]">
+      <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4 select-none font-['Poppins',sans-serif] touch-none">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -137,7 +141,7 @@ export function CouponDetailsModal({ offer, isOpen, onClose, onApply, isDarkMode
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-          className={`relative w-full sm:max-w-md max-h-[88vh] sm:max-h-[85vh] flex flex-col rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden ${
+          className={`relative w-full sm:max-w-md max-h-[88vh] sm:max-h-[85vh] flex flex-col rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden touch-auto ${
             isDarkMode ? 'bg-[#18181b] text-zinc-100' : 'bg-white text-zinc-900'
           }`}
         >
@@ -174,7 +178,7 @@ export function CouponDetailsModal({ offer, isOpen, onClose, onApply, isDarkMode
           </div>
 
           {/* Body Content */}
-          <div className="flex-1 overflow-y-auto px-5 py-4 hide-scrollbar">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 hide-scrollbar">
             {/* Title & Subtitle */}
             <h3 className="font-semibold text-lg sm:text-[19px] text-zinc-900 dark:text-white leading-tight m-0">
               {offer.title}

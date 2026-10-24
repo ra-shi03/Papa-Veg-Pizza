@@ -1,5 +1,6 @@
 import React from "react"
 import { useLocationStore } from "@food/store/locationStore"
+import { useScrollLock } from "@food/hooks/useScrollLock"
 
 export default function DeliveryMapModal({
   show,
@@ -11,6 +12,9 @@ export default function DeliveryMapModal({
   isDarkMode
 }) {
   const { confirmLocation } = useLocationStore()
+
+  // Lock background scroll when open
+  useScrollLock(Boolean(show))
 
   if (!show) return null
 

@@ -3,6 +3,7 @@ import { initialMockStoreRiders, initialMockLiveDeliveries, initialMockTrackingD
 import { storePricingService } from "../../modules/Food/pages/franchise-admin/products/services/storePricingService.js";
 import { mockCampaigns, mockCampaignPerformance, mockBanners, mockProducts, mockCoupons, mockNotifications, mockNotificationLogs } from "../../modules/Food/pages/franchise-admin/marketing/mockData.js";
 import { initialMockStaff, initialMockAttendance, initialMockShifts, initialMockPerformance } from "../../modules/Food/pages/store-manager/staffManagement/mockData.js";
+import { DEFAULT_TERMS_TEXT } from "../../modules/Food/constants/termsData.js";
 import {
   mockStoresList,
   mockProductsPerformance,
@@ -656,7 +657,13 @@ let db = {
   refunds: getStorageItem("refunds", initialMockRefunds),
   customer_complaints: getStorageItem("customer_complaints", initialMockComplaints),
   customer_reviews: getStorageItem("customer_reviews", initialMockReviews),
-  delivery_tracking: getStorageItem("delivery_tracking", initialMockDeliveryTracking)
+  delivery_tracking: getStorageItem("delivery_tracking", initialMockDeliveryTracking),
+  page_contents: getStorageItem("page_contents", {
+    terms: {
+      title: "Disclaimer",
+      content: DEFAULT_TERMS_TEXT
+    }
+  })
 };
 
 // Sync stores and managers to ensure new approvals data is available in existing localStorage
@@ -725,6 +732,65 @@ export function handleMockRequest(config) {
   const successRes = (payload) => ({ success: true, status: 200, data: { success: true, data: payload } });
   const successMsg = (msg, payload = null) => ({ success: true, status: 200, data: { success: true, message: msg, data: payload } });
   const errorRes = (msg, status = 400) => ({ success: false, status, data: { success: false, message: msg } });
+
+  // --- PAGE CONTENTS / TERMS & POLICIES ENDPOINTS ---
+  if (url.includes("/pages/") || url.includes("/pages-social-media/")) {
+    const keyMatch = url.match(/(?:pages|pages-social-media)\/([^?#/]+)/);
+    const pageKey = keyMatch ? keyMatch[1] : "terms";
+
+    if (method === "get") {
+      if (pageKey === "support") {
+        const storedSupport = db.page_contents?.support || {
+          title: "Customer Support",
+          description: "Have an issue with your order or questions about our menu? Get in touch directly:",
+          contactInfo: {
+            phone: "+91 9300990940",
+            email: "papafoodcorporation@gmail.com",
+            hours: "Support Hours: 10:00 AM – 11:30 PM Everyday"
+          },
+          phone: "+91 9300990940",
+          email: "papafoodcorporation@gmail.com",
+          hours: "Support Hours: 10:00 AM – 11:30 PM Everyday"
+        };
+        return successRes(storedSupport);
+      }
+      const stored = db.page_contents?.[pageKey] || {
+        title: pageKey.includes("terms") ? "Disclaimer" : pageKey,
+        content: pageKey.includes("terms") ? DEFAULT_TERMS_TEXT : ""
+      };
+      return successRes(stored);
+    }
+
+    if (method === "put" || method === "post") {
+      if (pageKey === "support") {
+        const phone = data?.contactInfo?.phone || data?.phone || "+91 9300990940";
+        const email = data?.contactInfo?.email || data?.email || "papafoodcorporation@gmail.com";
+        const hours = data?.contactInfo?.hours || data?.hours || "Support Hours: 10:00 AM – 11:30 PM Everyday";
+        const title = data?.title || "Customer Support";
+        const description = data?.description || "Have an issue with your order or questions about our menu? Get in touch directly:";
+
+        const supportObj = {
+          title,
+          description,
+          contactInfo: { phone, email, hours },
+          phone,
+          email,
+          hours
+        };
+        if (!db.page_contents) db.page_contents = {};
+        db.page_contents.support = supportObj;
+        saveDB();
+        return successMsg("Page updated successfully", supportObj);
+      }
+      if (!db.page_contents) db.page_contents = {};
+      db.page_contents[pageKey] = {
+        title: data?.title || (pageKey.includes("terms") ? "Disclaimer" : pageKey),
+        content: data?.content || ""
+      };
+      saveDB();
+      return successMsg("Page updated successfully", db.page_contents[pageKey]);
+    }
+  }
 
   // --- ORDER REPORTS ENDPOINTS ---
   if (url.includes("/reports/orders") && !url.includes("/reports/orders/dashboard") && !url.includes("/reports/orders/summary") && !url.includes("/reports/orders/status-distribution") && !url.includes("/reports/orders/hourly") && !url.includes("/reports/orders/order-type") && !url.includes("/reports/orders/store-performance") && !url.includes("/reports/orders/list")) {
@@ -1692,6 +1758,385 @@ export function handleMockRequest(config) {
     });
   }
 
+  // Track Order Public Mock API Match
+  if (url.includes("/orders/track")) {
+    let body = {};
+    try {
+      body = typeof config.data === "string" ? JSON.parse(config.data) : (config.data || config.params || {});
+    } catch (_) {}
+    const orderId = body.orderId || body.order_id || "ORD-1002";
+    const phone = body.phone || body.mobileNumber || "9300990940";
+    
+    const existing = (db.orders || []).find(o => 
+      String(o.orderId || o.id || o._id).toLowerCase() === String(orderId).toLowerCase()
+    );
+    
+    return successRes({
+      orderId: existing ? (existing.orderId || existing.id) : orderId,
+      _id: existing?._id || "ord-track-sample",
+      status: existing?.status || "preparing",
+      statusLabel: existing?.status === "delivered" ? "Delivered" : "Preparing Food",
+      headline: existing?.status === "delivered" ? "Order Delivered!" : "Chefs are preparing your pizza",
+      description: "Fresh ingredients are baking in the oven",
+      statusColor: existing?.status === "delivered" ? "emerald" : "amber",
+      isCancelled: false,
+      createdAt: existing?.createdAt || new Date().toISOString(),
+      estimatedMinutes: 25,
+      customer: {
+        name: "Rashi",
+        phone: phone
+      },
+      deliveryAddress: {
+        label: "Home",
+        street: "Regal Circle, South Tukoganj",
+        city: "Indore"
+      },
+      items: existing?.items || [
+        { name: "Double Cheese Margherita", quantity: 1, price: 299, variantName: "Medium", isVeg: true },
+        { name: "Stuffed Garlic Breadsticks", quantity: 1, price: 149, isVeg: true }
+      ],
+      pricing: existing?.pricing || {
+        subtotal: 448,
+        tax: 22,
+        deliveryFee: 30,
+        discount: 50,
+        total: 450
+      },
+      payment: {
+        method: "online",
+        status: "paid"
+      },
+      store: {
+        name: "Papa Veg Pizza - Central Depot",
+        phone: "0731-4040400",
+        address: "South Tukoganj, Indore"
+      },
+      deliveryPartner: {
+        name: "Rahul Sharma",
+        phone: "9876543210"
+      },
+      timeline: [
+        { step: 1, title: "Order Confirmed", description: "Store received and confirmed your order", completed: true, current: false },
+        { step: 2, title: "Preparing Food", description: "Chefs are preparing your meal in the kitchen", completed: true, current: true },
+        { step: 3, title: "Food Ready", description: "Order is packed and ready for delivery partner", completed: false, current: false },
+        { step: 4, title: "Out for Delivery", description: "Delivery partner is on the way to your address", completed: false, current: false },
+        { step: 5, title: "Delivered", description: "Order delivered safely", completed: false, current: false }
+      ]
+    });
+  }
+
+  // Order History Public Mock API Match
+  if (url.includes("/orders/history")) {
+    let body = {};
+    try {
+      body = typeof config.data === "string" ? JSON.parse(config.data) : (config.data || config.params || {});
+    } catch (_) {}
+    const orderId = body.orderId || body.order_id || "ORD-1002";
+    const phone = body.phone || body.mobileNumber || "9300990940";
+    
+    const existing = (db.orders || []).find(o => 
+      String(o.orderId || o.id || o._id).toLowerCase() === String(orderId).toLowerCase()
+    );
+
+    return successRes({
+      orderId: existing ? (existing.orderId || existing.id) : orderId,
+      _id: existing?._id || "ord-history-sample",
+      status: existing?.status || "delivered",
+      statusLabel: existing?.status === "preparing" ? "Preparing Food" : "Delivered",
+      isCancelled: false,
+      createdAt: existing?.createdAt || new Date(Date.now() - 3600000 * 24).toISOString(),
+      updatedAt: new Date().toISOString(),
+      deliveredAt: new Date(Date.now() - 3600000 * 23).toISOString(),
+      customer: {
+        name: "Rashi",
+        phone: phone
+      },
+      deliveryAddress: {
+        label: "Home",
+        street: "Regal Circle, South Tukoganj",
+        city: "Indore",
+        state: "Madhya Pradesh",
+        pincode: "452001",
+        additionalDetails: "Flat 402, Sunshine Heights"
+      },
+      items: existing?.items || [
+        { itemId: "item-1", name: "Farmhouse Fresh Pizza", quantity: 1, price: 349, variantName: "Medium (Pan Crust)", isVeg: true, total: 349 },
+        { itemId: "item-2", name: "Garlic Breadsticks", quantity: 1, price: 129, variantName: "Classic", isVeg: true, total: 129 },
+        { itemId: "item-3", name: "Thums Up (500ml)", quantity: 2, price: 40, variantName: "", isVeg: true, total: 80 }
+      ],
+      pricing: existing?.pricing || {
+        subtotal: 558,
+        tax: 28,
+        deliveryFee: 35,
+        discount: 50,
+        couponCode: "PVP50",
+        total: 571
+      },
+      payment: {
+        method: "online",
+        status: "paid",
+        transactionId: "TXN_PVP_984729"
+      },
+      store: {
+        name: "Papa Veg Pizza - Central Depot",
+        phone: "0731-4040400",
+        address: "South Tukoganj, Indore"
+      },
+      deliveryPartner: {
+        name: "Rahul Sharma",
+        phone: "9876543210"
+      },
+      timeline: [
+        { title: "Order Placed", timestamp: new Date(Date.now() - 3600000 * 24).toISOString(), completed: true },
+        { title: "Order Confirmed", timestamp: new Date(Date.now() - 3600000 * 24 + 120000).toISOString(), completed: true },
+        { title: "Preparing Food", timestamp: new Date(Date.now() - 3600000 * 24 + 300000).toISOString(), completed: true },
+        { title: "Out for Delivery", timestamp: new Date(Date.now() - 3600000 * 24 + 900000).toISOString(), completed: true },
+        { title: "Delivered", timestamp: new Date(Date.now() - 3600000 * 23).toISOString(), completed: true }
+      ]
+    });
+  }
+
+  // Bulk Order Config Mock API Match
+  if (url.includes("/bulk-order/config") || url.includes("/admin/bulk-orders/config")) {
+    if (!db.bulk_order_config) {
+      db.bulk_order_config = {
+        virtualParty: {
+          isActive: true,
+          title: "Virtual Pizza Party",
+          bannerImage: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1200&q=80",
+          title1: "WORK TOGETHER, EAT TOGETHER",
+          description1: "As virtual parties have become the new way to bond and enjoy together, it's time to up these unique celebrations with a unique feast.",
+          calloutText: "Introducing Papa Veg Pizza's Virtual Feast, a new way to place a bulk order for your virtual celebration and get it delivered in specially designed packages.",
+          title2: "CELEBRATIONS MADE EASY",
+          description2: "Convert your work from home into party from home with Papa Veg Pizza's Virtual Feast. Order some good old favourites from Papa Veg Pizza and celebrate with your colleagues in a new and safer way.",
+          featureImage: "https://images.unsplash.com/photo-1577962917302-cd874c4e31d2?auto=format&fit=crop&w=1000&q=80",
+          corporateEmail: "corporate.sales@papavegpizza.com",
+          corporatePhone: "+91 9300990940",
+          partySizeOptions: [
+            "Corporate Gathering (20-50 people)",
+            "Team Celebration (50-100 people)",
+            "Virtual Annual Meet (100+ people)",
+            "Family & Birthday Celebration",
+            "College / School Event",
+            "Other"
+          ]
+        },
+        egiftVoucher: {
+          isActive: true,
+          title: "E-Gift Voucher",
+          bannerImage: "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=1200&q=80",
+          heading1: "LAUNCH YOUR GIFTING WITH US NOW",
+          subheading1: "Get access to place order across Papa Veg Pizza stores in India via our app/website using E-Gift Voucher",
+          feature1Title: "Easy and secure ordering",
+          feature1Desc: "Place your E-Gift Voucher order with ease.",
+          feature2Title: "Customized to meet business needs",
+          feature2Desc: "Instant digital incentive with the flexibility of choosing the denominations.",
+          feature3Title: "Flexible delivery option",
+          feature3Desc: "Get your code delivered as an E-Gift card via e-mail.",
+          heading2: "SMALL GESTURES GO A LONG WAY",
+          description2: "Ultimate gifting for corporate and businesses. The Papa Veg Pizza's E-Gift Voucher is a great solution when it comes to rewarding and recognizing employees, customers and supporters with a sophisticated gifting platform.",
+          featureImage: "https://images.unsplash.com/photo-1577962917302-cd874c4e31d2?auto=format&fit=crop&w=1000&q=80",
+          corporateEmail: "corporate.sales@papavegpizza.com",
+          corporatePhone: "+91 9300990940",
+          denominationOptions: [
+            "25 - 50 Vouchers",
+            "50 - 100 Vouchers",
+            "100 - 500 Vouchers",
+            "500+ Corporate Vouchers",
+            "Custom Bulk Denomination"
+          ]
+        },
+        contactPage: {
+          feedbackHeading: "Have any feedback or queries? We'd love to hear from you. Write to us at",
+          feedbackEmail: "guestcare@papavegpizza.com",
+          outletButtonText: "FIND YOUR NEAREST OUTLET",
+          outletButtonLink: "/food/user/delivery-location",
+          outletHelpText: "Try our delicious treats and satisfy hunger with Papa Veg Pizza.",
+          locateLinkText: "Locate Nearby Pizza Restaurants",
+          locateLinkUrl: "/food/user/delivery-location",
+          customerCareTitle: "Papa Veg Pizza Customer Care Number",
+          customerCareNumber: "1800-889-1234",
+          corporateOfficeTitle: "Papa Veg Pizza Corporate Office",
+          companyName: "Papa Veg Pizza Private Limited",
+          addressLine1: "12/2 M.G. Road, Near Palasia Square",
+          addressLine2: "Indore - 452001, Madhya Pradesh, India",
+          mapEmbedUrl:
+            "https://maps.google.com/maps?q=Rajasthan&t=&z=7&ie=UTF8&iwloc=&output=embed",
+          mapExternalUrl: "https://maps.google.com/?q=Rajasthan",
+          facebookText: "Visit our page on Facebook",
+          facebookUrl: "https://facebook.com/papavegpizza",
+          googleText: "Visit our page on Google",
+          googleUrl: "https://google.com/search?q=Papa+Veg+Pizza",
+          instagramText: "Visit our page on Instagram",
+          instagramUrl: "https://instagram.com/papavegpizza",
+          twitterText: "Follow us on twitter for latest updates",
+          twitterUrl: "https://twitter.com/papavegpizza"
+        }
+      };
+      saveDB();
+    } else {
+      if (!db.bulk_order_config.contactPage) {
+        db.bulk_order_config.contactPage = {
+          feedbackHeading: "Have any feedback or queries? We'd love to hear from you. Write to us at",
+          feedbackEmail: "guestcare@papavegpizza.com",
+          outletButtonText: "FIND YOUR NEAREST OUTLET",
+          outletButtonLink: "/food/user/delivery-location",
+          outletHelpText: "Try our delicious treats and satisfy hunger with Papa Veg Pizza.",
+          locateLinkText: "Locate Nearby Pizza Restaurants",
+          locateLinkUrl: "/food/user/delivery-location",
+          customerCareTitle: "Papa Veg Pizza Customer Care Number",
+          customerCareNumber: "1800-889-1234",
+          corporateOfficeTitle: "Papa Veg Pizza Corporate Office",
+          companyName: "Papa Veg Pizza Private Limited",
+          addressLine1: "12/2 M.G. Road, Near Palasia Square",
+          addressLine2: "Indore - 452001, Madhya Pradesh, India",
+          mapEmbedUrl:
+            "https://maps.google.com/maps?q=Rajasthan&t=&z=7&ie=UTF8&iwloc=&output=embed",
+          mapExternalUrl: "https://maps.google.com/?q=Rajasthan",
+          facebookText: "Visit our page on Facebook",
+          facebookUrl: "https://facebook.com/papavegpizza",
+          googleText: "Visit our page on Google",
+          googleUrl: "https://google.com/search?q=Papa+Veg+Pizza",
+          instagramText: "Visit our page on Instagram",
+          instagramUrl: "https://instagram.com/papavegpizza",
+          twitterText: "Follow us on twitter for latest updates",
+          twitterUrl: "https://twitter.com/papavegpizza"
+        };
+        saveDB();
+      }
+    }
+
+    if (method === "put" || method === "post") {
+      let body = {};
+      try {
+        body = typeof config.data === "string" ? JSON.parse(config.data) : (config.data || {});
+      } catch (_) {}
+      db.bulk_order_config = {
+        ...db.bulk_order_config,
+        ...body,
+        virtualParty: {
+          ...db.bulk_order_config.virtualParty,
+          ...(body.virtualParty || {})
+        },
+        egiftVoucher: {
+          ...db.bulk_order_config.egiftVoucher,
+          ...(body.egiftVoucher || {})
+        },
+        contactPage: {
+          ...db.bulk_order_config.contactPage,
+          ...(body.contactPage || {})
+        }
+      };
+      saveDB();
+      return successRes(db.bulk_order_config);
+    }
+
+    return successRes(db.bulk_order_config);
+  }
+
+  // Bulk Order Inquiry Submit Mock API Match
+  if (url.includes("/bulk-order/inquiry") && method === "post") {
+    let body = {};
+    try {
+      body = typeof config.data === "string" ? JSON.parse(config.data) : (config.data || {});
+    } catch (_) {}
+
+    if (!db.bulk_inquiries) {
+      db.bulk_inquiries = [];
+    }
+
+    const newInquiry = {
+      _id: `inq-${Date.now()}`,
+      name: body.name || "Customer",
+      organisation: body.organisation || "",
+      phone: body.phone || "",
+      email: body.email || "",
+      location: body.location || "",
+      occasion: body.occasion || "Corporate Gathering (20-50 people)",
+      query: body.query || "",
+      type: body.type || "virtual_party",
+      status: "new",
+      createdAt: new Date().toISOString()
+    };
+
+    db.bulk_inquiries.unshift(newInquiry);
+    saveDB();
+    return successRes(newInquiry);
+  }
+
+  // Admin Bulk Order Inquiries Mock API Match
+  if (url.includes("/admin/bulk-orders") && !url.includes("/config")) {
+    if (!db.bulk_inquiries) {
+      db.bulk_inquiries = [
+        {
+          _id: "inq-101",
+          name: "Amit Sharma",
+          organisation: "TechCorp Solutions Pvt Ltd",
+          phone: "9826012345",
+          email: "amit.sharma@techcorp.com",
+          location: "Vijay Nagar, Indore",
+          occasion: "Team Celebration (50-100 people)",
+          query: "Need 60 medium pizzas with garlic bread for our Q3 team celebration.",
+          type: "virtual_party",
+          status: "new",
+          createdAt: new Date(Date.now() - 3600000 * 12).toISOString()
+        },
+        {
+          _id: "inq-102",
+          name: "Pooja Verma",
+          organisation: "Infosys Campus Indore",
+          phone: "9893054321",
+          email: "pooja.v@infosys.com",
+          location: "Super Corridor, Indore",
+          occasion: "Corporate Gathering (20-50 people)",
+          query: "Bulk dinner boxes for 35 developers during release weekend.",
+          type: "virtual_party",
+          status: "in_progress",
+          createdAt: new Date(Date.now() - 3600000 * 36).toISOString()
+        }
+      ];
+      saveDB();
+    }
+
+    // PATCH status update
+    const patchMatch = url.match(/\/admin\/bulk-orders\/([^/]+)/);
+    if (patchMatch && method === "patch") {
+      const inqId = patchMatch[1];
+      let body = {};
+      try {
+        body = typeof config.data === "string" ? JSON.parse(config.data) : (config.data || {});
+      } catch (_) {}
+      const target = db.bulk_inquiries.find(i => i._id === inqId);
+      if (target) {
+        if (body.status) target.status = body.status;
+        if (body.adminNotes !== undefined) target.adminNotes = body.adminNotes;
+        saveDB();
+        return successRes(target);
+      }
+    }
+
+    // DELETE inquiry
+    if (patchMatch && method === "delete") {
+      const inqId = patchMatch[1];
+      db.bulk_inquiries = db.bulk_inquiries.filter(i => i._id !== inqId);
+      saveDB();
+      return successRes({ id: inqId });
+    }
+
+    return successRes({
+      inquiries: db.bulk_inquiries,
+      total: db.bulk_inquiries.length,
+      page: 1,
+      totalPages: 1,
+      stats: {
+        total: db.bulk_inquiries.length,
+        newCount: db.bulk_inquiries.filter(i => i.status === "new").length,
+        inProgressCount: db.bulk_inquiries.filter(i => i.status === "in_progress").length,
+        completedCount: db.bulk_inquiries.filter(i => i.status === "completed").length
+      }
+    });
+  }
+
   // Single Order API Match
   const singleOrderMatch = url.match(/\/orders\/([^/]+)$/);
   if (singleOrderMatch && method === "get" && !url.includes("/reports/")) {
@@ -2232,6 +2677,51 @@ export function handleMockRequest(config) {
     };
   }
 
+  // User Profile GET
+  if (url.includes("/food/user/profile") && !url.includes("/profile-image") && method === "get") {
+    let userData = {
+      id: "cust-1",
+      name: "Rashi",
+      phone: "9300990940",
+      email: "",
+      profileCompleted: true
+    };
+    try {
+      const stored =
+        localStorage.getItem("currentUser") ||
+        localStorage.getItem("user_user") ||
+        localStorage.getItem("userProfile") ||
+        localStorage.getItem("user_profile");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed) {
+          userData = { ...userData, ...parsed };
+        }
+      }
+    } catch (_) {}
+
+    const name =
+      (userData.name || [userData.firstName, userData.lastName].filter(Boolean).join(" ")).trim() || "Rashi";
+    const phone = userData.phone || userData.mobile || userData.phoneNumber || "9300990940";
+    const email = userData.email || "";
+
+    const accountObj = {
+      id: userData.id || userData._id || "user-1",
+      name,
+      firstName: userData.firstName || name,
+      lastName: userData.lastName || "",
+      email,
+      phone,
+      profileImage: userData.profileImage || userData.avatar || null,
+      profileCompleted: Boolean(userData.profileCompleted)
+    };
+
+    return successRes({
+      user: userData,
+      account: accountObj
+    });
+  }
+
   if (url.includes("/food/user/profile/profile-image") && method === "post") {
     const defaultUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde";
     return successRes({ profileImage: defaultUrl });
@@ -2280,7 +2770,23 @@ export function handleMockRequest(config) {
       }
     } catch (e) {}
 
-    return successRes({ user: updatedUser });
+    const name =
+      (updatedUser.name || [updatedUser.firstName, updatedUser.lastName].filter(Boolean).join(" ")).trim() || "Rashi";
+    const phone = updatedUser.phone || updatedUser.mobile || "9300990940";
+    const email = updatedUser.email || "";
+
+    const accountObj = {
+      id: updatedUser.id || updatedUser._id || "user-1",
+      name,
+      firstName: updatedUser.firstName || name,
+      lastName: updatedUser.lastName || "",
+      email,
+      phone,
+      profileImage: updatedUser.profileImage || updatedUser.avatar || null,
+      profileCompleted: Boolean(updatedUser.profileCompleted)
+    };
+
+    return successRes({ user: updatedUser, account: accountObj });
   }
 
   if (url.includes("/food/auth/logout") || url.includes("/auth/logout")) {
@@ -3086,6 +3592,9 @@ export function handleMockRequest(config) {
   }
 
   if (url.includes("/coupons") && method === "get") {
+    if (url.includes("/public") && db.app_config && db.app_config.couponEnabled === false) {
+      return successRes([]);
+    }
     return successRes(db.coupons);
   }
 
@@ -5977,6 +6486,79 @@ export function handleMockRequest(config) {
 
     saveDB();
     return successRes(newRefund);
+  }
+
+  // App Configuration (Global Settings)
+  if (url.includes("/settings/app-config") || url.includes("/food/app-config") || url.includes("/food/admin/app-config") || url.includes("/app-config")) {
+    if (!db.app_config) {
+      db.app_config = {
+        _id: 'APP-CONFIG-60824',
+        customerAppVersion: '2.4.2',
+        androidVersion: '2.4.1',
+        iosVersion: '2.4.0',
+        forceUpdate: false,
+        paymentOptionEnabled: true,
+        walletEnabled: true,
+        loyaltyEnabled: true,
+        couponEnabled: true,
+        referralEnabled: true,
+        liveTrackingEnabled: true,
+        chatEnabled: true,
+        guestCheckoutEnabled: true,
+        multiStoreEnabled: true,
+        maintenanceBanner: false,
+        reviewsEnabled: true,
+        wishlistEnabled: true,
+        scheduledOrdersEnabled: true,
+        codEnabled: true,
+        pickupEnabled: true,
+        aiRecommendationsEnabled: true,
+        darkModeEnabled: false,
+        analyticsEnabled: true,
+        pushNotificationsEnabled: true,
+        inventorySyncEnabled: true,
+        updatedBy: 'Rohan Sharma (Super Admin)',
+        updatedAt: new Date().toISOString(),
+        versionHistory: [
+          { version: 'v2.4.2', notes: 'Patch: Payment option & UPI auto-routing updates', user: 'Rohan Sharma', time: '10 mins ago' },
+          { version: 'v2.4.1', notes: 'Minor: Referral program activation', user: 'Rohan Sharma', time: '2 hours ago' },
+          { version: 'v2.4.0', notes: 'Feature: Multi-store regional routing', user: 'Aman Verma', time: '1 day ago' },
+          { version: 'v2.3.9', notes: 'Fix: Invoice sequence prefix alignment', user: 'Sarah D.', time: '3 days ago' }
+        ]
+      };
+    }
+
+    if (method === "get") {
+      return successRes(db.app_config);
+    }
+
+    if (method === "patch" && url.includes("/feature")) {
+      const { key, enabled, name } = data || {};
+      if (key) {
+        db.app_config[key] = Boolean(enabled);
+        db.app_config.updatedAt = new Date().toISOString();
+        if (name) {
+          db.app_config.versionHistory.unshift({
+            version: `v${db.app_config.customerAppVersion}`,
+            notes: `Feature: ${name} ${enabled ? 'Enabled' : 'Disabled'}`,
+            user: 'Super Admin',
+            time: 'Just now'
+          });
+        }
+      }
+      saveDB();
+      return successRes(db.app_config);
+    }
+
+    if (method === "put" || method === "post" || method === "patch") {
+      db.app_config = {
+        ...db.app_config,
+        ...(data || {}),
+        updatedAt: new Date().toISOString()
+      };
+      saveDB();
+      return successRes(db.app_config);
+    }
   }
 
   // Default Fallback: Success for all operations so the admin panel continues working

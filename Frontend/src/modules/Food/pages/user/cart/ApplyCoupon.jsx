@@ -1,10 +1,12 @@
 import React, { useState } from "react"
 import { X } from "lucide-react"
+import { useAppConfig } from "@food/context/AppConfigContext"
 
 export default function ApplyCoupon({ show, onClose, onApply, cartTotal }) {
+  const { config: appConfig } = useAppConfig()
   const [couponInput, setCouponInput] = useState("")
 
-  if (!show) return null
+  if (!show || appConfig?.couponEnabled === false) return null
 
   const getDynamicCoupons = () => {
     try {

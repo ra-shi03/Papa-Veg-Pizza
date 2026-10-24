@@ -1,6 +1,7 @@
 import React, { useState } from "react"
 import { useLocationStore } from "@food/store/locationStore"
 import { ChevronDown, MapPin, Navigation, Info } from "lucide-react"
+import { useScrollLock } from "@food/hooks/useScrollLock"
 
 export default function TakeawayMapModal({
   show,
@@ -14,6 +15,9 @@ export default function TakeawayMapModal({
 }) {
   const { confirmLocation } = useLocationStore()
   const [selectedStore, setSelectedStore] = useState(null)
+
+  // Lock background scroll when open
+  useScrollLock(Boolean(show))
 
   if (!show) return null
 

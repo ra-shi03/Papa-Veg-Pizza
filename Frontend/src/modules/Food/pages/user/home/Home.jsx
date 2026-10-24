@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { HomeModals } from "./components/HomeModals"
 import { useLocationStore } from "@food/store/locationStore"
 import { useLocationGuard } from "@food/hooks/useLocationGuard"
+import { useScrollLock } from "@food/hooks/useScrollLock"
 import logoNew from "@/assets/logo1.png"
 import { DEALS } from "./HomeData"
 import { HomeStyles } from "./components/HomeStyles"
@@ -19,11 +20,12 @@ import ProductCustomizeModal from "@food/components/user/ProductCustomizeModal"
 import UserSidebarDrawer from "@food/components/user/UserSidebarDrawer"
 import DeliverOnTrainModal from "@food/components/user/DeliverOnTrainModal"
 import RewardsWalletLoading from "@food/components/user/RewardsWalletLoading"
-import RewardsWalletView from "../rewards/RewardsWalletView"
+import PreviousRewardsView from "../rewards/PreviousRewardsView"
 import { ChevronsUp, X } from "lucide-react"
 import apiClient, { adminClient } from "@/services/api/axios"
 import { userAPI } from "@food/api"
 import { applySystemTheme } from "@/shared/utils/themeSync"
+import { useAppConfig } from "@food/context/AppConfigContext"
 
 const DEFAULT_REWARD_TERMS = [
   "The Papa Veg Pizza Cheesy Rewards Loyalty Program (Loyalty Program) is being conducted by Papa Veg Pizza.",
@@ -37,6 +39,7 @@ const DEFAULT_REWARD_TERMS = [
 ];
 
 export default function Home() {
+  const { config: appConfig } = useAppConfig();
   const [rewardsConfig, setRewardsConfig] = useState(null);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [showRewardsLoading, setShowRewardsLoading] = useState(false);
@@ -97,24 +100,10 @@ export default function Home() {
   }, []);
 
   const handleStartRewardsFlow = () => {
-    const isAuth =
-      localStorage.getItem("user_authenticated") === "true" ||
-      Boolean(localStorage.getItem("user_accessToken") || localStorage.getItem("accessToken"));
-
-    if (!isAuth) {
-      const loginPath = window.location.pathname.startsWith('/food')
-        ? '/food/user/auth/login'
-        : '/user/auth/login';
-      navigate(loginPath, { state: { from: window.location.pathname } });
-      return;
-    }
-
-    setShowRewardsLoading(true);
-    if (rewardsLoadingTimeoutRef.current) clearTimeout(rewardsLoadingTimeoutRef.current);
-    rewardsLoadingTimeoutRef.current = setTimeout(() => {
-      setShowRewardsLoading(false);
-      setShowRewardsPage(true);
-    }, 1200);
+    const rewardsPath = window.location.pathname.startsWith('/food')
+      ? '/food/user/rewards'
+      : '/user/rewards';
+    navigate(rewardsPath);
   };
 
   const handleCancelRewardsLoading = () => {
@@ -123,16 +112,8 @@ export default function Home() {
   };
   const navigate = useNavigate()
 
-  useEffect(() => {
-    if (isTermsModalOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isTermsModalOpen]);
+  // Lock background scroll when any modal or sheet is open
+  useScrollLock(Boolean(isTermsModalOpen || showAdPopup || showRewardsLoading || showRewardsPage));
 
   // Ensure Welcome Screen is shown first for new app sessions
   useEffect(() => {
@@ -364,6 +345,8 @@ export default function Home() {
   // Superadmin Dynamic Coupons State
   const [coupons, setCoupons] = useState(() => {
     try {
+      const cachedCfg = JSON.parse(localStorage.getItem('pvp_app_config') || '{}');
+      if (cachedCfg.couponEnabled === false) return [];
       const superadmin = localStorage.getItem("pvp_coupons")
       if (superadmin) {
         const parsed = JSON.parse(superadmin).filter(c => (c.status === "active" || c.isActive) && (!c.endDate || new Date(c.endDate) > new Date()))
@@ -372,8 +355,15 @@ export default function Home() {
         }
       }
     } catch (e) { }
-    return DEFAULT_COUPONS
+    return [];
   })
+
+  // Immediately clear coupons if disabled globally
+  useEffect(() => {
+    if (appConfig?.couponEnabled === false) {
+      setCoupons([]);
+    }
+  }, [appConfig?.couponEnabled]);
   const [copiedCode, setCopiedCode] = useState("")
 
   // Removed orderMethods state
@@ -741,6 +731,10 @@ export default function Home() {
       }
     }
     const fetchCoupons = async () => {
+      if (appConfig?.couponEnabled === false) {
+        setCoupons([]);
+        return;
+      }
       try {
         const res = await apiClient.get('/settings/coupons/public');
         const list = res?.data?.data || res?.data;
@@ -754,7 +748,7 @@ export default function Home() {
 
       try {
         const superadmin = localStorage.getItem("pvp_coupons");
-        if (superadmin) {
+        if (superadmin && appConfig?.couponEnabled !== false) {
           const parsed = JSON.parse(superadmin).filter(c => (c.status === "active" || c.isActive) && (!c.endDate || new Date(c.endDate) > new Date()));
           if (parsed.length > 0) {
             setCoupons(parsed);
@@ -763,7 +757,7 @@ export default function Home() {
         }
       } catch (_) {}
 
-      setCoupons(prev => (prev && prev.length > 0 ? prev : DEFAULT_COUPONS));
+      setCoupons([]);
     };
 
     fetchRewards();
@@ -1442,7 +1436,7 @@ export default function Home() {
           )}
 
           {/* Dynamic Rewards Section */}
-          {rewardsConfig && rewardsConfig.isEnabled && (
+          {appConfig?.loyaltyEnabled !== false && rewardsConfig && rewardsConfig.isEnabled && (
             <div className="px-2 sm:px-3 mt-2 mb-4">
               <div 
                 className="rounded-2xl shadow-[0_2px_15px_rgba(0,0,0,0.04)] border border-zinc-200/80 dark:border-zinc-800 p-3.5 sm:p-4 transition-colors"
@@ -1541,7 +1535,7 @@ export default function Home() {
           )}
 
           {/* Dynamic Superadmin Coupons & Offers Section (matching Reference Image 2 with App Theme Color) */}
-          {coupons && coupons.length > 0 && (
+          {appConfig?.couponEnabled !== false && coupons && coupons.length > 0 && (
             <div className="mt-3 mb-4 select-none" style={{ fontFamily: 'Poppins, sans-serif' }}>
               <div className="px-2 sm:px-3 mb-2.5">
                 <h3 className="font-semibold text-zinc-900 dark:text-white text-[16px] sm:text-[17px] tracking-tight m-0 font-headline-sm-mobile">
@@ -1773,9 +1767,9 @@ export default function Home() {
           />
         )}
 
-        {/* Rewards & Wallet View matching Reference Images 1 & 2 */}
+        {/* Rewards View (Previous UI) */}
         {showRewardsPage && (
-          <RewardsWalletView 
+          <PreviousRewardsView 
             onBack={() => setShowRewardsPage(false)} 
             initialTab="rewards" 
             rewardsConfig={rewardsConfig}
@@ -1785,7 +1779,7 @@ export default function Home() {
         {/* Terms & Conditions Bottom Sheet Modal matching Image 1 */}
         <AnimatePresence>
           {isTermsModalOpen && (
-            <div className="fixed inset-0 z-50 flex flex-col justify-end items-center">
+            <div className="fixed inset-0 z-50 flex flex-col justify-end items-center touch-none">
               {/* Semi-transparent dark overlay */}
               <motion.div
                 initial={{ opacity: 0 }}
@@ -1820,7 +1814,7 @@ export default function Home() {
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
                 transition={{ type: "spring", damping: 28, stiffness: 300 }}
-                className="relative z-10 w-full max-w-lg bg-white dark:bg-zinc-900 rounded-t-[28px] shadow-2xl flex flex-col max-h-[75vh] overflow-hidden"
+                className="relative z-10 w-full max-w-lg bg-white dark:bg-zinc-900 rounded-t-[28px] shadow-2xl flex flex-col max-h-[75vh] overflow-hidden touch-auto"
                 style={{ fontFamily: 'Poppins, sans-serif' }}
               >
                 <div className="px-6 pt-5 pb-3">
@@ -1829,7 +1823,7 @@ export default function Home() {
                   </h3>
                 </div>
 
-                <div className="px-6 pb-6 overflow-y-auto space-y-3.5 hide-scrollbar">
+                <div className="px-6 pb-6 overflow-y-auto overscroll-contain space-y-3.5 hide-scrollbar">
                   {(Array.isArray(rewardsConfig?.terms) && rewardsConfig.terms.length > 0
                     ? rewardsConfig.terms
                     : DEFAULT_REWARD_TERMS

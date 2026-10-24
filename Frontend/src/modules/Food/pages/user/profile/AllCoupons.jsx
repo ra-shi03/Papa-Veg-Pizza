@@ -13,10 +13,12 @@ import {
 } from "lucide-react"
 import AnimatedPage from "@food/components/user/AnimatedPage"
 import { restaurantAPI } from "@food/api"
+import { useAppConfig } from "@food/context/AppConfigContext"
 import { toast } from "sonner"
 
 export default function AllCoupons() {
   const navigate = useNavigate()
+  const { config: appConfig } = useAppConfig()
   const [activeTab, setActiveTab] = useState("active") // "active", "redeemed", "expired"
   const [selectedFilter, setSelectedFilter] = useState("") // "", "online", "instore", "expiring"
   const [loading, setLoading] = useState(true)
@@ -41,6 +43,13 @@ export default function AllCoupons() {
   useEffect(() => {
     let cancelled = false
     const load = async () => {
+      if (appConfig?.couponEnabled === false) {
+        if (!cancelled) {
+          setActiveOffers([])
+          setLoading(false)
+        }
+        return
+      }
       try {
         setLoading(true)
         const res = await restaurantAPI.getPublicOffers()
@@ -59,7 +68,7 @@ export default function AllCoupons() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [appConfig?.couponEnabled])
 
   // Mock expired coupons based on UX screenshots
   const expiredOffers = [

@@ -1,5 +1,6 @@
 import React from "react"
 import { useLocationStore } from "@food/store/locationStore"
+import { useScrollLock } from "@food/hooks/useScrollLock"
 
 export default function DeliveryOrCollectionModal({
   show,
@@ -8,6 +9,9 @@ export default function DeliveryOrCollectionModal({
   isDarkMode
 }) {
   const { isModalOpen, modalMessage } = useLocationStore()
+
+  // Lock background scroll when open
+  useScrollLock(Boolean(show))
 
   if (!show) return null
 
@@ -53,11 +57,11 @@ export default function DeliveryOrCollectionModal({
 
   return (
     <div 
-      className={`fixed inset-0 z-55 flex items-end justify-center ${backdropBg} transition-opacity duration-300`}
+      className={`fixed inset-0 z-55 flex items-end justify-center ${backdropBg} transition-opacity duration-300 touch-none`}
       onClick={onClose}
     >
       <div 
-        className={`w-full max-w-md rounded-t-[32px] shadow-[0_-8px_30px_rgba(0,0,0,0.2)] px-6 pt-3 pb-8 z-30 flex flex-col text-left transition-transform duration-300 translate-y-0 ${sheetBg}`}
+        className={`w-full max-w-md rounded-t-[32px] shadow-[0_-8px_30px_rgba(0,0,0,0.2)] px-6 pt-3 pb-8 z-30 flex flex-col text-left transition-transform duration-300 translate-y-0 touch-auto overscroll-contain ${sheetBg}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Handle bar pill */}

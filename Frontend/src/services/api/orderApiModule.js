@@ -149,6 +149,33 @@ export const orderAPI = {
         description: payload.subject ? `${payload.subject}: ${payload.description}` : payload.description,
       }
     ),
+  getOrderMethods: async () => {
+    try {
+      const res = await userClient.get("/food/orders/methods");
+      const data = res?.data?.data;
+      const list = Array.isArray(data?.methods) ? data.methods : (Array.isArray(data) ? data : []);
+      if (list.length > 0) return list;
+    } catch (_) {}
+    try {
+      const homeRes = await apiClient.get('/settings/home-page');
+      const list = homeRes?.data?.data?.orderMethods;
+      if (Array.isArray(list) && list.length > 0) return list;
+    } catch (_) {}
+    try {
+      const stored = localStorage.getItem("pvp_order_methods");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_) {}
+    return [
+      { id: "delivery", label: "Delivery", enabled: true },
+      { id: "dine_in", label: "Dine-In", enabled: true },
+      { id: "takeaway", label: "Takeaway", enabled: true },
+      { id: "train", label: "Delivery on Train", enabled: true },
+      { id: "incar", label: "In-Car", enabled: true }
+    ];
+  },
 };
 
 // Dining bookings now handled by backend

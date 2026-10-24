@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Check } from 'lucide-react';
 import apiClient from '@/services/api/axios';
+import { useScrollLock } from "@food/hooks/useScrollLock";
 
 const DEFAULT_CRUST_OPTIONS = [
   {
@@ -106,10 +107,12 @@ export default function ProductCustomizeModal({
     ];
   }, [item]);
 
+  // Lock background scroll when modal is open
+  useScrollLock(Boolean(isOpen && item));
+
   // Reset state on open or item change
   useEffect(() => {
     if (isOpen && item) {
-      document.body.style.overflow = 'hidden';
       const initialSize = parsedSizes[0] || { name: "Regular", price: Number(item.price) || 299, description: "Serves 1 person only" };
       setSelectedSizeOption(initialSize);
       setSelectedCrust(item.defaultCrust || item.crust || "New Hand Tossed");
@@ -117,12 +120,7 @@ export default function ProductCustomizeModal({
       setSelectedMealOptions([]);
       setSelectedExtraCheese(false);
       setQuantity(1);
-    } else {
-      document.body.style.overflow = '';
     }
-    return () => {
-      document.body.style.overflow = '';
-    };
   }, [isOpen, item, parsedSizes]);
 
   // Assigned Addons
@@ -279,12 +277,18 @@ export default function ProductCustomizeModal({
   const toppingsDesc = item.toppingsSummary || item.description || (item.rawProduct && item.rawProduct.description) || "Toppings: Mozzarella Cheese • Fresh Herbs";
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+    <div 
+      onClick={onClose}
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in touch-none"
+    >
       {/* Modal Container */}
-      <div className="w-full max-w-md bg-white dark:bg-[#18181a] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[90vh] overflow-hidden transition-colors duration-300 font-['Poppins',sans-serif] animate-slide-up">
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md bg-white dark:bg-[#18181a] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[90vh] overflow-hidden transition-colors duration-300 font-['Poppins',sans-serif] animate-slide-up touch-auto"
+      >
         
         {/* Header: Sticky Top with Veg Icon, Title, Toppings summary, and Close button */}
-        <div className="bg-white dark:bg-[#1f1f22] px-5 py-4 flex items-start justify-between border-b border-zinc-200/70 dark:border-white/5 shrink-0">
+        <div className="bg-white dark:bg-[#1f1f22] px-5 py-4 flex items-start justify-between border-b border-zinc-200/70 dark:border-white/5 shrink-0 select-none">
           <div className="flex items-start gap-2.5 text-left min-w-0 pr-2">
             <span className="w-4 h-4 border-[1.5px] border-emerald-600 p-[1.5px] rounded-[3px] flex items-center justify-center bg-transparent shrink-0 mt-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 block" />
@@ -309,7 +313,7 @@ export default function ProductCustomizeModal({
         </div>
 
         {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5 text-left scrollbar-none">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-5 text-left scrollbar-none">
           
           {/* 1. Change Size Section (Reference Image 3: side-by-side selectable cards with checkmarks & discounts) */}
           {parsedSizes.length > 0 && (

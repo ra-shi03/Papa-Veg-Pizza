@@ -1,163 +1,49 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Plus, ClipboardList, CheckCircle, XCircle, AlertTriangle, TrendingUp, RefreshCw, X, Gift, Calendar, Clock, Sparkles } from "lucide-react";
+import { adminClient } from "@/services/api/axios";
 
 // Component imports
 import ComboDealsData from "./ComboDealsData";
 import ComboDetails from "./ComboDetails";
 import CreateComboModal from "./CreateComboModal";
 import EditComboModal from "./EditComboModal";
-import DuplicateComboModal from "./DuplicateComboModal";
 import DeleteComboModal from "./DeleteComboModal";
 
-// Predefined list of mock products (100% Pure Veg)
-const productsList = [
-  { id: "PP-V-001", name: "Paneer Tikka Supreme", category: "Pizza", price: 349, image: "https://images.unsplash.com/photo-1571066811602-71683a3f680d?fm=webp&fit=crop&w=100&q=80" },
-  { id: "PP-V-002", name: "Veg Supreme Delight", category: "Pizza", price: 299, image: "https://images.unsplash.com/photo-1590947132387-155cc02f3212?fm=webp&fit=crop&w=100&q=80" },
-  { id: "PP-V-003", name: "Tandoori Veggie Blast", category: "Pizza", price: 329, image: "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?fm=webp&fit=crop&w=100&q=80" },
-  { id: "PP-V-004", name: "Cheese Burst Margherita", category: "Pizza", price: 249, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?fm=webp&fit=crop&w=100&q=80" },
-  { id: "PP-V-005", name: "Spicy Capsicum & Corn", category: "Pizza", price: 219, image: "https://images.unsplash.com/photo-1534308983496-4fabb1a015ee?fm=webp&fit=crop&w=100&q=80" },
-  { id: "PP-V-006", name: "Garlic Breadsticks", category: "Garlic Bread", price: 99, image: "https://images.unsplash.com/photo-1544982503-9f984c14501a?fm=webp&fit=crop&w=100&q=80" },
-  { id: "PP-V-007", name: "Chocolate Lava Cake", category: "Desserts", price: 89, image: "https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?fm=webp&fit=crop&w=100&q=80" },
-  { id: "PP-V-008", name: "Cold Pepsi 500ml", category: "Beverages", price: 40, image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?fm=webp&fit=crop&w=100&q=80" }
-];
+const idOf = (v) => (v && typeof v === "object" ? String(v._id || v.id || "") : v ? String(v) : "");
 
-const franchisesList = [
-  "Franchise North India",
-  "Franchise South India",
-  "Franchise West India",
-  "Franchise East India"
-];
+// Flatten API combo into the shape the table / drawer / modals already use
+const normalizeCombo = (c) => ({
+  ...c,
+  _id: String(c._id),
+  price: Number(c.price) || 0,
+  originalPrice: Number(c.originalPrice) || 0,
+  discountValue: Number(c.discountValue) || 0,
+  categoryId: idOf(c.categoryId),
+  categoryLabel: c.categoryId && typeof c.categoryId === "object" ? c.categoryId.label || "" : "",
+  applicableFranchises: (c.applicableFranchises || []).map(idOf),
+  applicableStores: (c.applicableStores || []).map(idOf),
+  items: (c.items || []).map(it => ({
+    ...it,
+    _id: String(it._id || ""),
+    productId: idOf(it.productId) || null,
+    addonId: idOf(it.addonId) || null,
+    choices: (it.choices || []).map(ch => ({ ...ch, _id: String(ch._id || ""), productId: idOf(ch.productId) || null, addonId: idOf(ch.addonId) || null }))
+  }))
+});
 
-const storesList = [
-  "Store Delhi-Connaught Place",
-  "Store Mumbai-Andheri",
-  "Store Bangalore-Indiranagar",
-  "Store Chennai-Adyar",
-  "Store Pune-Kothrud"
-];
+// Backend errorHandler responds with { success: false, error }, controllers with { message }
+const getErrorMessage = (err, fallback) =>
+  err?.response?.data?.error || err?.response?.data?.message || err?.message || fallback;
 
 export default function ComboDeals() {
-  // Main Data States mapping combos & combo_items
-  const [combos, setCombos] = useState([
-    {
-      _id: "combo_001",
-      name: "Solo Classic Treat",
-      description: "1 Personal Margherita Pizza + 1 Garlic Breadsticks + 1 Coke",
-      image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?fm=webp&fit=crop&w=300&q=80",
-      comboType: "fixed",
-      price: 299,
-      discountType: "percentage",
-      discountValue: 20,
-      validFrom: "2026-06-01T00:00:00Z",
-      validTo: "2026-08-31T23:59:59Z",
-      status: "active",
-      applicabilityType: "all", // all, franchises, stores
-      applicableFranchises: [],
-      applicableStores: [],
-      createdBy: "Admin.Rashi",
-      updatedBy: "Admin.Rashi",
-      createdAt: "2026-06-01T10:00:00Z",
-      updatedAt: "2026-06-15T10:00:00Z"
-    },
-    {
-      _id: "combo_002",
-      name: "Family Veg Feast",
-      description: "2 Medium Veg Supreme Pizzas + 1 Garlic Breadsticks + 1 Choco Lava Cake + 2 Pepsi 500ml",
-      image: "https://images.unsplash.com/photo-1590947132387-155cc02f3212?fm=webp&fit=crop&w=300&q=80",
-      comboType: "meal",
-      price: 749,
-      discountType: "flat",
-      discountValue: 150,
-      validFrom: "2026-06-10T00:00:00Z",
-      validTo: "2026-07-10T23:59:59Z",
-      status: "active",
-      applicabilityType: "stores",
-      applicableFranchises: [],
-      applicableStores: ["Store Delhi-Connaught Place", "Store Mumbai-Andheri"],
-      createdBy: "Admin.Rashi",
-      updatedBy: "Admin.Rashi",
-      createdAt: "2026-06-08T12:00:00Z",
-      updatedAt: "2026-06-16T14:30:00Z"
-    },
-    {
-      _id: "combo_003",
-      name: "BOGO Friday Delight",
-      description: "Buy One Paneer Tikka Pizza, Get One Margherita Pizza (Equal size) at 50% discount",
-      image: "https://images.unsplash.com/photo-1571066811602-71683a3f680d?fm=webp&fit=crop&w=300&q=80",
-      comboType: "bogo",
-      price: 499,
-      discountType: "percentage",
-      discountValue: 50,
-      validFrom: "2026-06-25T00:00:00Z",
-      validTo: "2026-09-30T23:59:59Z",
-      status: "scheduled",
-      applicabilityType: "franchises",
-      applicableFranchises: ["Franchise West India", "Franchise North India"],
-      applicableStores: [],
-      createdBy: "Admin.Rashi",
-      updatedBy: "Admin.Rashi",
-      createdAt: "2026-06-12T15:00:00Z",
-      updatedAt: "2026-06-12T15:00:00Z"
-    },
-    {
-      _id: "combo_004",
-      name: "Student Hangout Offer",
-      description: "4 Personal Pizzas + 2 Garlic Breadsticks + 4 Pepsi 500ml",
-      image: "https://images.unsplash.com/photo-1534308983496-4fabb1a015ee?fm=webp&fit=crop&w=300&q=80",
-      comboType: "custom",
-      price: 649,
-      discountType: "flat",
-      discountValue: 180,
-      validFrom: "2026-06-15T00:00:00Z",
-      validTo: "2026-12-31T23:59:59Z",
-      status: "draft",
-      applicabilityType: "all",
-      applicableFranchises: [],
-      applicableStores: [],
-      createdBy: "Admin.Rashi",
-      updatedBy: "Admin.Rashi",
-      createdAt: "2026-06-15T11:20:00Z",
-      updatedAt: "2026-06-15T11:20:00Z"
-    },
-    {
-      _id: "combo_005",
-      name: "Mango Summer Sundae Special",
-      description: "1 Medium Farmhouse Pizza + 2 Choco Lava Cakes (Seasonal Mango Puree variant)",
-      image: "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?fm=webp&fit=crop&w=300&q=80",
-      comboType: "seasonal",
-      price: 380,
-      discountType: "percentage",
-      discountValue: 15,
-      validFrom: "2026-04-01T00:00:00Z",
-      validTo: "2026-06-15T23:59:59Z",
-      status: "expired",
-      applicabilityType: "all",
-      applicableFranchises: [],
-      applicableStores: [],
-      createdBy: "Admin.Rashi",
-      updatedBy: "Admin.Rashi",
-      createdAt: "2023-03-25T09:00:00Z",
-      updatedAt: "2026-06-16T00:00:00Z"
-    }
-  ]);
-
-  const [comboItems, setComboItems] = useState([
-    { _id: "ci_1", comboId: "combo_001", productId: "PP-V-004", quantity: 1 },
-    { _id: "ci_2", comboId: "combo_001", productId: "PP-V-006", quantity: 1 },
-    { _id: "ci_3", comboId: "combo_001", productId: "PP-V-008", quantity: 1 },
-    { _id: "ci_4", comboId: "combo_002", productId: "PP-V-002", quantity: 2 },
-    { _id: "ci_5", comboId: "combo_002", productId: "PP-V-006", quantity: 1 },
-    { _id: "ci_6", comboId: "combo_002", productId: "PP-V-007", quantity: 1 },
-    { _id: "ci_7", comboId: "combo_002", productId: "PP-V-008", quantity: 2 },
-    { _id: "ci_8", comboId: "combo_003", productId: "PP-V-001", quantity: 1 },
-    { _id: "ci_9", comboId: "combo_003", productId: "PP-V-004", quantity: 1 }
-  ]);
-
-  // Order references for delete constraint checking
-  const [orderComboReferences, setOrderComboReferences] = useState([
-    "combo_001",
-    "combo_002"
-  ]);
+  const [combos, setCombos] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [addons, setAddons] = useState([]);
+  const [franchises, setFranchises] = useState([]);
+  const [stores, setStores] = useState([]);
+  const [serverStats, setServerStats] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Toast / Alert banner state
   const [alert, setAlert] = useState(null);
@@ -166,7 +52,6 @@ export default function ComboDeals() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const [selectedCombo, setSelectedCombo] = useState(null);
@@ -177,23 +62,98 @@ export default function ComboDeals() {
     setTimeout(() => setAlert(null), 4000);
   };
 
+  const fetchCombos = useCallback(async () => {
+    try {
+      const [listRes, statsRes] = await Promise.all([
+        adminClient.get("/food/admin/combos"),
+        adminClient.get("/food/admin/combos/stats")
+      ]);
+      setCombos((listRes?.data?.data || []).map(normalizeCombo));
+      setServerStats(statsRes?.data?.data || null);
+    } catch (err) {
+      triggerAlert(getErrorMessage(err, "Failed to load combos"), "error");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Catalog lookups used by the create / edit form
+  const fetchLookups = useCallback(async () => {
+    const [prodRes, catRes, franRes, storeRes, addonRes] = await Promise.allSettled([
+      adminClient.get("/food/admin/products"),
+      adminClient.get("/food/admin/category-products?sort=sort_asc"),
+      adminClient.get("/food/admin/franchises"),
+      adminClient.get("/food/admin/stores"),
+      adminClient.get("/food/admin/addons")
+    ]);
+
+    if (prodRes.status === "fulfilled") {
+      const raw = prodRes.value?.data?.data;
+      const list = Array.isArray(raw) ? raw : raw?.foods || [];
+      setProducts(list.map(p => ({
+        id: String(p._id || p.id),
+        name: p.name || "",
+        category: (p.categoryId && typeof p.categoryId === "object" ? p.categoryId.label : "") || p.category || "",
+        categoryId: idOf(p.categoryId),
+        price: Number(p.sizes?.[0]?.price ?? p.price) || 0,
+        image: p.image || "",
+        sizes: (p.sizes || []).map(s => ({ size: s.size || s.name, price: Number(s.price) || 0 }))
+      })));
+    }
+    if (catRes.status === "fulfilled") {
+      setCategories((catRes.value?.data?.data || [])
+        .filter(c => c.type === "Category" || !c.type)
+        .map(c => ({ id: String(c._id), label: c.label || c.name || "" })));
+    }
+    if (addonRes.status === "fulfilled") {
+      const raw = addonRes.value?.data?.data;
+      const list = Array.isArray(raw) ? raw : raw?.addons || [];
+      setAddons(list
+        .filter(a => (a.status || "Active").toLowerCase() === "active")
+        .map(a => ({
+          id: String(a._id || a.id),
+          name: a.name || "",
+          category: a.type || "Add-on",
+          image: a.image || "",
+          price: Number(a.prices?.[0]?.price ?? a.price) || 0,
+          sizes: (a.prices || []).map(pr => ({ size: pr.size, price: Number(pr.price) || 0 }))
+        })));
+    }
+    if (franRes.status === "fulfilled") {
+      setFranchises((franRes.value?.data?.data || []).map(f => ({
+        id: String(f._id || f.id),
+        name: f.franchiseName || f.name || f.companyName || "Franchise"
+      })));
+    }
+    if (storeRes.status === "fulfilled") {
+      const raw = storeRes.value?.data?.data;
+      const list = Array.isArray(raw) ? raw : raw?.stores || [];
+      setStores(list.map(s => ({ id: String(s._id || s.id), name: s.storeName || s.name || "Store" })));
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCombos();
+    fetchLookups();
+  }, [fetchCombos, fetchLookups]);
+
+  // Combo items flattened (comboId -> items) for table pills & detail drawer
+  const comboItems = useMemo(
+    () => combos.flatMap(c => c.items.map(it => ({ ...it, comboId: c._id }))),
+    [combos]
+  );
+
   // Live Stats calculations
   const now = new Date();
   const stats = {
-    totalCombos: combos.length,
-    activeCombos: combos.filter(c => c.status === "active").length,
-    scheduledCombos: combos.filter(c => c.status === "scheduled").length,
-    expiredCombos: combos.filter(c => c.status === "expired" || (c.validTo && new Date(c.validTo) < now)).length,
-    draftCombos: combos.filter(c => c.status === "draft").length,
-    totalRevenue: 284500, // INR
-    mostPurchased: "Family Veg Feast",
-    expiringSoon: combos.filter(c => {
-      if (c.status !== "active" || !c.validTo) return false;
-      const expiry = new Date(c.validTo);
-      const diffTime = expiry - now;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays > 0 && diffDays <= 7;
-    }).length
+    totalCombos: serverStats?.totalCombos ?? combos.length,
+    activeCombos: serverStats?.activeCombos ?? combos.filter(c => c.status === "active").length,
+    scheduledCombos: serverStats?.scheduledCombos ?? combos.filter(c => c.status === "scheduled").length,
+    expiredCombos: serverStats?.expiredCombos ?? combos.filter(c => c.status === "expired" || (c.validTo && new Date(c.validTo) < now)).length,
+    draftCombos: serverStats?.draftCombos ?? combos.filter(c => c.status === "draft").length,
+    totalRevenue: serverStats?.totalRevenue ?? 0, // INR
+    mostPurchased: serverStats?.mostPurchased || "—",
+    expiringSoon: serverStats?.expiringSoon ?? 0
   };
 
   // Row Action Dispatchers
@@ -207,162 +167,94 @@ export default function ComboDeals() {
     setIsEditModalOpen(true);
   };
 
-  const handleDuplicate = (combo) => {
-    setSelectedCombo(combo);
-    setIsDuplicateModalOpen(true);
-  };
-
   const handleDelete = (combo) => {
     setSelectedCombo(combo);
     setIsDeleteModalOpen(true);
   };
 
-  const handleStatusChange = (comboId, newStatus) => {
-    setCombos(prev =>
-      prev.map(c => (c._id === comboId ? { ...c, status: newStatus, updatedAt: new Date().toISOString() } : c))
-    );
+  const handleStatusChange = async (comboId, newStatus) => {
     const target = combos.find(c => c._id === comboId);
-    triggerAlert(`Combo "${target ? target.name : 'Offer'}" status successfully updated to "${newStatus}"!`, "success");
+    try {
+      await adminClient.patch(`/food/admin/combos/${comboId}/status`, { status: newStatus });
+      triggerAlert(`Combo "${target ? target.name : 'Offer'}" status successfully updated to "${newStatus}"!`, "success");
+      fetchCombos();
+    } catch (err) {
+      triggerAlert(getErrorMessage(err, "Failed to update status"), "error");
+    }
   };
 
   // Form submit saves
-  const handleCreateSave = (newComboPayload, newItemsPayload) => {
-    const newComboId = `combo_${Date.now()}`;
-    const comboRecord = {
-      _id: newComboId,
-      ...newComboPayload,
-      createdBy: "Admin.Rashi",
-      updatedBy: "Admin.Rashi",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    const itemRecords = newItemsPayload.map((item, idx) => ({
-      _id: `ci_${Date.now()}_${idx}`,
-      comboId: newComboId,
-      productId: item.productId,
-      quantity: item.quantity
-    }));
-
-    setCombos(prev => [comboRecord, ...prev]);
-    setComboItems(prev => [...prev, ...itemRecords]);
-    setIsAddModalOpen(false);
-    triggerAlert(`Successfully created new combo deal "${comboRecord.name}"!`, "success");
-  };
-
-  const handleEditSave = (comboId, updatedComboPayload, updatedItemsPayload) => {
-    setCombos(prev =>
-      prev.map(c => (c._id === comboId ? {
-        ...c,
-        ...updatedComboPayload,
-        updatedBy: "Admin.Rashi",
-        updatedAt: new Date().toISOString()
-      } : c))
-    );
-
-    setComboItems(prev => {
-      const filtered = prev.filter(item => item.comboId !== comboId);
-      const newItems = updatedItemsPayload.map((item, idx) => ({
-        _id: item._id || `ci_${Date.now()}_${idx}`,
-        comboId: comboId,
-        productId: item.productId,
-        quantity: item.quantity
-      }));
-      return [...filtered, ...newItems];
-    });
-
-    setIsEditModalOpen(false);
-    triggerAlert(`Modifications saved for "${updatedComboPayload.name}"!`, "success");
-  };
-
-  const handleDuplicateConfirm = (originalId, newName, options) => {
-    const originalCombo = combos.find(c => c._id === originalId);
-    if (!originalCombo) return;
-
-    const newComboId = `combo_${Date.now()}`;
-    const comboRecord = {
-      ...originalCombo,
-      _id: newComboId,
-      name: newName,
-      image: options.copyBanner ? originalCombo.image : "https://images.unsplash.com/photo-1513104890138-7c749659a591?fm=webp&fit=crop&w=300&q=80",
-      validFrom: options.copyValidity ? originalCombo.validFrom : new Date().toISOString(),
-      validTo: options.copyValidity ? originalCombo.validTo : "",
-      applicabilityType: options.copyStores ? originalCombo.applicabilityType : "all",
-      applicableFranchises: options.copyStores ? originalCombo.applicableFranchises : [],
-      applicableStores: options.copyStores ? originalCombo.applicableStores : [],
-      status: "draft",
-      createdBy: "Admin.Rashi",
-      updatedBy: "Admin.Rashi",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    if (options.copyProducts) {
-      const originalItems = comboItems.filter(item => item.comboId === originalId);
-      const newItems = originalItems.map((item, idx) => ({
-        _id: `ci_${Date.now()}_${idx}`,
-        comboId: newComboId,
-        productId: item.productId,
-        quantity: item.quantity
-      }));
-      setComboItems(prev => [...prev, ...newItems]);
+  const handleCreateSave = async (payload) => {
+    try {
+      await adminClient.post("/food/admin/combos", payload);
+      setIsAddModalOpen(false);
+      triggerAlert(`Successfully ${payload.status === "draft" ? "saved draft of" : "created new combo deal"} "${payload.name}"!`, "success");
+      fetchCombos();
+    } catch (err) {
+      triggerAlert(getErrorMessage(err, "Failed to create combo"), "error");
     }
-
-    setCombos(prev => [comboRecord, ...prev]);
-    setIsDuplicateModalOpen(false);
-    triggerAlert(`Duplicated "${originalCombo.name}" as "${newName}"!`, "success");
   };
 
-  const handleDeleteConfirm = (comboId, actionType) => {
+  const handleEditSave = async (comboId, payload) => {
+    try {
+      await adminClient.patch(`/food/admin/combos/${comboId}`, payload);
+      setIsEditModalOpen(false);
+      triggerAlert(`Modifications saved for "${payload.name}"!`, "success");
+      fetchCombos();
+    } catch (err) {
+      triggerAlert(getErrorMessage(err, "Failed to save combo"), "error");
+    }
+  };
+
+  const handleDeleteConfirm = async (comboId, actionType) => {
     const target = combos.find(c => c._id === comboId);
     const name = target ? target.name : "Offer";
 
-    if (actionType === "archive") {
-      setCombos(prev =>
-        prev.map(c => (c._id === comboId ? { ...c, status: "archived", updatedAt: new Date().toISOString() } : c))
-      );
-      triggerAlert(`Combo "${name}" has been archived successfully.`, "warning");
-    } else {
-      setCombos(prev => prev.filter(c => c._id !== comboId));
-      setComboItems(prev => prev.filter(item => item.comboId !== comboId));
-      triggerAlert(`Combo "${name}" deleted from catalog.`, "error");
+    try {
+      if (actionType === "archive") {
+        await adminClient.patch(`/food/admin/combos/${comboId}/status`, { status: "archived" });
+        triggerAlert(`Combo "${name}" has been archived successfully.`, "warning");
+      } else {
+        await adminClient.delete(`/food/admin/combos/${comboId}`);
+        triggerAlert(`Combo "${name}" deleted from catalog.`, "error");
+      }
+      setIsDeleteModalOpen(false);
+      fetchCombos();
+    } catch (err) {
+      triggerAlert(getErrorMessage(err, "Failed to remove combo"), "error");
     }
-    setIsDeleteModalOpen(false);
   };
 
   // Bulk operation actions
-  const handleBulkAction = (action, selectedIds) => {
-    if (action === "activate") {
-      setCombos(prev => prev.map(c => selectedIds.includes(c._id) ? { ...c, status: "active", updatedAt: new Date().toISOString() } : c));
-      triggerAlert(`Bulk activated ${selectedIds.length} combos!`, "success");
-    } else if (action === "deactivate") {
-      setCombos(prev => prev.map(c => selectedIds.includes(c._id) ? { ...c, status: "inactive", updatedAt: new Date().toISOString() } : c));
-      triggerAlert(`Bulk deactivated ${selectedIds.length} combos!`, "success");
-    } else if (action === "archive") {
-      setCombos(prev => prev.map(c => selectedIds.includes(c._id) ? { ...c, status: "archived", updatedAt: new Date().toISOString() } : c));
-      triggerAlert(`Bulk archived ${selectedIds.length} combos!`, "warning");
-    } else if (action === "delete") {
-      const eligible = selectedIds.filter(id => !orderComboReferences.includes(id));
-      const ineligibles = selectedIds.filter(id => orderComboReferences.includes(id));
-
-      if (eligible.length > 0) {
-        setCombos(prev => prev.filter(c => !eligible.includes(c._id)));
-        setComboItems(prev => prev.filter(item => !eligible.includes(item.comboId)));
-      }
-
-      if (ineligibles.length > 0) {
-        triggerAlert(`Deleted ${eligible.length} eligible records. ${ineligibles.length} combos retained due to historical orders linkage.`, "warning");
+  const handleBulkAction = async (action, selectedIds) => {
+    try {
+      const res = await adminClient.patch("/food/admin/combos/bulk", { ids: selectedIds, action });
+      const result = res?.data?.data || {};
+      if (action === "delete") {
+        if (result.retained > 0) {
+          triggerAlert(`Deleted ${result.deleted} eligible records. ${result.retained} combos retained due to historical orders linkage.`, "warning");
+        } else {
+          triggerAlert(`Bulk deleted ${result.deleted} combos successfully.`, "error");
+        }
       } else {
-        triggerAlert(`Bulk deleted ${eligible.length} combos successfully.`, "error");
+        const verb = action === "activate" ? "activated" : action === "deactivate" ? "deactivated" : "archived";
+        if (result.skipped > 0) {
+          triggerAlert(`Bulk ${verb} ${result.updated} combos. ${result.skipped} skipped because their validity has ended.`, "warning");
+        } else {
+          triggerAlert(`Bulk ${verb} ${selectedIds.length} combos!`, action === "archive" ? "warning" : "success");
+        }
       }
+      fetchCombos();
+    } catch (err) {
+      triggerAlert(getErrorMessage(err, "Bulk action failed"), "error");
     }
   };
 
   // CSV Exporter
   const handleDownloadCSV = (dataset) => {
-    const headers = "ID,Name,Type,Price,DiscountType,DiscountValue,ValidFrom,ValidTo,Status,UpdatedAt\n";
+    const headers = "ID,Name,Menu Section,Type,Price,MRP,DiscountType,DiscountValue,ValidFrom,ValidTo,Status,UpdatedAt\n";
     const rows = dataset.map(c =>
-      `"${c._id}","${c.name}","${c.comboType}",${c.price},"${c.discountType}",${c.discountValue},"${c.validFrom || ""}","${c.validTo || ""}","${c.status}","${c.updatedAt || ""}"`
+      `"${c._id}","${c.name}","${c.categoryLabel || ""}","${c.comboType}",${c.price},${c.originalPrice || 0},"${c.discountType}",${c.discountValue},"${c.validFrom || ""}","${c.validTo || ""}","${c.status}","${c.updatedAt || ""}"`
     ).join("\n");
 
     const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
@@ -375,7 +267,8 @@ export default function ComboDeals() {
     document.body.removeChild(link);
   };
 
-  const triggerRefresh = () => {
+  const triggerRefresh = async () => {
+    await Promise.all([fetchCombos(), fetchLookups()]);
     triggerAlert("POS catalog combos synchronized and refreshed.", "success");
   };
 
@@ -415,7 +308,7 @@ export default function ComboDeals() {
             className="p-2 border border-zinc-250 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-lg text-zinc-550 dark:text-zinc-400 transition-colors shadow-sm cursor-pointer"
             title="Refresh Catalog"
           >
-            <RefreshCw size={12} />
+            <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
           </button>
 
           <button
@@ -526,10 +419,11 @@ export default function ComboDeals() {
       <ComboDealsData
         combos={combos}
         comboItems={comboItems}
-        products={productsList}
+        products={products}
+        franchises={franchises}
+        stores={stores}
         onView={handleView}
         onEdit={handleEdit}
-        onDuplicate={handleDuplicate}
         onDelete={handleDelete}
         onStatusChange={handleStatusChange}
         onBulkAction={handleBulkAction}
@@ -544,7 +438,9 @@ export default function ComboDeals() {
           onClose={() => setIsDetailOpen(false)}
           combo={selectedCombo}
           comboItems={comboItems.filter(item => item.comboId === selectedCombo._id)}
-          products={productsList}
+          products={products}
+          franchises={franchises}
+          stores={stores}
         />
       )}
 
@@ -554,9 +450,11 @@ export default function ComboDeals() {
           isOpen={isAddModalOpen}
           onClose={() => setIsAddModalOpen(false)}
           onSave={handleCreateSave}
-          products={productsList}
-          franchises={franchisesList}
-          stores={storesList}
+          products={products}
+          addons={addons}
+          categories={categories}
+          franchises={franchises}
+          stores={stores}
         />
       )}
 
@@ -566,21 +464,12 @@ export default function ComboDeals() {
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
           combo={selectedCombo}
-          comboItems={comboItems.filter(item => item.comboId === selectedCombo._id)}
-          onSave={(payloadCombo, payloadItems) => handleEditSave(selectedCombo._id, payloadCombo, payloadItems)}
-          products={productsList}
-          franchises={franchisesList}
-          stores={storesList}
-        />
-      )}
-
-      {/* Duplicate Combo Modal */}
-      {isDuplicateModalOpen && selectedCombo && (
-        <DuplicateComboModal
-          isOpen={isDuplicateModalOpen}
-          onClose={() => setIsDuplicateModalOpen(false)}
-          combo={selectedCombo}
-          onConfirm={(newName, options) => handleDuplicateConfirm(selectedCombo._id, newName, options)}
+          onSave={(payload) => handleEditSave(selectedCombo._id, payload)}
+          products={products}
+          addons={addons}
+          categories={categories}
+          franchises={franchises}
+          stores={stores}
         />
       )}
 
@@ -590,7 +479,7 @@ export default function ComboDeals() {
           isOpen={isDeleteModalOpen}
           onClose={() => setIsDeleteModalOpen(false)}
           combo={selectedCombo}
-          hasOrders={orderComboReferences.includes(selectedCombo._id)}
+          hasOrders={selectedCombo.orderCount > 0}
           onConfirm={(actionType) => handleDeleteConfirm(selectedCombo._id, actionType)}
         />
       )}

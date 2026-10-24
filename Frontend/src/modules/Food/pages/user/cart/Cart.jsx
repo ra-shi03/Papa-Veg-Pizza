@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft, Clock, Tag, ChevronRight, Gift, ChevronDown, ChevronUp } from "lucide-react"
 import { useCart } from "@food/context/CartContext"
+import { useAppConfig } from "@food/context/AppConfigContext"
 import ApplyCoupon from "./ApplyCoupon"
 import AddGiftCard from "./AddGiftCard"
 import CheckoutModal from "./CheckoutModal"
@@ -124,6 +125,7 @@ const ALL_PRODUCTS = {
 export default function Cart() {
   const navigate = useNavigate()
   const { replaceCart } = useCart()
+  const { config: appConfig } = useAppConfig()
 
   // Checkout Modal State
   const [showCheckoutModal, setShowCheckoutModal] = useState(false)
@@ -140,6 +142,13 @@ export default function Cart() {
     const savedTheme = localStorage.getItem("appTheme")
     return savedTheme ? savedTheme === "dark" : false
   })
+
+  // Clear applied coupon if disabled globally
+  useEffect(() => {
+    if (appConfig?.couponEnabled === false && appliedCoupon) {
+      setAppliedCoupon(null)
+    }
+  }, [appConfig?.couponEnabled, appliedCoupon])
 
   // Resolve Cart items from userCart localStorage on mount
   useEffect(() => {
@@ -537,41 +546,43 @@ export default function Cart() {
       {/* Promos & Discounts Section */}
       <div className="mt-6 px-margin-mobile space-y-sm">
         {/* Coupon Apply Row */}
-        <div
-          onClick={() => !appliedCoupon && setShowCouponModal(true)}
-          className="p-md flex items-center justify-between cursor-pointer glass-card rounded-xl hover:bg-white/5 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <Tag size={22} className="text-primary" />
-            <div className="text-left">
-              {appliedCoupon ? (
-                <div>
-                  <p className={`font-label-sm ${isDarkMode ? "text-white" : "text-[#131313]"}`}>
-                    Coupon {appliedCoupon.code} applied!
-                  </p>
-                  <p className="text-xs text-primary font-bold mt-0.5">
-                    ₹{discount} saved on this order
-                  </p>
-                </div>
-              ) : (
-                <p className={`font-label-sm ${isDarkMode ? "text-white" : "text-[#131313]"}`}>Apply Coupon</p>
-              )}
+        {appConfig?.couponEnabled !== false && (
+          <div
+            onClick={() => !appliedCoupon && setShowCouponModal(true)}
+            className="p-md flex items-center justify-between cursor-pointer glass-card rounded-xl hover:bg-white/5 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <Tag size={22} className="text-primary" />
+              <div className="text-left">
+                {appliedCoupon ? (
+                  <div>
+                    <p className={`font-label-sm ${isDarkMode ? "text-white" : "text-[#131313]"}`}>
+                      Coupon {appliedCoupon.code} applied!
+                    </p>
+                    <p className="text-xs text-primary font-bold mt-0.5">
+                      ₹{discount} saved on this order
+                    </p>
+                  </div>
+                ) : (
+                  <p className={`font-label-sm ${isDarkMode ? "text-white" : "text-[#131313]"}`}>Apply Coupon</p>
+                )}
+              </div>
             </div>
+            {appliedCoupon ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setAppliedCoupon(null)
+                }}
+                className="text-primary text-xs font-bold hover:underline active:scale-95 bg-transparent border-0 cursor-pointer"
+              >
+                Remove
+              </button>
+            ) : (
+              <ChevronRight size={20} className="text-primary" />
+            )}
           </div>
-          {appliedCoupon ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setAppliedCoupon(null)
-              }}
-              className="text-primary text-xs font-bold hover:underline active:scale-95 bg-transparent border-0 cursor-pointer"
-            >
-              Remove
-            </button>
-          ) : (
-            <ChevronRight size={20} className="text-primary" />
-          )}
-        </div>
+        )}
 
         {/* Gift Card Add Row */}
         <div

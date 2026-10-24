@@ -52,12 +52,26 @@ function getAccessToken(module) {
     const moduleToken = localStorage.getItem(key);
     if (moduleToken) return moduleToken;
 
+    // If request originates from an admin/superadmin route in the browser, fallback to admin_accessToken
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname || "";
+      if (
+        path.includes("/superadmin") ||
+        path.includes("/admin") ||
+        path.includes("/franchise-admin") ||
+        path.includes("/store-manager")
+      ) {
+        const adminTok = localStorage.getItem("admin_accessToken") || localStorage.getItem("accessToken") || localStorage.getItem("token");
+        if (adminTok) return adminTok;
+      }
+    }
+
     if (module === "user") {
       return localStorage.getItem("accessToken") || null;
     }
     // Also allow admin module to fall back to general accessToken or token
     if (module === "admin") {
-      return localStorage.getItem("accessToken") || localStorage.getItem("token") || null;
+      return localStorage.getItem("admin_accessToken") || localStorage.getItem("accessToken") || localStorage.getItem("token") || null;
     }
     return null;
   } catch {
@@ -253,11 +267,31 @@ if (typeof import.meta !== "undefined" && import.meta.env?.VITE_STANDALONE_MOCK 
 // Reuse the existing smart detection for the legacy client
 function getModuleFromUrl(url = "") {
   const u = typeof url === "string" ? url : (url?.url || "");
-  if (!u) return "user";
   const normalized = u.toLowerCase();
-  if (normalized.includes("/admin/") || normalized.includes("/food/admin/") || normalized.includes("/store/") || normalized.includes("/food/store/")) return "admin";
+  if (
+    normalized.includes("/admin/") ||
+    normalized.includes("/food/admin/") ||
+    normalized.includes("/store/") ||
+    normalized.includes("/food/store/") ||
+    normalized.includes("/settings") ||
+    normalized.includes("/app-config") ||
+    normalized.includes("/app-configurations")
+  ) return "admin";
   if (normalized.includes("/food/delivery") || normalized.includes("/delivery/")) return "delivery";
   if (normalized.includes("/food/restaurant/") || normalized.includes("/restaurant/")) return "restaurant";
+
+  if (typeof window !== "undefined") {
+    const path = window.location.pathname || "";
+    if (
+      path.includes("/superadmin") ||
+      path.includes("/admin") ||
+      path.includes("/franchise-admin") ||
+      path.includes("/store-manager")
+    ) {
+      return "admin";
+    }
+  }
+
   return "user";
 }
 

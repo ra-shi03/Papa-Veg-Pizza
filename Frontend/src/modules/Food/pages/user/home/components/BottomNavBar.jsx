@@ -3,10 +3,10 @@ import { useLocation } from "react-router-dom";
 
 export const DEFAULT_BOTTOM_NAV = [
   { id: 'menu', label: 'Menu', icon: 'local_pizza', iconType: 'material', iconUrl: '', badge: '', link: '/user/menu', enabled: true, sortOrder: 1 },
-  { id: 'reorder', label: 'Reorder', icon: 'shopping_bag', iconType: 'material', iconUrl: '', badge: '', link: '/user/orders', enabled: true, sortOrder: 2 },
-  { id: 'big-big', label: 'Big Big', icon: 'local_pizza', iconType: 'material', iconUrl: '', badge: 'NEW', link: '/user/menu?search=big', enabled: true, sortOrder: 3 },
+  { id: 'reorder', label: 'Reorder', icon: 'shopping_bag', iconType: 'material', iconUrl: '', badge: '', link: '/user/order-history', enabled: true, sortOrder: 2 },
+  { id: 'big-big', label: 'Big Big', icon: 'local_pizza', iconType: 'material', iconUrl: '', badge: 'NEW', link: '/user/menu?category=wow-4-in-1-pizza', enabled: true, sortOrder: 3 },
   { id: 'combos', label: 'Combos', icon: 'lunch_dining', iconType: 'material', iconUrl: '', badge: '', link: '/user/offers', enabled: true, sortOrder: 4 },
-  { id: 'rewards', label: 'Rewards', icon: 'stars', iconType: 'material', iconUrl: '', badge: '', link: '/user/wallet', enabled: true, sortOrder: 5 }
+  { id: 'rewards', label: 'Rewards', icon: 'stars', iconType: 'material', iconUrl: '', badge: '', link: '/user/rewards', enabled: true, sortOrder: 5 }
 ];
 
 export function BottomNavBar({
@@ -39,6 +39,18 @@ export function BottomNavBar({
 
     return [...source]
       .filter(item => item.enabled !== false)
+      .map(item => {
+        if (item.id === 'reorder' || item.label?.toLowerCase() === 'reorder') {
+          return { ...item, link: '/user/order-history' };
+        }
+        if ((item.id === 'big-big' || item.label?.toLowerCase() === 'big big' || item.label?.toLowerCase().includes('4 in 1')) && (!item.link || item.link === '/user/menu' || item.link === '/user/menu?search=big')) {
+          return { ...item, link: '/user/menu?category=wow-4-in-1-pizza' };
+        }
+        if (item.id === 'rewards' || item.label?.toLowerCase() === 'rewards' || item.label === '0/600') {
+          return { ...item, link: item.link && item.link.startsWith('/user/rewards') ? item.link : '/user/rewards' };
+        }
+        return item;
+      })
       .sort((a, b) => (Number(a.sortOrder) || 1) - (Number(b.sortOrder) || 1));
   }, [items]);
 
@@ -46,6 +58,13 @@ export function BottomNavBar({
 
   const handleNavClick = (item) => {
     let target = item.link || '/user';
+    if (item.id === 'reorder' || item.label?.toLowerCase() === 'reorder') {
+      target = '/user/order-history';
+    } else if ((item.id === 'big-big' || item.label?.toLowerCase() === 'big big' || item.label?.toLowerCase().includes('4 in 1')) && (!item.link || item.link === '/user/menu' || item.link === '/user/menu?search=big')) {
+      target = '/user/menu?category=wow-4-in-1-pizza';
+    } else if (item.id === 'rewards' || item.label?.toLowerCase() === 'rewards' || item.label === '0/600' || target === '/user/wallet') {
+      target = '/user/rewards';
+    }
     // Support relative paths if deployed under /food
     if (window.location.pathname.startsWith('/food') && !target.startsWith('/food')) {
       target = `/food${target}`;
@@ -70,10 +89,16 @@ export function BottomNavBar({
     <nav 
       aria-label="Bottom Navigation"
       className="fixed bottom-0 left-0 w-full z-50 bg-[#FFFFFF] dark:bg-[#121212] border-t border-zinc-200/80 dark:border-white/5 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] flex justify-around items-center px-1 pb-safe select-none"
-      style={{ height: 60 }}
+      style={{ minHeight: 62, height: 62 }}
     >
       {navItems.map((item) => {
-        const isCurrentActive = currentPath === item.link || (item.link !== '/user' && currentPath.startsWith(item.link));
+        const itemLink = item.link || '';
+        const itemTarget = (window.location.pathname.startsWith('/food') && !itemLink.startsWith('/food')) ? `/food${itemLink}` : itemLink;
+        const isCurrentActive =
+          currentPath === itemLink ||
+          currentPath === itemTarget ||
+          (itemLink !== '/user' && itemLink !== '/food/user' && (currentPath.startsWith(itemLink) || currentPath.startsWith(itemTarget))) ||
+          (item.id === 'reorder' && (currentPath.includes('/order-history') || currentPath.includes('/orders')));
         const isCartOrOrders = (item.id === 'reorder' || item.id === 'cart' || (item.link || '').includes('cart'));
         const showCartBadge = isCartOrOrders && totalCartCount > 0 && locationConfirmed;
 
@@ -86,18 +111,21 @@ export function BottomNavBar({
           >
             {/* Optional Top Badge (e.g. "NEW" from screenshot) */}
             {item.badge && (
-              <span className="absolute -top-1 left-1/2 -translate-x-1/2 bg-[#E53935] text-white text-[7.5px] font-semibold px-1.5 py-[1px] rounded-full uppercase tracking-tighter shadow-2xs leading-none z-10 scale-90">
+              <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 bg-[#E53935] text-white text-[8px] font-bold px-1.5 py-[1px] rounded-full uppercase tracking-tighter shadow-2xs leading-none z-10 scale-95 pointer-events-none whitespace-nowrap">
                 {item.badge}
               </span>
             )}
 
             {/* Icon Container */}
-            <div className="relative flex items-center justify-center h-6 w-6">
+            <div className="relative flex items-center justify-center h-7 w-auto min-w-[28px] max-w-[44px]">
               {item.iconType === 'image' && item.iconUrl ? (
                 <img 
                   src={item.iconUrl} 
                   alt={item.label} 
-                  className={`w-6 h-6 object-contain transition-transform group-hover:scale-105 ${isCurrentActive ? 'scale-105' : 'opacity-80'}`}
+                  className={`h-7 w-auto max-w-[42px] object-contain transition-all duration-200 group-hover:scale-110 drop-shadow-[0_1px_2px_rgba(0,0,0,0.06)] ${
+                    isCurrentActive ? 'scale-110' : 'scale-100 opacity-100'
+                  }`}
+                  style={{ imageRendering: '-webkit-optimize-contrast' }}
                 />
               ) : (
                 <span 

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
+import { useAppConfig } from "@food/context/AppConfigContext"
 import AccountMenuCard from "./AccountMenuCard"
 
 export default function AccountMenuList({ isDarkMode, onToggleTheme }) {
   const navigate = useNavigate()
+  const { config: appConfig } = useAppConfig()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   useEffect(() => {
@@ -22,11 +24,11 @@ export default function AccountMenuList({ isDarkMode, onToggleTheme }) {
   }, [])
 
   const MENU_ITEMS = [
-    {
+    ...(appConfig?.couponEnabled !== false ? [{
       title: "Exclusive Offers",
       icon: "local_offer",
       route: "/user/account/coupons",
-    },
+    }] : []),
     ...(isLoggedIn
       ? [
           {

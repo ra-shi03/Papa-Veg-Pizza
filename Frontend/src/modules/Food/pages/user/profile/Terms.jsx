@@ -1,134 +1,136 @@
-import { Link, useNavigate } from "react-router-dom"
-import { useState, useEffect } from "react"
-import { ArrowLeft, FileText, Loader2 } from "lucide-react"
-import { motion } from "framer-motion"
-import AnimatedPage from "@food/components/user/AnimatedPage"
-import { Button } from "@food/components/ui/button"
-import api from "@food/api"
-import useAppBackNavigation from "@food/hooks/useAppBackNavigation"
-import { API_ENDPOINTS } from "@food/api/config"
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import AnimatedPage from "@food/components/user/AnimatedPage";
+import api from "@food/api";
+import useAppBackNavigation from "@food/hooks/useAppBackNavigation";
+import { API_ENDPOINTS } from "@food/api/config";
+import { DEFAULT_TERMS_SECTIONS, parseTermsSections } from "@food/constants/termsData";
 
 export default function Terms() {
-  const navigate = useNavigate()
-  const goBack = useAppBackNavigation()
-  const [loading, setLoading] = useState(true)
-  const [termsData, setTermsData] = useState({
-    title: 'Terms of Service',
-    content: ''
-  })
+  const navigate = useNavigate();
+  const goBack = useAppBackNavigation();
+  const [loading, setLoading] = useState(true);
+  const [pageTitle, setPageTitle] = useState("Disclaimer");
+  const [sections, setSections] = useState(DEFAULT_TERMS_SECTIONS);
+  const [openSections, setOpenSections] = useState({ 0: true });
 
   useEffect(() => {
-    fetchTermsData()
-  }, [])
-
-  const fallbackContent = `
-<h3>1. Introduction</h3>
-<p>Welcome to Papa Veg Pizza. By accessing our application and using our services, you agree to be bound by these Terms of Service. Please read them carefully.</p>
-
-<h3>2. Ordering and Delivery</h3>
-<p>All orders are subject to availability and confirmation of the order price. Dispatch times may vary according to availability and any guarantees or representations made as to delivery times are subject to any delays resulting from traffic or force majeure for which we will not be responsible.</p>
-
-<h3>3. Pricing and Availability</h3>
-<p>Whilst we try and ensure that all details, descriptions and prices which appear on this application are accurate, errors may occur. If we discover an error in the price of any goods which you have ordered we will inform you of this as soon as possible.</p>
-
-<h3>4. Payment</h3>
-<p>Upon receiving your order we carry out a standard pre-authorization check on your payment card to ensure there are sufficient funds to fulfill the transaction.</p>
-
-<h3>5. Disclaimer of Liability</h3>
-<p>The material displayed on this application is provided without any guarantees, conditions or warranties as to its accuracy. Papa Veg Pizza hereby expressly excludes all conditions, warranties and other terms which might otherwise be implied by statute.</p>
-  `
+    fetchTermsData();
+  }, []);
 
   const fetchTermsData = async () => {
     try {
-      setLoading(true)
-      const response = await api.get(API_ENDPOINTS.ADMIN.TERMS_PUBLIC)
-      if (response.data.success && response.data.data && response.data.data.content) {
-        setTermsData(response.data.data)
-      } else {
-        setTermsData({ title: 'Terms of Service', content: fallbackContent })
+      setLoading(true);
+      const response = await api.get(API_ENDPOINTS.ADMIN.TERMS_PUBLIC);
+      if (response?.data?.success && response?.data?.data) {
+        const data = response.data.data;
+        if (data.title) {
+          setPageTitle(data.title);
+        }
+        if (data.content) {
+          const parsed = parseTermsSections(data.content);
+          if (parsed && parsed.length > 0) {
+            setSections(parsed);
+          }
+        }
       }
     } catch (error) {
-      console.error('Error fetching terms data:', error)
-      setTermsData({ title: 'Terms of Service', content: fallbackContent })
+      console.warn("Could not fetch remote terms, falling back to defaults:", error);
+      setSections(DEFAULT_TERMS_SECTIONS);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
+
+  const toggleSection = (index) => {
+    setOpenSections((prev) => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  };
 
   const handleBack = () => {
-    if (window.history.length > 0) {
-      // goBack()
-      navigate('/user/account')
-    } else {
-      navigate('/user/account')
-    }
-  }
+    navigate("/food/user");
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white dark:bg-[#0a0a0a] flex items-center justify-center p-6">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-10 w-10 animate-spin text-[#CB202D]" />
-          <p className="text-gray-500 font-bold uppercase tracking-widest text-xs">Loading...</p>
+      <div className="min-h-screen bg-[#F8F6F2] dark:bg-zinc-950 flex items-center justify-center p-6">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--primary,#E53935)]" />
+          <p className="text-zinc-400 font-semibold text-xs tracking-wider uppercase">Loading Terms...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
-    <AnimatedPage className="min-h-screen bg-white dark:bg-[#0a0a0a] pb-10">
-      {/* Premium Sticky Header */}
-      <div className="sticky top-0 z-50 bg-white/80 dark:bg-[#0a0a0a]/80 backdrop-blur-xl border-b border-gray-100 dark:border-gray-900">
-        <div className="max-w-4xl mx-auto px-4 h-16 md:h-20 flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="icon"
+    <AnimatedPage className="user-app-theme min-h-screen bg-[#F8F6F2] dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans select-none pb-12">
+      {/* Customer App Theme Top Bar */}
+      <header className="sticky top-0 z-50 bg-[var(--primary,#E53935)] text-white shadow-md">
+        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-4">
+          <button
+            type="button"
             onClick={handleBack}
-            className="h-10 w-10 rounded-full hover:bg-gray-100 dark:hover:bg-gray-900 transition-all active:scale-95 flex-shrink-0"
+            className="p-1.5 -ml-1.5 text-white hover:bg-white/15 rounded-full transition-all active:scale-95 flex items-center justify-center cursor-pointer border-0 bg-transparent"
+            aria-label="Back"
           >
-            <ArrowLeft className="h-6 w-6 text-gray-900 dark:text-white" />
-          </Button>
-          <div className="flex-1 text-center">
-            <h1 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tight leading-none">
-              {termsData.title || "Terms of Service"}
-            </h1>
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Papa Veg Pizza Policy</p>
-          </div>
-          <div className="w-10 h-10 flex-shrink-0"></div>
+            <ArrowLeft className="w-5 h-5 stroke-[2.4]" />
+          </button>
+          <h1 className="text-lg font-bold tracking-tight text-white m-0 select-none">
+            Terms & Conditions
+          </h1>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white dark:bg-[#111] rounded-[2rem] p-6 md:p-10 shadow-sm border border-gray-50 dark:border-gray-900"
-        >
-          {termsData.content ? (
-            <div
-              className="prose prose-slate dark:prose-invert max-w-none
-                prose-headings:font-black prose-headings:text-gray-900 dark:prose-headings:text-white
-                prose-p:text-gray-600 dark:prose-p:text-gray-400 prose-p:leading-relaxed
-                prose-strong:text-gray-900 dark:prose-strong:text-white
-                prose-a:text-[#CB202D] dark:prose-a:text-[#7e3866]
-                prose-li:text-gray-600 dark:prose-li:text-gray-400"
-              dangerouslySetInnerHTML={{ __html: termsData.content }}
-            />
-          ) : (
-            <div className="text-center py-28 flex flex-col items-center justify-center">
-              <FileText className="w-20 h-20 text-[#1e293b] dark:text-[#1e293b] mb-6 stroke-[1.5]" />
-              <p className="text-[#94a3b8] dark:text-[#94a3b8] text-lg font-medium tracking-tight">No content available at the moment.</p>
-            </div>
-          )}
-        </motion.div>
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-6">
+        {/* Main Heading */}
+        <h2 className="text-2xl font-bold text-center text-zinc-900 dark:text-white mb-6 tracking-tight">
+          {pageTitle}
+        </h2>
 
-        <p className="text-center mt-10 text-[10px] text-gray-400 font-black uppercase tracking-[0.2em] leading-relaxed">
-          Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} <br />
-          © {new Date().getFullYear()} Papa Veg Pizza. All Rights Reserved.
-        </p>
-      </div>
+        {/* Accordions List */}
+        <div className="space-y-2.5">
+          {sections.map((section, idx) => {
+            const isOpen = !!openSections[idx];
+            return (
+              <div key={idx} className="transition-all duration-200">
+                {/* Header Bar */}
+                <button
+                  type="button"
+                  onClick={() => toggleSection(idx)}
+                  className="w-full bg-[#f4f5f7] dark:bg-zinc-900/90 hover:bg-[#eaecee] dark:hover:bg-zinc-850 rounded-lg px-4 py-3.5 flex items-center justify-between text-left transition-colors cursor-pointer border border-transparent dark:border-zinc-800/60 shadow-2xs"
+                >
+                  <span className="text-[13.5px] font-medium text-zinc-700 dark:text-zinc-200 leading-snug pr-3">
+                    {section.title}
+                  </span>
+                  <span className="text-[var(--primary,#E53935)] dark:text-red-400 font-bold text-xl leading-none select-none px-1">
+                    {isOpen ? "−" : "+"}
+                  </span>
+                </button>
+
+                {/* Expanded Bullet List */}
+                {isOpen && section.items && section.items.length > 0 && (
+                  <div className="px-3 pt-3.5 pb-2.5 space-y-3 animate-in fade-in duration-200">
+                    {section.items.map((item, itemIdx) => (
+                      <div key={itemIdx} className="flex items-start gap-3">
+                        <span className="text-[8px] text-[var(--primary,#E53935)] dark:text-red-400 mt-1.5 shrink-0 select-none">
+                          ■
+                        </span>
+                        <p className="text-[13px] text-zinc-700 dark:text-zinc-300 leading-relaxed font-normal m-0">
+                          {item}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </main>
     </AnimatedPage>
-  )
+  );
 }
-
-

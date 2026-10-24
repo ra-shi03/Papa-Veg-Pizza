@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { FoodOrder, FoodSettings } from '../models/order.model.js';
+import { FoodAppConfig } from '../../settings/models/appConfig.model.js';
 // import { paymentSnapshotFromOrder } from './foodOrderPayment.service.js';
 import { logger } from '../../../../utils/logger.js';
 import { FoodUser } from '../../../../core/users/user.model.js';
@@ -161,6 +162,26 @@ export async function createOrder(userId, dto) {
     dto.paymentMethod === "card" ? "razorpay" : dto.paymentMethod;
   const isCash = paymentMethod === "cash";
   const isWallet = paymentMethod === "wallet";
+
+  // Validate global feature flags for payments & orders
+  const appConfig = await FoodAppConfig.findOne().select('paymentOptionEnabled codEnabled walletEnabled couponEnabled scheduledOrdersEnabled').lean();
+  if (appConfig) {
+    if (appConfig.paymentOptionEnabled === false && !isCash) {
+      throw new ValidationError("Online payment option is temporarily disabled. Please select Cash on Delivery or contact support.");
+    }
+    if (appConfig.codEnabled === false && isCash) {
+      throw new ValidationError("Cash on Delivery option is temporarily disabled.");
+    }
+    if (appConfig.walletEnabled === false && isWallet) {
+      throw new ValidationError("Wallet payment option is temporarily disabled.");
+    }
+    if (appConfig.couponEnabled === false && (dto.pricing?.couponCode || dto.couponCode)) {
+      throw new ValidationError("Coupon system is currently disabled globally.");
+    }
+    if (appConfig.scheduledOrdersEnabled === false && dto.scheduledAt) {
+      throw new ValidationError("Scheduled orders are currently disabled.");
+    }
+  }
 
   // Ensure pricing is present and consistent.
   const computedSubtotal = (dto.items || []).reduce((sum, item) => {
@@ -1644,4 +1665,425 @@ export async function deleteOrderAdmin(orderId, adminId) {
     orderMongoId: String(order._id),
   };
 }
+
+export async function trackOrderPublic(phone, orderId) {
+  const rawId = String(orderId || "").trim().replace(/^#/, "");
+  const rawPhone = String(phone || "").replace(/\D/g, "");
+
+  if (!rawId) {
+    throw new ValidationError("Order ID is required");
+  }
+  if (!rawPhone || rawPhone.length < 10) {
+    throw new ValidationError("A valid 10-digit mobile number is required");
+  }
+
+  const last10Phone = rawPhone.slice(-10);
+
+  let idFilter = null;
+  if (mongoose.isValidObjectId(rawId)) {
+    idFilter = {
+      $or: [
+        { _id: new mongoose.Types.ObjectId(rawId) },
+        { order_id: rawId },
+        { orderId: rawId }
+      ]
+    };
+  } else {
+    const escaped = rawId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    idFilter = {
+      $or: [
+        { order_id: { $regex: new RegExp(`^${escaped}$`, "i") } },
+        { orderId: { $regex: new RegExp(`^${escaped}$`, "i") } }
+      ]
+    };
+  }
+
+  const order = await FoodOrder.findOne(idFilter)
+    .populate("storeId", "storeName phone address area city location profileImage")
+    .populate("dispatch.deliveryPartnerId", "name fullName phone phoneNumber rating profileImage avatar")
+    .populate("userId", "name fullName phone mobile email")
+    .lean();
+
+  if (!order) {
+    throw new NotFoundError("No order found with this Order ID. Please check your order details.");
+  }
+
+  const normalize = (val) => {
+    if (!val) return "";
+    const digits = String(val).replace(/\D/g, "");
+    return digits.length >= 10 ? digits.slice(-10) : digits;
+  };
+
+  const candidatePhones = [
+    normalize(order.customerPhone),
+    normalize(order.deliveryAddress?.phone),
+    normalize(order.userId?.phone),
+    normalize(order.userId?.mobile)
+  ].filter(Boolean);
+
+  const isMatched = candidatePhones.some((p) => p === last10Phone);
+
+  if (!isMatched) {
+    throw new NotFoundError(
+      "The mobile number does not match this Order ID. Please verify your details."
+    );
+  }
+
+  const status = String(order.orderStatus || "created").toLowerCase();
+
+  const statusInfoMap = {
+    created: {
+      label: "Order Placed",
+      headline: "Order Placed Successfully",
+      description: "Waiting for store to confirm your order",
+      color: "blue",
+      step: 1
+    },
+    confirmed: {
+      label: "Order Confirmed",
+      headline: "Order Confirmed by Store",
+      description: "Your order is confirmed and will be prepared shortly",
+      color: "blue",
+      step: 1
+    },
+    preparing: {
+      label: "Preparing Food",
+      headline: "Chefs are preparing your pizza",
+      description: "Fresh ingredients are baking in the oven",
+      color: "amber",
+      step: 2
+    },
+    ready_for_pickup: {
+      label: "Food Ready",
+      headline: "Order packed & ready",
+      description: "Waiting for delivery rider pickup",
+      color: "amber",
+      step: 3
+    },
+    reached_pickup: {
+      label: "Rider at Store",
+      headline: "Delivery partner arrived at store",
+      description: "Collecting your freshly prepared order",
+      color: "amber",
+      step: 3
+    },
+    picked_up: {
+      label: "Out for Delivery",
+      headline: "Rider is heading to your location",
+      description: "Your hot pizza is on the way!",
+      color: "purple",
+      step: 4
+    },
+    reached_drop: {
+      label: "Rider Arrived",
+      headline: "Rider reached your address",
+      description: "Please collect your order at the door",
+      color: "purple",
+      step: 4
+    },
+    delivered: {
+      label: "Delivered",
+      headline: "Order Delivered!",
+      description: "Delivered successfully. Enjoy your hot & tasty pizza!",
+      color: "emerald",
+      step: 5
+    },
+    cancelled_by_user: {
+      label: "Cancelled",
+      headline: "Order Cancelled by Customer",
+      description: order.note || "You cancelled this order",
+      color: "red",
+      step: -1
+    },
+    cancelled_by_store: {
+      label: "Cancelled",
+      headline: "Order Cancelled by Store",
+      description: order.storeNote || order.note || "Store was unable to fulfill this order",
+      color: "red",
+      step: -1
+    },
+    cancelled_by_admin: {
+      label: "Cancelled",
+      headline: "Order Cancelled by Admin",
+      description: order.note || "Order was cancelled by support team",
+      color: "red",
+      step: -1
+    }
+  };
+
+  const currentInfo = statusInfoMap[status] || {
+    label: status.replace(/_/g, " "),
+    headline: "Order in Progress",
+    description: "Your order is being processed",
+    color: "blue",
+    step: 1
+  };
+
+  const isCancelled = status.startsWith("cancelled");
+
+  const timeline = [
+    {
+      step: 1,
+      title: "Order Confirmed",
+      description: "Store received and confirmed your order",
+      completed: isCancelled ? false : currentInfo.step >= 1,
+      current: !isCancelled && currentInfo.step === 1
+    },
+    {
+      step: 2,
+      title: "Preparing Food",
+      description: "Chefs are preparing your meal in the kitchen",
+      completed: isCancelled ? false : currentInfo.step >= 2,
+      current: !isCancelled && currentInfo.step === 2
+    },
+    {
+      step: 3,
+      title: "Food Ready",
+      description: "Order is packed and ready for delivery partner",
+      completed: isCancelled ? false : currentInfo.step >= 3,
+      current: !isCancelled && currentInfo.step === 3
+    },
+    {
+      step: 4,
+      title: "Out for Delivery",
+      description: "Delivery partner is on the way to your address",
+      completed: isCancelled ? false : currentInfo.step >= 4,
+      current: !isCancelled && currentInfo.step === 4
+    },
+    {
+      step: 5,
+      title: "Delivered",
+      description: "Order delivered safely",
+      completed: !isCancelled && currentInfo.step >= 5,
+      current: !isCancelled && currentInfo.step === 5
+    }
+  ];
+
+  return {
+    orderId: order.order_id || order.orderId || order._id.toString(),
+    _id: order._id.toString(),
+    status,
+    statusLabel: currentInfo.label,
+    headline: currentInfo.headline,
+    description: currentInfo.description,
+    statusColor: currentInfo.color,
+    isCancelled,
+    createdAt: order.createdAt,
+    estimatedMinutes: status === "delivered" ? 0 : 30,
+    customer: {
+      name: order.customerName || order.userId?.name || order.deliveryAddress?.name || "Customer",
+      phone: last10Phone
+    },
+    deliveryAddress: {
+      label: order.deliveryAddress?.label || "Home",
+      street: order.deliveryAddress?.street || "",
+      city: order.deliveryAddress?.city || "",
+      state: order.deliveryAddress?.state || "",
+      additionalDetails: order.deliveryAddress?.additionalDetails || ""
+    },
+    items: (order.items || []).map((i) => ({
+      name: i.name,
+      quantity: i.quantity,
+      price: i.price,
+      variantName: i.variantName,
+      image: i.image,
+      isVeg: i.isVeg !== false
+    })),
+    pricing: {
+      subtotal: order.pricing?.subtotal || 0,
+      tax: order.pricing?.tax || 0,
+      deliveryFee: order.pricing?.deliveryFee || 0,
+      discount: order.pricing?.discount || 0,
+      total: order.pricing?.total || 0
+    },
+    payment: {
+      method: order.payment?.method || "cash",
+      status: order.payment?.status || "pending"
+    },
+    store: {
+      name: order.storeId?.storeName || "Papa Veg Pizza",
+      phone: order.storeId?.phone || "",
+      address: order.storeId?.address || order.storeId?.area || ""
+    },
+    deliveryPartner: order.dispatch?.deliveryPartnerId ? {
+      name: order.dispatch.deliveryPartnerId.name || order.dispatch.deliveryPartnerId.fullName || "Delivery Partner",
+      phone: order.dispatch.deliveryPartnerId.phone || order.dispatch.deliveryPartnerId.phoneNumber || ""
+    } : null,
+    timeline
+  };
+}
+
+export const getOrderHistoryPublic = async (phone, orderId) => {
+  const rawId = String(orderId || "").trim().replace(/^#/, "");
+  const rawPhone = String(phone || "").replace(/\D/g, "");
+
+  if (!rawId) {
+    throw new ValidationError("Order ID is required");
+  }
+
+  let idFilter = null;
+  if (mongoose.isValidObjectId(rawId)) {
+    idFilter = {
+      $or: [
+        { _id: new mongoose.Types.ObjectId(rawId) },
+        { order_id: rawId },
+        { orderId: rawId }
+      ]
+    };
+  } else {
+    const escaped = rawId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    idFilter = {
+      $or: [
+        { order_id: { $regex: new RegExp(`^${escaped}$`, "i") } },
+        { orderId: { $regex: new RegExp(`^${escaped}$`, "i") } }
+      ]
+    };
+  }
+
+  const order = await FoodOrder.findOne(idFilter)
+    .populate("storeId", "storeName phone address area city location profileImage")
+    .populate("dispatch.deliveryPartnerId", "name fullName phone phoneNumber rating profileImage avatar")
+    .populate("userId", "name fullName phone mobile email")
+    .lean();
+
+  if (!order) {
+    throw new NotFoundError("No order found with this Order ID. Please check your order details.");
+  }
+
+  // If mobile number is provided, verify against phone numbers associated with this order
+  if (rawPhone && rawPhone.length >= 10) {
+    const last10Phone = rawPhone.slice(-10);
+    const normalize = (val) => {
+      if (!val) return "";
+      const digits = String(val).replace(/\D/g, "");
+      return digits.length >= 10 ? digits.slice(-10) : digits;
+    };
+
+    const candidatePhones = [
+      normalize(order.customerPhone),
+      normalize(order.deliveryAddress?.phone),
+      normalize(order.userId?.phone),
+      normalize(order.userId?.mobile)
+    ].filter(Boolean);
+
+    const isMatched = candidatePhones.some((p) => p === last10Phone);
+    if (!isMatched) {
+      throw new NotFoundError(
+        "The mobile number does not match this Order ID. Please verify your details."
+      );
+    }
+  }
+
+  const status = String(order.orderStatus || "created").toLowerCase();
+
+  const statusLabels = {
+    created: "Order Placed",
+    confirmed: "Order Confirmed",
+    preparing: "Preparing Food",
+    ready_for_pickup: "Food Ready",
+    reached_pickup: "Rider at Store",
+    picked_up: "Out for Delivery",
+    reached_drop: "Rider Arrived",
+    delivered: "Delivered",
+    completed: "Delivered",
+    cancelled_by_user: "Cancelled by Customer",
+    cancelled_by_store: "Cancelled by Store",
+    cancelled_by_admin: "Cancelled by Admin",
+    cancelled: "Order Cancelled"
+  };
+
+  const isCancelled = status.startsWith("cancelled");
+
+  const timeline = [
+    {
+      title: "Order Placed",
+      description: "Order placed successfully",
+      timestamp: order.createdAt,
+      completed: true
+    },
+    {
+      title: "Order Confirmed",
+      description: "Store confirmed your order",
+      timestamp: order.confirmedAt || (order.createdAt ? new Date(new Date(order.createdAt).getTime() + 2 * 60000).toISOString() : null),
+      completed: !isCancelled && !["created"].includes(status)
+    },
+    {
+      title: "Preparing Food",
+      description: "Chefs are preparing your meal in the kitchen",
+      timestamp: order.preparingAt || null,
+      completed: !isCancelled && !["created", "confirmed"].includes(status)
+    },
+    {
+      title: "Out for Delivery",
+      description: "Delivery partner is on the way",
+      timestamp: order.pickedUpAt || null,
+      completed: !isCancelled && ["picked_up", "reached_drop", "delivered", "completed"].includes(status)
+    },
+    {
+      title: isCancelled ? "Order Cancelled" : "Delivered",
+      description: isCancelled ? (order.cancellationReason || "Order was cancelled") : "Order delivered safely",
+      timestamp: isCancelled ? (order.cancelledAt || order.updatedAt) : (order.deliveredAt || null),
+      completed: isCancelled || ["delivered", "completed"].includes(status),
+      isCancelled
+    }
+  ];
+
+  return {
+    orderId: order.order_id || order.orderId || order._id.toString(),
+    _id: order._id.toString(),
+    status,
+    statusLabel: statusLabels[status] || status.replace(/_/g, " "),
+    isCancelled,
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
+    deliveredAt: order.deliveredAt,
+    cancellationReason: order.cancellationReason || order.note || "",
+    customer: {
+      name: order.customerName || order.userId?.name || order.deliveryAddress?.name || "Customer",
+      phone: order.customerPhone || order.deliveryAddress?.phone || order.userId?.phone || ""
+    },
+    deliveryAddress: {
+      label: order.deliveryAddress?.label || "Home",
+      street: order.deliveryAddress?.street || "",
+      city: order.deliveryAddress?.city || "",
+      state: order.deliveryAddress?.state || "",
+      pincode: order.deliveryAddress?.pincode || "",
+      additionalDetails: order.deliveryAddress?.additionalDetails || ""
+    },
+    items: (order.items || []).map((i) => ({
+      itemId: i.itemId || i._id,
+      name: i.name,
+      quantity: i.quantity || 1,
+      price: i.price || 0,
+      variantName: i.variantName || "",
+      image: i.image,
+      isVeg: i.isVeg !== false,
+      total: (i.quantity || 1) * (i.price || 0)
+    })),
+    pricing: {
+      subtotal: order.pricing?.subtotal || 0,
+      tax: order.pricing?.tax || 0,
+      deliveryFee: order.pricing?.deliveryFee || 0,
+      discount: order.pricing?.discount || 0,
+      couponCode: order.pricing?.couponCode || order.couponCode || "",
+      total: order.pricing?.total || 0
+    },
+    payment: {
+      method: order.payment?.method || order.paymentMethod || "cash",
+      status: order.payment?.status || (order.paymentStatus || "pending"),
+      transactionId: order.payment?.transactionId || ""
+    },
+    store: {
+      name: order.storeId?.storeName || "Papa Veg Pizza",
+      phone: order.storeId?.phone || "",
+      address: order.storeId?.address || order.storeId?.area || ""
+    },
+    deliveryPartner: order.dispatch?.deliveryPartnerId ? {
+      name: order.dispatch.deliveryPartnerId.name || order.dispatch.deliveryPartnerId.fullName || "Delivery Partner",
+      phone: order.dispatch.deliveryPartnerId.phone || order.dispatch.deliveryPartnerId.phoneNumber || ""
+    } : null,
+    timeline
+  };
+};
+
 

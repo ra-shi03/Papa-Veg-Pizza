@@ -19,7 +19,15 @@ import {
   X
 } from "lucide-react"
 import AnimatedPage from "@food/components/user/AnimatedPage"
-import { faqAPI } from "@/services/api"
+import { faqAPI, publicAPI } from "@/services/api"
+
+const DEFAULT_SUPPORT = {
+  title: "Customer Support",
+  description: "Have an issue with your order or questions about our menu? Get in touch directly:",
+  phone: "+91 9300990940",
+  email: "papafoodcorporation@gmail.com",
+  hours: "Support Hours: 10:00 AM – 11:30 PM Everyday"
+}
 
 // Category icon & styling helper
 const getCategoryMeta = (catName = "") => {
@@ -50,27 +58,12 @@ export default function Help() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("All")
   const [expandedFaqId, setExpandedFaqId] = useState(null)
+  const [supportInfo, setSupportInfo] = useState(DEFAULT_SUPPORT)
   const contactSectionRef = useRef(null)
 
   const handleBack = () => {
-    // If an explicit 'from' is provided and is NOT a looping route (location, address, help)
-    if (
-      location.state?.from &&
-      !location.state.from.includes("location") &&
-      !location.state.from.includes("address") &&
-      !location.state.from.includes("help")
-    ) {
-      const target =
-        location.state.from.startsWith("/food") || !window.location.pathname.startsWith("/food")
-          ? location.state.from
-          : `/food${location.state.from}`
-      navigate(target)
-    } else {
-      const profilePath = window.location.pathname.startsWith("/food")
-        ? "/food/user/account/profile-details"
-        : "/user/account/profile-details"
-      navigate(profilePath)
-    }
+    const homePath = window.location.pathname.startsWith("/food") ? "/food/user" : "/user"
+    navigate(homePath)
   }
 
   // Load dynamic FAQs from backend
@@ -89,6 +82,31 @@ export default function Help() {
       }
     }
     fetchFaqs()
+    return () => { cancelled = true }
+  }, [])
+
+  // Load dynamic Customer Support details from backend
+  useEffect(() => {
+    let cancelled = false
+    const fetchSupport = async () => {
+      try {
+        const res = await publicAPI.getSupport()
+        if (cancelled) return
+        const data = res?.data?.data || res?.data
+        if (data) {
+          setSupportInfo({
+            title: data.title || DEFAULT_SUPPORT.title,
+            description: data.description || DEFAULT_SUPPORT.description,
+            phone: data.contactInfo?.phone || data.phone || DEFAULT_SUPPORT.phone,
+            email: data.contactInfo?.email || data.email || DEFAULT_SUPPORT.email,
+            hours: data.contactInfo?.hours || data.hours || DEFAULT_SUPPORT.hours
+          })
+        }
+      } catch (err) {
+        console.error("Failed to fetch dynamic support info:", err)
+      }
+    }
+    fetchSupport()
     return () => { cancelled = true }
   }, [])
 
@@ -348,17 +366,17 @@ export default function Help() {
           <div>
             <h3 className="text-base font-bold text-zinc-900 dark:text-white m-0 flex items-center gap-2">
               <Phone className="w-4.5 h-4.5 text-[#E53935]" />
-              Customer Support
+              {supportInfo.title || "Customer Support"}
             </h3>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 m-0">
-              Have an issue with your order or questions about our menu? Get in touch directly:
+              {supportInfo.description || "Have an issue with your order or questions about our menu? Get in touch directly:"}
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Phone Support */}
             <a
-              href="tel:+919300990940"
+              href={`tel:${String(supportInfo.phone || "").replace(/\s+/g, '')}`}
               className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-red-400 dark:hover:border-red-900 bg-zinc-50/60 dark:bg-zinc-800/30 flex items-center gap-3 transition-colors no-underline group"
             >
               <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-950/40 text-[#E53935] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
@@ -367,14 +385,14 @@ export default function Help() {
               <div className="min-w-0">
                 <p className="text-[11px] text-zinc-400 font-medium m-0">Phone Support</p>
                 <p className="text-[13px] font-bold text-zinc-900 dark:text-white mt-0.5 m-0 truncate">
-                  +91 9300990940
+                  {supportInfo.phone}
                 </p>
               </div>
             </a>
 
             {/* Email Support */}
             <a
-              href="mailto:papafoodcorporation@gmail.com"
+              href={`mailto:${supportInfo.email || ""}`}
               className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-red-400 dark:hover:border-red-900 bg-zinc-50/60 dark:bg-zinc-800/30 flex items-center gap-3 transition-colors no-underline group"
             >
               <div className="w-10 h-10 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
@@ -383,7 +401,7 @@ export default function Help() {
               <div className="min-w-0">
                 <p className="text-[11px] text-zinc-400 font-medium m-0">Email Support</p>
                 <p className="text-[13px] font-bold text-zinc-900 dark:text-white mt-0.5 m-0 truncate">
-                  papafoodcorporation@gmail.com
+                  {supportInfo.email}
                 </p>
               </div>
             </a>
@@ -391,7 +409,7 @@ export default function Help() {
 
           <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center gap-2 text-zinc-500 dark:text-zinc-400 text-xs">
             <Clock className="w-3.5 h-3.5 text-[#E53935] shrink-0" />
-            <span>Support Hours: 10:00 AM – 11:30 PM Everyday</span>
+            <span>{supportInfo.hours?.startsWith('Support Hours:') ? supportInfo.hours : `Support Hours: ${supportInfo.hours}`}</span>
           </div>
         </div>
       </div>

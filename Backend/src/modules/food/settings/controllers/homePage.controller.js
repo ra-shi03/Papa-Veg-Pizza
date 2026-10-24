@@ -5,10 +5,18 @@ import { v2 as cloudinary } from 'cloudinary';
 
 const DEFAULT_BOTTOM_NAV = [
     { id: 'menu', label: 'Menu', icon: 'local_pizza', iconType: 'material', iconUrl: '', badge: '', link: '/user/menu', enabled: true, sortOrder: 1 },
-    { id: 'reorder', label: 'Reorder', icon: 'shopping_bag', iconType: 'material', iconUrl: '', badge: '', link: '/user/orders', enabled: true, sortOrder: 2 },
-    { id: 'big-big', label: 'Big Big', icon: 'local_pizza', iconType: 'material', iconUrl: '', badge: 'NEW', link: '/user/menu?search=big', enabled: true, sortOrder: 3 },
+    { id: 'reorder', label: 'Reorder', icon: 'shopping_bag', iconType: 'material', iconUrl: '', badge: '', link: '/user/order-history', enabled: true, sortOrder: 2 },
+    { id: 'big-big', label: 'Big Big', icon: 'local_pizza', iconType: 'material', iconUrl: '', badge: 'NEW', link: '/user/menu?category=wow-4-in-1-pizza', enabled: true, sortOrder: 3 },
     { id: 'combos', label: 'Combos', icon: 'lunch_dining', iconType: 'material', iconUrl: '', badge: '', link: '/user/offers', enabled: true, sortOrder: 4 },
-    { id: 'rewards', label: 'Rewards', icon: 'stars', iconType: 'material', iconUrl: '', badge: '', link: '/user/wallet', enabled: true, sortOrder: 5 }
+    { id: 'rewards', label: 'Rewards', icon: 'stars', iconType: 'material', iconUrl: '', badge: '', link: '/user/rewards', enabled: true, sortOrder: 5 }
+];
+
+export const DEFAULT_ORDER_METHODS = [
+    { id: 'delivery', label: 'Delivery', icon: 'moped', enabled: true },
+    { id: 'dine_in', label: 'Dine-In', icon: 'restaurant', enabled: true },
+    { id: 'takeaway', label: 'Takeaway', icon: 'store', enabled: true },
+    { id: 'train', label: 'Delivery on Train', icon: 'train', enabled: true },
+    { id: 'incar', label: 'In-Car', icon: 'directions_car', enabled: true }
 ];
 
 export const getHomePageConfig = async (req, res, next) => {
@@ -18,11 +26,37 @@ export const getHomePageConfig = async (req, res, next) => {
             config = await HomePage.create({ 
                 deliveryTimeMinutes: 30, 
                 deliveryTimeLabel: 'mins',
-                bottomNav: DEFAULT_BOTTOM_NAV
+                bottomNav: DEFAULT_BOTTOM_NAV,
+                orderMethods: DEFAULT_ORDER_METHODS
             });
-        } else if (!config.bottomNav || config.bottomNav.length === 0) {
-            config.bottomNav = DEFAULT_BOTTOM_NAV;
-            await config.save();
+        } else {
+            let updated = false;
+            if (!config.bottomNav || config.bottomNav.length === 0) {
+                config.bottomNav = DEFAULT_BOTTOM_NAV;
+                updated = true;
+            } else {
+                config.bottomNav.forEach(item => {
+                    if ((item.id === 'reorder' || item.label === 'Reorder') && (item.link === '/user/orders' || !item.link)) {
+                        item.link = '/user/order-history';
+                        updated = true;
+                    }
+                    if ((item.id === 'big-big' || item.label === 'Big Big') && (item.link === '/user/menu?search=big' || !item.link)) {
+                        item.link = '/user/menu?category=wow-4-in-1-pizza';
+                        updated = true;
+                    }
+                    if ((item.id === 'rewards' || item.label === 'Rewards' || item.label === '0/600') && (item.link === '/user/wallet' || !item.link)) {
+                        item.link = '/user/rewards';
+                        updated = true;
+                    }
+                });
+            }
+            if (!config.orderMethods || config.orderMethods.length === 0) {
+                config.orderMethods = DEFAULT_ORDER_METHODS;
+                updated = true;
+            }
+            if (updated) {
+                await config.save();
+            }
         }
         return sendResponse(res, 200, 'Home page configuration retrieved', config);
     } catch (error) {

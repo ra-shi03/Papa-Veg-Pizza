@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import api from '@food/api';
 import { API_ENDPOINTS } from '@food/api/config';
 import { legalHtmlToPlainText, plainTextToLegalHtml } from '@food/utils/legalContentFormat';
+import { DEFAULT_TERMS_TEXT, parseTermsSections } from '@food/constants/termsData';
 import { 
   Info, 
   Scale, 
@@ -18,6 +19,7 @@ import {
   Star, 
   Award, 
   Plus, 
+  Minus,
   X, 
   Loader2 
 } from 'lucide-react';
@@ -63,7 +65,8 @@ export default function PolicyManagement() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState('edit'); // 'edit' | 'preview'
-  const [activeRole, setActiveRole] = useState('user'); // 'user' | 'restaurant' | 'delivery'
+  const [activeRole, setActiveRole] = useState('user'); // 'user' (Customer) | 'delivery'
+  const [previewOpenSection, setPreviewOpenSection] = useState(0);
 
   // About Us State
   const [aboutData, setAboutData] = useState({
@@ -124,7 +127,10 @@ export default function PolicyManagement() {
           });
         } else {
           const content = data.content || '';
-          const textContent = legalHtmlToPlainText(content);
+          let textContent = legalHtmlToPlainText(content);
+          if (!textContent && selectedPolicy === 'terms' && activeRole === 'user') {
+            textContent = DEFAULT_TERMS_TEXT;
+          }
           setPolicyData({
             title: data.title || getDefaultTitle(),
             content: textContent
@@ -151,9 +157,10 @@ export default function PolicyManagement() {
         features: []
       });
     } else {
+      const defaultContent = (selectedPolicy === 'terms' && activeRole === 'user') ? DEFAULT_TERMS_TEXT : '';
       setPolicyData({
         title: getDefaultTitle(),
-        content: ''
+        content: defaultContent
       });
     }
   };
@@ -161,9 +168,9 @@ export default function PolicyManagement() {
   const getDefaultTitle = () => {
     switch (selectedPolicy) {
       case 'terms':
-        return `Terms and Conditions - ${activeRole.charAt(0).toUpperCase() + activeRole.slice(1)}`;
+        return activeRole === 'user' ? 'Terms and Conditions' : 'Terms and Conditions - Delivery';
       case 'privacy':
-        return `Privacy Policy - ${activeRole.charAt(0).toUpperCase() + activeRole.slice(1)}`;
+        return activeRole === 'user' ? 'Privacy Policy' : 'Privacy Policy - Delivery';
       case 'refund':
         return 'Refund Policy';
       case 'shipping':
@@ -290,7 +297,7 @@ export default function PolicyManagement() {
                   }}
                   className={`w-full text-left p-3 rounded-lg flex items-center justify-between border transition-all duration-200 group ${
                     selectedPolicy === policy.id
-                      ? 'bg-red-50/50 dark:bg-red-955/10 border-red-200 dark:border-red-900/40 text-red-650 dark:text-red-400 font-semibold'
+                      ? 'bg-red-50/50 dark:bg-red-955/10 border-red-200 dark:border-red-900/40 text-[#E53935] dark:text-red-400 font-semibold'
                       : 'border-transparent text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850/50'
                   }`}
                 >
@@ -303,7 +310,7 @@ export default function PolicyManagement() {
                       <PolicyIcon size={14} />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs text-zinc-900 dark:text-zinc-100 group-hover:text-red-650 dark:group-hover:text-red-400 font-bold truncate transition-colors">{policy.name}</p>
+                      <p className="text-xs text-zinc-900 dark:text-zinc-100 group-hover:text-[#E53935] dark:group-hover:text-red-400 font-bold truncate transition-colors">{policy.name}</p>
                       <p className="text-[9px] text-zinc-500 dark:text-zinc-400 truncate mt-0.5">{policy.desc}</p>
                     </div>
                   </div>
@@ -320,7 +327,7 @@ export default function PolicyManagement() {
           {/* Header Action Bar */}
           <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3 bg-zinc-50/50 dark:bg-zinc-955/50 shrink-0">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-red-650 animate-pulse"></span>
+              <span className="w-2 h-2 rounded-full bg-[#E53935] animate-pulse"></span>
               <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
                 Editing: {policiesList.find(p => p.id === selectedPolicy)?.name}
               </h3>
@@ -359,17 +366,21 @@ export default function PolicyManagement() {
             <div className="px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-100/30 dark:bg-zinc-900/30 shrink-0">
               <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Target Portal Audience</span>
               <div className="inline-flex p-0.5 bg-zinc-100 dark:bg-zinc-950 border border-zinc-250 dark:border-zinc-750 rounded-lg text-[10px] font-bold">
-                {['user', 'restaurant', 'delivery'].map((role) => (
+                {[
+                  { key: 'user', label: 'CUSTOMER' },
+                  { key: 'delivery', label: 'DELIVERY' }
+                ].map((item) => (
                   <button
-                    key={role}
-                    onClick={() => setActiveRole(role)}
-                    className={`px-3.5 py-1 rounded-md transition-all uppercase ${
-                      activeRole === role
-                        ? 'bg-red-650 text-white shadow-sm'
-                        : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
+                    key={item.key}
+                    type="button"
+                    onClick={() => setActiveRole(item.key)}
+                    className={`px-3.5 py-1.5 rounded-md transition-all font-bold text-[10px] cursor-pointer ${
+                      activeRole === item.key
+                        ? 'bg-[#E53935] text-white shadow-sm'
+                        : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
                     }`}
                   >
-                    {role}
+                    {item.label}
                   </button>
                 ))}
               </div>
@@ -380,7 +391,7 @@ export default function PolicyManagement() {
           <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-700 bg-white dark:bg-zinc-900">
             {loading ? (
               <div className="h-full min-h-[300px] flex flex-col items-center justify-center gap-3">
-                <Loader2 className="w-8 h-8 text-red-650 animate-spin" />
+                <Loader2 className="w-8 h-8 text-[#E53935] animate-spin" />
                 <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-455 italic">Fetching policy parameters...</p>
               </div>
             ) : selectedPolicy === 'about' ? (
@@ -548,6 +559,52 @@ export default function PolicyManagement() {
                       className="w-full min-h-[300px] h-[calc(100vh-380px)] p-3 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 text-xs focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] transition-all outline-none text-black dark:text-white font-mono leading-relaxed"
                     />
                   </div>
+                ) : selectedPolicy === 'terms' ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">Customer App Accordion Preview</label>
+                      <span className="text-[9px] font-semibold text-zinc-450 dark:text-zinc-500 italic">Live interactive mobile view</span>
+                    </div>
+                    <div className="max-w-xl mx-auto rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm overflow-hidden p-4">
+                      {/* Mobile Top Bar */}
+                      <div className="bg-[var(--primary,#E53935)] text-white px-4 py-3 rounded-lg flex items-center gap-3 shadow-sm mb-4">
+                        <span className="text-base font-bold">←</span>
+                        <h3 className="text-sm font-bold tracking-tight text-white">Terms & Conditions</h3>
+                      </div>
+                      <h4 className="text-center font-bold text-lg text-zinc-900 dark:text-zinc-100 mb-4">
+                        {policyData.title || 'Disclaimer'}
+                      </h4>
+                      <div className="space-y-2">
+                        {parseTermsSections(policyData.content).map((sec, idx) => {
+                          const isOpen = previewOpenSection === idx;
+                          return (
+                            <div key={idx} className="border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden transition-all">
+                              <button
+                                type="button"
+                                onClick={() => setPreviewOpenSection(isOpen ? null : idx)}
+                                className="w-full bg-[#f4f5f7] dark:bg-zinc-800/60 px-3.5 py-2.5 flex items-center justify-between text-left text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200/50 transition-colors"
+                              >
+                                <span>{sec.title}</span>
+                                <span className="text-[var(--primary,#E53935)] dark:text-red-400 font-bold text-sm">
+                                  {isOpen ? '−' : '+'}
+                                </span>
+                              </button>
+                              {isOpen && (
+                                <div className="px-4 py-3 bg-white dark:bg-zinc-900/40 space-y-2 text-xs border-t border-zinc-100 dark:border-zinc-800">
+                                  {sec.items.map((it, i) => (
+                                    <div key={i} className="flex items-start gap-2 text-zinc-600 dark:text-zinc-300">
+                                      <span className="text-[8px] text-zinc-800 dark:text-zinc-200 mt-1 select-none">■</span>
+                                      <p className="flex-1 text-[11.5px] leading-relaxed">{it}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">Content Preview</label>
@@ -576,15 +633,15 @@ export default function PolicyManagement() {
             <button
               onClick={handleSave}
               disabled={saving || loading}
-              className="px-4 py-1.5 bg-red-650 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-md flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 active:scale-95"
+              className="px-5 py-2 bg-[#E53935] hover:bg-[#d32f2f] text-white rounded-lg text-xs font-bold shadow-md flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 active:scale-95 cursor-pointer"
             >
               {saving ? (
                 <>
-                  <Loader2 size={12} className="animate-spin" />
+                  <Loader2 size={12} className="animate-spin text-white" />
                   <span>Saving...</span>
                 </>
               ) : (
-                <span>Save Changes</span>
+                <span className="text-white font-bold">Save Changes</span>
               )}
             </button>
           </footer>

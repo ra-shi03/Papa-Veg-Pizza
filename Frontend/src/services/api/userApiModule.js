@@ -339,4 +339,6 @@ export const heroBannerAPI = createStubAPI();
 export const publicAPI = {
   getPrivacy: (key = "privacy") => userClient.get(`/food/pages/${key}`),
   getTerms: (key = "terms") => userClient.get(`/food/pages/${key}`),
+  getSupport: () => userClient.get(`/food/pages/support`),
+  getPage: (key) => userClient.get(`/food/pages/${key}`),
 };
