@@ -2265,7 +2265,7 @@ export default function MenuList() {
                     <div 
                       key={item.id} 
                       onClick={() => checkLocation(() => openCustomizeModal(item))}
-                      className="relative w-full overflow-hidden flex flex-col justify-end min-h-[330px] sm:min-h-[360px] aspect-[4/3.2] bg-zinc-950 group shadow-sm transition-all duration-300 cursor-pointer"
+                      className="relative w-full overflow-hidden flex flex-col justify-end min-h-[360px] sm:min-h-[390px] aspect-[4/3.5] bg-zinc-950 group shadow-sm transition-all duration-300 cursor-pointer"
                     >
                       {/* Full-bleed Product Image covering entire card */}
                       {item.image && (
