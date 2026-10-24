@@ -5,7 +5,7 @@ export const DEFAULT_BOTTOM_NAV = [
   { id: 'menu', label: 'Menu', icon: 'local_pizza', iconType: 'material', iconUrl: '', badge: '', link: '/user/menu', enabled: true, sortOrder: 1 },
   { id: 'reorder', label: 'Reorder', icon: 'shopping_bag', iconType: 'material', iconUrl: '', badge: '', link: '/user/order-history', enabled: true, sortOrder: 2 },
   { id: 'big-big', label: 'Big Big', icon: 'local_pizza', iconType: 'material', iconUrl: '', badge: 'NEW', link: '/user/menu?category=wow-4-in-1-pizza', enabled: true, sortOrder: 3 },
-  { id: 'combos', label: 'Combos', icon: 'lunch_dining', iconType: 'material', iconUrl: '', badge: '', link: '/user/offers', enabled: true, sortOrder: 4 },
+  { id: 'combos', label: 'Combos', icon: 'lunch_dining', iconType: 'material', iconUrl: '', badge: '', link: '/user/combos', enabled: true, sortOrder: 4 },
   { id: 'rewards', label: 'Rewards', icon: 'stars', iconType: 'material', iconUrl: '', badge: '', link: '/user/rewards', enabled: true, sortOrder: 5 }
 ];
 
@@ -46,6 +46,9 @@ export function BottomNavBar({
         if ((item.id === 'big-big' || item.label?.toLowerCase() === 'big big' || item.label?.toLowerCase().includes('4 in 1')) && (!item.link || item.link === '/user/menu' || item.link === '/user/menu?search=big')) {
           return { ...item, link: '/user/menu?category=wow-4-in-1-pizza' };
         }
+        if (item.id === 'combos' || item.label?.toLowerCase() === 'combos') {
+          return { ...item, link: '/user/combos' };
+        }
         if (item.id === 'rewards' || item.label?.toLowerCase() === 'rewards' || item.label === '0/600') {
           return { ...item, link: item.link && item.link.startsWith('/user/rewards') ? item.link : '/user/rewards' };
         }
@@ -62,6 +65,8 @@ export function BottomNavBar({
       target = '/user/order-history';
     } else if ((item.id === 'big-big' || item.label?.toLowerCase() === 'big big' || item.label?.toLowerCase().includes('4 in 1')) && (!item.link || item.link === '/user/menu' || item.link === '/user/menu?search=big')) {
       target = '/user/menu?category=wow-4-in-1-pizza';
+    } else if (item.id === 'combos' || item.label?.toLowerCase() === 'combos') {
+      target = '/user/combos';
     } else if (item.id === 'rewards' || item.label?.toLowerCase() === 'rewards' || item.label === '0/600' || target === '/user/wallet') {
       target = '/user/rewards';
     }

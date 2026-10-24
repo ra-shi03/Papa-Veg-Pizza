@@ -41,6 +41,13 @@ router.post('/promise-campaign/item', authMiddleware, requireSuperAdmin, promise
 router.put('/promise-campaign/item/:itemId', authMiddleware, requireSuperAdmin, promiseCampaignController.updatePromiseItem);
 router.delete('/promise-campaign/item/:itemId', authMiddleware, requireSuperAdmin, promiseCampaignController.deletePromiseItem);
 
+import { getComboPageConfig, updateComboPageConfig, getComboBuilderData } from '../controllers/comboPage.controller.js';
+
+// Combo page (top/bottom banners + copy) configured by superadmin
+router.get('/combo-page', getComboPageConfig);
+router.get('/combo-page/build', getComboBuilderData);
+router.put('/combo-page', authMiddleware, requireSuperAdmin, updateComboPageConfig);
+
 import * as showcaseSectionController from '../controllers/showcaseSection.controller.js';
 
 // Dynamic Showcase Sections routes (Paneer Max, 6 in 1, Combo Bonanza, etc.)

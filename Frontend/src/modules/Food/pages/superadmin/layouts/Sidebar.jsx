@@ -169,7 +169,8 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
         { name: "Home Page", icon: Home },
         { name: "Promise Campaign", icon: Award },
         { name: "Showcase Sections", icon: Sparkles },
-        { name: "Search Overlay", icon: Search }
+        { name: "Search Overlay", icon: Search },
+        { name: "Combo Page", icon: Sparkles }
       ]
     }
 
@@ -433,6 +434,8 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
                                 navigate("/food/superadmin/user-app/showcase-sections")
                               } else if (item.name === "Search Overlay") {
                                 navigate("/food/superadmin/user-app/search-config")
+                              } else if (item.name === "Combo Page") {
+                                navigate("/food/superadmin/user-app/combo-page")
                               }
                               // On mobile, close sidebar when clicking a menu item
                               if (window.innerWidth < 1024) {

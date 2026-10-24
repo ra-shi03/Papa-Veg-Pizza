@@ -32,6 +32,8 @@ const UserOrderDetails = lazy(() => import("@food/pages/user/orders/UserOrderDet
 
 // Offers & Promise
 const Offers = lazy(() => import("@food/pages/user/Offers"))
+const ComboPage = lazy(() => import("@food/pages/user/ComboPage"))
+const ComboBuilder = lazy(() => import("@food/pages/user/ComboBuilder"))
 const PromisePage = lazy(() => import("@food/pages/user/PromisePage"))
 const BulkOrder = lazy(() => import("@food/pages/user/BulkOrder"))
 
@@ -149,6 +151,8 @@ export default function UserRouter() {
 
           {/* Offers & Coupons */}
           <Route path="offers" element={<Coupons />} />
+          <Route path="combos" element={<ComboPage />} />
+          <Route path="combos/build" element={<ComboBuilder />} />
           <Route path="coupons" element={<Coupons />} />
           <Route path="bulk-order" element={<BulkOrder />} />
           <Route path="bulk-orders" element={<BulkOrder />} />
