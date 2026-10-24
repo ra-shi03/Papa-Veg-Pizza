@@ -44,6 +44,7 @@ export default function Home() {
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [showRewardsLoading, setShowRewardsLoading] = useState(false);
   const [showRewardsPage, setShowRewardsPage] = useState(false);
+  const [showAdPopup, setShowAdPopup] = useState(false);
   const [isRewardsEnrolled, setIsRewardsEnrolled] = useState(() => {
     const isAuth =
       localStorage.getItem("user_authenticated") === "true" ||
@@ -488,7 +489,6 @@ export default function Home() {
   const [activeSlide, setActiveSlide] = useState(0)
 
   // Ad Popup State
-  const [showAdPopup, setShowAdPopup] = useState(false);
   const [adPopupData, setAdPopupData] = useState(null);
 
   // Modal states removed
