@@ -24,6 +24,10 @@ import { FoodDeliveryEmergencyHelp } from '../models/deliveryEmergencyHelp.model
 import { FoodReferralSettings } from '../models/referralSettings.model.js';
 import { FoodReferralLog } from '../models/referralLog.model.js';
 import { FoodSafetyEmergencyReport } from '../models/safetyEmergencyReport.model.js';
+import { FoodDeliveryWithdrawal } from '../../delivery/models/foodDeliveryWithdrawal.model.js';
+import { FoodSupportTicket } from '../../user/models/supportTicket.model.js';
+import { FoodStoreWithdrawal } from '../../store/models/storeWithdrawal.model.js';
+import { FoodStoreSupportTicket } from '../../store/models/storeSupportTicket.model.js';
 import { StoreManager } from '../../franchise/models/storeManager.model.js';
 import { UserRole } from '../../../../core/roles/models/userRole.model.js';
 import { Role } from '../../../../core/roles/models/role.model.js';

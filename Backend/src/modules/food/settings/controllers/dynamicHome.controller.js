@@ -1,4 +1,5 @@
 import { HomeSection } from '../models/homeSection.model.js';
+import { UiOffer } from '../models/uiOffer.model.js';
 import { FoodCoupon } from '../models/foodCoupon.model.js';
 import { FoodAppConfig } from '../models/appConfig.model.js';
 import { sendResponse, sendError } from '../../../../utils/response.js';

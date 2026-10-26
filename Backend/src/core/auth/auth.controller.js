@@ -195,8 +195,13 @@ export const updatePersonalProfileController = async (req, res, next) => {
   }
 };
 
+// Disabled: verifyTruecallerAndLogin trusts the phone number in the request (no Truecaller signature check),
+// so it would let anyone log in as any customer. Re-enable only after server-side verification of the
+// Truecaller response is implemented. Refusing here also stops it creating user records for arbitrary numbers.
 export const verifyTruecallerController = async (req, res, next) => {
   try {
+    return sendResponse(res, 501, "Truecaller login is not available. Please log in with OTP.", null);
+    // eslint-disable-next-line no-unreachable
     const { payload } = req.body;
     if (!payload || !payload.phone) {
       return sendResponse(res, 400, "Invalid Truecaller payload", null);
