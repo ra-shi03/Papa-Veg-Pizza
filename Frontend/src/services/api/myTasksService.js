@@ -180,6 +180,8 @@ export const myTasksService = {
       const res = await apiClient.get("/tasks");
       return res.data;
     } catch (err) {
+      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
+      if (err?.response) throw err;
       await sleep(500);
       const db = getDB();
       // Returns only tasks assigned to the mock user "Siddharth Verma"
@@ -194,6 +196,8 @@ export const myTasksService = {
       const res = await apiClient.get("/tasks/stats");
       return res.data;
     } catch (err) {
+      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
+      if (err?.response) throw err;
       await sleep(400);
       const db = getDB();
       const userTasks = db.tasks.filter((t) => t.assignedTo === "Siddharth Verma");
@@ -223,6 +227,8 @@ export const myTasksService = {
       const res = await apiClient.patch(`/tasks/${id}/start`, { notes });
       return res.data;
     } catch (err) {
+      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
+      if (err?.response) throw err;
       await sleep(600);
       const db = getDB();
       db.tasks = db.tasks.map((task) => {
@@ -256,6 +262,8 @@ export const myTasksService = {
       const res = await apiClient.patch(`/tasks/${id}/complete`, payload);
       return res.data;
     } catch (err) {
+      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
+      if (err?.response) throw err;
       await sleep(750);
       const db = getDB();
       db.tasks = db.tasks.map((task) => {
@@ -293,6 +301,8 @@ export const myTasksService = {
       const res = await apiClient.patch(`/tasks/${id}/delay`, payload);
       return res.data;
     } catch (err) {
+      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
+      if (err?.response) throw err;
       await sleep(600);
       const db = getDB();
       db.tasks = db.tasks.map((task) => {
@@ -320,12 +330,14 @@ export const myTasksService = {
     }
   },
 
-  // POST /api/inventory/request
+  // POST /api/v1/food/store/kitchen/inventory-requests
   requestIngredient: async (payload) => {
     try {
-      const res = await apiClient.post("/inventory/request", payload);
+      const res = await apiClient.post("/food/store/kitchen/inventory-requests", payload);
       return res.data;
     } catch (err) {
+      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
+      if (err?.response) throw err;
       await sleep(650);
       const db = getDB();
       db.inventoryRequests.push({
@@ -348,6 +360,8 @@ export const myTasksService = {
       const res = await apiClient.patch(`/tasks/${id}/request-reassign`, payload);
       return res.data;
     } catch (err) {
+      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
+      if (err?.response) throw err;
       await sleep(600);
       const db = getDB();
       db.tasks = db.tasks.map((task) => {
@@ -380,6 +394,8 @@ export const myTasksService = {
       const res = await apiClient.patch(`/tasks/${id}/reassign`, payload);
       return res.data;
     } catch (err) {
+      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
+      if (err?.response) throw err;
       await sleep(600);
       const db = getDB();
       db.tasks = db.tasks.map((task) => {
@@ -406,12 +422,14 @@ export const myTasksService = {
     }
   },
 
-  // POST /api/quality-check
+  // POST /api/v1/food/store/kitchen/quality-checks
   submitQualityCheck: async (payload) => {
     try {
-      const res = await apiClient.post("/quality-check", payload);
+      const res = await apiClient.post("/food/store/kitchen/quality-checks", payload);
       return res.data;
     } catch (err) {
+      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
+      if (err?.response) throw err;
       await sleep(700);
       const db = getDB();
       db.qualityChecks.push({
@@ -433,6 +451,8 @@ export const myTasksService = {
       const res = await apiClient.get("/tasks/team");
       return res.data;
     } catch (err) {
+      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
+      if (err?.response) throw err;
       await sleep(500);
       const db = getDB();
       const pending = db.tasks.filter((t) => t.status === "pending").length;
@@ -467,6 +487,8 @@ export const myTasksService = {
       const res = await apiClient.get("/tasks/notifications");
       return res.data;
     } catch (err) {
+      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
+      if (err?.response) throw err;
       await sleep(300);
       const db = getDB();
       return { success: true, data: db.notifications };
@@ -479,6 +501,8 @@ export const myTasksService = {
       const res = await apiClient.patch(`/tasks/notifications/${id}/read`);
       return res.data;
     } catch (err) {
+      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
+      if (err?.response) throw err;
       const db = getDB();
       db.notifications = db.notifications.map((n) =>
         n.id === id ? { ...n, isRead: true } : n

@@ -192,6 +192,31 @@ const kitchenPersonSchema = new mongoose.Schema(
     { _id: false }
 );
 
+/** Packaging station state of an order: ready_for_packaging -> packaging_started -> quality_checked -> sealed -> ready_for_pickup. */
+const packagingSchema = new mongoose.Schema(
+    {
+        status: {
+            type: String,
+            enum: ['ready_for_packaging', 'packaging_started', 'quality_checked', 'sealed', 'ready_for_pickup'],
+            default: 'ready_for_packaging'
+        },
+        staff: { type: kitchenPersonSchema, default: undefined },
+        startedAt: { type: Date, default: null },
+        checklist: {
+            pizzaCountVerified: { type: Boolean, default: false },
+            saucesIncluded: { type: Boolean, default: false },
+            cutleryIncluded: { type: Boolean, default: false },
+            billAttached: { type: Boolean, default: false },
+            qualityVerified: { type: Boolean, default: false },
+            packagingSealed: { type: Boolean, default: false },
+            notes: { type: String, default: '', trim: true, maxlength: 1000 }
+        },
+        sealedAt: { type: Date, default: null },
+        sealRemarks: { type: String, default: '', trim: true, maxlength: 500 }
+    },
+    { _id: false }
+);
+
 /** Kitchen workflow: store manager -> kitchen supervisor -> kitchen staff (per station). */
 const kitchenSchema = new mongoose.Schema(
     {
@@ -208,6 +233,13 @@ const kitchenSchema = new mongoose.Schema(
         },
         priority: { type: String, enum: ['normal', 'urgent'], default: 'normal' },
         notes: { type: String, default: '', trim: true },
+        // The kitchen team has acknowledged the order (Kitchen Queue: confirmed -> queued).
+        queuedAt: { type: Date, default: null },
+        // Why the order is running late, and how/when the lead closed that delay (Delayed Orders screen).
+        delayReason: { type: String, default: '', trim: true },
+        delayResolvedAt: { type: Date, default: null },
+        delayResolution: { type: String, default: '', trim: true },
+        packaging: { type: packagingSchema, default: undefined },
         isPaused: { type: Boolean, default: false },
         pauseReason: { type: String, default: '', trim: true },
         estimatedPrepMinutes: { type: Number, default: 0, min: 0 },

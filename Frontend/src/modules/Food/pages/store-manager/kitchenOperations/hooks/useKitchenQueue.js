@@ -3,6 +3,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import io from "socket.io-client";
 import apiClient from "@/services/api/axios";
+
+// The real endpoints are the source of truth. The localStorage mock below only runs when VITE_STANDALONE_MOCK=true.
+const STANDALONE_MOCK = import.meta.env?.VITE_STANDALONE_MOCK === "true";
+const KITCHEN = "/food/store/kitchen";
 import { mockChefs, initialMockOrders } from "../mockData";
 
 // Local storage key names (shares order database with incoming orders to demonstrate flow)
@@ -216,7 +220,7 @@ export function useKitchenQueue(filters = {}, page = 1, limit = 20) {
     queryKey: ["kitchenQueue", filters, page, limit],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/store/kitchen/queue", {
+        const response = await apiClient.get(`${KITCHEN}/queue`, {
           params: { page, limit, ...filters },
         });
 
@@ -241,8 +245,12 @@ export function useKitchenQueue(filters = {}, page = 1, limit = 20) {
             }
           };
         }
+        if (!STANDALONE_MOCK) {
+          return { orders: [], pagination: { total: 0, page, limit, totalPages: 1 } };
+        }
         throw new Error("No active orders in API, falling back to mock data");
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         console.warn("Backend API unavailable, falling back to simulated storage database.");
 
         let list = getLocalOrders();
@@ -331,6 +339,7 @@ export function useChefs() {
         if (Array.isArray(response.data?.data)) return response.data.data;
         throw new Error("Format mismatch");
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         return getLocalChefs().filter((s) => s.role === "chef" && s.status === "active");
       }
     },
@@ -343,11 +352,12 @@ export function useAcceptOrder() {
   return useMutation({
     mutationFn: async (orderId) => {
       try {
-        const response = await apiClient.put(`/orders/${orderId}/accept`, {
+        const response = await apiClient.put(`${KITCHEN}/orders/${orderId}/accept`, {
           status: "queued",
         });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Fallback simulation
         const local = getLocalOrders();
         const updated = local.map((o) =>
@@ -383,11 +393,12 @@ export function useAssignChef() {
   return useMutation({
     mutationFn: async ({ orderId, chefId }) => {
       try {
-        const response = await apiClient.put(`/orders/${orderId}/assign-chef`, {
+        const response = await apiClient.put(`${KITCHEN}/orders/${orderId}/assign-chef`, {
           chefId,
         });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Fallback simulation
         const local = getLocalOrders();
         const updatedOrders = local.map((o) =>
@@ -422,7 +433,7 @@ export function useRejectItem() {
   return useMutation({
     mutationFn: async ({ orderId, itemIds, reason, notifyCustomer }) => {
       try {
-        const response = await apiClient.post("/orders/item-reject", {
+        const response = await apiClient.post(`${KITCHEN}/orders/item-reject`, {
           orderId,
           itemIds,
           reason,
@@ -430,6 +441,7 @@ export function useRejectItem() {
         });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Fallback simulation
         const local = getLocalOrders();
         const updated = local.map((o) => {
@@ -473,6 +485,7 @@ export function useUpdateOrderStatus() {
           : await apiClient.patch(`/food/store/orders/${orderId}/reject`, { cancelReason: "Cancelled by kitchen" });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Fallback simulation
         const local = getLocalOrders();
         const updated = local.map((o) => {

@@ -23,7 +23,7 @@ export const setPriority = wrap((req) => ops.setPriority(req.user, req.params.or
 
 // Franchise admin: read-only view of every order across their stores (superadmin may pass ?franchiseId=).
 export const listFranchiseOrders = wrap((req) => {
-  const isSuper = ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN'].includes(ops.normalizeRole(req.user?.role));
+  const isSuper = ['SUPERADMIN', 'SUPER_ADMIN'].includes(ops.normalizeRole(req.user?.role));
   const user = isSuper && req.query.franchiseId ? { ...req.user, franchiseId: req.query.franchiseId } : req.user;
   return ops.listFranchiseOrders(user, req.query);
 });

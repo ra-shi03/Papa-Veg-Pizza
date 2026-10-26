@@ -16,8 +16,9 @@ import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core
 
 export const normalizeRole = (role) => String(role || '').trim().replace(/-/g, '_').toUpperCase();
 
-const STAFF_SLOTS = ['pizza_chef', 'baking_chef', 'packaging_staff'];
-const STAGE_ORDER = ['pending', 'preparing', 'baking', 'packaging', 'ready'];
+export const STAFF_SLOTS = ['pizza_chef', 'baking_chef', 'packaging_staff'];
+const MAX_WORKLOAD = 4; // live orders one person can hold before showing as busy
+export const STAGE_ORDER = ['pending', 'preparing', 'baking', 'packaging', 'ready'];
 const CANCELLED = ['cancelled_by_user', 'cancelled_by_store', 'cancelled_by_admin'];
 
 const VIEW_STATUSES = {
@@ -57,8 +58,8 @@ const resolveUiRole = (code, title) => {
   return uiRoleOf(title || (code === 'KITCHEN_STAFF' ? 'Kitchen Staff' : 'store manager'));
 };
 
-const toObjectId = (id) => new mongoose.Types.ObjectId(String(id));
-const idStr = (v) => (v ? String(v._id || v) : '');
+export const toObjectId = (id) => new mongoose.Types.ObjectId(String(id));
+export const idStr = (v) => (v ? String(v._id || v) : '');
 
 // ---------------------------------------------------------------------------------------------
 // Serialiser: FoodOrder -> the shape the store-operations screens already render
@@ -150,6 +151,7 @@ export const toOpsOrder = (order) => {
     kitchenSupervisor: person(k.supervisor),
     kitchenSupervisorId: k.supervisor?.userId ? String(k.supervisor.userId) : '',
     kitchenStage: k.stage || 'pending',
+    queuedAt: k.queuedAt || null,
     kitchenNote: k.notes || '',
     isPaused: !!k.isPaused,
     pauseReason: k.pauseReason || '',
@@ -171,21 +173,21 @@ export const toOpsOrder = (order) => {
 // Access control
 // ---------------------------------------------------------------------------------------------
 
-const requireStore = (user) => {
+export const requireStore = (user) => {
   if (!user?.storeId) throw new ForbiddenError('You are not assigned to a store.');
   return String(user.storeId);
 };
 
-const requireManager = (user) => {
+export const requireManager = (user) => {
   if (normalizeRole(user?.role) !== 'STORE_MANAGER') throw new ForbiddenError('Only the store manager can do this.');
 };
 
-const staffSlotsOf = (order, userId) =>
+export const staffSlotsOf = (order, userId) =>
   STAFF_SLOTS.filter((slot) => idStr(order.kitchen?.staff?.[slot]?.userId) === String(userId));
 
-const isOrderSupervisor = (order, userId) => idStr(order.kitchen?.supervisor?.userId) === String(userId);
+export const isOrderSupervisor = (order, userId) => idStr(order.kitchen?.supervisor?.userId) === String(userId);
 
-const findOrder = async (orderId, storeId) => {
+export const findOrder = async (orderId, storeId) => {
   const filter = mongoose.Types.ObjectId.isValid(orderId)
     ? { _id: toObjectId(orderId) }
     : { order_id: String(orderId) };
@@ -317,6 +319,10 @@ export async function listTeam(user, { role, q } = {}) {
       title: m.role,
       status: 'active',
       currentActiveOrders: load.get(String(m.userId)) || 0,
+      // The chef / baker / packer pickers show load against capacity
+      currentWorkload: load.get(String(m.userId)) || 0,
+      maxWorkload: MAX_WORKLOAD,
+      availability: (load.get(String(m.userId)) || 0) >= MAX_WORKLOAD ? 'busy' : 'available',
       avatar: m.profileImage && !m.profileImage.startsWith('data:') ? m.profileImage : '',
     }))
     .filter((m) => m.role !== 'store_manager')
@@ -328,7 +334,7 @@ export async function listTeam(user, { role, q } = {}) {
 // Workflow: manager -> supervisor -> staff
 // ---------------------------------------------------------------------------------------------
 
-const logStep = (order, user, note) => {
+export const logStep = (order, user, note) => {
   const status = order.orderStatus;
   pushStatusHistory(order, {
     byRole: normalizeRole(user.role),
@@ -468,6 +474,16 @@ export async function updateKitchenStage(user, orderId, payload = {}) {
     throw new ValidationError(`Order is already at '${current}'`);
   }
 
+  await moveToStage(user, storeId, order, stage);
+  return toOpsOrder(await reload(order._id, storeId));
+}
+
+/**
+ * Moves an order that is in the kitchen to a later stage: updates the order status (preparing / ready for pickup,
+ * which also notifies the customer and starts rider dispatch), the kitchen stage, the history and the staff tasks.
+ * Callers have already checked that the caller may do this.
+ */
+export async function moveToStage(user, storeId, order, stage) {
   if (stage === 'ready') {
     await updateOrderStatusStore(String(order._id), storeId, 'ready_for_pickup', 'Packed and ready for pickup');
   } else if (order.orderStatus === 'confirmed') {
@@ -484,7 +500,7 @@ export async function updateKitchenStage(user, orderId, payload = {}) {
     ? { status: 'completed', completedAt: new Date() }
     : { status: 'in_progress', startedAt: new Date() };
   await KitchenTask.updateMany({ orderId: fresh._id }, { $set: taskUpdate });
-  return toOpsOrder(await reload(order._id, storeId));
+  return fresh;
 }
 
 export async function setPriority(user, orderId, priority) {

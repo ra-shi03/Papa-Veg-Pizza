@@ -3,6 +3,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import io from "socket.io-client";
 import apiClient from "@/services/api/axios";
+
+// The real endpoints are the source of truth. The localStorage mock below only runs when VITE_STANDALONE_MOCK=true.
+const STANDALONE_MOCK = import.meta.env?.VITE_STANDALONE_MOCK === "true";
+const KITCHEN = "/food/store/kitchen";
 import {
   mockChefs,
   mockIngredients,
@@ -152,7 +156,7 @@ export function usePreparationBoard(filters = {}) {
     queryKey: ["preparationBoard", filters],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/preparation-board", {
+        const response = await apiClient.get(`${KITCHEN}/preparation-board`, {
           params: filters,
         });
         
@@ -168,8 +172,10 @@ export function usePreparationBoard(filters = {}) {
         if (apiItems && apiItems.length > 0) {
           return apiItems;
         }
+        if (!STANDALONE_MOCK) return apiItems;
         throw new Error("No items or empty array");
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         console.warn("Backend API unavailable, falling back to simulated storage database.");
 
         let list = getLocalPrepItems();
@@ -230,11 +236,12 @@ export function useMoveStage() {
   return useMutation({
     mutationFn: async ({ orderItemId, stage }) => {
       try {
-        const response = await apiClient.put(`/order-item/${orderItemId}/stage`, {
+        const response = await apiClient.put(`${KITCHEN}/order-item/${orderItemId}/stage`, {
           stage,
         });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Fallback simulation
         const local = getLocalPrepItems();
         const updated = local.map((item) =>
@@ -266,12 +273,13 @@ export function usePausePreparation() {
   return useMutation({
     mutationFn: async ({ orderItemId, reason, notes }) => {
       try {
-        const response = await apiClient.put(`/order-item/${orderItemId}/pause`, {
+        const response = await apiClient.put(`${KITCHEN}/order-item/${orderItemId}/pause`, {
           reason,
           notes,
         });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Fallback simulation
         const local = getLocalPrepItems();
         const updated = local.map((item) =>
@@ -299,11 +307,12 @@ export function useReassignChef() {
   return useMutation({
     mutationFn: async ({ orderItemId, chefId }) => {
       try {
-        const response = await apiClient.put(`/order-item/${orderItemId}/reassign`, {
+        const response = await apiClient.put(`${KITCHEN}/order-item/${orderItemId}/reassign`, {
           chefId,
         });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Fallback simulation
         const local = getLocalPrepItems();
         const updated = local.map((item) =>

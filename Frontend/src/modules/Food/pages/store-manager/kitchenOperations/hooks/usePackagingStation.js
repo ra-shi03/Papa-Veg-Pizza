@@ -3,6 +3,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import io from "socket.io-client";
 import apiClient from "@/services/api/axios";
+
+// The real endpoints are the source of truth. The localStorage mock below only runs when VITE_STANDALONE_MOCK=true.
+const STANDALONE_MOCK = import.meta.env?.VITE_STANDALONE_MOCK === "true";
+const KITCHEN = "/food/store/kitchen";
 import {
   mockPackagingStaff,
   initialMockPackagingOrders,
@@ -137,7 +141,7 @@ export function usePackagingStation(filters = {}) {
     queryKey: ["packagingStation", filters],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/packaging", {
+        const response = await apiClient.get(`${KITCHEN}/packaging`, {
           params: filters,
         });
 
@@ -153,8 +157,10 @@ export function usePackagingStation(filters = {}) {
         if (apiItems && apiItems.length > 0) {
           return apiItems;
         }
+        if (!STANDALONE_MOCK) return apiItems;
         throw new Error("No packaging orders returned");
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Fallback simulated list
         let list = getLocalOrders();
 
@@ -225,8 +231,10 @@ export function usePackagingStaff() {
         if (list && list.length > 0) {
           return list;
         }
+        if (!STANDALONE_MOCK) return list;
         throw new Error("No staff returned");
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         return JSON.parse(localStorage.getItem(PACKAGING_STAFF_KEY)) || mockPackagingStaff;
       }
     }
@@ -239,9 +247,10 @@ export function useStartPackaging() {
   return useMutation({
     mutationFn: async ({ orderId }) => {
       try {
-        const response = await apiClient.put("/packaging/start", { orderId });
+        const response = await apiClient.put(`${KITCHEN}/packaging/start`, { orderId });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         const local = getLocalOrders();
         const updated = local.map((o) =>
           o._id === orderId
@@ -273,9 +282,10 @@ export function usePackagingChecklist() {
   return useMutation({
     mutationFn: async (payload) => {
       try {
-        const response = await apiClient.post("/packaging/checklist", payload);
+        const response = await apiClient.post(`${KITCHEN}/packaging/checklist`, payload);
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         const local = getLocalOrders();
         const localLogs = getLocalLogs();
 
@@ -322,9 +332,10 @@ export function useSealPackage() {
   return useMutation({
     mutationFn: async ({ orderId, remarks = "" }) => {
       try {
-        const response = await apiClient.put("/packaging/seal", { orderId, remarks });
+        const response = await apiClient.put(`${KITCHEN}/packaging/seal`, { orderId, remarks });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         const local = getLocalOrders();
         const updated = local.map((o) =>
           o._id === orderId
@@ -355,11 +366,12 @@ export function useMarkReady() {
   return useMutation({
     mutationFn: async ({ orderId }) => {
       try {
-        const response = await apiClient.put(`/orders/${orderId}/ready`, {
+        const response = await apiClient.put(`${KITCHEN}/orders/${orderId}/ready`, {
           status: "ready_for_pickup"
         });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         const local = getLocalOrders();
         const updated = local.map((o) =>
           o._id === orderId

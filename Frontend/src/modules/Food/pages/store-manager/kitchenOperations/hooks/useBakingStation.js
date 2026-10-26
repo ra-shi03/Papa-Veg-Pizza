@@ -3,6 +3,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import io from "socket.io-client";
 import apiClient from "@/services/api/axios";
+
+// The real endpoints are the source of truth. The localStorage mock below only runs when VITE_STANDALONE_MOCK=true.
+const STANDALONE_MOCK = import.meta.env?.VITE_STANDALONE_MOCK === "true";
+const KITCHEN = "/food/store/kitchen";
 import {
   mockStaff,
   initialMockOvens,
@@ -205,7 +209,7 @@ export function useBakingStation(filters = {}) {
     queryKey: ["bakingStation", filters],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/baking-station", {
+        const response = await apiClient.get(`${KITCHEN}/baking-station`, {
           params: filters,
         });
         
@@ -221,8 +225,10 @@ export function useBakingStation(filters = {}) {
         if (apiItems && apiItems.length > 0) {
           return apiItems;
         }
+        if (!STANDALONE_MOCK) return apiItems;
         throw new Error("No items returned");
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Local fallback
         let list = getLocalBakingItems();
 
@@ -279,7 +285,7 @@ export function useOvens(statusFilter) {
     queryKey: ["ovens", statusFilter],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/ovens", {
+        const response = await apiClient.get(`${KITCHEN}/ovens`, {
           params: statusFilter ? { status: statusFilter } : {},
         });
         let list = [];
@@ -293,8 +299,10 @@ export function useOvens(statusFilter) {
         if (list && list.length > 0) {
           return list;
         }
+        if (!STANDALONE_MOCK) return list;
         throw new Error("No ovens returned");
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         let ovens = getLocalOvens();
         if (statusFilter) {
           ovens = ovens.filter(o => o.status === statusFilter);
@@ -323,8 +331,10 @@ export function useBakingStaff() {
         if (list && list.length > 0) {
           return list;
         }
+        if (!STANDALONE_MOCK) return list;
         throw new Error("No staff returned");
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         return JSON.parse(localStorage.getItem(STAFF_KEY)) || mockStaff;
       }
     }
@@ -337,7 +347,7 @@ export function useKitchenIssues() {
     queryKey: ["kitchenIssues"],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/kitchen-issues");
+        const response = await apiClient.get(`${KITCHEN}/kitchen-issues`);
         let list = [];
         if (Array.isArray(response.data)) {
           list = response.data;
@@ -349,8 +359,10 @@ export function useKitchenIssues() {
         if (list && list.length > 0) {
           return list;
         }
+        if (!STANDALONE_MOCK) return list;
         throw new Error("No issues returned");
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         return getLocalIssues();
       }
     }
@@ -363,7 +375,7 @@ export function useStartBaking() {
   return useMutation({
     mutationFn: async ({ orderItemId, ovenId, temperature = 250, expectedDuration = 8, remarks = "" }) => {
       try {
-        const response = await apiClient.put("/baking/start", {
+        const response = await apiClient.put(`${KITCHEN}/baking/start`, {
           orderItemId,
           ovenId,
           temperature,
@@ -372,6 +384,7 @@ export function useStartBaking() {
         });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         const local = getLocalBakingItems();
         const ovens = getLocalOvens();
         const targetItem = local.find(item => item._id === orderItemId);
@@ -426,13 +439,14 @@ export function useMoveOven() {
   return useMutation({
     mutationFn: async ({ orderItemId, newOvenId, remarks = "" }) => {
       try {
-        const response = await apiClient.put("/baking/move-oven", {
+        const response = await apiClient.put(`${KITCHEN}/baking/move-oven`, {
           orderItemId,
           newOvenId,
           remarks,
         });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         const local = getLocalBakingItems();
         const ovens = getLocalOvens();
         const targetItem = local.find(item => item._id === orderItemId);
@@ -482,13 +496,14 @@ export function usePauseBaking() {
   return useMutation({
     mutationFn: async ({ orderItemId, reason, notes = "" }) => {
       try {
-        const response = await apiClient.put("/baking/pause", {
+        const response = await apiClient.put(`${KITCHEN}/baking/pause`, {
           orderItemId,
           reason,
           notes,
         });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         const local = getLocalBakingItems();
         const ovens = getLocalOvens();
         const targetItem = local.find(item => item._id === orderItemId);
@@ -528,12 +543,13 @@ export function useCompleteBaking() {
   return useMutation({
     mutationFn: async ({ orderItemId, remarks = "" }) => {
       try {
-        const response = await apiClient.put("/baking/complete", {
+        const response = await apiClient.put(`${KITCHEN}/baking/complete`, {
           orderItemId,
           remarks
         });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         const local = getLocalBakingItems();
         const ovens = getLocalOvens();
         const targetItem = local.find(item => item._id === orderItemId);
@@ -572,7 +588,7 @@ export function useReportBakingIssue() {
   return useMutation({
     mutationFn: async ({ orderItemId, issueType, severity, remarks = "", image = "", notifyManager = false }) => {
       try {
-        const response = await apiClient.post("/kitchen-issues", {
+        const response = await apiClient.post(`${KITCHEN}/kitchen-issues`, {
           orderItemId,
           issueType,
           severity,
@@ -582,6 +598,7 @@ export function useReportBakingIssue() {
         });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         const localIssues = getLocalIssues();
         const newIssue = {
           _id: `issue-${Date.now()}`,

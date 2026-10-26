@@ -3,6 +3,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import io from "socket.io-client";
 import apiClient from "@/services/api/axios";
+
+// The real endpoints are the source of truth. The localStorage mock below only runs when VITE_STANDALONE_MOCK=true.
+const STANDALONE_MOCK = import.meta.env?.VITE_STANDALONE_MOCK === "true";
+const KITCHEN = "/food/store/kitchen";
 import {
   mockChefs,
   mockIngredients,
@@ -147,7 +151,7 @@ export function usePizzaStation(filters = {}) {
     queryKey: ["pizzaStation", filters],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/pizza-station", {
+        const response = await apiClient.get(`${KITCHEN}/pizza-station`, {
           params: filters,
         });
 
@@ -163,8 +167,10 @@ export function usePizzaStation(filters = {}) {
         if (apiItems && apiItems.length > 0) {
           return apiItems;
         }
+        if (!STANDALONE_MOCK) return apiItems;
         throw new Error("No items returned");
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         console.warn("Backend API unavailable, falling back to simulated storage database.");
 
         let list = getLocalStationItems();
@@ -231,11 +237,12 @@ export function useStartAssembly() {
   return useMutation({
     mutationFn: async ({ orderItemId }) => {
       try {
-        const response = await apiClient.put("/pizza-station/start", {
+        const response = await apiClient.put(`${KITCHEN}/pizza-station/start`, {
           orderItemId,
         });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Fallback simulation
         const local = getLocalStationItems();
         const updated = local.map((item) =>
@@ -263,13 +270,14 @@ export function usePauseAssembly() {
   return useMutation({
     mutationFn: async ({ orderItemId, reason, notes }) => {
       try {
-        const response = await apiClient.put("/pizza-station/pause", {
+        const response = await apiClient.put(`${KITCHEN}/pizza-station/pause`, {
           orderItemId,
           reason,
           notes,
         });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Fallback simulation
         const local = getLocalStationItems();
         const updated = local.map((item) =>
@@ -297,12 +305,13 @@ export function useCompleteAssembly() {
   return useMutation({
     mutationFn: async ({ orderItemId, notes }) => {
       try {
-        const response = await apiClient.put("/pizza-station/complete", {
+        const response = await apiClient.put(`${KITCHEN}/pizza-station/complete`, {
           orderItemId,
           notes,
         });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Fallback simulation
         const local = getLocalStationItems();
         const updated = local.map((item) =>

@@ -3,6 +3,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import io from "socket.io-client";
 import apiClient from "@/services/api/axios";
+
+// The real endpoints are the source of truth. The localStorage mock below only runs when VITE_STANDALONE_MOCK=true.
+const STANDALONE_MOCK = import.meta.env?.VITE_STANDALONE_MOCK === "true";
+const KITCHEN = "/food/store/kitchen";
 import {
   initialMockDelayedOrders,
   initialMockEscalations,
@@ -136,7 +140,7 @@ export function useDelayedOrders(filters = {}) {
     queryKey: ["delayedOrders", filters],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/delayed-orders", {
+        const response = await apiClient.get(`${KITCHEN}/delayed-orders`, {
           params: filters,
         });
 
@@ -152,8 +156,10 @@ export function useDelayedOrders(filters = {}) {
         if (apiItems && apiItems.length > 0) {
           return apiItems;
         }
+        if (!STANDALONE_MOCK) return apiItems;
         throw new Error("No items returned");
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Fallback to LocalStorage
         let list = getLocalDelayedOrders();
 
@@ -240,8 +246,10 @@ export function useActiveStaff() {
         if (list && list.length > 0) {
           return list;
         }
+        if (!STANDALONE_MOCK) return list;
         throw new Error("No staff returned");
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Fallback: merge chefs, baking staff, and packaging staff
         const chefs = mockChefs.map(c => ({ ...c, role: "Chef" }));
         const bakers = mockStaff.map(b => ({ ...b, role: "Baking Crew" }));
@@ -258,7 +266,7 @@ export function useEscalateOrder() {
   return useMutation({
     mutationFn: async ({ orderId, severity, reason, assignedTo, notes }) => {
       try {
-        const response = await apiClient.post(`/orders/${orderId}/escalate`, {
+        const response = await apiClient.post(`${KITCHEN}/orders/${orderId}/escalate`, {
           severity,
           reason,
           assignedTo,
@@ -266,6 +274,7 @@ export function useEscalateOrder() {
         });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Fallback LocalStorage update
         const escalations = getLocalEscalations();
         const newEsc = {
@@ -297,11 +306,12 @@ export function useReassignStaff() {
   return useMutation({
     mutationFn: async ({ orderId, staffId }) => {
       try {
-        const response = await apiClient.put(`/orders/${orderId}/reassign`, {
+        const response = await apiClient.put(`${KITCHEN}/orders/${orderId}/reassign`, {
           staffId
         });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Fallback LocalStorage update
         const orders = getLocalDelayedOrders();
         const updated = orders.map(o => {
@@ -361,12 +371,13 @@ export function useNotifyCustomer() {
   return useMutation({
     mutationFn: async ({ orderId, channels, message }) => {
       try {
-        const response = await apiClient.post(`/orders/${orderId}/notify-customer`, {
+        const response = await apiClient.post(`${KITCHEN}/orders/${orderId}/notify-customer`, {
           channels,
           message
         });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Mock success
         return { orderId, channels, message };
       }
@@ -385,11 +396,12 @@ export function useResolveDelay() {
   return useMutation({
     mutationFn: async ({ orderId, resolutionNotes }) => {
       try {
-        const response = await apiClient.put(`/orders/${orderId}/resolve-delay`, {
+        const response = await apiClient.put(`${KITCHEN}/orders/${orderId}/resolve-delay`, {
           resolutionNotes
         });
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Fallback LocalStorage update: set isDelayed = false
         const orders = getLocalDelayedOrders();
         const updated = orders.map(o => {
