@@ -50,3 +50,76 @@ describe('/v1/uploads/file and /v1/uploads/video', () => {
         assert.equal((await upload('/v1/uploads/video', fx.F.A.customerToken, Buffer.from('MZ'), 'a.exe', 'application/octet-stream')).status, 400);
     });
 });
+
+// ---- M5: the Cloudinary folder is chosen on the server -------------------------------------------------
+// Cloudinary is stubbed (shared SDK singleton), so these record the folder each upload would go to.
+describe('M5: upload folder is chosen by the server', () => {
+    const folders = [];
+    let restore;
+    before(async () => {
+        const { v2: cloudinary } = await import('cloudinary');
+        const original = cloudinary.uploader.upload_stream;
+        cloudinary.uploader.upload_stream = (options, cb) => {
+            folders.push(options.folder);
+            return { end: () => cb(null, { secure_url: `https://res.cloudinary.test/${options.folder}/x` }) };
+        };
+        restore = () => { cloudinary.uploader.upload_stream = original; };
+    });
+    after(() => restore?.());
+
+    const PDF = Buffer.from('%PDF-1.4 test');
+    const send = async (path, token, folder, file = PNG_HEADER, name = 'a.png', type = 'image/png') => {
+        const before = folders.length;
+        const res = await fx.api.post(`/api${path}`).set(fx.bearer(token)).field('folder', folder).attach('file', file, { filename: name, contentType: type });
+        assert.equal(res.status, 200, JSON.stringify(res.body));
+        assert.equal(folders.length, before + 1);
+        return folders.at(-1);
+    };
+    const A = () => fx.F.A;
+    const manager = () => fx.tokenFor(A().managerUserId, 'STORE_MANAGER', { franchiseId: A().franchiseId, storeId: A().storeId });
+    const rider = () => fx.tokenFor(A().customerId, 'DELIVERY_PARTNER');
+
+    test('a customer cannot write into an admin folder', async () => {
+        assert.equal(await send('/v1/uploads/image', A().customerToken, 'store-approvals/documents'), 'customers/uploads');
+        assert.equal(await send('/v1/uploads/file', A().customerToken, 'uploads', PDF, 'a.pdf', 'application/pdf'), 'customers/uploads/files');
+    });
+    test('a franchise admin and a store manager land in their own scoped folder', async () => {
+        assert.equal(await send('/v1/uploads/image', A().adminToken, 'welcome/images'), `franchises/${A().franchiseId}/uploads`);
+        assert.equal(await send('/v1/uploads/image', manager(), '../other'), `stores/${A().storeId}/uploads`);
+    });
+    test('a super admin may use the panel folders, nothing else', async () => {
+        assert.equal(await send('/v1/uploads/image', fx.SA, 'search/tabs'), 'search/tabs');
+        assert.equal(await send('/v1/uploads/image', fx.SA, 'store-approvals/documents'), 'uploads');
+        assert.equal(await send('/v1/uploads/file', fx.SA, 'bulk-orders', PDF, 'a.pdf', 'application/pdf'), 'bulk-orders');
+    });
+    test('a rider keeps the pickup-bill folder but nothing else', async () => {
+        assert.equal(await send('/v1/uploads/image', rider(), 'appzeto/delivery/bills'), 'appzeto/delivery/bills');
+        assert.equal(await send('/v1/uploads/image', rider(), 'welcome/images'), 'delivery/uploads');
+    });
+});
+
+// ---- M4: public delivery-partner registration ----------------------------------------------------------
+describe('M4: /v1/food/delivery/register only takes small, real images', () => {
+    const register = (field, buffer, filename, contentType) =>
+        fx.api.post('/api/v1/food/delivery/register').field('name', 'Rider').attach(field, buffer, { filename, contentType });
+
+    test('an image over 5 MB -> 413', async () => {
+        const big = Buffer.concat([PNG_HEADER, Buffer.alloc(6 * 1024 * 1024)]);
+        assert.equal((await register('aadharPhoto', big, 'big.png', 'image/png')).status, 413);
+    });
+    test('a non-image file -> 400', async () => {
+        assert.equal((await register('panPhoto', Buffer.from('%PDF-1.4'), 'a.pdf', 'application/pdf')).status, 400);
+    });
+    test('a script labelled as an image -> 400', async () => {
+        assert.equal((await register('profilePhoto', Buffer.from('<?php system($_GET[0]);'), 'a.png', 'image/png')).status, 400);
+    });
+    test('a file in an unexpected field -> 400', async () => {
+        assert.equal((await register('payload', PNG_HEADER, 'a.png', 'image/png')).status, 400);
+    });
+    test('two files in a one-file field -> 400', async () => {
+        const res = await fx.api.post('/api/v1/food/delivery/register')
+            .attach('aadharPhoto', PNG_HEADER, { filename: 'a.png', contentType: 'image/png' })
+            .attach('aadharPhoto', PNG_HEADER, { filename: 'b.png', contentType: 'image/png' });
+        assert.equal(res.status, 400);
+    });
+});

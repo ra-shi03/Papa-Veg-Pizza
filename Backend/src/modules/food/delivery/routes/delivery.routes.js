@@ -1,5 +1,5 @@
 import express from 'express';
-import { upload } from '../../../../middleware/upload.js';
+import { safeUpload } from '../../../../middleware/safeUpload.js';
 import { authMiddleware } from '../../../../core/auth/auth.middleware.js';
 import { requireRoles } from '../../../../core/roles/role.middleware.js';
 import * as orderController from '../../orders/controllers/order.controller.js';
@@ -8,7 +8,8 @@ import { deleteDeliveryAccountController } from '../controllers/deleteAccount.co
 
 const router = express.Router();
 
-const uploadFields = upload.fields([
+// Registration is public, so every file is size-limited, image-only and signature-checked (see safeUpload).
+const uploadFields = safeUpload('image', [
     { name: 'profilePhoto', maxCount: 1 },
     { name: 'aadharPhoto', maxCount: 1 },
     { name: 'panPhoto', maxCount: 1 },

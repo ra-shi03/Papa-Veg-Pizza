@@ -3,6 +3,12 @@ import { config } from './env.js';
 import { logger } from '../utils/logger.js';
 import { verifyAccessToken } from '../core/auth/token.util.js';
 import { getFirebaseDB } from './firebase.js';
+import {
+    findOrderForTracking,
+    canWatchOrder,
+    canPushLocation,
+    trackingIdsOf
+} from '../modules/food/orders/services/order-tracking-access.service.js';
 
 let io = null;
 
@@ -76,7 +82,13 @@ export const initSocket = async (server) => {
                 tokenPreview: maskToken(token),
             });
             const decoded = verifyAccessToken(token);
-            socket.user = { userId: decoded.userId, role: decoded.role };
+            // Scope travels with the user so ownership checks need no client input.
+            socket.user = {
+                userId: decoded.userId,
+                role: decoded.role,
+                franchiseId: decoded.franchiseId || null,
+                storeId: decoded.storeId || null
+            };
             logger.info(`Socket auth success: ${decoded.role}:${decoded.userId} for socket ${socket.id}`);
             return next();
         } catch (err) {
@@ -172,23 +184,45 @@ export const initSocket = async (server) => {
 
         // ─── Live Tracking Events ───────────────────────────────────────
 
-        // Users / stores subscribe to an order's real-time tracking room.
-        socket.on('join-tracking', (orderId) => {
-            if (!orderId) return;
-            const role = socket.user?.role;
-            if (role !== 'USER' && role !== 'STORE' && role !== 'DELIVERY_PARTNER') return;
-            const room = roomNames.tracking(orderId);
-            socket.join(room);
-            logger.info(`Socket ${socket.id} (${role}:${userId}) joined tracking room ${room}`);
-            socket.emit('tracking-room-joined', { room, orderId: String(orderId) });
+        // Subscribe to an order's real-time tracking room. Allowed for the customer who placed it, its
+        // assigned rider, its store, its franchise admin and super admins; checked against the DB record.
+        socket.on('join-tracking', async (orderId) => {
+            if (!orderId || (typeof orderId !== 'string' && typeof orderId !== 'number')) return;
+            try {
+                const order = await findOrderForTracking(orderId);
+                if (!canWatchOrder(socket.user, order)) {
+                    logger.warn(`Socket ${socket.id} (${role}:${userId}) refused tracking for order ${orderId}`);
+                    socket.emit('tracking-denied', { orderId: String(orderId) });
+                    return;
+                }
+                const room = roomNames.tracking(orderId);
+                socket.join(room);
+                logger.info(`Socket ${socket.id} (${role}:${userId}) joined tracking room ${room}`);
+                socket.emit('tracking-room-joined', { room, orderId: String(orderId) });
+            } catch (err) {
+                logger.error(`join-tracking failed for ${orderId}: ${err.message}`);
+                socket.emit('tracking-denied', { orderId: String(orderId) });
+            }
         });
+
+        // Orders this rider may push locations for, re-checked every 30s so a reassignment takes effect.
+        const pushableOrders = new Map();
+        const orderForPush = async (orderId) => {
+            const key = String(orderId);
+            const cached = pushableOrders.get(key);
+            if (cached && Date.now() - cached.at < 30000) return cached.order;
+            const order = await findOrderForTracking(orderId);
+            const allowed = canPushLocation(socket.user, order) ? order : null;
+            pushableOrders.set(key, { order: allowed, at: Date.now() });
+            return allowed;
+        };
 
         // Delivery partner emits live GPS location for an active order.
         // Broadcasts to the tracking room so users see the bike move in real time.
         const _lastLocationBroadcast = {};
         socket.on('update-location', async (data) => {
             if (socket.user?.role !== 'DELIVERY_PARTNER') return;
-            if (!data || !data.orderId) return;
+            if (!data || !data.orderId || (typeof data.orderId !== 'string' && typeof data.orderId !== 'number')) return;
 
             const lat = Number(data.lat);
             const lng = Number(data.lng);
@@ -204,6 +238,24 @@ export const initSocket = async (server) => {
             const lastTS = _lastLocationBroadcast[data.orderId] || 0;
             if (now - lastTS < 2000) return;
             _lastLocationBroadcast[data.orderId] = now;
+
+            // Only the rider assigned to this (still active) order. Rooms come from the order record;
+            // data.userId / data.storeId in the payload are ignored.
+            let order;
+            try {
+                order = await orderForPush(data.orderId);
+            } catch (err) {
+                logger.error(`update-location lookup failed for ${data.orderId}: ${err.message}`);
+                return;
+            }
+            if (!order) {
+                logDeliverySocket('Rejected location update for an order not assigned to this partner', {
+                    socketId: socket.id,
+                    deliveryPartnerId: String(userId),
+                    orderId: String(data.orderId),
+                });
+                return;
+            }
 
             const payload = {
                 orderId: String(data.orderId),
@@ -228,18 +280,12 @@ export const initSocket = async (server) => {
                 status: data.status || 'on_the_way',
             });
 
-            // Broadcast to tracking room (all users watching this order)
-            const trackingRoom = roomNames.tracking(data.orderId);
-            socket.to(trackingRoom).emit('location-update', payload);
-
-            // Also emit to the specific user room if userId is provided
-            if (data.userId) {
-                socket.to(roomNames.user(data.userId)).emit('location-update', payload);
-            }
-
-            if (data.storeId) {
-                socket.to(roomNames.store(data.storeId)).emit('location-update', payload);
-            }
+            // Broadcast to everyone watching this order (they may have joined by _id or by order number),
+            // plus the customer's and the store's own rooms, all taken from the order record.
+            const targets = trackingIdsOf(order).map(roomNames.tracking);
+            if (order.userId) targets.push(roomNames.user(order.userId));
+            if (order.storeId) targets.push(roomNames.store(order.storeId));
+            socket.to(targets).emit('location-update', payload);
 
             // ─── Scalable Persistence (BullMQ + Redis "Hot" Buffering) ───
             try {
@@ -300,7 +346,8 @@ export const initSocket = async (server) => {
                 }
             } catch (err) {
                 // Silently skip if Firebase not initialized yet
-                logger.debug(`Firebase RTDB sync skipped: ${err.message}`);
+                // (the logger has no debug level; calling it threw an unhandled rejection on every update)
+                logger.debug?.(`Firebase RTDB sync skipped: ${err.message}`);
             }
         });
 
