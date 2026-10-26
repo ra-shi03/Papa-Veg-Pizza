@@ -1,4 +1,3 @@
-import jwt from 'jsonwebtoken';
 import { verifyAccessToken } from './token.util.js';
 import { sendError } from '../../utils/response.js';
 import { User } from '../users/models/user.model.js';
@@ -41,30 +40,6 @@ export const authMiddleware = async (req, res, next) => {
     }
 
     try {
-        // Support development / test tokens
-        if (token.startsWith('mockHeader.') || token.endsWith('.mockSignature') || token === 'dummy_access_token' || token === 'mock_token') {
-            try {
-                const parts = token.split('.');
-                if (parts[1]) {
-                    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
-                    req.user = {
-                        userId: payload.userId || 'admin-1',
-                        role: payload.role || 'SUPERADMIN',
-                        franchiseId: payload.franchiseId || null,
-                        storeId: payload.storeId || null
-                    };
-                    return next();
-                }
-            } catch (_) {}
-            req.user = {
-                userId: 'admin-1',
-                role: 'SUPERADMIN',
-                franchiseId: null,
-                storeId: null
-            };
-            return next();
-        }
-
         const decoded = verifyAccessToken(token);
 
         // Attach decoded payload to req.user — available to all downstream handlers
@@ -84,9 +59,6 @@ export const authMiddleware = async (req, res, next) => {
             .lean();
 
         if (!doc) {
-            if (process.env.NODE_ENV !== 'production' && (role === 'SUPERADMIN' || role === 'ADMIN' || role === 'SUPER-ADMIN')) {
-                return next();
-            }
             return sendError(res, 401, 'Account not found');
         }
         if (doc.isDeleted === true) {
@@ -98,20 +70,6 @@ export const authMiddleware = async (req, res, next) => {
 
         return next();
     } catch (error) {
-        if (process.env.NODE_ENV !== 'production') {
-            try {
-                const decoded = jwt.decode(token);
-                if (decoded && (normalizeRole(decoded.role) === 'SUPERADMIN' || normalizeRole(decoded.role) === 'ADMIN')) {
-                    req.user = {
-                        userId: decoded.userId || 'admin-1',
-                        role: decoded.role || 'SUPERADMIN',
-                        franchiseId: decoded.franchiseId || null,
-                        storeId: decoded.storeId || null
-                    };
-                    return next();
-                }
-            } catch (_) {}
-        }
         return sendError(res, 401, 'Invalid or expired token');
     }
 };
