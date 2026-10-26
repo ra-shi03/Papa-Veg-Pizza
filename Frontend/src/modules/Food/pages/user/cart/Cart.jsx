@@ -11,6 +11,7 @@ import { AnimatedNumber, CartItemRow, CartSkeleton, haptic } from "./CartParts"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { toast } from "sonner"
 import { removeCartKey } from "./upsell/upsellApi"
+import apiClient from "@/services/api/axios"
 
 const ALL_PRODUCTS = {
   "margherita-supreme": {
@@ -163,6 +164,13 @@ export default function Cart() {
   const [showCouponModal, setShowCouponModal] = useState(false)
   const [showGiftCardModal, setShowGiftCardModal] = useState(false)
   const [appliedCoupon, setAppliedCoupon] = useState(null)
+  const [fees, setFees] = useState({ handlingFee: 0, platformFee: 0, packagingFee: 0, deliveryFee: 0, freeDeliveryUpTo: 0, freeDeliveryThreshold: 0, gstRate: 0 })
+  useEffect(() => {
+    apiClient.get("/food/fee-config").then((res) => {
+      const f = res?.data?.data
+      if (f) setFees((prev) => ({ ...prev, ...f }))
+    }).catch(() => {})
+  }, [])
   const [appliedGiftCard, setAppliedGiftCard] = useState(null)
   const [showTaxDetails, setShowTaxDetails] = useState(false)
   const [isDarkMode] = useState(() => {
@@ -207,6 +215,10 @@ export default function Cart() {
             size: c.selectedSize || "",
             quantity: itemQuantity,
             kind: c.kind,
+            crust: c.crust,
+            toppings: c.toppings,
+            meals: c.meals,
+            extraCheese: c.extraCheese,
             isLimitedOffer: !!c.isLimitedOffer,
             offerToken: c.offerToken,
             offerExpiresAt: c.offerExpiresAt,
@@ -359,9 +371,15 @@ export default function Cart() {
     }
   }
 
-  const handlingCharge = subtotal > 0 ? 35 : 0
-  const cgst = subtotal > 0 ? Number(((subtotal - discount + handlingCharge) * 0.025).toFixed(2)) : 0
-  const sgst = subtotal > 0 ? Number(((subtotal - discount + handlingCharge) * 0.025).toFixed(2)) : 0
+  // Fees are set by the super admin; the server charges the same numbers (delivery by distance is estimated here)
+  const freeDelivery = (fees.freeDeliveryUpTo > 0 && subtotal >= fees.freeDeliveryUpTo) || (fees.freeDeliveryThreshold > 0 && subtotal >= fees.freeDeliveryThreshold)
+  const handlingCharge = subtotal > 0
+    ? Number((fees.handlingFee + fees.platformFee + fees.packagingFee + (freeDelivery ? 0 : fees.deliveryFee)).toFixed(2))
+    : 0
+  const gstShare = fees.gstRate / 2
+  const taxable = subtotal - discount + (subtotal > 0 ? fees.handlingFee : 0)
+  const cgst = subtotal > 0 ? Number((taxable * gstShare / 100).toFixed(2)) : 0
+  const sgst = cgst
   const taxesAndCharges = subtotal > 0 ? Number((handlingCharge + cgst + sgst).toFixed(2)) : 0
 
   let giftCardValue = 0
@@ -708,8 +726,8 @@ export default function Cart() {
                       {discount > 0 && <BillRow label="Coupon discount" value={`-₹${discount}`} positive />}
                       {giftCardValue > 0 && <BillRow label="Gift card" value={`-₹${giftCardValue}`} positive />}
                       <BillRow label="Restaurant handling charges" value={`₹${handlingCharge}`} />
-                      <BillRow label="CGST (2.5%)" value={`₹${cgst}`} />
-                      <BillRow label="SGST (2.5%)" value={`₹${sgst}`} />
+                      <BillRow label={`CGST (${gstShare}%)`} value={`₹${cgst}`} />
+                      <BillRow label={`SGST (${gstShare}%)`} value={`₹${sgst}`} />
                     </div>
                   </motion.div>
                 )}
@@ -771,6 +789,7 @@ export default function Cart() {
         onClose={() => setShowCheckoutModal(false)}
         onOpenGiftCard={() => setShowGiftCardModal(true)}
         cartItems={cartItems}
+        couponCode={appliedCoupon?.code}
         subtotal={subtotal}
         discount={discount}
         handlingCharge={handlingCharge}

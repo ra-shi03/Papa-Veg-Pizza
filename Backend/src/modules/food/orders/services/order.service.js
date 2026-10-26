@@ -32,11 +32,11 @@ import * as foodTransactionService from './foodTransaction.service.js';
 import { reserveFunds, confirmReservation, releaseReservation, rupeesToPaise } from '../../user/services/walletLedger.service.js';
 import { awardOrderPointsSafely, reverseOrderPointsSafely } from '../../user/services/rewards.service.js';
 import { refundCancelledOrderToWallet, recordGatewayRefund } from '../../../../core/payments/refund.service.js';
-import { calculateOrderPricing } from './order-pricing.service.js';
+import { calculateOrderPricing, buildOrderPricing } from './order-pricing.service.js';
 import * as dispatchService from './order-dispatch.service.js';
 import * as deliveryService from './order-delivery.service.js';
 import * as paymentService from './order-payment.service.js';
-import { applyLimitedOffer } from './order-offer.service.js';
+import { spendOfferClaims, releaseOfferClaims } from './order-offer.service.js';
 import { getOrderableStore } from './order-store.service.js';
 import {
   enqueueOrderEvent,
@@ -132,8 +132,11 @@ export async function calculateOrder(userId, dto) {
 
 // ----- Create order -----
 export async function createOrder(userId, dto) {
-  dto = { ...dto, items: applyLimitedOffer(dto.items) };
   const store = await getOrderableStore(dto.storeId);
+
+  // Prices, fees, tax, discount and total are all computed here from the catalogue; the client's are ignored.
+  const priced = await buildOrderPricing(userId, { ...dto, deliveryAddress: dto.address });
+  dto = { ...dto, items: priced.items };
 
 
   const settings = await getDispatchSettings();
@@ -171,7 +174,7 @@ export async function createOrder(userId, dto) {
     if (appConfig.walletEnabled === false && isWallet) {
       throw new ValidationError("Wallet payment option is temporarily disabled.");
     }
-    if (appConfig.couponEnabled === false && (dto.pricing?.couponCode || dto.couponCode)) {
+    if (appConfig.couponEnabled === false && (dto.couponCode || dto.pricing?.couponCode)) {
       throw new ValidationError("Coupon system is currently disabled globally.");
     }
     if (appConfig.scheduledOrdersEnabled === false && dto.scheduledAt) {
@@ -179,48 +182,8 @@ export async function createOrder(userId, dto) {
     }
   }
 
-  // Ensure pricing is present and consistent.
-  const computedSubtotal = (dto.items || []).reduce((sum, item) => {
-    const price = Number(item?.price);
-    const qty = Number(item?.quantity);
-    if (!Number.isFinite(price) || !Number.isFinite(qty)) return sum;
-    return sum + Math.max(0, price) * Math.max(0, qty);
-  }, 0);
-  const normalizedPricing = {
-    subtotal: Number(dto.pricing?.subtotal ?? computedSubtotal),
-    tax: Number(dto.pricing?.tax ?? 0),
-    packagingFee: Number(dto.pricing?.packagingFee ?? 0),
-    deliveryFee: Number(dto.pricing?.deliveryFee ?? 0),
-    platformFee: Number(dto.pricing?.platformFee ?? 0),
-    discount: Number(dto.pricing?.discount ?? 0),
-    total: Number(dto.pricing?.total ?? 0),
-    currency: String(dto.pricing?.currency || "INR"),
-  };
-  const computedTotal = Math.max(
-    0,
-    (Number.isFinite(normalizedPricing.subtotal)
-      ? normalizedPricing.subtotal
-      : 0) +
-      (Number.isFinite(normalizedPricing.tax) ? normalizedPricing.tax : 0) +
-      (Number.isFinite(normalizedPricing.packagingFee)
-        ? normalizedPricing.packagingFee
-        : 0) +
-      (Number.isFinite(normalizedPricing.deliveryFee)
-        ? normalizedPricing.deliveryFee
-        : 0) +
-      (Number.isFinite(normalizedPricing.platformFee)
-        ? normalizedPricing.platformFee
-        : 0) -
-      (Number.isFinite(normalizedPricing.discount)
-        ? normalizedPricing.discount
-        : 0),
-  );
-  if (
-    !Number.isFinite(normalizedPricing.total) ||
-    normalizedPricing.total <= 0
-  ) {
-    normalizedPricing.total = computedTotal;
-  }
+  const { subtotal, tax, packagingFee, deliveryFee, platformFee, handlingFee, cancellationFee, cancellationFreeMinutes, discount, total, currency } = priced.pricing;
+  const normalizedPricing = { subtotal, tax, packagingFee, deliveryFee, platformFee, handlingFee, cancellationFee, cancellationFreeMinutes, discount, total, currency };
 
   const payment = {
     method: paymentMethod,
@@ -259,6 +222,7 @@ export async function createOrder(userId, dto) {
     0,
     (Number.isFinite(normalizedPricing.deliveryFee) ? normalizedPricing.deliveryFee : 0) +
       (Number.isFinite(normalizedPricing.platformFee) ? normalizedPricing.platformFee : 0) +
+      (Number.isFinite(normalizedPricing.handlingFee) ? normalizedPricing.handlingFee : 0) +
       storeCommission -
       riderEarning,
   );
@@ -331,7 +295,10 @@ export async function createOrder(userId, dto) {
     });
   }
 
+  // Each limited-time-offer token buys one order only; spent just before the save, given back if it fails.
+  let spentOfferClaims = [];
   try {
+    spentOfferClaims = await spendOfferClaims(userId, priced.offerClaims, order._id);
     await order.save();
     if (walletHold) {
       await confirmReservation({
@@ -342,6 +309,7 @@ export async function createOrder(userId, dto) {
       });
     }
   } catch (err) {
+    await releaseOfferClaims(spentOfferClaims);
     if (walletHold) {
       await releaseReservation({
         userId,
@@ -400,9 +368,7 @@ export async function createOrder(userId, dto) {
   } catch {
     // Don't block order placement on socket failures.
   }
-  const couponCode = dto.pricing?.couponCode
-    ? String(dto.pricing.couponCode).trim().toUpperCase()
-    : "";
+  const couponCode = priced.pricing.appliedCoupon?.code || "";
   if (couponCode) {
     const offer = await FoodOffer.findOne({ couponCode }).lean();
     if (offer) {
@@ -831,8 +797,20 @@ export async function cancelOrder(orderId, userId, reason, refundDestination = "
   const hasRefundProcessed =
     String(order.payment?.refund?.status || "none").toLowerCase() === "processed";
 
+  // Cancellation fee: only prepaid orders (nothing is collected on COD), only after the free window set by
+  // the super admin (snapshotted on the order). The customer gets the total back minus the fee.
+  const isPrepaid = paymentStatus === "paid" && (paymentMethod === "razorpay" || paymentMethod === "wallet");
+  const minutesSincePlaced = (Date.now() - new Date(order.createdAt).getTime()) / 60000;
+  const cancellationFee =
+    isPrepaid && minutesSincePlaced > (Number(order.pricing?.cancellationFreeMinutes) || 0)
+      ? Math.min(Number(order.pricing?.cancellationFee) || 0, order.pricing.total)
+      : 0;
+  const refundAmount = Math.max(0, order.pricing.total - cancellationFee);
+  if (order.pricing) order.pricing.cancellationFeeCharged = cancellationFee;
+
   // ✅ NEW: Automated Razorpay Refund on User Cancel
   if (
+    refundAmount > 0 &&
     paymentStatus === "paid" &&
     paymentMethod === "razorpay" &&
     order.payment?.razorpay?.paymentId &&
@@ -843,19 +821,20 @@ export async function cancelOrder(orderId, userId, reason, refundDestination = "
         await refundCancelledOrderToWallet(order, {
           description: `Refund for cancelled order #${order.order_id || order._id}`,
           reason: reason || "Order cancelled by customer",
+          amount: refundAmount,
         });
         order.payment.status = "refunded";
         order.payment.refund = {
           status: "processed",
           destination: "wallet",
-          amount: order.pricing.total,
+          amount: refundAmount,
           refundId: "",
           processedAt: new Date()
         };
       } else {
         const refundResult = await initiateRazorpayRefund(
           order.payment.razorpay.paymentId,
-          order.pricing.total
+          refundAmount
         );
 
         if (refundResult.success) {
@@ -863,7 +842,7 @@ export async function cancelOrder(orderId, userId, reason, refundDestination = "
           order.payment.refund = {
             status: "processed",
             destination: "source",
-            amount: order.pricing.total,
+            amount: refundAmount,
             refundId: refundResult.refundId,
             processedAt: new Date()
           };
@@ -872,7 +851,7 @@ export async function cancelOrder(orderId, userId, reason, refundDestination = "
           order.payment.refund = {
             status: "failed",
             destination: "source",
-            amount: order.pricing.total
+            amount: refundAmount
           };
         }
         await recordGatewayRefund(order, {
@@ -880,6 +859,7 @@ export async function cancelOrder(orderId, userId, reason, refundDestination = "
           gatewayRefundId: refundResult.refundId,
           reason: reason || "Order cancelled by customer",
           error: refundResult.error,
+          amount: refundAmount,
         });
       }
     } catch (err) {
@@ -887,10 +867,11 @@ export async function cancelOrder(orderId, userId, reason, refundDestination = "
       order.payment.refund = {
         status: "failed",
         destination: normalizedRefundDestination,
-        amount: order.pricing.total,
+        amount: refundAmount,
       };
     }
   } else if (
+    refundAmount > 0 &&
     paymentStatus === "paid" &&
     paymentMethod === "wallet" &&
     !hasRefundProcessed
@@ -899,17 +880,18 @@ export async function cancelOrder(orderId, userId, reason, refundDestination = "
       await refundCancelledOrderToWallet(order, {
         description: `Refund for cancelled order #${order.order_id || order._id}`,
         reason: reason || "Order cancelled by customer",
+        amount: refundAmount,
       });
       order.payment.status = "refunded";
       order.payment.refund = {
         status: "processed",
         destination: "wallet",
-        amount: order.pricing.total,
+        amount: refundAmount,
         processedAt: new Date()
       };
     } catch (err) {
       console.error(`Wallet refund processing error for Order ${orderId}:`, err);
-      order.payment.refund = { status: "failed", destination: "wallet", amount: order.pricing.total };
+      order.payment.refund = { status: "failed", destination: "wallet", amount: refundAmount };
     }
   }
 
@@ -952,8 +934,8 @@ export async function cancelOrder(orderId, userId, reason, refundDestination = "
       : "source";
   const refundDetail = isOnlinePaid
     ? settledRefundDestination === "wallet"
-      ? ` Your refund of ₹${order.pricing.total} has been credited to your wallet.`
-      : ` Your refund of ₹${order.pricing.total} is being processed and will be credited to your original payment method within 5-7 working days.`
+      ? ` Your refund of ₹${refundAmount} has been credited to your wallet.`
+      : ` Your refund of ₹${refundAmount} is being processed and will be credited to your original payment method within 5-7 working days.`
     : "";
   
   await notifyOwnersSafely(

@@ -1873,6 +1873,8 @@ export async function getFeeSettings() {
     return { feeSettings: doc || null };
 }
 
+const EXTRA_FEE_FIELDS = ['handlingFee', 'cancellationFee', 'cancellationFreeMinutes'];
+
 export async function upsertFeeSettings(body) {
     // Single active doc pattern: keep only one active record.
     const existing = await FoodFeeSettings.findOne({ isActive: true }).sort({ createdAt: -1 });
@@ -1900,6 +1902,11 @@ export async function upsertFeeSettings(body) {
         if (body.gstRate === null) $unset.gstRate = 1;
         else if (body.gstRate !== undefined) $set.gstRate = body.gstRate;
 
+        for (const key of EXTRA_FEE_FIELDS) {
+            if (body[key] === null) $unset[key] = 1;
+            else if (body[key] !== undefined) $set[key] = body[key];
+        }
+
         if (body.isActive !== undefined) $set.isActive = body.isActive;
 
         const update = {};
@@ -1921,6 +1928,9 @@ export async function upsertFeeSettings(body) {
     if (body.platformFee !== undefined && body.platformFee !== null) payload.platformFee = body.platformFee;
     if (body.packagingFee !== undefined && body.packagingFee !== null) payload.packagingFee = body.packagingFee;
     if (body.gstRate !== undefined && body.gstRate !== null) payload.gstRate = body.gstRate;
+    for (const key of EXTRA_FEE_FIELDS) {
+        if (body[key] !== undefined && body[key] !== null) payload[key] = body[key];
+    }
 
     const created = await FoodFeeSettings.create(payload);
     return created.toObject();

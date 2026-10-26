@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 import { CartConfig } from '../models/cartConfig.model.js';
@@ -27,7 +28,7 @@ const normalizeAddonType = (raw = '') => {
     return t || 'other';
 };
 
-const addonPrice = (addon, sizeName = '') => {
+export const addonPrice = (addon, sizeName = '') => {
     const prices = Array.isArray(addon.prices) ? addon.prices : [];
     const wanted = String(sizeName || '').trim().toLowerCase();
     const match =
@@ -346,6 +347,10 @@ export const getCartSuggestions = async (req, res, next) => {
 // ---------------------------------------------------------------------------------------------
 
 const OFFER_TOKEN_AUDIENCE = 'cart-offer';
+// Offer tokens never share a key with login tokens. Without OFFER_TOKEN_SECRET a separate key is derived,
+// so a token signed for one purpose can never verify for the other.
+const offerTokenKey = () => envConfig.offerTokenSecret ||
+    crypto.createHmac('sha256', String(envConfig.jwtAccessSecret)).update('pvp:cart-offer-token:v1').digest('hex');
 
 export const claimCartOffer = async (req, res, next) => {
     try {
@@ -359,10 +364,11 @@ export const claimCartOffer = async (req, res, next) => {
         }
 
         const expiresAt = Date.now() + cfg.offer.expiryMinutes * 60 * 1000;
+        // Bound to the signed-in user and given a unique id so the order can spend it exactly once.
         const token = jwt.sign(
-            { itemId: offerItem.id, price: offerItem.price },
-            envConfig.jwtAccessSecret,
-            { audience: OFFER_TOKEN_AUDIENCE, expiresIn: `${cfg.offer.expiryMinutes}m` }
+            { itemId: offerItem.id, price: offerItem.price, uid: String(req.user.userId) },
+            offerTokenKey(),
+            { algorithm: 'HS256', audience: OFFER_TOKEN_AUDIENCE, expiresIn: `${cfg.offer.expiryMinutes}m`, jwtid: crypto.randomUUID() }
         );
 
         return sendResponse(res, 200, 'Offer unlocked', {
@@ -378,12 +384,18 @@ export const claimCartOffer = async (req, res, next) => {
     }
 };
 
-// Used by order creation: returns the trusted offer price for an item, or null if the claim is invalid/expired.
-export const verifyOfferClaim = (token, itemId) => {
+// Used by order creation: returns the trusted claim ({ price, jti, expiresAt }) for an item, or null if the
+// token is invalid, expired, for another item or was issued to another user.
+export const verifyOfferClaim = (token, itemId, userId) => {
     try {
-        const decoded = jwt.verify(token, envConfig.jwtAccessSecret, { audience: OFFER_TOKEN_AUDIENCE });
-        return String(decoded.itemId) === String(itemId) ? Number(decoded.price) : null;
+        const decoded = jwt.verify(token, offerTokenKey(), { algorithms: ['HS256'], audience: OFFER_TOKEN_AUDIENCE });
+        if (String(decoded.itemId) !== String(itemId)) return null;
+        if (!decoded.uid || !decoded.jti || String(decoded.uid) !== String(userId)) return null;
+        return { price: Number(decoded.price), jti: decoded.jti, expiresAt: new Date(decoded.exp * 1000) };
     } catch {
         return null;
     }
 };
+
+// The minimum cart value the offer needs, read fresh so order creation can re-check it against the server subtotal.
+export const getOfferMinCartValue = async () => Number((await getOrCreate()).offer?.minCartValue) || 0;

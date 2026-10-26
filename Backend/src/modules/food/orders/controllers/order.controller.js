@@ -1,6 +1,7 @@
 import { sendResponse } from '../../../../utils/response.js';
 import { scopedStoreIds } from '../../shared/franchiseScope.js';
 import * as orderService from '../services/order.service.js';
+import { getPublicFeeConfig } from '../services/order-pricing.service.js';
 import * as foodOrderPaymentService from '../services/foodOrderPayment.service.js';
 import { HomePage } from '../../settings/models/homePage.model.js';
 import {
@@ -13,6 +14,14 @@ import {
     validateDispatchSettingsDto,
     validateOrderRatingsDto
 } from '../validators/order.validator.js';
+
+export async function getFeeConfigController(req, res, next) {
+    try {
+        return sendResponse(res, 200, 'Fee configuration retrieved', await getPublicFeeConfig());
+    } catch (err) {
+        next(err);
+    }
+}
 
 export async function calculateOrderController(req, res, next) {
     try {

@@ -7,30 +7,60 @@ import { FoodOfferUsage } from '../../admin/models/offerUsage.model.js';
 import { FoodAppConfig } from '../../settings/models/appConfig.model.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { haversineKm } from './order.helpers.js';
-import { applyLimitedOffer } from './order-offer.service.js';
+import { priceCartItems } from './catalog-pricing.service.js';
 import { getOrderableStore } from './order-store.service.js';
 
+const DEFAULT_FEES = {
+  deliveryFee: 25,
+  deliveryFeeRanges: [],
+  freeDeliveryUpTo: 0,
+  freeDeliveryThreshold: 149,
+  platformFee: 5,
+  packagingFee: 0,
+  handlingFee: 0,
+  cancellationFee: 0,
+  cancellationFreeMinutes: 0,
+  gstRate: 5,
+};
+
+// The fees the super admin configured (the built-in defaults apply only until they save any).
+async function loadFeeSettings() {
+  const doc = await FoodFeeSettings.findOne({ isActive: true }).sort({ createdAt: -1 }).lean();
+  // Once the super admin has saved settings, a field they left blank means 0, not the built-in default.
+  return doc || DEFAULT_FEES;
+}
+
+// Public view of the fees, so the cart can show the same numbers the server will charge.
+export async function getPublicFeeConfig() {
+  const f = await loadFeeSettings();
+  const pick = (k) => Number(f[k]) || 0;
+  return {
+    deliveryFee: pick('deliveryFee'),
+    deliveryFeeRanges: f.deliveryFeeRanges || [],
+    freeDeliveryUpTo: pick('freeDeliveryUpTo'),
+    freeDeliveryThreshold: pick('freeDeliveryThreshold'),
+    platformFee: pick('platformFee'),
+    packagingFee: pick('packagingFee'),
+    handlingFee: pick('handlingFee'),
+    gstRate: pick('gstRate'),
+    cancellationFee: pick('cancellationFee'),
+    cancellationFreeMinutes: pick('cancellationFreeMinutes'),
+  };
+}
+
+// Quote for a quick price check. Nothing is spent here.
 export async function calculateOrderPricing(userId, dto) {
+  const { pricing } = await buildOrderPricing(userId, dto);
+  return { pricing };
+}
+
+// Everything is rebuilt from the catalogue and the fee settings; prices and totals sent by the client are ignored.
+export async function buildOrderPricing(userId, dto) {
   const store = await getOrderableStore(dto.storeId);
 
-  const items = applyLimitedOffer(dto.items);
-  const subtotal = items.reduce(
-    (sum, it) => sum + (Number(it.price) || 0) * (Number(it.quantity) || 1),
-    0,
-  );
+  const { items, subtotal, offerClaims } = await priceCartItems(userId, dto.items);
 
-  const feeDoc = await FoodFeeSettings.findOne({ isActive: true })
-    .sort({ createdAt: -1 })
-    .lean();
-  const feeSettings = feeDoc || {
-    deliveryFee: 25,
-    deliveryFeeRanges: [],
-    freeDeliveryUpTo: 0,
-    freeDeliveryThreshold: 149,
-    platformFee: 5,
-    packagingFee: 0,
-    gstRate: 5,
-  };
+  const feeSettings = await loadFeeSettings();
 
   const packagingFee = feeSettings.packagingFee != null ? Number(feeSettings.packagingFee) : 0;
   const platformFee = feeSettings.platformFee != null ? Number(feeSettings.platformFee) : 0;
@@ -109,11 +139,10 @@ export async function calculateOrderPricing(userId, dto) {
     }
   }
 
+  const handlingFee = Number(feeSettings.handlingFee) > 0 ? Number(feeSettings.handlingFee) : 0;
+  const cancellationFee = Number(feeSettings.cancellationFee) > 0 ? Number(feeSettings.cancellationFee) : 0;
+  const cancellationFreeMinutes = Number(feeSettings.cancellationFreeMinutes) > 0 ? Number(feeSettings.cancellationFreeMinutes) : 0;
   const gstRate = feeSettings.gstRate != null ? Number(feeSettings.gstRate) : 0;
-  const tax =
-    Number.isFinite(gstRate) && gstRate > 0
-      ? Math.round(subtotal * (gstRate / 100))
-      : 0;
 
   let discount = 0;
   let appliedCoupon = null;
@@ -197,12 +226,21 @@ export async function calculateOrderPricing(userId, dto) {
     }
   }
 
+  // GST is charged on the food after discount plus the handling charge (what the cart shows).
+  const taxable = Math.max(0, subtotal - discount + handlingFee);
+  const tax =
+    Number.isFinite(gstRate) && gstRate > 0
+      ? Math.round(taxable * (gstRate / 100))
+      : 0;
+
   const total = Math.max(
     0,
-    subtotal + packagingFee + deliveryFee + platformFee + tax - discount,
+    subtotal + packagingFee + deliveryFee + platformFee + handlingFee + tax - discount,
   );
 
   return {
+    items,
+    offerClaims,
     pricing: {
       subtotal,
       tax,
@@ -211,6 +249,9 @@ export async function calculateOrderPricing(userId, dto) {
       deliveryFeeBreakdown: deliveryFeeBreakdown || undefined,
       freeDeliveryUpTo: Number.isFinite(freeUpTo) ? freeUpTo : undefined,
       platformFee,
+      handlingFee,
+      cancellationFee,
+      cancellationFreeMinutes,
       discount,
       total,
       currency: "INR",

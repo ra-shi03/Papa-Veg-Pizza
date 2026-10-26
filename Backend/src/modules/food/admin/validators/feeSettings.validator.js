@@ -15,6 +15,9 @@ const feeSettingsUpsertSchema = z.object({
     platformFee: z.number().min(0).nullable().optional(),
     packagingFee: z.number().min(0).nullable().optional(),
     gstRate: z.number().min(0).max(100).nullable().optional(),
+    handlingFee: z.number().min(0).nullable().optional(),
+    cancellationFee: z.number().min(0).nullable().optional(),
+    cancellationFreeMinutes: z.number().min(0).nullable().optional(),
     isActive: z.boolean().optional()
 });
 
@@ -53,6 +56,9 @@ export const validateFeeSettingsUpsertDto = (body) => {
             body?.gstRate === null ? null : body?.gstRate !== undefined ? Number(body.gstRate) : undefined,
         isActive: body?.isActive !== undefined ? Boolean(body.isActive) : undefined
     };
+    for (const key of ['handlingFee', 'cancellationFee', 'cancellationFreeMinutes']) {
+        normalized[key] = body?.[key] === null ? null : body?.[key] !== undefined ? Number(body[key]) : undefined;
+    }
 
     const result = feeSettingsUpsertSchema.safeParse(normalized);
     if (!result.success) {

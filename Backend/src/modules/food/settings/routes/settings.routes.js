@@ -108,7 +108,7 @@ import { getCartConfig, updateCartConfig, getCartSuggestions, claimCartOffer } f
 router.get('/cart-config', getCartConfig);
 router.put('/cart-config', authMiddleware, requireSuperAdmin, updateCartConfig);
 router.post('/cart-config/suggestions', getCartSuggestions);
-router.post('/cart-config/offer/claim', claimCartOffer);
+router.post('/cart-config/offer/claim', authMiddleware, claimCartOffer);
 
 export default router;
 

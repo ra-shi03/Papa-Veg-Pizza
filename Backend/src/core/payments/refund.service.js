@@ -56,9 +56,11 @@ async function getRemainingRefundablePaise(order) {
  * order cancelled by user/store). Idempotent per order.
  * @returns {{ amount:number, transaction:object, duplicate:boolean }}
  */
-export async function refundCancelledOrderToWallet(order, { description, reason = 'Order cancelled' } = {}) {
+export async function refundCancelledOrderToWallet(order, { description, reason = 'Order cancelled', amount } = {}) {
     if (!order?._id || !order?.userId) throw new ValidationError('Order not found');
-    const amountPaise = rupeesToPaise(order.pricing?.total || 0);
+    // `amount` lets a caller refund less than the total (e.g. after a cancellation fee); it can never exceed it.
+    const refundRupees = Math.min(Number(amount ?? order.pricing?.total) || 0, Number(order.pricing?.total) || 0);
+    const amountPaise = rupeesToPaise(refundRupees);
     if (!(amountPaise > 0)) throw new ValidationError('Nothing to refund for this order');
 
     const { transaction, duplicate } = await creditWallet({

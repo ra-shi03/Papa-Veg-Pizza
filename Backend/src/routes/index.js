@@ -30,7 +30,7 @@ import storeOrderRoutes from '../modules/food/store/routes/storeOrders.routes.js
 import kitchenTaskRoutes from '../modules/food/store/routes/kitchenTasks.routes.js';
 import { listFranchiseOrders } from '../modules/food/store/controllers/storeOrders.controller.js';
 import { resolveStoreForLocation } from '../modules/food/orders/services/order-store.service.js';
-import { trackOrderPublicController, getOrderHistoryPublicController, getOrderMethodsController } from '../modules/food/orders/controllers/order.controller.js';
+import { trackOrderPublicController, getOrderHistoryPublicController, getOrderMethodsController, getFeeConfigController } from '../modules/food/orders/controllers/order.controller.js';
 import {
   submitInquiryPublic,
   getConfigPublic,
@@ -156,6 +156,9 @@ router.get(['/v1/food/orders/track', '/v1/orders/track', '/v1/food/orders/track-
 // Public Order History route (No Auth Required)
 router.post(['/v1/food/orders/history', '/v1/orders/history', '/v1/food/orders/history-lookup', '/v1/orders/history-lookup'], getOrderHistoryPublicController);
 router.get(['/v1/food/orders/history', '/v1/orders/history', '/v1/food/orders/history-lookup', '/v1/orders/history-lookup'], getOrderHistoryPublicController);
+
+// Public fee configuration (handling, GST, platform fee... set by the super admin)
+router.get(['/v1/food/fee-config', '/v1/fee-config'], getFeeConfigController);
 
 // Public Order Methods route (No Auth Required)
 router.get(['/v1/food/orders/methods', '/v1/orders/methods', '/v1/food/order-methods', '/v1/order-methods'], getOrderMethodsController);

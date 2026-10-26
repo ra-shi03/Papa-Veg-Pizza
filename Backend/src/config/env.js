@@ -28,6 +28,8 @@ export const config = {
     jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
     jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES || '15m',
     jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES || '30d',
+    // Signs limited-time-offer tokens. Kept apart from the access-token secret (see cartConfig.controller.js).
+    offerTokenSecret: process.env.OFFER_TOKEN_SECRET,
 
     // OTP
     otpExpiry: process.env.OTP_EXPIRY || '5m',

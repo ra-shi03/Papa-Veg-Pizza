@@ -59,6 +59,11 @@ const pricingSchema = new mongoose.Schema(
         platformFee: { type: Number, default: 0, min: 0 },
         storeCommission: { type: Number, default: 0, min: 0 },
         discount: { type: Number, default: 0, min: 0 },
+        handlingFee: { type: Number, default: 0, min: 0 },
+        // Cancellation policy as it was when the order was placed, so later fee changes do not touch it.
+        cancellationFee: { type: Number, default: 0, min: 0 },
+        cancellationFreeMinutes: { type: Number, default: 0, min: 0 },
+        cancellationFeeCharged: { type: Number, default: 0, min: 0 },
         total: { type: Number, required: true, min: 0 },
         currency: { type: String, default: 'INR' }
     },

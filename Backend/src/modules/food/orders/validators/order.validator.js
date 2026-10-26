@@ -15,6 +15,9 @@ const orderItemSchema = z.object({
     kind: z.enum(['product', 'addon', 'topping']).optional(),
     size: z.string().optional(),
     crust: z.string().optional(),
+    toppings: z.array(z.string()).optional(),
+    meals: z.array(z.string()).optional(),
+    extraCheese: z.boolean().optional(),
     selectedAddons: z.array(z.object({
         id: z.string().optional(),
         name: z.string().min(1),
@@ -90,7 +93,9 @@ export function validateCreateOrderDto(body) {
         storeName: z.string().optional(),
         customerName: z.string().optional(),
         customerPhone: z.string().optional(),
-        pricing: pricingSchema,
+        // Accepted for older clients but never used: the server prices the order itself.
+        pricing: pricingSchema.partial().optional(),
+        couponCode: z.string().optional(),
         deliveryFleet: z.string().optional(),
         note: z.string().optional(),
         storeNote: z.string().optional(),
