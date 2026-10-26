@@ -6,12 +6,34 @@ import { getWalletSummary, listWalletTransactions } from '../../modules/food/use
 import { getRefundsByOrder, listRefunds } from './refund.service.js';
 import { createSettlement, processSettlement, listSettlements } from './settlement.service.js';
 import { logger } from '../../utils/logger.js';
+import mongoose from 'mongoose';
+import { FoodOrder } from '../../modules/food/orders/models/order.model.js';
+import { NotFoundError } from '../auth/errors.js';
+import { assertStoreInScope, scopedStoreIds } from '../../modules/food/shared/franchiseScope.js';
+
+const roleOf = (req) => String(req.user?.role || '').trim().replace(/_/g, '-').toUpperCase();
+
+// Records outside the caller's reach answer 404, so their existence is not revealed.
+// An order is reachable by the customer who placed it, or by an admin whose scope (set by
+// scopeIfAdmin on the route) includes the order's store. Super admin: any order.
+const assertOrderAccess = async (req, orderId) => {
+    if (!mongoose.isValidObjectId(orderId)) throw new NotFoundError('Order not found');
+    const order = await FoodOrder.findById(orderId).select('userId storeId').lean();
+    if (!order) throw new NotFoundError('Order not found');
+    if (roleOf(req) === 'USER' || roleOf(req) === 'CUSTOMER') {
+        if (String(order.userId) !== String(req.user.userId)) throw new NotFoundError('Order not found');
+        return;
+    }
+    const storeIds = await scopedStoreIds(req);
+    if (storeIds && !storeIds.some((id) => String(id) === String(order.storeId))) throw new NotFoundError('Order not found');
+};
 
 // ─── User Endpoints ───
 
 export const getPaymentHistoryController = async (req, res, next) => {
     try {
         const { orderId } = req.params;
+        await assertOrderAccess(req, orderId);
         const payments = await getPaymentsByOrder(orderId);
         return sendResponse(res, 200, 'Payment history fetched', { payments });
     } catch (err) {
@@ -22,6 +44,7 @@ export const getPaymentHistoryController = async (req, res, next) => {
 export const getOrderTransactionsController = async (req, res, next) => {
     try {
         const { orderId } = req.params;
+        await assertOrderAccess(req, orderId);
         const transactions = await getTransactionsByOrder(orderId);
         return sendResponse(res, 200, 'Transactions fetched', { transactions });
     } catch (err) {
@@ -55,7 +78,14 @@ export const getUserWalletTransactionsController = async (req, res, next) => {
 
 export const getStoreWalletController = async (req, res, next) => {
     try {
-        const storeId = req.user?.storeId || req.params.storeId;
+        // A store manager can only open its own store's wallet; an admin only a store in its franchise
+        let storeId;
+        if (roleOf(req) === 'STORE-MANAGER') {
+            storeId = req.user.storeId;
+            if (!storeId || String(req.params.storeId) !== String(storeId)) throw new NotFoundError('Store not found');
+        } else {
+            storeId = (await assertStoreInScope(req, req.params.storeId))._id;
+        }
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
         const data = await getWalletWithTransactions('store', storeId, { page, limit });
@@ -69,7 +99,11 @@ export const getStoreWalletController = async (req, res, next) => {
 
 export const getDeliveryWalletController = async (req, res, next) => {
     try {
-        const deliveryPartnerId = req.user?.deliveryPartnerId || req.params.deliveryPartnerId;
+        // A delivery partner can only open its own wallet (its id is the token's userId); super admin any
+        const deliveryPartnerId = roleOf(req) === 'DELIVERY-PARTNER' ? req.user.userId : req.params.deliveryPartnerId;
+        if (roleOf(req) === 'DELIVERY-PARTNER' && String(req.params.deliveryPartnerId) !== String(req.user.userId)) {
+            throw new NotFoundError('Delivery partner not found');
+        }
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
         const data = await getWalletWithTransactions('deliveryBoy', deliveryPartnerId, { page, limit });
@@ -167,6 +201,7 @@ export const listRefundsController = async (req, res, next) => {
 export const getRefundsByOrderController = async (req, res, next) => {
     try {
         const { orderId } = req.params;
+        await assertOrderAccess(req, orderId);
         const refunds = await getRefundsByOrder(orderId);
         return sendResponse(res, 200, 'Refunds fetched', { refunds });
     } catch (err) {

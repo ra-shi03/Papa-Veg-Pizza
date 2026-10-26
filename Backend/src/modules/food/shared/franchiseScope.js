@@ -36,6 +36,10 @@ export const attachFranchiseScope = (req, res, next) => {
     return sendError(res, 403, 'Admin access required');
 };
 
+/** Like attachFranchiseScope, but only for admins: other roles (customers, partners) pass through untouched. */
+export const scopeIfAdmin = (req, res, next) =>
+    isSuperAdmin(req.user) || normalizeRole(req.user?.role) === 'FRANCHISE-ADMIN' ? attachFranchiseScope(req, res, next) : next();
+
 const scopeOf = (req) => {
     if (!req.franchiseScope) throw new Error('attachFranchiseScope must run before scoped handlers');
     return req.franchiseScope;
