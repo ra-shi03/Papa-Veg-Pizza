@@ -15,7 +15,7 @@
     "migrate:fcm-tokens": "node scripts/migrate-fcm-tokens-to-profile-models.js",
     "migrate:order-payments": "node scripts/migrate-orders-to-transactions.js",
     "cleanup:legacy-collections": "node scripts/cleanup-legacy-collections.js",
-    "test": "node --test --test-concurrency=1 --test-force-exit --test-timeout=240000 \"test/**/*.test.js\"",
+    "test": "node --test --test-concurrency=1 --test-timeout=240000 \"test/**/*.test.js\"",
     "test:cleanup": "node test/cleanup-test-dbs.js"
   },
   "keywords": [],

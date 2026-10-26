@@ -45,6 +45,18 @@ async function build(ctx) {
     await mongoose.connect(uri, { dbName, serverSelectionTimeoutMS: 20000 });
     if (mongoose.connection.name !== dbName) throw new Error(`connected to ${mongoose.connection.name}, expected ${dbName}`);
 
+    // Housekeeping: a run that was killed or force-exited can leave its database behind, and the cluster
+    // has a hard cap on collections. Drop our own leftovers (pvp_test_<pid>_<base36 time>) older than 30 min.
+    try {
+        const { databases } = await mongoose.connection.db.admin().listDatabases();
+        for (const { name } of databases) {
+            const m = /^pvp_test_\d+_([0-9a-z]+)$/.exec(name);
+            if (m && name !== dbName && Date.now() - parseInt(m[1], 36) > 30 * 60 * 1000) {
+                await mongoose.connection.client.db(name).dropDatabase();
+            }
+        }
+    } catch { /* housekeeping only; never fail a run because of it */ }
+
     const { default: app } = await import('../../src/app.js');
     const m = async (path, name) => (await import(`../../src/${path}`))[name];
     const User = await m('core/users/models/user.model.js', 'User');

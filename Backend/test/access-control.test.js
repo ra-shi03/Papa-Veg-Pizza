@@ -107,7 +107,7 @@ runMatrix('/v1/food/payments: role gate per route group', [
     ['GET', '/v1/food/payments/wallet/transactions', ['customer']],
     ['GET', '/v1/food/payments/orders/64b000000000000000000001/payments', ['customer', ...ADMINS]],
     ['GET', '/v1/food/payments/store/64b000000000000000000001/wallet', ['store-manager', ...ADMINS]],
-    ['GET', '/v1/food/payments/delivery/64b000000000000000000001/wallet', ['delivery', ...ADMINS]],
+    ['GET', '/v1/food/payments/delivery/64b000000000000000000001/wallet', ['delivery', ...SUPER]],
     ['GET', '/v1/food/payments/admin/wallet', SUPER],
     ['GET', '/v1/food/payments/admin/finance/summary', SUPER],
     ['GET', '/v1/food/payments/admin/settlements', SUPER],
