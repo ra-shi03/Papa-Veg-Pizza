@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { KitchenTask } from '../models/kitchenTask.model.js';
+import { notifyUsers } from './kitchenTasks.service.js';
 import { FoodStore } from '../../store/models/store.model.js';
 import { StoreManager } from '../../franchise/models/storeManager.model.js';
 import { UserRole } from '../../../../core/roles/models/userRole.model.js';
@@ -370,12 +371,17 @@ export async function acceptOrder(user, orderId, payload = {}) {
   logStep(fresh, user, `Assigned to kitchen supervisor ${member.name}`);
   await fresh.save();
 
-  await KitchenTask.create({
+  const supervisorTask = await KitchenTask.create({
     orderId: fresh._id,
     storeId: toObjectId(storeId),
     assignedTo: member.userId,
     assignedBy: toObjectId(user.userId),
+    kind: 'supervisor',
     notes: payload.notes || '',
+  });
+  await notifyUsers({
+    userIds: [member.userId], storeId, taskId: supervisorTask._id, type: 'task_assigned',
+    title: 'New Order To Supervise', message: `Order ${fresh.order_id || fresh._id} was assigned to you.`,
   });
   return toOpsOrder(await reload(order._id, storeId));
 }
@@ -421,11 +427,22 @@ export async function assignStaff(user, orderId, payload = {}) {
   logStep(order, user, `${member.name} assigned as ${slot.replace(/_/g, ' ')}`);
   await order.save();
 
-  await KitchenTask.findOneAndUpdate(
-    { orderId: order._id, assignedTo: member.userId },
-    { $setOnInsert: { storeId: toObjectId(storeId), assignedBy: toObjectId(user.userId), status: 'pending' } },
-    { upsert: true },
-  );
+  // Someone else's unstarted task for this station is withdrawn when the station changes hands
+  await KitchenTask.deleteMany({ orderId: order._id, kind: 'staff', slot, status: 'pending', assignedTo: { $ne: member.userId } });
+  if (!(await KitchenTask.exists({ orderId: order._id, assignedTo: member.userId }))) {
+    const task = await KitchenTask.create({
+      orderId: order._id,
+      storeId: toObjectId(storeId),
+      assignedTo: member.userId,
+      assignedBy: toObjectId(user.userId),
+      kind: 'staff',
+      slot,
+    });
+    await notifyUsers({
+      userIds: [member.userId], storeId, taskId: task._id, type: 'task_assigned',
+      title: 'New Task Assigned', message: `Order ${order.order_id || order._id} was assigned to your station.`,
+    });
+  }
   return toOpsOrder(await reload(order._id, storeId));
 }
 
