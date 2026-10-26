@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { config } from '../../../config/env.js';
+import { isBcryptHash } from '../../../utils/password.js';
 
 const userSchema = new mongoose.Schema({
 
@@ -8,6 +10,16 @@ const userSchema = new mongoose.Schema({
         required: true,
         unique: true,
         trim: true
+    },
+    // Login identifier for admin-panel accounts (customers sign in by mobile + OTP and have none).
+    // Without this path Mongoose's strict mode silently drops `email` from User.create(), so staff
+    // accounts could never be found by the email login.
+    email: {
+        type: String,
+        unique: true,
+        sparse: true,       // allows many accounts with no email
+        trim: true,
+        lowercase: true
     },
     password: {
         type: String,
@@ -85,8 +97,13 @@ userSchema.index({ mobile: 1, isDeleted: 1 }, { name: 'idx_mobile_active' });
 userSchema.index({ primaryRole: 1, isActive: 1, isDeleted: 1 }, { name: 'idx_role_active' });
 userSchema.index({ isActive: 1, isDeleted: 1 });
 
+// Hash plaintext passwords on save. A value that is already a bcrypt hash (controllers that hash
+// first) is left alone, so nothing is ever double-hashed.
 userSchema.pre('save', async function (next) {
-    // Password hashing has been moved to controllers to prevent double-hashing issues.
+    if (!this.isModified('password') || !this.password || isBcryptHash(this.password)) {
+        return next();
+    }
+    this.password = await bcrypt.hash(this.password, config.bcryptSaltRounds);
     return next();
 });
 

@@ -5,6 +5,7 @@ import { UserRole } from '../../../../core/roles/models/userRole.model.js';
 import { StoreManager } from '../../franchise/models/storeManager.model.js';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
+import { assertPasswordStrength } from '../../../../utils/password.js';
 
 // Role code → DB role mapping for kitchen staff
 const ALLOWED_STAFF_ROLES = {
@@ -40,6 +41,13 @@ export const createKitchenStaff = async (req, res) => {
     if (!fullName || !email || !phone || !password) {
       await session.abortTransaction();
       return res.status(400).json({ success: false, message: 'Full name, email, phone, and password are required.' });
+    }
+
+    try {
+      assertPasswordStrength(password);
+    } catch (passwordError) {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, message: passwordError.message });
     }
 
     if (!callerStoreId) {

@@ -13,6 +13,19 @@ const baseURL =
     ? String(import.meta.env.VITE_API_BASE_URL).replace(/\/$/, "")
     : "/api/v1";
 
+// Dev-only safety net: when the backend 404s or is unreachable, requests are answered from
+// mockService instead, which hides endpoints that don't exist yet. Set VITE_USE_MOCK=false in
+// Frontend/.env to turn the fallback off and see what really works.
+// VITE_STANDALONE_MOCK=true (no backend at all) always keeps the mock on.
+const mockFallbackEnabled =
+  typeof import.meta !== "undefined" &&
+  ((import.meta.env?.DEV && import.meta.env?.VITE_USE_MOCK !== "false") ||
+    import.meta.env?.VITE_STANDALONE_MOCK === "true");
+
+if (typeof import.meta !== "undefined" && import.meta.env?.DEV) {
+  console.info(`[API] mock fallback ${mockFallbackEnabled ? "ON (set VITE_USE_MOCK=false to disable)" : "OFF - real backend errors are shown"}`);
+}
+
 const mockAdapter = (config) => {
   return new Promise((resolve, reject) => {
     try {
@@ -163,8 +176,7 @@ function createModuleClient(moduleName) {
       
       // Standalone mock fallback for network/404/5xx errors in dev mode
       const isNetworkOr404 = !err.response || err.response.status === 404 || err.response.status === 502 || err.response.status === 504;
-      const isDev = typeof import.meta !== "undefined" && (import.meta.env?.DEV || import.meta.env?.VITE_STANDALONE_MOCK === "true");
-      if (isNetworkOr404 && isDev && original && !original._isFallback) {
+      if (isNetworkOr404 && mockFallbackEnabled && original && !original._isFallback) {
         original._isFallback = true;
         console.warn(`[Axios Client: ${moduleName}] Failed: ${err.message}. Falling back to mock data...`);
         try {
@@ -219,6 +231,11 @@ function createModuleClient(moduleName) {
 
         if (newAccessToken) {
           localStorage.setItem(`${moduleName}_accessToken`, newAccessToken);
+          // Refresh tokens rotate: the response carries the new one, the old one stops working shortly
+          const newRefreshToken = data?.data?.refreshToken || data?.refreshToken;
+          if (newRefreshToken) {
+            localStorage.setItem(`${moduleName}_refreshToken`, newRefreshToken);
+          }
           window.dispatchEvent(new CustomEvent("authRefreshed", { 
             detail: { module: moduleName, token: newAccessToken } 
           }));
@@ -312,8 +329,7 @@ apiClient.interceptors.response.use(
     
     // Standalone mock fallback for network/404/5xx errors in dev mode
     const isNetworkOr404 = !err.response || err.response.status === 404 || err.response.status === 502 || err.response.status === 504;
-    const isDev = typeof import.meta !== "undefined" && (import.meta.env?.DEV || import.meta.env?.VITE_STANDALONE_MOCK === "true");
-    if (isNetworkOr404 && isDev && original && !original._isFallback) {
+    if (isNetworkOr404 && mockFallbackEnabled && original && !original._isFallback) {
       original._isFallback = true;
       console.warn(`[Axios Client: legacy] Failed: ${err.message}. Falling back to mock data...`);
       try {

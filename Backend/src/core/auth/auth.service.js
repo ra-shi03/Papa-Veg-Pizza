@@ -20,6 +20,7 @@ import { ValidationError, AuthError } from "./errors.js";
 import { config } from "../../config/env.js";
 import { logger } from "../../utils/logger.js";
 import { sendAdminResetOtpEmail } from "../../utils/email.js";
+import { assertPasswordStrength } from "../../utils/password.js";
 import mongoose from "mongoose";
 import { creditReferralReward } from "../../modules/food/user/services/userWallet.service.js";
 
@@ -250,6 +251,51 @@ export const verifyUserOtpAndLogin = async (
     isNewUser,
   };
 };
+/** Normalized admin-panel role of a user (primaryRole populated), or null if not an admin-panel role. */
+const adminRoleOf = (user) => {
+  let role = normalizeAdminRole(user?.primaryRole?.code);
+  // Normalize SUPER_ADMIN -> superadmin
+  if (role === 'super-admin' || role === 'super_admin') role = 'superadmin';
+  return ADMIN_PANEL_ROLES.has(role) ? role : null;
+};
+
+/**
+ * Franchise/store scope of an admin-panel account, read fresh from the DB (userRoles, then the
+ * staff record). Used at login and again on every token refresh, so a role or scope change takes
+ * effect on the next refresh instead of lasting until the old token expires.
+ */
+const resolveAdminScope = async (user, role) => {
+  const activeUserRole = await UserRole.findOne({
+    userId: user._id,
+    roleId: user.primaryRole._id,
+    status: 'ACTIVE'
+  }).lean();
+
+  let storeId = activeUserRole?.storeId?.toString() || null;
+  let franchiseId = activeUserRole?.franchiseId?.toString() || null;
+  let storeName = null;
+
+  // Normalize role to UPPER_SNAKE_CASE (handles kitchen-staff, KITCHEN_STAFF, kitchen_staff etc.)
+  const normalizedLoginRole = role ? role.toUpperCase().replace(/-/g, '_') : '';
+  const normalizedPrimaryCode = user.primaryRole?.code ? user.primaryRole.code.toUpperCase().replace(/-/g, '_') : '';
+
+  if (['STORE_MANAGER', 'KITCHEN_STAFF', 'KITCHEN_SUPERVISOR'].includes(normalizedLoginRole) ||
+      ['STORE_MANAGER', 'KITCHEN_STAFF', 'KITCHEN_SUPERVISOR'].includes(normalizedPrimaryCode)) {
+    // Try userId first, then email. Never query by a missing email: `{ email: undefined }`
+    // is dropped by Mongoose and the filter would match an arbitrary staff record.
+    const identity = [{ userId: user._id }];
+    if (user.email) identity.push({ email: user.email });
+    const staffRecord = await StoreManager.findOne({ $or: identity }).lean();
+    if (staffRecord) {
+      if (staffRecord.storeId && !storeId) storeId = staffRecord.storeId.toString();
+      if (staffRecord.franchiseId && !franchiseId) franchiseId = staffRecord.franchiseId.toString();
+      if (staffRecord.storeName) storeName = staffRecord.storeName;
+    }
+  }
+
+  return { storeId, franchiseId, storeName };
+};
+
 export const adminLogin = async ({ email, mobile, password } = {}, allowedRoles = null) => {
   if ((!email && !mobile) || !password) {
     throw new ValidationError("Email/mobile and password are required");
@@ -288,11 +334,8 @@ export const adminLogin = async ({ email, mobile, password } = {}, allowedRoles 
     throw new AuthError("This account has no roles assigned. Contact Super Admin.");
   }
 
-  let role = normalizeAdminRole(user.primaryRole.code);
-  // Normalize SUPER_ADMIN -> superadmin
-  if (role === 'super-admin' || role === 'super_admin') role = 'superadmin';
-
-  if (!ADMIN_PANEL_ROLES.has(role)) {
+  const role = adminRoleOf(user);
+  if (!role) {
     throw new AuthError("This account is not allowed to access admin panels");
   }
 
@@ -300,35 +343,12 @@ export const adminLogin = async ({ email, mobile, password } = {}, allowedRoles 
     throw new AuthError("Access denied: Insufficient permissions for this portal");
   }
 
-  // Fetch the active userRole to get franchiseId + storeId for JWT
-  // This is the production-correct approach: context-aware JWT payload
-  const activeUserRole = await UserRole.findOne({
-    userId: user._id,
-    roleId: user.primaryRole._id,
-    status: 'ACTIVE'
-  }).lean();
-
-  let storeId = activeUserRole?.storeId?.toString() || null;
-  let franchiseId = activeUserRole?.franchiseId?.toString() || null;
-  let storeName = null;
+  // Franchise + store scope for the JWT (context-aware payload), read from the DB
+  const scope = await resolveAdminScope(user, role);
+  let storeId = scope.storeId;
+  let franchiseId = scope.franchiseId;
+  let storeName = scope.storeName;
   let storeCode = null;
-
-  // Normalize role to UPPER_SNAKE_CASE (handles kitchen-staff, KITCHEN_STAFF, kitchen_staff etc.)
-  const normalizedLoginRole = role ? role.toUpperCase().replace(/-/g, '_') : '';
-  const normalizedPrimaryCode = user.primaryRole?.code ? user.primaryRole.code.toUpperCase().replace(/-/g, '_') : '';
-
-  if (['STORE_MANAGER', 'KITCHEN_STAFF', 'KITCHEN_SUPERVISOR'].includes(normalizedLoginRole) ||
-      ['STORE_MANAGER', 'KITCHEN_STAFF', 'KITCHEN_SUPERVISOR'].includes(normalizedPrimaryCode)) {
-    // Try userId first, then email (FoodUser vs User collection mismatch)
-    const staffRecord = await StoreManager.findOne({
-      $or: [{ userId: user._id }, { email: user.email }]
-    }).lean();
-    if (staffRecord) {
-      if (staffRecord.storeId && !storeId) storeId = staffRecord.storeId.toString();
-      if (staffRecord.franchiseId && !franchiseId) franchiseId = staffRecord.franchiseId.toString();
-      if (staffRecord.storeName) storeName = staffRecord.storeName;
-    }
-  }
 
   // If storeId is available (from UserRole or StoreManager), always fetch fresh store name
   if (storeId && !storeName) {
@@ -874,15 +894,10 @@ export const changeAdminPassword = async (
   if (!isMatch) {
     throw new AuthError("Current password is incorrect");
   }
-  if (!newPassword || String(newPassword).length < 6) {
-    throw new ValidationError("New password must be at least 6 characters");
-  }
+  assertPasswordStrength(newPassword, "New password");
 
-  const bcrypt = await import('bcryptjs');
-  const salt = await bcrypt.default.genSalt(12);
-  const hashedPassword = await bcrypt.default.hash(newPassword, salt);
-  
-  admin.password = hashedPassword;
+  // The User pre-save hook hashes it.
+  admin.password = newPassword;
   await admin.save();
 
   try {
@@ -903,6 +918,12 @@ export const changeAdminPassword = async (
   return { success: true };
 };
 
+/** Admin-panel account (User with an admin-panel primary role) for an email, or null. */
+const findAdminUserByEmail = async (normalizedEmail) => {
+  const user = await User.findOne({ email: normalizedEmail, isDeleted: { $ne: true } }).populate("primaryRole");
+  return user && adminRoleOf(user) ? user : null;
+};
+
 /** Admin forgot password: request OTP. Only accepts email that is registered as admin. */
 export const requestAdminForgotPasswordOtp = async (email) => {
   const normalizedEmail = String(email || "")
@@ -912,8 +933,8 @@ export const requestAdminForgotPasswordOtp = async (email) => {
     throw new ValidationError("Email is required");
   }
 
-  const admin = await FoodAdmin.findOne({ email: normalizedEmail });
-  if (!admin) {
+  const admin = await findAdminUserByEmail(normalizedEmail);
+  if (!admin || admin.isActive === false || admin.isBlocked === true) {
     throw new AuthError("This email is not registered as an admin account.");
   }
 
@@ -955,9 +976,7 @@ export const resetAdminPasswordWithOtp = async (email, otp, newPassword) => {
   if (!normalizedEmail || !otpStr) {
     throw new ValidationError("Email and OTP are required");
   }
-  if (!newPassword || String(newPassword).length < 6) {
-    throw new ValidationError("New password must be at least 6 characters");
-  }
+  assertPasswordStrength(newPassword, "New password");
 
   const record = await AdminResetOtp.findOne({ email: normalizedEmail });
   if (!record) {
@@ -976,14 +995,19 @@ export const resetAdminPasswordWithOtp = async (email, otp, newPassword) => {
     throw new AuthError("Invalid OTP.");
   }
 
-  const admin = await FoodAdmin.findOne({ email: normalizedEmail });
-  if (!admin) {
+  const admin = await findAdminUserByEmail(normalizedEmail);
+  if (!admin || admin.isActive === false || admin.isBlocked === true) {
     await record.deleteOne();
     throw new AuthError("Account not found.");
   }
 
+  // The User pre-save hook hashes it. A reset also clears any lockout and signs the account out
+  // everywhere: existing refresh tokens are revoked.
   admin.password = newPassword;
+  admin.failedLoginAttempts = 0;
+  admin.lockUntil = null;
   await admin.save();
+  await RefreshToken.deleteMany({ userId: admin._id });
   await record.deleteOne();
 
   try {
@@ -1004,6 +1028,11 @@ export const resetAdminPasswordWithOtp = async (email, otp, newPassword) => {
   return { success: true, message: "Password reset successfully." };
 };
 
+// After a refresh the previous refresh token stays valid for this long (parallel refreshes).
+const REFRESH_REUSE_GRACE_MS = 30 * 1000;
+// Active sessions per account (3 devices) plus the tokens still inside the grace window.
+const MAX_REFRESH_TOKENS_PER_USER = 6;
+
 export const refreshAccessToken = async (token) => {
   if (!token) {
     throw new ValidationError("Refresh token is required");
@@ -1011,7 +1040,7 @@ export const refreshAccessToken = async (token) => {
 
   // Look up by hash — DB never stores raw tokens
   const stored = await RefreshToken.findByRawToken(token);
-  if (!stored) {
+  if (!stored || stored.expiresAt <= new Date()) {
     throw new AuthError("Invalid or expired refresh token");
   }
 
@@ -1025,22 +1054,65 @@ export const refreshAccessToken = async (token) => {
     throw new AuthError("Refresh token has expired. Please log in again.");
   }
 
-  // Enforce active status check on every token refresh
-  const u = await User.findById(payload.userId).select("isActive isBlocked isDeleted").lean();
-  if (!u || u.isActive === false || u.isBlocked === true || u.isDeleted === true) {
+  // Re-read the account, its role and its franchise/store scope from the DB on every refresh.
+  // The claims inside the old token are never copied into the new one, so a deactivated account,
+  // a changed role or a re-assigned store takes effect at the next refresh.
+  const revoke = async (message) => {
     await RefreshToken.deleteOne({ _id: stored._id });
-    throw new AuthError("Account is deactivated. Please contact support.");
+    throw new AuthError(message);
+  };
+  const tokenKind = normalizeAdminRole(payload.role);
+  let newPayload;
+
+  if (payload.role === ROLES.DELIVERY_PARTNER) {
+    const partner = await FoodDeliveryPartner.findById(payload.userId).select("status").lean();
+    if (!partner || (partner.status && partner.status !== "approved")) {
+      await revoke("Account is deactivated. Please contact support.");
+    }
+    newPayload = { userId: String(payload.userId), role: ROLES.DELIVERY_PARTNER };
+  } else {
+    const u = await User.findById(payload.userId).populate("primaryRole").lean();
+    if (!u || u.isActive === false || u.isBlocked === true || u.isDeleted === true) {
+      await revoke("Account is deactivated. Please contact support.");
+    }
+    if (ADMIN_PANEL_ROLES.has(tokenKind)) {
+      const adminRole = adminRoleOf(u);
+      if (!adminRole) await revoke("Access has been revoked. Please log in again.");
+      const scope = await resolveAdminScope(u, adminRole);
+      newPayload = {
+        userId: String(u._id),
+        role: adminRole,
+        franchiseId: scope.franchiseId,
+        storeId: scope.storeId,
+      };
+    } else if (["customer", "user"].includes(tokenKind)) {
+      newPayload = { userId: String(u._id), role: "CUSTOMER" };
+    } else {
+      await revoke("Invalid refresh token. Please log in again.");
+    }
   }
 
-  // Issue new access token with same payload (including franchiseId + storeId)
-  const newAccessToken = signAccessToken({
-    userId:      payload.userId,
-    role:        payload.role,
-    franchiseId: payload.franchiseId || null,
-    storeId:     payload.storeId     || null,
+  // Rotate: issue a new refresh token and let the old one expire shortly. The short overlap
+  // keeps parallel requests / tabs that refresh at the same moment from logging the user out.
+  const newRefreshToken = signRefreshToken(newPayload);
+  const ttlMs = ms(config.jwtRefreshExpiresIn || "7d");
+  await RefreshToken.create({
+    userId: stored.userId,
+    tokenHash: RefreshToken.hashToken(newRefreshToken),
+    deviceId: stored.deviceId,
+    expiresAt: new Date(Date.now() + ttlMs),
   });
+  await RefreshToken.updateOne(
+    { _id: stored._id },
+    { $set: { expiresAt: new Date(Math.min(stored.expiresAt.getTime(), Date.now() + REFRESH_REUSE_GRACE_MS)) } },
+  );
 
-  return { accessToken: newAccessToken, refreshToken: token };
+  const sessions = await RefreshToken.find({ userId: stored.userId }).sort({ createdAt: -1 }).select("_id").lean();
+  if (sessions.length > MAX_REFRESH_TOKENS_PER_USER) {
+    await RefreshToken.deleteMany({ _id: { $in: sessions.slice(MAX_REFRESH_TOKENS_PER_USER).map((t) => t._id) } });
+  }
+
+  return { accessToken: signAccessToken(newPayload), refreshToken: newRefreshToken };
 };
 
 export const updatePersonalProfile = async (userId, updateData) => {

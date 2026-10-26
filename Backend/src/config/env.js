@@ -2,11 +2,23 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const nodeEnv = process.env.NODE_ENV || 'development';
+
+// FRONTEND_URL may hold several comma-separated origins (admin panel, user app, ...).
+const corsOrigins = String(process.env.FRONTEND_URL || '')
+    .split(',')
+    .map((o) => o.trim().replace(/\/+$/, ''))
+    .filter(Boolean);
+
 export const config = {
     // Basic server config
     port: process.env.PORT || 5000,
     host: process.env.HOST || '0.0.0.0',
-    nodeEnv: process.env.NODE_ENV || 'development',
+    nodeEnv,
+
+    // CORS allow-list (browser origins). Requests without an Origin header (mobile apps,
+    // server-to-server, webhooks) are not subject to CORS.
+    corsOrigins,
 
     // Database
     mongodbUri: process.env.MONGO_URI || process.env.MONGODB_URI,
@@ -14,7 +26,7 @@ export const config = {
     // JWT
     jwtAccessSecret: process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET,
     jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
-    jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES || '7d',
+    jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES || '15m',
     jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES || '30d',
 
     // OTP
@@ -24,7 +36,9 @@ export const config = {
     otpExpirySeconds: Number(process.env.OTP_EXPIRY_SECONDS || 300),
     otpRateLimit: Number(process.env.OTP_RATE_LIMIT || 3),
     otpRateWindow: Number(process.env.OTP_RATE_WINDOW || 600),
-    useDefaultOtp: process.env.USE_DEFAULT_OTP === 'true',
+    // The fixed test OTP can never be enabled in production, whatever USE_DEFAULT_OTP says.
+    useDefaultOtpRequested: process.env.USE_DEFAULT_OTP === 'true',
+    useDefaultOtp: process.env.USE_DEFAULT_OTP === 'true' && nodeEnv !== 'production',
 
     // SMS India Hub
     smsIndiaHubUsername: process.env.SMS_INDIA_HUB_USERNAME,
@@ -71,7 +85,7 @@ export const config = {
     firebaseWebVapidKey: process.env.VITE_FIREBASE_VAPID_KEY || process.env.FIREBASE_VAPID_KEY,
 
     // Socket.io
-    socketCorsOrigin: process.env.SOCKET_CORS_ORIGIN || '*',
+    socketCorsOrigin: process.env.SOCKET_CORS_ORIGIN || (corsOrigins.length ? corsOrigins : '*'),
 
     // Razorpay (payments)
     razorpayKeyId: process.env.RAZORPAY_KEY_ID,

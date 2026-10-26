@@ -41,7 +41,20 @@ app.use(helmet({
     noSniff: true,
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
 }));
-app.use(cors());
+// Browser origins must be listed in FRONTEND_URL (comma-separated). Outside production, local and
+// private-network origins (Vite on a LAN IP, phone testing) are also allowed. Requests with no
+// Origin header (mobile apps, webhooks, curl) are not browser CORS requests and pass through.
+const isDevOrigin = (o) =>
+    /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/.test(o);
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        const normalized = origin.replace(/\/+$/, '');
+        if (config.corsOrigins.includes(normalized)) return callback(null, true);
+        if (config.nodeEnv !== 'production' && isDevOrigin(normalized)) return callback(null, true);
+        return callback(null, false);
+    }
+}));
 app.use(morgan('dev'));
 app.use(express.json({
     verify: (req, res, buf) => {
