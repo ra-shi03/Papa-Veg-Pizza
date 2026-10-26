@@ -343,6 +343,16 @@ export const updateMyFranchise = async (req, res) => {
 
 
 // ─── Update Franchise ────────────────────────────────────────────────────────
+// Fields a caller may change on a franchise (what the edit form sends). isActive is set only via
+// `status`; ownerUserId, createdBy, ownerName (mirrors `name`) and timestamps are system-managed.
+const UPDATABLE_FRANCHISE_FIELDS = [
+    'name', 'franchiseName', 'email', 'phone', 'password', 'status',
+    'gstNumber', 'panNumber', 'address', 'pincode', 'franchiseCode',
+    'regionId', 'zoneId', 'city', 'state', 'type', 'totalStores',
+    'franchiseDuration', 'franchiseCost', 'paidAmount', 'dueAmount',
+    'gender', 'alternatePhone', 'dob'
+];
+
 export const updateFranchise = async (req, res) => {
     const session = await mongoose.startSession();
 
@@ -355,17 +365,16 @@ export const updateFranchise = async (req, res) => {
         let updatedFranchise;
 
         await session.withTransaction(async () => {
-            const updates = { ...req.body };
+            const updates = {};
+            for (const field of UPDATABLE_FRANCHISE_FIELDS) {
+                if (req.body[field] !== undefined) updates[field] = req.body[field];
+            }
 
             // Normalize status field
             if (updates.status !== undefined) {
                 updates.isActive = updates.status === 'ACTIVE';
                 delete updates.status;
             }
-
-            // Never allow overwriting ownerUserId or createdBy via patch
-            delete updates.ownerUserId;
-            delete updates.createdBy;
 
             // Map frontend specific names to Franchise schema
             if (updates.name !== undefined) {

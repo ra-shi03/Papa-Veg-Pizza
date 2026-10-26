@@ -168,9 +168,20 @@ export const getStoreManagerById = async (req, res) => {
   }
 };
 
+// Fields a caller may change on a store manager. userId, role, lastLoginAt and timestamps are
+// system-managed; address/emergencyContact/salary are folded into personalDetails below.
+const UPDATABLE_MANAGER_FIELDS = [
+  'name', 'email', 'phone', 'employeeCode', 'joinedDate', 'status', 'storeId', 'storeName',
+  'reportingManager', 'profileImage', 'personalDetails', 'permissions',
+  'address', 'emergencyContact', 'salary'
+];
+
 export const updateStoreManager = async (req, res) => {
   try {
-    const data = { ...req.body };
+    const data = {};
+    for (const field of UPDATABLE_MANAGER_FIELDS) {
+      if (req.body[field] !== undefined) data[field] = req.body[field];
+    }
     if (req.file) {
       data.profileImage = await uploadImageBuffer(req.file.buffer, 'papa-veg/managers');
     }

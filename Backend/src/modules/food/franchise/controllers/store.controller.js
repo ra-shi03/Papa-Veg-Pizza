@@ -31,16 +31,29 @@ const getFallbackOwner = async (req) => {
   return franchise?.ownerName || 'Unknown';
 };
 
+// Fields a caller may change on an existing store. franchiseId, approvalStatus, documents,
+// rejection/change-request fields and timestamps are system-managed and never taken from the body.
+const UPDATABLE_STORE_FIELDS = [
+  'storeName', 'code', 'phone', 'email', 'storeType', 'fulfillmentModes',
+  'regionId', 'zoneId', 'territoryId', 'city', 'state', 'pincode', 'latitude', 'longitude'
+];
+
 export const createStore = async (req, res) => {
   try {
     const {
-      storeName, storeCode, phone, email, address, status, 
+      storeName, storeCode, phone, email, address, status,
       storeType, fulfillmentModes, territoryId, zoneId, regionId
     } = req.body;
 
+    // The owning franchise always comes from the signed-in franchise admin's token.
+    const franchiseId = req.user?.franchiseId;
+    if (!franchiseId || !mongoose.Types.ObjectId.isValid(franchiseId)) {
+      return res.status(403).json({ success: false, message: 'Only a franchise admin can create stores' });
+    }
+
     // Map frontend structure to backend schema
     const newStoreData = {
-      franchiseId: req.user?.franchiseId || req.user?._id || '60d5ecb8b392d7001f3e7943', // Default mock if no auth
+      franchiseId,
       storeName: storeName,
       code: storeCode,
       phone: phone,
@@ -157,8 +170,12 @@ export const getStoreById = async (req, res) => {
 
 export const updateStore = async (req, res) => {
   try {
-    const updateData = { ...req.body };
-    
+    const updateData = {};
+    for (const field of UPDATABLE_STORE_FIELDS) {
+      if (req.body[field] !== undefined) updateData[field] = req.body[field];
+    }
+    if (typeof req.body.address === 'string') updateData.address = req.body.address;
+
     // Map frontend structure to backend schema for update
     if (req.body.address && typeof req.body.address === 'object') {
       updateData.address = req.body.address.line1 || '';
@@ -173,12 +190,10 @@ export const updateStore = async (req, res) => {
     
     if (req.body.storeCode !== undefined) {
       updateData.code = req.body.storeCode;
-      delete updateData.storeCode;
     }
-    
+
     if (req.body.status !== undefined) {
       updateData.isActive = req.body.status === 'Active';
-      delete updateData.status;
     }
 
     const query = mongoose.Types.ObjectId.isValid(req.params.id) 
