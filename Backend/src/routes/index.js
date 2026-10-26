@@ -24,6 +24,9 @@ import franchiseStoreRoutes from '../modules/food/franchise/routes/store.routes.
 import franchiseStoreManagerRoutes from '../modules/food/franchise/routes/storeManager.routes.js';
 import franchiseStoreApprovalRoutes from '../modules/food/franchise/routes/storeApproval.routes.js';
 import kitchenStaffRoutes from '../modules/food/store/routes/kitchenStaff.routes.js';
+import storeOrderRoutes from '../modules/food/store/routes/storeOrders.routes.js';
+import { listFranchiseOrders } from '../modules/food/store/controllers/storeOrders.controller.js';
+import { resolveStoreForLocation } from '../modules/food/orders/services/order-store.service.js';
 import { trackOrderPublicController, getOrderHistoryPublicController, getOrderMethodsController } from '../modules/food/orders/controllers/order.controller.js';
 import {
   submitInquiryPublic,
@@ -44,6 +47,30 @@ router.use('/v1/stores', franchiseStoreRoutes);
 router.use('/v1/store-managers', franchiseStoreManagerRoutes);
 router.use('/v1/store-approvals', franchiseStoreApprovalRoutes);
 router.use('/v1/food/store/staff', kitchenStaffRoutes);
+router.use('/v1/food/store/orders', storeOrderRoutes);
+router.get('/v1/food/franchise/orders', authMiddleware, requireRoles('ADMIN'), listFranchiseOrders);
+
+// Public: which store serves a delivery location (nearest approved store, zone-aware)
+router.get('/v1/food/stores/resolve', async (req, res, next) => {
+    try {
+        const lat = parseFloat(req.query.lat);
+        const lng = parseFloat(req.query.lng);
+        const { store, distanceKm } = await resolveStoreForLocation(lat, lng);
+        res.json({
+            success: true,
+            data: {
+                storeId: String(store._id),
+                franchiseId: String(store.franchiseId),
+                storeName: store.storeName,
+                phone: store.phone,
+                zoneId: store.zoneId ? String(store.zoneId) : null,
+                distanceKm
+            }
+        });
+    } catch (err) {
+        next(err);
+    }
+});
 
 router.get('/v1/health', (req, res) => {
     res.status(200).json({ status: 'UP', message: 'Server is healthy' });

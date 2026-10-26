@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { storeOrdersApi, LIVE_POLL_MS, useLiveIndicator } from "../../api/storeOrdersApi";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import io from "socket.io-client";
@@ -54,174 +55,50 @@ const setLocalIncomingOrders = (orders) => {
   localStorage.setItem(INCOMING_ORDERS_KEY, JSON.stringify(orders));
 };
 
+const REFUND_UI = { pending: "refund_pending", processed: "refund_completed", failed: "refund_failed" };
+
+const toCancelled = (o) => {
+  const cancelledEntry = [...(o.timeline || [])].reverse().find((t) => String(t.status).startsWith("cancelled"));
+  const refundable = o.paymentMethod === "Online" && o.paymentStatus !== "pending";
+  return {
+    ...o,
+    cancelledAt: cancelledEntry?.timestamp || o.createdAt,
+    cancelledBy: o.orderStatus === "cancelled_by_user" ? "Customer" : "Store",
+    refundStatus: REFUND_UI[o.refundStatus] || (refundable ? "refund_pending" : "not_applicable"),
+    refundAmount: refundable ? o.grandTotal : 0,
+  };
+};
+
 export function useCancelledOrders(filters = {}) {
-  const queryClient = useQueryClient();
-  const [socketConnected, setSocketConnected] = useState(false);
-
-  useEffect(() => {
-    setSocketConnected(true);
-    const socketUrl = import.meta.env?.VITE_SOCKET_URL || window.location.origin;
-    const socket = io(socketUrl, {
-      transports: ["websocket"],
-      autoConnect: false,
-    });
-
-    // Real-time socket events simulation
-    socket.on("connect", () => setSocketConnected(true));
-    socket.on("disconnect", () => setSocketConnected(false));
-    
-    // Simulate real-time socket events locally for demo purposes
-    const handleReopenSim = (e) => {
-      queryClient.invalidateQueries({ queryKey: ["cancelledOrders"] });
-    };
-    
-    window.addEventListener("orderReopenedSim", handleReopenSim);
-    window.addEventListener("refundInitiatedSim", handleReopenSim);
-
-    return () => {
-      socket.disconnect();
-      window.removeEventListener("orderReopenedSim", handleReopenSim);
-      window.removeEventListener("refundInitiatedSim", handleReopenSim);
-    };
-  }, [queryClient]);
-
-  const cancelledOrdersQuery = useQuery({
+  const query = useQuery({
     queryKey: ["cancelledOrders", filters],
     queryFn: async () => {
-      // Simulate network latency
-      await new Promise((resolve) => setTimeout(resolve, 350));
-      let list = getLocalCancelledOrders();
-
-      // Apply Search (Order ID, Customer Name, Phone Number)
-      if (filters.search) {
-        const q = filters.search.toLowerCase();
-        list = list.filter(
-          (o) =>
-            o.orderNumber.toLowerCase().includes(q) ||
-            o.customer?.name.toLowerCase().includes(q) ||
-            o.customer?.phone.includes(q)
-        );
-      }
-
-      // Filter by Date
-      if (filters.dateRange && filters.dateRange !== "All") {
-        const now = new Date();
-        list = list.filter((o) => {
-          const orderDate = new Date(o.createdAt);
-          if (filters.dateRange === "Today") {
-            return orderDate.toDateString() === now.toDateString();
-          }
-          if (filters.dateRange === "Yesterday") {
-            const yesterday = new Date();
-            yesterday.setDate(now.getDate() - 1);
-            return orderDate.toDateString() === yesterday.toDateString();
-          }
-          if (filters.dateRange === "Last 7 Days") {
-            const sevenDaysAgo = new Date();
-            sevenDaysAgo.setDate(now.getDate() - 7);
-            return orderDate >= sevenDaysAgo;
-          }
-          if (filters.dateRange === "Last 30 Days") {
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(now.getDate() - 30);
-            return orderDate >= thirtyDaysAgo;
-          }
-          return true;
-        });
-      }
-
-      // Filter by Custom Date Range
-      if (filters.customDateRange && filters.customDateRange.length === 2) {
-        const [start, end] = filters.customDateRange;
-        list = list.filter((o) => {
-          const orderDate = new Date(o.createdAt);
-          return orderDate >= new Date(start) && orderDate <= new Date(end);
-        });
-      }
-
-      // Filter by Cancellation Type (Customer, Store, System)
-      if (filters.cancellationType && filters.cancellationType !== "All") {
-        list = list.filter(
-          (o) => o.cancelledBy?.toLowerCase() === filters.cancellationType.toLowerCase()
-        );
-      }
-
-      // Filter by Refund Status
+      let list = (await storeOrdersApi.list("cancelled", { search: filters.search })).map(toCancelled);
       if (filters.refundStatus && filters.refundStatus !== "All") {
-        list = list.filter(
-          (o) => o.refundStatus?.toLowerCase() === filters.refundStatus.toLowerCase()
-        );
+        list = list.filter((o) => o.refundStatus === String(filters.refundStatus).toLowerCase());
       }
-
-      // Filter by Payment Method
       if (filters.paymentMethod && filters.paymentMethod !== "All") {
-        list = list.filter(
-          (o) => o.paymentMethod?.toLowerCase() === filters.paymentMethod.toLowerCase()
-        );
+        list = list.filter((o) => o.paymentMethod.toLowerCase() === String(filters.paymentMethod).toLowerCase());
       }
+      const dir = filters.sortOrder === "ascend" ? 1 : -1;
+      const field = filters.sortField || "cancelledAt";
+      list.sort((a, b) => ((a[field] || a.createdAt) < (b[field] || b.createdAt) ? -dir : dir));
 
-      // Filter by Reopen Eligibility
-      if (filters.reopenEligible && filters.reopenEligible !== "All") {
-        const now = new Date();
-        const checkEligible = (o) => {
-          const cancelledAtDate = new Date(o.cancelledAt || o.updatedAt);
-          const timeDiffMins = (now - cancelledAtDate) / 60000;
-          const isTimeEligible = timeDiffMins <= 5;
-          const isKitchenNotStarted = o.status !== "preparing" && o.status !== "baking" && o.status !== "packaging" && o.status !== "ready";
-          const isInventoryAvailable = true; // Simulated inventory check
-          return isTimeEligible && isKitchenNotStarted && isInventoryAvailable;
-        };
-
-        if (filters.reopenEligible === "Yes") {
-          list = list.filter(checkEligible);
-        } else if (filters.reopenEligible === "No") {
-          list = list.filter((o) => !checkEligible(o));
-        }
-      }
-
-      // Sort Cancelled Orders
-      const orderField = filters.sortField || "cancelledAt";
-      const orderDir = filters.sortOrder === "ascend" ? 1 : -1;
-      list.sort((a, b) => {
-        const valA = a[orderField] || a.createdAt;
-        const valB = b[orderField] || b.createdAt;
-        if (valA < valB) return -1 * orderDir;
-        if (valA > valB) return 1 * orderDir;
-        return 0;
-      });
-
-      // Pagination
       const page = parseInt(filters.page) || 1;
       const limit = parseInt(filters.limit) || 10;
-      const startIndex = (page - 1) * limit;
-      const endIndex = page * limit;
-      const paginatedList = list.slice(startIndex, endIndex);
-
-      // KPI Calculations
-      const totalCancelledOrders = list.length;
-      const totalRefundAmount = list.reduce((sum, o) => sum + (o.refundAmount || 0), 0);
-      const refundPendingCount = list.filter((o) => o.refundStatus === "refund_pending").length;
-      const refundCompletedCount = list.filter((o) => o.refundStatus === "refund_completed").length;
-
       return {
-        orders: paginatedList,
-        totalCancelledOrders,
-        totalRefundAmount,
-        refundPendingCount,
-        refundCompletedCount,
-        pagination: {
-          current: page,
-          pageSize: limit,
-          total: list.length,
-        },
+        orders: list.slice((page - 1) * limit, page * limit),
+        totalCancelledOrders: list.length,
+        totalRefundAmount: list.reduce((sum, o) => sum + o.refundAmount, 0),
+        refundPendingCount: list.filter((o) => o.refundStatus === "refund_pending").length,
+        refundCompletedCount: list.filter((o) => o.refundStatus === "refund_completed").length,
+        pagination: { current: page, pageSize: limit, total: list.length },
       };
     },
+    refetchInterval: LIVE_POLL_MS * 4,
+    staleTime: 5000,
   });
-
-  return {
-    ...cancelledOrdersQuery,
-    socketConnected,
-  };
+  return { ...query, socketConnected: useLiveIndicator(query) };
 }
 
 export function useInitiateRefund() {

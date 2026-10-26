@@ -7,16 +7,13 @@ import { FoodOfferUsage } from '../../admin/models/offerUsage.model.js';
 import { FoodAppConfig } from '../../settings/models/appConfig.model.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { haversineKm } from './order.helpers.js';
+import { applyLimitedOffer } from './order-offer.service.js';
+import { getOrderableStore } from './order-store.service.js';
 
 export async function calculateOrderPricing(userId, dto) {
-  const store = await FoodStore.findById(dto.storeId)
-    .select("status location")
-    .lean();
-  if (!store) throw new ValidationError("Store not found");
-  if (store.status !== "approved")
-    throw new ValidationError("Store not available");
+  const store = await getOrderableStore(dto.storeId);
 
-  const items = Array.isArray(dto.items) ? dto.items : [];
+  const items = applyLimitedOffer(dto.items);
   const subtotal = items.reduce(
     (sum, it) => sum + (Number(it.price) || 0) * (Number(it.quantity) || 1),
     0,

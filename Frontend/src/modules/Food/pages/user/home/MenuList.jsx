@@ -10,6 +10,7 @@ import { useScrollLock } from "@food/hooks/useScrollLock"
 import logoNew from "@/assets/logo1.png"
 import { renderFormattedText } from "@food/utils/formatText"
 import MenuSearchOverlay from "@food/components/user/MenuSearchOverlay"
+import { CartBottomBar, InlineUpsell } from "../cart/upsell/CartUpsell"
 
 
 const CRUST_OPTIONS = [
@@ -1367,6 +1368,7 @@ export default function MenuList() {
     return () => clearTimeout(timer);
   }, [activeTab, categories]);
   const [locationName, setLocationName] = useState(localStorage.getItem("deliveryAddress") || "")
+  const [cartBarHeight, setCartBarHeight] = useState(0)
   const [cart, setCart] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("userCart") || "{}")
@@ -1380,7 +1382,19 @@ export default function MenuList() {
     const handleCartSync = () => {
       try {
         const storedCart = JSON.parse(localStorage.getItem("userCart") || "{}")
-        setCart(storedCart)
+        const customMap = JSON.parse(localStorage.getItem("pvp_customized_items") || "{}")
+        setCart(prev => {
+          const next = {}
+          Object.entries(storedCart).forEach(([key, value]) => {
+            if (value && typeof value === "object") {
+              next[key] = value
+              return
+            }
+            const quantity = Number(value) || 0
+            if (quantity > 0) next[key] = { ...(prev[key] || customMap[key] || { price: 0 }), quantity }
+          })
+          return next
+        })
       } catch (e) {
         setCart({})
       }
@@ -2262,8 +2276,8 @@ export default function MenuList() {
                   const toppingsLine = item.toppingsSummary || item.description || "";
 
                   return (
+                    <React.Fragment key={item.id}>
                     <div 
-                      key={item.id} 
                       onClick={() => checkLocation(() => openCustomizeModal(item))}
                       className="relative w-full overflow-hidden flex flex-col justify-end min-h-[360px] sm:min-h-[390px] aspect-[4/3.5] bg-zinc-950 group shadow-sm transition-all duration-300 cursor-pointer"
                     >
@@ -2365,6 +2379,8 @@ export default function MenuList() {
                         </div>
                       </div>
                     </div>
+                    <InlineUpsell productId={item.id} products={allFlattenedProducts} dark={localStorage.getItem("appTheme") === "dark"} />
+                    </React.Fragment>
                   );
                 })}
               </section>
@@ -2896,25 +2912,16 @@ export default function MenuList() {
         </div>
       )}
 
-      {/* Floating Action Cart basket FAB */}
-      {totalCartCount > 0 && (
-        <div className="fixed bottom-24 right-4 pointer-events-none z-45">
-          <button
-            onClick={() => {
-              navigate("/user/cart")
-            }}
-            className="pointer-events-auto w-14 h-14 bg-primary text-on-primary rounded-full shadow-[0_0_20px_rgba(229,57,53,0.4)] flex items-center justify-center active:scale-95 transition-transform cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[28px]">shopping_basket</span>
-            <div className="absolute -top-1 -right-1 w-6 h-6 bg-white text-on-primary-container rounded-full text-[10px] font-bold flex items-center justify-center border border-primary animate-bounce">
-              {totalCartCount}
-            </div>
-          </button>
-        </div>
-      )}
+      {/* Domino's style bottom bar: Complete your order + View Cart (configured by superadmin) */}
+      <CartBottomBar
+        products={allFlattenedProducts}
+        dark={localStorage.getItem("appTheme") === "dark"}
+        onViewCart={() => navigate("/user/cart")}
+        onHeightChange={setCartBarHeight}
+      />
 
       {/* Floating Action Controls (Domino's style matching media_1792050211697_9dee3bdf.png) */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-md px-4 pointer-events-none z-40 flex items-center justify-between">
+      <div className="fixed left-1/2 -translate-x-1/2 w-full max-w-md px-4 pointer-events-none z-40 flex items-center justify-between" style={{ bottom: 24 + cartBarHeight }}>
         {/* Scroll-to-Top Floating Circular Button */}
         {showScrollToTop ? (
           <button

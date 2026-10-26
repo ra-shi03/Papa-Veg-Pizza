@@ -62,6 +62,7 @@ const PromiseCampaignConfig = lazy(() => import("../user-app/PromiseCampaignConf
 const ShowcaseSectionsConfig = lazy(() => import("../user-app/ShowcaseSectionsConfig"))
 const SearchConfig = lazy(() => import("../user-app/SearchConfig"))
 const ComboPageConfig = lazy(() => import("../user-app/ComboPageConfig"))
+const CartConfig = lazy(() => import("../user-app/CartConfig"))
 
 // Shared layout shell for user management pages to inherit Sidebar and Navbar
 function SuperAdminLayout() {
@@ -169,6 +170,8 @@ function SuperAdminLayout() {
     activeItem = "Promise Campaign"
   } else if (location.pathname.includes("/user-app/showcase-sections")) {
     activeItem = "Showcase Sections"
+  } else if (location.pathname.includes("/user-app/cart-config")) {
+    activeItem = "Cart & Upsell"
   }
 
   const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem("sa_sidebar_collapsed") === "true")
@@ -283,6 +286,7 @@ export default function SuperAdminRouter() {
             <Route path="/user-app/showcase-sections" element={<ShowcaseSectionsConfig />} />
             <Route path="/user-app/search-config" element={<SearchConfig />} />
             <Route path="/user-app/combo-page" element={<ComboPageConfig />} />
+            <Route path="/user-app/cart-config" element={<CartConfig />} />
           </Route>
         </Route>
 

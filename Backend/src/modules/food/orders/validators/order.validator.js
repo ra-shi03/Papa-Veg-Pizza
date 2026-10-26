@@ -11,7 +11,17 @@ const orderItemSchema = z.object({
     quantity: z.number().int().min(1),
     isVeg: z.boolean().optional().default(true),
     image: z.string().optional(),
-    notes: z.string().optional()
+    notes: z.string().optional(),
+    kind: z.enum(['product', 'addon', 'topping']).optional(),
+    size: z.string().optional(),
+    crust: z.string().optional(),
+    selectedAddons: z.array(z.object({
+        id: z.string().optional(),
+        name: z.string().min(1),
+        type: z.string().optional(),
+        price: z.number().min(0).optional()
+    })).optional(),
+    offerToken: z.string().optional()
 });
 
 const addressSchema = z.object({

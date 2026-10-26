@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { storeOrdersApi, LIVE_POLL_MS, useLiveIndicator } from "../../api/storeOrdersApi";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import io from "socket.io-client";
@@ -60,96 +61,32 @@ const setLocalAssignments = (assignments) => {
 
 // Hook to query ready orders
 export function useReadyOrders(filters = {}) {
-  const queryClient = useQueryClient();
-  const [socketConnected, setSocketConnected] = useState(false);
-
-  useEffect(() => {
-    // Simulate real-time socket connection for visual feedback
-    setSocketConnected(true);
-
-    const socketUrl = import.meta.env?.VITE_SOCKET_URL || window.location.origin;
-    const socket = io(socketUrl, {
-      transports: ["websocket"],
-      autoConnect: false, // Don't connect to prevent console error logs
-    });
-
-    // Websocket Listeners (Simulated or triggered on updates)
-    return () => {
-      socket.disconnect();
-    };
-  }, [queryClient]);
-
-  const readyOrdersQuery = useQuery({
+  const query = useQuery({
     queryKey: ["readyOrders", filters],
     queryFn: async () => {
-      // Artificial delay to simulate real network request
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      
-      let list = getLocalReadyOrders();
-
-      // Only display orders that are in "ready" status
-      list = list.filter((o) => o.status === "ready");
-
-      // Apply search filters
-      if (filters.search) {
-        const q = filters.search.toLowerCase();
-        list = list.filter(
-          (o) =>
-            o.orderNumber.toLowerCase().includes(q) ||
-            o.customer.name.toLowerCase().includes(q) ||
-            o.customer.phone.toLowerCase().includes(q)
-        );
-      }
-
-      // Filter by Order Type (Delivery/Pickup)
+      let list = await storeOrdersApi.list("ready", filters);
       if (filters.orderType && filters.orderType !== "All") {
         list = list.filter((o) => o.orderType === filters.orderType.toLowerCase());
       }
-
-      // Filter by Rider Status (Assigned/Unassigned)
       if (filters.riderStatus && filters.riderStatus !== "All") {
-        list = list.filter((o) => {
-          if (filters.riderStatus === "Assigned") {
-            return o.deliveryPartnerId !== null;
-          }
-          return o.deliveryPartnerId === null;
-        });
+        list = list.filter((o) => (filters.riderStatus === "Assigned" ? !!o.deliveryPartnerId : !o.deliveryPartnerId));
       }
-
-      // Filter by Waiting Time
       if (filters.waitingTime && filters.waitingTime !== "All") {
         const now = new Date();
         list = list.filter((o) => {
-          const readyTime = new Date(o.readyAt || o.createdAt);
-          const diffMins = Math.round((now - readyTime) / 60000);
-          
-          if (filters.waitingTime === "Under 5 min") {
-            return diffMins < 5;
-          }
-          if (filters.waitingTime === "5-15 min") {
-            return diffMins >= 5 && diffMins <= 15;
-          }
-          if (filters.waitingTime === "More than 15 min") {
-            return diffMins > 15;
-          }
+          const mins = Math.round((now - new Date(o.readyAt || o.createdAt)) / 60000);
+          if (filters.waitingTime === "Under 5 min") return mins < 5;
+          if (filters.waitingTime === "5-15 min") return mins >= 5 && mins <= 15;
+          if (filters.waitingTime === "More than 15 min") return mins > 15;
           return true;
         });
       }
-
-      // Filter by Priority
-      if (filters.priority && filters.priority !== "All") {
-        list = list.filter((o) => o.priority === filters.priority.toLowerCase());
-      }
-
       return list;
     },
-    staleTime: 1000,
+    refetchInterval: LIVE_POLL_MS,
+    staleTime: 3000,
   });
-
-  return {
-    ...readyOrdersQuery,
-    socketConnected,
-  };
+  return { ...query, data: query.data || [], socketConnected: useLiveIndicator(query) };
 }
 
 // Hook to query available riders

@@ -36,6 +36,8 @@ import { calculateOrderPricing } from './order-pricing.service.js';
 import * as dispatchService from './order-dispatch.service.js';
 import * as deliveryService from './order-delivery.service.js';
 import * as paymentService from './order-payment.service.js';
+import { applyLimitedOffer } from './order-offer.service.js';
+import { getOrderableStore } from './order-store.service.js';
 import {
   enqueueOrderEvent,
   haversineKm,
@@ -130,14 +132,8 @@ export async function calculateOrder(userId, dto) {
 
 // ----- Create order -----
 export async function createOrder(userId, dto) {
-  const store = await FoodStore.findById(dto.storeId)
-    .select("status storeName zoneId location isAcceptingOrders")
-    .lean();
-  if (!store) throw new ValidationError("Store not found");
-  if (store.status !== "approved")
-    throw new ValidationError("Store not accepting orders");
-  if (store.isAcceptingOrders === false)
-    throw new ValidationError("Store not accepting orders");
+  dto = { ...dto, items: applyLimitedOffer(dto.items) };
+  const store = await getOrderableStore(dto.storeId);
 
 
   const settings = await getDispatchSettings();
@@ -270,6 +266,7 @@ export async function createOrder(userId, dto) {
   const order = new FoodOrder({
     userId: new mongoose.Types.ObjectId(userId),
     storeId: new mongoose.Types.ObjectId(dto.storeId),
+    franchiseId: store.franchiseId,
     zoneId: dto.zoneId
       ? new mongoose.Types.ObjectId(dto.zoneId)
       : store.zoneId,

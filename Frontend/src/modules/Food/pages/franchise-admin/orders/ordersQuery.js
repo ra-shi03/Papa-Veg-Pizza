@@ -26,9 +26,10 @@ import {
   mockResolutionTypesChart
 } from "./mockOrders";
 import { toast } from "sonner";
+import { adminClient } from "@/services/api/axios";
 
-// In-memory database state
-let dbOrders = [...initialOrders];
+// Orders come from the backend (read-only for the franchise admin); refunds / issues below are still local.
+let dbOrders = [];
 let dbRefundRequests = [...mockRefundRequests];
 let dbRefundTransactions = [...mockRefundTransactions];
 let dbOrderIssues = [...mockOrderIssues];
@@ -40,10 +41,107 @@ const notifyListeners = () => {
   listeners.forEach((listener) => listener());
 };
 
+const FRANCHISE_STATUS = {
+  payment_verified: "Pending",
+  awaiting_confirmation: "Pending",
+  confirmed: "Confirmed",
+  preparing: "Preparing",
+  baking: "Baking",
+  packaging: "Packed",
+  ready: "Ready For Pickup",
+  out_for_delivery: "Out For Delivery",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
+
+const toFranchiseOrder = (o) => {
+  const status = o.deliveryPartnerId && o.status === "ready" ? "Rider Assigned" : FRANCHISE_STATUS[o.status] || "Pending";
+  const addr = o.deliveryAddress || {};
+  const staffNames = Object.values(o.assignedStaff || {}).filter(Boolean).map((p) => p.name);
+  const online = o.paymentMethod !== "COD";
+  return {
+    id: o._id,
+    orderNumber: o.orderNumber,
+    customer: {
+      name: o.customer?.name || "Customer",
+      phone: o.customer?.phone || "",
+      email: o.customer?.email || "",
+      avatar: "",
+      address: [addr.houseNumber, addr.landmark, addr.city, addr.pincode].filter(Boolean).join(", "),
+      coords: null,
+    },
+    store: { storeId: o.storeId, name: o.storeName || "Store" },
+    orderType: "Delivery",
+    placedAt: o.createdAt,
+    estimatedDeliveryTime: o.expectedReadyAt || o.createdAt,
+    orderStatus: status,
+    pricing: {
+      subtotal: o.subtotal,
+      tax: o.taxes,
+      deliveryFee: o.deliveryCharges,
+      discount: o.discountAmount,
+      total: o.grandTotal,
+    },
+    paymentMethod: online ? "Online" : "Cash",
+    paymentStatus: o.paymentStatus === "paid" ? "Paid" : o.paymentStatus === "refunded" ? "Refunded" : "Pending",
+    transactionId: "",
+    couponApplied: null,
+    deliveryPartner: o.deliveryPartnerId ? { riderId: o.deliveryPartnerId, name: "Assigned rider", vehicleType: "", phone: "" } : null,
+    items: (o.items || []).map((i) => ({
+      productId: i.productId,
+      productName: i.name,
+      variant: [i.size, i.variant].filter(Boolean).join(" / "),
+      quantity: i.quantity,
+      price: i.unitPrice,
+      image: i.image,
+      specialInstructions: [...(i.customizations?.extraToppings || []).map((t) => `+ ${t}`), i.customizations?.specialInstructions].filter(Boolean).join(", "),
+    })),
+    timeline: (o.timeline || []).map((t) => ({ status: t.status, updatedBy: t.note || "System", timestamp: t.timestamp })),
+    remarks: o.kitchenNote || "",
+    kitchen: { supervisor: o.kitchenSupervisor?.name || "", staff: staffNames, stage: o.kitchenStage },
+    ...(status === "Cancelled" ? {
+      cancellation: {
+        cancelledBy: o.orderStatus === "cancelled_by_user" ? "Customer" : "Store",
+        role: o.orderStatus === "cancelled_by_user" ? "CUSTOMER" : "STORE",
+        reason: o.cancelReason || "Cancelled",
+        remarks: "",
+        refundRequired: online && o.paymentStatus !== "pending",
+        refundAmount: online ? o.grandTotal : 0,
+        refundStatus: o.refundStatus === "processed" ? "Completed" : "Pending",
+        createdAt: o.createdAt,
+      },
+    } : {}),
+  };
+};
+
+let syncTimer = null;
+
+export const syncFranchiseOrders = async () => {
+  try {
+    const res = await adminClient.get("/food/franchise/orders", { params: { limit: 200 }, _isFallback: true });
+    const list = res?.data?.data;
+    if (Array.isArray(list)) {
+      dbOrders = list.map(toFranchiseOrder);
+      notifyListeners();
+    }
+  } catch (err) {
+    console.warn("Could not load franchise orders:", err?.message);
+  }
+};
+
+// Polls while at least one screen is subscribed, so new orders and kitchen progress appear live.
 const subscribe = (listener) => {
   listeners.add(listener);
+  if (listeners.size === 1) {
+    syncFranchiseOrders();
+    syncTimer = setInterval(syncFranchiseOrders, 8000);
+  }
   return () => {
     listeners.delete(listener);
+    if (listeners.size === 0 && syncTimer) {
+      clearInterval(syncTimer);
+      syncTimer = null;
+    }
   };
 };
 
@@ -158,11 +256,14 @@ export function useStores() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setData(mockStores);
+    const update = () => {
+      const seen = new Map();
+      dbOrders.forEach((o) => seen.set(o.store.storeId, { storeId: o.store.storeId, storeName: o.store.name }));
+      setData([...seen.values()]);
       setIsLoading(false);
-    }, 200);
-    return () => clearTimeout(timer);
+    };
+    update();
+    return subscribe(update);
   }, []);
 
   return { data, isLoading };

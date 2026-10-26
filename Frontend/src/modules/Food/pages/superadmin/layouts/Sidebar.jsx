@@ -46,7 +46,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Smartphone,
-  Award } from "lucide-react"
+  Award,
+  ShoppingCart } from "lucide-react"
 
 export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, isCollapsed = false, onToggleCollapse }) {
   const navigate = useNavigate()
@@ -170,7 +171,8 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
         { name: "Promise Campaign", icon: Award },
         { name: "Showcase Sections", icon: Sparkles },
         { name: "Search Overlay", icon: Search },
-        { name: "Combo Page", icon: Sparkles }
+        { name: "Combo Page", icon: Sparkles },
+        { name: "Cart & Upsell", icon: ShoppingCart }
       ]
     }
 
@@ -436,6 +438,8 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
                                 navigate("/food/superadmin/user-app/search-config")
                               } else if (item.name === "Combo Page") {
                                 navigate("/food/superadmin/user-app/combo-page")
+                              } else if (item.name === "Cart & Upsell") {
+                                navigate("/food/superadmin/user-app/cart-config")
                               }
                               // On mobile, close sidebar when clicking a menu item
                               if (window.innerWidth < 1024) {

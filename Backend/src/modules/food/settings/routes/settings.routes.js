@@ -102,5 +102,13 @@ router.get(['/app-config', '/app-configurations'], authMiddleware, requireSuperA
 router.put(['/app-config', '/app-configurations'], authMiddleware, requireSuperAdmin, appConfigController.updateAppConfigAdmin);
 router.patch(['/app-config/feature', '/app-configurations/feature'], authMiddleware, requireSuperAdmin, appConfigController.updateFeatureToggleAdmin);
 
+import { getCartConfig, updateCartConfig, getCartSuggestions, claimCartOffer } from '../controllers/cartConfig.controller.js';
+
+// Cart: bottom bar, "Complete your order" suggestions and limited time offer (superadmin configured)
+router.get('/cart-config', getCartConfig);
+router.put('/cart-config', authMiddleware, requireSuperAdmin, updateCartConfig);
+router.post('/cart-config/suggestions', getCartSuggestions);
+router.post('/cart-config/offer/claim', claimCartOffer);
+
 export default router;
 

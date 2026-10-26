@@ -11,7 +11,21 @@ const orderItemSchema = new mongoose.Schema(
         quantity: { type: Number, required: true, min: 1 },
         isVeg: { type: Boolean, default: true },
         image: { type: String, default: '' },
-        notes: { type: String, default: '' }
+        notes: { type: String, default: '' },
+        kind: { type: String, enum: ['product', 'addon', 'topping'], default: 'product' },
+        size: { type: String, trim: true, default: '' },
+        crust: { type: String, trim: true, default: '' },
+        selectedAddons: {
+            type: [{
+                _id: false,
+                id: { type: String, default: '' },
+                name: { type: String, required: true, trim: true },
+                type: { type: String, default: '' },
+                price: { type: Number, default: 0, min: 0 }
+            }],
+            default: []
+        },
+        isLimitedOffer: { type: Boolean, default: false }
     },
     { _id: false }
 );
@@ -27,8 +41,9 @@ const deliveryAddressSchema = new mongoose.Schema(
         state: { type: String, required: true, trim: true },
         zipCode: { type: String, default: '', trim: true },
         phone: { type: String, default: '', trim: true },
+        // No default for `type`: an address without coordinates must not produce a half-built GeoJSON point.
         location: {
-            type: { type: String, enum: ['Point'], default: 'Point' },
+            type: { type: String, enum: ['Point'] },
             coordinates: { type: [Number], default: undefined }
         }
     },
@@ -154,11 +169,46 @@ const deliveryStateSchema = new mongoose.Schema(
 const statusHistorySchema = new mongoose.Schema(
     {
         at: { type: Date, default: Date.now },
-        byRole: { type: String, enum: ['USER', 'STORE', 'DELIVERY_PARTNER', 'ADMIN', 'SYSTEM'] },
+        byRole: { type: String, enum: ['USER', 'STORE', 'DELIVERY_PARTNER', 'ADMIN', 'SYSTEM', 'STORE_MANAGER', 'KITCHEN_SUPERVISOR', 'KITCHEN_STAFF'] },
         byId: { type: mongoose.Schema.Types.ObjectId },
         from: { type: String },
         to: { type: String },
         note: { type: String, default: '' }
+    },
+    { _id: false }
+);
+
+const kitchenPersonSchema = new mongoose.Schema(
+    {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodUser' },
+        name: { type: String, default: '', trim: true },
+        assignedAt: { type: Date, default: Date.now }
+    },
+    { _id: false }
+);
+
+/** Kitchen workflow: store manager -> kitchen supervisor -> kitchen staff (per station). */
+const kitchenSchema = new mongoose.Schema(
+    {
+        stage: {
+            type: String,
+            enum: ['pending', 'preparing', 'baking', 'packaging', 'ready'],
+            default: 'pending'
+        },
+        supervisor: { type: kitchenPersonSchema, default: undefined },
+        staff: {
+            pizza_chef: { type: kitchenPersonSchema, default: undefined },
+            baking_chef: { type: kitchenPersonSchema, default: undefined },
+            packaging_staff: { type: kitchenPersonSchema, default: undefined }
+        },
+        priority: { type: String, enum: ['normal', 'urgent'], default: 'normal' },
+        notes: { type: String, default: '', trim: true },
+        isPaused: { type: Boolean, default: false },
+        pauseReason: { type: String, default: '', trim: true },
+        estimatedPrepMinutes: { type: Number, default: 0, min: 0 },
+        acceptedAt: { type: Date, default: null },
+        expectedReadyAt: { type: Date, default: null },
+        readyAt: { type: Date, default: null }
     },
     { _id: false }
 );
@@ -283,6 +333,10 @@ const orderSchema = new mongoose.Schema(
         statusHistory: {
             type: [statusHistorySchema],
             default: []
+        },
+        kitchen: {
+            type: kitchenSchema,
+            default: () => ({})
         },
         ratings: {
             type: orderRatingsSchema,

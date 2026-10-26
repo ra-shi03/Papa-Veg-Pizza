@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft, Clock, Tag, ChevronRight, Gift, ChevronDown, ChevronUp } from "lucide-react"
+import { ArrowLeft, Tag, ChevronRight, Gift, ChevronUp, Plus, Sparkles } from "lucide-react"
 import { useCart } from "@food/context/CartContext"
 import { useAppConfig } from "@food/context/AppConfigContext"
 import ApplyCoupon from "./ApplyCoupon"
 import AddGiftCard from "./AddGiftCard"
 import CheckoutModal from "./CheckoutModal"
+import { CartMealSuggestions, LimitedOffer } from "./upsell/CartUpsell"
+import { AnimatedNumber, CartItemRow, CartSkeleton, haptic } from "./CartParts"
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
+import { toast } from "sonner"
+import { removeCartKey } from "./upsell/upsellApi"
 
 const ALL_PRODUCTS = {
   "margherita-supreme": {
@@ -122,6 +127,25 @@ const ALL_PRODUCTS = {
   }
 }
 
+function SectionTitle({ ui, children }) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex-1 h-px" style={{ backgroundColor: ui.line }} />
+      <h3 className="text-sm font-semibold" style={{ color: ui.muted }}>{children}</h3>
+      <div className="flex-1 h-px" style={{ backgroundColor: ui.line }} />
+    </div>
+  )
+}
+
+function BillRow({ label, value, positive }) {
+  return (
+    <div className="flex justify-between items-center">
+      <span>{label}</span>
+      <span className={positive ? "font-semibold text-emerald-600" : "font-medium"}>{value}</span>
+    </div>
+  )
+}
+
 export default function Cart() {
   const navigate = useNavigate()
   const { replaceCart } = useCart()
@@ -132,6 +156,9 @@ export default function Cart() {
 
   // State Management
   const [cartItems, setCartItems] = useState([])
+  const [cartLoaded, setCartLoaded] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+  const reduceMotion = useReducedMotion()
   const [orderTypeInfo, setOrderTypeInfo] = useState("Order for Today 11:30")
   const [showCouponModal, setShowCouponModal] = useState(false)
   const [showGiftCardModal, setShowGiftCardModal] = useState(false)
@@ -179,6 +206,10 @@ export default function Cart() {
             description: c.description || "",
             size: c.selectedSize || "",
             quantity: itemQuantity,
+            kind: c.kind,
+            isLimitedOffer: !!c.isLimitedOffer,
+            offerToken: c.offerToken,
+            offerExpiresAt: c.offerExpiresAt,
             restaurant: "Papa Veg Pizza",
             restaurantId: "papa-veg-pizza-1"
           })
@@ -235,7 +266,15 @@ export default function Cart() {
         }
       })
 
+      // A limited time offer is dropped from the cart once its countdown ends
+      const expired = list.find((i) => i.isLimitedOffer && i.offerExpiresAt && i.offerExpiresAt <= Date.now())
+      if (expired) {
+        removeCartKey(expired.key)
+        return
+      }
+
       setCartItems(list)
+      setCartLoaded(true)
       replaceCart(list)
     }
 
@@ -276,6 +315,40 @@ export default function Cart() {
     window.dispatchEvent(new Event("cartUpdated"))
   }
 
+  useEffect(() => {
+    window.scrollTo(0, 0)
+    const onScroll = () => setScrolled(window.scrollY > 4)
+    window.addEventListener("scroll", onScroll, { passive: true })
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [])
+
+  // Removing a line offers an Undo for a few seconds instead of silently deleting it.
+  const removeItem = (item) => {
+    const stored = JSON.parse(localStorage.getItem("userCart") || "{}")
+    const raw = stored[item.key]
+    const qty = typeof raw === "object" && raw !== null ? Number(raw.quantity || 1) : Number(raw || item.quantity || 1)
+    delete stored[item.key]
+    localStorage.setItem("userCart", JSON.stringify(stored))
+    window.dispatchEvent(new Event("cartUpdated"))
+    toast(`Removed ${item.name}`, {
+      duration: 5000,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          const current = JSON.parse(localStorage.getItem("userCart") || "{}")
+          current[item.key] = qty
+          localStorage.setItem("userCart", JSON.stringify(current))
+          window.dispatchEvent(new Event("cartUpdated"))
+        },
+      },
+    })
+  }
+
+  const changeQty = (item, delta) => {
+    if (item.quantity + delta <= 0) removeItem(item)
+    else updateItemQty(item.key, delta)
+  }
+
   // Calculate pricing sums
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
@@ -297,12 +370,24 @@ export default function Cart() {
   }
 
   const total = subtotal > 0 ? Number((subtotal - discount + taxesAndCharges - giftCardValue).toFixed(2)) : 0
+  const savings = Number((discount + giftCardValue).toFixed(2))
+  const beforeSavings = Number((total + savings).toFixed(2))
+
+  const serviceKind = (typeof localStorage !== "undefined" && localStorage.getItem("activeService")) || "delivery"
+  const deliveryAddressLabel = typeof localStorage !== "undefined" ? localStorage.getItem("deliveryAddress") || "" : ""
+  const ui = {
+    page: isDarkMode ? "#0e0e0f" : "#efeff1",
+    card: isDarkMode ? "#1b1b1d" : "#ffffff",
+    text: isDarkMode ? "#f4f4f5" : "#1c1b1b",
+    muted: isDarkMode ? "#a1a1aa" : "#6b7280",
+    line: isDarkMode ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)",
+  }
 
   return (
     <div className={`min-h-screen flex justify-center transition-colors duration-300 ${isDarkMode ? "bg-[#0a0a0a]" : "bg-gray-100"}`}>
-      <div className={`font-body-md text-body-md w-full max-w-md min-h-screen pb-36 flex flex-col relative shadow-2xl border-x ${
+      <div className={`font-body-md text-body-md w-full max-w-md min-h-screen pb-44 flex flex-col relative shadow-2xl border-x ${
         isDarkMode ? "border-zinc-800/40" : "border-gray-200/50"
-      }`} style={{ backgroundColor: isDarkMode ? "#111111" : "#fbf9f8", color: isDarkMode ? "#e5e2e1" : "#1c1b1b" }}>
+      }`} style={{ backgroundColor: isDarkMode ? "#0e0e0f" : "#efeff1", color: isDarkMode ? "#e5e2e1" : "#1c1b1b" }}>
       {/* Custom Global Scrollbar Hider and Styling injection */}      <style dangerouslySetInnerHTML={{
         __html: `
         .glass-card {
@@ -448,350 +533,228 @@ export default function Cart() {
       }} />
 
       {/* Header */}
-      <header className="sticky top-0 left-0 w-full z-10 bg-surface/80 backdrop-blur-xl dark:bg-surface/80 border-b border-white/10 shadow-sm h-16 flex items-center justify-between px-margin-mobile">
-        <button
-          onClick={() => navigate(-1)}
-          className="p-2 hover:opacity-80 transition-opacity active:scale-95 bg-transparent border-0 cursor-pointer text-inherit"
-        >
-          <ArrowLeft size={22} className={isDarkMode ? "text-white" : "text-[#1c1b1b]"} />
-        </button>
-        <h1 className={`font-headline-lg-mobile text-lg font-bold absolute left-1/2 -translate-x-1/2 ${isDarkMode ? "text-white" : "text-[#1c1b1b]"}`}>Your Cart</h1>
-        <div className="w-8" />
+      <header className="sticky top-0 z-20 w-full h-14 flex items-center justify-between px-4 transition-shadow duration-200" style={{ backgroundColor: ui.card, borderBottom: `1px solid ${ui.line}`, boxShadow: scrolled ? "0 4px 14px rgba(0,0,0,0.10)" : "none" }}>
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate(-1)} aria-label="Back" className="p-1 bg-transparent border-0 cursor-pointer active:scale-95" style={{ color: ui.text }}>
+            <ArrowLeft size={22} />
+          </button>
+          <h1 className="text-lg font-bold" style={{ color: ui.text }}>Cart</h1>
+        </div>
+        {appConfig?.couponEnabled !== false && (
+          <button
+            onClick={() => !appliedCoupon && setShowCouponModal(true)}
+            className="flex items-center gap-1.5 text-sm font-medium bg-transparent border-0 cursor-pointer"
+            style={{ color: ui.muted }}
+          >
+            <Tag size={18} /> Coupons
+          </button>
+        )}
       </header>
 
-      {/* Order Type / Schedule Card */}
-      <div className="flex items-center gap-3 px-margin-mobile py-4 border-b border-white/10 glass-card mx-margin-mobile mt-md rounded-xl">
-        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-          <Clock size={18} />
-        </div>
-        <span className={`font-label-sm ${isDarkMode ? "text-white" : "text-[#131313]"}`}>{orderTypeInfo}</span>
-      </div>
-
-      {/* Order List Header */}
-      <div className="flex justify-between items-center px-margin-mobile pt-6 pb-2">
-        <h2 className={`font-headline-lg-mobile text-base ${isDarkMode ? "text-white" : "text-[#131313]"}`}>Order List</h2>
-        <button
-          onClick={() => navigate("/user/menu")}
-          className="text-primary font-label-sm hover:opacity-80 transition-opacity active:scale-95 bg-transparent border-0 outline-none cursor-pointer"
-        >
-          + Add more
-        </button>
-      </div>
-
-      {/* Cart Items Area */}
-      <div className="px-margin-mobile space-y-md">
-        {cartItems.length === 0 ? (
-          <div className="py-4 px-4 text-center opacity-60 font-label-sm">
-            Looks like you haven't added any item to your Cart yet
-          </div>
-        ) : (
-          cartItems.map((item) => (
-            <div key={item.key} className="glass-card rounded-xl p-md flex items-start gap-4">
-              {/* Veg Indicator Square Box */}
-              <div className="mt-1.5 border-2 border-tertiary w-3.5 h-3.5 flex items-center justify-center shrink-0">
-                <div className="bg-tertiary rounded-full w-1.5 h-1.5" />
-              </div>
-
-              {/* Info Details */}
-              <div className="flex-1 text-left space-y-1">
-                <h4 className={`font-headline-lg-mobile text-[14px] leading-tight ${isDarkMode ? "text-white" : "text-[#131313]"}`}>
-                  {item.name}
-                </h4>
-                {item.size && (
-                  <p className="font-label-sm text-[11px] opacity-60">
-                    Size: {item.size}
-                  </p>
-                )}
-                <p className={`font-price-xl text-sm mt-1 ${isDarkMode ? "text-white" : "text-[#131313]"}`}>
-                  ₹{item.price * item.quantity}
-                </p>
-              </div>
-
-              {/* Quantity Changer */}
-              <div className="flex items-center border border-white/10 rounded-lg h-9 overflow-hidden glass-card">
-                <button
-                  onClick={() => updateItemQty(item.key, -1)}
-                  className="px-3 h-full flex items-center justify-center text-primary font-bold text-lg hover:bg-white/5 active:bg-white/10 transition-colors bg-transparent border-0 cursor-pointer"
-                >
-                  -
-                </button>
-                <span className={`px-2 font-label-sm min-w-[20px] text-center flex items-center justify-center ${isDarkMode ? "text-white" : "text-[#131313]"}`}>
-                  {item.quantity}
-                </span>
-                <button
-                  onClick={() => updateItemQty(item.key, 1)}
-                  className="px-3 h-full flex items-center justify-center text-primary font-bold text-lg hover:bg-white/5 active:bg-white/10 transition-colors bg-transparent border-0 cursor-pointer"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Promo Banner */}
-      {cartItems.length > 0 && (
-        <div className="mt-4 px-margin-mobile">
-          <div className="rounded-xl overflow-hidden shadow-sm hover:scale-[1.01] transition-transform duration-200 cursor-pointer">
-            <img 
-              src="/free_gift_banner.png" 
-              alt="Claim Your Free Gift" 
-              className="w-full h-auto object-cover"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Promos & Discounts Section */}
-      <div className="mt-6 px-margin-mobile space-y-sm">
-        {/* Coupon Apply Row */}
-        {appConfig?.couponEnabled !== false && (
-          <div
-            onClick={() => !appliedCoupon && setShowCouponModal(true)}
-            className="p-md flex items-center justify-between cursor-pointer glass-card rounded-xl hover:bg-white/5 transition-colors"
+      {!cartLoaded ? (
+        <CartSkeleton ui={ui} />
+      ) : cartItems.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-8 py-24 gap-4">
+          <p className="text-base font-semibold" style={{ color: ui.text }}>Your cart is empty</p>
+          <p className="text-sm" style={{ color: ui.muted }}>Looks like you haven't added any item to your cart yet</p>
+          <button
+            onClick={() => navigate("/user/menu")}
+            className="mt-2 px-6 h-11 rounded-xl text-sm font-bold text-white border-0 cursor-pointer"
+            style={{ backgroundColor: "#E53935" }}
           >
-            <div className="flex items-center gap-3">
-              <Tag size={22} className="text-primary" />
-              <div className="text-left">
-                {appliedCoupon ? (
-                  <div>
-                    <p className={`font-label-sm ${isDarkMode ? "text-white" : "text-[#131313]"}`}>
-                      Coupon {appliedCoupon.code} applied!
-                    </p>
-                    <p className="text-xs text-primary font-bold mt-0.5">
-                      ₹{discount} saved on this order
-                    </p>
-                  </div>
-                ) : (
-                  <p className={`font-label-sm ${isDarkMode ? "text-white" : "text-[#131313]"}`}>Apply Coupon</p>
-                )}
-              </div>
+            Browse menu
+          </button>
+        </div>
+      ) : (
+        <div className="px-4 pt-4 space-y-4">
+          {/* Deliver card */}
+          <div className="rounded-2xl p-4 flex items-center gap-4" style={{ backgroundColor: ui.card }}>
+            <div className="shrink-0 text-left pr-4" style={{ borderRight: `1px solid ${ui.line}` }}>
+              <p className="text-[11px] font-semibold tracking-wide" style={{ color: ui.muted }}>
+                {serviceKind === "delivery" ? "DELIVER" : serviceKind === "takeaway" ? "TAKEAWAY" : "IN-CAR"}
+              </p>
+              <p className="text-xl font-bold leading-tight" style={{ color: ui.text }}>
+                {serviceKind === "delivery" ? `${appConfig?.estimatedDeliveryMinutes || 30} Mins` : "Pick up"}
+              </p>
             </div>
-            {appliedCoupon ? (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setAppliedCoupon(null)
-                }}
-                className="text-primary text-xs font-bold hover:underline active:scale-95 bg-transparent border-0 cursor-pointer"
-              >
-                Remove
-              </button>
-            ) : (
-              <ChevronRight size={20} className="text-primary" />
-            )}
+            <div className="min-w-0 text-left">
+              <p className="text-sm leading-snug line-clamp-2" style={{ color: ui.muted }}>
+                {serviceKind === "delivery" ? (deliveryAddressLabel || "Add a delivery address at checkout") : orderTypeInfo}
+              </p>
+            </div>
           </div>
-        )}
 
-        {/* Gift Card Add Row */}
-        <div
-          onClick={() => !appliedGiftCard && setShowGiftCardModal(true)}
-          className="p-md flex items-center justify-between cursor-pointer glass-card rounded-xl hover:bg-white/5 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <Gift size={22} className="text-primary" />
-            <div className="text-left">
-              {appliedGiftCard ? (
-                <div>
-                  <p className={`font-label-sm ${isDarkMode ? "text-white" : "text-[#131313]"}`}>
-                    Gift Card Applied
-                  </p>
-                  <p className="text-xs text-primary font-bold mt-0.5">
-                    ₹{giftCardValue} balance used
-                  </p>
-                </div>
-              ) : (
-                <p className={`font-label-sm ${isDarkMode ? "text-white" : "text-[#131313]"}`}>Add Gift Card</p>
-              )}
-            </div>
+          {/* Limited time offer (slide to unlock) */}
+          <div className="-mx-1">
+            <LimitedOffer dark={isDarkMode} cartTotal={subtotal} hasOfferInCart={cartItems.some((i) => i.isLimitedOffer)} />
           </div>
-          {appliedGiftCard ? (
+
+          {/* Items */}
+          <div className="rounded-2xl overflow-hidden text-left" style={{ backgroundColor: ui.card }}>
+            <AnimatePresence initial={false}>
+              {cartItems.map((item, index) => (
+                <CartItemRow
+                  key={item.key}
+                  item={item}
+                  index={index}
+                  ui={ui}
+                  onQty={(delta) => changeQty(item, delta)}
+                  onRemove={() => removeItem(item)}
+                />
+              ))}
+            </AnimatePresence>
+            <p className="px-4 pb-2 pt-0 text-[11px] text-left" style={{ color: ui.muted }}>Tip: swipe an item left to remove it</p>
             <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setAppliedGiftCard(null)
-              }}
-              className="text-primary text-xs font-bold hover:underline active:scale-95 bg-transparent border-0 cursor-pointer"
+              onClick={() => navigate("/user/menu")}
+              className="w-full flex items-center gap-2 px-4 py-3.5 text-sm font-medium bg-transparent border-0 cursor-pointer text-left"
+              style={{ color: ui.muted, borderTop: `1px dashed ${ui.line}` }}
             >
-              Remove
+              <Plus size={16} /> Add more items
             </button>
-          ) : (
-            <ChevronRight size={20} className="text-primary" />
-          )}
-        </div>
-      </div>
-
-      {/* Hungry for more? Section */}
-      {cartItems.length > 0 && (
-        <div className="mt-6 text-left">
-          <h3 className={`font-headline-lg-mobile text-base font-extrabold px-margin-mobile mb-3 ${isDarkMode ? "text-white" : "text-[#131313]"}`}>
-            Hungry for more?
-          </h3>
-          <div className="flex overflow-x-auto gap-4 px-margin-mobile pb-4 hide-scrollbar">
-            {[
-              {
-                id: "cheese-garlic-bread",
-                name: "Cheese Garlic Bread",
-                price: 149,
-                image: "/food/cheese_garlic_bread.jpg"
-              },
-              {
-                id: "garlic-bread-stix",
-                name: "Garlic Bread Stix",
-                price: 119,
-                image: "https://images.unsplash.com/photo-1619535860434-ba1d8fa12536?w=500&auto=format&fit=crop&q=80"
-              },
-              {
-                id: "choco-volcano",
-                name: "Choco Volcano Cake",
-                price: 139,
-                image: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=500&auto=format&fit=crop&q=80"
-              },
-              {
-                id: "pepsi-cola",
-                name: "Pepsi Cola (500ml)",
-                price: 60,
-                image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=500&auto=format&fit=crop&q=80"
-              }
-            ].map((item) => (
-              <div 
-                key={item.id}
-                className="glass-card rounded-xl p-3 flex items-center justify-between min-w-[280px] max-w-[280px] shrink-0 gap-3"
-              >
-                <div className="flex items-center gap-3">
-                  <img 
-                    src={item.image} 
-                    alt={item.name} 
-                    className="w-16 h-16 rounded-lg object-cover"
-                  />
-                  <div className="text-left space-y-0.5">
-                    <h4 className={`font-headline-lg-mobile text-xs font-semibold leading-tight ${isDarkMode ? "text-white" : "text-[#131313]"}`}>
-                      {item.name}
-                    </h4>
-                    <p className={`font-price-xl text-xs font-bold ${isDarkMode ? "text-white" : "text-[#131313]"}`}>
-                      ₹{item.price}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => updateItemQty(item.id, 1)}
-                  className="text-primary font-bold text-xs hover:opacity-85 active:scale-95 transition-all bg-transparent border-0 cursor-pointer px-2 py-1 outline-none"
-                >
-                  Add
-                </button>
-              </div>
-            ))}
           </div>
-        </div>
-      )}
 
-      {/* Bill Details Section */}
-      {cartItems.length > 0 && (
-        <div className="mt-4 px-margin-mobile text-left pb-16">
-          <div className="glass-card rounded-xl p-md space-y-3">
-            {/* Subtotal Row */}
-            <div className="flex justify-between items-center text-sm">
-              <span className="opacity-75 font-semibold">Subtotal</span>
-              <span className={`font-bold ${isDarkMode ? "text-white" : "text-[#131313]"}`}>₹{subtotal}</span>
-            </div>
+          {/* Complete your meal with */}
+          <div className="-mx-5">
+            <CartMealSuggestions dark={isDarkMode} cartIds={cartItems.map((i) => String(i.itemId))} />
+          </div>
 
-            {/* Discounts Row */}
-            {discount > 0 && (
-              <div className="flex justify-between items-center text-sm text-primary">
-                <span className="font-semibold">Discount Applied</span>
-                <span className="font-bold">-₹{discount}</span>
-              </div>
-            )}
-
-            {/* Gift Card Row */}
-            {giftCardValue > 0 && (
-              <div className="flex justify-between items-center text-sm text-primary">
-                <span className="font-semibold">Gift Card Balance Used</span>
-                <span className="font-bold">-₹{giftCardValue}</span>
-              </div>
-            )}
-
-            {/* Taxes & Charges Row */}
-            <div className="space-y-2">
-              <div 
-                onClick={() => setShowTaxDetails(!showTaxDetails)}
-                className="flex justify-between items-center text-sm cursor-pointer select-none"
-              >
-                <div className="flex items-center gap-1">
-                  <span className="opacity-75 font-semibold">Taxes and Charges</span>
-                  {showTaxDetails ? (
-                    <ChevronUp size={16} className="text-primary" />
+          {/* Savings & rewards */}
+          <div className="pt-2">
+            <SectionTitle ui={ui}>Savings &amp; Rewards</SectionTitle>
+            <div className="mt-3 rounded-2xl p-4 text-left space-y-3" style={{ backgroundColor: ui.card }}>
+              {appConfig?.couponEnabled !== false && (
+                <div className="rounded-xl p-3 flex items-center justify-between gap-3" style={{ border: `1px dashed ${ui.line}` }}>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Tag size={20} className="shrink-0 text-[#E53935]" />
+                    <div className="min-w-0">
+                      {appliedCoupon ? (
+                        <>
+                          <p className="text-sm font-semibold" style={{ color: ui.text }}>{appliedCoupon.code} applied</p>
+                          <p className="text-xs font-semibold text-emerald-600">₹{discount} saved on this order</p>
+                        </>
+                      ) : (
+                        <p className="text-sm font-semibold" style={{ color: ui.text }}>Apply a coupon</p>
+                      )}
+                    </div>
+                  </div>
+                  {appliedCoupon ? (
+                    <button onClick={() => setAppliedCoupon(null)} className="text-xs font-bold text-[#E53935] bg-transparent border-0 cursor-pointer">Remove</button>
                   ) : (
-                    <ChevronDown size={16} className="text-primary" />
+                    <button onClick={() => setShowCouponModal(true)} className="text-xs font-bold text-[#E53935] bg-transparent border-0 cursor-pointer flex items-center">View offers <ChevronRight size={14} /></button>
                   )}
                 </div>
-                <span className={`font-bold ${isDarkMode ? "text-white" : "text-[#131313]"}`}>₹{taxesAndCharges}</span>
-              </div>
-
-              {/* Tax Details Dropdown */}
-              {showTaxDetails && (
-                <div className="pl-4 pr-1 py-1 space-y-1.5 border-l border-white/10 dark:border-white/10 text-xs opacity-80">
-                  <div className="flex justify-between items-center">
-                    <span>Restaurant Handling Charges</span>
-                    <span>₹{handlingCharge}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>CGST (2.5%)</span>
-                    <span>₹{cgst}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>SGST (2.5%)</span>
-                    <span>₹{sgst}</span>
+              )}
+              <div className="rounded-xl p-3 flex items-center justify-between gap-3" style={{ border: `1px dashed ${ui.line}` }}>
+                <div className="flex items-center gap-3 min-w-0">
+                  <Gift size={20} className="shrink-0 text-[#E53935]" />
+                  <div className="min-w-0">
+                    {appliedGiftCard ? (
+                      <>
+                        <p className="text-sm font-semibold" style={{ color: ui.text }}>Gift card applied</p>
+                        <p className="text-xs font-semibold text-emerald-600">₹{giftCardValue} balance used</p>
+                      </>
+                    ) : (
+                      <p className="text-sm font-semibold" style={{ color: ui.text }}>Add a gift card</p>
+                    )}
                   </div>
                 </div>
-              )}
+                {appliedGiftCard ? (
+                  <button onClick={() => setAppliedGiftCard(null)} className="text-xs font-bold text-[#E53935] bg-transparent border-0 cursor-pointer">Remove</button>
+                ) : (
+                  <button onClick={() => setShowGiftCardModal(true)} className="text-xs font-bold text-[#E53935] bg-transparent border-0 cursor-pointer flex items-center">Add <ChevronRight size={14} /></button>
+                )}
+              </div>
             </div>
+          </div>
 
-            {/* Separator line */}
-            <div className="border-t border-white/10 dark:border-white/10 my-2" />
+          {/* Bill details */}
+          <div className="pt-2 pb-4">
+            <SectionTitle ui={ui}>Bill Details</SectionTitle>
+            <div className="mt-3 rounded-2xl p-4 text-left" style={{ backgroundColor: ui.card }}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-base font-bold" style={{ color: ui.text }}>To Pay</p>
+                  <button
+                    onClick={() => setShowTaxDetails(!showTaxDetails)}
+                    className="mt-0.5 text-xs bg-transparent border-0 p-0 cursor-pointer underline flex items-center"
+                    style={{ color: ui.muted }}
+                  >
+                    View Details {showTaxDetails ? <ChevronUp size={13} /> : <ChevronRight size={13} />}
+                  </button>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold" style={{ color: ui.text }}>
+                    {savings > 0 && <span className="text-sm font-medium line-through mr-2" style={{ color: ui.muted }}>₹{beforeSavings}</span>}
+                    <AnimatedNumber value={total} />
+                  </p>
+                  {savings > 0 && (
+                    <span className="inline-block mt-1 px-2 py-0.5 rounded text-[11px] font-bold text-white" style={{ backgroundColor: "#1b8a3a" }}>YOU SAVED ₹{savings}</span>
+                  )}
+                </div>
+              </div>
 
-            {/* Total Row */}
-            <div className="flex justify-between items-center text-base font-extrabold">
-              <span>Total</span>
-              <span className={`font-extrabold ${isDarkMode ? "text-white" : "text-[#131313]"}`}>₹{total}</span>
+              <AnimatePresence initial={false}>
+                {showTaxDetails && (
+                  <motion.div
+                    key="bill-breakdown"
+                    initial={reduceMotion ? false : { height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                    transition={{ duration: 0.22 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-3 pt-3 space-y-2 text-sm" style={{ borderTop: `1px dashed ${ui.line}`, color: ui.muted }}>
+                      <BillRow label="Item total" value={`₹${subtotal}`} />
+                      {discount > 0 && <BillRow label="Coupon discount" value={`-₹${discount}`} positive />}
+                      {giftCardValue > 0 && <BillRow label="Gift card" value={`-₹${giftCardValue}`} positive />}
+                      <BillRow label="Restaurant handling charges" value={`₹${handlingCharge}`} />
+                      <BillRow label="CGST (2.5%)" value={`₹${cgst}`} />
+                      <BillRow label="SGST (2.5%)" value={`₹${sgst}`} />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </div>
       )}
 
-      {/* Sticky Bottom Bar */}
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-surface/90 backdrop-blur-xl border-t border-white/10 px-margin-mobile pt-4 pb-8 z-30 flex flex-col gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.3)]">
-        <div className="flex justify-between items-center">
-          <span className="text-[11px] font-bold opacity-60">
-            Prices are GST-inclusive
-          </span>
-          <span className={`font-price-xl text-sm ${isDarkMode ? "text-white" : "text-[#131313]"}`}>
-            Total: ₹{total}
-          </span>
+      {/* Sticky pay bar */}
+      {cartItems.length > 0 && (
+        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30" style={{ backgroundColor: ui.card, boxShadow: "0 -4px 20px rgba(0,0,0,0.12)" }}>
+          {savings > 0 && (
+            <motion.div
+              key={`saved-${savings}`}
+              initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mx-3 mt-3 rounded-xl px-3 py-2.5 flex items-center gap-2 text-sm text-left" style={{ backgroundColor: isDarkMode ? "rgba(27,138,58,0.18)" : "#e8f5ec", color: isDarkMode ? "#9be7b0" : "#1b5e30" }}>
+              <Sparkles size={16} className="shrink-0" />
+              <span>You saved <b>₹{savings}</b> on this order</span>
+            </motion.div>
+          )}
+          <div className="flex items-center gap-3 px-3 py-3 pb-6">
+            <div className="shrink-0 text-left pl-1">
+              <p className="text-[11px]" style={{ color: ui.muted }}>Prices are GST-inclusive</p>
+              <p className="text-[11px]" style={{ color: ui.muted }}>Choose payment next</p>
+            </div>
+            <button
+              onClick={() => { haptic(12); setShowCheckoutModal(true) }}
+              className="flex-1 h-12 rounded-xl text-white font-bold text-[15px] border-0 cursor-pointer flex items-center justify-center gap-2 active:scale-[0.97] transition-transform"
+              style={{ backgroundColor: "#d32f3a" }}
+            >
+              Pay <AnimatedNumber value={total} />
+              {savings > 0 && <span className="text-sm font-medium line-through opacity-75">₹{beforeSavings}</span>}
+              <ChevronRight size={18} />
+            </button>
+          </div>
         </div>
-
-        <button
-          onClick={() => {
-            if (cartItems.length > 0) {
-              setShowCheckoutModal(true)
-            }
-          }}
-          disabled={cartItems.length === 0}
-          className={`w-full h-12 rounded-xl text-xs font-bold transition-all uppercase tracking-wider ${cartItems.length > 0
-            ? "bg-primary text-on-primary hover:bg-red-700 active:scale-95 shadow-[0_0_15px_rgba(229,57,53,0.3)] cursor-pointer border-0"
-            : "bg-white/10 text-white/40 cursor-not-allowed border border-white/10"
-            }`}
-        >
-          Proceed to Checkout
-        </button>
-      </div>
+      )}
 
       {/* Coupon Modal Overlay */}
       <ApplyCoupon
         show={showCouponModal}
         onClose={() => setShowCouponModal(false)}
-        onApply={(coupon) => setAppliedCoupon(coupon)}
+        onApply={(coupon) => { setAppliedCoupon(coupon); haptic(12); toast.success(`Coupon ${coupon.code} applied`) }}
         cartTotal={subtotal}
       />
 
@@ -799,7 +762,7 @@ export default function Cart() {
       <AddGiftCard
         show={showGiftCardModal}
         onClose={() => setShowGiftCardModal(false)}
-        onApply={(card) => setAppliedGiftCard(card)}
+        onApply={(card) => { setAppliedGiftCard(card); haptic(12); toast.success("Gift card applied") }}
       />
 
       {/* Checkout Modal Overlay */}

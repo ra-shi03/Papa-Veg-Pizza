@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { storeOrdersApi, LIVE_POLL_MS, useLiveIndicator } from "../../api/storeOrdersApi";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import io from "socket.io-client";
@@ -24,165 +25,51 @@ const setLocalCompletedOrders = (orders) => {
   localStorage.setItem(COMPLETED_ORDERS_STORAGE_KEY, JSON.stringify(orders));
 };
 
+const inDateRange = (o, f) => {
+  const created = new Date(o.createdAt);
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const days = (n) => created >= new Date(startOfToday.getTime() - (n - 1) * 86400000);
+  if (f.dateRangeType === "Today" && created < startOfToday) return false;
+  if (f.dateRangeType === "Yesterday" && !(created >= new Date(startOfToday.getTime() - 86400000) && created < startOfToday)) return false;
+  if (f.dateRangeType === "Last 7 Days" && !days(7)) return false;
+  if (f.dateRangeType === "Last 30 Days" && !days(30)) return false;
+  if (f.startDate && f.endDate) {
+    const end = new Date(f.endDate);
+    end.setHours(23, 59, 59, 999);
+    if (created < new Date(f.startDate) || created > end) return false;
+  }
+  return true;
+};
+
 export function useCompletedOrders(filters = {}) {
-  const queryClient = useQueryClient();
-  const [socketConnected, setSocketConnected] = useState(false);
-
-  useEffect(() => {
-    setSocketConnected(true);
-    const socketUrl = import.meta.env?.VITE_SOCKET_URL || window.location.origin;
-    const socket = io(socketUrl, {
-      transports: ["websocket"],
-      autoConnect: false,
-    });
-
-    // Real-time simulations
-    return () => {
-      socket.disconnect();
-    };
-  }, [queryClient]);
-
-  const completedOrdersQuery = useQuery({
+  const query = useQuery({
     queryKey: ["completedOrders", filters],
     queryFn: async () => {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      
-      let list = getLocalCompletedOrders();
-
-      // Apply Search (Order Number, Customer Name, Customer Phone)
-      if (filters.search) {
-        const q = filters.search.toLowerCase();
-        list = list.filter(
-          (o) =>
-            o.orderNumber.toLowerCase().includes(q) ||
-            o.customer.name.toLowerCase().includes(q) ||
-            o.customer.phone.toLowerCase().includes(q)
-        );
-      }
-
-      // Filter by Payment Type
+      let list = (await storeOrdersApi.list("completed", { search: filters.search })).filter((o) => inDateRange(o, filters));
       if (filters.paymentType && filters.paymentType !== "All") {
-        list = list.filter((o) => o.paymentMethod.toLowerCase() === filters.paymentType.toLowerCase());
+        list = list.filter((o) => o.paymentMethod.toLowerCase() === String(filters.paymentType).toLowerCase());
       }
 
-      // Filter by Payment Status (Paid, Refunded)
-      if (filters.paymentStatus && filters.paymentStatus !== "All") {
-        if (filters.paymentStatus.toLowerCase() === "refunded") {
-          list = list.filter((o) => o.refundStatus === "refunded");
-        } else {
-          list = list.filter((o) => o.refundStatus !== "refunded");
-        }
-      }
-
-      // Filter by Delivery Type (orderType)
-      if (filters.deliveryType && filters.deliveryType !== "All") {
-        list = list.filter((o) => o.orderType === filters.deliveryType.toLowerCase());
-      }
-
-      // Filter by Order Source
-      if (filters.orderSource && filters.orderSource !== "All") {
-        list = list.filter((o) => o.orderSource.toLowerCase() === filters.orderSource.toLowerCase());
-      }
-
-      // Filter by Order Value (High Value > 1000)
-      if (filters.highValue === "true" || filters.highValue === true || filters.orderValue === "High Value") {
-        list = list.filter((o) => o.grandTotal > 1000);
-      }
-
-      // Filter by Customer Rating
-      if (filters.rating && filters.rating !== "All") {
-        const targetRating = parseInt(filters.rating);
-        if (!isNaN(targetRating)) {
-          list = list.filter((o) => o.customerRating === targetRating);
-        }
-      }
-
-      // Filter by Date
-      if (filters.dateRangeType && filters.dateRangeType !== "All") {
-        const now = new Date();
-        now.setHours(23, 59, 59, 999); // end of today
-        
-        list = list.filter((o) => {
-          const orderDate = new Date(o.createdAt);
-          const diffTime = Math.abs(now - orderDate);
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-          if (filters.dateRangeType === "Today") {
-            return diffDays <= 1 && orderDate.getDate() === now.getDate();
-          }
-          if (filters.dateRangeType === "Yesterday") {
-            const yesterday = new Date();
-            yesterday.setDate(now.getDate() - 1);
-            return orderDate.getDate() === yesterday.getDate() && orderDate.getMonth() === yesterday.getMonth();
-          }
-          if (filters.dateRangeType === "Last 7 Days") {
-            return diffDays <= 7;
-          }
-          if (filters.dateRangeType === "Last 30 Days") {
-            return diffDays <= 30;
-          }
-          return true;
-        });
-      }
-
-      // Filter by Custom Date Range
-      if (filters.startDate && filters.endDate) {
-        const start = new Date(filters.startDate);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(filters.endDate);
-        end.setHours(23, 59, 59, 999);
-        
-        list = list.filter((o) => {
-          const orderDate = new Date(o.createdAt);
-          return orderDate >= start && orderDate <= end;
-        });
-      }
-
-      // Calculate KPI Aggregates
       const totalOrders = list.length;
       const totalRevenue = list.reduce((sum, o) => sum + o.grandTotal, 0);
-      const averageOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
-      
-      const ordersWithDuration = list.filter((o) => o.totalDuration);
-      const averageDeliveryTime = ordersWithDuration.length > 0 
-        ? Math.round(ordersWithDuration.reduce((sum, o) => sum + o.totalDuration, 0) / ordersWithDuration.length) 
-        : 28; // Default fallback to 28 mins
-
-      const ratedOrders = list.filter((o) => o.customerRating);
-      const averageCustomerRating = ratedOrders.length > 0
-        ? Number((ratedOrders.reduce((sum, o) => sum + o.customerRating, 0) / ratedOrders.length).toFixed(1))
-        : 4.5; // Default fallback to 4.5 stars
-
-      const highValueOrdersCount = list.filter((o) => o.grandTotal > 1000).length;
-
-      // Pagination
       const page = parseInt(filters.page) || 1;
       const limit = parseInt(filters.limit) || 10;
-      const startIndex = (page - 1) * limit;
-      const paginatedList = list.slice(startIndex, startIndex + limit);
-
       return {
-        orders: paginatedList,
+        orders: list.slice((page - 1) * limit, page * limit),
         totalOrders,
         totalRevenue,
-        averageOrderValue,
-        averageDeliveryTime,
-        averageCustomerRating,
-        highValueOrdersCount,
-        pagination: {
-          total: totalOrders,
-          page,
-          limit
-        }
+        averageOrderValue: totalOrders ? Math.round(totalRevenue / totalOrders) : 0,
+        averageDeliveryTime: 0,
+        averageCustomerRating: 0,
+        highValueOrdersCount: list.filter((o) => o.grandTotal > 1000).length,
+        pagination: { total: totalOrders, page, limit },
       };
     },
-    staleTime: 1000,
+    refetchInterval: LIVE_POLL_MS * 4,
+    staleTime: 5000,
   });
-
-  return {
-    ...completedOrdersQuery,
-    socketConnected,
-  };
+  return { ...query, socketConnected: useLiveIndicator(query) };
 }
 
 export function useReorderOrder() {

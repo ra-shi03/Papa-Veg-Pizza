@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom"
 import { ArrowLeft, MapPin, Check, User, Clock, Gift, ShieldCheck, CreditCard, ChevronRight, AlertTriangle } from "lucide-react"
 import { useCart } from "@food/context/CartContext"
 import { useProfile } from "@food/context/ProfileContext"
-import { useOrders } from "@food/context/OrdersContext"
 import { useAppConfig } from "@food/context/AppConfigContext"
 import { motion, AnimatePresence } from "framer-motion"
 import RazorpayPayment from "./RazorpayPayment"
+import apiClient from "@/services/api/axios"
+import { orderAPI } from "@food/api"
+import { toast } from "sonner"
 
 export default function CheckoutModal({
   show,
@@ -23,7 +25,6 @@ export default function CheckoutModal({
   const navigate = useNavigate()
   const { replaceCart, clearCart } = useCart()
   const { addAddress, paymentMethods } = useProfile()
-  const { createOrder } = useOrders()
   const { config: appConfig } = useAppConfig()
   const isPaymentOptionDisabled = appConfig?.paymentOptionEnabled === false
   const isLoggedIn = localStorage.getItem("user_authenticated") === "true" || !!localStorage.getItem("user_accessToken")
@@ -100,7 +101,10 @@ export default function CheckoutModal({
   }
 
   // Final Order placement
-  const handleSaveAddressAndCheckout = () => {
+  const [placingOrder, setPlacingOrder] = useState(false)
+
+  const handleSaveAddressAndCheckout = async () => {
+    if (placingOrder) return
     // Build structured address object
     const newAddressObject = {
       label: "Home",
@@ -119,51 +123,74 @@ export default function CheckoutModal({
       console.warn("Failed saving address to profile context, continuing order placement", e)
     }
 
-    const defaultPayment = paymentMethods?.[0] || { id: "cod", type: "cod", cardNumber: "Cash On Delivery", cardHolder: "Guest" }
-
     const activeService = localStorage.getItem("activeService") || "delivery"
     const savedDeliveryAddress = localStorage.getItem("deliveryAddress") || ""
     const isTrain = activeService === "train" || savedDeliveryAddress.toLowerCase().includes("train")
     const trainPnr = localStorage.getItem("pvp_train_pnr") || ""
 
-    // Place the order
-    const orderId = createOrder({
-      items: cartItems.map(item => ({
-        id: item.id || item.lineItemId,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        image: item.image
-      })),
-      address: {
-        street: isTrain && savedDeliveryAddress ? savedDeliveryAddress : newAddressObject.street,
-        additionalDetails: isTrain && trainPnr ? `IRCTC Train PNR: ${trainPnr}` : newAddressObject.additionalDetails,
-        city: newAddressObject.city,
-        state: newAddressObject.state,
-        zipCode: newAddressObject.zipCode
-      },
-      contact: {
-        name: contactName,
-        phone: contactPhone,
-        email: contactEmail
-      },
-      isTrainOrder: isTrain,
-      orderType: isTrain ? "train" : "delivery",
-      pnr: trainPnr || undefined,
-      trainDetails: isTrain ? {
-        deliveryAddress: savedDeliveryAddress,
-        pnr: trainPnr
-      } : undefined,
-      timeSlot: timeOption,
-      promoOptIn: promoCommunication,
-      paymentMethod: defaultPayment,
-      subtotal,
-      deliveryFee: handlingCharge,
-      tax: cgst + sgst,
-      total,
-      restaurant: cartItems[0]?.restaurant || "Papa Veg Pizza",
-      note: instructions.trim()
-    })
+    // Pick the store that serves this delivery location, then place the order with it.
+    let orderId
+    setPlacingOrder(true)
+    try {
+      let coords = null
+      try {
+        const loc = JSON.parse(localStorage.getItem("userLocation") || "null")
+        if (Number.isFinite(loc?.latitude) && Number.isFinite(loc?.longitude)) coords = loc
+      } catch (_) {}
+
+      const resolved = await apiClient.get("/food/stores/resolve", {
+        params: coords ? { lat: coords.latitude, lng: coords.longitude } : {},
+        _isFallback: true,
+      })
+      const store = resolved?.data?.data
+      if (!store?.storeId) throw new Error("No store is available right now")
+
+      const response = await orderAPI.createOrder({
+        storeId: store.storeId,
+        customerName: contactName,
+        customerPhone: contactPhone,
+        address: {
+          label: "Home",
+          name: contactName,
+          phone: contactPhone,
+          street: isTrain && savedDeliveryAddress ? savedDeliveryAddress : newAddressObject.street,
+          additionalDetails: isTrain && trainPnr ? `IRCTC Train PNR: ${trainPnr}` : newAddressObject.additionalDetails,
+          city: newAddressObject.city,
+          state: newAddressObject.state,
+          zipCode: newAddressObject.zipCode,
+          ...(coords ? { location: { type: "Point", coordinates: [coords.longitude, coords.latitude] } } : {}),
+        },
+        items: cartItems.map((item) => ({
+          itemId: String(item.itemId || item.id),
+          name: item.name,
+          price: Number(item.price) || 0,
+          quantity: item.quantity,
+          image: item.image || "",
+          size: item.size || "",
+          kind: item.kind || "product",
+          notes: item.description || "",
+          ...(item.offerToken ? { offerToken: item.offerToken } : {}),
+        })),
+        pricing: {
+          subtotal,
+          tax: cgst + sgst,
+          deliveryFee: handlingCharge,
+          discount,
+          total,
+        },
+        // The in-app payment screen is a preview, so orders are placed as pay-on-delivery.
+        paymentMethod: "cash",
+        note: instructions.trim(),
+      })
+      const created = response?.data?.data?.order
+      orderId = created?._id || created?.id
+      if (!orderId) throw new Error("Order could not be created")
+    } catch (err) {
+      setPlacingOrder(false)
+      toast.error(err?.response?.data?.message || err?.message || "Could not place your order")
+      return
+    }
+    setPlacingOrder(false)
 
     if (isTrain) {
       try {
