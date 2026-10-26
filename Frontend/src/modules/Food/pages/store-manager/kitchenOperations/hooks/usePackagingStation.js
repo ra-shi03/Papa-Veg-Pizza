@@ -213,7 +213,7 @@ export function usePackagingStaff() {
     queryKey: ["packagingStaff"],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/staff?role=packaging");
+        const response = await apiClient.get("/food/store/orders/team", { params: { role: "packaging_staff" } });
         let list = [];
         if (Array.isArray(response.data)) {
           list = response.data;

@@ -9,6 +9,8 @@ import paymentRoutes from '../core/payments/payment.routes.js';
 import fcmRoutes from '../core/notifications/fcm.routes.js';
 import notificationRoutes from '../core/notifications/notification.routes.js';
 import { authMiddleware, requireSuperAdmin } from '../core/auth/auth.middleware.js';
+import { scopeIfAdmin } from '../modules/food/shared/franchiseScope.js';
+import { getStoresDropdown, getStoresList } from '../modules/food/franchise/controllers/store.controller.js';
 import * as businessSettingsController from '../modules/food/admin/controllers/businessSettings.controller.js';
 import * as productController from '../modules/food/admin/controllers/product.controller.js';
 import * as addonController from '../modules/food/admin/controllers/addon.controller.js';
@@ -43,6 +45,9 @@ import { getPublicPageController } from '../modules/food/admin/controllers/pageC
 
 const router = express.Router();
 
+// Store pickers sit before the /v1/stores router: its /:id route would swallow them
+router.get('/v1/stores/dropdown', authMiddleware, requireRoles('ADMIN'), scopeIfAdmin, getStoresDropdown);
+router.get('/v1/stores/list', authMiddleware, requireRoles('ADMIN', 'STORE_MANAGER'), scopeIfAdmin, getStoresList);
 router.use('/v1/stores', franchiseStoreRoutes);
 router.use('/v1/store-managers', franchiseStoreManagerRoutes);
 router.use('/v1/store-approvals', franchiseStoreApprovalRoutes);

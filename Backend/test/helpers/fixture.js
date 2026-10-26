@@ -149,7 +149,7 @@ async function build(ctx) {
     }
 
     return {
-        api, call, bearer, tokenFor, models, ts, F, SA, superUser, roles,
+        api, baseUrl: `http://127.0.0.1:${ctx.server.address().port}`, call, bearer, tokenFor, models, ts, F, SA, superUser, roles,
         /** a signed token for an existing user, claiming any role/scope */
         claim: (role, scope) => tokenFor(F.A.adminUserId, role, scope),
     };

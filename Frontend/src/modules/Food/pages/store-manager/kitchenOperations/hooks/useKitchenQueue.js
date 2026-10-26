@@ -325,9 +325,8 @@ export function useChefs() {
     queryKey: ["kitchenChefs"],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/store/staff", {
-          params: { role: "chef" },
-        });
+        // Kitchen staff of this store (supervisors + station staff), from the store-orders API
+        const response = await apiClient.get("/food/store/orders/team");
         if (Array.isArray(response.data)) return response.data;
         if (Array.isArray(response.data?.data)) return response.data.data;
         throw new Error("Format mismatch");
@@ -467,9 +466,11 @@ export function useUpdateOrderStatus() {
   return useMutation({
     mutationFn: async ({ orderId, status }) => {
       try {
-        const response = await apiClient.put(`/orders/${orderId}`, {
-          status,
-        });
+        // Kitchen progress goes through the order's kitchen stage; a cancel is a rejection
+        const stage = { preparing: "preparing", baking: "baking", packaging: "packaging", ready_for_pickup: "ready" }[status];
+        const response = stage
+          ? await apiClient.patch(`/food/store/orders/${orderId}/stage`, { stage })
+          : await apiClient.patch(`/food/store/orders/${orderId}/reject`, { cancelReason: "Cancelled by kitchen" });
         return response.data;
       } catch (err) {
         // Fallback simulation

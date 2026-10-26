@@ -6,6 +6,7 @@ import {
     getStoreApprovals, 
     getStoreApprovalsDashboard, 
     submitStoreApproval,
+    getStoreApprovalDocuments,
     uploadStoreDocuments,
     approveStoreApproval,
     rejectStoreApproval,
@@ -24,6 +25,7 @@ router.get('/', getStoreApprovals);
 router.get('/dashboard', getStoreApprovalsDashboard);
 router.post('/:id/submit', submitStoreApproval);
 router.post('/:id/documents', upload.any(), uploadStoreDocuments);
+router.get('/:id/documents', getStoreApprovalDocuments);
 // Decisions on an application are the super admin's: a franchise admin cannot approve its own stores
 router.patch('/:id/approve', requireSuperAdmin, approveStoreApproval);
 router.patch('/:id/reject', requireSuperAdmin, rejectStoreApproval);

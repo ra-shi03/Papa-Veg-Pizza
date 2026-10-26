@@ -248,3 +248,39 @@ export const getDashboardKpis = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// Store pickers (report filters, the store-manager dashboard switcher).
+// Admins get the approved stores of their franchise; a store manager only their own store.
+const pickerStores = async (req) => {
+  const base = { status: { $ne: 'DELETED' } };
+  const role = String(req.user?.role || '').toUpperCase().replace(/_/g, '-');
+  if (role === 'STORE-MANAGER') {
+    if (!req.user.storeId || !mongoose.isValidObjectId(req.user.storeId)) return [];
+    return FoodStore.find({ ...base, _id: req.user.storeId }).select('storeName code city').lean();
+  }
+  return FoodStore.find({ ...base, approvalStatus: 'Approved', ...franchiseFilter(req) })
+    .sort({ storeName: 1 }).select('storeName code city').lean();
+};
+
+export const getStoresDropdown = async (req, res) => {
+  try {
+    const stores = await pickerStores(req);
+    res.status(200).json({
+      success: true,
+      data: stores.map((s) => ({ storeId: String(s._id), storeName: s.storeName, storeCode: s.code || '' })),
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getStoresList = async (req, res) => {
+  try {
+    const stores = await pickerStores(req);
+    const list = stores.map((s) => ({ _id: String(s._id), id: String(s._id), name: s.storeName, storeName: s.storeName, code: s.code || '', city: s.city || '' }));
+    // `stores` is what the store-manager dashboard reads; `data` follows the usual envelope
+    res.status(200).json({ success: true, stores: list, data: list });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

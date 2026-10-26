@@ -311,7 +311,7 @@ export function useBakingStaff() {
     queryKey: ["bakingStaff"],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/staff?role=baking");
+        const response = await apiClient.get("/food/store/orders/team", { params: { role: "baking_chef" } });
         let list = [];
         if (Array.isArray(response.data)) {
           list = response.data;

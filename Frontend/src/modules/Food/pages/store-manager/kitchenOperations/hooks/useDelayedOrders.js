@@ -228,7 +228,7 @@ export function useActiveStaff() {
     queryKey: ["activeStaff"],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/staff?status=active");
+        const response = await apiClient.get("/food/store/orders/team");
         let list = [];
         if (Array.isArray(response.data)) {
           list = response.data;

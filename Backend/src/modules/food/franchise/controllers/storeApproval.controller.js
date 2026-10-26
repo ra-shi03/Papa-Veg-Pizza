@@ -130,6 +130,23 @@ export const getStoreApprovalsDashboard = async (req, res) => {
   }
 };
 
+// Documents of one application (franchise-scoped). The screens only need the file list + links.
+export const getStoreApprovalDocuments = async (req, res) => {
+  try {
+    const store = await FoodStore.findOne(withFranchiseScope(req, { _id: req.params.id })).select('storeName documents').lean();
+    if (!store) return res.status(404).json({ success: false, message: 'Store not found' });
+    res.status(200).json({
+      success: true,
+      data: {
+        storeName: store.storeName,
+        documents: (store.documents || []).map((d) => ({ _id: String(d._id), type: d.type, name: d.name, url: d.url, isVerified: !!d.isVerified, uploadedAt: d.uploadedAt })),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // Submit for Approval
 export const submitStoreApproval = async (req, res) => {
   try {
