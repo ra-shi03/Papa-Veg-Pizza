@@ -14,25 +14,30 @@ import {
     listRefundsController,
     getRefundsByOrderController
 } from './payment.controller.js';
+import { requireSuperAdmin } from '../auth/auth.middleware.js';
+import { requireRoles } from '../roles/role.middleware.js';
 
 const router = express.Router();
 
+// authMiddleware is applied where this router is mounted; each group below adds its role gate.
+
 // ─── Payment history for an order (user sees their payment trail) ───
-router.get('/orders/:orderId/payments', getPaymentHistoryController);
-router.get('/orders/:orderId/transactions', getOrderTransactionsController);
-router.get('/orders/:orderId/refunds', getRefundsByOrderController);
+router.get('/orders/:orderId/payments', requireRoles('USER', 'ADMIN'), getPaymentHistoryController);
+router.get('/orders/:orderId/transactions', requireRoles('USER', 'ADMIN'), getOrderTransactionsController);
+router.get('/orders/:orderId/refunds', requireRoles('USER', 'ADMIN'), getRefundsByOrderController);
 
 // ─── User wallet (new transaction-based endpoints) ───
-router.get('/wallet/balance', getUserWalletBalanceController);
-router.get('/wallet/transactions', getUserWalletTransactionsController);
+router.get('/wallet/balance', requireRoles('USER'), getUserWalletBalanceController);
+router.get('/wallet/transactions', requireRoles('USER'), getUserWalletTransactionsController);
 
 // ─── Store wallet ───
-router.get('/store/:storeId/wallet', getStoreWalletController);
+router.get('/store/:storeId/wallet', requireRoles('STORE-MANAGER', 'ADMIN'), getStoreWalletController);
 
 // ─── Delivery partner wallet ───
-router.get('/delivery/:deliveryPartnerId/wallet', getDeliveryWalletController);
+router.get('/delivery/:deliveryPartnerId/wallet', requireRoles('DELIVERY_PARTNER', 'ADMIN'), getDeliveryWalletController);
 
-// ─── Admin / Finance ───
+// ─── Admin / Finance (super admin only) ───
+router.use('/admin', requireSuperAdmin);
 router.get('/admin/wallet', getAdminWalletController);
 router.get('/admin/finance/summary', getAdminFinanceSummaryController);
 router.get('/admin/settlements', listSettlementsController);

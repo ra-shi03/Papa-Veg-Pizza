@@ -8,13 +8,15 @@ import {
   getDashboardKpis
 } from '../controllers/store.controller.js';
 import { authMiddleware } from '../../../../core/auth/auth.middleware.js';
+import { requireRoles } from '../../../../core/roles/role.middleware.js';
 
 const router = express.Router();
 
-// Optional: Add authMiddleware if needed, but keeping it open or matching existing for now
-// Usually franchise admin routes require authentication
+// Super admin and franchise admin only
+router.use(authMiddleware, requireRoles('ADMIN'));
+
 router.get('/dashboard-kpis', getDashboardKpis);
-router.post('/', authMiddleware, createStore);
+router.post('/', createStore);
 router.get('/', getStores);
 router.get('/:id', getStoreById);
 router.patch('/:id', updateStore);

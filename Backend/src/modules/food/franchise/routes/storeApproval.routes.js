@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../../../core/auth/auth.middleware.js';
-import { 
+import { requireRoles } from '../../../../core/roles/role.middleware.js';
+import {
     getStoreApprovals, 
     getStoreApprovalsDashboard, 
     submitStoreApproval,
@@ -14,8 +15,8 @@ import { upload } from '../../../../middleware/upload.js';
 
 const router = Router();
 
-// Franchise admin must be authenticated
-router.use(authMiddleware);
+// Super admin and franchise admin only
+router.use(authMiddleware, requireRoles('ADMIN'));
 
 // Store Approvals routes
 router.get('/', getStoreApprovals);
