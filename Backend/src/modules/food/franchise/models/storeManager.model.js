@@ -20,7 +20,7 @@ const personalDetailsSchema = new mongoose.Schema({
 const storeManagerSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'FoodUser',
+    ref: 'User',
     default: null,
   },
   name: {

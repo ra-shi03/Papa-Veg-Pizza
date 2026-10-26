@@ -16,7 +16,7 @@ export const WALLET_TX_REASONS = [
 const walletTransactionSchema = new mongoose.Schema(
     {
         walletId: { type: mongoose.Schema.Types.ObjectId, ref: 'WalletAccount', required: true },
-        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodUser', required: true },
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
         orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodOrder', default: null },
         /** Human-readable order number (e.g. FOD-…) shown in history. */
         orderRef: { type: String, default: '', trim: true },

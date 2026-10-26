@@ -6,7 +6,7 @@ import mongoose from 'mongoose';
  */
 const walletAccountSchema = new mongoose.Schema(
     {
-        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodUser', required: true, index: true },
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
         currency: { type: String, default: 'INR', uppercase: true, trim: true },
         availableBalancePaise: {
             type: Number,

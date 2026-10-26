@@ -21,7 +21,7 @@ const adminSchema = new mongoose.Schema(
         profileImage: { type: String, trim: true, default: '' },
         roleId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'FoodRole',
+            ref: 'Role',
             default: null
         },
         fcmTokens: {

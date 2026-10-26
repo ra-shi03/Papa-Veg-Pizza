@@ -12,7 +12,7 @@ const deliveryProfileSchema = new mongoose.Schema({
     aadhaarNumber: String,
     currentStoreId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Store"
+        ref: "FoodStore"
     },
     isOnline: {
         type: Boolean,

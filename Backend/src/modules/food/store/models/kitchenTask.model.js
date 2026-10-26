@@ -4,7 +4,7 @@ const kitchenTaskSchema = new mongoose.Schema(
     {
         orderId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'Order',
+            ref: 'FoodOrder',
             required: true,
             index: true
         },

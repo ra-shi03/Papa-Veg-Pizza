@@ -4,7 +4,7 @@ const foodAddressSchema = new mongoose.Schema(
     {
         userId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'FoodUser',
+            ref: 'User',
             required: true,
             index: true
         },

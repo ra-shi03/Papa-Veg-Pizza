@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { Addon as FoodAddon } from '../models/addon.model.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { FoodItem } from '../models/food.model.js';
 import { getFoodDisplayPrice, serializeFoodVariants } from './foodVariant.service.js';

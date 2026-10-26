@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 /** Cheesy Rewards enrolment + points balance. Loyalty points only — never money. */
 const rewardMembershipSchema = new mongoose.Schema(
     {
-        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodUser', required: true, unique: true },
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
         status: { type: String, enum: ['ACTIVE', 'QUIT'], default: 'ACTIVE' },
         pointsBalance: {
             type: Number,

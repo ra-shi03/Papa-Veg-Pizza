@@ -15,11 +15,11 @@ const userSessionSchema = new mongoose.Schema({
     },
     franchiseId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Franchise"
+        ref: "FoodFranchise"
     },
     storeId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Store"
+        ref: "FoodStore"
     },
     device: String,
     browser: String,

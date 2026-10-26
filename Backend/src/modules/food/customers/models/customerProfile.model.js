@@ -10,11 +10,11 @@ const customerProfileSchema = new mongoose.Schema({
     loyaltyTier: String,
     walletId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Wallet"
+        ref: "WalletAccount"
     },
     defaultAddressId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Address"
+        ref: "FoodAddress"
     }
 }, { 
     timestamps: true,

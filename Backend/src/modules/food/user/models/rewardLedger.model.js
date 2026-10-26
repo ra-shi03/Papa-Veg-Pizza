@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 const rewardLedgerSchema = new mongoose.Schema(
     {
         membershipId: { type: mongoose.Schema.Types.ObjectId, ref: 'RewardMembership', required: true },
-        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodUser', required: true },
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
         orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodOrder', default: null },
         type: { type: String, enum: ['EARN', 'REDEEM', 'REVERSAL', 'EXPIRE', 'FORFEIT'], required: true },
         direction: { type: String, enum: ['CREDIT', 'DEBIT'], required: true },
