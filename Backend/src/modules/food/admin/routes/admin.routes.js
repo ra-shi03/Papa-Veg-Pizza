@@ -1,5 +1,6 @@
 import express from 'express';
-import { requireAdmin, requireSuperAdmin } from '../../../../core/auth/auth.middleware.js';
+import { requireSuperAdmin } from '../../../../core/auth/auth.middleware.js';
+import { attachFranchiseScope } from '../../shared/franchiseScope.js';
 import * as adminController from '../controllers/admin.controller.js';
 import * as staffController from '../controllers/staff.controller.js';
 import * as foodApprovalController from '../controllers/foodApproval.controller.js';
@@ -45,14 +46,49 @@ router.get('/combos/public', comboController.getPublicCombos);
 router.get('/categories', categoryProductController.getCategoryProducts);
 router.get('/categories/public', categoryProductController.getCategoryProducts);
 
-router.use(requireAdmin);
+// =============================================================================
+// FRANCHISE-SCOPED: super admin and franchise admin.
+// attachFranchiseScope takes the franchise from the token; every handler below filters its
+// queries with it (super admin sees all, a franchise admin only its own franchise).
+// =============================================================================
+router.use(attachFranchiseScope);
+
+// ----- Own franchise / profile -----
+router.get('/franchises/my-franchise', franchiseController.getMyFranchise);
+router.patch('/franchises/my-franchise', franchiseController.updateMyFranchise);
+router.get('/profile/work', adminController.getStoreManagerProfileWork);
+
+// ----- Geography (shared reference data, read-only) -----
+router.get('/regions', geographyController.getRegions);
+router.get('/regions/:id', geographyController.getRegionById);
+router.get('/zones', geographyController.getZones);
+router.get('/zones/:id', geographyController.getZoneById);
+router.get('/territories', geographyController.getTerritories);
+router.get('/territories/:id', geographyController.getTerritoryById);
+
+// ----- Stores, orders, customers (read, scoped to the franchise) -----
+router.get('/stores', adminController.getStores);
+router.get('/stores/:id([0-9a-fA-F]{24})', adminController.getStoreById);
+router.get('/orders', orderController.listOrdersAdminController);
+router.get('/orders/:orderId', orderController.getOrderByIdAdminController);
+router.get('/customers', adminController.getCustomers);
+router.get('/customers/:id', adminController.getCustomerById);
+
+// ----- Staff / RBAC Management (the controller limits roles and franchise/store itself) -----
+router.post('/staff', staffController.createStaff);
+router.get('/staff', staffController.getStaffList);
+router.put('/staff/:id', staffController.updateStaff);
+router.delete('/staff/:id', staffController.deleteStaff);
+
+// =============================================================================
+// SUPER ADMIN ONLY: everything below is platform-wide (settings, catalogue, finance,
+// delivery fleet, other franchises, ...). A franchise admin gets 403.
+// =============================================================================
+router.use(requireSuperAdmin);
 
 // ----- Admin Rewards Config -----
 router.get('/rewards/config', rewardConfigController.getRewardConfig);
 router.put('/rewards/config', rewardConfigController.updateRewardConfig);
-
-// ----- Profile / Work -----
-router.get('/profile/work', adminController.getStoreManagerProfileWork);
 
 // ----- Broadcast Notifications -----
 router.post('/notifications/broadcast', notificationBroadcastController.createBroadcastNotificationController);
@@ -61,16 +97,12 @@ router.delete('/notifications/broadcast/:id', notificationBroadcastController.de
 
 // ----- Franchises -----
 router.post('/franchises', franchiseController.createFranchise);
-router.get('/franchises/my-franchise', franchiseController.getMyFranchise);
-router.patch('/franchises/my-franchise', franchiseController.updateMyFranchise);
 router.get('/franchises', franchiseController.getFranchises);
 router.get('/franchises/:id', franchiseController.getFranchiseById);
 router.patch('/franchises/:id', franchiseController.updateFranchise);
 router.delete('/franchises/:id', franchiseController.deleteFranchise);
 
-// ----- Customers -----
-router.get('/customers', adminController.getCustomers);
-router.get('/customers/:id', adminController.getCustomerById);
+// ----- Customers (account status is platform-wide) -----
 router.patch('/customers/:id/status', adminController.updateCustomerStatus);
 
 // ----- Safety / Emergency Reports -----
@@ -86,8 +118,7 @@ router.get('/global-search', adminController.globalSearch);
 router.get('/stores/complaints', adminController.getStoreComplaints);
 router.patch('/stores/complaints/:id', adminController.updateStoreComplaint);
 
-// ----- Stores -----
-router.get('/stores', adminController.getStores);
+// ----- Stores (list + single read are in the franchise-scoped section above) -----
 router.get('/dashboard-stats', adminController.getDashboardStats);
 router.get('/reports/stores', adminController.getStoreReport);
 router.get('/reports/transactions', adminController.getTransactionReport);
@@ -97,7 +128,6 @@ router.get('/stores/pending', adminController.getPendingStores);
 router.get('/stores/reviews', adminController.getStoreReviews);
 router.get('/stores/:id/menu-pdf', adminController.getStoreMenuPdfDownloadUrl);
 router.get('/stores/:id/download-menu-pdf', adminController.downloadStoreMenuPdf);
-router.get('/stores/:id', adminController.getStoreById);
 router.get('/stores/:id/analytics', adminController.getStoreAnalytics);
 router.get('/stores/:id/menu', adminController.getStoreMenuById);
 router.get('/stores/:id/menu-pdf', adminController.getStoreMenuPdfDownloadUrl);
@@ -266,26 +296,18 @@ router.patch('/delivery/:id/approve', adminController.approveDeliveryPartner);
 router.patch('/delivery/:id/reject', adminController.rejectDeliveryPartner);
 
 // ----- Regions, Zones, Territories -----
-router.get('/regions', geographyController.getRegions);
 router.post('/regions', geographyController.createRegion);
-router.get('/regions/:id', geographyController.getRegionById);
 router.patch('/regions/:id', geographyController.updateRegion);
 router.delete('/regions/:id', geographyController.deleteRegion);
 
-router.get('/zones', geographyController.getZones);
 router.post('/zones', geographyController.createZone);
-router.get('/zones/:id', geographyController.getZoneById);
 router.patch('/zones/:id', geographyController.updateZone);
 router.delete('/zones/:id', geographyController.deleteZone);
 
-router.get('/territories', geographyController.getTerritories);
 router.post('/territories', geographyController.createTerritory);
-router.get('/territories/:id', geographyController.getTerritoryById);
 router.patch('/territories/:id', geographyController.updateTerritory);
 router.delete('/territories/:id', geographyController.deleteTerritory);
 // ----- Orders -----
-router.get('/orders', orderController.listOrdersAdminController);
-router.get('/orders/:orderId', orderController.getOrderByIdAdminController);
 router.delete('/orders/:orderId', orderController.deleteOrderAdminController);
 
 // ----- Refunds (Super Admin only: approval credits the wallet or refunds the original payment method) -----
@@ -298,10 +320,5 @@ router.get('/pages-social-media/:key', getAdminPageController);
 router.put('/pages-social-media/:key', upsertAdminPageController);
 
 router.get('/sidebar-badges', adminController.getSidebarBadges);
-// ----- Staff / RBAC Management -----
-router.post('/staff', staffController.createStaff);
-router.get('/staff', staffController.getStaffList);
-router.put('/staff/:id', staffController.updateStaff);
-router.delete('/staff/:id', staffController.deleteStaff);
 
 export default router;

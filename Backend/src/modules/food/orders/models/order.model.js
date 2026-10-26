@@ -180,7 +180,7 @@ const statusHistorySchema = new mongoose.Schema(
 
 const kitchenPersonSchema = new mongoose.Schema(
     {
-        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodUser' },
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
         name: { type: String, default: '', trim: true },
         assignedAt: { type: Date, default: Date.now }
     },
@@ -257,7 +257,9 @@ const orderSchema = new mongoose.Schema(
         },
         userId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'FoodUser',
+            // The user model is registered as 'User' (FoodUser is only an import alias); a 'FoodUser'
+            // ref made every populate('userId') on orders fail with "Schema hasn't been registered".
+            ref: 'User',
             required: true
         },
         franchiseId: {

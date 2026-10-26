@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import * as adminService from '../services/admin.service.js';
 import { FoodStore as FoodStore } from '../../store/models/store.model.js';
+import { findScopedStore, franchiseFilter, scopedStoreIds } from '../../shared/franchiseScope.js';
 import { validateCategoryListQuery, validateCategoryRejectDto, validateCategoryUpsertDto } from '../validators/category.validator.js';
 import { validateCreateOfferDto, validateUpdateOfferCartVisibilityDto } from '../validators/offer.validator.js';
 import { validateAddDeliveryBonusDto } from '../validators/deliveryBonus.validator.js';
@@ -13,7 +14,7 @@ import { validateReferralSettingsUpsertDto } from '../validators/referralSetting
 // ----- Customers / Users -----
 export async function getCustomers(req, res, next) {
     try {
-        const data = await adminService.getCustomers(req.query || {});
+        const data = await adminService.getCustomers(req.query || {}, { storeIds: await scopedStoreIds(req) });
         res.status(200).json({ success: true, message: 'Customers fetched successfully', data });
     } catch (error) {
         next(error);
@@ -26,7 +27,7 @@ export async function getCustomerById(req, res, next) {
         if (!id || !mongoose.Types.ObjectId.isValid(id)) {
             return res.status(400).json({ success: false, message: 'Invalid customer id' });
         }
-        const customer = await adminService.getCustomerById(id);
+        const customer = await adminService.getCustomerById(id, { storeIds: await scopedStoreIds(req) });
         if (!customer) return res.status(404).json({ success: false, message: 'Customer not found' });
         res.status(200).json({ success: true, message: 'Customer fetched successfully', data: { user: customer, customer } });
     } catch (error) {
@@ -139,7 +140,7 @@ export async function globalSearch(req, res, next) {
 
 export async function getStores(req, res, next) {
     try {
-        const data = await adminService.getStores(req.query);
+        const data = await adminService.getStores(req.query, { franchiseFilter: franchiseFilter(req) });
         res.status(200).json({
             success: true,
             message: 'Stores fetched successfully',
@@ -235,7 +236,8 @@ export async function getStoreById(req, res, next) {
         if (!id || !mongoose.Types.ObjectId.isValid(id)) {
             return res.status(400).json({ success: false, message: 'Invalid store id' });
         }
-        const store = await adminService.getStoreById(id);
+        // Outside the caller's franchise behaves exactly like a store that does not exist
+        const store = (await findScopedStore(req, id)) ? await adminService.getStoreById(id) : null;
         if (!store) {
             return res.status(404).json({ success: false, message: 'Store not found' });
         }

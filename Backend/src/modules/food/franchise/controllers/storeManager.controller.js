@@ -6,6 +6,15 @@ import { Role } from '../../../../core/roles/models/role.model.js';
 import { UserRole } from '../../../../core/roles/models/userRole.model.js';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
+import { assertPasswordStrength, generateTempPassword } from '../../../../utils/password.js';
+import { findScopedStore, isSuperAdmin, scopedStoreIds } from '../../shared/franchiseScope.js';
+
+// Managers are linked to a store (storeId is stored as a string); a franchise admin only sees
+// managers of its own franchise's stores. Super admin: no restriction.
+const managerScope = async (req) => {
+  const storeIds = await scopedStoreIds(req);
+  return storeIds === null ? {} : { storeId: { $in: storeIds.map(String) } };
+};
 
 
 export const createStoreManager = async (req, res) => {
@@ -13,6 +22,12 @@ export const createStoreManager = async (req, res) => {
     const data = { ...req.body };
     if (req.file) {
       data.profileImage = await uploadImageBuffer(req.file.buffer, 'papa-veg/managers');
+    }
+    // The store must exist and belong to the caller's franchise (a franchise admin must pick one)
+    if (data.storeId || !isSuperAdmin(req.user)) {
+      if (!(await findScopedStore(req, data.storeId))) {
+        return res.status(400).json({ success: false, message: 'Choose a store from your franchise.' });
+      }
     }
     // Validate store manager assignment
     if (data.storeId) {
@@ -34,8 +49,15 @@ export const createStoreManager = async (req, res) => {
       role = await Role.create({ code: 'STORE_MANAGER', name: 'Store Manager', description: 'Manages a specific store', isSystemRole: true });
     }
 
-    // 2. Create User
-    const hashedPassword = await bcrypt.hash(data.password || '12345678', 10);
+    // 2. Create User. An admin-chosen password must be at least 8 characters; without one a random
+    // temporary password is generated and returned once in this response (only the hash is stored).
+    let temporaryPassword = null;
+    if (data.password) {
+      assertPasswordStrength(data.password);
+    } else {
+      temporaryPassword = generateTempPassword();
+    }
+    const hashedPassword = await bcrypt.hash(data.password || temporaryPassword, 10);
     const user = await FoodUser.create({
       email: data.email,
       mobile: data.phone,
@@ -94,7 +116,10 @@ export const createStoreManager = async (req, res) => {
     const storeManager = new StoreManager(data);
     const savedManager = await storeManager.save();
     
-    res.status(201).json({ success: true, data: savedManager });
+    res.status(201).json({
+      success: true,
+      data: temporaryPassword ? { ...savedManager.toObject(), temporaryPassword } : savedManager
+    });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }
@@ -104,9 +129,15 @@ export const getStoreManagers = async (req, res) => {
   try {
     const { status, storeId, search } = req.query;
     let query = { status: { $ne: 'DELETED' } };
+    const scope = await managerScope(req);
     
     if (status && status !== 'All') query.status = status;
     if (storeId && storeId !== 'All') query.storeId = storeId;
+    if (scope.storeId) {
+      // A ?storeId= outside the caller's franchise matches nothing
+      const allowed = scope.storeId.$in;
+      query.storeId = query.storeId ? { $in: allowed.filter((id) => id === String(query.storeId)) } : { $in: allowed };
+    }
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -147,7 +178,7 @@ export const getStoreManagers = async (req, res) => {
 
 export const getStoreManagerById = async (req, res) => {
   try {
-    const manager = await StoreManager.findById(req.params.id).lean();
+    const manager = await StoreManager.findOne({ _id: req.params.id, ...(await managerScope(req)) }).lean();
     if (!manager) return res.status(404).json({ success: false, message: 'Not found' });
 
     if (manager.storeId) {
@@ -201,7 +232,11 @@ export const updateStoreManager = async (req, res) => {
       };
     }
 
-    const manager = await StoreManager.findByIdAndUpdate(req.params.id, data, {
+    if (data.storeId !== undefined && !(await findScopedStore(req, data.storeId))) {
+      return res.status(400).json({ success: false, message: 'Choose a store from your franchise.' });
+    }
+
+    const manager = await StoreManager.findOneAndUpdate({ _id: req.params.id, ...(await managerScope(req)) }, data, {
       new: true,
       runValidators: true,
     });
@@ -240,7 +275,7 @@ export const updateStoreManager = async (req, res) => {
 
 export const deleteStoreManager = async (req, res) => {
   try {
-    const manager = await StoreManager.findById(req.params.id);
+    const manager = await StoreManager.findOne({ _id: req.params.id, ...(await managerScope(req)) });
     if (!manager) return res.status(404).json({ success: false, message: 'Not found' });
 
     // Hard Delete associated user records

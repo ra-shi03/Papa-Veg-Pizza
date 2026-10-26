@@ -10,18 +10,16 @@ import { Profile } from '../../../../core/users/models/profile.model.js';
 import { Role } from '../../../../core/roles/models/role.model.js';
 import { UserRole } from '../../../../core/roles/models/userRole.model.js';
 import bcrypt from 'bcryptjs';
+import { generateTempPassword } from '../../../../utils/password.js';
+import { franchiseFilter, withFranchiseScope } from '../../shared/franchiseScope.js';
 
 // Get store approvals list for franchise admin
 export const getStoreApprovals = async (req, res) => {
   try {
     const { page = 1, limit = 10, search = '', status = 'All', city = '', sort = 'createdAt', order = 'desc' } = req.query;
     
-    // Build query - allow Superadmin to see all franchises
-    const query = {};
-    const userRole = String(req.user?.role || '').toUpperCase().replace(/_/g, '-');
-    if (userRole !== 'SUPER-ADMIN' && userRole !== 'SUPERADMIN' && userRole !== 'ADMIN') {
-      query.franchiseId = req.user?.franchiseId || req.user?._id || '60d5ecb8b392d7001f3e7943';
-    }
+    // Build query - super admin sees all franchises, a franchise admin only its own (from the token)
+    const query = { ...franchiseFilter(req) };
     
     if (status && status !== 'All') {
       query.approvalStatus = status;
@@ -106,11 +104,7 @@ export const getStoreApprovals = async (req, res) => {
 // Get Dashboard KPIs
 export const getStoreApprovalsDashboard = async (req, res) => {
   try {
-    const query = {};
-    const userRole = String(req.user?.role || '').toUpperCase().replace(/_/g, '-');
-    if (userRole !== 'SUPER-ADMIN' && userRole !== 'SUPERADMIN' && userRole !== 'ADMIN') {
-      query.franchiseId = req.user?.franchiseId || req.user?._id || '60d5ecb8b392d7001f3e7943';
-    }
+    const query = { ...franchiseFilter(req) };
     
     const [draft, pending, approved, rejected, changesRequested] = await Promise.all([
       FoodStore.countDocuments({ ...query, approvalStatus: 'Draft' }),
@@ -140,7 +134,7 @@ export const getStoreApprovalsDashboard = async (req, res) => {
 export const submitStoreApproval = async (req, res) => {
   try {
     const storeId = req.params.id;
-    const store = await FoodStore.findById(storeId);
+    const store = await FoodStore.findOne(withFranchiseScope(req, { _id: storeId }));
     
     if (!store) {
       return res.status(404).json({ success: false, message: 'Store not found' });
@@ -168,7 +162,7 @@ export const submitStoreApproval = async (req, res) => {
 export const uploadStoreDocuments = async (req, res) => {
   try {
     const storeId = req.params.id;
-    const store = await FoodStore.findById(storeId);
+    const store = await FoodStore.findOne(withFranchiseScope(req, { _id: storeId }));
     
     if (!store) {
       return res.status(404).json({ success: false, message: 'Store not found' });
@@ -239,9 +233,10 @@ export const approveStoreApproval = async (req, res) => {
   try {
     const storeId = req.params.id;
     const { adminName, adminEmail, adminPhone, franchiseName } = req.body;
-    
-    const store = await FoodStore.findById(storeId);
-    
+    let temporaryPassword = null;
+
+    const store = await FoodStore.findOne(withFranchiseScope(req, { _id: storeId }));
+
     if (!store) {
       return res.status(404).json({ success: false, message: 'Store not found' });
     }
@@ -260,10 +255,12 @@ export const approveStoreApproval = async (req, res) => {
       }
 
       // 2. Create User
-      const existingUser = await FoodUser.findOne({ email: adminEmail });
+      const existingUser = await FoodUser.findOne({ email: String(adminEmail).trim().toLowerCase() });
       let user = existingUser;
       if (!user) {
-        const hashedPassword = await bcrypt.hash('12345678', 10);
+        // New account: random one-time password, returned once in this response (only the hash is stored)
+        temporaryPassword = generateTempPassword();
+        const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
         user = await FoodUser.create({
           email: adminEmail,
           mobile: adminPhone,
@@ -295,6 +292,7 @@ export const approveStoreApproval = async (req, res) => {
         await UserRole.create({
           userId: user._id,
           storeId: store._id,
+          franchiseId: store.franchiseId,
           roleId: role._id,
           isPrimary: !hasPrimary
         });
@@ -322,7 +320,7 @@ export const approveStoreApproval = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Store approved successfully',
-      data: store
+      data: temporaryPassword ? { ...store.toObject(), temporaryPassword } : store
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -333,7 +331,7 @@ export const rejectStoreApproval = async (req, res) => {
   try {
     const storeId = req.params.id;
     const { reason, notes } = req.body;
-    const store = await FoodStore.findById(storeId);
+    const store = await FoodStore.findOne(withFranchiseScope(req, { _id: storeId }));
     
     if (!store) {
       return res.status(404).json({ success: false, message: 'Store not found' });
@@ -358,7 +356,7 @@ export const requestChangesStoreApproval = async (req, res) => {
   try {
     const storeId = req.params.id;
     const { instructions, notes, deadline } = req.body;
-    const store = await FoodStore.findById(storeId);
+    const store = await FoodStore.findOne(withFranchiseScope(req, { _id: storeId }));
     
     if (!store) {
       return res.status(404).json({ success: false, message: 'Store not found' });
@@ -385,7 +383,7 @@ export const verifyDocument = async (req, res) => {
     const storeId = req.params.id;
     const documentId = req.params.docId;
     
-    const store = await FoodStore.findById(storeId);
+    const store = await FoodStore.findOne(withFranchiseScope(req, { _id: storeId }));
     if (!store) {
       return res.status(404).json({ success: false, message: 'Store not found' });
     }

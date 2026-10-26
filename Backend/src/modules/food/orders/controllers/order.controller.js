@@ -1,4 +1,5 @@
 import { sendResponse } from '../../../../utils/response.js';
+import { scopedStoreIds } from '../../shared/franchiseScope.js';
 import * as orderService from '../services/order.service.js';
 import * as foodOrderPaymentService from '../services/foodOrderPayment.service.js';
 import { HomePage } from '../../settings/models/homePage.model.js';
@@ -326,7 +327,7 @@ export async function getPaymentStatusController(req, res, next) {
 
 export async function listOrdersAdminController(req, res, next) {
     try {
-        const result = await orderService.listOrdersAdmin(req.query);
+        const result = await orderService.listOrdersAdmin(req.query, { storeIds: await scopedStoreIds(req) });
         return sendResponse(res, 200, 'Orders retrieved', result);
     } catch (err) {
         next(err);
@@ -336,7 +337,7 @@ export async function listOrdersAdminController(req, res, next) {
 export async function getOrderByIdAdminController(req, res, next) {
     try {
         const orderId = req.params.orderId;
-        const order = await orderService.getOrderById(orderId, { admin: true });
+        const order = await orderService.getOrderById(orderId, { admin: true, storeIds: await scopedStoreIds(req) });
         return sendResponse(res, 200, 'Order retrieved', { order });
     } catch (err) {
         next(err);
@@ -410,10 +411,10 @@ export async function getOrderHistoryPublicController(req, res, next) {
         const phone = req.body?.phone || req.body?.mobileNumber || req.query?.phone || req.query?.mobileNumber;
         const orderId = req.body?.orderId || req.body?.order_id || req.query?.orderId || req.query?.order_id;
 
-        if (!orderId) {
+        if (!orderId || !phone) {
             return res.status(400).json({
                 success: false,
-                message: 'Order ID is required.'
+                message: 'Both Mobile Number and Order ID are required.'
             });
         }
 

@@ -8,7 +8,7 @@ import orderUserRoutes from '../modules/food/orders/routes/order.routes.user.js'
 import paymentRoutes from '../core/payments/payment.routes.js';
 import fcmRoutes from '../core/notifications/fcm.routes.js';
 import notificationRoutes from '../core/notifications/notification.routes.js';
-import { authMiddleware } from '../core/auth/auth.middleware.js';
+import { authMiddleware, requireSuperAdmin } from '../core/auth/auth.middleware.js';
 import * as businessSettingsController from '../modules/food/admin/controllers/businessSettings.controller.js';
 import * as productController from '../modules/food/admin/controllers/product.controller.js';
 import * as addonController from '../modules/food/admin/controllers/addon.controller.js';
@@ -157,12 +157,12 @@ router.get(['/v1/food/orders/methods', '/v1/orders/methods', '/v1/food/order-met
 router.post(['/v1/food/bulk-order/inquiry', '/v1/bulk-order/inquiry'], submitInquiryPublic);
 router.get(['/v1/food/bulk-order/config', '/v1/bulk-order/config'], getConfigPublic);
 
-// Admin Bulk Order routes
-router.get(['/v1/food/admin/bulk-orders', '/v1/admin/bulk-orders'], authMiddleware, requireRoles('ADMIN', 'SUPERADMIN', 'SUPER_ADMIN'), listInquiriesAdmin);
-router.patch(['/v1/food/admin/bulk-orders/:id/status', '/v1/admin/bulk-orders/:id/status'], authMiddleware, requireRoles('ADMIN', 'SUPERADMIN', 'SUPER_ADMIN'), updateInquiryStatusAdmin);
-router.delete(['/v1/food/admin/bulk-orders/:id', '/v1/admin/bulk-orders/:id'], authMiddleware, requireRoles('ADMIN', 'SUPERADMIN', 'SUPER_ADMIN'), deleteInquiryAdmin);
-router.get(['/v1/food/admin/bulk-orders/config', '/v1/admin/bulk-orders/config'], authMiddleware, requireRoles('ADMIN', 'SUPERADMIN', 'SUPER_ADMIN'), getConfigPublic);
-router.put(['/v1/food/admin/bulk-orders/config', '/v1/admin/bulk-orders/config'], authMiddleware, requireRoles('ADMIN', 'SUPERADMIN', 'SUPER_ADMIN'), updateConfigAdmin);
+// Admin Bulk Order routes (platform-wide: super admin only; requireRoles('ADMIN') would also let franchise admins in)
+router.get(['/v1/food/admin/bulk-orders', '/v1/admin/bulk-orders'], authMiddleware, requireSuperAdmin, listInquiriesAdmin);
+router.patch(['/v1/food/admin/bulk-orders/:id/status', '/v1/admin/bulk-orders/:id/status'], authMiddleware, requireSuperAdmin, updateInquiryStatusAdmin);
+router.delete(['/v1/food/admin/bulk-orders/:id', '/v1/admin/bulk-orders/:id'], authMiddleware, requireSuperAdmin, deleteInquiryAdmin);
+router.get(['/v1/food/admin/bulk-orders/config', '/v1/admin/bulk-orders/config'], authMiddleware, requireSuperAdmin, getConfigPublic);
+router.put(['/v1/food/admin/bulk-orders/config', '/v1/admin/bulk-orders/config'], authMiddleware, requireSuperAdmin, updateConfigAdmin);
 
 router.use('/v1/food/admin', authMiddleware, requireRoles('ADMIN'), storeAdminRoutes);
 router.use('/v1/food/user', authMiddleware, requireRoles('USER'), userRoutes);
@@ -174,13 +174,13 @@ router.use('/v1/payments/webhook', webhookRoutes);
 router.use('/v1/fcm-tokens', fcmRoutes);
 router.use('/fcm-tokens', fcmRoutes);
 
-router.get('/v1/admin/queues', authMiddleware, requireRoles('ADMIN'), getQueuesController);
+router.get('/v1/admin/queues', authMiddleware, requireSuperAdmin, getQueuesController);
 
 // App Configuration public & admin aliases
 router.get(['/v1/food/app-config/public', '/v1/app-config/public'], appConfigController.getAppConfigPublic);
-router.get(['/v1/food/admin/app-config', '/v1/admin/app-config'], authMiddleware, requireRoles('ADMIN', 'SUPERADMIN', 'SUPER_ADMIN'), appConfigController.getAppConfigAdmin);
-router.put(['/v1/food/admin/app-config', '/v1/admin/app-config'], authMiddleware, requireRoles('ADMIN', 'SUPERADMIN', 'SUPER_ADMIN'), appConfigController.updateAppConfigAdmin);
-router.patch(['/v1/food/admin/app-config/feature', '/v1/admin/app-config/feature'], authMiddleware, requireRoles('ADMIN', 'SUPERADMIN', 'SUPER_ADMIN'), appConfigController.updateFeatureToggleAdmin);
+router.get(['/v1/food/admin/app-config', '/v1/admin/app-config'], authMiddleware, requireSuperAdmin, appConfigController.getAppConfigAdmin);
+router.put(['/v1/food/admin/app-config', '/v1/admin/app-config'], authMiddleware, requireSuperAdmin, appConfigController.updateAppConfigAdmin);
+router.patch(['/v1/food/admin/app-config/feature', '/v1/admin/app-config/feature'], authMiddleware, requireSuperAdmin, appConfigController.updateFeatureToggleAdmin);
 
 // Public CMS Pages (About, Terms, Privacy, Refund, Shipping, Cancellation)
 router.get(['/v1/food/pages/:key', '/v1/pages/:key', '/food/pages/:key', '/pages/:key'], getPublicPageController);

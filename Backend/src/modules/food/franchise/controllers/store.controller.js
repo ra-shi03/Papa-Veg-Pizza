@@ -4,6 +4,7 @@ import { StoreManager } from '../models/storeManager.model.js';
 import { FoodRegion } from '../../admin/models/region.model.js';
 import { FoodZone } from '../../admin/models/zone.model.js';
 import mongoose from 'mongoose';
+import { franchiseFilter, withFranchiseScope } from '../../shared/franchiseScope.js';
 
 const formatStoreResponse = (store, fallbackOwnerName = 'Unknown') => {
   if (!store) return store;
@@ -24,9 +25,6 @@ const getFallbackOwner = async (req) => {
   let franchise;
   if (req.user?.franchiseId) {
     franchise = await FoodFranchise.findById(req.user.franchiseId).lean();
-  }
-  if (!franchise) {
-    franchise = await FoodFranchise.findOne().lean();
   }
   return franchise?.ownerName || 'Unknown';
 };
@@ -89,7 +87,8 @@ export const createStore = async (req, res) => {
 export const getStores = async (req, res) => {
   try {
     const { status, city, search, type } = req.query;
-    let query = { status: { $ne: 'DELETED' }, approvalStatus: 'Approved' }; // Ensure only approved stores are fetched
+    // Only approved stores, and only the caller's franchise (super admin: all, or ?franchiseId=)
+    let query = { status: { $ne: 'DELETED' }, approvalStatus: 'Approved', ...franchiseFilter(req) };
     
     if (status && status !== 'All') {
       query.isActive = status === 'Active';
@@ -139,7 +138,7 @@ export const getStoreById = async (req, res) => {
       ? { _id: req.params.id } 
       : { code: req.params.id };
 
-    const store = await FoodStore.findOne(query)
+    const store = await FoodStore.findOne(withFranchiseScope(req, query))
       .populate('regionId zoneId territoryId', 'name')
       .populate('franchiseId', 'ownerName name companyName email phone regionId zoneId')
       .lean();
@@ -200,7 +199,7 @@ export const updateStore = async (req, res) => {
       ? { _id: req.params.id }
       : { code: req.params.id };
 
-    const store = await FoodStore.findOneAndUpdate(query, updateData, {
+    const store = await FoodStore.findOneAndUpdate(withFranchiseScope(req, query), updateData, {
       new: true,
       runValidators: true,
     })
@@ -222,7 +221,7 @@ export const deleteStore = async (req, res) => {
     const query = mongoose.Types.ObjectId.isValid(req.params.id) 
       ? { _id: req.params.id }
       : { code: req.params.id };
-    const store = await FoodStore.findOneAndDelete(query);
+    const store = await FoodStore.findOneAndDelete(withFranchiseScope(req, query));
     if (!store) return res.status(404).json({ success: false, message: 'Store not found' });
     res.status(200).json({ success: true, data: {} });
   } catch (error) {
@@ -232,9 +231,10 @@ export const deleteStore = async (req, res) => {
 
 export const getDashboardKpis = async (req, res) => {
   try {
-    const totalStores = await FoodStore.countDocuments({ status: { $ne: 'DELETED' } });
-    const activeStores = await FoodStore.countDocuments({ status: 'Active' });
-    const suspendedStores = await FoodStore.countDocuments({ status: 'Suspended' });
+    const scope = franchiseFilter(req);
+    const totalStores = await FoodStore.countDocuments({ ...scope, status: { $ne: 'DELETED' } });
+    const activeStores = await FoodStore.countDocuments({ ...scope, status: 'Active' });
+    const suspendedStores = await FoodStore.countDocuments({ ...scope, status: 'Suspended' });
     
     res.status(200).json({
       success: true,

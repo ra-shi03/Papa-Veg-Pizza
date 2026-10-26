@@ -25,6 +25,7 @@ import { FoodReferralLog } from '../models/referralLog.model.js';
 import { FoodSafetyEmergencyReport } from '../models/safetyEmergencyReport.model.js';
 import { StoreManager } from '../../franchise/models/storeManager.model.js';
 import { UserRole } from '../../../../core/roles/models/userRole.model.js';
+import { Role } from '../../../../core/roles/models/role.model.js';
 import { Profile } from '../../../../core/users/models/profile.model.js';
 
 import { FoodOrder } from '../../orders/models/order.model.js';
@@ -350,12 +351,13 @@ export async function updateStoreComplaint(id, updateData) {
     return updated;
 }
 
-export async function getStores(query) {
+export async function getStores(query, { franchiseFilter = {} } = {}) {
     const limit = Math.min(Math.max(parseInt(query.limit, 10) || 100, 1), 1000);
     const page = Math.max(parseInt(query.page, 10) || 1, 1);
     const skip = (page - 1) * limit;
     const status = query.status;
-    const filter = {};
+    // franchiseFilter comes from attachFranchiseScope: {} for a super admin, { franchiseId } otherwise
+    const filter = { ...franchiseFilter };
     if (status && ['pending', 'approved', 'rejected'].includes(status)) {
         filter.status = status;
     }
@@ -1251,12 +1253,21 @@ export async function getTaxReportDetail(storeId, query = {}) {
 }
 
 // ----- Customers / Users (admin) -----
-export async function getCustomers(query = {}) {
+// Customers a caller may see: everyone for a super admin (storeIds null), otherwise only customers
+// who have ordered from one of the given stores (the caller's franchise).
+const customerIdsForStores = async (storeIds) =>
+    storeIds === null ? null : FoodOrder.distinct('userId', { storeId: { $in: storeIds }, userId: { $ne: null } });
+
+export async function getCustomers(query = {}, { storeIds = null } = {}) {
     const limit = Math.min(Math.max(parseInt(query.limit, 10) || 50, 1), 1000);
     const page = Math.max(parseInt(query.page, 10) || 1, 1);
     const skip = (page - 1) * limit;
 
-    const filter = { role: 'USER' };
+    // Customer accounts are identified by their primary role (User has no `role` field).
+    const customerRole = await Role.findOne({ code: 'CUSTOMER' }).select('_id').lean();
+    const filter = { primaryRole: customerRole?._id ?? null };
+    const allowedIds = await customerIdsForStores(storeIds);
+    if (allowedIds) filter._id = { $in: allowedIds };
 
     if (query.status) {
         if (String(query.status) === 'active') filter.isActive = true;
@@ -1309,7 +1320,7 @@ export async function getCustomers(query = {}) {
     const userIds = docs.map((u) => u._id).filter(Boolean);
     const orderStats = userIds.length > 0
         ? await FoodOrder.aggregate([
-            { $match: { userId: { $in: userIds } } },
+            { $match: { userId: { $in: userIds }, ...(storeIds ? { storeId: { $in: storeIds } } : {}) } },
             {
                 $group: {
                     _id: '$userId',
@@ -1358,13 +1369,18 @@ export async function getCustomers(query = {}) {
     return { customers, total, page, limit };
 }
 
-export async function getCustomerById(id) {
+export async function getCustomerById(id, { storeIds = null } = {}) {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
+    const customerRole = await Role.findOne({ code: 'CUSTOMER' }).select('_id').lean();
+    // Only customer accounts, and for a franchise admin only customers of its stores
+    const exists = await FoodUser.exists({ _id: id, primaryRole: customerRole?._id ?? null });
+    if (!exists) return null;
+    if (storeIds && !(await FoodOrder.exists({ userId: id, storeId: { $in: storeIds } }))) return null;
     const u = await FoodUser.findById(id).select('-__v').lean();
     if (!u) return null;
     const customerObjectId = new mongoose.Types.ObjectId(id);
     const orderStats = await FoodOrder.aggregate([
-        { $match: { userId: customerObjectId } },
+        { $match: { userId: customerObjectId, ...(storeIds ? { storeId: { $in: storeIds } } : {}) } },
         {
             $group: {
                 _id: '$userId',

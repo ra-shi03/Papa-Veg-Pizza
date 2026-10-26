@@ -5,6 +5,7 @@ import { Profile } from '../../../../core/users/models/profile.model.js';
 import { Role } from '../../../../core/roles/models/role.model.js';
 import { UserRole } from '../../../../core/roles/models/userRole.model.js';
 import { sendError, sendResponse } from '../../../../utils/response.js';
+import { assertPasswordStrength } from '../../../../utils/password.js';
 import { FoodRegion } from '../models/region.model.js';
 import { FoodZone } from '../models/zone.model.js';
 import { FoodTerritory } from '../models/territory.model.js';
@@ -56,9 +57,7 @@ export const createFranchise = async (req, res) => {
                 throw Object.assign(new Error('Required fields are missing: name, email, phone, password, franchiseName, franchiseCode'), { statusCode: 400 });
             }
 
-            if (String(password).length < 8) {
-                throw Object.assign(new Error('Password must be at least 8 characters'), { statusCode: 400 });
-            }
+            assertPasswordStrength(password);
 
             const normalizedEmail = String(email).trim().toLowerCase();
             const normalizedPhone = String(phone).trim();
@@ -260,6 +259,11 @@ export const getFranchiseById = async (req, res) => {
     }
 };
 
+// The franchise of the signed-in franchise admin: the franchiseId in the token (what every other
+// franchise-scoped route uses), falling back to the franchise this user owns.
+const myFranchiseFilter = (req) =>
+    req.franchiseScope?.franchiseId ? { _id: req.franchiseScope.franchiseId } : { ownerUserId: req.user?.userId };
+
 // ─── Get My Franchise (Franchise Admin) ──────────────────────────────────────
 // The logged-in franchise admin calls this to get their own franchise data.
 // Lookup: FoodFranchise.ownerUserId === req.user._id
@@ -273,7 +277,7 @@ export const getMyFranchise = async (req, res) => {
 
         // Also fetch their profile for personal info fields
         const [franchise, profile] = await Promise.all([
-            FoodFranchise.findOne({ ownerUserId: userId }).lean(),
+            FoodFranchise.findOne(myFranchiseFilter(req)).lean(),
             Profile.findOne({ userId }).lean()
         ]);
 
@@ -312,7 +316,7 @@ export const updateMyFranchise = async (req, res) => {
             return sendError(res, 401, 'Not authenticated');
         }
 
-        const franchise = await FoodFranchise.findOne({ ownerUserId: userId });
+        const franchise = await FoodFranchise.findOne(myFranchiseFilter(req));
         if (!franchise) {
             return sendError(res, 404, 'No franchise linked to your account');
         }
@@ -389,6 +393,7 @@ export const updateFranchise = async (req, res) => {
             let passwordUpdate = null;
             if (updates.password) {
                 passwordUpdate = updates.password;
+                assertPasswordStrength(passwordUpdate);
             }
             delete updates.password;
 

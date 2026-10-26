@@ -623,7 +623,7 @@ export async function listOrdersUser(userId, query) {
 
 export async function getOrderById(
   orderId,
-  { userId, storeId, deliveryPartnerId, admin } = {},
+  { userId, storeId, deliveryPartnerId, admin, storeIds = null } = {},
 ) {
   const identity = buildOrderIdentityFilter(orderId);
   if (!identity) throw new ValidationError("Order id required");
@@ -638,7 +638,14 @@ export async function getOrderById(
     .lean();
   if (!order) throw new NotFoundError("Order not found");
 
-  if (admin) return normalizeOrderForClient(order);
+  if (admin) {
+    // Franchise-scoped admin: an order of another franchise's store is reported as not found
+    const orderStore = order.storeId?._id?.toString() || order.storeId?.toString();
+    if (storeIds && !storeIds.some((id) => String(id) === orderStore)) {
+      throw new NotFoundError("Order not found");
+    }
+    return normalizeOrderForClient(order);
+  }
 
   const orderUserId = order.userId?._id?.toString() || order.userId?.toString();
   const orderStoreId = order.storeId?._id?.toString() || order.storeId?.toString();
@@ -1457,7 +1464,8 @@ export async function getPaymentStatus(orderId, deliveryPartnerId) {
 }
 
 // ----- Admin -----
-export async function listOrdersAdmin(query) {
+/** storeIds: the stores the caller may see (franchise scope); null = no restriction (super admin). */
+export async function listOrdersAdmin(query, { storeIds = null } = {}) {
   const { page, limit, skip } = buildPaginationOptions(query);
   const filter = {
     $or: [
@@ -1537,6 +1545,12 @@ export async function listOrdersAdmin(query) {
 
   if (storeIdRaw && mongoose.Types.ObjectId.isValid(storeIdRaw)) {
     filter.storeId = new mongoose.Types.ObjectId(storeIdRaw);
+  }
+  if (storeIds) {
+    // A ?storeId= outside the caller's franchise simply matches nothing
+    filter.storeId = filter.storeId
+      ? { $in: storeIds.filter((id) => String(id) === String(filter.storeId)) }
+      : { $in: storeIds };
   }
 
   if (startDateRaw || endDateRaw) {
@@ -1917,6 +1931,11 @@ export const getOrderHistoryPublic = async (phone, orderId) => {
   if (!rawId) {
     throw new ValidationError("Order ID is required");
   }
+  // This route is public, so the order ID alone must never reveal an order: the mobile number
+  // on the order is required and checked below.
+  if (rawPhone.length < 10) {
+    throw new ValidationError("Mobile number is required");
+  }
 
   let idFilter = null;
   if (mongoose.isValidObjectId(rawId)) {
@@ -1947,8 +1966,8 @@ export const getOrderHistoryPublic = async (phone, orderId) => {
     throw new NotFoundError("No order found with this Order ID. Please check your order details.");
   }
 
-  // If mobile number is provided, verify against phone numbers associated with this order
-  if (rawPhone && rawPhone.length >= 10) {
+  // Verify the mobile number against the phone numbers associated with this order
+  {
     const last10Phone = rawPhone.slice(-10);
     const normalize = (val) => {
       if (!val) return "";
