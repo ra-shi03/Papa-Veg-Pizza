@@ -4,6 +4,7 @@ import { TaskNotification } from '../models/taskNotification.model.js';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { StoreManager } from '../../franchise/models/storeManager.model.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
+import { config } from '../../../../config/env.js';
 
 // My Tasks: the work items behind an order in the kitchen. A task is created when the store manager
 // hands an order to a supervisor (kind 'supervisor') and when a supervisor assigns a station
@@ -219,8 +220,17 @@ export async function startTask(user, id, payload = {}) {
   return view(task);
 }
 
-// Only http(s) links are kept as proof; an inline base64 preview is never stored
-const proofUrl = (v) => (/^https?:\/\/\S{1,1990}$/i.test(String(v || '')) ? String(v) : '');
+// Proof must be an image we uploaded: https://res.cloudinary.com/<our cloud>/(image|video)/upload/... Any other
+// link (tracking pixels, other hosts, base64 previews) is dropped, because supervisors' browsers load it.
+const proofUrl = (v) => {
+  const raw = String(v || '');
+  const cloud = config.cloudinaryCloudName;
+  if (!cloud || raw.length > 2000) return '';
+  let url;
+  try { url = new URL(raw); } catch { return ''; }
+  const ours = url.protocol === 'https:' && url.hostname === 'res.cloudinary.com' && !url.port && !url.username && !url.password;
+  return ours && url.pathname.startsWith(`/${cloud}/image/upload/`) ? raw : '';
+};
 
 export async function completeTask(user, id, payload = {}) {
   const task = await findMyTask(user, id);

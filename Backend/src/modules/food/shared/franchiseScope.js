@@ -14,7 +14,9 @@ import { sendError } from '../../../utils/response.js';
 // cannot even learn that another franchise's store / order / customer exists.
 
 const normalizeRole = (role) => String(role || '').trim().replace(/_/g, '-').toUpperCase();
-const SUPER_ADMIN_ROLES = new Set(['SUPERADMIN', 'SUPER-ADMIN', 'ADMIN']);
+// Only the real super admin role. A literal 'ADMIN' is not a role anyone logs in with; it is only the
+// requireRoles('ADMIN') shorthand for "super admin or franchise admin", so it must never mean super admin here.
+const SUPER_ADMIN_ROLES = new Set(['SUPERADMIN', 'SUPER-ADMIN']);
 
 const toObjectId = (value) =>
     value && mongoose.Types.ObjectId.isValid(String(value)) ? new mongoose.Types.ObjectId(String(value)) : null;

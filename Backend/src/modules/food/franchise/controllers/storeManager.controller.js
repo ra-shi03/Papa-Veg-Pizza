@@ -17,17 +17,30 @@ const managerScope = async (req) => {
 };
 
 
+// Fields a caller may set when creating a manager. userId, role, lastLoginAt and storeName are set by the
+// server (storeName from the store record); profileImage only comes from the uploaded file.
+const CREATABLE_MANAGER_FIELDS = [
+  'name', 'email', 'phone', 'employeeCode', 'joinedDate', 'status', 'storeId',
+  'reportingManager', 'personalDetails', 'address', 'emergencyContact', 'salary'
+];
+
 export const createStoreManager = async (req, res) => {
   try {
-    const data = { ...req.body };
+    const data = {};
+    for (const field of CREATABLE_MANAGER_FIELDS) {
+      if (req.body[field] !== undefined) data[field] = req.body[field];
+    }
+    const password = req.body.password;
     if (req.file) {
       data.profileImage = await uploadImageBuffer(req.file.buffer, 'papa-veg/managers');
     }
     // The store must exist and belong to the caller's franchise (a franchise admin must pick one)
     if (data.storeId || !isSuperAdmin(req.user)) {
-      if (!(await findScopedStore(req, data.storeId))) {
+      const scopedStore = await findScopedStore(req, data.storeId, '_id franchiseId storeName');
+      if (!scopedStore) {
         return res.status(400).json({ success: false, message: 'Choose a store from your franchise.' });
       }
+      data.storeName = scopedStore.storeName || '';
     }
     // Validate store manager assignment
     if (data.storeId) {
@@ -52,12 +65,12 @@ export const createStoreManager = async (req, res) => {
     // 2. Create User. An admin-chosen password must be at least 8 characters; without one a random
     // temporary password is generated and returned once in this response (only the hash is stored).
     let temporaryPassword = null;
-    if (data.password) {
-      assertPasswordStrength(data.password);
+    if (password) {
+      assertPasswordStrength(password);
     } else {
       temporaryPassword = generateTempPassword();
     }
-    const hashedPassword = await bcrypt.hash(data.password || temporaryPassword, 10);
+    const hashedPassword = await bcrypt.hash(password || temporaryPassword, 10);
     const user = await FoodUser.create({
       email: data.email,
       mobile: data.phone,
@@ -105,7 +118,7 @@ export const createStoreManager = async (req, res) => {
 
     // 5. Create StoreManager record
     data.userId = user._id;
-    data.role = data.role || 'Store Manager';
+    data.role = 'Store Manager';
     if (data.address || data.emergencyContact || data.salary) {
       data.personalDetails = {
         address: data.address || data.personalDetails?.address || '',

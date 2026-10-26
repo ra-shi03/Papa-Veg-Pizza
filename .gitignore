@@ -43,3 +43,9 @@ yarn-error.log*
 *.njsproj
 *.sln
 
+
+# Editor / patch leftovers (old copies of code must never be committed)
+*.orig
+*.rej
+*.patch
+*.bak

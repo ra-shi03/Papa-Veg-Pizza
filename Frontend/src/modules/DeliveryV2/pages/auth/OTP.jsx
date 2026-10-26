@@ -11,9 +11,12 @@ const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 
 
+// Login OTPs are 6 digits (the backend generates and verifies exactly 6).
+const OTP_LENGTH = 6
+
 export default function DeliveryOTP() {
   const navigate = useNavigate()
-  const [otp, setOtp] = useState(["", "", "", ""])
+  const [otp, setOtp] = useState(Array(OTP_LENGTH).fill(""))
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
@@ -102,12 +105,12 @@ export default function DeliveryOTP() {
     setError("")
 
     // Auto-focus next input
-    if (value && index < 3) {
+    if (value && index < OTP_LENGTH - 1) {
       inputRefs.current[index + 1]?.focus()
     }
 
-    // Auto-submit when all 4 digits are entered and we are in OTP step
-    if (!showNameInput && newOtp.every((digit) => digit !== "") && newOtp.length === 4) {
+    // Auto-submit when all digits are entered and we are in OTP step
+    if (!showNameInput && newOtp.every((digit) => digit !== "") && newOtp.length === OTP_LENGTH) {
       handleVerify(newOtp.join(""))
     }
   }
@@ -132,15 +135,15 @@ export default function DeliveryOTP() {
     if (e.key === "v" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
       navigator.clipboard.readText().then((text) => {
-        const digits = text.replace(/\D/g, "").slice(0, 4).split("")
+        const digits = text.replace(/\D/g, "").slice(0, OTP_LENGTH).split("")
         const newOtp = [...otp]
         digits.forEach((digit, i) => {
-          if (i < 4) {
+          if (i < OTP_LENGTH) {
             newOtp[i] = digit
           }
         })
         setOtp(newOtp)
-        if (digits.length === 4) {
+        if (digits.length === OTP_LENGTH) {
           handleVerify(newOtp.join(""))
         } else {
           inputRefs.current[digits.length]?.focus()
@@ -152,15 +155,15 @@ export default function DeliveryOTP() {
   const handlePaste = (e) => {
     e.preventDefault()
     const pastedData = e.clipboardData.getData("text")
-    const digits = pastedData.replace(/\D/g, "").slice(0, 4).split("")
+    const digits = pastedData.replace(/\D/g, "").slice(0, OTP_LENGTH).split("")
     const newOtp = [...otp]
     digits.forEach((digit, i) => {
-      if (i < 4) {
+      if (i < OTP_LENGTH) {
         newOtp[i] = digit
       }
     })
     setOtp(newOtp)
-    if (!showNameInput && digits.length === 4) {
+    if (!showNameInput && digits.length === OTP_LENGTH) {
       handleVerify(newOtp.join(""))
       return
     }
@@ -448,7 +451,7 @@ export default function DeliveryOTP() {
       })
     }, 1000)
 
-    setOtp(["", "", "", ""])
+    setOtp(Array(OTP_LENGTH).fill(""))
     setShowNameInput(false)
     setName("")
     setNameError("")

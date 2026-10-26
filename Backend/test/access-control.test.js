@@ -170,3 +170,19 @@ describe('removed endpoints', () => {
         assert.equal((await fx.call('GET', '/fcm-tokens/test-get-token/9999999999')).status, 404);
     });
 });
+
+// N4: a token whose role is literally "ADMIN" is not a super admin (it is only the requireRoles('ADMIN') shorthand).
+describe('the literal ADMIN role', () => {
+    const adminToken = () => fx.tokenFor(fx.superUser, 'ADMIN');
+    test('cannot use super-admin-only routes', async () => {
+        assert.equal((await fx.call('GET', '/v1/food/admin/fee-settings', adminToken())).status, 403);
+        assert.equal((await fx.call('GET', '/v1/admin/queues', adminToken())).status, 403);
+    });
+    test('does not get an all-franchise scope on franchise-scoped routes', async () => {
+        assert.equal((await fx.call('GET', '/v1/food/admin/stores', adminToken())).status, 403);
+    });
+    test('the real super admin still gets through', async () => {
+        assert.equal((await fx.call('GET', '/v1/food/admin/fee-settings', fx.SA)).status, 200);
+        assert.equal((await fx.call('GET', '/v1/food/admin/stores', fx.SA)).status, 200);
+    });
+});

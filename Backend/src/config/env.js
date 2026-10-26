@@ -87,7 +87,15 @@ export const config = {
     firebaseWebVapidKey: process.env.VITE_FIREBASE_VAPID_KEY || process.env.FIREBASE_VAPID_KEY,
 
     // Socket.io
-    socketCorsOrigin: process.env.SOCKET_CORS_ORIGIN || (corsOrigins.length ? corsOrigins : '*'),
+    // Never '*'. Production needs FRONTEND_URL (validateConfig refuses to start without it); outside
+    // production, local and private-network origins are allowed when nothing is configured.
+    socketCorsOrigin: process.env.SOCKET_CORS_ORIGIN
+        ? process.env.SOCKET_CORS_ORIGIN.split(',').map((o) => o.trim().replace(/\/+$/, '')).filter(Boolean)
+        : corsOrigins.length
+            ? corsOrigins
+            : nodeEnv === 'production'
+                ? []
+                : [/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/],
 
     // Razorpay (payments)
     razorpayKeyId: process.env.RAZORPAY_KEY_ID,

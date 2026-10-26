@@ -125,12 +125,14 @@ export const initSocket = async (server) => {
     io.on('connection', (socket) => {
         const userId = socket.user?.userId;
         const role = socket.user?.role;
+        // Customer logins carry the role CUSTOMER (older tokens USER); both are the same person.
+        const isCustomerRole = role === 'USER' || role === 'CUSTOMER';
         logger.info(`Socket client connected: ${socket.id} (${role || 'UNKNOWN'}:${userId || '-'})`);
 
         // Auto-join role rooms (lets us emit without a custom join).
         if (userId && role) {
             if (role === 'STORE') socket.join(roomNames.store(userId));
-            if (role === 'USER') socket.join(roomNames.user(userId));
+            if (isCustomerRole) socket.join(roomNames.user(userId));
             if (role === 'DELIVERY_PARTNER') {
                 socket.join(roomNames.delivery(userId));
                 socket.join('all_delivery'); // Global delivery broadcast room
@@ -378,9 +380,9 @@ export const initSocket = async (server) => {
               });
             }
             const { resyncState } = await import('../modules/food/orders/services/order.service.js');
-            const state = await resyncState(userId, role);
+            const state = await resyncState(userId, isCustomerRole ? 'USER' : role);
             if (state.activeOrder) {
-              const eventName = role === 'USER' ? 'order_state' : 'active_order';
+              const eventName = isCustomerRole ? 'order_state' : 'active_order';
               socket.emit(eventName, state.activeOrder);
               if (role === 'DELIVERY_PARTNER') {
                 logDeliverySocket('Resync emitted active order', {
@@ -396,7 +398,7 @@ export const initSocket = async (server) => {
               }
               
               // Re-emit OTP if user is in drop phase
-              if (role === 'USER' && state.activeOrder.handoverOtp) {
+              if (isCustomerRole && state.activeOrder.handoverOtp) {
                 socket.emit('delivery_drop_otp', {
                   orderId: state.activeOrder.orderId,
                   otp: state.activeOrder.handoverOtp,

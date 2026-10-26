@@ -152,8 +152,55 @@ describe('access + refresh tokens', () => {
         const first = (await login('/v1/auth/franchise/login', A.email, PASSWORD)).body.data.refreshToken;
         assert.equal((await refresh(first)).status, 200);
         assert.equal((await refresh(first)).status, 200, 'still inside the overlap window');
-        await fx.models.RefreshToken.updateOne({ tokenHash: fx.models.RefreshToken.hashToken(first) }, { $set: { expiresAt: new Date(Date.now() - 1000) } });
+        await age(first);
         assert.equal((await refresh(first)).status, 401, 'rejected once the overlap has passed');
+    });
+
+    // N5: replaying an already-rotated token after the grace window ends the whole session family.
+    const RT = () => fx.models.RefreshToken;
+    const age = (token, seconds = 60) =>
+        RT().updateOne({ tokenHash: RT().hashToken(token) }, { $set: { rotatedAt: new Date(Date.now() - seconds * 1000) } });
+    test('reuse after the grace window revokes the whole family, including the newest token', async () => {
+        const first = (await login('/v1/auth/franchise/login', A.email, PASSWORD)).body.data.refreshToken;
+        const second = (await refresh(first)).body.data.refreshToken;
+        const third = (await refresh(second)).body.data.refreshToken; // the legitimate client keeps going
+        await age(first); await age(second);
+        assert.equal((await refresh(first)).status, 401, 'the replayed token is rejected');
+        assert.equal((await refresh(third)).status, 401, 'and the session it belonged to is dead');
+        assert.equal(await RT().countDocuments({ tokenHash: RT().hashToken(third) }), 0);
+    });
+    test('reuse inside the grace window is just a parallel tab, not an attack', async () => {
+        const first = (await login('/v1/auth/franchise/login', A.email, PASSWORD)).body.data.refreshToken;
+        const viaTab1 = (await refresh(first)).body.data.refreshToken;
+        assert.equal((await refresh(first)).status, 200);
+        assert.equal((await refresh(viaTab1)).status, 200, 'the session survives');
+    });
+    test('replay on one device does not log out the same user\'s other device', async () => {
+        const phone = (await login('/v1/auth/franchise/login', A.email, PASSWORD)).body.data.refreshToken;
+        const laptop = (await login('/v1/auth/franchise/login', A.email, PASSWORD)).body.data.refreshToken;
+        const phone2 = (await refresh(phone)).body.data.refreshToken;
+        await age(phone);
+        assert.equal((await refresh(phone)).status, 401);
+        assert.equal((await refresh(phone2)).status, 401, 'phone session family revoked');
+        assert.equal((await refresh(laptop)).status, 200, 'laptop untouched');
+    });
+    test('rotated tokens do not count as devices: three logins on three devices all keep working after refreshes', async () => {
+        const devices = [];
+        for (let i = 0; i < 3; i += 1) devices.push((await login('/v1/auth/franchise/login', A.email, PASSWORD)).body.data.refreshToken);
+        for (let round = 0; round < 3; round += 1) {
+            for (let i = 0; i < 3; i += 1) {
+                const r = await refresh(devices[i]);
+                assert.equal(r.status, 200, `device ${i} round ${round}`);
+                devices[i] = r.body.data.refreshToken;
+            }
+        }
+    });
+    test('a fourth login evicts the oldest device only', async () => {
+        const first = (await login('/v1/auth/franchise/login', A.email, PASSWORD)).body.data.refreshToken;
+        const others = [];
+        for (let i = 0; i < 3; i += 1) others.push((await login('/v1/auth/franchise/login', A.email, PASSWORD)).body.data.refreshToken);
+        assert.equal((await refresh(first)).status, 401, 'oldest session evicted');
+        for (const t of others) assert.equal((await refresh(t)).status, 200);
     });
     test('scope is re-read from the database on refresh', async () => {
         const rt = (await login('/v1/auth/franchise/login', A.email, PASSWORD)).body.data.refreshToken;

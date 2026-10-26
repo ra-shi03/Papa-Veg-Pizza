@@ -145,12 +145,30 @@ describe('task actions (assignee only)', () => {
         assert.notEqual(s.avgCompletionTime, 'N/A');
         assert.match(s.performanceScore, /%$/);
     });
-    test('a proof link over https is kept', async () => {
+    // N3: proof images must be ours (Cloudinary, our own cloud); anything else is dropped, never fetched by a browser.
+    const proofFor = async (image) => {
         const o2 = await newOrder(A); await accept(A, o2, sup); await assign(sup.token, o2, pizza, 'pizza_chef');
         const t2 = await taskOf(pizza, o2.ref);
         await act(pizza, 'start', {}, t2._id);
-        const res = await act(pizza, 'complete', { image: 'https://example.com/proof.jpg' }, t2._id);
-        assert.deepEqual(res.body.data.attachments, ['https://example.com/proof.jpg']);
+        const res = await act(pizza, 'complete', { image }, t2._id);
+        assert.equal(res.status, 200);
+        return res.body.data.attachments;
+    };
+    test('a proof image from our own Cloudinary account is kept', async () => {
+        const url = 'https://res.cloudinary.com/test/image/upload/v1/papa-veg/proof.jpg';
+        assert.deepEqual(await proofFor(url), [url]);
+    });
+    test('any other link is dropped: other hosts, other Cloudinary accounts, http, look-alike hosts, credentials', async () => {
+        for (const bad of [
+            'https://example.com/proof.jpg',
+            'https://res.cloudinary.com/someone-else/image/upload/v1/x.jpg',
+            'http://res.cloudinary.com/test/image/upload/v1/x.jpg',
+            'https://res.cloudinary.com.evil.example/test/image/upload/v1/x.jpg',
+            'https://evil.example/res.cloudinary.com/test/image/upload/x.jpg',
+            'https://user:pass@res.cloudinary.com/test/image/upload/v1/x.jpg',
+            'https://res.cloudinary.com/test/raw/upload/v1/x.html',
+            'https://res.cloudinary.com/test/image/uploadx/v1/x.jpg',
+        ]) assert.deepEqual(await proofFor(bad), [], bad);
     });
     test('malformed ids are 404, not a 500', async () => {
         assert.equal((await act(pizza, 'start', {}, 'not-an-id')).status, 404);

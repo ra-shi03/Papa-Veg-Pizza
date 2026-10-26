@@ -224,11 +224,7 @@ export const verifyUserOtpAndLogin = async (
     expiresAt,
   });
 
-  const tokens = await RefreshToken.find({ userId: user._id }).sort({ createdAt: -1 });
-  if (tokens.length > 3) {
-    const tokensToDelete = tokens.slice(3).map(t => t._id);
-    await RefreshToken.deleteMany({ _id: { $in: tokensToDelete } });
-  }
+  await RefreshToken.trimSessions(user._id, 3);
 
   return {
     accessToken,
@@ -396,11 +392,7 @@ export const adminLogin = async ({ email, mobile, password } = {}, allowedRoles 
   });
 
   // Limit active sessions (max 3 per user)
-  const tokens = await RefreshToken.find({ userId: user._id }).sort({ createdAt: -1 });
-  if (tokens.length > 3) {
-    const tokensToDelete = tokens.slice(3).map(t => t._id);
-    await RefreshToken.deleteMany({ _id: { $in: tokensToDelete } });
-  }
+  await RefreshToken.trimSessions(user._id, 3);
 
   user.lastLoginAt = new Date();
   await user.save();
@@ -516,11 +508,7 @@ export const verifyDeliveryOtpAndLogin = async (phone, otp, fcmToken, platform) 
   });
 
   // Limit active sessions (max 3 per user)
-  const tokens = await RefreshToken.find({ userId: deliveryPartner._id }).sort({ createdAt: -1 });
-  if (tokens.length > 3) {
-    const tokensToDelete = tokens.slice(3).map(t => t._id);
-    await RefreshToken.deleteMany({ _id: { $in: tokensToDelete } });
-  }
+  await RefreshToken.trimSessions(deliveryPartner._id, 3);
 
   return {
     token: accessToken,
@@ -1030,8 +1018,8 @@ export const resetAdminPasswordWithOtp = async (email, otp, newPassword) => {
 
 // After a refresh the previous refresh token stays valid for this long (parallel refreshes).
 const REFRESH_REUSE_GRACE_MS = 30 * 1000;
-// Active sessions per account (3 devices) plus the tokens still inside the grace window.
-const MAX_REFRESH_TOKENS_PER_USER = 6;
+// Live sessions (devices) per account; rotated tokens are kept separately for replay detection.
+const MAX_REFRESH_SESSIONS_PER_USER = 3;
 
 export const refreshAccessToken = async (token) => {
   if (!token) {
@@ -1042,6 +1030,16 @@ export const refreshAccessToken = async (token) => {
   const stored = await RefreshToken.findByRawToken(token);
   if (!stored || stored.expiresAt <= new Date()) {
     throw new AuthError("Invalid or expired refresh token");
+  }
+
+  // Reuse detection. A token that was already exchanged is only good for the short grace window (parallel
+  // tabs). Presenting it later means someone kept a copy: end the whole session family, so the attacker's
+  // newest token dies too and the real user has to log in again.
+  const familyId = stored.familyId || String(stored._id);
+  if (stored.rotatedAt && Date.now() - stored.rotatedAt.getTime() > REFRESH_REUSE_GRACE_MS) {
+    await RefreshToken.deleteMany({ userId: stored.userId, $or: [{ familyId }, { _id: stored._id }] });
+    logger.warn(`Refresh token reuse detected for user ${stored.userId}; session family ${familyId} revoked`);
+    throw new AuthError("Your session is no longer valid. Please log in again.");
   }
 
   const jwt = await import("jsonwebtoken");
@@ -1100,17 +1098,17 @@ export const refreshAccessToken = async (token) => {
     userId: stored.userId,
     tokenHash: RefreshToken.hashToken(newRefreshToken),
     deviceId: stored.deviceId,
+    familyId,
     expiresAt: new Date(Date.now() + ttlMs),
   });
+  // Mark the old token as exchanged (the first time only, so the grace window is measured from then). It is kept,
+  // not shortened, so a later replay can be told apart from an unknown token.
   await RefreshToken.updateOne(
-    { _id: stored._id },
-    { $set: { expiresAt: new Date(Math.min(stored.expiresAt.getTime(), Date.now() + REFRESH_REUSE_GRACE_MS)) } },
+    { _id: stored._id, rotatedAt: null },
+    { $set: { rotatedAt: new Date(), familyId } },
   );
 
-  const sessions = await RefreshToken.find({ userId: stored.userId }).sort({ createdAt: -1 }).select("_id").lean();
-  if (sessions.length > MAX_REFRESH_TOKENS_PER_USER) {
-    await RefreshToken.deleteMany({ _id: { $in: sessions.slice(MAX_REFRESH_TOKENS_PER_USER).map((t) => t._id) } });
-  }
+  await RefreshToken.trimSessions(stored.userId, MAX_REFRESH_SESSIONS_PER_USER);
 
   return { accessToken: signAccessToken(newPayload), refreshToken: newRefreshToken };
 };

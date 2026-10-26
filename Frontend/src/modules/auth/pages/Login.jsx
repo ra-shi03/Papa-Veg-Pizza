@@ -18,6 +18,9 @@ import { Input } from "@food/components/ui/input"
 import { Label } from "@food/components/ui/label"
 import { User } from "lucide-react"
 
+// Login OTPs are 6 digits (the backend generates and verifies exactly 6).
+const OTP_LENGTH = 6
+
 export default function UnifiedOTPFastLogin() {
   const RESEND_COOLDOWN_SECONDS = 60
   const [phoneNumber, setPhoneNumber] = useState("")
@@ -105,9 +108,9 @@ export default function UnifiedOTPFastLogin() {
 
   const handleVerifyOTP = async (e) => {
     e.preventDefault()
-    const otpDigits = String(otp).replace(/\D/g, "").slice(0, 4)
-    if (otpDigits.length !== 4) {
-      toast.error("Please enter the 4-digit OTP")
+    const otpDigits = String(otp).replace(/\D/g, "").slice(0, OTP_LENGTH)
+    if (otpDigits.length !== OTP_LENGTH) {
+      toast.error(`Please enter the ${OTP_LENGTH}-digit OTP`)
       return
     }
     if (submitting.current) return
@@ -367,7 +370,7 @@ export default function UnifiedOTPFastLogin() {
                   className="space-y-6"
                 >
                   <div className="flex justify-between gap-3">
-                    {[0, 1, 2, 3].map((index) => (
+                    {Array.from({ length: OTP_LENGTH }, (_, index) => index).map((index) => (
                       <input
                         key={index}
                         id={`otp-${index}`}
@@ -381,9 +384,9 @@ export default function UnifiedOTPFastLogin() {
                           if (!val) return;
                           const newOtp = otp.split("");
                           newOtp[index] = val;
-                          const combined = newOtp.join("").slice(0, 4);
+                          const combined = newOtp.join("").slice(0, OTP_LENGTH);
                           setOtp(combined);
-                          if (index < 3 && val) {
+                          if (index < OTP_LENGTH - 1 && val) {
                             document.getElementById(`otp-${index + 1}`)?.focus();
                           }
                         }}
@@ -430,7 +433,7 @@ export default function UnifiedOTPFastLogin() {
 
                   <button
                     type="submit"
-                    disabled={loading || otp.length < 4}
+                    disabled={loading || otp.length < OTP_LENGTH}
                     className="w-full py-4.5 bg-[#7e3866] hover:bg-[#6a2f56] disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 text-white rounded-2xl font-bold text-lg shadow-xl shadow-[#7e3866]/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                   >
                     {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : "Verify & Continue"}

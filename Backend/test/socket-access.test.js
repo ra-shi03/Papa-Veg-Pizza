@@ -107,6 +107,20 @@ describe('H2: join-tracking needs a link to the order', () => {
     });
 });
 
+describe('customer room: role CUSTOMER and role USER both get their personal room', () => {
+    for (const role of ['CUSTOMER', 'USER']) {
+        test(`${role}: receives its own order's location without joining tracking, and not another customer's`, async () => {
+            const { id } = await makeOrder();
+            const mine = await client(fx.tokenFor(A.customerId, role));
+            const theirs = await client(fx.tokenFor(B.customerId, role));
+            const [a, b] = [next(mine, 'location-update'), next(theirs, 'location-update', 1200)];
+            (await client(as.rider())).emit('update-location', { orderId: id, lat: 22.7, lng: 75.8 });
+            assert.ok(await a, 'the order\'s customer gets it');
+            assert.equal(await b, null);
+        });
+    }
+});
+
 describe('H3: update-location only from the assigned rider, rooms from the order', () => {
     const point = (orderId, extra = {}) => ({ orderId, lat: 22.7, lng: 75.8, ...extra });
 

@@ -145,11 +145,7 @@ export const verifyDeliveryOtpAndLogin = async (phone, otp, fcmToken, platform) 
   });
 
   // Limit active sessions (max 3 per user)
-  const tokens = await RefreshToken.find({ userId: deliveryPartner._id }).sort({ createdAt: -1 });
-  if (tokens.length > 3) {
-    const tokensToDelete = tokens.slice(3).map(t => t._id);
-    await RefreshToken.deleteMany({ _id: { $in: tokensToDelete } });
-  }
+  await RefreshToken.trimSessions(deliveryPartner._id, 3);
 
   return {
     token: accessToken,

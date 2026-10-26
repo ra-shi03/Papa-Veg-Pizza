@@ -99,11 +99,7 @@ export const adminLogin = async ({ email, mobile, password } = {}, allowedRoles 
   });
 
   // Limit active sessions
-  const tokens = await RefreshToken.find({ userId: admin._id }).sort({ createdAt: -1 });
-  if (tokens.length > 3) {
-    const tokensToDelete = tokens.slice(3).map(t => t._id);
-    await RefreshToken.deleteMany({ _id: { $in: tokensToDelete } });
-  }
+  await RefreshToken.trimSessions(admin._id, 3);
 
   admin.lastLogin = new Date();
   await admin.save({ validateModifiedOnly: true });

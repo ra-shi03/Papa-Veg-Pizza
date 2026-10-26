@@ -8,9 +8,12 @@ import { authAPI, userAPI } from "@food/api"
 import { setAuthData as setUserAuthData } from "@food/utils/auth"
 import { motion, AnimatePresence } from "framer-motion"
 
+// Login OTPs are 6 digits (the backend generates and verifies exactly 6).
+const OTP_LENGTH = 6
+
 export default function OTP() {
   const navigate = useNavigate()
-  const [otp, setOtp] = useState(["1", "2", "3", "4"]) // By default OTP is 1234
+  const [otp, setOtp] = useState(import.meta.env.DEV ? ["1", "2", "3", "4", "5", "6"] : Array(OTP_LENGTH).fill("")) // dev default OTP is 123456 (USE_DEFAULT_OTP, never in production)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
@@ -90,14 +93,14 @@ export default function OTP() {
     setOtp(newOtp)
     setError("")
 
-    // Auto-focus next input (4 boxes)
-    if (value && index < 3) {
+    // Auto-focus next input
+    if (value && index < OTP_LENGTH - 1) {
       inputRefs.current[index + 1]?.focus()
     }
 
-    // Auto-submit when all 4 digits are entered
-    if (!showNameInput && newOtp.slice(0, 4).every((digit) => digit !== "")) {
-      handleVerify(newOtp.slice(0, 4).join(""))
+    // Auto-submit when all digits are entered
+    if (!showNameInput && newOtp.slice(0, OTP_LENGTH).every((digit) => digit !== "")) {
+      handleVerify(newOtp.slice(0, OTP_LENGTH).join(""))
     }
   }
 
@@ -117,16 +120,16 @@ export default function OTP() {
     if (e.key === "v" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
       navigator.clipboard.readText().then((text) => {
-        const digits = text.replace(/\D/g, "").slice(0, 4).split("")
+        const digits = text.replace(/\D/g, "").slice(0, OTP_LENGTH).split("")
         const newOtp = [...otp]
         digits.forEach((digit, i) => {
-          if (i < 4) newOtp[i] = digit
+          if (i < OTP_LENGTH) newOtp[i] = digit
         })
         setOtp(newOtp)
-        if (!showNameInput && digits.length === 4) {
-          handleVerify(newOtp.slice(0, 4).join(""))
+        if (!showNameInput && digits.length === OTP_LENGTH) {
+          handleVerify(newOtp.slice(0, OTP_LENGTH).join(""))
         } else {
-          inputRefs.current[Math.min(digits.length, 3)]?.focus()
+          inputRefs.current[Math.min(digits.length, OTP_LENGTH - 1)]?.focus()
         }
       })
     }
@@ -135,16 +138,16 @@ export default function OTP() {
   const handlePaste = (e) => {
     e.preventDefault()
     const pastedData = e.clipboardData.getData("text")
-    const digits = pastedData.replace(/\D/g, "").slice(0, 4).split("")
+    const digits = pastedData.replace(/\D/g, "").slice(0, OTP_LENGTH).split("")
     const newOtp = [...otp]
     digits.forEach((digit, i) => {
-      if (i < 4) newOtp[i] = digit
+      if (i < OTP_LENGTH) newOtp[i] = digit
     })
     setOtp(newOtp)
-    if (!showNameInput && digits.length === 4) {
-      handleVerify(newOtp.slice(0, 4).join(""))
+    if (!showNameInput && digits.length === OTP_LENGTH) {
+      handleVerify(newOtp.slice(0, OTP_LENGTH).join(""))
     } else {
-      inputRefs.current[Math.min(digits.length, 3)]?.focus()
+      inputRefs.current[Math.min(digits.length, OTP_LENGTH - 1)]?.focus()
     }
   }
 
@@ -153,9 +156,9 @@ export default function OTP() {
     if (submittingRef.current) return
 
     const code = (otpValue || otp.join("")).replace(/\D/g, "")
-    const code4 = code.slice(0, 4)
-    if (code4.length !== 4) {
-      setError("OTP must be exactly 4 digits")
+    const codeFull = code.slice(0, OTP_LENGTH)
+    if (codeFull.length !== OTP_LENGTH) {
+      setError(`OTP must be exactly ${OTP_LENGTH} digits`)
       return
     }
 
@@ -168,7 +171,7 @@ export default function OTP() {
       const authDataParsed = storedAuth ? JSON.parse(storedAuth) : null
       const mobileNumber = authDataParsed?.phone || contactInfo
 
-      const response = await authAPI.verifyOTP(mobileNumber, code4)
+      const response = await authAPI.verifyOTP(mobileNumber, codeFull)
       const data = response?.data?.data || response?.data || {}
       const user = data.user || data
       const token = data.accessToken || data.token
@@ -280,7 +283,7 @@ export default function OTP() {
     }
 
     setResendTimer(60)
-    setOtp(["", "", "", "", "", ""])
+    setOtp(Array(OTP_LENGTH).fill(""))
     setShowNameInput(false)
     setName("")
     setNameError("")
