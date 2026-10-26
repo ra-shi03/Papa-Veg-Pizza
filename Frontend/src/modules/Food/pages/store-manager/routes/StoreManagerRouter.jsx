@@ -33,11 +33,6 @@ import Performance from "../staffManagement/Performance"
 import CustomerOrders from "../customers/CustomerOrders"
 import Complaints from "../customers/Complaints"
 import Reviews from "../customers/Reviews"
-import DailySales from "../reports/DailySales"
-import OrderReports from "../reports/OrderReports"
-import KitchenPerformance from "../reports/KitchenPerformance"
-import StaffPerformance from "../reports/StaffPerformance"
-import StorePerformance from "../reports/StorePerformance"
 import Profile from "../profile/Profile"
 import MyTasks from "../myTasks/MyTasks"
 
@@ -363,48 +358,6 @@ export default function StoreManagerRouter() {
             element={
               <RoleProtectedRoute allowedRoles={["store_manager", "store_owner", "assistant_manager", "customer_experience_manager"]}>
                 <Reviews />
-              </RoleProtectedRoute>
-            }
-          />
-
-          {/* Reports */}
-          <Route
-            path="reports/sales"
-            element={
-              <RoleProtectedRoute allowedRoles={["store_manager"]}>
-                <DailySales />
-              </RoleProtectedRoute>
-            }
-          />
-          <Route
-            path="reports/orders"
-            element={
-              <RoleProtectedRoute allowedRoles={["store_manager"]}>
-                <OrderReports />
-              </RoleProtectedRoute>
-            }
-          />
-          <Route
-            path="reports/kitchen"
-            element={
-              <RoleProtectedRoute allowedRoles={["store_manager"]}>
-                <KitchenPerformance />
-              </RoleProtectedRoute>
-            }
-          />
-          <Route
-            path="reports/staff"
-            element={
-              <RoleProtectedRoute allowedRoles={["store_manager"]}>
-                <StaffPerformance />
-              </RoleProtectedRoute>
-            }
-          />
-          <Route
-            path="reports/store"
-            element={
-              <RoleProtectedRoute allowedRoles={["store_manager"]}>
-                <StorePerformance />
               </RoleProtectedRoute>
             }
           />

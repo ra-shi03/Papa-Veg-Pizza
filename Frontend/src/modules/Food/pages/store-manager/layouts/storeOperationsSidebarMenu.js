@@ -238,48 +238,6 @@ export const storeOperationsSidebarMenu = [
     ]
   },
   {
-    type: "section",
-    label: "Reports",
-    allowedRoles: ["store_manager"],
-    items: [
-      {
-        type: "link",
-        label: "Daily Sales",
-        path: "/store-operations/reports/sales",
-        icon: "DollarSign",
-        allowedRoles: ["store_manager"]
-      },
-      {
-        type: "link",
-        label: "Order Reports",
-        path: "/store-operations/reports/orders",
-        icon: "FileText",
-        allowedRoles: ["store_manager"]
-      },
-      {
-        type: "link",
-        label: "Kitchen Performance",
-        path: "/store-operations/reports/kitchen",
-        icon: "Gauge",
-        allowedRoles: ["store_manager"]
-      },
-      {
-        type: "link",
-        label: "Staff Performance",
-        path: "/store-operations/reports/staff",
-        icon: "Users",
-        allowedRoles: ["store_manager"]
-      },
-      {
-        type: "link",
-        label: "Store Performance",
-        path: "/store-operations/reports/store",
-        icon: "Store",
-        allowedRoles: ["store_manager"]
-      }
-    ]
-  },
-  {
     type: "link",
     label: "My Tasks",
     path: "/store-operations/tasks",

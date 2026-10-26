@@ -36,16 +36,6 @@ const Campaign = lazy(() => import("../marketing/Campaign"))
 const PushNotification = lazy(() => import("../marketing/PushNotification"))
 
 const RewardsManagement = lazy(() => import("../marketing/RewardsManagement"))
-const TaxReports = lazy(() => import("../financial/TaxReports"))
-const TransactionManagement = lazy(() => import("../financial/TransactionManagement"))
-const FranchiseCommission = lazy(() => import("../financial/FranchiseCommission"))
-const Revenue = lazy(() => import("../financial/Revenue"))
-const Payouts = lazy(() => import("../financial/Payouts"))
-const SalesAnalytics = lazy(() => import("../analytics/SalesAnalytics"))
-const CustomerAnalytics = lazy(() => import("../analytics/CustomerAnalytics"))
-const StoreAnalytics = lazy(() => import("../analytics/StoreAnalytics"))
-const DeliveryAnalytics = lazy(() => import("../analytics/DeliveryAnalytics"))
-const GrowthReport = lazy(() => import("../analytics/GrowthReport"))
 const Settings = lazy(() => import("../settings/Settings"))
 const AppConfiguration = lazy(() => import("../settings/AppConfiguration"))
 const PaymentGateways = lazy(() => import("../settings/PaymentGateways"))
@@ -122,26 +112,6 @@ function SuperAdminLayout() {
     activeItem = "Push Notifications"
   } else if (location.pathname.includes("/rewards")) {
     activeItem = "Rewards Program"
-  } else if (location.pathname.includes("/tax-reports")) {
-    activeItem = "Tax Reports"
-  } else if (location.pathname.includes("/transactions")) {
-    activeItem = "Transactions"
-  } else if (location.pathname.includes("/commissions")) {
-    activeItem = "Franchise Commissions"
-  } else if (location.pathname.includes("/payouts")) {
-    activeItem = "Payouts"
-  } else if (location.pathname.includes("/revenue")) {
-    activeItem = "Revenue"
-  } else if (location.pathname.includes("/sales-analytics")) {
-    activeItem = "Sales Analytics"
-  } else if (location.pathname.includes("/customer-analytics")) {
-    activeItem = "Customer Analytics"
-  } else if (location.pathname.includes("/store-analytics")) {
-    activeItem = "Store Analytics"
-  } else if (location.pathname.includes("/delivery-analytics")) {
-    activeItem = "Delivery Analytics"
-  } else if (location.pathname.includes("/growth-reports")) {
-    activeItem = "Growth Reports"
   } else if (location.pathname.includes("/app-configuration")) {
     activeItem = "App Configuration"
   } else if (location.pathname.includes("/payment-gateways")) {
@@ -260,16 +230,6 @@ export default function SuperAdminRouter() {
             <Route path="/push-notifications" element={<PushNotification />} />
 
             <Route path="/rewards" element={<RewardsManagement />} />
-            <Route path="/tax-reports" element={<TaxReports />} />
-            <Route path="/transactions" element={<TransactionManagement />} />
-            <Route path="/commissions" element={<FranchiseCommission />} />
-            <Route path="/payouts" element={<Payouts />} />
-            <Route path="/revenue" element={<Revenue />} />
-            <Route path="/sales-analytics" element={<SalesAnalytics />} />
-            <Route path="/customer-analytics" element={<CustomerAnalytics />} />
-            <Route path="/store-analytics" element={<StoreAnalytics />} />
-            <Route path="/delivery-analytics" element={<DeliveryAnalytics />} />
-            <Route path="/growth-reports" element={<GrowthReport />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/app-configuration" element={<AppConfiguration />} />
             <Route path="/payment-gateways" element={<PaymentGateways />} />

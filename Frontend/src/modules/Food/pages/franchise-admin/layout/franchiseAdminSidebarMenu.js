@@ -66,37 +66,6 @@ export const franchiseAdminSidebarMenu = [
     ],
   },
   {
-    type: "section",
-    label: "FINANCE",
-    items: [
-      { type: "link", label: "Franchise Revenue", path: "/franchise-admin/franchise-revenue", icon: "DollarSign" },
-      { type: "link", label: "Expenses", path: "/franchise-admin/expenses", icon: "TrendingDown" },
-      { type: "link", label: "Store Earnings", path: "/franchise-admin/store-earnings", icon: "Landmark" },
-      { type: "link", label: "Rider Payouts", path: "/franchise-admin/rider-payouts", icon: "CreditCard" },
-      { type: "link", label: "Reports", path: "/franchise-admin/reports", icon: "FileText" },
-    ],
-  },
-  {
-    type: "section",
-    label: "MARKETING",
-    items: [
-      { type: "link", label: "Local Coupons", path: "/franchise-admin/coupons", icon: "Ticket" },
-      { type: "link", label: "Campaigns", path: "/franchise-admin/campaigns", icon: "Megaphone" },
-      { type: "link", label: "Promotional Banners", path: "/franchise-admin/banners", icon: "Image" },
-      { type: "link", label: "Notifications", path: "/franchise-admin/notifications", icon: "Bell" },
-    ],
-  },
-  {
-    type: "section",
-    label: "REPORTS",
-    items: [
-      { type: "link", label: "Sales Reports", path: "/franchise-admin/sales-report", icon: "BarChart3" },
-      { type: "link", label: "Order Reports", path: "/franchise-admin/orders-report", icon: "LineChart" },
-      { type: "link", label: "Staff Reports", path: "/franchise-admin/staff-reports", icon: "ClipboardList" },
-      { type: "link", label: "Inventory Reports", path: "/franchise-admin/inventory-reports", icon: "FileText" },
-    ],
-  },
-  {
     type: "link",
     label: "Profile",
     path: "/franchise-admin/dashboard/profile",

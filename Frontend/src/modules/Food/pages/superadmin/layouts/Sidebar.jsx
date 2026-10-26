@@ -114,16 +114,6 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
       ]
     },
     {
-      title: "Financial",
-      items: [
-        { name: "Revenue", icon: TrendingUp },
-        { name: "Franchise Commissions", icon: Percent },
-        { name: "Payouts", icon: Landmark },
-        { name: "Transactions", icon: History },
-        { name: "Tax Reports", icon: FileText }
-      ]
-    },
-    {
       title: "Marketing",
       items: [
         { name: "Coupons", icon: Ticket },
@@ -131,16 +121,6 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
         { name: "Push Notifications", icon: Bell },
 
         { name: "Rewards Program", icon: Trophy },
-      ]
-    },
-    {
-      title: "Analytics & Reports",
-      items: [
-        { name: "Sales Analytics", icon: BarChart3 },
-        { name: "Customer Analytics", icon: LineChart },
-        { name: "Store Analytics", icon: Store },
-        { name: "Delivery Analytics", icon: Bike },
-        { name: "Growth Reports", icon: TrendingUp }
       ]
     },
     {
@@ -376,26 +356,6 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
                                 navigate("/food/superadmin/push-notifications")
                               } else if (item.name === "Rewards Program") {
                                 navigate("/food/superadmin/rewards")
-                              } else if (item.name === "Tax Reports") {
-                                navigate("/food/superadmin/tax-reports")
-                              } else if (item.name === "Transactions") {
-                                navigate("/food/superadmin/transactions")
-                              } else if (item.name === "Franchise Commissions") {
-                                navigate("/food/superadmin/commissions")
-                              } else if (item.name === "Payouts") {
-                                navigate("/food/superadmin/payouts")
-                              } else if (item.name === "Revenue") {
-                                navigate("/food/superadmin/revenue")
-                              } else if (item.name === "Sales Analytics") {
-                                navigate("/food/superadmin/sales-analytics")
-                              } else if (item.name === "Customer Analytics") {
-                                navigate("/food/superadmin/customer-analytics")
-                              } else if (item.name === "Store Analytics") {
-                                navigate("/food/superadmin/store-analytics")
-                              } else if (item.name === "Delivery Analytics") {
-                                navigate("/food/superadmin/delivery-analytics")
-                              } else if (item.name === "Growth Reports") {
-                                navigate("/food/superadmin/growth-reports")
                               } else if (item.name === "Settings") {
                                 navigate("/food/superadmin/settings")
                               } else if (item.name === "App Configuration") {

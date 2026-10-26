@@ -8,15 +8,6 @@ import Loader from "@food/components/Loader";
 // Lazy Loaded Pages
 const AdminHome = lazy(() => import("@food/pages/franchise-admin/dashboard/FranchiseAdminDashboard"));
 const AdminProfile = lazy(() => import("@food/pages/franchise-admin/AdminProfile"));
-const FranchiseRevenue = lazy(() => import("@food/pages/franchise-admin/finance/FranchiseRevenue"));
-const Expenses = lazy(() => import("@food/pages/franchise-admin/finance/Expenses"));
-const StoreEarnings = lazy(() => import("@food/pages/franchise-admin/finance/StoreEarnings"));
-const RiderPayouts = lazy(() => import("@food/pages/franchise-admin/finance/RiderPayouts"));
-const Reports = lazy(() => import("@food/pages/franchise-admin/finance/Reports"));
-const SalesReport = lazy(() => import("@food/pages/franchise-admin/reports/SalesReport"));
-const OrdersReport = lazy(() => import("@food/pages/franchise-admin/reports/OrdersReport"));
-const StaffReports = lazy(() => import("@food/pages/franchise-admin/reports/StaffReports"));
-const InventoryReports = lazy(() => import("@food/pages/franchise-admin/reports/InventoryReports"));
 const RefundRequests = lazy(() => import("@food/pages/franchise-admin/orders/RefundRequests"));
 const OrderIssues = lazy(() => import("@food/pages/franchise-admin/orders/OrderIssues"));
 const LiveOrders = lazy(() => import("@food/pages/franchise-admin/orders/LiveOrders"));
@@ -31,11 +22,6 @@ const StorePricing = lazy(() => import("@food/pages/franchise-admin/products/Sto
 
 
 // Promotions Management
-const Coupons = lazy(() => import("@food/pages/franchise-admin/marketing/LocalCoupons"));
-const Campaigns = lazy(() => import("@food/pages/franchise-admin/marketing/Campaigns"));
-const PromotionalBanner = lazy(() => import("@food/pages/franchise-admin/PromotionalBanner"));
-const PromotionalBanners = lazy(() => import("@food/pages/franchise-admin/marketing/PromotionalBanners"));
-const NotificationsPage = lazy(() => import("@food/pages/franchise-admin/marketing/Notifications"));
 
 const Stores = lazy(() => import("@food/pages/franchise-admin/storeManagement/Stores"));
 const StoreApprovals = lazy(() => import("@food/pages/franchise-admin/storeManagement/StoreApprovals"));
@@ -109,19 +95,6 @@ export default function FranchiseAdminRouter() {
           <Route path="stock-levels" element={<StockLevels />} />
           <Route path="low-stock-alerts" element={<LowStockAlerts />} />
           <Route path="purchase-requests" element={<PurchaseRequests />} />
-          <Route path="franchise-revenue" element={<FranchiseRevenue />} />
-          <Route path="expenses" element={<Expenses />} />
-          <Route path="store-earnings" element={<StoreEarnings />} />
-          <Route path="rider-payouts" element={<RiderPayouts />} />
-          <Route path="reports" element={<Reports />} />
-          <Route path="sales-report" element={<SalesReport />} />
-          <Route path="orders-report" element={<OrdersReport />} />
-          <Route path="staff-reports" element={<StaffReports />} />
-          <Route path="inventory-reports" element={<InventoryReports />} />
-          <Route path="coupons" element={<Coupons />} />
-          <Route path="campaigns" element={<Campaigns />} />
-          <Route path="banners" element={<PromotionalBanners />} />
-          <Route path="notifications" element={<NotificationsPage />} />
           <Route path="profile" element={<AdminProfile />} />
 
           {/* FOOD ADMIN - All food related routes nested here */}
@@ -160,12 +133,11 @@ export default function FranchiseAdminRouter() {
             <Route path="addons" element={<Navigate to="/franchise-admin/addons" replace />} />
 
             {/* PROMOTIONS, CUSTOMERS, DELIVERYMEN, etc. */}
-            <Route path="campaigns/basic" element={<Navigate to="/franchise-admin/campaigns" replace />} />
-            <Route path="campaigns/food" element={<Navigate to="/franchise-admin/campaigns" replace />} />
-            <Route path="coupons" element={<Navigate to="/franchise-admin/coupons" replace />} />
+            <Route path="campaigns/basic" element={<Navigate to="/franchise-admin/dashboard" replace />} />
+            <Route path="campaigns/food" element={<Navigate to="/franchise-admin/dashboard" replace />} />
+            <Route path="coupons" element={<Navigate to="/franchise-admin/dashboard" replace />} />
             <Route path="cashback" element={<Navigate to="/franchise-admin/dashboard" replace />} />
-            <Route path="banners" element={<Navigate to="/franchise-admin/banners" replace />} />
-            <Route path="promotional-banner" element={<PromotionalBanner />} />
+            <Route path="banners" element={<Navigate to="/franchise-admin/dashboard" replace />} />
             <Route path="advertisement" element={<Navigate to="/franchise-admin/dashboard" replace />} />
             <Route path="advertisement/new" element={<Navigate to="/franchise-admin/dashboard" replace />} />
             <Route path="advertisement/requests" element={<Navigate to="/franchise-admin/dashboard" replace />} />
@@ -185,17 +157,17 @@ export default function FranchiseAdminRouter() {
             <Route path="delivery-boy-commission" element={<Navigate to="/franchise-admin/dashboard" replace />} />
             <Route path="delivery-cash-limit" element={<Navigate to="/franchise-admin/dashboard" replace />} />
             <Route path="cash-limit-settlement" element={<Navigate to="/franchise-admin/dashboard" replace />} />
-            <Route path="delivery-withdrawal" element={<Navigate to="/franchise-admin/rider-payouts" replace />} />
+            <Route path="delivery-withdrawal" element={<Navigate to="/franchise-admin/dashboard" replace />} />
             <Route path="delivery-boy-wallet" element={<Navigate to="/franchise-admin/dashboard" replace />} />
             <Route path="delivery-emergency-help" element={<Navigate to="/franchise-admin/dashboard" replace />} />
             <Route path="delivery-support-tickets" element={<Navigate to="/franchise-admin/dashboard" replace />} />
 
             {/* REPORTS & SETTINGS */}
-            <Route path="transaction-report" element={<Navigate to="/franchise-admin/reports" replace />} />
-            <Route path="expense-report" element={<Navigate to="/franchise-admin/expenses" replace />} />
-            <Route path="disbursement-report/stores" element={<Navigate to="/franchise-admin/store-earnings" replace />} />
+            <Route path="transaction-report" element={<Navigate to="/franchise-admin/dashboard" replace />} />
+            <Route path="expense-report" element={<Navigate to="/franchise-admin/dashboard" replace />} />
+            <Route path="disbursement-report/stores" element={<Navigate to="/franchise-admin/dashboard" replace />} />
             <Route path="disbursement-report/deliverymen" element={<Navigate to="/franchise-admin/dashboard" replace />} />
-            <Route path="order-report/regular" element={<Navigate to="/franchise-admin/orders-report" replace />} />
+            <Route path="order-report/regular" element={<Navigate to="/franchise-admin/dashboard" replace />} />
             <Route path="order-report/campaign" element={<Navigate to="/franchise-admin/dashboard" replace />} />
             <Route path="customer-report/feedback-experience" element={<Navigate to="/franchise-admin/dashboard" replace />} />
             <Route path="tax-report" element={<Navigate to="/franchise-admin/dashboard" replace />} />
@@ -203,8 +175,8 @@ export default function FranchiseAdminRouter() {
             
             {/* Extra Report paths from sidebar */}
             {/* Mapped outside to /franchise-admin/sales-report */}
-            <Route path="staff-report" element={<Navigate to="/franchise-admin/staff-reports" replace />} />
-            <Route path="inventory-report" element={<Navigate to="/franchise-admin/inventory-reports" replace />} />
+            <Route path="staff-report" element={<Navigate to="/franchise-admin/dashboard" replace />} />
+            <Route path="inventory-report" element={<Navigate to="/franchise-admin/dashboard" replace />} />
 
             <Route path="store-withdraws" element={<Navigate to="/franchise-admin/dashboard" replace />} />
             <Route path="withdraw-method" element={<Navigate to="/franchise-admin/dashboard" replace />} />
@@ -231,7 +203,7 @@ export default function FranchiseAdminRouter() {
             <Route path="3rd-party-configurations/analytics" element={<Navigate to="/franchise-admin/dashboard" replace />} />
             <Route path="3rd-party-configurations/ai" element={<Navigate to="/franchise-admin/dashboard" replace />} />
             <Route path="app-web-settings" element={<Navigate to="/franchise-admin/dashboard" replace />} />
-            <Route path="notifications" element={<Navigate to="/franchise-admin/notifications" replace />} />
+            <Route path="notifications" element={<Navigate to="/franchise-admin/dashboard" replace />} />
             <Route path="broadcast-notification" element={<Navigate to="/franchise-admin/dashboard" replace />} />
             <Route path="notification-channels" element={<Navigate to="/franchise-admin/dashboard" replace />} />
             <Route path="landing-page-settings/admin" element={<Navigate to="/franchise-admin/dashboard" replace />} />
