@@ -32,6 +32,7 @@ import kitchenOpsRoutes from '../modules/food/store/routes/kitchenOps.routes.js'
 import inventoryRoutes from '../modules/food/store/routes/inventory.routes.js';
 import { customersRouter as storeCustomersRoutes, complaintsRouter as storeComplaintsRoutes, reviewsRouter as storeReviewsRoutes, dashboardComplaintsRouter } from '../modules/food/store/routes/storeCrm.routes.js';
 import { storeDashboardRouter, adminDashboardRouter } from '../modules/food/dashboard/routes/dashboard.routes.js';
+import { storePerformanceRouter, operatingHoursRouter, storeExtrasRouter, storePricingRouter, storeDetailsRouter } from '../modules/food/franchise/routes/storeOps.routes.js';
 import { listFranchiseOrders } from '../modules/food/store/controllers/storeOrders.controller.js';
 import { resolveStoreForLocation } from '../modules/food/orders/services/order-store.service.js';
 import { trackOrderPublicController, getOrderHistoryPublicController, getOrderMethodsController, getFeeConfigController } from '../modules/food/orders/controllers/order.controller.js';
@@ -53,6 +54,8 @@ const router = express.Router();
 // Store pickers sit before the /v1/stores router: its /:id route would swallow them
 router.get('/v1/stores/dropdown', authMiddleware, requireRoles('ADMIN'), scopeIfAdmin, getStoresDropdown);
 router.get('/v1/stores/list', authMiddleware, requireRoles('ADMIN', 'STORE_MANAGER'), scopeIfAdmin, getStoresList);
+// Store hours / status / performance: also readable by a store manager, so they sit before the admin-only /v1/stores router
+router.use('/v1/stores', storeExtrasRouter);
 router.use('/v1/stores', franchiseStoreRoutes);
 router.use('/v1/store-managers', franchiseStoreManagerRoutes);
 router.use('/v1/store-approvals', franchiseStoreApprovalRoutes);
@@ -66,6 +69,11 @@ router.use('/v1/food/store/reviews', storeReviewsRoutes);
 router.use('/v1/complaints', dashboardComplaintsRouter);
 router.use('/v1/store/dashboard', storeDashboardRouter);
 router.use('/v1/admin/dashboard', adminDashboardRouter);
+router.use('/v1/store-performance', storePerformanceRouter);
+router.use('/v1/operating-hours', operatingHoursRouter);
+// /v1/store-pricing, /v1/bulk-price-update, /v1/copy-pricing, /v1/price-history; /v1/orders|inventory|reviews|users?storeId=
+router.use('/v1', storePricingRouter);
+router.use('/v1', storeDetailsRouter);
 router.use('/v1/tasks', kitchenTaskRoutes);
 router.get('/v1/food/franchise/orders', authMiddleware, requireRoles('ADMIN'), listFranchiseOrders);
 

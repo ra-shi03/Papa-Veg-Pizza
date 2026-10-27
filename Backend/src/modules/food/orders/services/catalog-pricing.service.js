@@ -4,6 +4,8 @@ import { Addon } from '../../admin/models/addon.model.js';
 import { FoodCombo } from '../../admin/models/combo.model.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { addonPrice, getOfferMinCartValue, verifyOfferClaim } from '../../settings/controllers/cartConfig.controller.js';
+import { StoreProductPrice } from '../../franchise/models/storeProductPrice.model.js';
+import { storeUnitPrice } from '../../franchise/services/storePriceRules.js';
 
 // The user app adds a flat amount for "extra cheese" (MenuList.jsx calculateTotalPrice); it is not a catalogue item.
 const EXTRA_CHEESE_PRICE = 65;
@@ -23,9 +25,10 @@ const addonPriceForSize = (addon, sizeName, defaultCrust) => {
   return Number(match?.price) || 0;
 };
 
-async function priceProductLine(item, addons) {
+async function priceProductLine(item, addons, storeRules) {
   const product = mongoose.isValidObjectId(item.itemId) ? await Product.findById(item.itemId).lean() : null;
   if (!product || !/^active$/i.test(product.status || '')) return null;
+  const rule = storeRules?.get(String(product._id));
 
   const sizes = Array.isArray(product.sizes) ? product.sizes : [];
   let base = Number(product.price) || 0;
@@ -39,6 +42,10 @@ async function priceProductLine(item, addons) {
     base = Number(size.price) || 0;
     sizeName = size.size;
   }
+  // The store's own price (Store Pricing) replaces the catalogue price; add-ons keep their catalogue prices.
+  const storePrice = storeUnitPrice(rule, product, sizeName);
+  if (storePrice?.available === false) throw unavailable(item);
+  if (storePrice) base = storePrice.price;
 
   let unit = base;
   const selectedAddons = [];
@@ -110,13 +117,18 @@ async function priceAddonLine(item) {
  * Rebuilds the cart from the catalogue. The client's price, subtotal and total are never read.
  * Limited-time-offer lines take their price from the signed claim (bound to this user, one use each);
  * the offer's minimum is re-checked against the server subtotal of the other lines.
+ * With a storeId, that store's price rules (Store Pricing) override the catalogue price of its products.
  * Returns { items, subtotal, offerClaims } where offerClaims must be spent with spendOfferClaims() when the order is saved.
  */
-export async function priceCartItems(userId, clientItems) {
+export async function priceCartItems(userId, clientItems, { storeId } = {}) {
   const items = Array.isArray(clientItems) ? clientItems : [];
   const addons = items.some((i) => i.kind !== 'addon' && i.kind !== 'topping' && !i.offerToken)
     ? await Addon.find({ status: { $ne: 'Inactive' } }).lean()
     : [];
+  const productIds = items.filter((i) => mongoose.isValidObjectId(i.itemId)).map((i) => String(i.itemId));
+  const storeRules = storeId && mongoose.isValidObjectId(storeId) && productIds.length
+    ? new Map((await StoreProductPrice.find({ storeId, productId: { $in: productIds } }).lean()).map((r) => [String(r.productId), r]))
+    : null;
 
   const priced = [];
   const offerClaims = [];
@@ -134,7 +146,7 @@ export async function priceCartItems(userId, clientItems) {
 
     let line;
     if (item.kind === 'addon' || item.kind === 'topping') line = await priceAddonLine(item);
-    else line = (await priceProductLine(item, addons)) || (await priceComboLine(item));
+    else line = (await priceProductLine(item, addons, storeRules)) || (await priceComboLine(item));
     if (!line) throw unavailable(item);
 
     priced.push({ ...rest, ...line, isVeg: line.isVeg ?? rest.isVeg, isLimitedOffer: false });

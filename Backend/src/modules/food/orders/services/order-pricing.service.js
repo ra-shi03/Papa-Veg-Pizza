@@ -58,7 +58,7 @@ export async function calculateOrderPricing(userId, dto) {
 export async function buildOrderPricing(userId, dto) {
   const store = await getOrderableStore(dto.storeId);
 
-  const { items, subtotal, offerClaims } = await priceCartItems(userId, dto.items);
+  const { items, subtotal, offerClaims } = await priceCartItems(userId, dto.items, { storeId: store._id });
 
   const feeSettings = await loadFeeSettings();
 

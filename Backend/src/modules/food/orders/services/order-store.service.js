@@ -2,6 +2,9 @@ import { FoodStore } from '../../store/models/store.model.js';
 import { FoodZone } from '../../admin/models/zone.model.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { haversineKm } from './order.helpers.js';
+import { openStoreIds } from '../../franchise/services/storeHours.js';
+
+const CLOSED = 'The store is closed right now. Please order during its opening hours.';
 
 const ORDERABLE = { approvalStatus: 'Approved', isActive: { $ne: false } };
 const STORE_FIELDS = 'storeName code phone franchiseId zoneId address city state pincode latitude longitude';
@@ -26,14 +29,16 @@ const insidePolygon = (lat, lng, polygon = []) => {
   return inside;
 };
 
-// Store that can take orders right now (approved + active) with a GeoJSON `location` for distance maths.
+// Store that can take orders right now (approved + active + open per its operating hours) with a GeoJSON
+// `location` for distance maths.
 export async function getOrderableStore(storeId) {
   const store = await FoodStore.findOne({ _id: storeId, ...ORDERABLE }).select(STORE_FIELDS).lean();
   if (!store) throw new ValidationError('Store not accepting orders');
+  if (!(await openStoreIds([store._id])).has(String(store._id))) throw new ValidationError(CLOSED);
   return withLocation(store);
 }
 
-// Nearest orderable store to a delivery point. Stores whose zone contains the point win; with a single
+// Nearest orderable, open store to a delivery point. Stores whose zone contains the point win; with a single
 // store (or no coordinates) it simply falls back to the first orderable store.
 export async function resolveStoreForLocation(lat, lng) {
   const stores = (await FoodStore.find(ORDERABLE).select(STORE_FIELDS).lean()).map(withLocation);
@@ -50,6 +55,10 @@ export async function resolveStoreForLocation(lat, lng) {
       if (inZone.length) pool = inZone;
     }
   }
+  // Only stores open right now (operating hours, holidays, temporary closure)
+  const open = await openStoreIds(pool.map((s) => s._id));
+  pool = pool.filter((s) => open.has(String(s._id)));
+  if (pool.length === 0) throw new ValidationError(CLOSED);
 
   const ranked = pool
     .map((store) => ({

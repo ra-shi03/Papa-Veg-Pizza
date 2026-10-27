@@ -18,5 +18,7 @@ const stockTransactionSchema = new mongoose.Schema(
 );
 
 stockTransactionSchema.index({ ingredientId: 1, createdAt: -1 });
+// Store performance: a store's stock movements over a period
+stockTransactionSchema.index({ storeId: 1, createdAt: -1 });
 
 export const StockTransaction = mongoose.model('StockTransaction', stockTransactionSchema);

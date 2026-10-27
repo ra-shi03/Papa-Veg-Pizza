@@ -424,6 +424,8 @@ orderSchema.index({ storeId: 1, orderStatus: 1, createdAt: -1 });
 orderSchema.index({ storeId: 1, createdAt: -1 });
 orderSchema.index({ franchiseId: 1, createdAt: -1 });
 orderSchema.index({ franchiseId: 1, orderStatus: 1 });
+// Store performance: a store's ratings over time
+orderSchema.index({ storeId: 1, 'ratings.store.ratedAt': -1 }, { partialFilterExpression: { 'ratings.store.rating': { $exists: true } } });
 orderSchema.index({ 'dispatch.deliveryPartnerId': 1, orderStatus: 1 });
 orderSchema.index({ 'dispatch.status': 1, orderStatus: 1 });
 orderSchema.index({ 'dispatch.status': 1, orderStatus: 1, updatedAt: -1 });
