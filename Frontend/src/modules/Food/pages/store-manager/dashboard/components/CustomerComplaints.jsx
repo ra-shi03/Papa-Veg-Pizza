@@ -27,6 +27,7 @@ export default function CustomerComplaints({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/recent-complaints", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
+        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
         return MOCK_COMPLAINTS
       }
     }

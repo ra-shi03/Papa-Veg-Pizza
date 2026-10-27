@@ -448,3 +448,16 @@ export async function replyToReview(user, id, body = {}) {
   const customer = (await storeCustomers(ctx)).find((c) => c._id === String(o.userId));
   return toReview(ctx, o.toObject(), customer);
 }
+
+/** Dashboard quick action: resolve the open complaint about one of this store's orders, by order number. */
+export async function resolveByOrderNumber(user, body = {}) {
+  const ctx = context(user);
+  mustManager(ctx);
+  const orderNumber = str(body.orderNumber, 60);
+  if (!orderNumber) throw new ValidationError('Order number is required');
+  const order = await FoodOrder.findOne({ storeId: ctx.storeId, order_id: orderNumber }).select('_id').lean();
+  if (!order) throw new NotFoundError('Order not found');
+  const ticket = await FoodSupportTicket.findOne({ storeId: ctx.storeId, orderId: order._id, status: { $ne: 'resolved' } }).sort({ createdAt: -1 }).select('_id').lean();
+  if (!ticket) throw new NotFoundError('No open complaint for this order');
+  return resolveComplaint(user, String(ticket._id), { actionTaken: str(body.notes, 500) || 'Resolved from the store dashboard' });
+}

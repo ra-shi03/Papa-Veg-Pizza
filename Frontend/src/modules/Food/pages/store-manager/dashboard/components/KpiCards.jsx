@@ -27,6 +27,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/today-sales", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
+        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
         return MOCK_KPIS.sales
       }
     }
@@ -40,6 +41,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/today-orders", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
+        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
         return MOCK_KPIS.orders
       }
     }
@@ -53,6 +55,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/active-orders", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
+        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
         return MOCK_KPIS.active
       }
     }
@@ -66,6 +69,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/prep-time", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
+        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
         return MOCK_KPIS.prep
       }
     }
@@ -79,6 +83,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/pending-deliveries", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
+        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
         return MOCK_KPIS.delivery
       }
     }
@@ -92,6 +97,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/low-stock", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
+        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
         return MOCK_KPIS.stock
       }
     }
@@ -105,6 +111,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/staff-duty", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
+        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
         return MOCK_KPIS.staff
       }
     }
@@ -118,6 +125,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/customer-rating", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
+        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
         return MOCK_KPIS.rating
       }
     }

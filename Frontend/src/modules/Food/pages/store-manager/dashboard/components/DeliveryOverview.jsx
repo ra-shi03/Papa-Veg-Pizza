@@ -33,6 +33,7 @@ export default function DeliveryOverview({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/delivery-overview", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
+        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
         return MOCK_DELIVERY_OVERVIEW
       }
     }

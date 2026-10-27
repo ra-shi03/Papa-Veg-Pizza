@@ -24,3 +24,4 @@ export const resolveComplaint = wrap('Complaint resolved', (req) => crm.resolveC
 export const listReviews = wrap('Reviews fetched', (req) => crm.listReviews(req.user, req.query));
 export const reviewDetails = wrap('Review fetched', (req) => crm.reviewDetails(req.user, req.params.id));
 export const replyToReview = wrap('Reply published', (req) => crm.replyToReview(req.user, req.params.id, req.body));
+export const resolveByOrderNumber = wrap('Complaint resolved', (req) => crm.resolveByOrderNumber(req.user, req.body));

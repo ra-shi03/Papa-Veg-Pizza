@@ -26,3 +26,8 @@ reviewsRouter.use(...guard);
 reviewsRouter.get('/', c.listReviews);
 reviewsRouter.get('/:id', c.reviewDetails);
 reviewsRouter.post('/:id/reply', c.replyToReview);           // manager
+
+// Store dashboard "Resolve" button: POST /v1/complaints/resolve { orderNumber, notes }
+export const dashboardComplaintsRouter = express.Router();
+dashboardComplaintsRouter.use(...guard);
+dashboardComplaintsRouter.post('/resolve', c.resolveByOrderNumber);

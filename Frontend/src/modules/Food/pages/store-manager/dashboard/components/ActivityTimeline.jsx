@@ -24,6 +24,7 @@ export default function ActivityTimeline({ storeId, refreshKey, activities }) {
         const response = await apiClient.get("/store/dashboard/activity-logs", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
+        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
         return MOCK_ACTIVITY_LOGS
       }
     }

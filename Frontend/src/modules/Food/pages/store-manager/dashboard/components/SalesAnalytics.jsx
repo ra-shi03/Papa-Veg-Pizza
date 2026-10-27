@@ -64,6 +64,7 @@ export default function SalesAnalytics({ storeId, refreshKey }) {
         })
         return response.data?.data || response.data
       } catch (e) {
+        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
         return filterType === "daily" 
           ? MOCK_SALES_HOURLY 
           : filterType === "weekly" 

@@ -57,6 +57,7 @@ export default function LiveOrderBoard({ storeId, refreshKey, liveCounts }) {
         const response = await apiClient.get("/store/dashboard/live-orders", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
+        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
         return MOCK_LIVE_ORDERS
       }
     }

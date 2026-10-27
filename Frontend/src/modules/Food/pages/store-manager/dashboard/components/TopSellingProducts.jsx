@@ -36,6 +36,7 @@ export default function TopSellingProducts({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/top-products", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
+        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
         return MOCK_TOP_PRODUCTS
       }
     }
