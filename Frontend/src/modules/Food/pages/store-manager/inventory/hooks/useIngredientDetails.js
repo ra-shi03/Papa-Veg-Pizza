@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalIngredients, getLocalTransactions, mockConsumptionStats } from "../mockData";
 
 export function useIngredientDetails(ingredientId) {
@@ -8,7 +9,7 @@ export function useIngredientDetails(ingredientId) {
     queryFn: async () => {
       if (!ingredientId) return null;
       try {
-        const response = await apiClient.get(`/inventory/${ingredientId}`);
+        const response = await apiClient.get(`${INV}/${ingredientId}`);
 
         // Detect stubbed response pattern
         if (
@@ -24,6 +25,7 @@ export function useIngredientDetails(ingredientId) {
 
         throw new Error("Invalid response format");
       } catch (err) {
+        failOrMock(err);
         console.warn(`Backend API unavailable for ingredient details ${ingredientId}. Using local storage details.`);
         
         const ingredients = getLocalIngredients();

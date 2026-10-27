@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { 
   getLocalTransfers, 
   setLocalTransfers, 
@@ -26,7 +27,7 @@ export function useTransferStock() {
       } = payload;
 
       try {
-        const response = await apiClient.post("/inventory/transfer", {
+        const response = await apiClient.post(`${INV}/transfer`, {
           fromStoreId,
           toStoreId,
           ingredientId,
@@ -45,6 +46,7 @@ export function useTransferStock() {
         }
         throw new Error(response.data?.message || "Failed to submit stock transfer");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable. Saving transfer request to local storage database.");
 
         // Simulate network delay

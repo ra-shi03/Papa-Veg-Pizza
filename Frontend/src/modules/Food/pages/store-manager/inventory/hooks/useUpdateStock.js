@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { 
   getLocalIngredients, 
   setLocalIngredients, 
@@ -16,7 +17,7 @@ export function useUpdateStock() {
       const { ingredientId, type, quantity, reason, notes, updatedBy = "Shubham Jamliya" } = payload;
       
       try {
-        const response = await apiClient.post("/inventory/update-stock", {
+        const response = await apiClient.post(`${INV}/update-stock`, {
           ingredientId,
           type,
           quantity: Number(quantity),
@@ -30,6 +31,7 @@ export function useUpdateStock() {
         
         throw new Error(response.data?.message || "Stock update failed on backend");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable for stock update. Executing update on local database.");
 
         // Simulate network delay

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalStockRequests, getLocalIngredients, mockStaffProfiles } from "../mockData";
 
 export function useStockRequestDetails(requestId) {
@@ -8,7 +9,7 @@ export function useStockRequestDetails(requestId) {
     queryFn: async () => {
       if (!requestId) return null;
       try {
-        const response = await apiClient.get(`/stock-requests/${requestId}`);
+        const response = await apiClient.get(`${INV}/stock-requests/${requestId}`);
 
         if (
           response.data?.message === "Stubbed operational response" ||
@@ -23,6 +24,7 @@ export function useStockRequestDetails(requestId) {
 
         throw new Error("Invalid response format");
       } catch (err) {
+        failOrMock(err);
         console.warn(`Backend API unavailable for stock request details ${requestId}. Assembling locally.`);
         
         const requests = getLocalStockRequests();

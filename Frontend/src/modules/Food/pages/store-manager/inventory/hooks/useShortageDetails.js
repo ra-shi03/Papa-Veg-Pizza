@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { 
   getLocalShortages, 
   getLocalIngredients, 
@@ -14,7 +15,7 @@ export function useShortageDetails(shortageId) {
     enabled: !!shortageId,
     queryFn: async () => {
       try {
-        const response = await apiClient.get(`/ingredient-shortages/${shortageId}`);
+        const response = await apiClient.get(`${INV}/ingredient-shortages/${shortageId}`);
         if (
           response.data?.message === "Stubbed operational response" ||
           response.data?.data?.message === "Stubbed operational response"
@@ -26,6 +27,7 @@ export function useShortageDetails(shortageId) {
         }
         throw new Error("Invalid response format");
       } catch (err) {
+        failOrMock(err);
         console.warn(`Backend API unavailable. Fetching shortage details for ${shortageId} from local storage.`);
 
         // Simulate network latency

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalInventoryAlerts } from "../mockData";
 
 export function useAlertsDashboard() {
@@ -7,7 +8,7 @@ export function useAlertsDashboard() {
     queryKey: ["alerts-dashboard"],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/alerts/dashboard");
+        const response = await apiClient.get(`${INV}/alerts/dashboard`);
         if (
           response.data?.message === "Stubbed operational response" ||
           response.data?.data?.message === "Stubbed operational response"
@@ -19,6 +20,7 @@ export function useAlertsDashboard() {
         }
         throw new Error("Invalid response format");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable. Fetching alerts dashboard from local storage.");
 
         // Simulate network latency

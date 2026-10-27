@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { mockShortageTimeline } from "../mockData";
 
 export function useNotifyAdmin() {
@@ -11,7 +12,7 @@ export function useNotifyAdmin() {
       const { shortageId, type, message, priority } = payload;
 
       try {
-        const response = await apiClient.post("/notifications/admin", {
+        const response = await apiClient.post(`${INV}/notifications/admin`, {
           shortageId,
           type,
           message,
@@ -28,6 +29,7 @@ export function useNotifyAdmin() {
         }
         throw new Error(response.data?.message || "Failed to notify admin");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable. Logging admin notification.");
 
         // Simulate network delay

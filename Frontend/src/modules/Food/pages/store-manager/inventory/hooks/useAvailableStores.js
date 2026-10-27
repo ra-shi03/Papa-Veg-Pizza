@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { mockStores } from "../mockData";
 
 export function useAvailableStores(ingredientId) {
@@ -8,7 +9,7 @@ export function useAvailableStores(ingredientId) {
     enabled: !!ingredientId,
     queryFn: async () => {
       try {
-        const response = await apiClient.get(`/inventory/available-stores`, {
+        const response = await apiClient.get(`${INV}/available-stores`, {
           params: { ingredientId }
         });
         if (
@@ -19,6 +20,7 @@ export function useAvailableStores(ingredientId) {
         }
         return response.data;
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable. Fetching available stores from mock database.");
 
         // Simulate network delay

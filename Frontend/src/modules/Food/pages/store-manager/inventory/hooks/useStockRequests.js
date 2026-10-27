@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalStockRequests } from "../mockData";
 
 export function useStockRequests(filters = {}, role = "store_manager", currentUser = "Aman Verma") {
@@ -18,7 +19,7 @@ export function useStockRequests(filters = {}, role = "store_manager", currentUs
     queryKey: ["stock-requests", filters, role, currentUser],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/stock-requests", {
+        const response = await apiClient.get(`${INV}/stock-requests`, {
           params: { ...filters, role, currentUser }
         });
 
@@ -35,6 +36,7 @@ export function useStockRequests(filters = {}, role = "store_manager", currentUs
 
         throw new Error("Invalid response format");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable for stock requests. Filtering locally.");
         
         let list = getLocalStockRequests();

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { 
   getLocalWasteLogs, 
   setLocalWasteLogs, 
@@ -45,7 +46,7 @@ export function useReportWaste() {
         ({ ingredientId, quantity, wasteType, reason, remarks = "", images = [], reportedBy = "Aman Verma" } = payload);
       }
       try {
-        const response = await apiClient.post("/waste/report", payload, {
+        const response = await apiClient.post(`${INV}/waste/report`, payload, {
           headers: {
             "Content-Type": "multipart/form-data"
           }
@@ -61,6 +62,7 @@ export function useReportWaste() {
         }
         throw new Error(response.data?.message || "Waste report failed on backend");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable. Saving waste report locally.");
 
         // Simulate network delay

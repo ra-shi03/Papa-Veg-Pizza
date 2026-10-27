@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalShortages, setLocalShortages, mockShortageTimeline } from "../mockData";
 
 export function useResolveShortage() {
@@ -11,7 +12,7 @@ export function useResolveShortage() {
       const { shortageId, actionTaken, notes = "" } = payload;
 
       try {
-        const response = await apiClient.patch(`/ingredient-shortages/${shortageId}/resolve`, {
+        const response = await apiClient.patch(`${INV}/ingredient-shortages/${shortageId}/resolve`, {
           actionTaken,
           notes
         });
@@ -26,6 +27,7 @@ export function useResolveShortage() {
         }
         throw new Error(response.data?.message || "Failed to resolve shortage");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable. Resolving shortage in local database.");
 
         // Simulate network delay

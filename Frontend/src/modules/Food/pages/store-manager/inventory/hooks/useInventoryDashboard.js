@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalIngredients } from "../mockData";
 
 export function useInventoryDashboard() {
@@ -7,7 +8,7 @@ export function useInventoryDashboard() {
     queryKey: ["inventory-dashboard"],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/inventory/dashboard");
+        const response = await apiClient.get(`${INV}/dashboard`);
         
         // Detect stubbed response pattern
         if (
@@ -26,6 +27,7 @@ export function useInventoryDashboard() {
 
         throw new Error("Invalid response format");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable for dashboard. Using local calculated values.");
         
         // Compute dashboard metrics from local storage

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { 
   getLocalStockRequests, 
   setLocalStockRequests,
@@ -18,7 +19,7 @@ export function useFulfillRequest() {
       const { requestId, deliveredQty, remarks, fulfilledBy = "Shubham Jamliya" } = payload;
 
       try {
-        const response = await apiClient.patch("/stock-requests/fulfill", {
+        const response = await apiClient.patch(`${INV}/stock-requests/fulfill`, {
           requestId,
           deliveredQty: Number(deliveredQty),
           remarks
@@ -30,6 +31,7 @@ export function useFulfillRequest() {
 
         throw new Error(response.data?.message || "Failed to fulfill request");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable for stock fulfillment. Simulating locally.");
 
         // Simulate network delay

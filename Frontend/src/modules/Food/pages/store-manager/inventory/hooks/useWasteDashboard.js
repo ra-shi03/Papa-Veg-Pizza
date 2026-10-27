@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalWasteLogs } from "../mockData";
 
 export function useWasteDashboard() {
@@ -7,7 +8,7 @@ export function useWasteDashboard() {
     queryKey: ["waste-dashboard"],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/waste/dashboard");
+        const response = await apiClient.get(`${INV}/waste/dashboard`);
         if (
           response.data?.message === "Stubbed operational response" ||
           response.data?.data?.message === "Stubbed operational response"
@@ -19,6 +20,7 @@ export function useWasteDashboard() {
         }
         throw new Error("Invalid response format");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable. Fetching waste dashboard from local storage.");
 
         // Simulate network latency

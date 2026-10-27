@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalWasteLogs } from "../mockData";
 
 export function useWasteLogs(filters, role, currentUser) {
@@ -9,7 +10,7 @@ export function useWasteLogs(filters, role, currentUser) {
     queryKey: ["waste", page, limit, search, wasteType, reportedBy, from, to, role, currentUser],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/waste", {
+        const response = await apiClient.get(`${INV}/waste`, {
           params: { page, limit, search, wasteType, reportedBy, from, to }
         });
         if (
@@ -23,6 +24,7 @@ export function useWasteLogs(filters, role, currentUser) {
         }
         throw new Error("Invalid response format");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable. Fetching waste logs from local database.");
 
         // Simulate network latency

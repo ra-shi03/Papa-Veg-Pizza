@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalInventoryAlerts } from "../mockData";
 
 export function useInventoryAlerts(filters = {}, options = {}) {
@@ -11,7 +12,7 @@ export function useInventoryAlerts(filters = {}, options = {}) {
     refetchInterval,
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/alerts", {
+        const response = await apiClient.get(`${INV}/alerts`, {
           params: { page, limit, search, severity, status, from, to }
         });
         if (
@@ -25,6 +26,7 @@ export function useInventoryAlerts(filters = {}, options = {}) {
         }
         throw new Error("Invalid response format");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable. Fetching alerts from local database.");
 
         // Simulate network latency

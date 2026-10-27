@@ -9,6 +9,7 @@ import {
   toObjectId, idStr,
 } from './storeOrders.service.js';
 import { notifyUsers } from './kitchenTasks.service.js';
+import { recipeIndex } from './inventoryOps.service.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 
 // Station screens (preparation board, pizza station, baking station, ovens, kitchen issues).
@@ -122,7 +123,7 @@ const base = (item, order) => ({
 
 const estimatedPrep = (order) => order?.kitchen?.estimatedPrepMinutes || 12;
 
-const toPrepItem = (item, order) => ({
+const toPrepItem = (item, order, recipeId = null) => ({
   ...base(item, order),
   assigned_chef: ownerOf(item, order, 'chef')?.id || null,
   current_stage: item.stage,
@@ -130,7 +131,7 @@ const toPrepItem = (item, order) => ({
   estimated_time: estimatedPrep(order),
   paused: !!item.paused,
   pauseReason: item.pauseReason,
-  recipeId: null,
+  recipeId,
 });
 
 const assemblyStatus = (item) => {
@@ -139,7 +140,7 @@ const assemblyStatus = (item) => {
   return item.paused ? 'assembly_paused' : 'assembly_started';
 };
 
-const toPizzaItem = (item, order) => ({
+const toPizzaItem = (item, order, recipeId = null) => ({
   ...base(item, order),
   pizzaId: `PIZ-${String(item._id).slice(-4).toUpperCase()}`,
   assigned_chef: ownerOf(item, order, 'chef')?.id || null,
@@ -151,7 +152,7 @@ const toPizzaItem = (item, order) => ({
   paused: !!item.paused,
   pauseReason: item.pauseReason,
   pauseNotes: item.pauseNotes,
-  recipeId: null,
+  recipeId,
 });
 
 const bakingStatus = (item) => {
@@ -194,7 +195,7 @@ async function loadItems(user, stages, station, extraOrderFilter = {}) {
   const visible = isStaff(user)
     ? items.filter((it) => canWorkOnItem(user, it, byOrder.get(String(it.orderId)), station))
     : items;
-  return { items: visible, byOrder };
+  return { items: visible, byOrder, recipeFor: await recipeIndex(toObjectId(requireStore(user))) };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -202,7 +203,7 @@ async function loadItems(user, stages, station, extraOrderFilter = {}) {
 // ---------------------------------------------------------------------------------------------
 
 export async function preparationBoard(user, q = {}) {
-  const { items, byOrder } = await loadItems(user, PREP_STAGES, 'prep');
+  const { items, byOrder, recipeFor } = await loadItems(user, PREP_STAGES, 'prep');
   return items
     .map((it) => ({ it, order: byOrder.get(String(it.orderId)) }))
     .filter(({ it, order }) => matches(q.search, order.order_id, it.name))
@@ -211,11 +212,11 @@ export async function preparationBoard(user, q = {}) {
     .filter(({ it }) => !q.size || q.size === 'All' || it.size === q.size)
     .filter(({ order }) => String(q.delayed) !== 'true' || isDelayed(order))
     .filter(({ it, order }) => String(q.onlyUnassigned) !== 'true' || !ownerOf(it, order, 'chef'))
-    .map(({ it, order }) => toPrepItem(it, order));
+    .map(({ it, order }) => toPrepItem(it, order, recipeFor(it.name)));
 }
 
 export async function pizzaStation(user, q = {}) {
-  const { items, byOrder } = await loadItems(user, [...PREP_STAGES, 'baking', 'baked'], 'prep');
+  const { items, byOrder, recipeFor } = await loadItems(user, [...PREP_STAGES, 'baking', 'baked'], 'prep');
   return items
     .map((it) => ({ it, order: byOrder.get(String(it.orderId)) }))
     .filter(({ it, order }) => matches(q.search, order.order_id, it.name))
@@ -225,7 +226,7 @@ export async function pizzaStation(user, q = {}) {
     .filter(({ it }) => !q.size || q.size === 'All' || it.size === q.size)
     .filter(({ it }) => !q.crust || q.crust === 'All' || it.crust === q.crust)
     .filter(({ order }) => String(q.delayed) !== 'true' || isDelayed(order))
-    .map(({ it, order }) => toPizzaItem(it, order));
+    .map(({ it, order }) => toPizzaItem(it, order, recipeFor(it.name)));
 }
 
 export async function bakingStation(user, q = {}) {

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalWasteLogs, setLocalWasteLogs } from "../mockData";
 
 export function useApproveWaste() {
@@ -10,7 +11,7 @@ export function useApproveWaste() {
     mutationFn: async (payload) => {
       const { wasteId, remarks = "", approvedBy = "Shubham Jamliya" } = payload;
       try {
-        const response = await apiClient.patch(`/waste/${wasteId}/approve`, { remarks });
+        const response = await apiClient.patch(`${INV}/waste/${wasteId}/approve`, { remarks });
         if (
           response.data?.message === "Stubbed operational response" ||
           response.data?.data?.message === "Stubbed operational response"
@@ -22,6 +23,7 @@ export function useApproveWaste() {
         }
         throw new Error(response.data?.message || "Waste approval failed on backend");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable. Approving waste log locally.");
 
         // Simulate network delay

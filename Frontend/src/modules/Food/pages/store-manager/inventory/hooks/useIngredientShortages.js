@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalShortages } from "../mockData";
 
 export function useIngredientShortages(filters = {}, options = {}) {
@@ -20,7 +21,7 @@ export function useIngredientShortages(filters = {}, options = {}) {
     refetchInterval,
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/ingredient-shortages", {
+        const response = await apiClient.get(`${INV}/ingredient-shortages`, {
           params: { page, limit, search, severity, status, storeId, from, to }
         });
         if (
@@ -34,6 +35,7 @@ export function useIngredientShortages(filters = {}, options = {}) {
         }
         throw new Error("Invalid response format");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable. Fetching ingredient shortages from local database.");
 
         // Simulate network latency

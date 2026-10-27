@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalStockRequests, setLocalStockRequests } from "../mockData";
 
 export function useRejectRequest() {
@@ -11,7 +12,7 @@ export function useRejectRequest() {
       const { requestId, remarks, approvedBy = "Shubham Jamliya" } = payload;
 
       try {
-        const response = await apiClient.patch("/stock-requests/reject", {
+        const response = await apiClient.patch(`${INV}/stock-requests/reject`, {
           requestId,
           remarks
         });
@@ -22,6 +23,7 @@ export function useRejectRequest() {
 
         throw new Error(response.data?.message || "Failed to reject request");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable for stock rejection. Simulating locally.");
 
         // Simulate network delay

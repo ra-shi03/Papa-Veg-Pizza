@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalInventoryAlerts, getLocalIngredients, mockConsumptionStats } from "../mockData";
 
 export function useAlertDetails(alertId) {
@@ -8,7 +9,7 @@ export function useAlertDetails(alertId) {
     enabled: !!alertId,
     queryFn: async () => {
       try {
-        const response = await apiClient.get(`/alerts/${alertId}`);
+        const response = await apiClient.get(`${INV}/alerts/${alertId}`);
         if (
           response.data?.message === "Stubbed operational response" ||
           response.data?.data?.message === "Stubbed operational response"
@@ -20,6 +21,7 @@ export function useAlertDetails(alertId) {
         }
         throw new Error("Invalid response format");
       } catch (err) {
+        failOrMock(err);
         console.warn(`Backend API unavailable. Fetching alert details for ${alertId} from local storage.`);
 
         // Simulate network latency

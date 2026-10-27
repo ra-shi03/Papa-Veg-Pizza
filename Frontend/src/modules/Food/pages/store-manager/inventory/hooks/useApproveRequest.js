@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalStockRequests, setLocalStockRequests } from "../mockData";
 
 export function useApproveRequest() {
@@ -11,7 +12,7 @@ export function useApproveRequest() {
       const { requestId, approvedQty, remarks, approvedBy = "Shubham Jamliya" } = payload;
 
       try {
-        const response = await apiClient.patch("/stock-requests/approve", {
+        const response = await apiClient.patch(`${INV}/stock-requests/approve`, {
           requestId,
           approvedQty: Number(approvedQty),
           remarks
@@ -23,6 +24,7 @@ export function useApproveRequest() {
 
         throw new Error(response.data?.message || "Failed to approve request");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable for stock approval. Simulating locally.");
 
         // Simulate network delay

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalIngredients } from "../mockData";
 
 export function useIngredients(filters = {}) {
@@ -19,7 +20,7 @@ export function useIngredients(filters = {}) {
     queryKey: ["inventory", filters],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/inventory", {
+        const response = await apiClient.get(INV, {
           params: filters
         });
 
@@ -37,6 +38,7 @@ export function useIngredients(filters = {}) {
 
         throw new Error("Invalid response format");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable for ingredients. Using local filtered data.");
         
         let list = getLocalIngredients();

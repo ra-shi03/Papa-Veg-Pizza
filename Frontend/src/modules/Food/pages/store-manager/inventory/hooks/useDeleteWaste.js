@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalWasteLogs, setLocalWasteLogs } from "../mockData";
 
 export function useDeleteWaste() {
@@ -11,7 +12,7 @@ export function useDeleteWaste() {
       const { wasteId } = payload;
 
       try {
-        const response = await apiClient.delete(`/waste/${wasteId}`);
+        const response = await apiClient.delete(`${INV}/waste/${wasteId}`);
         if (
           response.data?.message === "Stubbed operational response" ||
           response.data?.data?.message === "Stubbed operational response"
@@ -23,6 +24,7 @@ export function useDeleteWaste() {
         }
         throw new Error(response.data?.message || "Failed to delete waste log on backend");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable. Deleting waste log from local storage database.");
 
         // Simulate network delay

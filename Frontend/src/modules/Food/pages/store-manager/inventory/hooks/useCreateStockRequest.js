@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalStockRequests, setLocalStockRequests, getLocalIngredients } from "../mockData";
 
 export function useCreateStockRequest() {
@@ -11,7 +12,7 @@ export function useCreateStockRequest() {
       const { ingredientId, requestedQty, urgency, reason, notes, requestedBy = "Aman Verma" } = payload;
       
       try {
-        const response = await apiClient.post("/stock-requests", {
+        const response = await apiClient.post(`${INV}/stock-requests`, {
           ingredientId,
           requestedQty: Number(requestedQty),
           urgency,
@@ -25,6 +26,7 @@ export function useCreateStockRequest() {
 
         throw new Error(response.data?.message || "Failed to create request");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable to create request. Appending locally.");
 
         // Simulate network delay

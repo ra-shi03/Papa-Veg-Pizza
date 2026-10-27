@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalInventoryAlerts, setLocalInventoryAlerts } from "../mockData";
 
 export function useResolveAlert() {
@@ -11,7 +12,7 @@ export function useResolveAlert() {
       const { alertId, resolutionNote, resolvedBy = "Shubham Jamliya" } = payload;
 
       try {
-        const response = await apiClient.patch(`/alerts/resolve`, {
+        const response = await apiClient.patch(`${INV}/alerts/resolve`, {
           alertId,
           resolutionNote,
           resolvedBy
@@ -27,6 +28,7 @@ export function useResolveAlert() {
         }
         throw new Error(response.data?.message || "Failed to resolve alert on backend");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable. Resolving alert in local database.");
 
         // Simulate network delay

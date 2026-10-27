@@ -7,6 +7,7 @@ import apiClient from "@/services/api/axios";
 // The real endpoints are the source of truth. The localStorage mock below only runs when VITE_STANDALONE_MOCK=true.
 const STANDALONE_MOCK = import.meta.env?.VITE_STANDALONE_MOCK === "true";
 const KITCHEN = "/food/store/kitchen";
+const INVENTORY = "/food/store/inventory";
 import {
   mockChefs,
   mockIngredients,
@@ -338,9 +339,10 @@ export function useIngredientIssue() {
   return useMutation({
     mutationFn: async (payload) => {
       try {
-        const response = await apiClient.post("/ingredient-shortages", payload);
+        const response = await apiClient.post(`${INVENTORY}/ingredient-shortages`, payload);
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Fallback simulation
         const localShortages = JSON.parse(localStorage.getItem(SHORTAGES_STORAGE_KEY)) || [];
         const newIssue = {
@@ -368,11 +370,12 @@ export function useIngredients() {
     queryKey: ["ingredientsStock"],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/ingredients");
+        const response = await apiClient.get(`${INVENTORY}/ingredients`);
         if (Array.isArray(response.data)) return response.data;
         if (Array.isArray(response.data?.data)) return response.data.data;
         throw new Error("Format mismatch");
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         return getLocalIngredients();
       }
     },
@@ -385,11 +388,12 @@ export function useRecipes() {
     queryKey: ["recipesList"],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/recipes");
+        const response = await apiClient.get(`${INVENTORY}/recipes`);
         if (Array.isArray(response.data)) return response.data;
         if (Array.isArray(response.data?.data)) return response.data.data;
         throw new Error("Format mismatch");
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         return mockRecipes;
       }
     },

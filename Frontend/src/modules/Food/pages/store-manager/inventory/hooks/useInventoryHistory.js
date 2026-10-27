@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalTransactions } from "../mockData";
 
 export function useInventoryHistory(ingredientId, filters = {}) {
@@ -15,7 +16,7 @@ export function useInventoryHistory(ingredientId, filters = {}) {
     queryFn: async () => {
       if (!ingredientId) return { data: [], pagination: {} };
       try {
-        const response = await apiClient.get(`/inventory/${ingredientId}/history`, {
+        const response = await apiClient.get(`${INV}/${ingredientId}/history`, {
           params: filters
         });
 
@@ -33,6 +34,7 @@ export function useInventoryHistory(ingredientId, filters = {}) {
 
         throw new Error("Invalid response format");
       } catch (err) {
+        failOrMock(err);
         console.warn(`Backend API unavailable for history on ingredient ${ingredientId}. Using local history logs.`);
         
         let list = getLocalTransactions().filter(t => t.ingredientId === ingredientId);

@@ -4,7 +4,9 @@ import { StoreManager } from '../../franchise/models/storeManager.model.js';
 import { KitchenTask } from '../models/kitchenTask.model.js';
 import { KitchenItem } from '../models/kitchenItem.model.js';
 import { KitchenEscalation } from '../models/kitchenEscalation.model.js';
-import { IngredientRequest } from '../models/ingredientRequest.model.js';
+import { inventoryContext, ensureIngredients } from './inventoryAccess.js';
+import { requestIngredientFromTask, taskRequestView } from './inventoryOps.service.js';
+import { StockRequest } from '../models/stockRequest.model.js';
 import { QualityCheck } from '../models/qualityCheck.model.js';
 import {
   normalizeRole, requireStore, isOrderSupervisor, staffSlotsOf, findOrder, logStep, toObjectId, idStr, toOpsOrder,
@@ -453,33 +455,27 @@ export async function requestIngredient(user, { ingredientName, quantity, unit, 
   if (!un) throw new ValidationError('Unit is required');
   const task = taskId ? await findScopedTask(user, taskId, storeId) : null;
 
-  const request = await IngredientRequest.create({
-    storeId: toObjectId(storeId),
-    requestedBy: toObjectId(user.userId),
-    taskId: task?._id || null,
-    ingredientName: name,
-    quantity: qty,
-    unit: un,
-    reason: str(reason, 500),
-  });
+  // The same stock request the Inventory > Stock Requests screen shows (one source of truth).
+  const ctx = await inventoryContext(user);
+  await ensureIngredients(ctx);
+  const request = await requestIngredientFromTask(user, { ingredientName: name, quantity: qty, unit: un, reason, taskId: task?._id }, ctx);
+
   const managers = await StoreManager.find({ storeId: String(storeId), status: 'Active', role: /manager/i, userId: { $ne: null } }).select('userId').lean();
   await notifyUsers({
     userIds: managers.map((m) => m.userId).filter((id) => String(id) !== String(user.userId)),
     storeId, taskId: task?._id || null, type: 'task_assigned', title: 'Ingredient request',
     message: `${qty} ${un} of ${name}${request.reason ? ` - ${request.reason}` : ''}`,
   });
-  return { _id: String(request._id), ingredientName: name, quantity: qty, unit: un, reason: request.reason, status: request.status, createdAt: request.createdAt };
+  return taskRequestView(request.toObject());
 }
 
+// Manager: every request of the store. Supervisor / staff: their own.
 export async function listIngredientRequests(user) {
   const storeId = toObjectId(requireStore(user));
   const filter = { storeId };
   if (!isManager(user)) filter.requestedBy = toObjectId(user.userId);
-  const rows = await IngredientRequest.find(filter).sort({ createdAt: -1 }).limit(200).lean();
-  return rows.map((r) => ({
-    _id: String(r._id), requestedBy: String(r.requestedBy), ingredientName: r.ingredientName, quantity: r.quantity,
-    unit: r.unit, reason: r.reason, status: r.status, createdAt: r.createdAt,
-  }));
+  const rows = await StockRequest.find(filter).sort({ createdAt: -1 }).limit(200).lean();
+  return rows.map(taskRequestView);
 }
 
 export async function submitQualityCheck(user, payload = {}) {

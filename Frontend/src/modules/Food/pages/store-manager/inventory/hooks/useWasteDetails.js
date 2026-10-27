@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
+import { INV, failOrMock } from "./inventoryApi";
 import { getLocalWasteLogs, getLocalIngredients, mockStaffProfiles } from "../mockData";
 
 export function useWasteDetails(wasteId) {
@@ -8,7 +9,7 @@ export function useWasteDetails(wasteId) {
     enabled: !!wasteId,
     queryFn: async () => {
       try {
-        const response = await apiClient.get(`/waste/${wasteId}`);
+        const response = await apiClient.get(`${INV}/waste/${wasteId}`);
         if (
           response.data?.message === "Stubbed operational response" ||
           response.data?.data?.message === "Stubbed operational response"
@@ -20,6 +21,7 @@ export function useWasteDetails(wasteId) {
         }
         throw new Error("Invalid response format");
       } catch (err) {
+        failOrMock(err);
         console.warn("Backend API unavailable. Fetching waste log detail from local database.");
 
         // Simulate network latency

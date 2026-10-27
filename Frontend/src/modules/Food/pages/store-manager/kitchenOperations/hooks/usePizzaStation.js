@@ -7,6 +7,7 @@ import apiClient from "@/services/api/axios";
 // The real endpoints are the source of truth. The localStorage mock below only runs when VITE_STANDALONE_MOCK=true.
 const STANDALONE_MOCK = import.meta.env?.VITE_STANDALONE_MOCK === "true";
 const KITCHEN = "/food/store/kitchen";
+const INVENTORY = "/food/store/inventory";
 import {
   mockChefs,
   mockIngredients,
@@ -339,9 +340,10 @@ export function useReportShortage() {
   return useMutation({
     mutationFn: async (payload) => {
       try {
-        const response = await apiClient.post("/ingredient-shortages", payload);
+        const response = await apiClient.post(`${INVENTORY}/ingredient-shortages`, payload);
         return response.data;
       } catch (err) {
+        if (!STANDALONE_MOCK) throw err;
         // Fallback simulation
         const localShortages = JSON.parse(localStorage.getItem(SHORTAGES_STORAGE_KEY)) || [];
         const newIssue = {
