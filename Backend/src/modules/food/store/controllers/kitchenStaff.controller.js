@@ -6,6 +6,7 @@ import { StoreManager } from '../../franchise/models/storeManager.model.js';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import { assertPasswordStrength } from '../../../../utils/password.js';
+import { escapeRegex } from '../../../../utils/helpers.js';
 
 // Role code → DB role mapping for kitchen staff
 const ALLOWED_STAFF_ROLES = {
@@ -213,10 +214,11 @@ export const getKitchenStaff = async (req, res) => {
 
     if (status && status !== 'All') query.status = status;
     if (search) {
+      const rx = escapeRegex(search);
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { employeeCode: { $regex: search, $options: 'i' } },
+        { name: { $regex: rx, $options: 'i' } },
+        { email: { $regex: rx, $options: 'i' } },
+        { employeeCode: { $regex: rx, $options: 'i' } },
       ];
     }
 

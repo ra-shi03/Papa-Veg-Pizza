@@ -1,6 +1,7 @@
 import { Addon } from '../models/addon.model.js';
 import { Product } from '../models/product.model.js';
 import { sendError, sendResponse } from '../../../../utils/response.js';
+import { escapeRegex } from '../../../../utils/helpers.js';
 
 export const createAddon = async (req, res) => {
     try {
@@ -200,10 +201,10 @@ export const getAddons = async (req, res) => {
         const { type, status } = req.query;
         const queryFilter = {};
         if (status) {
-            queryFilter.status = { $regex: new RegExp(`^${status}$`, 'i') };
+            queryFilter.status = { $regex: new RegExp(`^${escapeRegex(status)}$`, 'i') };
         }
         if (type) {
-            queryFilter.type = { $regex: new RegExp(type, 'i') };
+            queryFilter.type = { $regex: new RegExp(escapeRegex(type), 'i') };
         }
 
         const addons = await Addon.find(queryFilter).sort({ createdAt: -1 });

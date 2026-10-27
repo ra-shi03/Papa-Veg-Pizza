@@ -5,6 +5,7 @@ import { FoodFranchise } from '../../franchise/models/franchise.model.js';
 import { FoodStore } from '../../store/models/store.model.js';
 import { CategoryProduct } from '../models/categoryProduct.model.js';
 import mongoose from 'mongoose';
+import { escapeRegex } from '../../../../utils/helpers.js';
 
 export async function getProducts(req, res, next) {
     try {
@@ -12,7 +13,7 @@ export async function getProducts(req, res, next) {
 
         const filter = {};
         if (search && search.trim()) {
-            filter.name = { $regex: search.trim(), $options: 'i' };
+            filter.name = { $regex: escapeRegex(search.trim()), $options: 'i' };
         }
         if (status && status !== 'All') {
             filter.status = status;
@@ -23,8 +24,8 @@ export async function getProducts(req, res, next) {
             } else {
                 const matchingCats = await CategoryProduct.find({ 
                     $or: [
-                        { label: { $regex: category.trim(), $options: 'i' } },
-                        { name: { $regex: category.trim(), $options: 'i' } }
+                        { label: { $regex: escapeRegex(category.trim()), $options: 'i' } },
+                        { name: { $regex: escapeRegex(category.trim()), $options: 'i' } }
                     ]
                 }).select('_id');
                 if (matchingCats.length > 0) {
@@ -79,7 +80,7 @@ export async function getProductStats(req, res, next) {
 
         const filter = {};
         if (search && search.trim()) {
-            filter.name = { $regex: search.trim(), $options: 'i' };
+            filter.name = { $regex: escapeRegex(search.trim()), $options: 'i' };
         }
         if (status && status !== 'All') {
             filter.status = status;
@@ -90,8 +91,8 @@ export async function getProductStats(req, res, next) {
             } else {
                 const matchingCats = await CategoryProduct.find({ 
                     $or: [
-                        { label: { $regex: category.trim(), $options: 'i' } },
-                        { name: { $regex: category.trim(), $options: 'i' } }
+                        { label: { $regex: escapeRegex(category.trim()), $options: 'i' } },
+                        { name: { $regex: escapeRegex(category.trim()), $options: 'i' } }
                     ]
                 }).select('_id');
                 if (matchingCats.length > 0) {
@@ -149,7 +150,7 @@ export async function getPublicProducts(req, res, next) {
 
         const filter = { status: { $regex: /^active$/i } };
         if (search && search.trim()) {
-            filter.name = { $regex: search.trim(), $options: 'i' };
+            filter.name = { $regex: escapeRegex(search.trim()), $options: 'i' };
         }
         if (category && category !== 'All' && category !== 'All Categories') {
             if (mongoose.Types.ObjectId.isValid(category)) {
@@ -157,8 +158,8 @@ export async function getPublicProducts(req, res, next) {
             } else {
                 const matchingCats = await CategoryProduct.find({ 
                     $or: [
-                        { label: { $regex: category.trim(), $options: 'i' } },
-                        { name: { $regex: category.trim(), $options: 'i' } }
+                        { label: { $regex: escapeRegex(category.trim()), $options: 'i' } },
+                        { name: { $regex: escapeRegex(category.trim()), $options: 'i' } }
                     ]
                 }).select('_id');
                 if (matchingCats.length > 0) {

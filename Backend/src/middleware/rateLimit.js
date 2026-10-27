@@ -32,3 +32,35 @@ export const authRateLimiter = rateLimit({
     }
 });
 
+// Public order lookup (order id + mobile number, no sign-in). Order ids are short (FOD- and 7 digits), so failed
+// lookups are limited per caller, per order id and per mobile number: guessing the orders of a known number, or the
+// number of a known order, stops after a few tries. Successful lookups do not count.
+const lookupField = (req, ...names) => {
+    for (const n of names) {
+        const v = req.body?.[n] ?? req.query?.[n];
+        if (v !== undefined && v !== null && v !== '') return String(v);
+    }
+    return '';
+};
+const lookupOrderKey = (req) => lookupField(req, 'orderId', 'order_id').trim().replace(/^#/, '').toLowerCase();
+const lookupPhoneKey = (req) => lookupField(req, 'phone', 'mobileNumber').replace(/\D/g, '').slice(-10);
+
+const lookupLimiter = (max, key) => rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max,
+    skipSuccessfulRequests: true,
+    ...(key ? { keyGenerator: (req) => key(req), skip: (req) => !key(req) } : {}),
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        success: false,
+        message: 'Too many order lookups. Please try again later, or sign in to see your orders.'
+    }
+});
+
+export const publicOrderLookupLimiters = [
+    lookupLimiter(30),
+    lookupLimiter(5, (req) => lookupOrderKey(req) && `order:${lookupOrderKey(req)}`),
+    lookupLimiter(10, (req) => lookupPhoneKey(req) && `phone:${lookupPhoneKey(req)}`)
+];
+

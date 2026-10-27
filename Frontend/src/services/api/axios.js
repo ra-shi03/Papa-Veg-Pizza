@@ -326,6 +326,19 @@ function withMenuLocation(config) {
   return config;
 }
 
+// A few customer screens read catalogue lists through admin URLs. Those lists need an admin sign-in (they include
+// draft and archived items); for anyone else the same list is read once from its public twin instead.
+const PUBLIC_TWINS = [
+  [/^\/food\/admin\/categories(?=\?|$)/, "/food/categories/public"],
+  [/^\/food\/admin\/category-products(?=\?|$)/, "/food/admin/category-products/public"],
+];
+function publicTwin(config) {
+  if (!config || config._publicTwin || String(config.method || "get").toLowerCase() !== "get") return null;
+  const url = String(config.url || "");
+  const twin = PUBLIC_TWINS.find(([re]) => re.test(url));
+  return twin ? { ...config, url: url.replace(twin[0], twin[1]), _publicTwin: true } : null;
+}
+
 apiClient.interceptors.request.use(
   (config) => {
     withMenuLocation(config);
@@ -353,6 +366,9 @@ apiClient.interceptors.response.use(
         return Promise.reject(mockErr);
       }
     }
+    const status = err?.response?.status;
+    const twin = (status === 401 || status === 403) && publicTwin(original);
+    if (twin) return apiClient(twin);
     return Promise.reject(err);
   }
 );

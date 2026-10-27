@@ -5,6 +5,7 @@ import '../models/categoryProduct.model.js';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { FoodStore } from '../../store/models/store.model.js';
 import { NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
+import { escapeRegex } from '../../../../utils/helpers.js';
 import {
     validateComboUpsert,
     validateComboStatus,
@@ -137,7 +138,7 @@ export async function getCombos(req, res, next) {
         const { search, status, comboType, categoryId } = req.query;
 
         const filter = {};
-        if (search && search.trim()) filter.name = { $regex: search.trim(), $options: 'i' };
+        if (search && search.trim()) filter.name = { $regex: escapeRegex(search.trim()), $options: 'i' };
         if (status && status !== 'All') filter.status = status;
         if (comboType && comboType !== 'All') filter.comboType = comboType;
         if (categoryId && mongoose.Types.ObjectId.isValid(categoryId)) filter.categoryId = categoryId;

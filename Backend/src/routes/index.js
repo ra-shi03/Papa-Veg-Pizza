@@ -19,6 +19,8 @@ import * as rewardConfigController from '../modules/food/admin/controllers/rewar
 import * as categoryProductController from '../modules/food/admin/controllers/categoryProduct.controller.js';
 import * as adminController from '../modules/food/admin/controllers/admin.controller.js';
 import { requireRoles } from '../core/roles/role.middleware.js';
+import { sanitizeQuery } from '../middleware/sanitizeQuery.js';
+import { publicOrderLookupLimiters } from '../middleware/rateLimit.js';
 import { getQueuesController } from '../controllers/admin.controller.js';
 import webhookRoutes from '../core/payments/routes/webhook.routes.js';
 import searchRoutes from '../modules/food/search/routes/search.routes.js';
@@ -52,6 +54,14 @@ import * as appConfigController from '../modules/food/settings/controllers/appCo
 import { getPublicPageController } from '../modules/food/admin/controllers/pageContent.controller.js';
 
 const router = express.Router();
+
+// Catalogue and staff lists put query values into Mongo filters: no operators, one plain value per key.
+// Mounted first so it runs before every router below that serves these paths.
+router.use([
+    '/v1/food/admin/menu', '/v1/food/admin/products', '/v1/food/products', '/v1/food/admin/category-products',
+    '/v1/food/admin/categories', '/v1/food/categories', '/v1/food/admin/addons', '/v1/food/admin/combos',
+    '/v1/food/combos', '/v1/food/store/staff',
+], sanitizeQuery);
 
 // Store pickers sit before the /v1/stores router: its /:id route would swallow them
 router.get('/v1/stores/dropdown', authMiddleware, requireRoles('ADMIN'), scopeIfAdmin, getStoresDropdown);
@@ -146,8 +156,7 @@ router.get('/v1/food/admin/business-settings/public', businessSettingsController
 // Public menu route
 router.get('/v1/food/admin/menu/public', productController.getPublicMenu);
 
-// Public products routes
-router.get('/v1/food/admin/products', productController.getProducts);
+// Public products routes (the full admin lists, with Draft / Archived items, are in the admin router below)
 router.get('/v1/food/admin/products/public', productController.getPublicProducts);
 router.get('/v1/food/products/public', productController.getPublicProducts);
 
@@ -156,8 +165,6 @@ router.get(['/v1/food/combos/public', '/v1/food/admin/combos/public'], comboCont
 
 // Public addons route
 router.get('/v1/food/admin/addons/public', addonController.getAddons);
-router.get('/v1/food/admin/addons/stats', addonController.getAddonStats);
-router.get('/v1/food/admin/addons/stats/public', addonController.getAddonStats);
 
 // Public rewards config route
 router.get('/v1/food/admin/rewards/public', rewardConfigController.getPublicRewardConfig);
@@ -167,23 +174,20 @@ import * as faqController from '../modules/food/settings/controllers/faq.control
 router.get('/v1/food/faqs/public', faqController.getPublicFaqs);
 
 // Public category-products routes
-router.get('/v1/food/admin/category-products', categoryProductController.getCategoryProducts);
 router.get('/v1/food/admin/category-products/public', categoryProductController.getCategoryProducts);
-router.get('/v1/food/admin/category-products/categories', categoryProductController.getCategoryProducts);
 
 // Public categories routes (No Auth Required - serves categories from CategoryProduct)
-router.get('/v1/food/admin/categories', categoryProductController.getCategoryProducts);
 router.get('/v1/food/admin/categories/public', categoryProductController.getCategoryProducts);
 router.get('/v1/food/categories/public', categoryProductController.getCategoryProducts);
 router.get('/v1/food/categories', categoryProductController.getCategoryProducts);
 
 // Public Order Tracking route (No Auth Required)
-router.post(['/v1/food/orders/track', '/v1/orders/track', '/v1/food/orders/track-public'], trackOrderPublicController);
-router.get(['/v1/food/orders/track', '/v1/orders/track', '/v1/food/orders/track-public'], trackOrderPublicController);
+router.post(['/v1/food/orders/track', '/v1/orders/track', '/v1/food/orders/track-public'], publicOrderLookupLimiters, trackOrderPublicController);
+router.get(['/v1/food/orders/track', '/v1/orders/track', '/v1/food/orders/track-public'], publicOrderLookupLimiters, trackOrderPublicController);
 
 // Public Order History route (No Auth Required)
-router.post(['/v1/food/orders/history', '/v1/orders/history', '/v1/food/orders/history-lookup', '/v1/orders/history-lookup'], getOrderHistoryPublicController);
-router.get(['/v1/food/orders/history', '/v1/orders/history', '/v1/food/orders/history-lookup', '/v1/orders/history-lookup'], getOrderHistoryPublicController);
+router.post(['/v1/food/orders/history', '/v1/orders/history', '/v1/food/orders/history-lookup', '/v1/orders/history-lookup'], publicOrderLookupLimiters, getOrderHistoryPublicController);
+router.get(['/v1/food/orders/history', '/v1/orders/history', '/v1/food/orders/history-lookup', '/v1/orders/history-lookup'], publicOrderLookupLimiters, getOrderHistoryPublicController);
 
 // Public fee configuration (handling, GST, platform fee... set by the super admin)
 router.get(['/v1/food/fee-config', '/v1/fee-config'], getFeeConfigController);

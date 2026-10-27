@@ -1,5 +1,5 @@
 import express from 'express';
-import { upload } from '../../../../middleware/upload.js';
+import { safeUpload } from '../../../../middleware/safeUpload.js';
 import {
     listAddressesController,
     addAddressController,
@@ -50,7 +50,8 @@ const router = express.Router();
 
 router.get('/profile', getCurrentUserProfileController);
 router.patch('/profile', updateCurrentUserProfileController);
-router.post('/profile/profile-image', upload.single('file'), uploadCurrentUserProfileImageController);
+// Customers can reach this: images only (5 MB, type checked against the file signature)
+router.post('/profile/profile-image', safeUpload('image', 'file'), uploadCurrentUserProfileImageController);
 
 // Wallet (Bearer USER)
 router.get('/wallet', getUserWalletController);

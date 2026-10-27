@@ -154,7 +154,8 @@ describe('/v1/food/admin/staff and the kitchen/store routes keep their own gates
 });
 
 describe('public routes that must stay public', () => {
-    for (const path of ['/v1/health', '/v1/food/admin/categories', '/v1/food/admin/products/public', '/v1/fcm-tokens/check']) {
+    // /v1/food/admin/categories is admin-only since audit3 M1; its public twin is /v1/food/categories/public
+    for (const path of ['/v1/health', '/v1/food/categories/public', '/v1/food/admin/products/public', '/v1/fcm-tokens/check']) {
         test(`GET ${path} needs no token`, async () => {
             assert.ok(!guarded((await fx.call('GET', path)).status));
         });

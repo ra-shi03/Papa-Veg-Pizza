@@ -9,7 +9,7 @@ How it was checked:
 - **Route sweep.** `test/helpers/routes.js` walks the Express router stack (740 routes) and reads the guards in
   front of each one (`authMiddleware`, `requireRoles(...)`, `requireSuperAdmin`, `attachFranchiseScope`).
   `test/audit3.test.js` fails when a route has no `authMiddleware` or no role guard unless it is in
-  `test/fixtures/reviewed-routes.json` (128 public routes and 17 sign-in-only routes, each reviewed below).
+  `test/fixtures/reviewed-routes.json` (122 public routes after the M1 fix, and 17 sign-in-only routes, each reviewed below).
   All 187 routes of Features 1-6 are behind both.
 - **Scope and IDOR.** Every handler of Features 1-6 takes the store or franchise from the token and looks records up
   with it (`storeId` / `franchiseId` in the query, or a scoped-store lookup first); other stores and franchises
@@ -33,19 +33,29 @@ How it was checked:
 Confirmed already closed (no change): `POST /auth/user/verify-truecaller` returns 501 and creates nothing (test added).
 The service function behind it trusts the payload; see L1.
 
+## Medium, fixed in the follow-up (exploitable signed out or with a customer token)
+
+| # | Finding | Fix | Tests |
+|---|---------|-----|-------|
+| M1 | **Unauthenticated catalogue admin lists.** `GET /v1/food/admin/products` returned Draft and Archived products to anyone; `/admin/addons/stats(/public)`, `/admin/category-products`, `/admin/category-products/categories` and `/admin/categories` were open too. Query values reached Mongo filters as given (operator objects; user text used as a regex, so `?search=(a+)+$` or `[` could hang or 500 the request). | The open duplicates in `routes/index.js` are removed: these GETs now reach the admin router (`authMiddleware` + `requireRoles(ADMIN)`, and its own `requireSuperAdmin` for stats, add-ons and combos, unchanged). The `/public` menu routes stay public. New `middleware/sanitizeQuery.js` on the product, category, combo, add-on, menu and staff paths: any key starting with `$` or containing `.` (checked on the raw query string, at any depth) and any non-scalar value (`a[b]=`, repeated keys) is 400; everything else is passed on as a string. `escapeRegex` (`utils/helpers.js`) in the product, category, combo, add-on and staff list handlers. The customer app's own reads of `/food/admin/categories` and `/food/admin/category-products` fall back to the public twin in `services/api/axios.js` (no screen changed). | `audit3-mediums.test.js`: 10 admin lists: signed out 401, customer / manager / rider 403, super admin 200, franchise admin as the admin router allows; 10 public menu routes 200 signed out and never show a Draft; `?price[$gt]=0`, `?name[$ne]=x`, `?$where=1`, `?a.b=1`, nested and repeated keys: 400 on admin, public and staff lists; regex characters: 200 and matched literally |
+| M2 | **Public order lookup could be guessed.** Order ids are `FOD-` + 7 digits; with a known mobile number the orders (name, address, rider) could be enumerated at the global rate limit. | `publicOrderLookupLimiters` (`middleware/rateLimit.js`) on `/orders/track` and `/orders/history` (all aliases, GET and POST): failed lookups limited to 30 per IP, 5 per order id and 10 per mobile number per 15 minutes; successful lookups do not count. Side effect, accepted: 5 wrong numbers lock that order's public lookup for 15 minutes (the signed-in app is unaffected). | `audit3-mediums.test.js`: successful lookups unlimited; 6th try for one order is 429 even with the right number (also via the other route and spelling); 11th for one number is 429; one caller stopped by the 31st miss |
+| M3 (customer part) | **Customer profile image took any file** (bare `upload`, 50 MB, no type check). | `/v1/food/user/profile/profile-image` uses `safeUpload('image')`: JPEG/PNG/WebP/GIF/HEIC, 5 MB, signature checked. | `audit3-mediums.test.js`: HTML, SVG named `.png` and PDF -> 400; 6 MB -> 413 |
+
+M6 is partly closed by the same middleware (operator injection and unescaped regex in the staff list); the rest of M6 stays below.
+
 ## Medium (not fixed)
+
+All of these need a staff, admin or rider sign-in, or are not exploitable.
 
 | # | Finding | Where | Suggestion |
 |---|---------|-------|-----------|
-| M1 | Unauthenticated catalogue admin lists. `GET /v1/food/admin/products` returns Draft and Archived products; `/admin/addons/stats` and `/admin/category-products*` are open too. `status`, `search` and `category` go into the Mongo filter as given (`?status[$ne]=x` is an operator injection; user text is used as a regex). | `routes/index.js`, `product.controller.js getProducts` | Active-only for anonymous callers, coerce query values to strings, escape regex input. |
-| M2 | Public order lookup (`/orders/track`, `/orders/history`) is protected by order id + last 10 digits of the phone and only the global rate limit. | `order.service.js trackOrderPublic` | Stricter limiter per IP and per order id, small delay on a miss. |
-| M3 | Uploads on `upload.*` routes have limits now but no MIME or file-signature check (store documents accept anything; `.pdf` by file name is stored as a PDF). `safeUpload` already does this. | store approvals, store managers, admin, user routes | Move those routes to `safeUpload`. |
+| M3 (rest) | Uploads on the remaining `upload.*` routes have limits but no MIME or file-signature check (store documents accept anything; `.pdf` by file name is stored as a PDF). All need an admin or franchise-admin sign-in. | store approvals, store managers, admin, settings, dynamic-home routes | Move those routes to `safeUpload`. |
 | M4 | With the Redis adapter and several server instances, every instance runs the order change stream and emits, so a screen gets each `order_event` once per instance. | `order-events.service.js` | Run the watcher on one instance (env flag) or dedupe with an event id. |
 | M5 | Socket rooms are fixed at connect from the token. A manager who is removed or moved keeps receiving their old store's events until the socket reconnects or the access token expires. | `socket.js` | Disconnect a user's sockets when the account is deactivated or re-scoped. |
-| M6 | Staff list: `search` is used as an unescaped regex and `status` is passed to the query unchecked (operator injection, limited to the caller's own store). `PATCH .../status` accepts `Inactive` but the model rejects it (500). Non-string `email` / `role` bodies give 500. | `kitchenStaff.controller.js` | zod validator for the staff module, escape regex input. |
+| M6 (rest) | Staff module (store manager only): `PATCH .../status` accepts `Inactive` but the model rejects it (500). Non-string `email` / `role` bodies give 500. (The list's regex and operator injection are fixed, see above.) | `kitchenStaff.controller.js` | zod validator for the staff module. |
 | M7 | `DELETE /food/store/staff/:id` is a hard delete (user, profile, role link, staff record) although documented as a soft delete; orders keep the staff name only as text. | `kitchenStaff.controller.js` | Soft delete (`status: DELETED`, `isActive: false`). |
 | M8 | The assigned rider receives the customer's email with the order (`getOrderById` populates `email`). Riders do not need it. | `order.service.js getOrderById` | Remove `email` from the rider view. |
-| M9 | Public `GET /v1/food/offers/public` lists coupon codes to anyone, including first-time-only codes. By design for the coupons page, but it exposes codes to non-customers. | `storePublic.controller.js` | Require sign-in, or hide `customerScope: first-time` codes from signed-out callers. |
+| M9 | Public `GET /v1/food/offers/public` lists coupon codes to anyone, including first-time-only codes. By design for the coupons page, but it exposes codes to non-customers. Re-checked in the follow-up: not exploitable, because checkout enforces `first-time` for the signed-in customer (`order-pricing.service.js`) and orders need a sign-in, so knowing a code gives nothing. | `storePublic.controller.js` | Require sign-in, or hide `customerScope: first-time` codes from signed-out callers. |
 
 ## Low (not fixed)
 

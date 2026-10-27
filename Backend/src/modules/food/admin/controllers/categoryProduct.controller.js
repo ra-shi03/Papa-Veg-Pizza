@@ -1,12 +1,13 @@
 import { CategoryProduct } from '../models/categoryProduct.model.js';
+import { escapeRegex } from '../../../../utils/helpers.js';
 
 export const getCategoryProducts = async (req, res) => {
   try {
     const { sort, search } = req.query;
-    
+
     let query = {};
     if (search) {
-      query.label = { $regex: search, $options: 'i' };
+      query.label = { $regex: escapeRegex(search), $options: 'i' };
     }
 
     let sortObj = { sort: 1, createdAt: 1 };

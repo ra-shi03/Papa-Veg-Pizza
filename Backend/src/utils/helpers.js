@@ -6,7 +6,10 @@ export const buildPaginationOptions = (query) => {
     return { page, limit, skip };
 };
 
-export const buildPaginatedResult = ({ docs, total, page, limit }) => {
+/** User text used inside a RegExp: matched literally, so it cannot change the pattern (or hang it). */
+export const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+export const buildPaginatedResult =({ docs, total, page, limit }) => {
     const totalPages = Math.ceil(total / limit) || 1;
 
     return {
