@@ -9,7 +9,7 @@ import http from 'node:http';
 import { io as connect } from 'socket.io-client';
 import { createFixture, mongoose } from './helpers/fixture.js';
 
-let fx; let A; let B; let server; let url;
+let fx; let A; let B; let server; let url; let startOrderEventStream; let stopOrderEventStream;
 const sockets = [];
 const RIDER = String(new mongoose.Types.ObjectId());
 const OTHER_RIDER = String(new mongoose.Types.ObjectId());
@@ -19,11 +19,15 @@ before(async () => {
     const { initSocket } = await import('../src/config/socket.js');
     server = http.createServer();
     await initSocket(server);
+    ({ startOrderEventStream, stopOrderEventStream } = await import('../src/modules/food/orders/services/order-events.service.js'));
+    startOrderEventStream();
+    await new Promise((resolve) => setTimeout(resolve, 1200)); // let the change stream attach
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     url = `http://127.0.0.1:${server.address().port}`;
 });
 after(async () => {
     sockets.forEach((s) => s.disconnect());
+    await stopOrderEventStream?.();
     const { getIO } = await import('../src/config/socket.js');
     await new Promise((resolve) => getIO()?.close(() => resolve()) ?? resolve());
     await fx?.teardown();
@@ -176,5 +180,113 @@ describe('H3: update-location only from the assigned rider, rooms from the order
         assert.equal(gotVs, null, 'another store must not get the location');
         assert.ok(gotOu, "the order's own customer gets it");
         assert.ok(gotOs, "the order's own store gets it");
+    });
+});
+
+
+// ─── Order events: store room and franchise room, rooms from the order record and the token ───────────────────
+
+describe('order events reach only the right rooms', () => {
+    let who;
+    const EVENT_KEYS = ['at', 'deliveryPartnerId', 'franchiseId', 'orderId', 'orderMongoId', 'orderStatus', 'stage', 'storeId', 'type'];
+    before(async () => {
+        await mongoose.connection.collection('food_delivery_partners').insertOne({ _id: new mongoose.Types.ObjectId(RIDER), name: 'Rider One', phone: '9100000001', status: 'approved', availabilityStatus: 'online', createdAt: new Date(), updatedAt: new Date() });
+        const scopeA = { franchiseId: A.franchiseId, storeId: A.storeId };
+        who = {
+            managerA: await client(as.managerA()),
+            supervisorA: await client(fx.tokenFor(new mongoose.Types.ObjectId(), 'KITCHEN_SUPERVISOR', scopeA)),
+            adminA: await client(as.adminA()),
+            managerB: await client(as.managerB()),
+            adminB: await client(as.adminB()),
+            staffA: await client(fx.tokenFor(new mongoose.Types.ObjectId(), 'KITCHEN_STAFF', scopeA)),
+            customerA: await client(as.customerA()),
+            rider: await client(as.rider()),
+        };
+    });
+    /** Runs `action`, then reports which sockets got an order_event (and what). */
+    async function watch(action, ms = 1800) {
+        const pending = Object.entries(who).map(([name, s]) => next(s, 'order_event', ms).then((e) => [name, e]));
+        await action();
+        return Object.fromEntries(await Promise.all(pending));
+    }
+    const got = (r) => Object.keys(r).filter((k) => r[k]).sort();
+    const insideA = ['adminA', 'managerA', 'supervisorA'];
+    const order = async (over) => { const o = await makeOrder(over); await new Promise((r) => setTimeout(r, 400)); return o; };
+
+    test('a new order goes to its store (manager, supervisor) and its franchise admin, nobody else', async () => {
+        let created;
+        const r = await watch(async () => { created = await makeOrder({ orderStatus: 'created', dispatch: { status: 'unassigned' } }); });
+        assert.deepEqual(got(r), insideA);
+        assert.equal(r.managerA.type, 'new_order');
+        assert.equal(r.managerA.orderMongoId, created.id);
+        assert.deepEqual([r.managerA.storeId, r.managerA.franchiseId], [A.storeId, A.franchiseId]);
+    });
+    test('the payload is ids and states only: no customer, address or OTP', async () => {
+        const o = await order({ customerName: 'Asha', customerPhone: '9000000000', deliveryOtp: '4321', deliveryAddress: { street: 'x' } });
+        const r = await watch(() => fx.models.FoodOrder.updateOne({ _id: o.id }, { $set: { orderStatus: 'preparing' } }));
+        assert.deepEqual(Object.keys(r.managerA).sort(), EVENT_KEYS);
+        const text = JSON.stringify(r.adminA);
+        for (const secret of ['Asha', '9000000000', '4321']) assert.ok(!text.includes(secret), secret);
+        assert.equal(r.managerA.type, 'status_changed');
+        assert.equal(r.managerA.orderStatus, 'preparing');
+    });
+    test('a kitchen stage change, delivered and cancelled each have their own event', async () => {
+        const o = await order({ orderStatus: 'preparing' });
+        let r = await watch(() => fx.models.FoodOrder.updateOne({ _id: o.id }, { $set: { 'kitchen.stage': 'baking' } }));
+        assert.deepEqual(got(r), insideA);
+        assert.deepEqual([r.managerA.type, r.managerA.stage], ['stage_changed', 'baking']);
+        r = await watch(() => fx.models.FoodOrder.updateOne({ _id: o.id }, { $set: { orderStatus: 'delivered' } }));
+        assert.equal(r.adminA.type, 'delivered');
+        const c = await order({ orderStatus: 'confirmed' });
+        r = await watch(() => fx.models.FoodOrder.updateOne({ _id: c.id }, { $set: { orderStatus: 'cancelled_by_store' } }));
+        assert.deepEqual(got(r), insideA);
+        assert.equal(r.managerA.type, 'cancelled');
+    });
+    test('an order of franchise B reaches B\'s rooms only', async () => {
+        const r = await watch(() => fx.models.FoodOrder.collection.insertOne({
+            order_id: `B${fx.ts}${seq++}`, userId: new mongoose.Types.ObjectId(B.customerId), storeId: new mongoose.Types.ObjectId(B.storeId),
+            franchiseId: new mongoose.Types.ObjectId(B.franchiseId), orderStatus: 'created', items: [], createdAt: new Date(), updatedAt: new Date(),
+        }));
+        assert.deepEqual(got(r), ['adminB', 'managerB']);
+    });
+    test('assigning a rider (store API): rider_assigned to the store rooms, the offer only to that rider', async () => {
+        const o = await order({ orderStatus: 'ready_for_pickup', dispatch: { status: 'unassigned' } });
+        const offer = next(who.rider, 'new_order_available', 2500);
+        const done = next(who.managerA, 'store:assignment-success', 2500);
+        const r = await watch(async () => {
+            const res = await fx.call('POST', '/v1/store/delivery/assign', A.managerToken, { orderId: o.id, riderId: RIDER });
+            assert.equal(res.status, 200, JSON.stringify(res.body));
+        });
+        assert.deepEqual(got(r), insideA);
+        assert.deepEqual([r.managerA.type, r.managerA.deliveryPartnerId], ['rider_assigned', RIDER]);
+        assert.equal((await offer)?.orderMongoId, o.id, 'the rider\'s own room gets the offer');
+        assert.ok(await done, 'the manager gets the assignment confirmation');
+    });
+    test('rooms come from the token: joining attempts by name do nothing', async () => {
+        for (const room of [`store:${A.storeId}`, `franchise:${A.franchiseId}`]) {
+            who.customerA.emit('join-store', A.storeId);
+            who.customerA.emit('join', room);
+            who.managerB.emit('join-store', A.storeId);
+            who.adminB.emit('join', room);
+        }
+        const o = await order();
+        const r = await watch(() => fx.models.FoodOrder.updateOne({ _id: o.id }, { $set: { orderStatus: 'preparing' } }));
+        assert.deepEqual(got(r), insideA);
+    });
+});
+
+describe('order events: pure mapping', () => {
+    test('what each change means', async () => {
+        const { eventTypesOf } = await import('../src/modules/food/orders/services/order-events.service.js');
+        const change = (updatedFields, doc, operationType = 'update') => ({ operationType, updateDescription: { updatedFields }, fullDocument: doc });
+        assert.deepEqual(eventTypesOf(change({}, { orderStatus: 'created' }, 'insert')), ['new_order']);
+        assert.deepEqual(eventTypesOf(change({ orderStatus: 'delivered', 'statusHistory.3': {} }, { orderStatus: 'delivered' })), ['delivered']);
+        assert.deepEqual(eventTypesOf(change({ orderStatus: 'cancelled_by_user' }, { orderStatus: 'cancelled_by_user' })), ['cancelled']);
+        assert.deepEqual(eventTypesOf(change({ 'kitchen.stage': 'baking' }, { orderStatus: 'preparing' })), ['stage_changed']);
+        assert.deepEqual(eventTypesOf(change({ orderStatus: 'preparing', 'kitchen.stage': 'preparing' }, { orderStatus: 'preparing' })).sort(), ['stage_changed', 'status_changed']);
+        assert.deepEqual(eventTypesOf(change({ 'dispatch.deliveryPartnerId': 'x' }, { dispatch: { deliveryPartnerId: 'x' } })), ['rider_assigned']);
+        assert.deepEqual(eventTypesOf(change({ 'dispatch.deliveryPartnerId': null }, { dispatch: { deliveryPartnerId: null } })), [], 'a rider removed is not an assignment');
+        assert.deepEqual(eventTypesOf(change({ note: 'x' }, { orderStatus: 'preparing' })), []);
+        assert.deepEqual(eventTypesOf({ operationType: 'update', updateDescription: { updatedFields: { orderStatus: 'x' } } }), []);
     });
 });

@@ -1,3 +1,4 @@
+import { priceMenuForStore } from '../../orders/services/menu-store-pricing.service.js';
 import { Product } from '../models/product.model.js';
 import { Addon } from '../models/addon.model.js';
 import { FoodFranchise } from '../../franchise/models/franchise.model.js';
@@ -172,7 +173,8 @@ export async function getPublicProducts(req, res, next) {
             .populate('crusts')
             .sort({ createdAt: -1 });
 
-        res.status(200).json({ success: true, data: products, totalCount: products.length });
+        const priced = await priceMenuForStore(products, req.query);
+        res.status(200).json({ success: true, data: priced, totalCount: priced.length });
     } catch (error) {
         next(error);
     }
@@ -191,7 +193,7 @@ export async function getPublicMenu(req, res, next) {
             success: true, 
             data: {
                 categories,
-                products
+                products: await priceMenuForStore(products, req.query)
             } 
         });
     } catch (error) {

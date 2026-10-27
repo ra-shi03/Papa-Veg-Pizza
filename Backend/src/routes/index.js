@@ -32,6 +32,7 @@ import kitchenOpsRoutes from '../modules/food/store/routes/kitchenOps.routes.js'
 import inventoryRoutes from '../modules/food/store/routes/inventory.routes.js';
 import { customersRouter as storeCustomersRoutes, complaintsRouter as storeComplaintsRoutes, reviewsRouter as storeReviewsRoutes, dashboardComplaintsRouter } from '../modules/food/store/routes/storeCrm.routes.js';
 import { storeDashboardRouter, adminDashboardRouter } from '../modules/food/dashboard/routes/dashboard.routes.js';
+import { storeDeliveryRouter, zonesRouter } from '../modules/food/store/routes/storeDelivery.routes.js';
 import { storePerformanceRouter, operatingHoursRouter, storeExtrasRouter, storePricingRouter, storeDetailsRouter } from '../modules/food/franchise/routes/storeOps.routes.js';
 import { listFranchiseOrders } from '../modules/food/store/controllers/storeOrders.controller.js';
 import { resolveStoreForLocation } from '../modules/food/orders/services/order-store.service.js';
@@ -68,6 +69,8 @@ router.use('/v1/food/store/complaints', storeComplaintsRoutes);
 router.use('/v1/food/store/reviews', storeReviewsRoutes);
 router.use('/v1/complaints', dashboardComplaintsRouter);
 router.use('/v1/store/dashboard', storeDashboardRouter);
+router.use('/v1/store', storeDeliveryRouter);
+router.use('/v1/food/zones', zonesRouter);
 router.use('/v1/admin/dashboard', adminDashboardRouter);
 router.use('/v1/store-performance', storePerformanceRouter);
 router.use('/v1/operating-hours', operatingHoursRouter);

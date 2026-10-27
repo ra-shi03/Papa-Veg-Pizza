@@ -67,3 +67,24 @@ export function storeUnitPrice(rule, product, sizeName = '', day = today()) {
   const price = Number(rule[`${changed || mine[0]}Price`]);
   return price > 0 ? { available: true, price } : null;
 }
+
+/**
+ * A catalogue product as one store sells it: sizes[].price and price replaced by the store's price, so the menu
+ * shows what the order will charge. Same shape as the input. null when the store marked it unavailable.
+ */
+export function applyStorePrice(product, rule, day = today()) {
+  if (!rule || rule.status !== 'ACTIVE') return product;
+  if (rule.availability === 'UNAVAILABLE') return null;
+  const out = { ...product };
+  if (Array.isArray(product.sizes) && product.sizes.length) {
+    out.sizes = product.sizes.map((s) => {
+      const sp = storeUnitPrice(rule, product, s.size, day);
+      return sp?.available ? { ...s, price: sp.price } : s;
+    });
+    out.price = Math.min(...out.sizes.map((s) => Number(s.price) || 0));
+  } else {
+    const sp = storeUnitPrice(rule, product, '', day);
+    if (sp?.available) out.price = sp.price;
+  }
+  return out;
+}

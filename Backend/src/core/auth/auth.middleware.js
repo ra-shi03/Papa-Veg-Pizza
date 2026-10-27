@@ -1,6 +1,7 @@
 import { verifyAccessToken } from './token.util.js';
 import { sendError } from '../../utils/response.js';
 import { User } from '../users/models/user.model.js';
+import { FoodDeliveryPartner } from '../../modules/food/delivery/models/deliveryPartner.model.js';
 
 const normalizeRole = (role) => String(role || '').trim().replace(/_/g, '-').toUpperCase();
 
@@ -54,6 +55,18 @@ export const authMiddleware = async (req, res, next) => {
 
         // For all roles: enforce real-time account status check
         // This ensures deactivated accounts are locked out on the very next request
+        // Delivery partners are their own records (their token carries the partner id, not a User id).
+        // A suspended or rejected partner is locked out on the next request, like a deactivated user.
+        if (role === 'DELIVERY-PARTNER') {
+            const partner = await FoodDeliveryPartner.findById(decoded.userId).select('status').lean();
+            if (partner) {
+                if (partner.status === 'suspended' || partner.status === 'rejected') {
+                    return sendError(res, 401, 'Account is inactive. Contact support.');
+                }
+                return next();
+            }
+        }
+
         const doc = await User.findById(decoded.userId)
             .select('isActive isBlocked isDeleted')
             .lean();

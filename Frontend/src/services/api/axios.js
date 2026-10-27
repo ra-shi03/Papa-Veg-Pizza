@@ -312,8 +312,23 @@ function getModuleFromUrl(url = "") {
   return "user";
 }
 
+// The customer menu is priced per store: send the customer's saved location so the server can pick the same
+// store checkout will use (the prices shown then match the order total).
+const MENU_URL = /\/food\/(admin\/)?(menu|products)\/public/;
+function withMenuLocation(config) {
+  try {
+    if (!MENU_URL.test(String(config.url || "")) || config.params?.storeId || config.params?.lat != null) return config;
+    const loc = JSON.parse(localStorage.getItem("userLocation") || "null");
+    if (Number.isFinite(loc?.latitude) && Number.isFinite(loc?.longitude)) {
+      config.params = { ...(config.params || {}), lat: loc.latitude, lng: loc.longitude };
+    }
+  } catch (_) {}
+  return config;
+}
+
 apiClient.interceptors.request.use(
   (config) => {
+    withMenuLocation(config);
     const module = config.contextModule || getModuleFromUrl(config.url);
     const token = getAccessToken(module);
     if (token) config.headers.Authorization = `Bearer ${token}`;

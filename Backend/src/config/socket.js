@@ -38,6 +38,7 @@ const roomNames = {
     store: (id) => `store:${String(id)}`,
     user: (id) => `user:${String(id)}`,
     delivery: (id) => `delivery:${String(id)}`,
+    franchise: (id) => `franchise:${String(id)}`,
     tracking: (orderId) => `tracking:${String(orderId)}`
 };
 
@@ -132,6 +133,14 @@ export const initSocket = async (server) => {
         // Auto-join role rooms (lets us emit without a custom join).
         if (userId && role) {
             if (role === 'STORE') socket.join(roomNames.store(userId));
+            // Order events for store staff and franchise admins: the rooms come from their own signed token.
+            const scopeRole = String(role).replace(/-/g, '_').toUpperCase();
+            if ((scopeRole === 'STORE_MANAGER' || scopeRole === 'KITCHEN_SUPERVISOR') && socket.user.storeId) {
+                socket.join(roomNames.store(socket.user.storeId));
+            }
+            if (scopeRole === 'FRANCHISE_ADMIN' && socket.user.franchiseId) {
+                socket.join(roomNames.franchise(socket.user.franchiseId));
+            }
             if (isCustomerRole) socket.join(roomNames.user(userId));
             if (role === 'DELIVERY_PARTNER') {
                 socket.join(roomNames.delivery(userId));

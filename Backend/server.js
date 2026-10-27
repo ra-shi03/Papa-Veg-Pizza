@@ -4,7 +4,8 @@ import { config } from './src/config/env.js';
 import { validateConfig } from './src/config/validateEnv.js';
 import { connectDB, disconnectDB } from './src/config/db.js';
 import { connectRedis, closeRedis } from './src/config/redis.js';
-import { initSocket } from './src/config/socket.js';
+import { initSocket } from './src/config/socket.js';
+import { startOrderEventStream, stopOrderEventStream } from './src/modules/food/orders/services/order-events.service.js';
 import { initializeQueues, closeBullMQConnection } from './src/queues/index.js';
 import { expireExpiredOffers } from './src/modules/food/admin/services/admin.service.js';
 
@@ -28,6 +29,7 @@ const gracefulShutdown = async (signal) => {
             await closeRedis();
             await closeBullMQConnection();
             if (expireOffersInterval) clearInterval(expireOffersInterval);
+            await stopOrderEventStream();
 
             logger.info('Graceful shutdown complete');
             process.exit(0);
@@ -58,6 +60,7 @@ const startServer = async () => {
 
         // 3. Initialize Socket.IO with the HTTP server (Redis adapter when Redis enabled)
         await initSocket(httpServer);
+        startOrderEventStream(); // order events to the store and franchise rooms
 
         if (config.redisEnabled) {
             await connectRedis();
