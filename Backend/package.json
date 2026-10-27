@@ -16,7 +16,7 @@
     "migrate:order-payments": "node scripts/migrate-orders-to-transactions.js",
     "cleanup:legacy-collections": "node scripts/cleanup-legacy-collections.js",
     "test": "node --test --test-concurrency=1 --test-timeout=240000 \"test/**/*.test.js\"",
-    "test:cleanup": "node test/cleanup-test-dbs.js"
+    "test:quick": "node --test --test-concurrency=1 --test-timeout=240000 test/inventory.test.js test/kitchen-ops.test.js test/order-pricing.test.js test/access-control.test.js"
   },
   "keywords": [],
   "author": "",
@@ -47,6 +47,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "mongodb-memory-server": "^11.3.0",
     "nodemon": "^3.1.2",
     "socket.io-client": "^4.7.5",
     "supertest": "^7.1.4"

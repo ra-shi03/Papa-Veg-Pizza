@@ -1,12 +1,32 @@
-// Shared fixture for the security regression tests.
+// Shared fixture for the regression tests.
 //
-// - Runs against a THROWAWAY database on the cluster in MONGODB_URI (named pvp_test_<pid>_<time>),
-//   created here and dropped in teardown(). The real database is never read or written.
+// - Each test file gets its OWN throwaway MongoDB: an in-memory, single-node replica set (mongodb-memory-server;
+//   a replica set because the app uses transactions). Nothing touches Atlas or any shared database, and
+//   `npm test` needs no network once the MongoDB binary is cached (~/.cache/mongodb-binaries).
+// - The connection string in Backend/.env is never used: MONGO_URI / MONGODB_URI are pointed at the in-memory
+//   server before the app (and src/config/env.js, which loads .env) is imported, and dotenv never overrides a
+//   variable that is already set. A guard refuses any Atlas-looking URI (mongodb.net / mongodb+srv).
+// - TEST_MONGODB_URI may point at another LOCAL MongoDB instead (it must be a replica set).
 // - Everything is set up through the real HTTP API where possible, so the tests exercise the same
 //   middleware, controllers and scoping code as production.
 // - No email, push notification, SMS or Cloudinary call is made.
 
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
+
+/** Fails fast if a test would talk to a hosted cluster. */
+export function assertTestDatabaseUri(uri) {
+    if (!uri) throw new Error('No test MongoDB URI.');
+    if (/mongodb\+srv:|mongodb\.net/i.test(uri)) {
+        throw new Error(
+            'Refusing to run tests against a hosted MongoDB (Atlas: mongodb.net / mongodb+srv). ' +
+            'Tests use an in-memory MongoDB by default; unset TEST_MONGODB_URI or point it at a local mongod.',
+        );
+    }
+    return uri;
+}
+
 // Environment must be fixed BEFORE the app (and src/config/env.js) is imported.
+const setDefault = (key, value) => { if (process.env[key] === undefined) process.env[key] = value; };
 process.env.NODE_ENV = process.env.NODE_ENV === 'production' ? 'production' : 'test'; // a test file may opt in to production mode (set before importing this file)
 process.env.RATE_LIMIT_MAX = '1000000';
 process.env.AUTH_RATE_LIMIT_MAX = '1000000';
@@ -24,8 +44,26 @@ process.env.RAZORPAY_KEY_SECRET = '';
 process.env.CLOUDINARY_CLOUD_NAME = 'test';
 process.env.CLOUDINARY_API_KEY = 'test';
 process.env.CLOUDINARY_API_SECRET = 'test';
+process.env.REDIS_ENABLED = 'false';
+process.env.BULLMQ_ENABLED = 'false';
+// Test values for everything a developer's .env could otherwise change (a test file may set its own first).
+setDefault('JWT_ACCESS_SECRET', 'test-access-secret-0123456789abcdef0123456789abcdef');
+setDefault('JWT_REFRESH_SECRET', 'test-refresh-secret-0123456789abcdef0123456789abcdef');
+setDefault('OFFER_TOKEN_SECRET', 'test-offer-secret-0123456789abcdef0123456789abcdef');
+setDefault('JWT_ACCESS_EXPIRES', '');
+setDefault('JWT_REFRESH_EXPIRES', '');
+setDefault('USE_DEFAULT_OTP', '');
+setDefault('FRONTEND_URL', '');
+setDefault('SOCKET_CORS_ORIGIN', '');
 
-await import('dotenv/config');
+// The database: this file's own in-memory replica set, unless TEST_MONGODB_URI names a local one.
+const memory = process.env.TEST_MONGODB_URI
+    ? null
+    : await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: 'wiredTiger' } });
+const TEST_URI = assertTestDatabaseUri(process.env.TEST_MONGODB_URI || memory.getUri());
+process.env.MONGO_URI = TEST_URI;
+process.env.MONGODB_URI = TEST_URI;
+const TEST_DB = `pvp_test_${process.pid}`;
 
 import http from 'node:http';
 import mongoose from 'mongoose';
@@ -35,29 +73,13 @@ import jwt from 'jsonwebtoken';
 export const PASSWORD = 'Reg#Test-Pass1';
 
 async function build(ctx) {
-    const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
-    if (!uri) throw new Error('MONGODB_URI is not set (Backend/.env): the regression tests need a MongoDB to run against.');
-
-    const dbName = `pvp_test_${process.pid}_${Date.now().toString(36)}`;
-    // Hard guard: only ever work in a database created for this run.
-    if (!/^pvp_test_/.test(dbName)) throw new Error('refusing to run outside a pvp_test_* database');
-
-    await mongoose.connect(uri, { dbName, serverSelectionTimeoutMS: 20000 });
-    if (mongoose.connection.name !== dbName) throw new Error(`connected to ${mongoose.connection.name}, expected ${dbName}`);
-
-    // Housekeeping: a run that was killed or force-exited can leave its database behind, and the cluster
-    // has a hard cap on collections. Drop our own leftovers (pvp_test_<pid>_<base36 time>) older than 30 min.
-    try {
-        const { databases } = await mongoose.connection.db.admin().listDatabases();
-        for (const { name } of databases) {
-            const m = /^pvp_test_\d+_([0-9a-z]+)$/.exec(name);
-            if (m && name !== dbName && Date.now() - parseInt(m[1], 36) > 30 * 60 * 1000) {
-                await mongoose.connection.client.db(name).dropDatabase();
-            }
-        }
-    } catch { /* housekeeping only; never fail a run because of it */ }
+    await mongoose.connect(TEST_URI, { dbName: TEST_DB, serverSelectionTimeoutMS: 20000 });
+    if (mongoose.connection.name !== TEST_DB) throw new Error(`connected to ${mongoose.connection.name}, expected ${TEST_DB}`);
 
     const { default: app } = await import('../../src/app.js');
+    // Proof that the app sees the test database, not the one in .env
+    const { config } = await import('../../src/config/env.js');
+    if (config.mongodbUri !== TEST_URI) throw new Error('The app is not using the test database URI.');
     const m = async (path, name) => (await import(`../../src/${path}`))[name];
     const User = await m('core/users/models/user.model.js', 'User');
     const Role = await m('core/roles/models/role.model.js', 'Role');
@@ -157,7 +179,8 @@ async function build(ctx) {
 
 /**
  * Builds the fixture. The returned teardown() (also run automatically if setup fails) drops the
- * throwaway database and disconnects, so a failed run can neither leak data nor hang the process.
+ * throwaway database, disconnects and stops the in-memory server, so a failed run can neither leak data nor hang
+ * the process.
  */
 export async function createFixture() {
     const ctx = { server: null };
@@ -174,6 +197,7 @@ export async function createFixture() {
             }
         } finally {
             await mongoose.disconnect();
+            await memory?.stop();
         }
     };
     try {

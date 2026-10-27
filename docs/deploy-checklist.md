@@ -206,4 +206,4 @@ Then check in the apps:
 
 - [ ] Delete the `.env` backup from §0 (it holds the old, burned secrets): `shred -u ~/env-backup-*` or `rm`.
 - [ ] Update `docs/audit-2.md`: P0-6 server config, secret rotation and deployment become **Done**.
-- [ ] Optional: in Atlas, set up a separate test cluster and point `npm test` at it. Today the tests use throwaway `pvp_test_*` databases on the production cluster (N6).
+- [x] Tests no longer touch Atlas (N6): `npm test` runs every file on its own in-memory MongoDB, and refuses any `mongodb.net` / `mongodb+srv` URI. Nothing to clean up on the cluster.
