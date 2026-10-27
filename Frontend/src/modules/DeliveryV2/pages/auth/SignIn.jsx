@@ -1,17 +1,21 @@
-import { useState, useRef } from "react"
+import React, { useState, useRef } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { motion } from "framer-motion"
-import { ShieldCheck, Truck, Star, Heart, ArrowRight, Loader2, ShieldQuestion } from "lucide-react"
-import { Button } from "@food/components/ui/button"
+import { ShieldCheck, Heart, ArrowRight, ArrowLeft, Loader2, ShieldQuestion } from "lucide-react"
 import { toast } from "sonner"
 import { deliveryAPI } from "@food/api"
 import { clearModuleAuth } from "@food/utils/auth"
-import logoNew from "@/assets/logo1.png"
+import { useSystemTheme } from "@/shared/utils/themeSync"
+import heroPizza from "@/assets/hero-pizza.png"
 
 const DEFAULT_COUNTRY_CODE = "+91"
 
 export default function DeliverySignIn() {
   const navigate = useNavigate()
+  const { primaryColor, companyName = "Papa Veg Pizza" } = useSystemTheme()
+  // User app light theme: vibrant brand red/coral (no dark/black tint)
+  const brandColor = primaryColor && primaryColor !== "#a43c12" ? primaryColor : "#EE3A43"
+
   const [phone, setPhone] = useState(() => {
     const stored = sessionStorage.getItem("deliveryAuthData")
     if (stored) {
@@ -66,84 +70,111 @@ export default function DeliverySignIn() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#0a0a0a] flex flex-col relative overflow-hidden font-['Poppins']">
-      {/* Decorative Background Elements */}
-      <div className="absolute top-0 left-0 w-full h-[600px] bg-gradient-to-b from-[#E53935]/10 via-[#E53935]/5 to-transparent pointer-events-none" />
-      <div className="absolute top-[-100px] right-[-100px] w-[500px] h-[500px] bg-[#E53935]/5 rounded-full blur-[120px] pointer-events-none animate-pulse" />
-      <div className="absolute bottom-[-100px] left-[-100px] w-[400px] h-[400px] bg-[#E53935]/5 rounded-full blur-[120px] pointer-events-none" />
-
-      {/* Main Content */}
-      <div className="absolute top-6 right-6 z-20">
-        <Link to="/delivery/auth/support">
-          <Button variant="ghost" className="text-gray-500 hover:text-[#E53935] font-semibold flex items-center gap-2">
-            <ShieldQuestion className="w-5 h-5" />
-            Support
-          </Button>
-        </Link>
-      </div>
-
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative z-10">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          className="w-full max-w-[440px]"
+    <div className="min-h-screen bg-white text-gray-900 flex flex-col justify-between relative overflow-hidden font-['Poppins',sans-serif] select-none">
+      {/* Top Section with Light Curved Wave Banner */}
+      <div>
+        <div 
+          className="relative w-full pt-6 pb-20 px-6 overflow-hidden rounded-b-[40px] sm:rounded-b-[48px] shadow-md"
+          style={{
+            background: `linear-gradient(145deg, ${brandColor} 0%, #FF5722 100%)`
+          }}
         >
-          {/* Logo & Header */}
-          <div className="text-center mb-8">
-            <motion.div
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: "spring", stiffness: 200, damping: 20 }}
-              className="relative inline-block mb-4"
-            >
-              <img 
-                src={logoNew} 
-                alt="Papa Veg Pizza Logo" 
-                className="w-32 h-32 md:w-36 md:h-36 object-contain mx-auto"
-              />
-            </motion.div>
+          {/* Soft Accent Circles */}
+          <div className="absolute -top-10 -right-10 w-44 h-44 rounded-full bg-white/15 blur-lg pointer-events-none" />
+          <div className="absolute -bottom-8 -left-8 w-36 h-36 rounded-full bg-white/10 blur-md pointer-events-none" />
 
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="text-gray-400 dark:text-gray-500 font-bold text-xs uppercase tracking-[0.3em]"
+          {/* Top Bar with Navigation & Support */}
+          <div className="relative z-10 max-w-md mx-auto flex items-center justify-between">
+            <Link 
+              to="/food/delivery/welcome"
+              className="flex items-center gap-1.5 text-white text-xs font-semibold px-3.5 py-1.5 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md transition-all active:scale-95 shadow-sm"
             >
-              DELIVERY PARTNER
-            </motion.p>
+              <ArrowLeft className="w-4 h-4" />
+              <span>Welcome</span>
+            </Link>
+
+            <Link 
+              to="/delivery/auth/support"
+              className="flex items-center gap-1.5 text-white text-xs font-semibold px-3.5 py-1.5 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md transition-all active:scale-95 shadow-sm"
+            >
+              <ShieldQuestion className="w-4 h-4" />
+              <span>Support</span>
+            </Link>
           </div>
 
-          {/* Login Card */}
-          <div className="bg-white/80 dark:bg-[#1a1a1a]/80 backdrop-blur-2xl rounded-[3rem] p-8 sm:p-12 shadow-[0_40px_80px_-20px_rgba(229,57,53,0.2)] dark:shadow-none border border-white/20 dark:border-gray-800 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-[#E53935]/20 to-transparent" />
+          {/* Header Title */}
+          <div className="relative z-10 text-center mt-3">
+            <p className="text-[11px] font-bold tracking-[0.25em] text-white uppercase drop-shadow-sm">
+              {companyName}
+            </p>
+            <h2 className="text-xl sm:text-2xl font-black text-white tracking-wider uppercase drop-shadow-sm mt-0.5">
+              Delivery Partner
+            </h2>
+          </div>
+        </div>
 
-            <div className="mb-10 text-center sm:text-left">
-              <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-2 font-['Outfit'] tracking-tight">
+        {/* Overlapping Circular Rider Badge (Catrider Style) */}
+        <div className="relative -mt-14 mb-2 flex justify-center z-20">
+          <motion.div 
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-white p-2.5 shadow-[0_10px_25px_rgba(0,0,0,0.12)] border-4 border-white flex items-center justify-center relative overflow-hidden group"
+          >
+            <div 
+              className="absolute inset-0 rounded-full opacity-10"
+              style={{ backgroundColor: brandColor }}
+            />
+            <img 
+              src="/MapRider.png" 
+              alt="Delivery Rider" 
+              className="w-full h-full object-contain relative z-10 drop-shadow-sm group-hover:scale-105 transition-transform duration-300" 
+            />
+          </motion.div>
+        </div>
+
+        {/* Floating Light Login Card */}
+        <div className="w-full max-w-sm sm:max-w-md mx-auto px-5 relative z-20">
+          <motion.div 
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="bg-white rounded-[28px] sm:rounded-[32px] p-6 sm:p-8 shadow-[0_10px_35px_rgba(0,0,0,0.06)] border border-gray-100"
+          >
+            {/* Title */}
+            <div className="text-center mb-6">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight uppercase font-['Poppins']">
                 Partner Sign In
-              </h2>
-              <div className="h-1 w-10 bg-[#E53935] rounded-full mb-3 hidden sm:block" />
-              <p className="text-base text-gray-500 dark:text-gray-400 font-medium">
-                Enter your registered mobile number to start earning
+              </h1>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1 font-medium">
+                Enter your mobile number to log in or register
               </p>
             </div>
 
-            <form onSubmit={handleSendOTP} className="space-y-8">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-[#E53935] uppercase tracking-[0.2em] ml-1">Mobile Number</label>
-                <div className="relative group">
-                  <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
-                    <span className="text-sm font-bold text-[#E53935] border-r border-gray-200 dark:border-gray-800 pr-3">+91</span>
-                  </div>
-                  <input
+            {/* Form */}
+            <form onSubmit={handleSendOTP} className="space-y-5">
+              <div>
+                <label className="block text-[11px] font-bold text-gray-400 tracking-wider uppercase mb-1.5 ml-1">
+                  Mobile Number
+                </label>
+                <div 
+                  className="flex items-center bg-gray-50 border-2 border-gray-200 rounded-2xl px-4 py-3 transition-all focus-within:border-[#EE3A43] focus-within:bg-white focus-within:ring-4 focus-within:ring-red-500/10"
+                >
+                  <span 
+                    className="text-base font-bold pr-3 border-r border-gray-300 select-none"
+                    style={{ color: brandColor }}
+                  >
+                    +91
+                  </span>
+                  <input 
                     type="tel"
                     required
                     autoFocus
                     value={phone}
                     onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                     maxLength={10}
-                    className="block w-full pl-16 pr-6 py-4 bg-gray-50 dark:bg-gray-900/50 text-gray-900 dark:text-white border-2 border-transparent focus:border-[#E53935]/50 rounded-2xl outline-none transition-all placeholder:text-gray-300 font-bold text-lg shadow-sm"
                     placeholder="00000 00000"
+                    className="w-full bg-transparent pl-3 text-lg font-bold text-gray-900 outline-none tracking-wider placeholder:text-gray-300 font-mono"
                   />
                 </div>
               </div>
@@ -151,46 +182,57 @@ export default function DeliverySignIn() {
               <button
                 type="submit"
                 disabled={loading || phone.length < 10}
-                className="w-full py-4.5 bg-[#E53935] hover:bg-[#b71c1c] disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 text-white rounded-2xl font-bold text-lg shadow-xl shadow-[#E53935]/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 group overflow-hidden relative"
+                className="w-full py-4 rounded-full font-bold text-base text-white shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:pointer-events-none"
+                style={{
+                  backgroundColor: brandColor,
+                  boxShadow: `0 10px 24px -4px ${brandColor}55`
+                }}
               >
                 {loading ? (
-                  <Loader2 className="w-6 h-6 animate-spin" />
+                  <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
                   <>
                     <span>Continue Delivery</span>
                     <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </>
                 )}
-                <motion.div
-                  className="absolute inset-0 bg-white/20 translate-x-[-100%]"
-                  whileHover={{ translateX: "100%" }}
-                  transition={{ duration: 0.6 }}
-                />
               </button>
             </form>
-          </div>
-
-          <div className="mt-8 text-center">
-            <p className="text-[11px] text-gray-400 font-medium leading-relaxed max-w-[320px] mx-auto">
-              By continuing, you agree to Papa Veg Pizza's <br />
-              <Link to="/food/delivery/profile/terms" className="text-gray-900 dark:text-white font-bold hover:text-[#E53935] transition-colors">Terms of Service</Link>
-              <span className="mx-1">&</span>
-              <Link to="/food/delivery/profile/privacy" className="text-gray-900 dark:text-white font-bold hover:text-[#E53935] transition-colors">Privacy Policy</Link>
-            </p>
-          </div>
-
-          <div className="mt-12 flex justify-center items-center gap-6 opacity-30 grayscale hover:opacity-60 transition-opacity">
-            <div className="flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4" />
-              <span className="text-[10px] font-black uppercase tracking-widest">Safe & Secure</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Heart className="w-4 h-4" />
-              <span className="text-[10px] font-black uppercase tracking-widest">Earning Opportunities</span>
-            </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        </div>
       </div>
+
+      {/* Footer & Badges */}
+      <div className="relative z-10 max-w-md mx-auto px-6 py-6 text-center">
+        <p className="text-[11px] text-gray-400 font-medium leading-relaxed">
+          By continuing, you agree to {companyName}'s <br />
+          <Link to="/food/delivery/profile/terms" className="font-bold underline text-gray-700 hover:text-[#EE3A43] transition-colors">
+            Terms of Service
+          </Link>
+          <span className="mx-1">&</span>
+          <Link to="/food/delivery/profile/privacy" className="font-bold underline text-gray-700 hover:text-[#EE3A43] transition-colors">
+            Privacy Policy
+          </Link>
+        </p>
+
+        <div className="flex items-center justify-center gap-6 mt-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+          <div className="flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+            <span>Safe & Secure</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Heart className="w-4 h-4" style={{ color: brandColor }} />
+            <span>Earning Opportunities</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Decorative Signature Pizza Dish in Bottom-Right Corner (Catrider Style) */}
+      <img 
+        src={heroPizza} 
+        alt="Delicious Pizza"
+        className="absolute -bottom-7 -right-7 w-36 h-36 sm:w-44 sm:h-44 object-contain pointer-events-none drop-shadow-[0_16px_25px_rgba(0,0,0,0.14)] rotate-[-12deg] z-0 select-none opacity-95" 
+      />
     </div>
   )
 }

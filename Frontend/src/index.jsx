@@ -142,6 +142,18 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 })
 
+// Automatically handle Vite dynamic module preload errors (outdated optimize dep or chunk hash change)
+window.addEventListener('vite:preloadError', (event) => {
+  console.warn('Vite preload error detected, reloading page...', event)
+  const reloadKey = 'vite_preload_retry'
+  const lastRetry = sessionStorage.getItem(reloadKey)
+  const now = Date.now()
+  if (!lastRetry || now - Number(lastRetry) > 5000) {
+    sessionStorage.setItem(reloadKey, String(now))
+    window.location.reload()
+  }
+})
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { AppProviders } from './app/providers.jsx'

@@ -48,8 +48,9 @@ const StoreLogin = lazy(() => import('../modules/Food/pages/store-manager/auth/S
 const FranchiseAdminLogin = lazy(() => import('../modules/Food/pages/franchise-admin/auth/AdminLogin'))
 
 
-const AppRoutes = () => {
+export function AppRoutes() {
   const location = useLocation()
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -72,58 +73,64 @@ const AppRoutes = () => {
   }, [location.pathname, location.search])
 
   return (
-    <Routes>
-      {/* Auth Module */}
-      <Route path="/delivery/auth/*" element={<AuthApp />} />
-      <Route path="/store/auth/*" element={<AuthApp />} />
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        {/* Auth Module */}
+        <Route path="/delivery/auth/*" element={<Suspense fallback={<PageLoader />}><AuthApp /></Suspense>} />
+        <Route path="/store/auth/*" element={<Suspense fallback={<PageLoader />}><AuthApp /></Suspense>} />
 
-      {/* Delivery V2 Module */}
-      <Route path="/delivery/*" element={<Navigate to="/food/delivery" replace />} />
-      <Route path="/food/delivery/*" element={<Suspense fallback={<PageLoader />}><DeliveryV2App /></Suspense>} />
+        {/* Delivery V2 Module */}
+        <Route path="/delivery/*" element={<Navigate to="/food/delivery" replace />} />
+        <Route path="/food/delivery/*" element={<Suspense fallback={<PageLoader />}><DeliveryV2App /></Suspense>} />
 
-      {/* Food Module - Handle both /food and root / for the user app */}
-      <Route path="/food/*" element={<FoodAppWrapper />} />
+        {/* Food Module - Handle both /food and root / for the user app */}
+        <Route path="/food/*" element={<FoodAppWrapper />} />
 
-      {/* Unified Authentication Routes */}
-      <Route path="/superadmin/login" element={<Suspense fallback={<PageLoader />}><SuperAdminLogin /></Suspense>} />
-      <Route path="/admin/login" element={<Navigate to="/superadmin/login" replace />} />
-      <Route path="/franchise-admin/login" element={<Suspense fallback={<PageLoader />}><FranchiseAdminLogin /></Suspense>} />
-      <Route path="/store-operation/login" element={<Suspense fallback={<PageLoader />}><StoreLogin /></Suspense>} />
+        {/* Unified Authentication Routes */}
+        <Route path="/superadmin/login" element={<Suspense fallback={<PageLoader />}><SuperAdminLogin /></Suspense>} />
+        <Route path="/admin/login" element={<Navigate to="/superadmin/login" replace />} />
+        <Route path="/franchise-admin/login" element={<Suspense fallback={<PageLoader />}><FranchiseAdminLogin /></Suspense>} />
+        <Route path="/store-operation/login" element={<Suspense fallback={<PageLoader />}><StoreLogin /></Suspense>} />
 
-      {/* Redirects for Store operations shortcut URLs */}
-      <Route path="/store/dashboard" element={<Navigate to="/store-operations/dashboard" replace />} />
-      <Route path="/store/my-tasks" element={<Navigate to="/store-operations/tasks" replace />} />
+        {/* Redirects for Store operations shortcut URLs */}
+        <Route path="/store/dashboard" element={<Navigate to="/store-operations/dashboard" replace />} />
+        <Route path="/store/my-tasks" element={<Navigate to="/store-operations/tasks" replace />} />
 
-      {/* Global Franchise Admin Portal */}
-      <Route path="/franchise-admin/*" element={
-        <ProtectedRoute module="admin" requiredRole="franchise-admin" loginPath="/franchise-admin/login">
-          <FranchiseAdminRouter />
-        </ProtectedRoute>
-      } />
-      <Route path="/admin/*" element={<Navigate to="/franchise-admin/dashboard" replace />} />
-      
-      {/* Unified Store Operations Panel (Role-Based) */}
-      <Route path="/store-operations/*" element={
-        <ProtectedRoute module="admin" requiredRole={["store-manager", "kitchen-supervisor", "kitchen-staff"]} loginPath="/store-operation/login">
-          <StoreManagerRouter />
-        </ProtectedRoute>
-      } />
+        {/* Global Franchise Admin Portal */}
+        <Route path="/franchise-admin/*" element={
+          <ProtectedRoute module="admin" requiredRole="franchise-admin" loginPath="/franchise-admin/login">
+            <Suspense fallback={<PageLoader />}>
+              <FranchiseAdminRouter />
+            </Suspense>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/*" element={<Navigate to="/franchise-admin/dashboard" replace />} />
+        
+        {/* Unified Store Operations Panel (Role-Based) */}
+        <Route path="/store-operations/*" element={
+          <ProtectedRoute module="admin" requiredRole={["store-manager", "kitchen-supervisor", "kitchen-staff"]} loginPath="/store-operation/login">
+            <Suspense fallback={<PageLoader />}>
+              <StoreManagerRouter />
+            </Suspense>
+          </ProtectedRoute>
+        } />
 
-      {/* Super Admin Portal */}
-      <Route path="/superadmin/*" element={
-        <ProtectedRoute module="admin" requiredRole="superadmin" loginPath="/superadmin/login">
-          <Suspense fallback={<PageLoader />}><SuperAdminRouter /></Suspense>
-        </ProtectedRoute>
-      } />
+        {/* Super Admin Portal */}
+        <Route path="/superadmin/*" element={
+          <ProtectedRoute module="admin" requiredRole="superadmin" loginPath="/superadmin/login">
+            <Suspense fallback={<PageLoader />}><SuperAdminRouter /></Suspense>
+          </ProtectedRoute>
+        } />
 
 
-      {/* Welcome Screen */}
-      <Route path="/welcome" element={<Suspense fallback={<PageLoader />}><WelcomeScreen /></Suspense>} />
+        {/* Welcome Screen */}
+        <Route path="/welcome" element={<Suspense fallback={<PageLoader />}><WelcomeScreen /></Suspense>} />
 
-      {/* Handle root and other paths via FoodAppWrapper */}
-      <Route path="/" element={<Navigate to="/welcome" replace />} />
-      <Route path="/*" element={<FoodAppWrapper />} />
-    </Routes>
+        {/* Handle root and other paths via FoodAppWrapper */}
+        <Route path="/" element={<Navigate to="/welcome" replace />} />
+        <Route path="/*" element={<FoodAppWrapper />} />
+      </Routes>
+    </Suspense>
   )
 }
 

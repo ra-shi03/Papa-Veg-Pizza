@@ -1,440 +1,139 @@
-import { useState, useEffect, useRef } from "react"
-import { useNavigate } from "react-router-dom"
-import { motion, AnimatePresence } from "framer-motion"
-import { CheckCircle2, Play, Pause, IndianRupee } from "lucide-react"
-import BottomPopup from "@delivery/components/BottomPopup"
-import { useCompanyName } from "@food/hooks/useCompanyName"
-const debugLog = (...args) => {}
-const debugWarn = (...args) => {}
-const debugError = (...args) => {}
-
+import React from "react"
+import { useNavigate, Link } from "react-router-dom"
+import { motion } from "framer-motion"
+import { ArrowRight } from "lucide-react"
+import { useSystemTheme } from "@/shared/utils/themeSync"
+import logoNew from "@/assets/logo1.png"
+import heroPizza from "@/assets/hero-pizza.png"
 
 export default function DeliveryWelcome() {
-  const companyName = useCompanyName()
   const navigate = useNavigate()
-  const [showPopup, setShowPopup] = useState(true)
-  const [isPlaying, setIsPlaying] = useState(true)
-  const [audioTime, setAudioTime] = useState("00:00")
-  const audioRef = useRef(null)
+  const { primaryColor, companyName = "Papa Veg Pizza" } = useSystemTheme()
+  // User app light theme: vibrant brand red/coral (no dark/black tint)
+  const brandColor = primaryColor && primaryColor !== "#a43c12" ? primaryColor : "#EE3A43"
 
-  // Get user name from localStorage
-  const getUserName = () => {
-    try {
-      const userData = localStorage.getItem("delivery_user")
-      if (userData) {
-        const user = JSON.parse(userData)
-        return user.name || "Delivery Partner"
-      }
-    } catch (error) {
-      debugError("Error getting user name:", error)
+  const handleGetStarted = () => {
+    const token = localStorage.getItem("delivery_accessToken")
+    const authenticated = localStorage.getItem("delivery_authenticated") === "true"
+    if (token && authenticated) {
+      navigate("/food/delivery", { replace: true })
+      return
     }
-    return "Delivery Partner"
-  }
-
-  const userName = getUserName()
-
-  // Simulate audio playback
-  useEffect(() => {
-    if (isPlaying) {
-      // Simulate audio time progression
-      let time = 0
-      const interval = setInterval(() => {
-        time += 1
-        const minutes = Math.floor(time / 60)
-        const seconds = time % 60
-        setAudioTime(`${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`)
-        
-        // Stop after 10 seconds (simulating audio length)
-        if (time >= 10) {
-          setIsPlaying(false)
-          clearInterval(interval)
-        }
-      }, 1000)
-
-      return () => clearInterval(interval)
-    }
-  }, [isPlaying])
-
-  const handleProceed = () => {
-    setShowPopup(false)
-  }
-
-
-  const toggleAudio = () => {
-    setIsPlaying(!isPlaying)
+    navigate("/food/delivery/login")
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col relative overflow-hidden">
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 relative z-10">
-        {/* Welcome Message */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-center mb-20"
-        >
-          
-          <h1 className="text-lg font-semibold text-gray-900">
-            Hi {userName},
-          </h1>
-          <h2 className="text-lg font-semibold text-gray-900">
-            Welcome to {companyName} Delivery
-          </h2>
-        </motion.div>
-
-        {/* Unlock Prompt */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
-          className="text-center mb-4"
-        >
-          <p className="text-xl font-extrabold text-gray-900 mb-2">
-            Complete 1 order to unlock
-          </p>
-          <p className="text-4xl font-bold text-gray-900 mb-2">
-            ₹100
-          </p>
-          <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>Valid till 10 December 2025</span>
-          </div>
-        </motion.div>
-
-        {/* Reward Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, duration: 0.5 }}
-          className="w-full max-w-sm bg-black rounded-3xl p-6 mb-8 relative overflow-hidden"
-        >
-     
-          {/* Money Illustration - Stack of Currency Notes */}
-          <div className="flex justify-center mb-4">
-            <div className="relative">
-              <div className="w-24 h-24 bg-green-600 rounded-lg flex items-center justify-center relative overflow-visible">
-                <div className="absolute inset-0 bg-gradient-to-br from-green-500 to-green-700 rounded-lg"></div>
-                {/* Stack of money notes with band */}
-                <div className="relative z-10">
-                  {/* Band/Tie around notes */}
-                  {/* <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-3 bg-amber-300 rounded-full z-30"></div> */}
-                  
-                  {/* Note 1 - Back (left) */}
-                  <div className="w-10 h-14 bg-green-400 rounded-sm transform -rotate-12 absolute -left-2 top-1/2 -translate-y-1/2 z-0 shadow-md"></div>
-                  
-                  {/* Note 2 - Middle */}
-                  <div className="w-10 h-14 bg-green-300 rounded-sm transform rotate-0 relative z-10 shadow-lg"></div>
-                  
-                  {/* Note 3 - Front (right) */}
-                  <div className="w-10 h-14 bg-green-200 rounded-sm transform rotate-12 absolute -right-2 top-1/2 -translate-y-1/2 z-20 shadow-xl flex items-center justify-center">
-                    <IndianRupee className="w-5 h-5 text-green-800" strokeWidth={3} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Reward Amount */}
-          <div className="text-center mb-2">
-            <div className="flex items-center justify-center gap-2">
-              <span className="text-5xl font-bold text-white">₹100</span>
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <p className="text-sm text-white/80 mt-2">
-              Joining cash added to pocket
-            </p>
-          </div>
-
-          {/* Start Earning Button */}
-           <button
-             onClick={() => {
-               // Navigate directly to delivery home page (map with hotspots)
-               navigate("/food/delivery", { replace: true })
-             }}
-             className="w-full bg-[#00B761] hover:bg-[#00A055] text-white font-bold py-4 rounded-lg mt-4 flex items-center justify-center gap-2 transition-colors"
-           >
-            <span>Start earning</span>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </motion.div>
-      </div>
-
-      {/* Audio Player */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 z-20">
-        <div className="flex items-center gap-4 max-w-2xl mx-auto">
-          <button
-            onClick={toggleAudio}
-            className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center hover:bg-gray-800 transition-colors"
-          >
-            {isPlaying ? (
-              <Pause className="w-5 h-5" />
-            ) : (
-              <Play className="w-5 h-5 ml-0.5" />
-            )}
-          </button>
-          
-          {/* Waveform */}
-          <div className="flex-1 flex items-center gap-1 h-8">
-            {[...Array(30)].map((_, i) => {
-              // Use a seeded random-like pattern for each bar
-              const seed = i * 0.1
-              const baseHeight = 20
-              const maxHeight = 80
-              
-              // Create varying heights using sine waves with different frequencies
-              const height1 = baseHeight + (Math.sin(seed) * 0.5 + 0.5) * (maxHeight - baseHeight)
-              const height2 = baseHeight + (Math.sin(seed + 1) * 0.5 + 0.5) * (maxHeight - baseHeight)
-              const height3 = baseHeight + (Math.sin(seed + 2) * 0.5 + 0.5) * (maxHeight - baseHeight)
-              const height4 = baseHeight + (Math.sin(seed + 3) * 0.5 + 0.5) * (maxHeight - baseHeight)
-              
-              return (
-                <motion.div
-                  key={i}
-                  className="w-1 bg-gray-400 rounded-full"
-                  animate={isPlaying ? {
-                    height: [
-                      `${height1}%`,
-                      `${height2}%`,
-                      `${height3}%`,
-                      `${height4}%`,
-                      `${height1}%`,
-                    ],
-                  } : {
-                    height: `${baseHeight}%`,
-                  }}
-                  transition={{
-                    duration: 0.5 + (i % 3) * 0.2,
-                    repeat: isPlaying ? Infinity : 0,
-                    repeatDelay: 0,
-                    delay: i * 0.05,
-                    ease: "easeInOut",
-                  }}
-                />
-              )
-            })}
-          </div>
-
-          {/* Time */}
-          <span className="text-sm text-gray-600 font-mono min-w-[50px]">
-            {audioTime}
-          </span>
-
-        </div>
-      </div>
-
-      {/* Profile Active Popup */}
-      <BottomPopup
-        isOpen={showPopup}
-        onClose={() => setShowPopup(false)}
-        showCloseButton={false}
-        closeOnBackdropClick={false}
-        maxHeight="70vh"
-        showHandle={false}
+    <div className="min-h-screen bg-white text-gray-900 flex flex-col justify-between relative overflow-hidden font-['Poppins',sans-serif] select-none">
+      {/* Top Curved Header in Light/Vibrant Brand Theme */}
+      <div 
+        className="relative w-full pt-8 pb-14 px-6 overflow-hidden rounded-b-[44px] sm:rounded-b-[52px] shadow-md"
+        style={{
+          background: `linear-gradient(145deg, ${brandColor} 0%, #FF5722 100%)`
+        }}
       >
-        <div className="flex flex-col items-center py-6 relative overflow-hidden">
-          {/* Confetti Animation inside popup */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-            {[...Array(30)].map((_, i) => (
-              <motion.div
-                key={i}
-                className="absolute w-2 h-2 rounded-sm"
-                style={{
-                  left: `${Math.random() * 100}%`,
-                  top: `-5%`,
-                  backgroundColor: ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'][Math.floor(Math.random() * 6)],
-                }}
-                initial={{
-                  y: -50,
-                  opacity: 1,
-                  rotate: 0,
-                }}
-                animate={{
-                  y: 600,
-                  opacity: 0,
-                  rotate: 360,
-                }}
-                transition={{
-                  duration: 2 + Math.random() * 2,
-                  delay: Math.random() * 1,
-                  repeat: Infinity,
-                  ease: "linear",
-                }}
-              />
-            ))}
-          </div>
+        {/* Soft Background Accent Circles */}
+        <div className="absolute -top-10 -right-10 w-44 h-44 rounded-full bg-white/15 blur-lg pointer-events-none" />
+        <div className="absolute -bottom-10 -left-10 w-36 h-36 rounded-full bg-white/10 blur-md pointer-events-none" />
 
-          {/* Animated Checkmark Circle */}
-          <div className="relative mb-6 z-10">
-            {/* Outer ring animation */}
-            <motion.div
-              className="absolute inset-0 w-32 h-32 rounded-full border-4 border-green-500"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1.2, opacity: 0 }}
-              transition={{
-                duration: 1.5,
-                repeat: Infinity,
-                ease: "easeOut",
-              }}
+        {/* Circular Logo Badge (Catrider Style) */}
+        <div className="relative z-10 flex flex-col items-center">
+          <motion.div 
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 240, damping: 20 }}
+            className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white shadow-[0_8px_20px_rgba(0,0,0,0.12)] border-4 border-white p-2.5 flex items-center justify-center mb-2.5"
+          >
+            <img 
+              src={logoNew} 
+              alt={companyName} 
+              className="w-full h-full object-contain"
             />
-            
-            {/* Main circle with checkmark */}
-            <motion.div
-              className="w-32 h-32 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center shadow-2xl relative overflow-hidden"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{
-                type: "spring",
-                stiffness: 200,
-                damping: 15,
-              }}
-            >
-              {/* Confetti inside circle */}
-              {[...Array(8)].map((_, i) => (
-                <motion.div
-                  key={i}
-                  className="absolute w-2 h-2 rounded-full"
-                  style={{
-                    backgroundColor: ['#fbbf24', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#3b82f6'][Math.floor(Math.random() * 6)],
-                    top: '50%',
-                    left: '50%',
-                  }}
-                  initial={{
-                    x: 0,
-                    y: 0,
-                    scale: 0,
-                    opacity: 1,
-                  }}
-                  animate={{
-                    x: Math.cos((i * 45) * Math.PI / 180) * 60,
-                    y: Math.sin((i * 45) * Math.PI / 180) * 60,
-                    scale: [0, 1, 0],
-                    opacity: [1, 1, 0],
-                  }}
-                  transition={{
-                    duration: 1,
-                    delay: 0.3,
-                    ease: "easeOut",
-                  }}
-                />
-              ))}
-
-              {/* Checkmark */}
-              <motion.svg
-                className="w-16 h-16 text-white relative z-10"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{
-                  duration: 0.6,
-                  delay: 0.2,
-                  ease: "easeOut",
-                }}
-              >
-                <motion.path
-                  d="M5 12l5 5L19 7"
-                  initial={{ pathLength: 0 }}
-                  animate={{ pathLength: 1 }}
-                  transition={{
-                    duration: 0.5,
-                    delay: 0.3,
-                    ease: "easeOut",
-                  }}
-                />
-              </motion.svg>
-            </motion.div>
-
-            {/* Sparkles around circle */}
-            {[...Array(6)].map((_, i) => (
-              <motion.div
-                key={i}
-                className="absolute w-2 h-2 bg-yellow-400 rounded-full"
-                style={{
-                  top: '50%',
-                  left: '50%',
-                }}
-                initial={{
-                  x: 0,
-                  y: 0,
-                  scale: 0,
-                  opacity: 0,
-                }}
-                animate={{
-                  x: Math.cos((i * 60) * Math.PI / 180) * 80,
-                  y: Math.sin((i * 60) * Math.PI / 180) * 80,
-                  scale: [0, 1, 0],
-                  opacity: [0, 1, 0],
-                }}
-                transition={{
-                  duration: 0.8,
-                  delay: 0.4 + i * 0.1,
-                  ease: "easeOut",
-                }}
-              />
-            ))}
-          </div>
-
-          {/* Profile Active Text */}
-          <motion.h2
-            className="text-2xl font-bold text-gray-900 mb-6 z-10 relative"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.5 }}
-          >
-            Profile active
-          </motion.h2>
-
-          {/* Delivery Bag Card */}
-          <motion.div
-            className="w-full bg-gray-50 rounded-xl p-4 mb-6 flex items-center gap-4 z-10 relative"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7, duration: 0.5 }}
-          >
-            {/* Bag Image Placeholder */}
-            <div className="w-20 h-20 bg-black rounded-lg flex items-center justify-center flex-shrink-0">
-              <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-              </svg>
-            </div>
-            
-            {/* Bag Info */}
-            <div className="flex-1">
-              <h3 className="font-semibold text-gray-900 mb-1">
-                {companyName} delivery bag
-              </h3>
-              <p className="text-sm text-gray-600">
-                Your bag will be shipped after your second day of order deliveries
-              </p>
-            </div>
           </motion.div>
 
-          {/* Proceed Button */}
-          <motion.button
-            onClick={handleProceed}
-            className="w-full bg-black text-white font-bold py-4 rounded-lg hover:bg-gray-800 transition-colors z-10 relative"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.9, duration: 0.5 }}
-          >
-            Proceed
-          </motion.button>
+          <p className="text-xs font-bold tracking-[0.25em] text-white uppercase text-center drop-shadow-sm">
+            {companyName}
+          </p>
+          <span className="text-[10px] text-white/90 tracking-widest uppercase font-semibold mt-0.5">
+            Delivery Partner
+          </span>
         </div>
-      </BottomPopup>
+      </div>
+
+      {/* Center Section: Delivery Rider & Crisp Light Typography */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-6 relative z-10">
+        {/* Rider Illustration on Pure White with Soft Glow */}
+        <motion.div 
+          initial={{ opacity: 0, y: 25 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="relative flex items-center justify-center mb-5"
+        >
+          {/* Very Soft Light Tint Halo */}
+          <div 
+            className="w-48 h-48 sm:w-56 sm:h-56 rounded-full absolute pointer-events-none opacity-10 blur-md"
+            style={{ backgroundColor: brandColor }}
+          />
+          <img 
+            src="/MapRider.png" 
+            alt="Delivery Partner Rider" 
+            className="w-44 h-44 sm:w-52 sm:h-52 object-contain relative z-10 drop-shadow-lg"
+          />
+        </motion.div>
+
+        {/* Heading & Subtitle */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15, duration: 0.4 }}
+          className="text-center"
+        >
+          <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight uppercase leading-tight font-['Poppins']">
+            Welcome To <br />
+            <span style={{ color: brandColor }}>Food Delivery</span>
+          </h1>
+
+          <p className="text-xs sm:text-sm text-gray-500 mt-2 max-w-[280px] mx-auto font-medium leading-relaxed">
+            Deliver delicious meals, earn great incentives, and enjoy flexible working hours.
+          </p>
+        </motion.div>
+      </div>
+
+      {/* Bottom Section: Decorative Pizza on Left & "Get Started" Pill on Right */}
+      <div className="relative w-full pb-8 pt-2 px-6 flex items-end justify-between min-h-[120px]">
+        {/* Decorative Pizza Plate in Bottom-Left Corner (Catrider Style) */}
+        <img 
+          src={heroPizza} 
+          alt="Delicious Pizza"
+          className="absolute -bottom-7 -left-7 w-36 h-36 sm:w-44 sm:h-44 object-contain pointer-events-none drop-shadow-[0_16px_25px_rgba(0,0,0,0.14)] rotate-[15deg] z-10 select-none" 
+        />
+
+        {/* Spacer on the left to prevent overlap */}
+        <div className="w-24 sm:w-32 pointer-events-none" />
+
+        {/* Action Button & Link on the Right */}
+        <div className="relative z-20 flex flex-col items-end">
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={handleGetStarted}
+            className="px-8 py-3.5 sm:px-9 sm:py-4 rounded-full font-bold text-sm sm:text-base text-white shadow-xl flex items-center gap-2 group transition-all"
+            style={{
+              backgroundColor: brandColor,
+              boxShadow: `0 10px 25px -4px ${brandColor}55`
+            }}
+          >
+            <span>Get Started</span>
+            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
+          </motion.button>
+
+          <Link 
+            to="/food/delivery/login"
+            className="text-[11px] font-semibold text-gray-500 hover:text-gray-900 mt-2 mr-2 transition-colors"
+          >
+            Already a partner? <span className="underline font-bold" style={{ color: brandColor }}>Sign In</span>
+          </Link>
+        </div>
+      </div>
     </div>
   )
 }
-
-
