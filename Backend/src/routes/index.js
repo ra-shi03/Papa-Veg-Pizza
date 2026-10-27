@@ -30,6 +30,7 @@ import storeOrderRoutes from '../modules/food/store/routes/storeOrders.routes.js
 import kitchenTaskRoutes from '../modules/food/store/routes/kitchenTasks.routes.js';
 import kitchenOpsRoutes from '../modules/food/store/routes/kitchenOps.routes.js';
 import inventoryRoutes from '../modules/food/store/routes/inventory.routes.js';
+import { customersRouter as storeCustomersRoutes, complaintsRouter as storeComplaintsRoutes, reviewsRouter as storeReviewsRoutes } from '../modules/food/store/routes/storeCrm.routes.js';
 import { listFranchiseOrders } from '../modules/food/store/controllers/storeOrders.controller.js';
 import { resolveStoreForLocation } from '../modules/food/orders/services/order-store.service.js';
 import { trackOrderPublicController, getOrderHistoryPublicController, getOrderMethodsController, getFeeConfigController } from '../modules/food/orders/controllers/order.controller.js';
@@ -58,6 +59,9 @@ router.use('/v1/food/store/staff', kitchenStaffRoutes);
 router.use('/v1/food/store/orders', storeOrderRoutes);
 router.use('/v1/food/store/kitchen', kitchenOpsRoutes);
 router.use('/v1/food/store/inventory', inventoryRoutes);
+router.use('/v1/food/store/customers', storeCustomersRoutes);
+router.use('/v1/food/store/complaints', storeComplaintsRoutes);
+router.use('/v1/food/store/reviews', storeReviewsRoutes);
 router.use('/v1/tasks', kitchenTaskRoutes);
 router.get('/v1/food/franchise/orders', authMiddleware, requireRoles('ADMIN'), listFranchiseOrders);
 

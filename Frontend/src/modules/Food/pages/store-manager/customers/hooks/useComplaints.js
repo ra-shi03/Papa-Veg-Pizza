@@ -39,7 +39,7 @@ export function useComplaintsList(filters = {}) {
     queryKey: ["complaints", filters],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/store/complaints", {
+        const response = await apiClient.get("/food/store/complaints", {
           params: filters,
         });
         if (response.data?.success && response.data?.data) {
@@ -47,6 +47,7 @@ export function useComplaintsList(filters = {}) {
         }
         throw new Error("Invalid API format");
       } catch (err) {
+        if (err?.response) throw err;
         console.warn("Backend Complaints API offline, applying local mock filters");
 
         const localComplaints = getLocalData(COMPLAINTS_STORAGE_KEY, mockComplaints);
@@ -181,12 +182,13 @@ export function useComplaintDetails(complaintId) {
     queryKey: ["complaintDetails", complaintId],
     queryFn: async () => {
       try {
-        const response = await apiClient.get(`/store/complaints/${complaintId}`);
+        const response = await apiClient.get(`/food/store/complaints/${complaintId}`);
         if (response.data?.success && response.data?.data) {
           return response.data.data;
         }
         throw new Error("Invalid API response format");
       } catch (err) {
+        if (err?.response) throw err;
         console.warn("Backend Complaint Details API offline, applying local mock fetch");
 
         const localComplaints = getLocalData(COMPLAINTS_STORAGE_KEY, mockComplaints);
@@ -224,9 +226,10 @@ export function useResolveComplaint() {
   return useMutation({
     mutationFn: async ({ complaintId, data }) => {
       try {
-        const response = await apiClient.put(`/store/complaints/${complaintId}/resolve`, data);
+        const response = await apiClient.put(`/food/store/complaints/${complaintId}/resolve`, data);
         return response.data?.data || response.data;
       } catch (err) {
+        if (err?.response) throw err;
         console.warn("Backend Resolve Complaint API offline, updating local storage");
 
         const localComplaints = getLocalData(COMPLAINTS_STORAGE_KEY, mockComplaints);

@@ -73,6 +73,9 @@ router.get('/orders', orderController.listOrdersAdminController);
 router.get('/orders/:orderId', orderController.getOrderByIdAdminController);
 router.get('/customers', adminController.getCustomers);
 router.get('/customers/:id', adminController.getCustomerById);
+// Customer complaints about stores: a franchise admin sees and handles only its own stores' complaints
+router.get('/stores/complaints', adminController.getStoreComplaints);
+router.patch('/stores/complaints/:id', adminController.updateStoreComplaint);
 
 // ----- Staff / RBAC Management (the controller limits roles and franchise/store itself) -----
 router.post('/staff', staffController.createStaff);
@@ -115,8 +118,6 @@ router.delete('/safety-emergency-reports/:id', adminController.deleteSafetyEmerg
 router.get('/support-tickets', adminController.getSupportTicketsController);
 router.patch('/support-tickets/:id', adminController.updateSupportTicketController);
 router.get('/global-search', adminController.globalSearch);
-router.get('/stores/complaints', adminController.getStoreComplaints);
-router.patch('/stores/complaints/:id', adminController.updateStoreComplaint);
 
 // ----- Stores (list + single read are in the franchise-scoped section above) -----
 router.get('/dashboard-stats', adminController.getDashboardStats);

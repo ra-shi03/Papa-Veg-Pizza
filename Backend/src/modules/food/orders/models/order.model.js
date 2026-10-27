@@ -262,7 +262,17 @@ const orderEntityRatingSchema = new mongoose.Schema(
 const orderRatingsSchema = new mongoose.Schema(
     {
         store: { type: orderEntityRatingSchema, default: undefined },
-        deliveryPartner: { type: orderEntityRatingSchema, default: undefined }
+        deliveryPartner: { type: orderEntityRatingSchema, default: undefined },
+        // The store manager's public reply to the customer's store rating (Reviews screen).
+        storeReply: {
+            type: new mongoose.Schema({
+                text: { type: String, required: true, trim: true, maxlength: 1000 },
+                repliedBy: { type: String, default: '', trim: true },
+                repliedById: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+                repliedAt: { type: Date, default: Date.now }
+            }, { _id: false }),
+            default: undefined
+        }
     },
     { _id: false }
 );

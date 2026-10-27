@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { ValidationError } from '../../../../core/auth/errors.js';
+import { NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 import { FoodStore as FoodStore } from '../../store/models/store.model.js';
 import { buildRawDownloadUrlFromFileUrl } from '../../../../services/cloudinary.service.js';
 import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
@@ -197,7 +197,8 @@ export async function getStoreManagerProfileWork(userId) {
     };
 }
 
-export async function getStoreComplaints(query = {}) {
+// storeIds: null for a super admin (every store), otherwise the stores of the caller's franchise.
+export async function getStoreComplaints(query = {}, { storeIds = null } = {}) {
     const limit = Math.min(Math.max(parseInt(query.limit, 10) || 50, 1), 500);
     const page = Math.max(parseInt(query.page, 10) || 1, 1);
     const skip = (page - 1) * limit;
@@ -207,6 +208,13 @@ export async function getStoreComplaints(query = {}) {
     if (query.complaintType && query.complaintType !== 'all') filter.issueType = query.complaintType;
     if (query.storeId && mongoose.Types.ObjectId.isValid(query.storeId)) {
         filter.storeId = new mongoose.Types.ObjectId(query.storeId);
+    }
+    if (storeIds !== null) {
+        const allowed = storeIds.map(String);
+        // a ?storeId= outside the caller's franchise matches nothing
+        filter.storeId = filter.storeId
+            ? { $in: allowed.includes(String(filter.storeId)) ? [filter.storeId] : [] }
+            : { $in: storeIds.map((id) => new mongoose.Types.ObjectId(String(id))) };
     }
     if (query.search) {
         const searchRegex = { $regex: query.search, $options: 'i' };
@@ -338,9 +346,17 @@ export async function globalSearch(query = '') {
     return results;
 }
 
-export async function updateStoreComplaint(id, updateData) {
+export async function updateStoreComplaint(id, updateData, { storeIds = null } = {}) {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-        throw new ValidationError('Invalid complaint ID');
+        throw new NotFoundError('Complaint not found');
+    }
+    // A complaint about another franchise's store is "not found" for a franchise admin
+    const scope = storeIds === null ? {} : { storeId: { $in: storeIds.map((s) => new mongoose.Types.ObjectId(String(s))) } };
+    if (!(await FoodSupportTicket.exists({ _id: new mongoose.Types.ObjectId(id), ...scope }))) {
+        throw new NotFoundError('Complaint not found');
+    }
+    if (updateData.status && !['open', 'in-progress', 'resolved'].includes(updateData.status)) {
+        throw new ValidationError('Invalid status');
     }
     const update = {};
     if (updateData.status) update.status = updateData.status;

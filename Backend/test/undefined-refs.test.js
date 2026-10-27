@@ -34,10 +34,12 @@ function undefinedModelNames(source) {
     }
     const used = new Set();
     for (const [, name] of source.matchAll(new RegExp(`(?<![.\\w])([A-Z][A-Za-z0-9]+)\\.(?:${QUERY_METHODS})\\(`, 'g'))) used.add(name);
+    // error classes thrown with `new` (e.g. NotFoundError) must be imported too
+    for (const [, name] of source.matchAll(/\bnew\s+([A-Z][A-Za-z0-9]*Error)\(/g)) if (!['Error', 'TypeError', 'RangeError', 'SyntaxError'].includes(name)) used.add(name);
     return [...used].filter((n) => !declared.has(n) && !GLOBALS.has(n));
 }
 
-test('every model used in src is imported or declared in that file', () => {
+test('every model and error class used in src is imported or declared in that file', () => {
     const root = resolve('src');
     const problems = [];
     for (const file of walk(root)) {

@@ -30,7 +30,7 @@ export function useCustomerOrdersList(filters = {}) {
     queryKey: ["customerOrders", filters],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/store/customers/orders", {
+        const response = await apiClient.get("/food/store/customers/orders", {
           params: filters,
         });
 
@@ -42,6 +42,7 @@ export function useCustomerOrdersList(filters = {}) {
         }
         throw new Error("Invalid API format");
       } catch (err) {
+        if (err?.response) throw err;
         console.warn("Backend Customer Orders API offline, applying local mock filters");
         
         // Client side filtering fallback
@@ -184,12 +185,13 @@ export function useCustomerProfile(customerId) {
     queryFn: async () => {
       if (!customerId) return null;
       try {
-        const response = await apiClient.get(`/store/customers/${customerId}`);
+        const response = await apiClient.get(`/food/store/customers/${customerId}`);
         if (response.data?.success && response.data?.data) {
           return response.data.data;
         }
         return response.data;
       } catch (err) {
+        if (err?.response) throw err;
         console.warn("Backend Customer Detail API offline, using local mock fallback");
         const localCust = getLocalData(CUSTOMER_STORAGE_KEY, mockCustomers);
         const localOrd = getLocalData(STORE_ORDERS_STORAGE_KEY, mockOrders);
@@ -222,12 +224,13 @@ export function useOrderDetails(orderId) {
     queryFn: async () => {
       if (!orderId) return null;
       try {
-        const response = await apiClient.get(`/store/orders/${orderId}`);
+        const response = await apiClient.get(`/food/store/customers/orders/${orderId}`);
         if (response.data?.success && response.data?.data) {
           return response.data.data;
         }
         return response.data;
       } catch (err) {
+        if (err?.response) throw err;
         console.warn("Backend Order Details API offline, using local mock fallback");
         const localCust = getLocalData(CUSTOMER_STORAGE_KEY, mockCustomers);
         const localOrd = getLocalData(STORE_ORDERS_STORAGE_KEY, mockOrders);
@@ -291,6 +294,7 @@ export function useCreateRefund() {
         const response = await apiClient.post(`/store/orders/${orderId}/refund`, { reason });
         return response.data?.data || response.data;
       } catch (err) {
+        if (err?.response) throw err;
         console.warn("Backend Refund API offline, applying client-side refund status");
         
         // Mutate local storage

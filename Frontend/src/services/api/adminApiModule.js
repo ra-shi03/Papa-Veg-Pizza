@@ -176,7 +176,7 @@ export const adminAPI = {
     adminClient.get("/food/admin/restaurants/pending"),
   /** List restaurant complaints (admin). */
   getRestaurantComplaints: (params = {}) =>
-    adminClient.get("/food/admin/restaurants/complaints", { params }),
+    adminClient.get("/food/admin/stores/complaints", { params }),
   getRestaurantMenuPdfUrl: (id) =>
     adminClient.get(`/food/admin/restaurants/${String(id)}/menu-pdf`),
   downloadRestaurantMenuPdf: (id) =>
@@ -184,7 +184,7 @@ export const adminAPI = {
       responseType: "blob",
     }),
   updateRestaurantComplaint: (id, body) =>
-    adminClient.patch(`/food/admin/restaurants/complaints/${id}`, body),
+    adminClient.patch(`/food/admin/stores/complaints/${id}`, body),
   /** Global universal search (admin). */
   globalSearch: (query) =>
     adminClient.get("/food/admin/global-search", { params: { query } }),

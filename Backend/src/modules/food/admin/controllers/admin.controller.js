@@ -97,7 +97,7 @@ export async function updateStoreComplaint(req, res, next) {
     try {
         const { id } = req.params;
         const { status, adminResponse } = req.body;
-        const updated = await adminService.updateStoreComplaint(id, { status, adminResponse });
+        const updated = await adminService.updateStoreComplaint(id, { status, adminResponse }, { storeIds: await scopedStoreIds(req) });
         res.status(200).json({ success: true, message: 'Complaint updated successfully', data: { complaint: updated } });
     } catch (error) {
         next(error);
@@ -107,7 +107,7 @@ export async function updateStoreComplaint(req, res, next) {
 // ----- Stores -----
 export async function getStoreComplaints(req, res, next) {
     try {
-        const data = await adminService.getStoreComplaints(req.query || {});
+        const data = await adminService.getStoreComplaints(req.query || {}, { storeIds: await scopedStoreIds(req) });
         res.status(200).json({ success: true, message: 'Store complaints fetched successfully', data });
     } catch (error) {
         next(error);

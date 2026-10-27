@@ -39,7 +39,7 @@ export function useReviewsList(filters = {}) {
     queryKey: ["reviews", filters],
     queryFn: async () => {
       try {
-        const response = await apiClient.get("/store/reviews", {
+        const response = await apiClient.get("/food/store/reviews", {
           params: filters,
         });
         if (response.data?.success && response.data?.data) {
@@ -47,6 +47,7 @@ export function useReviewsList(filters = {}) {
         }
         throw new Error("Invalid API format");
       } catch (err) {
+        if (err?.response) throw err;
         console.warn("Backend Reviews API offline, applying local mock filters");
 
         const localReviews = getLocalData(REVIEWS_STORAGE_KEY, mockReviews);
@@ -177,12 +178,13 @@ export function useReviewDetails(reviewId) {
     queryKey: ["reviewDetails", reviewId],
     queryFn: async () => {
       try {
-        const response = await apiClient.get(`/store/reviews/${reviewId}`);
+        const response = await apiClient.get(`/food/store/reviews/${reviewId}`);
         if (response.data?.success && response.data?.data) {
           return response.data.data;
         }
         throw new Error("Invalid API format");
       } catch (err) {
+        if (err?.response) throw err;
         console.warn("Backend Review Details API offline, applying local mock query");
 
         const localReviews = getLocalData(REVIEWS_STORAGE_KEY, mockReviews);
@@ -232,9 +234,10 @@ export function useReplyToReview() {
   return useMutation({
     mutationFn: async ({ reviewId, text, repliedBy }) => {
       try {
-        const response = await apiClient.post(`/store/reviews/${reviewId}/reply`, { text, repliedBy });
+        const response = await apiClient.post(`/food/store/reviews/${reviewId}/reply`, { text, repliedBy });
         return response.data?.data || response.data;
       } catch (err) {
+        if (err?.response) throw err;
         console.warn("Backend Reply Review API offline, updating local mock state");
 
         const localReviews = getLocalData(REVIEWS_STORAGE_KEY, mockReviews);
