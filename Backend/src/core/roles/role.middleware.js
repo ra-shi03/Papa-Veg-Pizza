@@ -22,7 +22,7 @@ const roleMatches = (userRole, allowedRole) => {
 };
 
 export const requireRoles = (...allowedRoles) => {
-    return (req, res, next) => {
+    const guard = (req, res, next) => {
         if (!req.user || !req.user.role) {
             return sendError(res, 401, 'Not authenticated');
         }
@@ -33,6 +33,9 @@ export const requireRoles = (...allowedRoles) => {
 
         next();
     };
+    // named so the route audit (test/route-guards.test.js) can read which roles guard a route
+    Object.defineProperty(guard, 'name', { value: `requireRoles(${allowedRoles.join(',')})` });
+    return guard;
 };
 
 export const allowRoles = requireRoles;

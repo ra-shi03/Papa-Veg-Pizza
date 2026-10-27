@@ -1,5 +1,6 @@
 import express from 'express';
 import { getWelcomeScreenConfig, updateWelcomeScreenConfig } from '../controllers/welcomeScreen.controller.js';
+import { getDeliveryWelcomeScreenConfig, updateDeliveryWelcomeScreenConfig } from '../controllers/deliveryWelcomeScreen.controller.js';
 import { getHomePageConfig, createOrUpdateHomePageConfig, updateHomePageConfig, uploadHomePageBanner, updateHomePageBanner, deleteHomePageBanner } from '../controllers/homePage.controller.js';
 import { authMiddleware, requireSuperAdmin } from '../../../../core/auth/auth.middleware.js';
 import { upload } from '../../../../middleware/upload.js';
@@ -11,6 +12,10 @@ router.get('/welcome', getWelcomeScreenConfig);
 
 // Protected route to update config
 router.put('/welcome', authMiddleware, requireSuperAdmin, updateWelcomeScreenConfig);
+
+// Delivery App Welcome Screen routes
+router.get('/delivery-welcome', getDeliveryWelcomeScreenConfig);
+router.put('/delivery-welcome', authMiddleware, requireSuperAdmin, updateDeliveryWelcomeScreenConfig);
 
 // Home page configuration routes
 router.get('/home-page', getHomePageConfig);

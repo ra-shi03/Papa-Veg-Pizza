@@ -2,6 +2,7 @@ import apiClient, { userClient, restaurantClient, deliveryClient, adminClient } 
 import { API_ENDPOINTS } from "./config.js";
 import * as authService from "./auth.js";
 import { createStubAPI, emptyDataStub, stub } from "./core.js";
+import * as legacyStore from "./legacyStoreAdapter.js";
 
 
 export const restaurantAPI = {
@@ -108,10 +109,10 @@ export const restaurantAPI = {
     return restaurantClient.post("/food/restaurant/profile/menu-images", formData);
   },
   /** Public Offers for users (global/selected restaurant) */
-  getPublicOffers: () => userClient.get("/food/restaurant/offers"),
+  getPublicOffers: (params = {}) => legacyStore.getPublicOffers(params),
   /** Backward-compat helper used by Cart: returns coupons array for an item by adapting public offers */
   getCouponsByItemIdPublic: (restaurantId, _itemId) =>
-    userClient.get("/food/restaurant/offers").then((res) => {
+    legacyStore.getPublicOffers().then((res) => {
       const list = res?.data?.data?.allOffers || res?.data?.allOffers || [];
       const now = Date.now();
       const coupons = list
@@ -181,11 +182,11 @@ export const restaurantAPI = {
     if (!token) return Promise.reject(new Error("FCM token is required"));
     const path =
       platform === "mobile" ? "/fcm-tokens/mobile/save" : "/fcm-tokens/save";
-    return restaurantClient.post(path, { token: String(token), platform });
+    return adminClient.post(path, { token: String(token), platform });
   },
   removeFcmToken: (token, platform = "web") => {
     if (!token) return Promise.reject(new Error("FCM token is required"));
-    return restaurantClient.delete(
+    return adminClient.delete(
       `/fcm-tokens/remove/${encodeURIComponent(String(token))}`,
       { data: { token: String(token), platform } }
     );
@@ -387,13 +388,13 @@ export const restaurantAPI = {
   },
   /** Public: list approved restaurants for user app */
   getRestaurants: (params = {}, config = {}) =>
-    getPublicRestaurantsOnce(params, config),
+    legacyStore.getRestaurants(params, config),
   /** Public: get single approved restaurant by id or slug */
   getRestaurantById: (id, config = {}) =>
-    userClient.get(`/food/restaurant/restaurants/${String(id)}`, { ...config }),
+    legacyStore.getRestaurantById(id, config),
   /** Public: get approved menu by restaurant id or slug */
   getMenuByRestaurantId: (id, config = {}) =>
-    getPublicRestaurantMenuOnce(id, config),
+    legacyStore.getMenuByRestaurantId(id, config),
   /** Public: get outlet timings by restaurant id */
   getOutletTimingsByRestaurantId: (id, config = {}) =>
     getPublicRestaurantOutletTimingsOnce(id, config),
@@ -402,8 +403,7 @@ export const restaurantAPI = {
     userClient.get(`/food/restaurant/restaurants/${String(id)}/addons`, {
       ...config,
     }),
-  getPublicOffers: (params = {}) =>
-    userClient.get("/food/restaurant/offers", { params }),
+  getPublicOffers: (params = {}) => legacyStore.getPublicOffers(params),
   /** Resend delivery notification (restaurant dashboard) */
   resendDeliveryNotification: (orderId) =>
     restaurantClient.post(`/food/restaurant/orders/${String(orderId)}/resend-notification`, {}),

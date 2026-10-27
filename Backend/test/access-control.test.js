@@ -12,7 +12,7 @@ before(async () => {
     tokens = {
         anonymous: null,
         customer: F.A.customerToken,
-        delivery: fx.claim('DELIVERY_PARTNER'),
+        delivery: (await fx.partner()).token,
         'store-manager': F.A.managerToken,
         'kitchen-staff': fx.claim('kitchen-staff', { franchiseId: F.A.franchiseId, storeId: F.A.storeId }),
         'franchise-admin': F.A.adminToken,

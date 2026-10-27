@@ -77,7 +77,9 @@ describe('M5: upload folder is chosen by the server', () => {
     };
     const A = () => fx.F.A;
     const manager = () => fx.tokenFor(A().managerUserId, 'STORE_MANAGER', { franchiseId: A().franchiseId, storeId: A().storeId });
-    const rider = () => fx.tokenFor(A().customerId, 'DELIVERY_PARTNER');
+    let riderToken;
+    before(async () => { riderToken = (await fx.partner()).token; });
+    const rider = () => riderToken;
 
     test('a customer cannot write into an admin folder', async () => {
         assert.equal(await send('/v1/uploads/image', A().customerToken, 'store-approvals/documents'), 'customers/uploads');

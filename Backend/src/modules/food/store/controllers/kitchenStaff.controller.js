@@ -17,6 +17,20 @@ const ALLOWED_STAFF_ROLES = {
 };
 
 /**
+ * The staff a store manager may look at and change: kitchen supervisors and kitchen staff of the manager's own
+ * store, never the manager themselves and never another manager of the store (their records sit in the same store).
+ * Without this a manager could suspend or hard-delete themselves, a peer manager, or the account the franchise
+ * admin created for the store.
+ */
+const KITCHEN_ROLE_CODES = ['KITCHEN_SUPERVISOR', 'KITCHEN_STAFF'];
+async function manageableStaff(req, extra = {}) {
+  const roles = await Role.find({ code: { $in: KITCHEN_ROLE_CODES } }).select('_id').lean();
+  const links = await UserRole.find({ storeId: req.user.storeId, roleId: { $in: roles.map((r) => r._id) } }).select('userId').lean();
+  const ids = links.map((l) => l.userId).filter((id) => String(id) !== String(req.user.userId));
+  return { storeId: req.user.storeId, userId: { $in: ids }, ...extra };
+}
+
+/**
  * POST /v1/food/store/staff
  * Create a new kitchen staff member.
  * Saves in: users + profiles + userRoles + storemanagers
@@ -193,11 +207,8 @@ export const getKitchenStaff = async (req, res) => {
     }
 
     const { search, status } = req.query;
-    const query = { 
-      storeId: callerStoreId, 
-      status: { $ne: 'DELETED' },
-      userId: { $ne: req.user.userId } // Exclude the Store Manager themselves
-    }; 
+    // Kitchen staff of this store only: not the manager, not other managers
+    const query = await manageableStaff(req, { status: { $ne: 'DELETED' } });
     console.log("getKitchenStaff Query:", query);
 
     if (status && status !== 'All') query.status = status;
@@ -259,7 +270,7 @@ export const getKitchenStaffById = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid staff ID.' });
     }
 
-    const staff = await StoreManager.findOne({ _id: id, storeId: callerStoreId, status: { $ne: 'DELETED' } }).lean();
+    const staff = await StoreManager.findOne(await manageableStaff(req, { _id: id, status: { $ne: 'DELETED' } })).lean();
     if (!staff) {
       return res.status(404).json({ success: false, message: 'Staff member not found.' });
     }
@@ -308,7 +319,7 @@ export const updateKitchenStaff = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid staff ID.' });
     }
 
-    const staff = await StoreManager.findOne({ _id: id, storeId: callerStoreId, status: { $ne: 'DELETED' } });
+    const staff = await StoreManager.findOne(await manageableStaff(req, { _id: id, status: { $ne: 'DELETED' } }));
     if (!staff) {
       return res.status(404).json({ success: false, message: 'Staff member not found.' });
     }
@@ -395,7 +406,7 @@ export const updateStaffStatus = async (req, res) => {
     }
 
     const staff = await StoreManager.findOneAndUpdate(
-      { _id: id, storeId: callerStoreId, status: { $ne: 'DELETED' } },
+      await manageableStaff(req, { _id: id, status: { $ne: 'DELETED' } }),
       { $set: { status } },
       { new: true }
     );
@@ -436,7 +447,7 @@ export const assignShift = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid staff ID.' });
     }
 
-    const staff = await StoreManager.findOne({ _id: id, storeId: callerStoreId, status: { $ne: 'DELETED' } });
+    const staff = await StoreManager.findOne(await manageableStaff(req, { _id: id, status: { $ne: 'DELETED' } }));
     if (!staff) {
       return res.status(404).json({ success: false, message: 'Staff member not found.' });
     }
@@ -477,7 +488,7 @@ export const markLeave = async (req, res) => {
     }
 
     const staff = await StoreManager.findOneAndUpdate(
-      { _id: id, storeId: callerStoreId, status: { $ne: 'DELETED' } },
+      await manageableStaff(req, { _id: id, status: { $ne: 'DELETED' } }),
       { $set: { status: 'On Leave' } },
       { new: true }
     );
@@ -510,7 +521,7 @@ export const deleteKitchenStaff = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid staff ID.' });
     }
 
-    const staff = await StoreManager.findOneAndDelete({ _id: id, storeId: callerStoreId });
+    const staff = await StoreManager.findOneAndDelete(await manageableStaff(req, { _id: id }));
 
     if (!staff) {
       return res.status(404).json({ success: false, message: 'Staff member not found.' });

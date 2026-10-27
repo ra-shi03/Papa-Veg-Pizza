@@ -32,6 +32,7 @@ import kitchenOpsRoutes from '../modules/food/store/routes/kitchenOps.routes.js'
 import inventoryRoutes from '../modules/food/store/routes/inventory.routes.js';
 import { customersRouter as storeCustomersRoutes, complaintsRouter as storeComplaintsRoutes, reviewsRouter as storeReviewsRoutes, dashboardComplaintsRouter } from '../modules/food/store/routes/storeCrm.routes.js';
 import { storeDashboardRouter, adminDashboardRouter } from '../modules/food/dashboard/routes/dashboard.routes.js';
+import { getPublicStore, getPublicOffers } from '../modules/food/store/controllers/storePublic.controller.js';
 import { storeDeliveryRouter, zonesRouter } from '../modules/food/store/routes/storeDelivery.routes.js';
 import { storePerformanceRouter, operatingHoursRouter, storeExtrasRouter, storePricingRouter, storeDetailsRouter } from '../modules/food/franchise/routes/storeOps.routes.js';
 import { listFranchiseOrders } from '../modules/food/store/controllers/storeOrders.controller.js';
@@ -101,6 +102,10 @@ router.get('/v1/food/stores/resolve', async (req, res, next) => {
         next(err);
     }
 });
+
+// Public, read-only: a store's public details and the coupons a customer can use (customer app)
+router.get('/v1/food/stores/:id', getPublicStore);
+router.get('/v1/food/offers/public', getPublicOffers);
 
 router.get('/v1/health', (req, res) => {
     res.status(200).json({ status: 'UP', message: 'Server is healthy' });

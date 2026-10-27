@@ -51,9 +51,11 @@ describe('store wallet', () => {
 describe('delivery partner wallet', () => {
     const path = (id) => `/v1/food/payments/delivery/${id}/wallet`;
     // a delivery partner's id is the token's userId
-    const partner = () => fx.tokenFor(B.customerId, 'DELIVERY_PARTNER');
+    let partnerToken; let partnerId;
+    before(async () => { ({ token: partnerToken, id: partnerId } = await fx.partner()); });
+    const partner = () => partnerToken;
     test('a delivery partner can open only their own wallet', async () => {
-        assert.notEqual((await fx.call('GET', path(B.customerId), partner())).status, 404);
+        assert.notEqual((await fx.call('GET', path(partnerId), partner())).status, 404);
         assert.equal((await fx.call('GET', path(A.customerId), partner())).status, 404);
         assert.equal((await fx.call('GET', path('64b000000000000000000001'), partner())).status, 404);
     });

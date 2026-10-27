@@ -172,6 +172,15 @@ async function build(ctx) {
 
     return {
         api, baseUrl: `http://127.0.0.1:${ctx.server.address().port}`, call, bearer, tokenFor, models, ts, F, SA, superUser, roles,
+        /** A real delivery partner record (status: approved | suspended | rejected | pending) and a token for it. */
+        partner: async (status = 'approved') => {
+            const _id = new mongoose.Types.ObjectId();
+            await mongoose.connection.collection('food_delivery_partners').insertOne({
+                _id, name: 'Test Rider', phone: `9${String(Date.now()).slice(-9)}${Math.floor(Math.random() * 90 + 10)}`.slice(0, 12), status,
+                availabilityStatus: 'online', createdAt: new Date(), updatedAt: new Date(),
+            });
+            return { id: String(_id), token: tokenFor(_id, 'DELIVERY_PARTNER') };
+        },
         /** a signed token for an existing user, claiming any role/scope */
         claim: (role, scope) => tokenFor(F.A.adminUserId, role, scope),
     };

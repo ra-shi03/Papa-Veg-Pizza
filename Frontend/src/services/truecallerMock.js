@@ -1,28 +1,19 @@
+import { toast } from "sonner";
+
+// Truecaller login is not available yet: the server refuses it (501) until a real Truecaller verification is set up,
+// and there is no Truecaller SDK in this build. The buttons stay where they are; pressing one now tells the customer
+// to use their mobile number instead of spinning, or worse, pretending to verify a made-up phone number.
+// Resolving never happens, so the login page's catch simply ends its loading state.
+const MESSAGE = "Truecaller login isn't available right now. Please continue with your mobile number.";
+
 export const truecallerMock = {
-  isInstalled: () => {
-    // Randomly true or false, or just true for testing
-    return true; 
-  },
+  isInstalled: () => true,
   requestVerification: () => {
-    return new Promise((resolve, reject) => {
-      console.log("Mock Truecaller: Requesting verification...");
-      // Simulate network delay
-      setTimeout(() => {
-        const success = Math.random() > 0.1; // 90% success rate
-        if (success) {
-          resolve({
-            successful: true,
-            payload: {
-              phone: "+919999999999",
-              firstName: "Truecaller",
-              lastName: "User",
-              isVerified: true
-            }
-          });
-        } else {
-          reject(new Error("User cancelled or verification failed"));
-        }
-      }, 1500);
-    });
-  }
+    try {
+      toast.info(MESSAGE);
+    } catch (_) {
+      // no toaster mounted: the login page still just stops loading
+    }
+    return Promise.reject(new Error(MESSAGE));
+  },
 };

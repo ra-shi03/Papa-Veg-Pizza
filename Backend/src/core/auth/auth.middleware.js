@@ -55,16 +55,15 @@ export const authMiddleware = async (req, res, next) => {
 
         // For all roles: enforce real-time account status check
         // This ensures deactivated accounts are locked out on the very next request
-        // Delivery partners are their own records (their token carries the partner id, not a User id).
-        // A suspended or rejected partner is locked out on the next request, like a deactivated user.
+        // Delivery partners are their own records (their token carries the partner id, not a User id). A partner
+        // token is only good for an APPROVED partner record: suspended, rejected, pending or missing -> 401 on the
+        // very next request. It is never checked against (or satisfied by) a User, so a customer or admin id cannot
+        // stand in for a partner, and a partner id cannot stand in for a customer.
         if (role === 'DELIVERY-PARTNER') {
             const partner = await FoodDeliveryPartner.findById(decoded.userId).select('status').lean();
-            if (partner) {
-                if (partner.status === 'suspended' || partner.status === 'rejected') {
-                    return sendError(res, 401, 'Account is inactive. Contact support.');
-                }
-                return next();
-            }
+            if (!partner) return sendError(res, 401, 'Account not found');
+            if (partner.status !== 'approved') return sendError(res, 401, 'Account is inactive. Contact support.');
+            return next();
         }
 
         const doc = await User.findById(decoded.userId)
