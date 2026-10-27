@@ -366,7 +366,7 @@ If you run **more than one** server process or instance (PM2 cluster mode, `-i N
 
 There is no migration step. Mongoose builds the indexes declared in the models when the server connects (`autoIndex` is left at its default, on).
 
-- **New collections** (empty, so instant): inventory and stock (`stockrequests`, stock transactions/transfers, recipes, ingredient shortages and alerts), kitchen
+- **New collections** (empty, so instant): shifts and attendance (`food_store_shifts`, `food_store_attendance`), inventory and stock (`stockrequests`, stock transactions/transfers, recipes, ingredient shortages and alerts), kitchen
   (`kitchenitems`, ovens, tasks, escalations, issues, quality checks), store hours, store product prices, price history, delivery issues, offer claims.
 - **Existing collections that gain indexes:**
   - `food_orders`: four new indexes (`storeId+createdAt`, `franchiseId+createdAt`, `franchiseId+orderStatus`, and a partial index on store ratings).
@@ -400,8 +400,9 @@ Do this on the **deployed** site after the smoke test, with one real account per
 (create something, reload the page, it is still there; look at another account's view and it is not shared). Several store-panel screens still carry demo/mock data
 files as a fallback, so a screen that loads but shows data you never created is **not** passing. Mark it down and hide it for now.
 
-Phase-1 scope is what the backend supports and the audits tested. **Phase 2, do not show to the client:** attendance, shifts, store profile, reports,
+Phase-1 scope is what the backend supports and the audits tested. **Phase 2, do not show to the client:** staff Performance, reports,
 finance, marketing and rewards. They exist in the menus, but their backend is deferred or demo-only.
+(Attendance, shifts and the profile pages are built server-side in Feature 7. Check each one in the click-through below before showing it.)
 
 ### Super admin
 - [ ] Works: sign in; Dashboard; Franchises (create a franchise admin with email + temporary password); Stores and Store Approvals; Products, Categories, Add-ons, Combos;
@@ -419,17 +420,20 @@ finance, marketing and rewards. They exist in the menus, but their backend is de
 - [ ] Works: sign in at `/store-operation/login`; Dashboard; Orders (Incoming, Active, Ready, Completed, Cancelled) with live updates; Kitchen Operations (queue, preparation, stations, delayed orders);
       Delivery Operations (assign rider, rider availability, tracking, delivery issues); Inventory (stock, requests, waste, low stock, shortages); Staff Management → **Kitchen Staff** (add supervisor/staff, edit, suspend);
       Customers (orders, complaints, reviews); My Tasks.
-- [ ] Phase 2, hide: **Attendance**, **Shift Management**, **Performance** (staff), **Profile / store profile**, Reports, any revenue/finance figures.
+- [ ] Feature 7, check before showing: **Attendance** (mark, bulk mark, edit, delete), **Shift Management** (create, edit, assign staff, delete) and **Profile** (personal info, password, photo, notifications, sessions). Create something, reload, and confirm it is still there; a record that only exists in your browser is the demo fallback, not the server.
+- [ ] Phase 2, hide: **Performance** (staff), Reports, any revenue/finance figures.
 - [ ] A store manager can create kitchen supervisor/staff but cannot see, edit or delete their own manager account or anyone outside their store.
 
 ### Kitchen supervisor
 - [ ] Works: sign in; sees all of the store's orders; accepts/assigns staff to an order; Kitchen Queue and stations; Delayed Orders; My Tasks; stage changes on orders they run.
-- [ ] Phase 2, hide: Attendance, Shifts, Profile pages, Reports.
+- [ ] Feature 7: can read the store's shifts and attendance, clock in and out for themselves, and edit their own Profile. Cannot create shifts or mark other people's attendance (403).
+- [ ] Phase 2, hide: Performance, Reports.
 - [ ] Cannot reach store-manager-only pages (staff creation, inventory approvals, delivery assignment): the screen or the API says no.
 
 ### Kitchen staff
 - [ ] Works: sign in; **My Tasks** shows only the tasks assigned to them; start/complete a task; move the stage of an order assigned to them; notifications.
-- [ ] Phase 2, hide: Attendance, Shifts, Profile, Performance, and any menu item other than My Tasks / their station.
+- [ ] Feature 7: can clock in and out and see only their own attendance and shift; can edit their own Profile.
+- [ ] Phase 2, hide: Performance, and any menu item other than My Tasks / their station / Profile.
 - [ ] Sees no other staff's tasks. (Kitchen staff are given store orders only through the tasks assigned to them.)
 
 ### Customer (user app)

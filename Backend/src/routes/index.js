@@ -34,6 +34,8 @@ import kitchenOpsRoutes from '../modules/food/store/routes/kitchenOps.routes.js'
 import inventoryRoutes from '../modules/food/store/routes/inventory.routes.js';
 import { customersRouter as storeCustomersRoutes, complaintsRouter as storeComplaintsRoutes, reviewsRouter as storeReviewsRoutes, dashboardComplaintsRouter } from '../modules/food/store/routes/storeCrm.routes.js';
 import { storeDashboardRouter, adminDashboardRouter } from '../modules/food/dashboard/routes/dashboard.routes.js';
+import { storeAttendanceRouter } from '../modules/food/store/routes/attendance.routes.js';
+import { storeProfileRouter } from '../modules/food/store/routes/storeProfile.routes.js';
 import { getPublicStore, getPublicOffers } from '../modules/food/store/controllers/storePublic.controller.js';
 import { storeDeliveryRouter, zonesRouter } from '../modules/food/store/routes/storeDelivery.routes.js';
 import { storePerformanceRouter, operatingHoursRouter, storeExtrasRouter, storePricingRouter, storeDetailsRouter } from '../modules/food/franchise/routes/storeOps.routes.js';
@@ -80,7 +82,10 @@ router.use('/v1/food/store/complaints', storeComplaintsRoutes);
 router.use('/v1/food/store/reviews', storeReviewsRoutes);
 router.use('/v1/complaints', dashboardComplaintsRouter);
 router.use('/v1/store/dashboard', storeDashboardRouter);
+// Shifts and attendance (guards per route) must come before the delivery router, whose router-wide guard would turn kitchen staff away
+router.use('/v1/store', storeAttendanceRouter);
 router.use('/v1/store', storeDeliveryRouter);
+router.use('/v1/profile', storeProfileRouter);
 router.use('/v1/food/zones', zonesRouter);
 router.use('/v1/admin/dashboard', adminDashboardRouter);
 router.use('/v1/store-performance', storePerformanceRouter);

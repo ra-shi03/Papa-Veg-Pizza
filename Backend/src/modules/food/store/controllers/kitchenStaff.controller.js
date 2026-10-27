@@ -248,6 +248,7 @@ export const getKitchenStaff = async (req, res) => {
 
     const enhancedStaff = staff.map(s => ({
       ...s,
+      fullName: s.name,   // the attendance and shift screens look people up by fullName
       storeName: storeName || s.storeName,
       franchiseName: franchiseName || s.franchiseName
     }));

@@ -17,6 +17,17 @@ const personalDetailsSchema = new mongoose.Schema({
   weeklyWorkingDays: { type: [String], default: [] }
 }, { _id: false });
 
+// What the person wants to be alerted about (profile > Notifications). Only these keys, only booleans.
+const notificationPrefsSchema = new mongoose.Schema({
+  orderAlerts: { type: Boolean, default: true },
+  inventoryAlerts: { type: Boolean, default: true },
+  shiftAlerts: { type: Boolean, default: false },
+  complaintAlerts: { type: Boolean, default: true },
+  dailyReports: { type: Boolean, default: true },
+  smsAlerts: { type: Boolean, default: false },
+  pushNotifications: { type: Boolean, default: true }
+}, { _id: false });
+
 const storeManagerSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -82,6 +93,10 @@ const storeManagerSchema = new mongoose.Schema({
   },
   personalDetails: {
     type: personalDetailsSchema,
+    default: () => ({})
+  },
+  notificationPrefs: {
+    type: notificationPrefsSchema,
     default: () => ({})
   },
 }, {

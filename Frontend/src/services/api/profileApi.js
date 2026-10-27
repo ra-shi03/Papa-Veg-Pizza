@@ -4,7 +4,19 @@
  * for stand-alone mock environments or incomplete backend APIs.
  */
 
-import apiClient, { adminClient } from "./axios.js";
+import { adminClient } from "./axios.js";
+
+// The /profile/* calls are the store team's own profile: they go through the admin client, which sends the store's sign-in.
+// (The general client picks the token from the URL, and "/profile" would get the customer's.)
+// Session calls carry this device's refresh token in a header, so the server can tell "this device" from the others.
+const refreshHeader = () => {
+  try {
+    const token = localStorage.getItem("admin_refreshToken");
+    return token ? { "X-Refresh-Token": token } : {};
+  } catch {
+    return {};
+  }
+};
 
 // Helper to simulate network latency
 const sleep = (ms = 400) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -107,7 +119,7 @@ export const profileApi = {
   // GET /api/profile
   getProfile: async () => {
     try {
-      const res = await apiClient.get("/profile");
+      const res = await adminClient.get("/profile", { headers: refreshHeader() });
       return res.data;
     } catch (err) {
       await sleep(600);
@@ -131,7 +143,7 @@ export const profileApi = {
   // PUT /api/profile/personal
   updatePersonalInfo: async (personalInfo) => {
     try {
-      const res = await adminClient.put("/food/auth/profile/personal", personalInfo);
+      const res = await adminClient.put("/profile/personal", personalInfo);
       return res.data;
     } catch (err) {
       await sleep(800);
@@ -156,7 +168,7 @@ export const profileApi = {
   // GET /api/profile/permissions
   getPermissions: async () => {
     try {
-      const res = await apiClient.get("/profile/permissions");
+      const res = await adminClient.get("/profile/permissions");
       return res.data;
     } catch (err) {
       await sleep(300);
@@ -185,7 +197,7 @@ export const profileApi = {
   // GET /api/profile/performance
   getPerformance: async () => {
     try {
-      const res = await apiClient.get("/profile/performance");
+      const res = await adminClient.get("/profile/performance");
       return res.data;
     } catch (err) {
       await sleep(500);
@@ -197,7 +209,7 @@ export const profileApi = {
   // GET /api/profile/attendance
   getAttendance: async () => {
     try {
-      const res = await apiClient.get("/profile/attendance");
+      const res = await adminClient.get("/profile/attendance");
       return res.data;
     } catch (err) {
       await sleep(500);
@@ -228,7 +240,7 @@ export const profileApi = {
   // PUT /api/profile/notifications
   updateNotifications: async (notifications) => {
     try {
-      const res = await apiClient.put("/profile/notifications", notifications);
+      const res = await adminClient.put("/profile/notifications", notifications);
       return res.data;
     } catch (err) {
       await sleep(600);
@@ -242,7 +254,7 @@ export const profileApi = {
   // GET /api/profile/activity-logs
   getActivityLogs: async () => {
     try {
-      const res = await apiClient.get("/profile/activity-logs");
+      const res = await adminClient.get("/profile/activity-logs");
       return res.data;
     } catch (err) {
       await sleep(500);
@@ -254,7 +266,9 @@ export const profileApi = {
   // PUT /api/profile/change-password
   changePassword: async (passwordData) => {
     try {
-      const res = await adminClient.patch("/food/auth/admin/change-password", passwordData);
+      // this device's refresh token keeps this session signed in while the other logins are signed out
+      const refreshToken = refreshHeader()["X-Refresh-Token"];
+      const res = await adminClient.put("/profile/change-password", refreshToken ? { ...passwordData, refreshToken } : passwordData);
       return res.data;
     } catch (err) {
       return { success: false, message: err?.response?.data?.message || err.message || "Password update failed." };
@@ -264,7 +278,7 @@ export const profileApi = {
   // DELETE /api/profile/sessions/:id
   deleteSession: async (id) => {
     try {
-      const res = await apiClient.delete(`/profile/sessions/${id}`);
+      const res = await adminClient.delete(`/profile/sessions/${id}`);
       return res.data;
     } catch (err) {
       await sleep(600);
@@ -278,7 +292,7 @@ export const profileApi = {
   // DELETE /api/profile/sessions/other
   logoutOtherSessions: async () => {
     try {
-      const res = await apiClient.delete("/profile/sessions?scope=other");
+      const res = await adminClient.delete("/profile/sessions?scope=other", { headers: refreshHeader() });
       return res.data;
     } catch (err) {
       await sleep(800);
@@ -292,7 +306,7 @@ export const profileApi = {
   // DELETE /api/profile/sessions/all
   logoutAllSessions: async () => {
     try {
-      const res = await apiClient.delete("/profile/sessions?scope=all");
+      const res = await adminClient.delete("/profile/sessions?scope=all");
       return res.data;
     } catch (err) {
       await sleep(800);

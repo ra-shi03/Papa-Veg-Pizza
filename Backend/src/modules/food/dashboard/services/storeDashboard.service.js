@@ -8,6 +8,7 @@ import { StockTransaction } from '../../store/models/stockTransaction.model.js';
 import { KitchenItem } from '../../store/models/kitchenItem.model.js';
 import { KitchenOven } from '../../store/models/kitchenOven.model.js';
 import { User } from '../../../../core/users/models/user.model.js';
+import { todaySummary } from '../../store/services/attendance.service.js';
 import { storeScope, startOfDay, daysAgo, hourLabel, ago, round1, round2, CANCELLED, SALE } from './dashboardAccess.js';
 
 // Store manager dashboard (/v1/store/dashboard/*). Every widget is computed from live data of ONE store, chosen by
@@ -75,12 +76,12 @@ export async function lowStock(user, q) {
   return { lowStockItems: await StoreIngredient.countDocuments(lowStockFilter(store._id)) };
 }
 
-// No attendance module yet: "on duty" is the store's active staff (people on leave / suspended are not).
 const staffOf = (storeId) => StoreManager.find({ storeId: String(storeId), userId: { $ne: null }, status: { $ne: 'DELETED' } }).select('status role').lean();
 
+/** Staff on duty = kitchen team members who have clocked in today and not clocked out (real attendance data). */
 export async function staffDuty(user, q) {
   const store = await storeScope(user, q, 'staff-duty');
-  return { staffOnDuty: (await staffOf(store._id)).filter((s) => s.status === 'Active').length };
+  return { staffOnDuty: (await todaySummary(store._id)).staffOnDuty };
 }
 
 export async function customerRating(user, q) {
@@ -233,11 +234,11 @@ export async function inventoryAlerts(user, q) {
   };
 }
 
-/** No attendance module yet: present = active staff, absent = on leave, late is not tracked (0). */
+/** Today's attendance of the kitchen team: present (worked today), late (arrived after the shift start + grace), absent (marked absent / on leave). */
 export async function staffOverview(user, q) {
   const store = await storeScope(user, q, 'staff-overview');
-  const staff = await staffOf(store._id);
-  return { present: staff.filter((s) => s.status === 'Active').length, late: 0, absent: staff.filter((s) => s.status === 'On Leave').length };
+  const { present, late, absent } = await todaySummary(store._id);
+  return { present, late, absent };
 }
 
 const TICKET_STATUS = { open: 'Open', 'in-progress': 'In Progress', resolved: 'Resolved' };
