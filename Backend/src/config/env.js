@@ -38,9 +38,17 @@ export const config = {
     otpExpirySeconds: Number(process.env.OTP_EXPIRY_SECONDS || 300),
     otpRateLimit: Number(process.env.OTP_RATE_LIMIT || 3),
     otpRateWindow: Number(process.env.OTP_RATE_WINDOW || 600),
-    // The fixed test OTP can never be enabled in production, whatever USE_DEFAULT_OTP says.
+    // The fixed test OTP is dev-only: useDefaultOtp is never true in production, whatever USE_DEFAULT_OTP says.
     useDefaultOtpRequested: process.env.USE_DEFAULT_OTP === 'true',
     useDefaultOtp: process.env.USE_DEFAULT_OTP === 'true' && nodeEnv !== 'production',
+    // TEMPORARY production demo switch (remove before real launch): with USE_DEFAULT_OTP=true AND this exactly "true",
+    // customer and delivery-partner phone logins accept 123456 in production. Admin password-reset OTPs are not affected.
+    allowDefaultOtpInProduction: process.env.ALLOW_DEFAULT_OTP_IN_PRODUCTION === 'true',
+    // Optional: only these numbers (last 10 digits) get the default OTP; every other number is refused. Empty = all numbers.
+    testOtpPhones: String(process.env.TEST_OTP_PHONES || '')
+        .split(',')
+        .map((p) => p.replace(/\D/g, '').slice(-10))
+        .filter(Boolean),
 
     // SMS India Hub
     smsIndiaHubUsername: process.env.SMS_INDIA_HUB_USERNAME,

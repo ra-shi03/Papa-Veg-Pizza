@@ -30,8 +30,19 @@ export const validateConfig = () => {
     }
 
     if (config.nodeEnv === 'production') {
-        if (config.useDefaultOtpRequested) {
+        if (config.useDefaultOtpRequested && config.allowDefaultOtpInProduction) {
+            const phones = config.testOtpPhones || [];
+            logger.warn(
+                '!!! DEFAULT OTP 123456 IS ACTIVE IN PRODUCTION (USE_DEFAULT_OTP=true + ALLOW_DEFAULT_OTP_IN_PRODUCTION=true). ' +
+                (phones.length
+                    ? `Only for the ${phones.length} number(s) in TEST_OTP_PHONES; every other number is refused an OTP. `
+                    : 'For EVERY phone number: anyone can sign in as any customer or delivery partner with 123456. Set TEST_OTP_PHONES to limit it. ') +
+                'No login SMS is sent. Admin password-reset OTPs are not affected. Remove this switch before the real launch.'
+            );
+        } else if (config.useDefaultOtpRequested) {
             logger.warn('USE_DEFAULT_OTP=true is ignored in production: real OTPs are generated and sent by SMS.');
+        } else if (config.allowDefaultOtpInProduction) {
+            logger.warn('ALLOW_DEFAULT_OTP_IN_PRODUCTION=true has no effect without USE_DEFAULT_OTP=true: real OTPs are generated and sent by SMS.');
         }
         if (config.corsOrigins.length === 0) {
             logger.error('FRONTEND_URL is not set. In production it must list the site origin(s) that may call this API and open sockets, e.g. FRONTEND_URL=https://app.example.com,https://admin.example.com. Refusing to start.');

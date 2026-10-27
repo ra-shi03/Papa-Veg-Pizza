@@ -53,6 +53,8 @@ setDefault('OFFER_TOKEN_SECRET', 'test-offer-secret-0123456789abcdef0123456789ab
 setDefault('JWT_ACCESS_EXPIRES', '');
 setDefault('JWT_REFRESH_EXPIRES', '');
 setDefault('USE_DEFAULT_OTP', '');
+setDefault('ALLOW_DEFAULT_OTP_IN_PRODUCTION', '');
+setDefault('TEST_OTP_PHONES', '');
 setDefault('FRONTEND_URL', '');
 setDefault('SOCKET_CORS_ORIGIN', '');
 

@@ -112,9 +112,8 @@ export const requestUserOtp = async (phone) => {
   }
 
   const otp = await createOrUpdateOtp(phone);
-  // TODO: integrate SMS provider here
-  const shouldExposeOtp =
-    config.nodeEnv !== "production" || config.useDefaultOtp;
+  // Never in the response in production, even with the temporary default-OTP switch on.
+  const shouldExposeOtp = config.nodeEnv !== "production";
   return shouldExposeOtp ? { otp } : {};
 };
 
@@ -422,9 +421,8 @@ export const requestDeliveryOtp = async (phone) => {
     throw new ValidationError("Phone is required");
   }
   const otp = await createOrUpdateOtp(phone);
-  // Only expose OTP in response when in default/dev mode — never in production with real SMS
-  const shouldExposeOtp =
-    config.nodeEnv !== "production" || config.useDefaultOtp;
+  // Never in the response in production, even with the temporary default-OTP switch on.
+  const shouldExposeOtp = config.nodeEnv !== "production";
   return shouldExposeOtp ? { otp } : {};
 };
 

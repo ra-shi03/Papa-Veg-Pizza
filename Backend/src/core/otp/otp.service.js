@@ -3,7 +3,29 @@ import ms from 'ms';
 import { OTPVerification } from '../auth/models/otpVerification.model.js';
 import { config } from '../../config/env.js';
 import { logger } from '../../utils/logger.js';
-import { ValidationError } from '../auth/errors.js';
+import { ValidationError, ForbiddenError } from '../auth/errors.js';
+
+const last10 = (phone) => String(phone || '').replace(/\D/g, '').slice(-10);
+
+/**
+ * TEMPORARY production demo switch (remove before real launch). On only in production with BOTH
+ * USE_DEFAULT_OTP=true and ALLOW_DEFAULT_OTP_IN_PRODUCTION=true. Read at call time.
+ */
+export const isProductionDefaultOtpOn = () =>
+    config.nodeEnv === 'production' && config.useDefaultOtpRequested === true && config.allowDefaultOtpInProduction === true;
+
+/**
+ * Which OTP a phone login gets:
+ *   'default'  the fixed 123456 (dev default-OTP mode, or the production switch for an allowed number); no SMS
+ *   'random'   a random 6-digit OTP sent by SMS (production as usual)
+ *   'blocked'  production switch on, TEST_OTP_PHONES set, and this number is not on it
+ */
+const otpModeFor = (phone) => {
+    if (config.useDefaultOtp) return 'default';
+    if (!isProductionDefaultOtpOn()) return 'random';
+    const allowed = config.testOtpPhones || [];
+    return allowed.length === 0 || allowed.includes(last10(phone)) ? 'default' : 'blocked';
+};
 
 const generateOtpCode = () => {
     // 6 digits, uniformly random (randomInt's upper bound is exclusive)
@@ -70,6 +92,11 @@ const sendSmsViaIndiaHub = async (phone, otp) => {
 };
 
 export const createOrUpdateOtp = async (phone) => {
+    const mode = otpModeFor(phone);
+    if (mode === 'blocked') {
+        throw new ForbiddenError('Login by OTP is not available for this number yet.');
+    }
+
     const existing = await OTPVerification.findOne({ mobile: phone });
     const now = new Date();
 
@@ -91,9 +118,12 @@ export const createOrUpdateOtp = async (phone) => {
     }
 
     let otp;
-    if (config.useDefaultOtp) {
+    if (mode === 'default' && config.useDefaultOtp) {
         otp = '123456';
         logger.info(`Default OTP mode enabled – OTP is ${otp} for phone ${phone}`);
+    } else if (mode === 'default') {
+        otp = '123456';
+        logger.warn(`Production default OTP issued for phone ******${last10(phone).slice(-4)} (ALLOW_DEFAULT_OTP_IN_PRODUCTION)`);
     } else {
         otp = generateOtpCode();
     }
@@ -126,7 +156,7 @@ export const createOrUpdateOtp = async (phone) => {
     }
 
     // Only send SMS if not in default OTP mode
-    if (!config.useDefaultOtp) {
+    if (mode !== 'default') {
         await sendSmsViaIndiaHub(phone, otp);
     }
 

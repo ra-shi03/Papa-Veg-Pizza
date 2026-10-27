@@ -79,7 +79,9 @@ All three must be different. Never reuse old values or anything that looks typed
 
 | Variable | Value / note |
 |---|---|
-| `USE_DEFAULT_OTP` | `false`, or delete the line. It is ignored in production anyway; `false` makes that explicit. |
+| `USE_DEFAULT_OTP` | `false`, or delete the line. On its own it is ignored in production; `false` makes that explicit. Must be `true` only for the temporary demo switch below. |
+| `ALLOW_DEFAULT_OTP_IN_PRODUCTION` | **TEMPORARY, remove before the real launch.** Default off. Only when it is exactly `true` **and** `USE_DEFAULT_OTP=true`, customer and delivery-partner phone logins accept `123456` in production and no login SMS is sent. Anything else (`TRUE`, `1`, unset) keeps production as before. The OTP is never returned in the API response; the 6-digit rule, attempt limit and request limits are unchanged; admin password-reset OTPs are not affected. The server logs a loud `DEFAULT OTP 123456 IS ACTIVE IN PRODUCTION` warning at every start while it is on. |
+| `TEST_OTP_PHONES` | Optional, only used with the switch above. Comma-separated mobile numbers (e.g. `98xxxxxxx1,98xxxxxxx2`; spaces and `+91` are ignored, the last 10 digits count). When set, only these numbers can request an OTP; every other number gets `403`. **When empty, `123456` works for every number: anyone can sign in as any customer or rider.** Use the list. |
 | `SMS_INDIA_HUB_API_KEY`, `SMS_INDIA_HUB_SENDER_ID`, `SMS_INDIA_HUB_USERNAME`, `SMS_INDIA_HUB_DLT_TEMPLATE_ID` | Unchanged. OTPs are now **6 digits**. The DLT template uses `##var##`, so it should accept 6 digits; confirm with one real SMS (§5). |
 | `OTP_EXPIRY_SECONDS` / `OTP_EXPIRY_MINUTES` / `OTP_EXPIRY` | Unchanged (default 300 s). |
 | `OTP_MAX_ATTEMPTS`, `OTP_RATE_LIMIT`, `OTP_RATE_WINDOW` | Unchanged (defaults 5 attempts, 3 requests per 600 s). |
@@ -107,7 +109,8 @@ Features 1-6 added **no new backend variables**. Everything below is from the se
 | `FRONTEND_URL` | **Now required in production** (server exits without it). Remove `http://localhost:5173`. |
 | `SOCKET_CORS_ORIGIN` | **New, optional.** Unset means sockets use `FRONTEND_URL`; set it only if socket origins differ. No `*` fallback any more. In production an empty value means every browser socket is refused. |
 | `JWT_ACCESS_EXPIRES` | **Delete the line** from the server `.env` (it has `7d`; the code default is `15m`). |
-| `USE_DEFAULT_OTP` | Set `false` or delete. Ignored in production, but be explicit. |
+| `USE_DEFAULT_OTP` | Set `false` or delete. Ignored in production, but be explicit (unless the demo switch below is used). |
+| `ALLOW_DEFAULT_OTP_IN_PRODUCTION`, `TEST_OTP_PHONES` | **New, temporary.** Demo switch while SMS is not integrated: with `USE_DEFAULT_OTP=true`, phone logins accept `123456` in production, for the numbers in `TEST_OTP_PHONES` (or every number if empty). See the OTP section. **Remove both before the real launch.** |
 | `JWT_SECRET` | Legacy name. Remove it so only `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` are used. |
 | `REDIS_ENABLED`, `REDIS_URL` | Unchanged names. **Behaviour matters now**, see §8.3. |
 
@@ -293,6 +296,11 @@ Then check in the apps:
 ## 7. After a successful deploy
 
 - [ ] Delete the `.env` backup from §0 (it holds the old, burned secrets): `shred -u ~/env-backup-*` or `rm`.
+- [ ] **Before the real launch (as soon as SMS works): turn off the default-OTP demo switch.** In `Backend/.env` delete
+      `ALLOW_DEFAULT_OTP_IN_PRODUCTION` and `TEST_OTP_PHONES` and set `USE_DEFAULT_OTP=false`, restart, and check that `pm2 logs` no longer shows
+      `DEFAULT OTP 123456 IS ACTIVE IN PRODUCTION` and that a login SMS arrives with a random 6-digit code. Then remove the switch from the code
+      (`allowDefaultOtpInProduction` / `testOtpPhones` in `config/env.js`, `otp.service.js`, `validateEnv.js`, and `test/otp-production-switch.test.js`).
+      While it is on, anyone who knows a listed number (or any number, if the list is empty) can sign in as that customer or rider.
 - [ ] Update `docs/audit-2.md`: P0-6 server config, secret rotation and deployment become **Done**.
 - [x] Tests no longer touch Atlas (N6): `npm test` runs every file on its own in-memory MongoDB, and refuses any `mongodb.net` / `mongodb+srv` URI. Nothing to clean up on the cluster.
 
