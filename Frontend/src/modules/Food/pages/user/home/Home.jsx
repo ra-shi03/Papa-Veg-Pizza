@@ -1153,7 +1153,6 @@ export default function Home() {
     localStorage.setItem("userCart", JSON.stringify(stored));
     setCart(stored);
     window.dispatchEvent(new Event("cartUpdated"));
-    triggerToast("Added to basket!");
   };
 
   const removeFromCart = (id) => {
@@ -1220,7 +1219,6 @@ export default function Home() {
 
     setCart(stored);
     window.dispatchEvent(new Event("cartUpdated"));
-    triggerToast(`Added ${customizedItem.title || customizedItem.name} to basket!`);
   };
 
   // Banner click navigation routing
@@ -1306,7 +1304,7 @@ export default function Home() {
 
         {/* Custom Toast Alert */}
         {toast.visible && (
-          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-55 bg-[#E53935] text-white px-6 py-3 rounded-full shadow-2xl glass-card font-label-sm text-xs border border-white/20 animate-bounce">
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-55 bg-[#E53935] text-white px-6 py-3 rounded-full shadow-2xl font-label-sm text-xs border border-white/20 animate-bounce">
             {toast.message}
           </div>
         )}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft, MapPin, Check, User, Clock, Gift, ShieldCheck, CreditCard, ChevronRight, AlertTriangle } from "lucide-react"
+import { ArrowLeft, MapPin, Check, User, Clock, ShieldCheck, CreditCard, ChevronRight, AlertTriangle } from "lucide-react"
 import { useCart } from "@food/context/CartContext"
 import { useProfile } from "@food/context/ProfileContext"
 import { useAppConfig } from "@food/context/AppConfigContext"
@@ -13,7 +13,6 @@ import { toast } from "sonner"
 export default function CheckoutModal({
   show,
   onClose,
-  onOpenGiftCard,
   cartItems,
   couponCode,
   subtotal,
@@ -497,21 +496,7 @@ export default function CheckoutModal({
                     </button>
                   </div>
 
-                  {/* Row 4: Gift Card */}
-                  <div className="p-4 flex items-start gap-3">
-                    <Gift className="w-5 h-5 text-zinc-450 dark:text-zinc-550 shrink-0 mt-0.5" />
-                    <div className="flex-1 text-left">
-                      <p className="text-xs font-semibold leading-normal">Add Gift Card</p>
-                    </div>
-                    <button 
-                      onClick={onOpenGiftCard}
-                      className="text-xs font-black text-primary hover:text-primary-hover bg-transparent border-0 outline-none cursor-pointer"
-                    >
-                      Add
-                    </button>
-                  </div>
-
-                  {/* Row 5: Payment (UPI / Credit Card) */}
+                  {/* Row 4: Payment (UPI / Credit Card) */}
                   <div className="p-4 flex items-start gap-3">
                     <CreditCard className={`w-5 h-5 shrink-0 mt-0.5 ${isPaymentOptionDisabled ? "text-amber-500" : "text-zinc-450 dark:text-zinc-550"}`} />
                     <div className="flex-1 text-left">

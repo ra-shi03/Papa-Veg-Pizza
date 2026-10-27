@@ -155,6 +155,12 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
         { name: "Combo Page", icon: Sparkles },
         { name: "Cart & Upsell", icon: ShoppingCart }
       ]
+    },
+    {
+      title: "Delivery App",
+      items: [
+        { name: "Delivery Welcome Page", icon: Bike }
+      ]
     }
 
   ]
@@ -403,6 +409,8 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
                                 navigate("/food/superadmin/user-app/combo-page")
                               } else if (item.name === "Cart & Upsell") {
                                 navigate("/food/superadmin/user-app/cart-config")
+                              } else if (item.name === "Delivery Welcome Page") {
+                                navigate("/food/superadmin/delivery-app/welcome-page")
                               }
                               // On mobile, close sidebar when clicking a menu item
                               if (window.innerWidth < 1024) {

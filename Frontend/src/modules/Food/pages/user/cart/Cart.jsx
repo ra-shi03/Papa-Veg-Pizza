@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft, Tag, ChevronRight, Gift, ChevronUp, Plus, Sparkles } from "lucide-react"
+import { ArrowLeft, Tag, ChevronRight, ChevronUp, Plus, Sparkles } from "lucide-react"
 import { useCart } from "@food/context/CartContext"
 import { useAppConfig } from "@food/context/AppConfigContext"
 import ApplyCoupon from "./ApplyCoupon"
-import AddGiftCard from "./AddGiftCard"
 import CheckoutModal from "./CheckoutModal"
 import { CartMealSuggestions, LimitedOffer } from "./upsell/CartUpsell"
 import { AnimatedNumber, CartItemRow, CartSkeleton, haptic } from "./CartParts"
@@ -162,7 +161,6 @@ export default function Cart() {
   const reduceMotion = useReducedMotion()
   const [orderTypeInfo, setOrderTypeInfo] = useState("Order for Today 11:30")
   const [showCouponModal, setShowCouponModal] = useState(false)
-  const [showGiftCardModal, setShowGiftCardModal] = useState(false)
   const [appliedCoupon, setAppliedCoupon] = useState(null)
   const [fees, setFees] = useState({ handlingFee: 0, platformFee: 0, packagingFee: 0, deliveryFee: 0, freeDeliveryUpTo: 0, freeDeliveryThreshold: 0, gstRate: 0 })
   useEffect(() => {
@@ -171,12 +169,22 @@ export default function Cart() {
       if (f) setFees((prev) => ({ ...prev, ...f }))
     }).catch(() => {})
   }, [])
-  const [appliedGiftCard, setAppliedGiftCard] = useState(null)
   const [showTaxDetails, setShowTaxDetails] = useState(false)
   const [isDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem("appTheme")
     return savedTheme ? savedTheme === "dark" : false
   })
+
+  const getMenuPath = () => {
+    return window.location.pathname.startsWith("/food") ? "/food/user/menu" : "/user/menu"
+  }
+
+  // Navigate directly to menu page when cart is empty
+  useEffect(() => {
+    if (cartLoaded && cartItems.length === 0) {
+      navigate(getMenuPath(), { replace: true })
+    }
+  }, [cartLoaded, cartItems.length, navigate])
 
   // Clear applied coupon if disabled globally
   useEffect(() => {
@@ -325,6 +333,15 @@ export default function Cart() {
 
     localStorage.setItem("userCart", JSON.stringify(stored))
     window.dispatchEvent(new Event("cartUpdated"))
+
+    const remainingKeys = Object.keys(stored).filter(k => {
+      const v = stored[k]
+      const q = typeof v === 'object' && v !== null ? Number(v.quantity || 1) : Number(v)
+      return q > 0
+    })
+    if (remainingKeys.length === 0) {
+      navigate(getMenuPath(), { replace: true })
+    }
   }
 
   useEffect(() => {
@@ -342,8 +359,18 @@ export default function Cart() {
     delete stored[item.key]
     localStorage.setItem("userCart", JSON.stringify(stored))
     window.dispatchEvent(new Event("cartUpdated"))
+
+    const remainingKeys = Object.keys(stored).filter(k => {
+      const v = stored[k]
+      const q = typeof v === 'object' && v !== null ? Number(v.quantity || 1) : Number(v)
+      return q > 0
+    })
+    if (remainingKeys.length === 0) {
+      navigate(getMenuPath(), { replace: true })
+    }
+
     toast(`Removed ${item.name}`, {
-      duration: 5000,
+      duration: 4000,
       action: {
         label: "Undo",
         onClick: () => {
@@ -382,13 +409,8 @@ export default function Cart() {
   const sgst = cgst
   const taxesAndCharges = subtotal > 0 ? Number((handlingCharge + cgst + sgst).toFixed(2)) : 0
 
-  let giftCardValue = 0
-  if (appliedGiftCard) {
-    giftCardValue = Math.min(appliedGiftCard.value, subtotal - discount + taxesAndCharges)
-  }
-
-  const total = subtotal > 0 ? Number((subtotal - discount + taxesAndCharges - giftCardValue).toFixed(2)) : 0
-  const savings = Number((discount + giftCardValue).toFixed(2))
+  const total = subtotal > 0 ? Number((subtotal - discount + taxesAndCharges).toFixed(2)) : 0
+  const savings = Number(discount.toFixed(2))
   const beforeSavings = Number((total + savings).toFixed(2))
 
   const serviceKind = (typeof localStorage !== "undefined" && localStorage.getItem("activeService")) || "delivery"
@@ -571,19 +593,7 @@ export default function Cart() {
 
       {!cartLoaded ? (
         <CartSkeleton ui={ui} />
-      ) : cartItems.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center px-8 py-24 gap-4">
-          <p className="text-base font-semibold" style={{ color: ui.text }}>Your cart is empty</p>
-          <p className="text-sm" style={{ color: ui.muted }}>Looks like you haven't added any item to your cart yet</p>
-          <button
-            onClick={() => navigate("/user/menu")}
-            className="mt-2 px-6 h-11 rounded-xl text-sm font-bold text-white border-0 cursor-pointer"
-            style={{ backgroundColor: "#E53935" }}
-          >
-            Browse menu
-          </button>
-        </div>
-      ) : (
+      ) : cartItems.length === 0 ? null : (
         <div className="px-4 pt-4 space-y-4">
           {/* Deliver card */}
           <div className="rounded-2xl p-4 flex items-center gap-4" style={{ backgroundColor: ui.card }}>
@@ -662,26 +672,6 @@ export default function Cart() {
                   )}
                 </div>
               )}
-              <div className="rounded-xl p-3 flex items-center justify-between gap-3" style={{ border: `1px dashed ${ui.line}` }}>
-                <div className="flex items-center gap-3 min-w-0">
-                  <Gift size={20} className="shrink-0 text-[#E53935]" />
-                  <div className="min-w-0">
-                    {appliedGiftCard ? (
-                      <>
-                        <p className="text-sm font-semibold" style={{ color: ui.text }}>Gift card applied</p>
-                        <p className="text-xs font-semibold text-emerald-600">₹{giftCardValue} balance used</p>
-                      </>
-                    ) : (
-                      <p className="text-sm font-semibold" style={{ color: ui.text }}>Add a gift card</p>
-                    )}
-                  </div>
-                </div>
-                {appliedGiftCard ? (
-                  <button onClick={() => setAppliedGiftCard(null)} className="text-xs font-bold text-[#E53935] bg-transparent border-0 cursor-pointer">Remove</button>
-                ) : (
-                  <button onClick={() => setShowGiftCardModal(true)} className="text-xs font-bold text-[#E53935] bg-transparent border-0 cursor-pointer flex items-center">Add <ChevronRight size={14} /></button>
-                )}
-              </div>
             </div>
           </div>
 
@@ -724,7 +714,6 @@ export default function Cart() {
                     <div className="mt-3 pt-3 space-y-2 text-sm" style={{ borderTop: `1px dashed ${ui.line}`, color: ui.muted }}>
                       <BillRow label="Item total" value={`₹${subtotal}`} />
                       {discount > 0 && <BillRow label="Coupon discount" value={`-₹${discount}`} positive />}
-                      {giftCardValue > 0 && <BillRow label="Gift card" value={`-₹${giftCardValue}`} positive />}
                       <BillRow label="Restaurant handling charges" value={`₹${handlingCharge}`} />
                       <BillRow label={`CGST (${gstShare}%)`} value={`₹${cgst}`} />
                       <BillRow label={`SGST (${gstShare}%)`} value={`₹${sgst}`} />
@@ -776,18 +765,10 @@ export default function Cart() {
         cartTotal={subtotal}
       />
 
-      {/* Gift Card Modal Overlay */}
-      <AddGiftCard
-        show={showGiftCardModal}
-        onClose={() => setShowGiftCardModal(false)}
-        onApply={(card) => { setAppliedGiftCard(card); haptic(12); toast.success("Gift card applied") }}
-      />
-
       {/* Checkout Modal Overlay */}
       <CheckoutModal
         show={showCheckoutModal}
         onClose={() => setShowCheckoutModal(false)}
-        onOpenGiftCard={() => setShowGiftCardModal(true)}
         cartItems={cartItems}
         couponCode={appliedCoupon?.code}
         subtotal={subtotal}

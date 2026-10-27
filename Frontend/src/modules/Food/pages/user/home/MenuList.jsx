@@ -1558,7 +1558,6 @@ export default function MenuList() {
     
     window.dispatchEvent(new Event("cartUpdated"))
     setCustomizeItem(null)
-    triggerToast(`Added ${customizeItem.title} to cart!`)
   }
 
   const totalCartCount = Object.values(cart).reduce((sum, item) => sum + item.quantity, 0)
@@ -1836,12 +1835,7 @@ export default function MenuList() {
         `
       }} />
 
-      {/* Custom Toast Alert */}
-      {toast.visible && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-55 bg-[#E53935] text-white px-6 py-3 rounded-full shadow-2xl glass-card font-label-sm text-xs border border-white/20 animate-bounce">
-          {toast.message}
-        </div>
-      )}
+      {/* Custom Toast Alert permanently removed as requested */}
 
       {/* ── TOP STICKY CONTAINER (Header + Filters + Category Tabs) ── */}
       <div className={`sticky top-0 z-45 bg-[#F8F6F2] dark:bg-[#111111] border-b border-zinc-200 dark:border-zinc-800 transition-all duration-200 ${
@@ -3033,7 +3027,6 @@ export default function MenuList() {
               openCustomizeModal(product);
             } else {
               addToCart(product);
-              triggerToast(`Added ${product.title} to cart!`);
             }
           });
         }}
