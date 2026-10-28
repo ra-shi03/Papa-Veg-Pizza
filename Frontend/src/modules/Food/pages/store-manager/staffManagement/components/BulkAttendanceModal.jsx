@@ -9,6 +9,7 @@ import {
 import { useStaffList } from "../hooks/useStaff";
 import { useBulkMarkAttendance } from "../hooks/useAttendance";
 import { useShiftList } from "../hooks/useShifts";
+import { localToday } from "../localToday";
 
 export default function BulkAttendanceModal({ isOpen, onClose }) {
   // All staff, filtered below: the server's status filter is an exact match ("Active"), so asking for "active" returns nobody
@@ -16,7 +17,7 @@ export default function BulkAttendanceModal({ isOpen, onClose }) {
   const { data: shifts = [] } = useShiftList({ status: "active" });
   const bulkMarkMutation = useBulkMarkAttendance();
 
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(localToday);
   const [shiftId, setShiftId] = useState("Morning");
   const [attendanceStates, setAttendanceStates] = useState({});
 

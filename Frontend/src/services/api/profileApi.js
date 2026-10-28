@@ -5,7 +5,7 @@
  */
 
 import { adminClient } from "./axios.js";
-import { STANDALONE_MOCK } from "./mockPolicy.js";
+import { STANDALONE_MOCK, failOrMock } from "./mockPolicy.js";
 
 // The /profile/* calls are the store team's own profile: they go through the admin client, which sends the store's sign-in.
 // (The general client picks the token from the URL, and "/profile" would get the customer's.)
@@ -132,6 +132,7 @@ export const profileApi = {
       const res = await adminClient.get("/profile", { headers: refreshHeader() });
       return res.data;
     } catch (err) {
+      failOrMock(err, "Could not load your profile."); // the real error; sample data only when VITE_STANDALONE_MOCK=true
       await sleep(600);
       const data = getLocalData();
       // Ensure the mock role matches any changes made in the demo environment if needed
@@ -176,12 +177,31 @@ export const profileApi = {
 
 
 
+  // POST /profile/photo (multipart, field "file"): the server checks it is a real image and returns its URL
+  uploadPhoto: async (file) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await adminClient.post("/profile/photo", formData);
+      return res.data;
+    } catch (err) {
+      if (!STANDALONE_MOCK) return failed(err, "Failed to upload photo.");
+      const profileImage = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
+      return { success: true, data: { profileImage } };
+    }
+  },
+
   // GET /api/profile/permissions
   getPermissions: async () => {
     try {
       const res = await adminClient.get("/profile/permissions");
       return res.data;
     } catch (err) {
+      failOrMock(err, "Could not load permissions."); // the real error; sample data only when VITE_STANDALONE_MOCK=true
       await sleep(300);
       const data = getLocalData();
       // Provide permission matrix based on role
@@ -211,6 +231,7 @@ export const profileApi = {
       const res = await adminClient.get("/profile/performance");
       return res.data;
     } catch (err) {
+      failOrMock(err, "Could not load performance."); // the real error; sample data only when VITE_STANDALONE_MOCK=true
       await sleep(500);
       const data = getLocalData();
       return { success: true, data: data.performanceSummary };
@@ -223,6 +244,7 @@ export const profileApi = {
       const res = await adminClient.get("/profile/attendance");
       return res.data;
     } catch (err) {
+      failOrMock(err, "Could not load attendance."); // the real error; sample data only when VITE_STANDALONE_MOCK=true
       await sleep(500);
       const data = getLocalData();
       
@@ -269,6 +291,7 @@ export const profileApi = {
       const res = await adminClient.get("/profile/activity-logs");
       return res.data;
     } catch (err) {
+      failOrMock(err, "Could not load activity."); // the real error; sample data only when VITE_STANDALONE_MOCK=true
       await sleep(500);
       const data = getLocalData();
       return { success: true, data: data.recentActivities };

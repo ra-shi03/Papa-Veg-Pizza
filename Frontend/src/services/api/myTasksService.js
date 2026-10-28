@@ -181,8 +181,8 @@ export const myTasksService = {
       const res = await apiClient.get("/tasks");
       return res.data;
     } catch (err) {
-      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
-      if (err?.response) throw err;
+      // The real answer (a 403 / 404 / 400 or a network failure) is shown; the sample tasks below only run when VITE_STANDALONE_MOCK=true.
+      failOrMock(err, "Could not load your tasks"); // the real error; sample data only when VITE_STANDALONE_MOCK=true
       await sleep(500);
       const db = getDB();
       // Returns only tasks assigned to the mock user "Siddharth Verma"
@@ -197,8 +197,8 @@ export const myTasksService = {
       const res = await apiClient.get("/tasks/stats");
       return res.data;
     } catch (err) {
-      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
-      if (err?.response) throw err;
+      // The real answer (a 403 / 404 / 400 or a network failure) is shown; the sample tasks below only run when VITE_STANDALONE_MOCK=true.
+      failOrMock(err, "Could not load your tasks"); // the real error; sample data only when VITE_STANDALONE_MOCK=true
       await sleep(400);
       const db = getDB();
       const userTasks = db.tasks.filter((t) => t.assignedTo === "Siddharth Verma");
@@ -459,8 +459,8 @@ export const myTasksService = {
       const res = await apiClient.get("/tasks/team");
       return res.data;
     } catch (err) {
-      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
-      if (err?.response) throw err;
+      // The real answer (a 403 / 404 / 400 or a network failure) is shown; the sample tasks below only run when VITE_STANDALONE_MOCK=true.
+      failOrMock(err, "Could not load your tasks"); // the real error; sample data only when VITE_STANDALONE_MOCK=true
       await sleep(500);
       const db = getDB();
       const pending = db.tasks.filter((t) => t.status === "pending").length;
@@ -495,8 +495,8 @@ export const myTasksService = {
       const res = await apiClient.get("/tasks/notifications");
       return res.data;
     } catch (err) {
-      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
-      if (err?.response) throw err;
+      // The real answer (a 403 / 404 / 400 or a network failure) is shown; the sample tasks below only run when VITE_STANDALONE_MOCK=true.
+      failOrMock(err, "Could not load your tasks"); // the real error; sample data only when VITE_STANDALONE_MOCK=true
       await sleep(300);
       const db = getDB();
       return { success: true, data: db.notifications };

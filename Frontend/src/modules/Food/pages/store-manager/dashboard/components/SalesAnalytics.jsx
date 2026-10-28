@@ -8,6 +8,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import apiClient from "@/services/api/axios"
+import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 // Mock Sales Data
 const MOCK_SALES_HOURLY = [
@@ -64,7 +65,7 @@ export default function SalesAnalytics({ storeId, refreshKey }) {
         })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
+        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
         return filterType === "daily" 
           ? MOCK_SALES_HOURLY 
           : filterType === "weekly" 

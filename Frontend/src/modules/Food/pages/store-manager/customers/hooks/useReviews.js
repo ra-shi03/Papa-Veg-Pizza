@@ -48,7 +48,7 @@ export function useReviewsList(filters = {}) {
         }
         throw new Error("Invalid API format");
       } catch (err) {
-        if (err?.response) throw err;
+        failOrMock(err, "Could not load reviews"); // the real error; sample data only when VITE_STANDALONE_MOCK=true
         console.warn("Backend Reviews API offline, applying local mock filters");
 
         const localReviews = getLocalData(REVIEWS_STORAGE_KEY, mockReviews);
@@ -185,7 +185,7 @@ export function useReviewDetails(reviewId) {
         }
         throw new Error("Invalid API format");
       } catch (err) {
-        if (err?.response) throw err;
+        failOrMock(err, "Could not load reviews"); // the real error; sample data only when VITE_STANDALONE_MOCK=true
         console.warn("Backend Review Details API offline, applying local mock query");
 
         const localReviews = getLocalData(REVIEWS_STORAGE_KEY, mockReviews);

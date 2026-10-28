@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { Truck, ToggleLeft, ToggleRight, MapPin, X, Map, ShieldAlert, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
 import apiClient from "@/services/api/axios"
+import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 // Mock delivery data
 const MOCK_DELIVERY_OVERVIEW = {
@@ -33,7 +34,7 @@ export default function DeliveryOverview({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/delivery-overview", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
+        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
         return MOCK_DELIVERY_OVERVIEW
       }
     }
@@ -48,8 +49,22 @@ export default function DeliveryOverview({ storeId, refreshKey }) {
     setShowRiderModal(true)
   }
 
+  // The list behind the cards (/store/dashboard/rider-roster)
+  const { data: riderRoster } = useQuery({
+    queryKey: ["rider-roster-widget", storeId, refreshKey],
+    queryFn: async () => {
+      try {
+        const response = await apiClient.get("/store/dashboard/rider-roster", { params: { storeId } })
+        return response.data?.data || []
+      } catch (e) {
+        if (e?.response || !STANDALONE_MOCK) throw e
+        return MOCK_RIDERS
+      }
+    }
+  })
+
   // Filter riders by selected status card clicked
-  const filteredRiders = MOCK_RIDERS.filter((rider) => {
+  const filteredRiders = (riderRoster || []).filter((rider) => {
     if (riderFilter === "available") return rider.status === "Idle" || rider.status === "Waiting at Store"
     if (riderFilter === "assigned") return rider.status.startsWith("Delivering")
     if (riderFilter === "delayed") return rider.status.includes("Delayed")

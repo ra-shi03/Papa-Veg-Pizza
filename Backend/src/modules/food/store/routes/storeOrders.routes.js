@@ -13,6 +13,7 @@ router.get('/team', c.listTeam);                            // supervisors + kit
 router.get('/:orderId', c.getOrder);
 router.patch('/:orderId/accept', c.acceptOrder);            // manager -> picks the kitchen supervisor
 router.patch('/:orderId/reject', c.rejectOrder);            // manager
+router.patch('/:orderId/reopen', c.reopenOrder);            // manager, within 5 minutes of the store's own cancellation
 router.patch('/:orderId/assign-staff', c.assignStaff);      // manager / that order's supervisor
 router.patch('/:orderId/stage', c.updateStage);             // assigned staff / supervisor / manager
 router.patch('/:orderId/priority', c.setPriority);          // manager / supervisor

@@ -15,6 +15,7 @@ export const getOrder = wrap((req) => ops.getStoreOrder(req.user, req.params.ord
 export const listTeam = wrap((req) => ops.listTeam(req.user, req.query));
 export const acceptOrder = wrap((req) => ops.acceptOrder(req.user, req.params.orderId, req.body));
 export const rejectOrder = wrap((req) => ops.rejectOrder(req.user, req.params.orderId, req.body));
+export const reopenOrder = wrap((req) => ops.reopenOrder(req.user, req.params.orderId, req.body));
 export const assignStaff = wrap((req) => ops.assignStaff(req.user, req.params.orderId, req.body));
 export const updateStage = wrap((req) => ops.updateKitchenStage(req.user, req.params.orderId, req.body));
 export const pauseOrder = wrap((req) => ops.setPaused(req.user, req.params.orderId, req.body));

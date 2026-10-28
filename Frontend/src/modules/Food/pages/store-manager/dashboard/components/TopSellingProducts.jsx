@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { Award, Eye, X, Pizza, TrendingUp, BarChart3 } from "lucide-react"
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar } from "recharts"
 import apiClient from "@/services/api/axios"
+import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 // Mock top products
 const MOCK_TOP_PRODUCTS = [
@@ -36,7 +37,7 @@ export default function TopSellingProducts({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/top-products", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
+        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
         return MOCK_TOP_PRODUCTS
       }
     }

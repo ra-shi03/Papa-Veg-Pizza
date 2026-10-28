@@ -4,6 +4,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts"
 import { X, Search, ChevronUp, ChevronDown, ClipboardList } from "lucide-react"
 import { toast } from "sonner"
 import apiClient from "@/services/api/axios"
+import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 // Mock order status breakdown
 const MOCK_STATUS_DATA = {
@@ -64,7 +65,7 @@ export default function OrderStatusDonut({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/order-status", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
+        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
         return MOCK_STATUS_DATA
       }
     }
@@ -89,8 +90,22 @@ export default function OrderStatusDonut({ storeId, refreshKey }) {
     setShowStatusModal(true)
   }
 
+  // The list behind the cards (/store/dashboard/order-list)
+  const { data: orderRows } = useQuery({
+    queryKey: ["order-list-widget", storeId, refreshKey],
+    queryFn: async () => {
+      try {
+        const response = await apiClient.get("/store/dashboard/order-list", { params: { storeId } })
+        return response.data?.data || []
+      } catch (e) {
+        if (e?.response || !STANDALONE_MOCK) throw e
+        return MOCK_ORDERS
+      }
+    }
+  })
+
   // Filter & Sort Table rows
-  const filteredOrders = MOCK_ORDERS.filter((order) => {
+  const filteredOrders = (orderRows || []).filter((order) => {
     const matchesStatus = selectedStatus === "all" || order.status === selectedStatus
     const matchesSearch = 
       order.orderNumber.toLowerCase().includes(debouncedSearch.toLowerCase()) ||

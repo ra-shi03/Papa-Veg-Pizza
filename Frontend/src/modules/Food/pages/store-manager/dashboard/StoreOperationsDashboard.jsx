@@ -6,6 +6,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import apiClient from "@/services/api/axios"
+import { useOrderEvents } from "../api/storeOrdersApi"
 
 // Import modular components
 import KpiCards from "./components/KpiCards"
@@ -39,27 +40,7 @@ export default function StoreOperationsDashboard() {
   
   // Real-Time Notification State
   const [showNotifDrawer, setShowNotifDrawer] = useState(false)
-  const [notifications, setNotifications] = useState([
-    { id: 1, title: "Low Cheese Stock", message: "Processed Mozzarella Cheese is under 3kg threshold", type: "Critical", time: "Just now", unread: true },
-    { id: 2, title: "Order PV-8839 Delayed", message: "Double Cheese Margherita has exceeded baking duration by 6m", type: "Warning", time: "5m ago", unread: true },
-    { id: 3, title: "Rider Delayed", message: "Rider Amit Kumar is stuck in traffic on Order PV-8830", type: "Warning", time: "12m ago", unread: true },
-    { id: 4, title: "New Stock Request Approved", message: "10kg Capsicum approved by franchise warehouse manager", type: "Info", time: "40m ago", unread: false }
-  ])
-
-  // Live Socket.IO Simulator Data State
-  const [liveOrdersCount, setLiveOrdersCount] = useState({
-    incoming: 3,
-    preparing: 8,
-    ready: 4,
-    delivery: 2
-  })
-
-  const [liveActivities, setLiveActivities] = useState([
-    { id: 1, action: "Order PV-8842 accepted", user: "Manager (Shubham)", type: "order", timestamp: "1m ago" },
-    { id: 2, action: "Margherita pizza moved to Baking", user: "Chef (Vijay)", type: "kitchen", timestamp: "5m ago" },
-    { id: 3, action: "Low stock alert triggered: Paneer", user: "System", type: "inventory", timestamp: "14m ago" },
-    { id: 4, action: "Rider assigned: Ramesh Singh", user: "Auto-Dispatch", type: "delivery", timestamp: "20m ago" }
-  ])
+  const [notifications, setNotifications] = useState([])
 
   // Clock Update
   useEffect(() => {
@@ -82,66 +63,14 @@ export default function StoreOperationsDashboard() {
     fetchStores()
   }, [])
 
-  // Socket.IO event simulation for real-time dashboard updates
-  useEffect(() => {
-    const socketInterval = setInterval(() => {
-      const events = [
-        { type: "orderCreated", title: "New Order Received", msg: "Order PV-8850 placed by Rohan Malhotra (₹640)", cat: "incoming" },
-        { type: "orderAccepted", title: "Order Confirmed", msg: "Order PV-8845 accepted and sent to kitchen", cat: "preparing" },
-        { type: "orderPreparing", title: "Baking Started", msg: "Paneer Supreme Pizza entered oven", cat: "preparing" },
-        { type: "orderReady", title: "Order Ready", msg: "Order PV-8839 is packed and ready", cat: "ready" },
-        { type: "deliveryAssigned", title: "Rider Allocated", msg: "Rider Ramesh Kumar is picking up Order PV-8839", cat: "delivery" }
-      ]
-
-      const chosenEvent = events[Math.floor(Math.random() * events.length)]
-      
-      // Update Counts
-      setLiveOrdersCount(prev => {
-        const next = { ...prev }
-        if (chosenEvent.type === "orderCreated") {
-          next.incoming += 1
-        } else if (chosenEvent.type === "orderAccepted") {
-          next.incoming = Math.max(0, next.incoming - 1)
-          next.preparing += 1
-        } else if (chosenEvent.type === "orderReady") {
-          next.preparing = Math.max(0, next.preparing - 1)
-          next.ready += 1
-        } else if (chosenEvent.type === "deliveryAssigned") {
-          next.ready = Math.max(0, next.ready - 1)
-          next.delivery += 1
-        }
-        return next
-      })
-
-      // Add Notification
-      const newNotif = {
-        id: Date.now(),
-        title: chosenEvent.title,
-        message: chosenEvent.msg,
-        type: chosenEvent.type === "orderCreated" ? "Info" : "Warning",
-        time: "Just now",
-        unread: true
-      }
-      setNotifications(prev => [newNotif, ...prev])
-
-      // Add Activity Log
-      const newAct = {
-        id: Date.now(),
-        action: chosenEvent.msg,
-        user: chosenEvent.type === "deliveryAssigned" ? "Auto-Dispatch" : "System",
-        type: chosenEvent.type.includes("delivery") ? "delivery" : chosenEvent.type.includes("order") ? "order" : "kitchen",
-        timestamp: "Just now"
-      }
-      setLiveActivities(prev => [newAct, ...prev.slice(0, 8)])
-
-      toast.info(`[Realtime: ${chosenEvent.type}] ${chosenEvent.title}`, {
-        description: chosenEvent.msg
-      })
-
-    }, 35000) // Simulated socket fires every 35s to prevent crowding, but keep UI alive
-
-    return () => clearInterval(socketInterval)
-  }, [])
+  // Real-time: every order_event of this store (pushed by the server over the socket) refreshes the widgets.
+  // A burst of events (one order moving through several steps) is folded into one refresh.
+  const refreshTimer = React.useRef(null)
+  useOrderEvents(() => {
+    clearTimeout(refreshTimer.current)
+    refreshTimer.current = setTimeout(() => setRefreshKey((k) => k + 1), 1500)
+  })
+  useEffect(() => () => clearTimeout(refreshTimer.current), [])
 
   return (
     <div className="bg-slate-50 dark:bg-zinc-950 min-h-screen text-slate-800 dark:text-zinc-100 transition-colors duration-300">
@@ -168,7 +97,6 @@ export default function StoreOperationsDashboard() {
         <LiveOrderBoard 
           storeId={selectedStoreId} 
           refreshKey={refreshKey} 
-          liveCounts={liveOrdersCount} 
         />
 
         {/* Column layout for Kitchen & Delivery */}
@@ -202,7 +130,6 @@ export default function StoreOperationsDashboard() {
         <ActivityTimeline 
           storeId={selectedStoreId} 
           refreshKey={refreshKey} 
-          activities={liveActivities} 
         />
 
       </div>

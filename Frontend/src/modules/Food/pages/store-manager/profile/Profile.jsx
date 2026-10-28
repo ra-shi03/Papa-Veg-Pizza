@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
 import { User, Briefcase, Shield, Award, Calendar, Bell, Activity, Key, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { profileApi, adminAPI } from "@food/api";
+import { profileApi } from "@food/api";
 
 // Component imports
 import ProfileHeader from "./components/ProfileHeader";
@@ -54,57 +54,22 @@ export default function Profile({ forcedRole }) {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      // Fetch real store manager profile data using adminAPI which queries StoreManager & Profile collections
-      const res = await adminAPI.getAdminProfile();
-      if (res && res.data && (res.data.admin || res.data.data?.admin)) {
-        const adminData = res.data.admin || res.data.data?.admin;
-        
-        // Map backend admin/storeManager profile to the structure the UI expects
-        const mappedProfile = {
-           user: {
-             fullName: adminData.name || adminData.fullName || "",
-             email: adminData.email || "",
-             phone: adminData.phone || adminData.mobile || "",
-             gender: adminData.personalDetails?.gender || "Not Specified",
-             dateOfBirth: adminData.personalDetails?.dateOfBirth || "Not Specified",
-             address: adminData.personalDetails?.address || "Not Specified",
-             employeeId: adminData.employeeCode || "Not Specified",
-             designation: "Store Operations Manager",
-             role: adminData.role || currentRole || "store_manager",
-             storeName: adminData.storeName || "Assigned Store Hub",
-             storeAddress: adminData.storeAddress || null,
-             joiningDate: adminData.joinedDate ? new Date(adminData.joinedDate).toLocaleDateString() : "N/A",
-             status: adminData.status || "Active",
-             lastLogin: adminData.lastLoginAt ? new Date(adminData.lastLoginAt).toLocaleString() : "N/A",
-             profileImage: adminData.profileImage || null,
-             reportingManager: adminData.reportingManager || "N/A",
-             emergencyContact: adminData.personalDetails?.emergencyContact ? {
-                 name: adminData.personalDetails?.emergencyContactName || "N/A",
-                 phone: adminData.personalDetails?.emergencyContact || "N/A",
-                 relation: adminData.personalDetails?.emergencyContactRelation || "N/A",
-             } : null
-           },
-           store: { 
-             name: adminData.storeName || "Papa Veg Pizza", 
-             address: adminData.storeAddress || adminData.storeDetails?.address || "N/A", 
-             openingTime: adminData.storeDetails?.openingTime || "11 AM", 
-             closingTime: adminData.storeDetails?.closingTime || "11 PM", 
-             managerName: adminData.name 
-           },
-           attendanceSummary: { attendanceRate: 100, presentDays: 25, absentDays: 0, totalHours: 200, lateEntries: 0 },
-           performanceSummary: { ordersManaged: 0, avgPrepTime: "N/A", delayedOrders: 0, customerComplaints: 0, performanceRating: 5, yearsOfService: 1 },
-        };
-        
-        setProfileData(mappedProfile);
-      } else {
-        // Fallback to mock if structure is missing
-        const fallbackRes = await profileApi.getProfile();
-        if (fallbackRes.success) setProfileData(fallbackRes.data);
-      }
+      // GET /profile: the caller's own profile, store, and real attendance and performance numbers (never sample data)
+      const res = await profileApi.getProfile();
+      const data = res?.data;
+      if (!data?.user) throw new Error(res?.message || "Could not load your profile.");
+      setProfileData({
+        ...data,
+        user: {
+          ...data.user,
+          joiningDate: data.user.joiningDate ? String(data.user.joiningDate).slice(0, 10) : "",
+          storeAddress: data.store?.address || null,
+        },
+      });
     } catch (err) {
-      // Fallback on error
-      const fallbackRes = await profileApi.getProfile();
-      if (fallbackRes.success) setProfileData(fallbackRes.data);
+      // No made-up person on failure: the page stays empty and says why
+      setProfileData(null);
+      toast.error(err?.response?.data?.message || err?.message || "Could not load your profile.");
     } finally {
       setLoading(false);
     }
@@ -130,36 +95,16 @@ export default function Profile({ forcedRole }) {
   };
 
   const handlePhotoUpload = async (file) => {
+    toast.loading("Uploading profile image...", { id: "photo-upload" });
     try {
-      toast.loading("Uploading profile image...", { id: "photo-upload" });
-      
-      // Simulate API file upload
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result;
-        // Update local state and mock storage
-        localStorage.setItem("pvp_profile_photo", base64String);
-        
-        setProfileData((prev) => {
-          if (!prev) return null;
-          const updated = {
-            ...prev,
-            user: { ...prev.user, profileImage: base64String },
-          };
-          // Persist in localStorage mock data too
-          const storeData = JSON.parse(localStorage.getItem("pvp_store_profile_data") || "{}");
-          if (storeData.user) {
-            storeData.user.profileImage = base64String;
-            localStorage.setItem("pvp_store_profile_data", JSON.stringify(storeData));
-          }
-          return updated;
-        });
-
-        toast.success("Profile photo uploaded successfully.", { id: "photo-upload" });
-      };
-      reader.readAsDataURL(file);
+      // POST /profile/photo (images only, checked by the server); the saved URL comes back
+      const res = await profileApi.uploadPhoto(file);
+      if (!res?.success) throw new Error(res?.message || "Failed to upload photo.");
+      const url = res.data?.profileImage;
+      setProfileData((prev) => (prev ? { ...prev, user: { ...prev.user, profileImage: url } } : prev));
+      toast.success("Profile photo uploaded successfully.", { id: "photo-upload" });
     } catch (err) {
-      toast.error("Failed to upload photo.", { id: "photo-upload" });
+      toast.error(err?.message || "Failed to upload photo.", { id: "photo-upload" });
     }
   };
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { storeOrdersApi, LIVE_POLL_MS, useLiveIndicator } from "../../api/storeOrdersApi";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { STANDALONE_MOCK, failOrMock } from "@/services/api/mockPolicy";
 import io from "socket.io-client";
 import { initialMockCompletedOrders } from "../mockData";
 
@@ -77,6 +78,11 @@ export function useReorderOrder() {
 
   return useMutation({
     mutationFn: async ({ previousOrderId, items }) => {
+      // Placing an order on a customer's behalf needs pricing, payment and the customer's consent: not built yet.
+      // Say so instead of pretending a new order exists (the local copy below only runs when VITE_STANDALONE_MOCK=true).
+      if (!STANDALONE_MOCK) {
+        throw new Error("Reordering from the store is not available yet. Ask the customer to place the order again in the app.");
+      }
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       const completedOrders = getLocalCompletedOrders();

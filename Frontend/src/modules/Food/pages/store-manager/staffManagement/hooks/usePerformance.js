@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
+import { failOrMock } from "@/services/api/mockPolicy";
 import { initialMockPerformance } from "../mockData";
 
 const PERFORMANCE_STORAGE_KEY = "pvp_kitchen_performance";
@@ -48,6 +49,7 @@ export function usePerformanceList(filters = {}) {
         }
         throw new Error("API return format mismatch");
       } catch (err) {
+        failOrMock(err, "Could not load performance"); // sample data only when VITE_STANDALONE_MOCK=true
         console.warn("Backend performance API offline, pulling from local storage mock data");
         let list = getLocalPerformance();
 
@@ -119,6 +121,7 @@ export function useStaffPerformanceDetails(staffId, period = "monthly") {
         }
         throw new Error("API return format mismatch");
       } catch (err) {
+        failOrMock(err, "Could not load performance"); // sample data only when VITE_STANDALONE_MOCK=true
         const list = getLocalPerformance();
         const found = list.find((p) => p.staffId === staffId && p.period === period);
         if (found) return found;

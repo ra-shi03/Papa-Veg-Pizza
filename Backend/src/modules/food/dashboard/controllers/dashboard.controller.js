@@ -30,6 +30,10 @@ export const storeWidgets = {
   'staff-overview': wrap(store.staffOverview),
   'recent-complaints': wrap(store.recentComplaints),
   'activity-logs': wrap(store.activityLogs),
+  // the lists behind the cards (drill-down modals)
+  'order-list': wrap(store.orderList),
+  'rider-roster': wrap(store.riderRoster),
+  'staff-roster': wrap(store.staffRoster),
 };
 
 // Franchise admin dashboard

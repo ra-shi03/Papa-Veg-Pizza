@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { AlertTriangle, AlertOctagon, Info, X, ClipboardList, Sparkles, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import apiClient from "@/services/api/axios"
+import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 // Mock inventory alerts
 const MOCK_INVENTORY_ALERTS = {
@@ -28,7 +29,7 @@ export default function InventoryAlerts({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/inventory-alerts", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
+        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
         return MOCK_INVENTORY_ALERTS
       }
     }

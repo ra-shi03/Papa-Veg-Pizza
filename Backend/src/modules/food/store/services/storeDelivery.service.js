@@ -4,13 +4,12 @@ import { DeliveryIssue } from '../models/deliveryIssue.model.js';
 import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
 import { FoodZone } from '../../admin/models/zone.model.js';
 import { Refund } from '../../../../core/payments/models/refund.model.js';
-import { buildOrderIdentityFilter, buildDeliverySocketPayload, haversineKm } from '../../orders/services/order.helpers.js';
+import { buildOrderIdentityFilter, buildDeliverySocketPayload, haversineKm, pushStatusHistory, enqueueOrderEvent } from '../../orders/services/order.helpers.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 import { isId, toId, startOfDay, round1 } from '../../dashboard/services/dashboardAccess.js';
 import {
-  validateAssignDto, validateCreateIssueDto, validateResolveIssueDto, validateRefundDto,
-} from '../validators/storeDelivery.validator.js';
+  validateAssignDto, validateCreateIssueDto, validateResolveIssueDto, validateRefundDto, validatePickupDto } from '../validators/storeDelivery.validator.js';
 
 // Store manager's delivery screens (/v1/store/*): riders, assign / reassign, live deliveries, tracking, timeline,
 // delivery issues, and "record refund request". Who may call, from the token:
@@ -322,6 +321,36 @@ export async function assignRider(user, body = {}, q = {}) {
   return assign(ctx, order, await findRider(ctx, dto.riderId));
 }
 
+/**
+ * PATCH /store/orders/:orderId/pickup : the store hands a ready order to its assigned rider. Same transition the rider
+ * confirms in the delivery app (ready -> picked up, out for delivery); the rider's app is told over its socket.
+ * The store manager only; the store comes from the token.
+ */
+export async function confirmPickup(user, orderId, body = {}, q = {}) {
+  const ctx = await deliveryContext(user, q, { write: true });
+  const { notes } = validatePickupDto(body);
+  const identity = buildOrderIdentityFilter(orderId);
+  if (!identity) throw new NotFoundError('Order not found');
+  const order = await FoodOrder.findOne({ $and: [identity, { storeId: ctx.storeId }] });
+  if (!order) throw new NotFoundError('Order not found');
+  if (!['ready_for_pickup', 'reached_pickup'].includes(order.orderStatus)) {
+    throw new ValidationError('Only an order that is ready for pickup can be handed to the rider.');
+  }
+  const riderId = order.dispatch?.deliveryPartnerId;
+  if (!riderId) throw new ValidationError('Assign a rider before confirming the pickup.');
+  const from = order.orderStatus;
+  const pickedUpAt = new Date();
+  order.orderStatus = 'picked_up';
+  order.deliveryState = { ...(order.deliveryState?.toObject?.() || order.deliveryState || {}), currentPhase: 'en_route_to_delivery', status: 'picked_up', pickedUpAt };
+  pushStatusHistory(order, { byRole: 'STORE_MANAGER', byId: ctx.user.userId, from, to: 'picked_up', note: `Pickup confirmed by the store${notes ? `: ${notes}` : ''}` });
+  await order.save();
+  getIO()?.to(rooms.delivery(String(riderId))).emit('order_status_update', {
+    orderMongoId: String(order._id), orderId: String(order._id), orderStatus: order.orderStatus, deliveryState: order.deliveryState,
+  });
+  enqueueOrderEvent('picked_up', { orderMongoId: String(order._id), orderId: String(order._id), deliveryPartnerId: String(riderId) });
+  return { orderId: String(order._id), orderNumber: order.order_id || String(order._id), orderStatus: order.orderStatus, pickedUpAt };
+}
+
 // ---------------------------------------------------------------------------------------------
 // Refund request (record only: nothing is paid out here)
 // ---------------------------------------------------------------------------------------------
@@ -354,6 +383,21 @@ export async function requestOrderRefund(user, orderId, body = {}, q = {}) {
     _id: String(r._id), orderId: String(order._id), orderNumber: order.order_id || String(order._id), reason: r.reason,
     amount: r.amount, status: r.status, approvedBy: '--', createdAt: r.createdAt,
   };
+}
+
+/** GET /store/orders/:orderId/refunds : the refund records of one of this store's orders (Refund History). */
+export async function orderRefunds(user, orderId, q = {}) {
+  const ctx = await deliveryContext(user, q);
+  const order = await findOrder(ctx, orderId, '_id');
+  const refunds = await Refund.find({ orderId: order._id }).sort({ createdAt: -1 }).lean();
+  const by = { USER: 'Customer', SYSTEM: 'System', ADMIN: 'Admin' };
+  return refunds.map((r) => ({
+    _id: String(r._id), orderId: String(r.orderId), amount: r.amount, status: r.status, reason: r.reason,
+    refundMethod: r.refundTo === 'gateway' ? 'Original payment method' : 'Wallet',
+    referenceNumber: r.gatewayRefundId || `REF-${String(r._id).slice(-8).toUpperCase()}`,
+    processedBy: r.metadata?.source === 'store' ? 'Store' : by[r.requestedBy] || 'System',
+    createdAt: r.createdAt,
+  }));
 }
 
 // ---------------------------------------------------------------------------------------------

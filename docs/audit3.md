@@ -134,3 +134,9 @@ These cannot be fixed by rethrowing, because there is no request to fail. They n
 | `orders/hooks/useCompletedOrders.js` | `useReorderOrder` | No endpoint yet. |
 
 (`useExportCompletedOrders` also makes no request, but it only exports data already on the screen.)
+
+**Update (branch `p1-finish`):** everything listed above under "Listed, not fixed" is fixed: every read now shows the real error or an
+empty state outside standalone mock mode, and the order writes call the server (`/store/delivery/assign`, `PATCH /store/orders/:id/pickup`,
+`POST /food/store/kitchen/orders/:id/escalate`, `POST /store/orders/:id/refund`, `PATCH /food/store/orders/:id/reopen`). The exception is
+`useReorderOrder`, which now says reordering is not available instead of faking a new order. The dashboard drill-down lists
+read `/store/dashboard/order-list`, `rider-roster` and `staff-roster`, and the simulated socket on the store dashboard is gone (real `order_event`s refresh it).

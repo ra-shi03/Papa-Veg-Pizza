@@ -11,6 +11,8 @@ storeDeliveryRouter.get('/riders', c.riders);
 storeDeliveryRouter.get('/rider/:id', c.rider);
 storeDeliveryRouter.get('/orders/ready', c.readyOrders);
 storeDeliveryRouter.post('/orders/:orderId/refund', c.requestRefund);
+storeDeliveryRouter.patch('/orders/:orderId/pickup', c.confirmPickup);
+storeDeliveryRouter.get('/orders/:orderId/refunds', c.orderRefunds);
 storeDeliveryRouter.get('/tracking/:orderId', c.tracking);
 storeDeliveryRouter.get('/delivery/live', c.liveDeliveries);
 storeDeliveryRouter.get('/delivery/available-riders', c.availableRiders);

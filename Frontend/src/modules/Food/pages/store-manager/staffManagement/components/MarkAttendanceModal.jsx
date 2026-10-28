@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@food/components/ui/dialog";
 import { useStaffList } from "../hooks/useStaff";
+import { localToday } from "../localToday";
 import { useMarkAttendance } from "../hooks/useAttendance";
 
 const attendanceFormSchema = z.object({
@@ -48,7 +49,7 @@ export default function MarkAttendanceModal({ isOpen, onClose }) {
     defaultValues: {
       staffId: "",
       shiftId: "Morning",
-      date: new Date().toISOString().split("T")[0],
+      date: localToday(),
       status: "present",
       checkIn: "09:00",
       checkOut: "17:00",

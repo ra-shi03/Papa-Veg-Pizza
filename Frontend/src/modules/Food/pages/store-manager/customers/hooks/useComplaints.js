@@ -48,7 +48,7 @@ export function useComplaintsList(filters = {}) {
         }
         throw new Error("Invalid API format");
       } catch (err) {
-        if (err?.response) throw err;
+        failOrMock(err, "Could not load complaints"); // the real error; sample data only when VITE_STANDALONE_MOCK=true
         console.warn("Backend Complaints API offline, applying local mock filters");
 
         const localComplaints = getLocalData(COMPLAINTS_STORAGE_KEY, mockComplaints);
@@ -189,7 +189,7 @@ export function useComplaintDetails(complaintId) {
         }
         throw new Error("Invalid API response format");
       } catch (err) {
-        if (err?.response) throw err;
+        failOrMock(err, "Could not load complaints"); // the real error; sample data only when VITE_STANDALONE_MOCK=true
         console.warn("Backend Complaint Details API offline, applying local mock fetch");
 
         const localComplaints = getLocalData(COMPLAINTS_STORAGE_KEY, mockComplaints);

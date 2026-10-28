@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { storeOrdersApi, LIVE_POLL_MS, useLiveIndicator } from "../../api/storeOrdersApi";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { STANDALONE_MOCK, failOrMock } from "@/services/api/mockPolicy";
 import io from "socket.io-client";
 import { initialMockReadyOrders, initialMockRiders } from "../mockData";
 
@@ -94,7 +95,16 @@ export function useAvailableRiders(searchQuery = "") {
   return useQuery({
     queryKey: ["availableRiders", searchQuery],
     queryFn: async () => {
-      let list = getLocalRiders().filter((r) => r.status === "active" && r.availability === "available");
+      let list;
+      try {
+        // GET /store/delivery/available-riders: online riders, the free ones first ("idle")
+        list = ((await storeOrdersApi.availableRiders()) || [])
+          .filter((r) => r.availability === "idle")
+          .map((r) => ({ ...r, employeeId: r.mobile || "", currentDeliveries: r.activeOrders || 0, availability: "available", status: "active" }));
+      } catch (err) {
+        failOrMock(err, "Could not load riders"); // the local list below only runs when VITE_STANDALONE_MOCK=true
+        list = getLocalRiders().filter((r) => r.status === "active" && r.availability === "available");
+      }
       
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
@@ -111,7 +121,16 @@ export function useAssignRider() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ orderId, deliveryPartnerId, estimatedDistance, estimatedETA, notes }) => {
+    mutationFn: async (args) => {
+      try {
+        // POST /store/delivery/assign (the same assignment the Assign Rider screen makes)
+        const riders = queryClient.getQueriesData({ queryKey: ["availableRiders"] }).flatMap(([, d]) => d || []);
+        const res = await storeOrdersApi.assignRider(args.orderId, args.deliveryPartnerId);
+        return { ...res, orderId: args.orderId, rider: riders.find((r) => r._id === args.deliveryPartnerId) || { name: "The rider" } };
+      } catch (err) {
+        failOrMock(err, "Could not assign the rider"); // the local copy below only runs when VITE_STANDALONE_MOCK=true
+      }
+      const { orderId, deliveryPartnerId, estimatedDistance, estimatedETA, notes } = args;
       await new Promise((resolve) => setTimeout(resolve, 300));
 
       const orders = getLocalReadyOrders();
@@ -191,12 +210,18 @@ export function useConfirmPickup() {
 
   return useMutation({
     mutationFn: async ({ orderId, riderOTP, pickedUpAt, notes }) => {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
       // OTP Verification Check (Any 4-digit code works, but let's check it is filled)
       if (!riderOTP || riderOTP.length !== 4) {
         throw new Error("Invalid OTP code. Must be a 4-digit number.");
       }
+      // The server does not check this code: the system has no pickup code yet, so the store manager's confirmation is
+      // what hands the order over (PATCH /store/orders/:id/pickup, the same step the rider confirms in the delivery app).
+      try {
+        return await storeOrdersApi.confirmPickup(orderId, { notes });
+      } catch (err) {
+        failOrMock(err, "Could not confirm the pickup"); // the local copy below only runs when VITE_STANDALONE_MOCK=true
+      }
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
       const orders = getLocalReadyOrders();
       const order = orders.find((o) => o._id === orderId);
@@ -272,6 +297,13 @@ export function useEscalateOrder() {
 
   return useMutation({
     mutationFn: async ({ orderId, reason, notes }) => {
+      try {
+        // POST /food/store/kitchen/orders/:id/escalate (recorded as a kitchen escalation for this order)
+        await storeOrdersApi.escalate(orderId, { reason, notes, severity: "High" });
+        return { success: true, orderId, reason };
+      } catch (err) {
+        failOrMock(err, "Could not escalate the order"); // the local copy below only runs when VITE_STANDALONE_MOCK=true
+      }
       await new Promise((resolve) => setTimeout(resolve, 300));
 
       const orders = getLocalReadyOrders();

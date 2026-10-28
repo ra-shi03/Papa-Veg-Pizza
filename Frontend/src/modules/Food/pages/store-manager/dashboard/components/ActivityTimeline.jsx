@@ -2,6 +2,7 @@ import React, { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { ClipboardList, X, Play, Clock, User, AlertOctagon } from "lucide-react"
 import apiClient from "@/services/api/axios"
+import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 // Mock activity logs
 const MOCK_ACTIVITY_LOGS = [
@@ -24,14 +25,14 @@ export default function ActivityTimeline({ storeId, refreshKey, activities }) {
         const response = await apiClient.get("/store/dashboard/activity-logs", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
+        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
         return MOCK_ACTIVITY_LOGS
       }
     }
   })
 
-  // Use live activities passed from socket simulator, falling back to server logs
-  const timelineData = activities || serverLogs || MOCK_ACTIVITY_LOGS
+  // The store's real activity (refreshed on every order_event through refreshKey); sample logs only in standalone mock mode
+  const timelineData = activities || serverLogs || (STANDALONE_MOCK ? MOCK_ACTIVITY_LOGS : [])
 
   const handleEventClick = (evt) => {
     setSelectedEvent(evt)

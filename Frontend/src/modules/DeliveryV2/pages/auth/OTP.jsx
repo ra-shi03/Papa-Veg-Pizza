@@ -178,7 +178,8 @@ export default function DeliveryOTP() {
 
     const code = otpValue || otp.join("")
 
-    if (code.length !== 4) {
+    // OTPs are 6 digits (OTP_LENGTH); a leftover 4-digit check made a full code do nothing
+    if (code.length !== OTP_LENGTH) {
       return
     }
 

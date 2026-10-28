@@ -360,3 +360,39 @@ export function useDeleteAttendance() {
     },
   });
 }
+
+// 7. The caller's own attendance today (kitchen supervisor and kitchen staff): GET /store/attendance/today
+export function useMyAttendanceToday(enabled = true) {
+  return useQuery({
+    queryKey: ["myAttendanceToday"],
+    enabled,
+    queryFn: async () => {
+      const response = await apiClient.get("/store/attendance/today");
+      return response.data?.data || null;
+    },
+    refetchInterval: 60000,
+  });
+}
+
+// 8. Clock in / clock out for the caller (the store comes from the sign-in, never from the screen)
+export function useClockInOut() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (action) => {
+      try {
+        const response = await apiClient.post(action === "out" ? "/store/attendance/clock-out" : "/store/attendance/clock-in");
+        return response.data;
+      } catch (err) {
+        throw new Error(err?.response?.data?.message || err?.response?.data?.error || "Could not update your attendance");
+      }
+    },
+    onSuccess: (data, action) => {
+      queryClient.invalidateQueries({ queryKey: ["myAttendanceToday"] });
+      queryClient.invalidateQueries({ queryKey: ["kitchenAttendance"] });
+      toast.success(action === "out" ? "Clocked out. See you next shift!" : "Clocked in. Have a good shift!");
+    },
+    onError: (err) => {
+      toast.error(err?.message || "Could not update your attendance");
+    },
+  });
+}

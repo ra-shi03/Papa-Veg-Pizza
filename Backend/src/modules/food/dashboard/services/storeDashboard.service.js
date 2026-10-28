@@ -8,7 +8,8 @@ import { StockTransaction } from '../../store/models/stockTransaction.model.js';
 import { KitchenItem } from '../../store/models/kitchenItem.model.js';
 import { KitchenOven } from '../../store/models/kitchenOven.model.js';
 import { User } from '../../../../core/users/models/user.model.js';
-import { todaySummary } from '../../store/services/attendance.service.js';
+import { todaySummary, todayRoster } from '../../store/services/attendance.service.js';
+import { clockOf } from '../../store/services/attendanceTime.js';
 import { storeScope, startOfDay, daysAgo, hourLabel, ago, round1, round2, CANCELLED, SALE } from './dashboardAccess.js';
 
 // Store manager dashboard (/v1/store/dashboard/*). Every widget is computed from live data of ONE store, chosen by
@@ -139,14 +140,31 @@ export async function orderStatus(user, q) {
   ]);
   const out = { incoming: 0, preparing: 0, baking: 0, packaging: 0, ready: 0, delivered: 0, cancelled: 0 };
   for (const { _id: { s, k }, n } of rows) {
-    if (s === 'created') out.incoming += n;
-    else if (s === 'confirmed') out.preparing += n;
-    else if (s === 'preparing') out[k === 'baking' ? 'baking' : k === 'packaging' ? 'packaging' : 'preparing'] += n;
-    else if (s === 'ready_for_pickup' || s === 'reached_pickup' || OUT.includes(s)) out.ready += n; // left the kitchen (incl. with the rider)
-    else if (s === 'delivered') out.delivered += n;
-    else if (CANCELLED.includes(s)) out.cancelled += n;
+    const bucket = bucketOf(s, k);
+    if (bucket) out[bucket] += n;
   }
   return out;
+}
+
+/** The donut's slice for an order: its status, and for orders being made, the kitchen stage. */
+function bucketOf(status, stage) {
+  if (status === 'created') return 'incoming';
+  if (status === 'confirmed') return 'preparing';
+  if (status === 'preparing') return stage === 'baking' ? 'baking' : stage === 'packaging' ? 'packaging' : 'preparing';
+  if (status === 'ready_for_pickup' || status === 'reached_pickup' || OUT.includes(status)) return 'ready'; // left the kitchen (incl. with the rider)
+  if (status === 'delivered') return 'delivered';
+  if (CANCELLED.includes(status)) return 'cancelled';
+  return null;
+}
+
+/** Today's orders behind the order-status donut, one row per order, in the donut's own slices. */
+export async function orderList(user, q) {
+  const store = await storeScope(user, q, 'order-list');
+  const orders = await FoodOrder.find({ storeId: store._id, createdAt: { $gte: startOfDay() } })
+    .select('order_id customerName orderStatus kitchen.stage createdAt').sort({ createdAt: -1 }).limit(300).lean();
+  return orders
+    .map((o) => ({ orderNumber: o.order_id || String(o._id), customer: o.customerName || 'Customer', status: bucketOf(o.orderStatus, o.kitchen?.stage), createdTime: clockOf(new Date(o.createdAt)) }))
+    .filter((o) => o.status);
 }
 
 /** Pizzas sold in the last 30 days (top 5 by quantity). */
@@ -203,6 +221,45 @@ export async function kitchenPerformance(user, q) {
     bakingStation: pct(new Set(baking.map((b) => String(b.ovenId))).size, ovens.length),
     packagingStation: pct(packing, packers),
   };
+}
+
+/**
+ * The riders behind the delivery-overview card: riders on this store's orders (waiting for pickup, on the road, or late)
+ * and free online riders. Status words are the ones the card's filters read ("Delivering...", "Delayed", "Idle").
+ */
+export async function riderRoster(user, q) {
+  const store = await storeScope(user, q, 'rider-roster');
+  const [orders, allBusy] = await Promise.all([
+    FoodOrder.find({ storeId: store._id, orderStatus: { $in: ['ready_for_pickup', 'reached_pickup', ...OUT] }, 'dispatch.deliveryPartnerId': { $ne: null } })
+      .select('order_id orderStatus dispatch.deliveryPartnerId statusHistory updatedAt').lean(),
+    FoodOrder.distinct('dispatch.deliveryPartnerId', { orderStatus: { $in: ['ready_for_pickup', 'reached_pickup', ...OUT] }, 'dispatch.deliveryPartnerId': { $ne: null } }),
+  ]);
+  const free = await FoodDeliveryPartner.find({ status: 'approved', availabilityStatus: 'online', _id: { $nin: allBusy } }).select('name').limit(50).lean();
+  const onOrders = await FoodDeliveryPartner.find({ _id: { $in: orders.map((o) => o.dispatch.deliveryPartnerId) } }).select('name').lean();
+  const nameOf = new Map(onOrders.map((r) => [String(r._id), r.name]));
+  const byRider = new Map();
+  for (const o of orders) {
+    const id = String(o.dispatch.deliveryPartnerId);
+    const onRoad = OUT.includes(o.orderStatus);
+    const late = onRoad && minutesBetween(historyAt(o, 'picked_up') || o.updatedAt, new Date()) > DELIVERY_LATE_MIN;
+    const row = byRider.get(id) || { name: nameOf.get(id) || 'Rider', status: '', orders: [], location: '', late: false, onRoad: false };
+    row.orders.push(o.order_id || String(o._id));
+    row.late = row.late || late; row.onRoad = row.onRoad || onRoad;
+    byRider.set(id, row);
+  }
+  const busy = [...byRider.values()].map((r) => ({
+    name: r.name,
+    status: r.late ? 'Delivering (Delayed)' : r.onRoad ? 'Delivering' : 'Delivering (awaiting pickup)',
+    ordersAssigned: r.orders.join(', '),
+    location: r.onRoad ? 'On the way to the customer' : 'At the store',
+  }));
+  return [...busy, ...free.map((r) => ({ name: r.name, status: 'Idle', ordersAssigned: 'None', location: 'Online' }))];
+}
+
+/** Today's kitchen team behind the staff-overview card (real clock-ins). */
+export async function staffRoster(user, q) {
+  const store = await storeScope(user, q, 'staff-roster');
+  return todayRoster(store._id);
 }
 
 /** Riders: free online riders (the fleet is shared), riders on this store's orders, and late deliveries. */

@@ -17,9 +17,7 @@ import BulkActionsModal from "./components/BulkActionsModal";
 import PricingAnalytics from "./components/PricingAnalytics";
 
 // Hooks
-import { useStorePricing } from "./hooks/useStorePricing";
-import { useCategories } from "./hooks/useCategories";
-import { useProducts } from "./hooks/useProducts";
+import { useStorePricing, usePricingCategories, usePricingProducts } from "./hooks/useStorePricing";
 
 export default function StorePricing() {
   const [activeTab, setActiveTab] = useState("table"); // 'table' | 'analytics'
@@ -48,8 +46,8 @@ export default function StorePricing() {
 
   // Queries
   const { data: pricingData, isLoading, refetch } = useStorePricing(filters);
-  const { data: categoriesData } = useCategories({ limit: 1000 });
-  const { data: productsData } = useProducts({ limit: 1000 });
+  const { data: categoriesData } = usePricingCategories();
+  const { data: productsData } = usePricingProducts();
 
   // Fetch stores list
   const { data: storesList = [] } = useQuery({

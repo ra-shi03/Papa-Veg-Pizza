@@ -45,7 +45,8 @@ export function toDay(value, label = 'date') {
 }
 
 /** The hours that apply on a calendar date (a holiday overrides the weekday), or null when closed all day. */
-function windowOn(doc, date) {
+/** The open / close window of a date (holiday first, then the weekday), or null when closed. */
+export function windowOn(doc, date) {
   const holiday = (doc.holidays || []).find((h) => h.date === ymd(date));
   if (holiday) return holiday.isClosed ? null : { open: holiday.open || '00:00', close: holiday.close || '00:00' };
   const day = doc.week?.[JS_DAY[date.getDay()]];

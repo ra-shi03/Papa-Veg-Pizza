@@ -18,6 +18,8 @@ export const liveDeliveries = handle((req) => svc.liveDeliveries(req.user, q(req
 export const tracking = handle((req) => svc.tracking(req.user, req.params.orderId, q(req)));
 export const timeline = handle((req) => svc.timeline(req.user, req.params.orderId, q(req)));
 export const assign = handle((req) => svc.assignRider(req.user, req.body, q(req)), 'Rider assigned successfully.');
+export const orderRefunds = handle((req) => svc.orderRefunds(req.user, req.params.orderId, q(req)));
+export const confirmPickup = handle((req) => svc.confirmPickup(req.user, req.params.orderId, req.body, q(req)), 'Order handed to the rider.');
 export const requestRefund = handle((req) => svc.requestOrderRefund(req.user, req.params.orderId, req.body, q(req)), 'Refund request recorded', 201);
 export const issues = handle((req) => svc.listIssues(req.user, q(req)));
 export const createIssue = handle((req) => svc.createIssue(req.user, req.body, q(req)), 'Issue reported', 201);

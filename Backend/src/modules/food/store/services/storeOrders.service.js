@@ -8,6 +8,7 @@ import { UserRole } from '../../../../core/roles/models/userRole.model.js';
 import { Role } from '../../../../core/roles/models/role.model.js';
 import { updateOrderStatusStore } from '../../orders/services/order.service.js';
 import { pushStatusHistory } from '../../orders/services/order.helpers.js';
+import { Refund } from '../../../../core/payments/models/refund.model.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 
 // ---------------------------------------------------------------------------------------------
@@ -406,6 +407,34 @@ export async function rejectOrder(user, orderId, payload = {}) {
     fresh.payment.refund = { ...(fresh.payment.refund?.toObject?.() || {}), status: 'pending', amount: fresh.pricing?.total || 0 };
     await fresh.save();
   }
+  return toOpsOrder(await reload(order._id, storeId));
+}
+
+const REOPEN_WINDOW_MIN = 5;
+
+/**
+ * PATCH /food/store/orders/:orderId/reopen : undo the store's own cancellation within 5 minutes; the order goes back to
+ * Incoming. Store manager only. Only orders the STORE cancelled (not the customer or an admin), and never one that was
+ * paid online or has a refund started, so no money is handled twice.
+ */
+export async function reopenOrder(user, orderId, payload = {}) {
+  requireManager(user);
+  const storeId = requireStore(user);
+  const order = await findOrder(orderId, storeId);
+  if (order.orderStatus !== 'cancelled_by_store') throw new ValidationError('Only an order the store cancelled can be reopened.');
+  const cancelledAt = [...(order.statusHistory || [])].reverse().find((h) => h.to === 'cancelled_by_store')?.at || order.updatedAt;
+  if (Date.now() - new Date(cancelledAt).getTime() > REOPEN_WINDOW_MIN * 60000) {
+    throw new ValidationError(`Cannot reopen order: Reopening window of ${REOPEN_WINDOW_MIN} minutes has expired.`);
+  }
+  const pay = order.payment || {};
+  const refundStarted = pay.refund?.status && pay.refund.status !== 'none';   // the schema default is 'none'
+  if (['paid', 'refunded', 'authorized'].includes(pay.status) || refundStarted || (await Refund.exists({ orderId: order._id }))) {
+    throw new ValidationError('An order that was paid online or has a refund started cannot be reopened.');
+  }
+  const message = String(payload.customerMessage || '').trim().slice(0, 300);
+  pushStatusHistory(order, { byRole: 'STORE_MANAGER', byId: user.userId, from: 'cancelled_by_store', to: 'created', note: `Reopened by the store${message ? `: ${message}` : ''}` });
+  order.orderStatus = 'created';
+  await order.save();
   return toOpsOrder(await reload(order._id, storeId));
 }
 

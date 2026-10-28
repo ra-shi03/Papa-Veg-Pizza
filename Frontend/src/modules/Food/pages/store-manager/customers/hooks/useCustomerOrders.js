@@ -43,7 +43,7 @@ export function useCustomerOrdersList(filters = {}) {
         }
         throw new Error("Invalid API format");
       } catch (err) {
-        if (err?.response) throw err;
+        failOrMock(err, "Could not load customer data"); // the real error; sample data only when VITE_STANDALONE_MOCK=true
         console.warn("Backend Customer Orders API offline, applying local mock filters");
         
         // Client side filtering fallback
@@ -192,7 +192,7 @@ export function useCustomerProfile(customerId) {
         }
         return response.data;
       } catch (err) {
-        if (err?.response) throw err;
+        failOrMock(err, "Could not load customer data"); // the real error; sample data only when VITE_STANDALONE_MOCK=true
         console.warn("Backend Customer Detail API offline, using local mock fallback");
         const localCust = getLocalData(CUSTOMER_STORAGE_KEY, mockCustomers);
         const localOrd = getLocalData(STORE_ORDERS_STORAGE_KEY, mockOrders);
@@ -231,7 +231,7 @@ export function useOrderDetails(orderId) {
         }
         return response.data;
       } catch (err) {
-        if (err?.response) throw err;
+        failOrMock(err, "Could not load customer data"); // the real error; sample data only when VITE_STANDALONE_MOCK=true
         console.warn("Backend Order Details API offline, using local mock fallback");
         const localCust = getLocalData(CUSTOMER_STORAGE_KEY, mockCustomers);
         const localOrd = getLocalData(STORE_ORDERS_STORAGE_KEY, mockOrders);

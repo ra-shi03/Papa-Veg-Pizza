@@ -14,6 +14,7 @@ import { isId, toId, ago, daysAgo, round1 } from '../../dashboard/services/dashb
 import { profileAttendance } from './attendance.service.js';
 import { conflict } from './attendanceAccess.js';
 import { clockOf, dateKeyOf } from './attendanceTime.js';
+import { hoursByStore, windowOn, closureCovers, to12 } from '../../franchise/services/storeHours.js';
 
 // The profile screens of the store manager, kitchen supervisor and kitchen staff (/v1/profile/*). Every call is about the
 // caller's own account: the user id and store come from the token, never from the request.
@@ -140,6 +141,17 @@ export async function activityLogs(user) {
 
 // ---- the profile ------------------------------------------------------------------------------
 
+/** Today's hours from the store's Operating Hours, in the screen's "09:00 AM" format. No record means open all day. */
+async function todaysHours(storeId) {
+    const now = new Date();
+    const doc = (await hoursByStore([toId(storeId)])).get(String(storeId));
+    if (doc && closureCovers(doc.closure, now)) return { openingTime: 'Closed', closingTime: 'temporarily' };
+    const w = doc ? windowOn(doc, now) : { open: '00:00', close: '00:00' };
+    if (!w) return { openingTime: 'Closed', closingTime: 'today' };
+    if (w.open === w.close) return { openingTime: 'Open', closingTime: '24 hours' };
+    return { openingTime: to12(w.open), closingTime: to12(w.close) };
+}
+
 export async function getProfile(user, refreshToken) {
     const { role, staff } = await ownRecord(user);
     const [store, account, attendance, perf, activities, sessions] = await Promise.all([
@@ -151,12 +163,13 @@ export async function getProfile(user, refreshToken) {
         listSessions(user, refreshToken),
     ]);
     const address = store?.address;
+    const { openingTime, closingTime } = await todaysHours(user.storeId);
     return {
         user: userDto(role, staff, store, account?.lastLoginAt),
         store: {
             name: store?.storeName || staff.storeName || '',
             address: typeof address === 'string' ? address : [address?.line1, address?.city, address?.state, address?.pincode].filter(Boolean).join(', '),
-            openingTime: '', closingTime: '', managerName: role === 'STORE_MANAGER' ? staff.name : staff.reportingManager || '',
+            openingTime, closingTime, managerName: role === 'STORE_MANAGER' ? staff.name : staff.reportingManager || '',
         },
         attendanceSummary: attendance.summary,
         performanceSummary: perf,

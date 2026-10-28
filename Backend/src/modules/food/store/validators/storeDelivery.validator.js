@@ -29,4 +29,5 @@ export const validateResolveIssueDto = (body) => parse(z.object({
     penaltyAmount: money,
     reassignRiderId: id.nullish(),
 }), body);
+export const validatePickupDto = (body) => parse(z.object({ notes: z.string().trim().max(300).optional().default('') }), body);
 export const validateRefundDto = (body) => parse(z.object({ reason: z.string().trim().max(500).optional(), amount: money }), body);

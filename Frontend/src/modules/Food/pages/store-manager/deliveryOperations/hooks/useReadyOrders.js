@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
+import { STANDALONE_MOCK, failOrMock } from "@/services/api/mockPolicy";
 import { initialMockReadyOrders } from "../mockDeliveryData";
 
 const READY_ORDERS_KEY = "pvp_ready_orders";
@@ -43,11 +44,11 @@ export default function useReadyOrders(filters = {}) {
           apiItems = response.data.orders;
         }
 
-        if (apiItems && apiItems.length > 0) {
-          return apiItems;
-        }
+        // An empty list is a real answer ("no orders ready"), never a reason to show sample orders
+        if (!STANDALONE_MOCK || apiItems.length > 0) return apiItems;
         throw new Error("No orders returned");
       } catch (err) {
+        failOrMock(err, "Could not load ready orders");
         // Local fallback
         let list = getLocalReadyOrders();
 

@@ -5,6 +5,7 @@ import {
   AlertTriangle, Users, Star, IndianRupee 
 } from "lucide-react"
 import apiClient from "@/services/api/axios"
+import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 // Mock statistics for offline fallback
 const MOCK_KPIS = {
@@ -27,7 +28,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/today-sales", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
+        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
         return MOCK_KPIS.sales
       }
     }
@@ -41,7 +42,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/today-orders", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
+        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
         return MOCK_KPIS.orders
       }
     }
@@ -55,7 +56,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/active-orders", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
+        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
         return MOCK_KPIS.active
       }
     }
@@ -69,7 +70,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/prep-time", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
+        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
         return MOCK_KPIS.prep
       }
     }
@@ -83,7 +84,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/pending-deliveries", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
+        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
         return MOCK_KPIS.delivery
       }
     }
@@ -97,7 +98,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/low-stock", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
+        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
         return MOCK_KPIS.stock
       }
     }
@@ -111,7 +112,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/staff-duty", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
+        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
         return MOCK_KPIS.staff
       }
     }
@@ -125,7 +126,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/customer-rating", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
+        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
         return MOCK_KPIS.rating
       }
     }

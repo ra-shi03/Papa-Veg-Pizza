@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
+import { localToday } from "./localToday";
 import { 
   Plus, 
   Search, 
@@ -61,7 +62,7 @@ export default function Attendance() {
   const [selectedRecord, setSelectedRecord] = useState(null);
 
   // Get active filters from URL parameters, defaulting to sane defaults
-  const dateFilter = searchParams.get("date") || new Date().toISOString().split("T")[0];
+  const dateFilter = searchParams.get("date") || localToday();
   const shiftFilter = searchParams.get("shift") || "All";
   const statusFilter = searchParams.get("status") || "All";
   const roleFilter = searchParams.get("role") || "All";
@@ -102,7 +103,7 @@ export default function Attendance() {
 
   // Reset all filters to today
   const handleClearFilters = () => {
-    setSearchParams({ date: new Date().toISOString().split("T")[0] });
+    setSearchParams({ date: localToday() });
     setLocalSearch("");
   };
 

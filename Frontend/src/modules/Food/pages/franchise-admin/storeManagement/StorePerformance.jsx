@@ -87,12 +87,18 @@ export default function StorePerformance() {
     return () => clearTimeout(handler)
   }, [searchVal])
 
+  // The date filter, as the server reads it (?dateRange=today|last7|last30|custom&start=&end=)
+  const rangeParams = dateRange === "custom"
+    ? (customStart && customEnd ? { dateRange: "custom", start: customStart, end: customEnd } : { dateRange: "last7" })
+    : { dateRange }
+  const rangeKey = JSON.stringify(rangeParams)
+
   // 2. Fetch KPI Summary (auto-polls every 12 seconds for live production updates)
   const {
     data: kpis,
     isLoading: loadingKpis,
     refetch: refetchKPIs
-  } = useMockQuery("perf_kpis", () => adminAPI.getStorePerformanceDashboard(), {
+  } = useMockQuery(["perf_kpis", rangeKey], () => adminAPI.getStorePerformanceDashboard(rangeParams), {
     refetchInterval: 12000
   })
 
@@ -110,8 +116,8 @@ export default function StorePerformance() {
     () => adminAPI.getStorePerformanceRatings()
   )
   const { data: comparisonData, isLoading: loadingComparison } = useMockQuery(
-    "perf_comparison", 
-    () => adminAPI.getStorePerformanceComparison()
+    ["perf_comparison", rangeKey],
+    () => adminAPI.getStorePerformanceComparison(rangeParams)
   )
   const { data: busyHoursData, isLoading: loadingBusyHours } = useMockQuery(
     "perf_busy_hours", 
@@ -129,10 +135,11 @@ export default function StorePerformance() {
       type: typeFilter !== "All" ? typeFilter : undefined,
       city: cityFilter !== "All" ? cityFilter : undefined,
       sort: sortKey,
-      order: sortOrder
+      order: sortOrder,
+      ...rangeParams
     }
     return adminAPI.getStorePerformanceList(params)
-  }, [page, limit, debouncedSearch, storeFilter, statusFilter, typeFilter, cityFilter, sortKey, sortOrder])
+  }, [page, limit, debouncedSearch, storeFilter, statusFilter, typeFilter, cityFilter, sortKey, sortOrder, rangeKey])
 
   const {
     data: storesList,
@@ -140,7 +147,7 @@ export default function StorePerformance() {
     isError: hasStoresError,
     refetch: refetchStores
   } = useMockQuery(
-    ["perf_list", page, limit, debouncedSearch, storeFilter, statusFilter, typeFilter, cityFilter, sortKey, sortOrder],
+    ["perf_list", page, limit, debouncedSearch, storeFilter, statusFilter, typeFilter, cityFilter, sortKey, sortOrder, rangeKey],
     fetchStoresList,
     { refetchInterval: 15000 } // Re-poll list every 15 seconds
   )

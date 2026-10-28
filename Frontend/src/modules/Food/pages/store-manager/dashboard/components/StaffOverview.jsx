@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Users, UserCheck, Clock, UserX, X, Search, ChevronRight } from "lucide-react"
 import apiClient from "@/services/api/axios"
+import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 // Mock staff overview
 const MOCK_STAFF_OVERVIEW = {
@@ -52,7 +53,7 @@ export default function StaffOverview({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/staff-overview", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
+        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
         return MOCK_STAFF_OVERVIEW
       }
     }
@@ -67,8 +68,22 @@ export default function StaffOverview({ storeId, refreshKey }) {
     setShowRosterModal(true)
   }
 
+  // The list behind the cards (/store/dashboard/staff-roster)
+  const { data: staffRoster } = useQuery({
+    queryKey: ["staff-roster-widget", storeId, refreshKey],
+    queryFn: async () => {
+      try {
+        const response = await apiClient.get("/store/dashboard/staff-roster", { params: { storeId } })
+        return response.data?.data || []
+      } catch (e) {
+        if (e?.response || !STANDALONE_MOCK) throw e
+        return MOCK_STAFF_ATTENDANCE
+      }
+    }
+  })
+
   // Filter roster by clicked card + search query
-  const filteredRoster = MOCK_STAFF_ATTENDANCE.filter((staff) => {
+  const filteredRoster = (staffRoster || []).filter((staff) => {
     const matchesStatus = 
       filterStatus === "all" || 
       (filterStatus === "present" && staff.status === "Present") ||

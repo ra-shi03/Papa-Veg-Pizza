@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { storeOrdersApi, LIVE_POLL_MS, useLiveIndicator } from "../../api/storeOrdersApi";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { STANDALONE_MOCK, failOrMock } from "@/services/api/mockPolicy";
 import io from "socket.io-client";
 import { initialMockCancelledOrders, initialMockRefunds } from "../mockData";
 
@@ -106,7 +107,16 @@ export function useInitiateRefund() {
 
   return useMutation({
     mutationFn: async (payload) => {
-      // Simulate network request
+      try {
+        // POST /store/orders/:id/refund: a refund request record (nothing is paid out from the store screen)
+        const r = await storeOrdersApi.requestRefund(payload.orderId, {
+          amount: Number(payload.refundAmount) || undefined,
+          reason: [payload.reason, payload.notes].filter(Boolean).join(" - ") || undefined,
+        });
+        return { success: true, refund: { ...r, referenceNumber: `REF-${String(r?._id || "").slice(-8).toUpperCase()}` } };
+      } catch (err) {
+        failOrMock(err, "Could not record the refund request"); // the local copy below only runs when VITE_STANDALONE_MOCK=true
+      }
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       const { orderId, refundAmount, refundType, refundMethod, reason, notes } = payload;
@@ -166,7 +176,13 @@ export function useReopenOrder() {
 
   return useMutation({
     mutationFn: async ({ orderId, customerMessage }) => {
-      // Simulate network request
+      try {
+        // PATCH /food/store/orders/:id/reopen: within 5 minutes of the store's own cancellation, back to Incoming
+        const order = await storeOrdersApi.reopen(orderId, { customerMessage });
+        return { success: true, order };
+      } catch (err) {
+        failOrMock(err, "Could not reopen the order"); // the local copy below only runs when VITE_STANDALONE_MOCK=true
+      }
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       const cancelledList = getLocalCancelledOrders();
@@ -235,6 +251,11 @@ export function useRefundHistory(orderId) {
   return useQuery({
     queryKey: ["refundHistory", orderId],
     queryFn: async () => {
+      try {
+        return (await storeOrdersApi.refunds(orderId)) || [];
+      } catch (err) {
+        failOrMock(err, "Could not load the refund history"); // sample refunds only when VITE_STANDALONE_MOCK=true
+      }
       await new Promise((resolve) => setTimeout(resolve, 200));
       const refunds = getLocalRefunds();
       return refunds.filter((r) => r.orderId === orderId);

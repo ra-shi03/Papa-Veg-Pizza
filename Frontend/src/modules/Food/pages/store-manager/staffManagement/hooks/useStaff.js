@@ -3,6 +3,21 @@ import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
 import { failOrMock } from "@/services/api/mockPolicy";
 
+// Local copy of the staff list, used only by the VITE_STANDALONE_MOCK=true paths below (it was referenced but never defined)
+const STAFF_STORAGE_KEY = "pvp_kitchen_staff";
+const getLocalStaff = () => {
+  try {
+    return JSON.parse(localStorage.getItem(STAFF_STORAGE_KEY)) || [];
+  } catch {
+    return [];
+  }
+};
+const setLocalStaff = (list) => {
+  try {
+    localStorage.setItem(STAFF_STORAGE_KEY, JSON.stringify(list));
+  } catch {}
+};
+
 // 1. Fetch Staff List Hook
 export function useStaffList(filters = {}) {
   return useQuery({
@@ -33,6 +48,7 @@ export function useStaffDetails(id) {
         }
         throw new Error("API return format mismatch");
       } catch (err) {
+        failOrMock(err, "Could not load the staff member"); // sample data only when VITE_STANDALONE_MOCK=true
         const list = getLocalStaff();
         const found = list.find((s) => s._id === id);
         if (found) return found;

@@ -27,6 +27,21 @@ export const storeOrdersApi = {
     adminClient.patch(`${BASE}/${orderId}/pause`, payload, REAL).then(unwrap),
   delay: (orderId, payload) =>
     adminClient.patch(`${BASE}/${orderId}/delay`, payload, REAL).then(unwrap),
+  reopen: (orderId, payload) =>
+    adminClient.patch(`${BASE}/${orderId}/reopen`, payload, REAL).then(unwrap),
+  // Rider hand-off, escalation and refunds live in the delivery and kitchen modules
+  availableRiders: () =>
+    adminClient.get("/store/delivery/available-riders", REAL).then(unwrap),
+  assignRider: (orderId, riderId) =>
+    adminClient.post("/store/delivery/assign", { orderId, riderId }, REAL).then(unwrap),
+  confirmPickup: (orderId, payload) =>
+    adminClient.patch(`/store/orders/${orderId}/pickup`, payload, REAL).then(unwrap),
+  escalate: (orderId, payload) =>
+    adminClient.post(`/food/store/kitchen/orders/${orderId}/escalate`, payload, REAL).then(unwrap),
+  requestRefund: (orderId, payload) =>
+    adminClient.post(`/store/orders/${orderId}/refund`, payload, REAL).then(unwrap),
+  refunds: (orderId) =>
+    adminClient.get(`/store/orders/${orderId}/refunds`, REAL).then(unwrap),
 };
 
 export const apiErrorMessage = (err) =>
@@ -57,6 +72,13 @@ function joinLiveFeed(onEvent, onState) {
     listeners.delete(l);
     if (!listeners.size && shared) { shared.socket.disconnect(); shared = null; }
   };
+}
+
+/** Calls onEvent for every order_event of this store (the same shared socket the order lists use). */
+export function useOrderEvents(onEvent) {
+  const handler = useRef(onEvent);
+  handler.current = onEvent;
+  useEffect(() => joinLiveFeed((event) => handler.current?.(event), () => {}), []);
 }
 
 export function useLiveIndicator(query) {

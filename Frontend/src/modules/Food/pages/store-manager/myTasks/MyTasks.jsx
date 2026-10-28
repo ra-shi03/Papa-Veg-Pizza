@@ -25,6 +25,7 @@ import CompletedTasksTable from "./components/CompletedTasksTable";
 import DelayedTasksTable from "./components/DelayedTasksTable";
 import TaskHistoryTable from "./components/TaskHistoryTable";
 import TeamTasksWidget from "./components/TeamTasksWidget";
+import ClockInOutButton from "./components/ClockInOutButton";
 
 // Modals
 import StartTaskModal from "./modals/StartTaskModal";
@@ -206,13 +207,17 @@ export default function MyTasks() {
           </p>
         </div>
 
-        {/* Quick action: request ingredient replenishment */}
-        <button
-          onClick={() => openModal("ingredient")}
-          className="text-[10px] font-black uppercase tracking-wider px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] active:scale-[0.98] transition-all shadow-md cursor-pointer self-start md:self-auto"
-        >
-          Request Ingredients
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Kitchen supervisors and kitchen staff clock themselves in and out here */}
+          {(role === "kitchen_supervisor" || role === "kitchen_staff") && <ClockInOutButton />}
+          {/* Quick action: request ingredient replenishment */}
+          <button
+            onClick={() => openModal("ingredient")}
+            className="text-[10px] font-black uppercase tracking-wider px-4 py-2.5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] active:scale-[0.98] transition-all shadow-md cursor-pointer self-start md:self-auto"
+          >
+            Request Ingredients
+          </button>
+        </div>
       </div>
 
       {/* 1. Bento Dashboard Stats Summary */}

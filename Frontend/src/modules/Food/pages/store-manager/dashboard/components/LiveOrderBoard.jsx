@@ -5,6 +5,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import apiClient from "@/services/api/axios"
+import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 // Mock order lists by status
 const MOCK_LIVE_ORDERS = {
@@ -33,7 +34,6 @@ const MOCK_LIVE_ORDERS = {
 export default function LiveOrderBoard({ storeId, refreshKey, liveCounts }) {
   const [showLiveModal, setShowLiveModal] = useState(false)
   const [activeTab, setActiveTab] = useState("incoming")
-  const [localOrders, setLocalOrders] = useState(MOCK_LIVE_ORDERS)
 
   // Modal Table search/pagination
   const [searchVal, setSearchVal] = useState("")
@@ -57,36 +57,21 @@ export default function LiveOrderBoard({ storeId, refreshKey, liveCounts }) {
         const response = await apiClient.get("/store/dashboard/live-orders", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
+        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
         return MOCK_LIVE_ORDERS
       }
     }
   })
 
-  // Auto-refresh every 10 seconds
+  // The board is the server's live orders (order_event refreshes it through refreshKey); a slow poll is the safety net
   useEffect(() => {
-    const interval = setInterval(() => {
-      refetch()
-      // Simulate slight dynamic variation locally to feel alive
-      setLocalOrders(prev => {
-        const copy = JSON.parse(JSON.stringify(prev))
-        // Add ETA minute decreases
-        Object.keys(copy).forEach(k => {
-          copy[k].forEach(order => {
-            if (order.eta.endsWith("m") && order.eta !== "0m") {
-              const num = parseInt(order.eta)
-              if (num > 1) {
-                order.eta = `${num - 1}m`
-              }
-            }
-          })
-        })
-        return copy
-      })
-    }, 10000)
-
+    const interval = setInterval(() => refetch(), 30000)
     return () => clearInterval(interval)
   }, [refetch])
+
+  const EMPTY_BOARD = { incoming: [], preparing: [], ready: [], delivery: [] }
+  const localOrders = serverOrders || (STANDALONE_MOCK ? MOCK_LIVE_ORDERS : EMPTY_BOARD)
+  const countOf = (key) => (localOrders[key] || []).length
 
   const openStatusView = (status) => {
     setActiveTab(status)
@@ -108,10 +93,10 @@ export default function LiveOrderBoard({ storeId, refreshKey, liveCounts }) {
   )
 
   const columns = [
-    { key: "incoming", label: "Incoming", icon: Inbox, color: "border-blue-500 text-blue-600 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-900/50", count: liveCounts.incoming },
-    { key: "preparing", label: "Preparing", icon: Flame, color: "border-orange-500 text-orange-600 bg-orange-50/50 dark:bg-orange-950/10 dark:border-orange-900/50", count: liveCounts.preparing },
-    { key: "ready", label: "Ready", icon: CheckCircle, color: "border-emerald-500 text-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/10 dark:border-emerald-900/50", count: liveCounts.ready },
-    { key: "delivery", label: "Out For Delivery", icon: Truck, color: "border-purple-500 text-purple-600 bg-purple-50/50 dark:bg-purple-950/10 dark:border-purple-900/50", count: liveCounts.delivery }
+    { key: "incoming", label: "Incoming", icon: Inbox, color: "border-blue-500 text-blue-600 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-900/50", count: countOf("incoming") },
+    { key: "preparing", label: "Preparing", icon: Flame, color: "border-orange-500 text-orange-600 bg-orange-50/50 dark:bg-orange-950/10 dark:border-orange-900/50", count: countOf("preparing") },
+    { key: "ready", label: "Ready", icon: CheckCircle, color: "border-emerald-500 text-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/10 dark:border-emerald-900/50", count: countOf("ready") },
+    { key: "delivery", label: "Out For Delivery", icon: Truck, color: "border-purple-500 text-purple-600 bg-purple-50/50 dark:bg-purple-950/10 dark:border-purple-900/50", count: countOf("delivery") }
   ]
 
   return (

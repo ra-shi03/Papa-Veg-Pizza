@@ -2,6 +2,7 @@ import React, { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Flame, Clock, AlertTriangle, AlertOctagon, X, Search, ChevronRight } from "lucide-react"
 import apiClient from "@/services/api/axios"
+import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 // Mock kitchen data
 const MOCK_KITCHEN_PERF = {
@@ -30,7 +31,7 @@ export default function KitchenPerformance({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/kitchen-performance", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response) throw e // the server answered (e.g. 403): do not show sample numbers
+        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
         return MOCK_KITCHEN_PERF
       }
     }

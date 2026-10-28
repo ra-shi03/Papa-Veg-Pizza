@@ -299,6 +299,26 @@ export async function todaySummary(storeId, now = new Date()) {
     };
 }
 
+/**
+ * Today's kitchen team for the dashboard roster: { employee, role, shift, status } with status
+ * Present / Late (worked today), Absent (marked absent or on leave, or an account on leave), or Not clocked in.
+ */
+export async function todayRoster(storeId, now = new Date()) {
+    const staff = await kitchenStaffRecords(storeId);
+    const [records, shifts] = await Promise.all([
+        StoreAttendance.find({ storeId, date: dateKeyOf(now), staffId: { $in: staff.map((s) => s._id) } }).select('staffId status late').lean(),
+        StoreShift.find({ storeId, status: 'active' }).select('shiftName assignedStaff').lean(),
+    ]);
+    const recordOf = new Map(records.map((r) => [String(r.staffId), r]));
+    const shiftOf = (id) => shifts.find((sh) => (sh.assignedStaff || []).some((a) => String(a) === String(id)))?.shiftName || '-';
+    return staff.map((s) => {
+        const r = recordOf.get(String(s._id));
+        const status = r && PRESENT.includes(r.status) ? (r.late ? 'Late' : 'Present')
+            : (r || s.status === 'On Leave') ? 'Absent' : 'Not clocked in';
+        return { employee: s.name, role: s.role || '', shift: shiftOf(s._id), status };
+    });
+}
+
 /** Own attendance for the profile screen: { summary, logs } over the last 30 days. */
 export async function profileAttendance(user) {
     const role = String(user?.role || '').replace(/-/g, '_').toUpperCase();
