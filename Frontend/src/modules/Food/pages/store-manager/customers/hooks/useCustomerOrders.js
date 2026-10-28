@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
+import { failOrMock } from "@/services/api/mockPolicy";
 import { mockCustomers, mockOrders, mockComplaints, mockReviews } from "../mockData";
 
 // Fallback Mock Local Storage Keys for Customer DB
@@ -294,7 +295,7 @@ export function useCreateRefund() {
         const response = await apiClient.post(`/store/orders/${orderId}/refund`, { reason });
         return response.data?.data || response.data;
       } catch (err) {
-        if (err?.response) throw err;
+        failOrMock(err, "Failed to process refund request"); // the server's answer, unless VITE_STANDALONE_MOCK=true
         console.warn("Backend Refund API offline, applying client-side refund status");
         
         // Mutate local storage
@@ -327,8 +328,8 @@ export function useCreateRefund() {
       queryClient.invalidateQueries({ queryKey: ["customerProfile"] });
       toast.success("Refund request successfully created!");
     },
-    onError: () => {
-      toast.error("Failed to process refund request");
+    onError: (err) => {
+      toast.error(err?.message || "Failed to process refund request");
     }
   });
 }

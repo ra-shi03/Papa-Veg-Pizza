@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
+import { failOrMock } from "@/services/api/mockPolicy";
 import { mockReviews, mockCustomers, mockOrders, mockOrderItems } from "../mockData";
 
 // Local Storage Keys
@@ -237,7 +238,7 @@ export function useReplyToReview() {
         const response = await apiClient.post(`/food/store/reviews/${reviewId}/reply`, { text, repliedBy });
         return response.data?.data || response.data;
       } catch (err) {
-        if (err?.response) throw err;
+        failOrMock(err, "Failed to publish reply"); // the server's answer, unless VITE_STANDALONE_MOCK=true
         console.warn("Backend Reply Review API offline, updating local mock state");
 
         const localReviews = getLocalData(REVIEWS_STORAGE_KEY, mockReviews);
@@ -265,8 +266,8 @@ export function useReplyToReview() {
       queryClient.invalidateQueries({ queryKey: ["reviewDetails", variables.reviewId] });
       toast.success("Manager reply published successfully!");
     },
-    onError: () => {
-      toast.error("Failed to publish reply");
+    onError: (err) => {
+      toast.error(err?.message || "Failed to publish reply");
     }
   });
 }

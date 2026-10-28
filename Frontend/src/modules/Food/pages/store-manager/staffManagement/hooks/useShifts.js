@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
+import { failOrMock } from "@/services/api/mockPolicy";
 import { initialMockShifts } from "../mockData";
 
 const SHIFTS_STORAGE_KEY = "pvp_kitchen_shifts";
@@ -54,6 +55,7 @@ export function useShiftList(filters = {}) {
         }
         throw new Error("API return format mismatch");
       } catch (err) {
+        failOrMock(err, "Could not load shifts"); // real error unless VITE_STANDALONE_MOCK=true
         console.warn("Backend shifts API offline, pulling from local storage mock data");
         let list = getLocalShifts();
 
@@ -96,6 +98,7 @@ export function useShiftDetails(id) {
         }
         throw new Error("API return format mismatch");
       } catch (err) {
+        failOrMock(err, "Could not load the shift"); // real error unless VITE_STANDALONE_MOCK=true
         const list = getLocalShifts();
         const found = list.find((s) => s._id === id);
         if (found) return found;
@@ -121,6 +124,7 @@ export function useCreateShift() {
         }
         return response.data;
       } catch (err) {
+        failOrMock(err, "Failed to create shift"); // real error unless VITE_STANDALONE_MOCK=true
         const list = getLocalShifts();
         const newRecord = {
           _id: payload.shiftName.replace(/ /g, "_") + "-" + Date.now(),
@@ -146,8 +150,8 @@ export function useCreateShift() {
       queryClient.invalidateQueries({ queryKey: ["kitchenShifts"] });
       toast.success("Shift created successfully!");
     },
-    onError: () => {
-      toast.error("Failed to create shift");
+    onError: (err) => {
+      toast.error(err?.message || "Failed to create shift");
     },
   });
 }
@@ -167,6 +171,7 @@ export function useUpdateShift() {
         }
         return response.data;
       } catch (err) {
+        failOrMock(err, "Failed to update shift"); // real error unless VITE_STANDALONE_MOCK=true
         const list = getLocalShifts();
         const updated = list.map((s) => {
           if (s._id === id) {
@@ -192,8 +197,8 @@ export function useUpdateShift() {
       queryClient.invalidateQueries({ queryKey: ["shiftDetails", variables.id] });
       toast.success("Shift updated successfully!");
     },
-    onError: () => {
-      toast.error("Failed to update shift");
+    onError: (err) => {
+      toast.error(err?.message || "Failed to update shift");
     },
   });
 }
@@ -213,6 +218,7 @@ export function useDeleteShift() {
         }
         return response.data;
       } catch (err) {
+        failOrMock(err, "Failed to delete shift"); // real error unless VITE_STANDALONE_MOCK=true
         // Localstorage updates
         const list = getLocalShifts();
         const filtered = list.filter((s) => s._id !== id);
@@ -241,8 +247,8 @@ export function useDeleteShift() {
       queryClient.invalidateQueries({ queryKey: ["kitchenStaff"] }); // Refresh staff lists too
       toast.success("Shift deleted successfully!");
     },
-    onError: () => {
-      toast.error("Failed to delete shift");
+    onError: (err) => {
+      toast.error(err?.message || "Failed to delete shift");
     },
   });
 }
@@ -262,6 +268,7 @@ export function useAssignStaffToShift() {
         }
         return response.data;
       } catch (err) {
+        failOrMock(err, "Failed to assign staff to shift"); // real error unless VITE_STANDALONE_MOCK=true
         // Fallback implementation
         const list = getLocalShifts();
         const updatedShifts = list.map((s) => {
@@ -309,8 +316,8 @@ export function useAssignStaffToShift() {
       queryClient.invalidateQueries({ queryKey: ["shiftDetails", variables.shiftId] });
       toast.success("Shift assignments updated successfully!");
     },
-    onError: () => {
-      toast.error("Failed to assign staff to shift");
+    onError: (err) => {
+      toast.error(err?.message || "Failed to assign staff to shift");
     },
   });
 }

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
+import { failOrMock } from "@/services/api/mockPolicy";
 
 // 1. Fetch Staff List Hook
 export function useStaffList(filters = {}) {
@@ -57,7 +58,8 @@ export function useCreateStaff() {
             err?.response?.data?.message || "Failed to register staff member."
           );
         }
-        // Server offline fallback — save to localStorage
+        // No server: a real error unless VITE_STANDALONE_MOCK=true (then it is saved to localStorage below)
+        failOrMock(err, "Failed to register staff member.");
         const list = getLocalStaff();
         const nextCodeNum = list.length + 1;
         const codeMap = { "Kitchen Supervisor": "KS", "Pizza Maker": "PM", "Baker": "BK", "Packager": "PK" };
@@ -200,6 +202,7 @@ export function useDeleteStaff() {
         const response = await apiClient.delete(`/food/store/staff/${id}`);
         return response.data;
       } catch (err) {
+        failOrMock(err, "Failed to delete staff member");
         const list = getLocalStaff();
         const filtered = list.filter((s) => s._id !== id);
         setLocalStaff(filtered);
@@ -210,8 +213,8 @@ export function useDeleteStaff() {
       queryClient.invalidateQueries({ queryKey: ["kitchenStaff"] });
       toast.success("Staff member deleted successfully!");
     },
-    onError: () => {
-      toast.error("Failed to delete staff member");
+    onError: (err) => {
+      toast.error(err?.message || "Failed to delete staff member");
     },
   });
 }

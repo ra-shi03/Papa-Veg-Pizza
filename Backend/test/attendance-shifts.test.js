@@ -173,6 +173,16 @@ describe('shifts: who sees what, and other stores', () => {
         assert.equal((await call('GET', `/shifts/${morning._id}`, baker.token)).status, 200);
         assert.equal((await call('GET', '/shifts', bStaff.token)).body.data.length, 0);
     });
+    test('the bulk attendance modal can build its roster from the staff list and each shift\'s assignedStaff', async () => {
+        const staff = ok(await fx.call('GET', '/v1/food/store/staff', A.managerToken));
+        const morning = ok(await call('GET', '/shifts?status=active', A.managerToken)).find((s) => s.shiftName === 'Morning');
+        // the modal's own rule: active (any case) and on the selected shift
+        const roster = staff.filter((s) => String(s.status || '').toLowerCase() === 'active' && morning.assignedStaff.map(String).includes(String(s._id)));
+        assert.deepEqual(roster.map((s) => s.fullName).sort(), ['Name abaker', 'Name asup']);
+        assert.ok(staff.every((s) => s.status === 'Active'), 'the server says "Active", not "active"');
+        // what the modal used to ask for: the status filter is an exact match, so "active" finds nobody
+        assert.equal(ok(await fx.call('GET', '/v1/food/store/staff?status=active', A.managerToken)).length, 0);
+    });
     test('another store\'s manager and staff cannot read or change these shifts (404)', async () => {
         const [morning] = ok(await call('GET', '/shifts', A.managerToken));
         for (const token of [B.managerToken, bSup.token, bStaff.token]) assert.equal((await call('GET', `/shifts/${morning._id}`, token)).status, 404);

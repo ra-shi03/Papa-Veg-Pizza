@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
+import { failOrMock } from "@/services/api/mockPolicy";
 import { initialMockAttendance } from "../mockData";
 
 const ATTENDANCE_STORAGE_KEY = "pvp_kitchen_attendance";
@@ -54,6 +55,7 @@ export function useAttendanceList(filters = {}) {
         }
         throw new Error("API return format mismatch");
       } catch (err) {
+        failOrMock(err, "Could not load attendance"); // real error unless VITE_STANDALONE_MOCK=true
         console.warn("Backend attendance API offline, pulling from local storage mock data");
         let list = getLocalAttendance();
 
@@ -132,6 +134,7 @@ export function useAttendanceDetails(id) {
         }
         throw new Error("API return format mismatch");
       } catch (err) {
+        failOrMock(err, "Could not load the attendance record"); // real error unless VITE_STANDALONE_MOCK=true
         const list = getLocalAttendance();
         const found = list.find((a) => a._id === id);
         if (found) return found;
@@ -159,6 +162,7 @@ export function useMarkAttendance() {
 
         return response.data;
       } catch (err) {
+        failOrMock(err, "Failed to mark attendance"); // real error unless VITE_STANDALONE_MOCK=true
         // Simulation Fallback
         const list = getLocalAttendance();
         const newRecord = {
@@ -186,8 +190,8 @@ export function useMarkAttendance() {
       queryClient.invalidateQueries({ queryKey: ["kitchenAttendance"] });
       toast.success("Attendance marked successfully!");
     },
-    onError: () => {
-      toast.error("Failed to mark attendance");
+    onError: (err) => {
+      toast.error(err?.message || "Failed to mark attendance");
     },
   });
 }
@@ -209,6 +213,7 @@ export function useBulkMarkAttendance() {
 
         return response.data;
       } catch (err) {
+        failOrMock(err, "Failed to submit bulk attendance"); // real error unless VITE_STANDALONE_MOCK=true
         // Simulation Fallback
         const list = getLocalAttendance();
         
@@ -264,8 +269,8 @@ export function useBulkMarkAttendance() {
       queryClient.invalidateQueries({ queryKey: ["kitchenAttendance"] });
       toast.success("Bulk attendance registered successfully!");
     },
-    onError: () => {
-      toast.error("Failed to submit bulk attendance");
+    onError: (err) => {
+      toast.error(err?.message || "Failed to submit bulk attendance");
     },
   });
 }
@@ -287,6 +292,7 @@ export function useUpdateAttendance() {
 
         return response.data;
       } catch (err) {
+        failOrMock(err, "Failed to update attendance record"); // real error unless VITE_STANDALONE_MOCK=true
         // Simulation Fallback
         const list = getLocalAttendance();
         const updated = list.map((a) => {
@@ -315,8 +321,8 @@ export function useUpdateAttendance() {
       queryClient.invalidateQueries({ queryKey: ["attendanceDetails", variables.id] });
       toast.success("Attendance record updated successfully!");
     },
-    onError: () => {
-      toast.error("Failed to update attendance record");
+    onError: (err) => {
+      toast.error(err?.message || "Failed to update attendance record");
     },
   });
 }
@@ -338,6 +344,7 @@ export function useDeleteAttendance() {
 
         return response.data;
       } catch (err) {
+        failOrMock(err, "Failed to delete attendance record"); // real error unless VITE_STANDALONE_MOCK=true
         const list = getLocalAttendance();
         const filtered = list.filter((a) => a._id !== id);
         setLocalAttendance(filtered);
@@ -348,8 +355,8 @@ export function useDeleteAttendance() {
       queryClient.invalidateQueries({ queryKey: ["kitchenAttendance"] });
       toast.success("Attendance record deleted successfully!");
     },
-    onError: () => {
-      toast.error("Failed to delete attendance record");
+    onError: (err) => {
+      toast.error(err?.message || "Failed to delete attendance record");
     },
   });
 }

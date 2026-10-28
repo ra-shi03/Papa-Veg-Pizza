@@ -5,6 +5,7 @@
  */
 
 import { adminClient } from "./axios.js";
+import { STANDALONE_MOCK } from "./mockPolicy.js";
 
 // The /profile/* calls are the store team's own profile: they go through the admin client, which sends the store's sign-in.
 // (The general client picks the token from the URL, and "/profile" would get the customer's.)
@@ -17,6 +18,15 @@ const refreshHeader = () => {
     return {};
   }
 };
+
+// A write that failed says so (the screens show `message`); the local copy below only runs when VITE_STANDALONE_MOCK=true.
+const failed = (err, fallback) => ({
+  success: false,
+  message:
+    err?.response?.data?.message ||
+    err?.response?.data?.error ||
+    (err?.response ? fallback : "Could not reach the server. Check your connection and try again."),
+});
 
 // Helper to simulate network latency
 const sleep = (ms = 400) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -146,6 +156,7 @@ export const profileApi = {
       const res = await adminClient.put("/profile/personal", personalInfo);
       return res.data;
     } catch (err) {
+      if (!STANDALONE_MOCK) return failed(err, "Failed to update profile.");
       await sleep(800);
       const data = getLocalData();
       data.user = {
@@ -243,6 +254,7 @@ export const profileApi = {
       const res = await adminClient.put("/profile/notifications", notifications);
       return res.data;
     } catch (err) {
+      if (!STANDALONE_MOCK) return failed(err, "Failed to update preferences.");
       await sleep(600);
       const data = getLocalData();
       data.notifications = notifications;
@@ -281,6 +293,7 @@ export const profileApi = {
       const res = await adminClient.delete(`/profile/sessions/${id}`);
       return res.data;
     } catch (err) {
+      if (!STANDALONE_MOCK) return failed(err, "Failed to end the session.");
       await sleep(600);
       const data = getLocalData();
       data.activeSessions = data.activeSessions.filter((s) => s.id !== id);
@@ -295,6 +308,7 @@ export const profileApi = {
       const res = await adminClient.delete("/profile/sessions?scope=other", { headers: refreshHeader() });
       return res.data;
     } catch (err) {
+      if (!STANDALONE_MOCK) return failed(err, "Failed to sign out the other sessions.");
       await sleep(800);
       const data = getLocalData();
       data.activeSessions = data.activeSessions.filter((s) => s.current);
@@ -309,6 +323,7 @@ export const profileApi = {
       const res = await adminClient.delete("/profile/sessions?scope=all");
       return res.data;
     } catch (err) {
+      if (!STANDALONE_MOCK) return failed(err, "Failed to sign out all sessions.");
       await sleep(800);
       const data = getLocalData();
       data.activeSessions = [];

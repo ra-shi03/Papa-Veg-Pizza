@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
+import { failOrMock } from "@/services/api/mockPolicy";
 import { mockComplaints, mockCustomers, mockOrders, mockStaff } from "../mockData";
 
 // Local Storage Keys
@@ -229,7 +230,7 @@ export function useResolveComplaint() {
         const response = await apiClient.put(`/food/store/complaints/${complaintId}/resolve`, data);
         return response.data?.data || response.data;
       } catch (err) {
-        if (err?.response) throw err;
+        failOrMock(err, "Failed to resolve complaint"); // the server's answer, unless VITE_STANDALONE_MOCK=true
         console.warn("Backend Resolve Complaint API offline, updating local storage");
 
         const localComplaints = getLocalData(COMPLAINTS_STORAGE_KEY, mockComplaints);
@@ -298,8 +299,8 @@ export function useResolveComplaint() {
       queryClient.invalidateQueries({ queryKey: ["customerOrders"] });
       toast.success("Complaint resolved successfully!");
     },
-    onError: () => {
-      toast.error("Failed to resolve complaint");
+    onError: (err) => {
+      toast.error(err?.message || "Failed to resolve complaint");
     }
   });
 }

@@ -79,3 +79,58 @@ All of these need a staff, admin or rider sign-in, or are not exploitable.
 - Refund request from the store: a pending record only; nothing is paid; duplicate and over-total requests are refused.
 - FCM token removal is scoped to the caller's own record. Profile update (`PUT /auth/profile/personal`) writes named fields only, and a partner token cannot use it.
 - Public store and menu endpoints expose only fields a customer already sees (tested field list; unapproved, inactive and unknown stores are 404).
+
+## Mock fallbacks that hide errors
+
+Found by scanning every `catch` in the store manager panel (`Frontend/src/modules/Food/pages/store-manager/`, 226 of them) and the service modules its
+screens call (`profileApi.js`, `myTasksService.js`). The risk: a `catch` that answers a failed request with sample data or a success toast, so a refused or
+lost action looks like it worked. With a backend, the answer must be the server's. The only switch for local mock data is `VITE_STANDALONE_MOCK=true`
+(`services/api/mockPolicy.js`, the same rule the inventory and kitchen hooks already follow).
+
+Three patterns turned up:
+
+- **A. Swallows everything.** Any error, including a 403 / 404 / 409, is replaced by local data or a fake success.
+- **B. Rethrows only when the server answered.** `if (err?.response) throw err` is right for a 4xx, but a network failure still shows sample data or a fake success.
+- **C. Never calls the server.** The hook only reads and writes `localStorage` (after a fake delay) and reports success.
+
+### Fixed (every hook that writes: create, update, delete, mark, resolve, reply, refund, assign)
+
+Each now stops at the real error unless `VITE_STANDALONE_MOCK=true`, and the toast shows the server's own message (the 403 / 409 text), not a fixed "Failed to ...".
+
+| File | Hooks | Was |
+|---|---|---|
+| `staffManagement/hooks/useAttendance.js` | `useMarkAttendance`, `useBulkMarkAttendance`, `useUpdateAttendance`, `useDeleteAttendance` (+ list and details reads) | A: a refused mark / edit / delete saved a fake record and showed a success toast |
+| `staffManagement/hooks/useShifts.js` | `useCreateShift`, `useUpdateShift`, `useDeleteShift`, `useAssignStaffToShift` (+ list and details reads) | A: same |
+| `staffManagement/hooks/useStaff.js` | `useDeleteStaff`, `useCreateStaff` | A for delete (any error deleted the person locally and said "deleted"); B for create (network failure registered a fake person) |
+| `customers/hooks/useComplaints.js`, `useCustomerOrders.js`, `useReviews.js` | `useResolveComplaint`, `useCreateRefund`, `useReplyToReview` | B: network failure resolved / refunded / replied in `localStorage` |
+| `deliveryOperations/hooks/useAssignRider.js` | `useAssignRider` | A: any error "assigned" the rider locally ("Simulated") |
+| `services/api/myTasksService.js` | `startTask`, `completeTask`, `reportDelay`, `requestIngredient`, `requestReassignment`, `reassignTask`, `submitQualityCheck`, `markNotificationRead` | B: a kitchen worker's "Start" or "Complete" could succeed only in their own browser |
+| `services/api/profileApi.js` | `updatePersonalInfo`, `updateNotifications`, `deleteSession`, `logoutOtherSessions`, `logoutAllSessions` | A: a failed profile save returned `success: true` |
+
+Also in `BulkAttendanceModal.jsx`: the roster listed nobody (the request asked the server for `status=active`, which matches nothing because the value is `Active`, and the shift list was hard-coded to names instead of the real shift ids). It now reads all staff, compares status case-insensitively, and uses the real shift ids and each shift's `assignedStaff`.
+
+Already correct (no change): all inventory hooks (`failOrMock`), all six kitchen operations hooks (`STANDALONE_MOCK`), `orders/hooks/useActiveOrders.js` and `useIncomingOrders.js` (no fallback), and the delivery issue, rider, tracking and live-delivery hooks (no fallback).
+
+### Listed, not fixed: reads (a failed or empty read shows sample data)
+
+| Where | Pattern | What the person sees |
+|---|---|---|
+| `deliveryOperations/hooks/useReadyOrders.js`, `useAvailableRiders.js` | A, and **also an empty answer** | A store with no ready orders or no riders is shown the seeded sample orders and riders. This is the worst of the list: it needs no error at all. |
+| `dashboard/components/*` (KpiCards x8, StaffOverview, LiveOrderBoard, OrderStatusDonut, SalesAnalytics, TopSellingProducts, KitchenPerformance, DeliveryOverview, InventoryAlerts, ActivityTimeline, CustomerComplaints) and `StoreOperationsDashboard.jsx` | B | When the server cannot be reached, the dashboard shows sample figures (for example 12 staff on duty) instead of an error. |
+| `customers/hooks/useComplaints.js`, `useCustomerOrders.js`, `useReviews.js` (lists, `useComplaintDetails`, `useCustomerProfile`, `useOrderDetails`, `useReviewDetails`) | B | Sample customers, complaints and reviews when the server is unreachable. |
+| `staffManagement/hooks/usePerformance.js` (list and details) | A | Sample performance for any error (the screen is deferred). |
+| `staffManagement/hooks/useStaff.js` `useStaffDetails` | A | Calls `getLocalStaff`, which does not exist in that file: a real error turns into a `ReferenceError`. |
+| `services/api/profileApi.js` (`getProfile`, `getPermissions`, `getPerformance`, `getAttendance`, `getActivityLogs`) and `profile/Profile.jsx` | A | If the server fails, the profile page shows a made-up person ("Siddharth Verma") and sample attendance. |
+| `services/api/myTasksService.js` (`getMyTasks`, `getMyTaskStats`, `getTeamTasks`, `getNotifications`) | B | Sample tasks when the server is unreachable. |
+
+### Listed, not fixed: writes that never call the server (pattern C)
+
+These cannot be fixed by rethrowing, because there is no request to fail. They need endpoints and a repoint. They show a success toast and change only the browser's `localStorage`.
+
+| File | Hooks | Notes |
+|---|---|---|
+| `orders/hooks/useReadyOrders.js` | `useAssignRider`, `useConfirmPickup`, `useEscalateOrder` | Used by Ready Orders. The real rider assignment is `/store/delivery/assign`, used by `deliveryOperations/AssignRider.jsx`; the Ready Orders screen should be pointed at it. |
+| `orders/hooks/useCancelledOrders.js` | `useInitiateRefund`, `useReopenOrder` | The store refund request exists server-side (`POST /store/orders/:id/refund`, a pending record only), used by `useCreateRefund`. |
+| `orders/hooks/useCompletedOrders.js` | `useReorderOrder` | No endpoint yet. |
+
+(`useExportCompletedOrders` also makes no request, but it only exports data already on the screen.)

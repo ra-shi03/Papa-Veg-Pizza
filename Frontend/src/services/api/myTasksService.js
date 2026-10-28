@@ -5,6 +5,7 @@
  */
 
 import apiClient from "./axios";
+import { failOrMock } from "./mockPolicy.js";
 
 // Helper to simulate network latency
 const sleep = (ms = 400) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -227,8 +228,9 @@ export const myTasksService = {
       const res = await apiClient.patch(`/tasks/${id}/start`, { notes });
       return res.data;
     } catch (err) {
-      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
-      if (err?.response) throw err;
+      // A write never pretends to work: the server's answer (403 / 404 / 400) or a network failure is shown as the error.
+      // The mock below only runs when VITE_STANDALONE_MOCK=true.
+      failOrMock(err, "Could not save your change. Please try again."); // the server's answer, unless VITE_STANDALONE_MOCK=true
       await sleep(600);
       const db = getDB();
       db.tasks = db.tasks.map((task) => {
@@ -262,8 +264,9 @@ export const myTasksService = {
       const res = await apiClient.patch(`/tasks/${id}/complete`, payload);
       return res.data;
     } catch (err) {
-      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
-      if (err?.response) throw err;
+      // A write never pretends to work: the server's answer (403 / 404 / 400) or a network failure is shown as the error.
+      // The mock below only runs when VITE_STANDALONE_MOCK=true.
+      failOrMock(err, "Could not save your change. Please try again."); // the server's answer, unless VITE_STANDALONE_MOCK=true
       await sleep(750);
       const db = getDB();
       db.tasks = db.tasks.map((task) => {
@@ -301,8 +304,9 @@ export const myTasksService = {
       const res = await apiClient.patch(`/tasks/${id}/delay`, payload);
       return res.data;
     } catch (err) {
-      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
-      if (err?.response) throw err;
+      // A write never pretends to work: the server's answer (403 / 404 / 400) or a network failure is shown as the error.
+      // The mock below only runs when VITE_STANDALONE_MOCK=true.
+      failOrMock(err, "Could not save your change. Please try again."); // the server's answer, unless VITE_STANDALONE_MOCK=true
       await sleep(600);
       const db = getDB();
       db.tasks = db.tasks.map((task) => {
@@ -336,8 +340,9 @@ export const myTasksService = {
       const res = await apiClient.post("/food/store/kitchen/inventory-requests", payload);
       return res.data;
     } catch (err) {
-      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
-      if (err?.response) throw err;
+      // A write never pretends to work: the server's answer (403 / 404 / 400) or a network failure is shown as the error.
+      // The mock below only runs when VITE_STANDALONE_MOCK=true.
+      failOrMock(err, "Could not save your change. Please try again."); // the server's answer, unless VITE_STANDALONE_MOCK=true
       await sleep(650);
       const db = getDB();
       db.inventoryRequests.push({
@@ -360,8 +365,9 @@ export const myTasksService = {
       const res = await apiClient.patch(`/tasks/${id}/request-reassign`, payload);
       return res.data;
     } catch (err) {
-      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
-      if (err?.response) throw err;
+      // A write never pretends to work: the server's answer (403 / 404 / 400) or a network failure is shown as the error.
+      // The mock below only runs when VITE_STANDALONE_MOCK=true.
+      failOrMock(err, "Could not save your change. Please try again."); // the server's answer, unless VITE_STANDALONE_MOCK=true
       await sleep(600);
       const db = getDB();
       db.tasks = db.tasks.map((task) => {
@@ -394,8 +400,9 @@ export const myTasksService = {
       const res = await apiClient.patch(`/tasks/${id}/reassign`, payload);
       return res.data;
     } catch (err) {
-      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
-      if (err?.response) throw err;
+      // A write never pretends to work: the server's answer (403 / 404 / 400) or a network failure is shown as the error.
+      // The mock below only runs when VITE_STANDALONE_MOCK=true.
+      failOrMock(err, "Could not save your change. Please try again."); // the server's answer, unless VITE_STANDALONE_MOCK=true
       await sleep(600);
       const db = getDB();
       db.tasks = db.tasks.map((task) => {
@@ -428,8 +435,9 @@ export const myTasksService = {
       const res = await apiClient.post("/food/store/kitchen/quality-checks", payload);
       return res.data;
     } catch (err) {
-      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
-      if (err?.response) throw err;
+      // A write never pretends to work: the server's answer (403 / 404 / 400) or a network failure is shown as the error.
+      // The mock below only runs when VITE_STANDALONE_MOCK=true.
+      failOrMock(err, "Could not save your change. Please try again."); // the server's answer, unless VITE_STANDALONE_MOCK=true
       await sleep(700);
       const db = getDB();
       db.qualityChecks.push({
@@ -501,8 +509,9 @@ export const myTasksService = {
       const res = await apiClient.patch(`/tasks/notifications/${id}/read`);
       return res.data;
     } catch (err) {
-      // The server answered (e.g. 403 / 404 / 400): show that, do not pretend it worked. The mock below is for "no server".
-      if (err?.response) throw err;
+      // A write never pretends to work: the server's answer (403 / 404 / 400) or a network failure is shown as the error.
+      // The mock below only runs when VITE_STANDALONE_MOCK=true.
+      failOrMock(err, "Could not save your change. Please try again."); // the server's answer, unless VITE_STANDALONE_MOCK=true
       const db = getDB();
       db.notifications = db.notifications.map((n) =>
         n.id === id ? { ...n, isRead: true } : n

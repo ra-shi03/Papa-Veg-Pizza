@@ -8,17 +8,31 @@ import {
 } from "@food/components/ui/dialog";
 import { useStaffList } from "../hooks/useStaff";
 import { useBulkMarkAttendance } from "../hooks/useAttendance";
+import { useShiftList } from "../hooks/useShifts";
 
 export default function BulkAttendanceModal({ isOpen, onClose }) {
-  const { data: staffList = [], isLoading: isLoadingStaff } = useStaffList({ status: "active" });
+  // All staff, filtered below: the server's status filter is an exact match ("Active"), so asking for "active" returns nobody
+  const { data: staffList = [], isLoading: isLoadingStaff } = useStaffList();
+  const { data: shifts = [] } = useShiftList({ status: "active" });
   const bulkMarkMutation = useBulkMarkAttendance();
 
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [shiftId, setShiftId] = useState("Morning");
   const [attendanceStates, setAttendanceStates] = useState({});
 
-  // Filter staff by the selected shift
-  const filteredStaff = staffList.filter((s) => s.shiftId === shiftId && s.status === "active");
+  // The real API sends shifts with their own ids and the staff on each in `assignedStaff`; start on the first real shift
+  useEffect(() => {
+    if (shifts.length > 0 && !shifts.some((sh) => sh._id === shiftId)) setShiftId(shifts[0]._id);
+  }, [shifts]);
+  const selectedShift = shifts.find((sh) => sh._id === shiftId);
+
+  // Active staff on the selected shift. Status is compared case-insensitively ("Active" from the server, "active" in mock data).
+  const isActive = (s) => String(s.status || "").toLowerCase() === "active";
+  const isOnShift = (s) =>
+    Array.isArray(selectedShift?.assignedStaff)
+      ? selectedShift.assignedStaff.map(String).includes(String(s._id))
+      : String(s.shiftId) === String(shiftId);
+  const filteredStaff = staffList.filter((s) => isActive(s) && isOnShift(s));
 
   // Initialize/Reset local attendance states when shift or staff list changes
   useEffect(() => {
@@ -108,9 +122,10 @@ export default function BulkAttendanceModal({ isOpen, onClose }) {
                 onChange={(e) => setShiftId(e.target.value)}
                 className="w-full px-3 py-2.5 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 text-slate-800 dark:text-zinc-250 focus:outline-none"
               >
-                <option value="Morning">Morning Shift</option>
-                <option value="Afternoon">Afternoon Shift</option>
-                <option value="Night">Night Shift</option>
+                {shifts.length === 0 && <option value={shiftId}>No shifts created yet</option>}
+                {shifts.map((sh) => (
+                  <option key={sh._id} value={sh._id}>{sh.shiftName}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -147,7 +162,7 @@ export default function BulkAttendanceModal({ isOpen, onClose }) {
             ) : filteredStaff.length === 0 ? (
               <div className="p-8 text-center space-y-2">
                 <AlertCircle className="mx-auto text-zinc-400" size={24} />
-                <p className="text-zinc-500 font-bold">No active staff assigned to the {shiftId} Shift</p>
+                <p className="text-zinc-500 font-bold">No active staff assigned to the {selectedShift?.shiftName || ""} Shift</p>
                 <p className="text-[10px] text-zinc-400">Assign staff shifts in Kitchen Staff tab before marking roster.</p>
               </div>
             ) : (

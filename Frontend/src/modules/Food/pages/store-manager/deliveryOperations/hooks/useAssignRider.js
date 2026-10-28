@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
+import { failOrMock } from "@/services/api/mockPolicy";
 import { getLocalReadyOrders, setLocalReadyOrders } from "./useReadyOrders";
 import { getLocalRiders, setLocalRiders } from "./useAvailableRiders";
 
@@ -16,6 +17,7 @@ export default function useAssignRider() {
         });
         return response.data;
       } catch (err) {
+        failOrMock(err, "Could not assign rider. Please try again."); // real error unless VITE_STANDALONE_MOCK=true
         // Fallback LocalStorage updates
         const orders = getLocalReadyOrders();
         const updatedOrders = orders.map((o) => {
