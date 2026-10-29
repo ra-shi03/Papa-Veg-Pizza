@@ -4,11 +4,13 @@ import { FoodSupportTicket } from '../../user/models/supportTicket.model.js';
 import { FoodStore } from '../models/store.model.js';
 import { StoreManager } from '../../franchise/models/storeManager.model.js';
 import { User } from '../../../../core/users/models/user.model.js';
+import { Role } from '../../../../core/roles/models/role.model.js';
 import { Profile } from '../../../../core/users/models/profile.model.js';
 import { Refund } from '../../../../core/payments/models/refund.model.js';
 import { notifyOwnersSafely } from '../../orders/services/order.helpers.js';
 import { config } from '../../../../config/env.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
+import { storeArea, nearbyAddressFilter } from './nearby.js';
 
 // Store manager panel: Customers & Orders, Complaints, Reviews.
 //
@@ -16,7 +18,8 @@ import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core
 //   kitchen supervisor -> own store, read only, with the customer's phone and email masked
 //   everyone else      -> 403 (routes);  another store's customer / order / complaint / review -> 404
 //
-// Customers are the people who ordered from this store (derived from orders). Complaints are the support tickets
+// Customers are the people who ordered from this store (derived from orders), plus customers whose saved address is
+// near the store (nearby.js) even before their first order here, tagged "new" or "nearby". Complaints are the support tickets
 // customers raise about this store / its orders; reviews are the store ratings customers leave on orders.
 
 const normalize = (role) => String(role || '').trim().replace(/-/g, '_').toUpperCase();
@@ -33,6 +36,35 @@ function context(user) {
   if (!isId(user.storeId)) throw new ForbiddenError('No store is linked to your account.');
   return { user, storeId: toId(user.storeId), isManager: role === 'STORE_MANAGER' };
 }
+/**
+ * Who may read the Customers screens (/food/store/customers/*), from the token:
+ *   store manager      -> own store; full phone, masked email
+ *   kitchen supervisor -> own store; phone and email masked
+ *   franchise admin    -> one store of its own franchise (?storeId=); read only, phone and email masked
+ *   super admin        -> any store (?storeId=); read only; full phone, masked email
+ * Another store or franchise -> 404; anyone else -> 403.
+ */
+async function customerContext(user, q = {}) {
+  const role = normalize(user?.role);
+  if (role === 'STORE_MANAGER' || role === 'KITCHEN_SUPERVISOR') {
+    if (!isId(user.storeId)) throw new ForbiddenError('No store is linked to your account.');
+    if (q.storeId && String(q.storeId) !== String(user.storeId)) throw new NotFoundError('Store not found');
+    return { user, storeId: toId(user.storeId), isManager: role === 'STORE_MANAGER', fullPhone: role === 'STORE_MANAGER' };
+  }
+  if (role === 'FRANCHISE_ADMIN' || role === 'SUPERADMIN' || role === 'SUPER_ADMIN') {
+    if (!isId(q.storeId)) throw new ValidationError('Choose a store (storeId).');
+    const filter = { _id: toId(q.storeId) };
+    if (role === 'FRANCHISE_ADMIN') {
+      if (!isId(user.franchiseId)) throw new ForbiddenError('No franchise is linked to your account.');
+      filter.franchiseId = toId(user.franchiseId);
+    }
+    const store = await FoodStore.findOne(filter).select('_id').lean();
+    if (!store) throw new NotFoundError('Store not found');
+    return { user, storeId: store._id, isManager: false, fullPhone: role !== 'FRANCHISE_ADMIN' };
+  }
+  throw new ForbiddenError('You do not have access to customers.');
+}
+
 const mustManager = (ctx) => {
   if (!ctx.isManager) throw new ForbiddenError('Only the store manager can do this.');
 };
@@ -52,6 +84,8 @@ export const maskEmail = (e) => {
   return `${local[0]}***@${domain}`;
 };
 const contact = (ctx, { mobile = '', email = '' }) => (ctx.isManager ? { mobile, email } : { mobile: maskPhone(mobile), email: maskEmail(email) });
+// Customers screens: the email is always masked; the phone is full only for the store manager and the super admin
+const customerContact = (ctx, { mobile = '', email = '' }) => ({ mobile: ctx.fullPhone ? mobile : maskPhone(mobile), email: maskEmail(email) });
 
 const pagination = (total, page, limit) => ({ total, page, limit, pages: Math.max(1, Math.ceil(total / limit)) });
 const pageOf = (q, d = 10) => ({ page: Math.max(1, parseInt(q.page, 10) || 1), limit: Math.min(100, Math.max(1, parseInt(q.limit, 10) || d)) });
@@ -139,44 +173,90 @@ async function storeCustomers(ctx) {
 }
 
 const masked = (ctx, c) => ({ ...c, ...contact(ctx, c) });
+const maskedCustomer = (ctx, c) => ({ ...c, ...customerContact(ctx, c) });
+
+const NEW_DAYS = 30;
+const tagOf = (u) => (Date.now() - new Date(u.createdAt).getTime() <= NEW_DAYS * 86400000 ? 'new' : 'nearby');
+
+/**
+ * Customers whose saved address is near this store and who have not ordered here (yet): no order history, only
+ * their contact and a tag ("new": signed up in the last 30 days, otherwise "nearby").
+ */
+async function nearbyCustomers(ctx, { exclude = [], only } = {}) {
+  const role = await Role.findOne({ code: 'CUSTOMER' }).select('_id').lean();
+  if (!role) return [];
+  const area = await storeArea(ctx.storeId);
+  const users = await User.find({
+    primaryRole: role._id,
+    isDeleted: { $ne: true },
+    _id: only ? only : { $nin: exclude },
+    ...nearbyAddressFilter(area, { list: 'addresses', point: 'location', city: 'city' }),
+  }).select('mobile email createdAt addresses.recipientName addresses.isDefault').limit(2000).lean();
+  const profiles = await Profile.find({ userId: { $in: users.map((u) => u._id) } }).select('userId firstName lastName email').lean();
+  const profileById = new Map(profiles.map((p) => [String(p.userId), p]));
+  return users.map((u) => {
+    const p = profileById.get(String(u._id)) || {};
+    const address = (u.addresses || []).find((a) => a.isDefault) || (u.addresses || [])[0] || {};
+    return {
+      _id: String(u._id),
+      name: [p.firstName, p.lastName].filter(Boolean).join(' ') || address.recipientName || 'Customer',
+      mobile: u.mobile || '',
+      email: p.email || u.email || '',
+      totalOrders: 0,
+      totalSpent: 0,
+      loyaltyPoints: 0,
+      lastOrderDate: null,
+      createdAt: u.createdAt,
+      tag: tagOf(u),
+      recentOrder: null,
+    };
+  });
+}
 
 export async function listCustomers(user, q = {}) {
-  const ctx = context(user);
-  let list = await storeCustomers(ctx);
+  const ctx = await customerContext(user, q);
+  const ordered = await storeCustomers(ctx);
+  let list = [...ordered, ...(await nearbyCustomers(ctx, { exclude: ordered.map((c) => toId(c._id)) }))];
   const search = str(q.search, 80).toLowerCase();
   if (search) list = list.filter((c) => [c.name, c.email, c.mobile].some((v) => String(v).toLowerCase().includes(search)));
   if (String(q.returning) === 'true') list = list.filter((c) => c.totalOrders > 1);
   if (String(q.highValue) === 'true') list = list.filter((c) => c.totalSpent >= HIGH_VALUE);
   if (!isAll(q.status)) list = list.filter((c) => c.recentOrder?.orderStatus?.toLowerCase() === String(q.status).toLowerCase());
   if (!isAll(q.paymentStatus)) list = list.filter((c) => c.recentOrder?.paymentStatus === String(q.paymentStatus).toLowerCase());
-  list = list.filter((c) => inRange(c.lastOrderDate, q));
+  if (q.startDate && q.endDate) list = list.filter((c) => c.lastOrderDate && inRange(c.lastOrderDate, q));
   const keyOf = (c, by) => ({
-    name: c.name, mobile: c.mobile, orderNumber: c.recentOrder?.orderNumber || '', lastOrderDate: new Date(c.lastOrderDate).getTime(),
-    orderDate: new Date(c.lastOrderDate).getTime(), totalSpent: c.recentOrder?.totalAmount || 0, orderAmount: c.recentOrder?.totalAmount || 0,
+    name: c.name, mobile: c.mobile, orderNumber: c.recentOrder?.orderNumber || '', lastOrderDate: new Date(c.lastOrderDate || 0).getTime(),
+    orderDate: new Date(c.lastOrderDate || 0).getTime(), totalSpent: c.recentOrder?.totalAmount || 0, orderAmount: c.recentOrder?.totalAmount || 0,
     totalAmount: c.recentOrder?.totalAmount || 0, totalOrders: c.totalOrders,
   }[by] ?? c.name);
   list.sort(sorter(q, keyOf, { by: 'name', order: 'asc' }));
   const { page, limit } = pageOf(q);
-  return { customers: list.slice((page - 1) * limit, page * limit).map((c) => masked(ctx, c)), pagination: pagination(list.length, page, limit) };
+  return { customers: list.slice((page - 1) * limit, page * limit).map((c) => maskedCustomer(ctx, c)), pagination: pagination(list.length, page, limit) };
 }
 
-export async function customerProfile(user, customerId) {
-  const ctx = context(user);
+export async function customerProfile(user, customerId, q = {}) {
+  const ctx = await customerContext(user, q);
   if (!isId(customerId)) throw new NotFoundError('Customer not found');
   const orders = await FoodOrder.find({ storeId: ctx.storeId, userId: toId(customerId) }).sort({ createdAt: -1 }).limit(50).lean();
-  if (!orders.length) throw new NotFoundError('Customer not found'); // never ordered here: not this store's customer
+  if (!orders.length) {
+    // Never ordered here: a customer of this store only when their saved address is near it
+    const [near] = await nearbyCustomers(ctx, { only: toId(customerId) });
+    if (!near) throw new NotFoundError('Customer not found');
+    const { recentOrder, ...profile } = near;
+    return { customerProfile: maskedCustomer(ctx, profile), recentOrders: [], complaints: await complaintsOf(ctx, { userId: toId(customerId) }), reviews: [] };
+  }
   const customer = (await storeCustomers(ctx)).find((c) => c._id === String(customerId));
   const [complaints, reviews] = await Promise.all([
     complaintsOf(ctx, { userId: toId(customerId) }),
     Promise.resolve(orders.filter((o) => o.ratings?.store?.rating).map((o) => toReview(ctx, o, customer))),
   ]);
   const { recentOrder, ...profile } = customer;
-  return { customerProfile: masked(ctx, profile), recentOrders: orders.map(orderSummary), complaints, reviews };
+  return { customerProfile: maskedCustomer(ctx, profile), recentOrders: orders.map(orderSummary), complaints, reviews };
 }
 
 /** Order details for the customer screens (items, payment, tracking, refunds). */
-export async function orderDetails(user, orderId) {
-  const ctx = context(user);
+export async function orderDetails(user, orderId, q = {}) {
+  const ctx = await customerContext(user, q);
   if (!isId(orderId)) throw new NotFoundError('Order not found');
   const order = await FoodOrder.findOne({ _id: toId(orderId), storeId: ctx.storeId }).lean();
   if (!order) throw new NotFoundError('Order not found');
@@ -185,7 +265,7 @@ export async function orderDetails(user, orderId) {
     User.findById(order.userId).select('mobile email').lean(),
     Refund.find({ orderId: order._id }).sort({ createdAt: -1 }).lean(),
   ]);
-  const who = contact(ctx, { mobile: order.customerPhone || u?.mobile || '', email: u?.email || '' });
+  const who = customerContact(ctx, { mobile: order.customerPhone || u?.mobile || '', email: u?.email || '' });
   return {
     order: { ...orderSummary(order), customerName: order.customerName || 'Customer', customerMobile: who.mobile, customerEmail: who.email, storeName: store?.storeName || '' },
     items: (order.items || []).map((i) => ({

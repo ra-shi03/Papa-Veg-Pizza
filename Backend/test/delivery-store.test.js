@@ -3,7 +3,8 @@
 //
 // Store A orders: ready (ready_for_pickup, no rider), prep (preparing), road (picked_up, rider R1), done (delivered, rider R1),
 // gone (cancelled). Store B: bready (ready_for_pickup).
-// Riders: R1 shared + online, R2 belongs to store B, R3 shared but pending approval, R4 belongs to store A + offline.
+// Riders: R1 shared + online near store A, R2 belongs to store B, R3 shared but pending approval (no location),
+// R4 belongs to store A + offline. Who is near whom is covered in nearby-people.test.js.
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createFixture, mongoose } from './helpers/fixture.js';
@@ -36,7 +37,7 @@ before(async () => {
     staff = fx.claim('KITCHEN_STAFF', { franchiseId: A.franchiseId, storeId: A.storeId });
     await fx.models.FoodStore.updateOne({ _id: A.storeId }, { $set: { latitude: 22.74, longitude: 75.89 } });
     await mongoose.connection.collection('food_delivery_partners').insertMany([
-        partner(R[1], { n: 1, set: { lastLat: 22.75, lastLng: 75.9 } }),
+        partner(R[1], { n: 1, set: { lastLat: 22.75, lastLng: 75.9, lastLocation: { type: 'Point', coordinates: [75.9, 22.75] } } }),
         partner(R[2], { n: 2, set: { storeId: oid(B.storeId), franchiseId: oid(B.franchiseId) } }),
         partner(R[3], { n: 3, set: { status: 'pending' } }),
         partner(R[4], { n: 4, set: { storeId: oid(A.storeId), franchiseId: oid(A.franchiseId), availabilityStatus: 'offline' } }),
@@ -117,11 +118,12 @@ describe('riders and orders', () => {
         const r1 = list.find((r) => r.name === 'Rider 1');
         assert.deepEqual(
             [r1.mobile, r1.vehicleType, r1.availability, r1.currentStatus, r1.currentOrderId, r1.activeOrders, r1.todayDeliveries, r1.averageDeliveryTime, r1.cancellationRate],
-            ['9100000010', 'Bike', 'online', 'busy', O.road.ref, 1, 1, 30, 0],
+            ['91******10', 'Bike', 'online', 'busy', O.road.ref, 1, 1, 30, 0],
         );
         assert.equal(list.find((r) => r.name === 'Rider 4').currentStatus, 'idle');
         assert.ok(!JSON.stringify(list).includes('password'));
-        assert.deepEqual(ok(await fx.call('GET', `${S}/riders`, B.managerToken)).map((r) => r.name).sort(), ['Rider 1', 'Rider 2']);
+        // Store B is far from R1 (another city), so only its own rider
+        assert.deepEqual(ok(await fx.call('GET', `${S}/riders`, B.managerToken)).map((r) => r.name).sort(), ['Rider 2']);
         assert.equal(ok(await fx.call('GET', `${S}/rider/${R[1]}`, A.managerToken)).name, 'Rider 1');
     });
     test('available riders: online ones only, with distance from the store', async () => {

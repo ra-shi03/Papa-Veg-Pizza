@@ -1,9 +1,11 @@
 // Store manager panel: customers, complaints, reviews (/v1/food/store/customers | complaints | reviews),
 // and the franchise scoping of the admin complaints and customers endpoints.
 //
-//   store manager      -> own store; replies to reviews, responds to and resolves complaints; full contact details
+//   store manager      -> own store; replies to reviews, responds to and resolves complaints; full phone (the
+//                         Customers screens mask the email, complaints and reviews show it)
 //   kitchen supervisor -> own store, read only, phone and email masked
-//   kitchen staff, franchise admin, super admin, customers -> 403 on the store screens
+//   franchise admin, super admin -> Customers screens read only via ?storeId= (nearby-people.test.js)
+//   kitchen staff, customers -> 403 on the store screens; franchise / super admin -> 403 on complaints and reviews
 //   another store / franchise -> 404
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -70,9 +72,10 @@ const raiseComplaint = (customerToken, orderId, issueType = 'Missing Items', des
 describe('who may open the store screens', () => {
     const paths = ['/customers/orders', '/complaints', '/reviews'];
     for (const path of paths) {
-        test(`GET ${S}${path}: anonymous 401; kitchen staff, customers, franchise admin, super admin 403; manager and supervisor 200`, async () => {
+        test(`GET ${S}${path}: anonymous 401; kitchen staff, customers (and admins outside Customers) 403; manager and supervisor 200`, async () => {
             assert.equal((await fx.call('GET', `${S}${path}`)).status, 401);
-            for (const token of [chef.token, A.customerToken, A.adminToken, fx.SA]) assert.equal((await get(token, path)).status, 403, path);
+            const refused = path === '/customers/orders' ? [chef.token, A.customerToken] : [chef.token, A.customerToken, A.adminToken, fx.SA];
+            for (const token of refused) assert.equal((await get(token, path)).status, 403, path);
             assert.equal((await get(MGR_A(), path)).status, 200);
             assert.equal((await get(sup.token, path)).status, 200);
         });
@@ -101,9 +104,9 @@ describe('customers', () => {
         assert.deepEqual(b.customers.map((c) => c._id).sort(), [B.customerId, both.id].sort());
         assert.equal(b.customers.find((c) => c._id === both.id).totalSpent, 7000);
     });
-    test('the manager sees full contact details; the supervisor sees them masked', async () => {
+    test('the manager sees the full phone and a masked email; the supervisor sees both masked', async () => {
         const full = (await list(MGR_A())).customers.find((c) => c._id === A.customerId);
-        assert.equal(full.email, `alice${fx.ts}@example.invalid`);
+        assert.equal(full.email, 'a***@example.invalid');
         assert.match(full.mobile, /^\d{10,11}$/);
         const masked = (await list(sup.token)).customers.find((c) => c._id === A.customerId);
         assert.match(masked.mobile, /^\d{2}\*{6,7}\d{2}$/);

@@ -42,6 +42,8 @@ before(async () => {
     riderWaiting = await fx.partner('approved');
     riderLate = await fx.partner('approved');
     riderFree = await fx.partner('approved');
+    // the free rider is store A's own (who is near whom: nearby-people.test.js)
+    await mongoose.connection.collection('food_delivery_partners').updateOne({ _id: new mongoose.Types.ObjectId(riderFree.id) }, { $set: { storeId: new mongoose.Types.ObjectId(A.storeId), franchiseId: new mongoose.Types.ObjectId(A.franchiseId) } });
 });
 after(async () => { await fx?.teardown(); });
 

@@ -15,13 +15,14 @@ export default function useRiders(filters = {}) {
         list = response.data.riders;
       }
 
-      // 1. Search Filter (by name or phone number)
+      // 1. Search Filter (by name, phone number or area; the server sends riders near this store, phone masked)
       if (filters.search) {
         const q = filters.search.toLowerCase();
         list = list.filter(
           (r) =>
-            r.name.toLowerCase().includes(q) ||
-            r.mobile.includes(q)
+            String(r.name || "").toLowerCase().includes(q) ||
+            String(r.mobile || "").includes(q) ||
+            String(r.area || "").toLowerCase().includes(q)
         );
       }
 

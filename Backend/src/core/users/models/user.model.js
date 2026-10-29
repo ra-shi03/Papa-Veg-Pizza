@@ -96,6 +96,8 @@ const userSchema = new mongoose.Schema({
 userSchema.index({ mobile: 1, isDeleted: 1 }, { name: 'idx_mobile_active' });
 userSchema.index({ primaryRole: 1, isActive: 1, isDeleted: 1 }, { name: 'idx_role_active' });
 userSchema.index({ isActive: 1, isDeleted: 1 });
+// Store panel "customers near this store" (store/services/nearby.js)
+userSchema.index({ 'addresses.location': '2dsphere' });
 
 // Hash plaintext passwords on save. A value that is already a bcrypt hash (controllers that hash
 // first) is left alone, so nothing is ever double-hashed.

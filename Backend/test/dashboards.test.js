@@ -69,10 +69,11 @@ before(async () => {
     O.y1 = await seed(A, { status: 'delivered', total: 1000, rating: 5, at: yesterday });
     O.b1 = await seed(B, { status: 'delivered', total: 9999, rating: 2 });
 
-    // riders: one busy on o6, one free and online
+    // riders: one busy on o6, one free and online; both are store A's own riders (who is near whom: nearby-people.test.js)
+    const own = { storeId: new mongoose.Types.ObjectId(A.storeId), franchiseId: new mongoose.Types.ObjectId(A.franchiseId) };
     await mongoose.connection.collection('food_delivery_partners').insertMany([
-        { _id: RIDER_BUSY, name: 'Rider Busy', phone: '9111111111', status: 'approved', availabilityStatus: 'online' },
-        { _id: RIDER_FREE, name: 'Rider Free', phone: '9222222222', status: 'approved', availabilityStatus: 'online' },
+        { _id: RIDER_BUSY, name: 'Rider Busy', phone: '9111111111', status: 'approved', availabilityStatus: 'online', ...own },
+        { _id: RIDER_FREE, name: 'Rider Free', phone: '9222222222', status: 'approved', availabilityStatus: 'online', ...own },
     ]);
     // stock: one counted ingredient below its reorder level, with an active critical alert
     const ing = await mongoose.connection.collection('food_store_ingredients').insertOne({

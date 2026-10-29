@@ -4,10 +4,12 @@ import { DeliveryIssue } from '../models/deliveryIssue.model.js';
 import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
 import { FoodZone } from '../../admin/models/zone.model.js';
 import { Refund } from '../../../../core/payments/models/refund.model.js';
-import { buildOrderIdentityFilter, buildDeliverySocketPayload, haversineKm, pushStatusHistory, enqueueOrderEvent } from '../../orders/services/order.helpers.js';
+import { buildOrderIdentityFilter, buildDeliverySocketPayload, pushStatusHistory, enqueueOrderEvent } from '../../orders/services/order.helpers.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 import { isId, toId, startOfDay, round1 } from '../../dashboard/services/dashboardAccess.js';
+import { storeArea, nearbyFilter, distanceKm } from './nearby.js';
+import { maskPhone } from './storeCrm.service.js';
 import {
   validateAssignDto, validateCreateIssueDto, validateResolveIssueDto, validateRefundDto, validatePickupDto } from '../validators/storeDelivery.validator.js';
 
@@ -51,17 +53,46 @@ export async function deliveryContext(user, query = {}, { write = false } = {}) 
   return { user, role, store, storeId: store._id, franchiseId: store.franchiseId, canWrite };
 }
 
-/** Riders this store may use: approved partners of the store, of its franchise (no store), or of nobody (shared fleet). */
-const riderFilter = (ctx) => ({
-  status: 'approved',
-  $or: [{ storeId: ctx.storeId }, { storeId: null, franchiseId: ctx.franchiseId }, { storeId: null, franchiseId: null }],
-});
+// The only rider fields the store panel reads: never documents, bank details, Aadhaar / PAN or the full phone.
+const RIDER_FIELDS = 'name phone vehicleType status availabilityStatus city state lastLocation lastLocationAt rating totalDeliveries approvedAt createdAt updatedAt';
 
-async function findRider(ctx, riderId) {
+/**
+ * Riders a store sees (approved and pending): the store's own riders, plus riders of its franchise or of the shared
+ * fleet (no store, no franchise) who are near the store (nearby.js). Riders of other stores or franchises never
+ * appear. `approvedOnly` for anything that hands a rider an order.
+ */
+export async function riderScope(store, { approvedOnly = false } = {}) {
+  const area = await storeArea(store._id);
+  const filter = {
+    status: approvedOnly ? 'approved' : { $in: ['approved', 'pending'] },
+    $or: [
+      { storeId: store._id },
+      {
+        $and: [
+          { storeId: null, franchiseId: { $in: [store.franchiseId || null, null] } },
+          nearbyFilter(area, { point: 'lastLocation', city: 'city' }),
+        ],
+      },
+    ],
+  };
+  return { area, filter };
+}
+
+async function findRider(ctx, riderId, opts) {
   if (!isId(riderId)) throw new NotFoundError('Rider not found');
-  const rider = await FoodDeliveryPartner.findOne({ _id: toId(riderId), ...riderFilter(ctx) }).lean();
+  const { area, filter } = await riderScope(ctx.store, opts);
+  const rider = await FoodDeliveryPartner.findOne({ _id: toId(riderId), ...filter }).select(RIDER_FIELDS).lean();
   if (!rider) throw new NotFoundError('Rider not found');
-  return rider;
+  return { ...rider, _area: area };
+}
+
+/** The rider named on an issue: the order's own rider (wherever they are now), or one the store may use. */
+async function issueRider(ctx, order, riderId) {
+  if (isId(riderId) && String(order.dispatch?.deliveryPartnerId || '') === String(riderId)) {
+    const own = await FoodDeliveryPartner.findById(order.dispatch.deliveryPartnerId).select('name').lean();
+    if (own) return own;
+  }
+  return findRider(ctx, riderId, { approvedOnly: true });
 }
 
 async function findOrder(ctx, orderId, select) {
@@ -113,17 +144,30 @@ async function riderStats(ids) {
   return new Map(rows.map((r) => [String(r._id), r]));
 }
 
-const toRider = (p, s = {}) => ({
+const isPending = (p) => p.status === 'pending';
+/** pending (not approved yet) / online / offline */
+export const riderStatusOf = (p) => (isPending(p) ? 'pending' : p.availabilityStatus === 'online' ? 'online' : 'offline');
+export const riderAreaOf = (p) => String(p.city || p.state || '').trim();
+const kmFrom = (area, p) => {
+  const d = distanceKm(area, p.lastLocation?.coordinates);
+  return d == null ? null : round1(d);
+};
+
+const toRider = (p, s = {}, area = {}) => ({
   _id: String(p._id),
   name: p.name,
-  mobile: p.phone,
+  mobile: maskPhone(p.phone),
   vehicleType: p.vehicleType || '',
-  vehicleNumber: p.vehicleNumber || '',
   joiningDate: new Date(p.approvedAt || p.createdAt).toISOString().slice(0, 10),
   rating: p.rating || 0,
+  approvalStatus: isPending(p) ? 'pending' : 'approved',
+  status: riderStatusOf(p),
+  area: riderAreaOf(p),
+  distanceFromStore: kmFrom(area, p),
   availability: p.availabilityStatus || 'offline',
-  currentStatus: s.active ? 'busy' : 'idle',
+  currentStatus: isPending(p) ? 'pending' : s.active ? 'busy' : 'idle',
   currentOrderId: s.current || null,
+  lastSeen: p.lastLocationAt || p.updatedAt,
   lastActive: p.lastLocationAt || p.updatedAt,
   totalDeliveries: Math.max(p.totalDeliveries || 0, s.delivered || 0),
   averageDeliveryTime: s.takeN ? Math.round(s.takeSum / s.takeN) : 0,
@@ -133,32 +177,38 @@ const toRider = (p, s = {}) => ({
   activeOrders: s.active || 0,
 });
 
+/** Riders near this store, approved and pending (Riders / Rider Availability screens). */
 export async function listRiders(user, q = {}) {
   const ctx = await deliveryContext(user, q);
-  const partners = await FoodDeliveryPartner.find(riderFilter(ctx)).select('-password -aadharNumber -panNumber -drivingLicenseNumber -bankAccountNumber -bankIfscCode -upiId').sort({ name: 1 }).limit(300).lean();
+  const { area, filter } = await riderScope(ctx.store);
+  const partners = await FoodDeliveryPartner.find(filter).select(RIDER_FIELDS).sort({ name: 1 }).limit(300).lean();
   const stats = await riderStats(partners.map((p) => p._id));
-  return partners.map((p) => toRider(p, stats.get(String(p._id))));
+  return partners.map((p) => toRider(p, stats.get(String(p._id)), area));
 }
 
 export async function riderDetails(user, riderId, q = {}) {
   const ctx = await deliveryContext(user, q);
-  const p = await findRider(ctx, riderId);
-  return toRider(p, (await riderStats([p._id])).get(String(p._id)));
+  const { _area, ...p } = await findRider(ctx, riderId);
+  return toRider(p, (await riderStats([p._id])).get(String(p._id)), _area);
 }
 
-/** Online riders, idle ones first, then nearest to the store. */
+/**
+ * Riders who can take an order now: approved, online and near the store; idle ones first, then nearest. Pending
+ * riders are left out here because they cannot be assigned (they are listed by listRiders).
+ */
 export async function availableRiders(user, q = {}) {
   const ctx = await deliveryContext(user, q);
-  const partners = await FoodDeliveryPartner.find({ ...riderFilter(ctx), availabilityStatus: 'online' }).select('name phone vehicleType rating lastLat lastLng').lean();
+  const { area, filter } = await riderScope(ctx.store, { approvedOnly: true });
+  const partners = await FoodDeliveryPartner.find({ ...filter, availabilityStatus: 'online' }).select(RIDER_FIELDS).lean();
   const stats = await riderStats(partners.map((p) => p._id));
-  const { latitude, longitude } = ctx.store;
   const out = partners.map((p) => {
     const active = stats.get(String(p._id))?.active || 0;
-    const known = Number.isFinite(latitude) && Number.isFinite(longitude) && Number.isFinite(p.lastLat) && Number.isFinite(p.lastLng);
+    const km = kmFrom(area, p);
     return {
-      _id: String(p._id), name: p.name, mobile: p.phone, vehicleType: p.vehicleType || '', currentStatus: 'online',
+      _id: String(p._id), name: p.name, mobile: maskPhone(p.phone), vehicleType: p.vehicleType || '', currentStatus: 'online',
+      status: 'online', area: riderAreaOf(p), lastSeen: p.lastLocationAt || p.updatedAt,
       activeOrders: active, availability: active ? 'busy' : 'idle', rating: p.rating || 0,
-      distanceFromStore: known ? round1(haversineKm(latitude, longitude, p.lastLat, p.lastLng)) : 0, _known: known,
+      distanceFromStore: km ?? 0, _known: km != null,
     };
   });
   out.sort((a, b) => (a.activeOrders ? 1 : 0) - (b.activeOrders ? 1 : 0) || (b._known - a._known) || a.distanceFromStore - b.distanceFromStore);
@@ -318,7 +368,7 @@ export async function assignRider(user, body = {}, q = {}) {
   const ctx = await deliveryContext(user, q, { write: true });
   const dto = validateAssignDto(body);
   const order = await findOrder(ctx, dto.orderId, 'order_id orderStatus dispatch items pricing payment deliveryAddress customerName customerPhone note storeId userId');
-  return assign(ctx, order, await findRider(ctx, dto.riderId));
+  return assign(ctx, order, await findRider(ctx, dto.riderId, { approvedOnly: true }));
 }
 
 /**
@@ -452,8 +502,8 @@ export async function listIssues(user, q = {}) {
 export async function createIssue(user, body = {}, q = {}) {
   const ctx = await deliveryContext(user, q, { write: true });
   const dto = validateCreateIssueDto(body);
-  const order = await findOrder(ctx, dto.orderId, 'order_id');
-  const rider = dto.riderId ? await findRider(ctx, dto.riderId) : null;
+  const order = await findOrder(ctx, dto.orderId, 'order_id dispatch.deliveryPartnerId');
+  const rider = dto.riderId ? await issueRider(ctx, order, dto.riderId) : null;
   const issue = await DeliveryIssue.create({
     storeId: ctx.storeId, franchiseId: ctx.franchiseId, orderId: order._id, orderRef: order.order_id || String(order._id),
     riderId: rider?._id || null, riderName: rider?.name || '', issueType: dto.issueType, description: dto.description,
@@ -472,7 +522,7 @@ export async function updateIssue(user, issueId, body = {}, q = {}) {
 
   // Validate everything before changing anything
   if (dto.reassignRiderId && dto.refundAmount > 0) throw new ValidationError('Choose either a refund request or a new rider for this issue.');
-  const rider = dto.reassignRiderId ? await findRider(ctx, dto.reassignRiderId) : null;
+  const rider = dto.reassignRiderId ? await findRider(ctx, dto.reassignRiderId, { approvedOnly: true }) : null;
   const order = await FoodOrder.findOne({ _id: issue.orderId, storeId: ctx.storeId }).select('order_id orderStatus dispatch items pricing payment deliveryAddress customerName customerPhone note storeId userId').lean();
   if (rider && !order) throw new NotFoundError('Order not found');
   if (dto.refundAmount > 0 && !order) throw new NotFoundError('Order not found');

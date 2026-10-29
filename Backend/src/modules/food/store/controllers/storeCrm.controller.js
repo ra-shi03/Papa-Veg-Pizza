@@ -11,8 +11,8 @@ const wrap = (message, fn) => async (req, res, next) => {
 
 // Customers & orders
 export const listCustomers = wrap('Customers fetched', (req) => crm.listCustomers(req.user, req.query));
-export const customerProfile = wrap('Customer fetched', (req) => crm.customerProfile(req.user, req.params.customerId));
-export const orderDetails = wrap('Order fetched', (req) => crm.orderDetails(req.user, req.params.orderId));
+export const customerProfile = wrap('Customer fetched', (req) => crm.customerProfile(req.user, req.params.customerId, req.query));
+export const orderDetails = wrap('Order fetched', (req) => crm.orderDetails(req.user, req.params.orderId, req.query));
 
 // Complaints
 export const listComplaints = wrap('Complaints fetched', (req) => crm.listComplaints(req.user, req.query));

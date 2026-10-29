@@ -10,6 +10,7 @@ import { KitchenOven } from '../../store/models/kitchenOven.model.js';
 import { User } from '../../../../core/users/models/user.model.js';
 import { todaySummary, todayRoster } from '../../store/services/attendance.service.js';
 import { clockOf } from '../../store/services/attendanceTime.js';
+import { riderScope, riderAreaOf } from '../../store/services/storeDelivery.service.js';
 import { storeScope, startOfDay, daysAgo, hourLabel, ago, round1, round2, CANCELLED, SALE } from './dashboardAccess.js';
 
 // Store manager dashboard (/v1/store/dashboard/*). Every widget is computed from live data of ONE store, chosen by
@@ -225,7 +226,9 @@ export async function kitchenPerformance(user, q) {
 
 /**
  * The riders behind the delivery-overview card: riders on this store's orders (waiting for pickup, on the road, or late)
- * and free online riders. Status words are the ones the card's filters read ("Delivering...", "Delayed", "Idle").
+ * and the other riders near this store (storeDelivery riderScope: approved and pending, never another store's or
+ * franchise's). Status words are the ones the card's filters read ("Delivering...", "Delayed", "Idle"), plus
+ * "Offline" and "Pending approval".
  */
 export async function riderRoster(user, q) {
   const store = await storeScope(user, q, 'rider-roster');
@@ -234,7 +237,8 @@ export async function riderRoster(user, q) {
       .select('order_id orderStatus dispatch.deliveryPartnerId statusHistory updatedAt').lean(),
     FoodOrder.distinct('dispatch.deliveryPartnerId', { orderStatus: { $in: ['ready_for_pickup', 'reached_pickup', ...OUT] }, 'dispatch.deliveryPartnerId': { $ne: null } }),
   ]);
-  const free = await FoodDeliveryPartner.find({ status: 'approved', availabilityStatus: 'online', _id: { $nin: allBusy } }).select('name').limit(50).lean();
+  const { filter } = await riderScope(store);
+  const free = await FoodDeliveryPartner.find({ ...filter, _id: { $nin: allBusy } }).select('name status availabilityStatus city state').sort({ name: 1 }).limit(50).lean();
   const onOrders = await FoodDeliveryPartner.find({ _id: { $in: orders.map((o) => o.dispatch.deliveryPartnerId) } }).select('name').lean();
   const nameOf = new Map(onOrders.map((r) => [String(r._id), r.name]));
   const byRider = new Map();
@@ -253,7 +257,11 @@ export async function riderRoster(user, q) {
     ordersAssigned: r.orders.join(', '),
     location: r.onRoad ? 'On the way to the customer' : 'At the store',
   }));
-  return [...busy, ...free.map((r) => ({ name: r.name, status: 'Idle', ordersAssigned: 'None', location: 'Online' }))];
+  const idleStatus = (r) => (r.status === 'pending' ? 'Pending approval' : r.availabilityStatus === 'online' ? 'Idle' : 'Offline');
+  const rank = { Idle: 0, Offline: 1, 'Pending approval': 2 };
+  const others = free.map((r) => ({ name: r.name, status: idleStatus(r), ordersAssigned: 'None', location: riderAreaOf(r) || (r.availabilityStatus === 'online' ? 'Online' : '') }))
+    .sort((a, b) => rank[a.status] - rank[b.status]);
+  return [...busy, ...others];
 }
 
 /** Today's kitchen team behind the staff-overview card (real clock-ins). */
@@ -262,7 +270,7 @@ export async function staffRoster(user, q) {
   return todayRoster(store._id);
 }
 
-/** Riders: free online riders (the fleet is shared), riders on this store's orders, and late deliveries. */
+/** Riders: free online riders near this store (riderScope), riders on this store's orders, and late deliveries. */
 export async function deliveryOverview(user, q) {
   const store = await storeScope(user, q, 'delivery-overview');
   const [onOrders, allBusy, out] = await Promise.all([
@@ -270,7 +278,8 @@ export async function deliveryOverview(user, q) {
     FoodOrder.distinct('dispatch.deliveryPartnerId', { orderStatus: { $in: ['ready_for_pickup', 'reached_pickup', ...OUT] }, 'dispatch.deliveryPartnerId': { $ne: null } }),
     FoodOrder.find({ storeId: store._id, orderStatus: { $in: OUT } }).select('statusHistory updatedAt').lean(),
   ]);
-  const available = await FoodDeliveryPartner.countDocuments({ status: 'approved', availabilityStatus: 'online', _id: { $nin: allBusy } });
+  const { filter } = await riderScope(store, { approvedOnly: true });
+  const available = await FoodDeliveryPartner.countDocuments({ ...filter, availabilityStatus: 'online', _id: { $nin: allBusy } });
   const late = out.filter((o) => minutesBetween(historyAt(o, 'picked_up') || o.updatedAt, new Date()) > DELIVERY_LATE_MIN).length;
   return { availableRiders: available, assignedRiders: onOrders.length, delayedDeliveries: late };
 }

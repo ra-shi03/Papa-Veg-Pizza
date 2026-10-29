@@ -83,6 +83,9 @@ before(async () => {
     sup = await makeStaff('Kitchen Supervisor', 'rfsup');
     rider = await fx.partner();
     otherRider = await fx.partner();
+    // store A's own riders, so the store can assign them wherever they are (who is near whom: nearby-people.test.js)
+    const own = { storeId: new mongoose.Types.ObjectId(A.storeId), franchiseId: new mongoose.Types.ObjectId(A.franchiseId) };
+    await mongoose.connection.collection('food_delivery_partners').updateMany({ _id: { $in: [rider.id, otherRider.id].map((id) => new mongoose.Types.ObjectId(id)) } }, { $set: own });
 });
 after(async () => { await fx?.teardown(); });
 

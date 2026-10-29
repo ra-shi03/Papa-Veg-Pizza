@@ -190,7 +190,11 @@ describe('order events reach only the right rooms', () => {
     let who;
     const EVENT_KEYS = ['at', 'deliveryPartnerId', 'franchiseId', 'orderId', 'orderMongoId', 'orderStatus', 'stage', 'storeId', 'type'];
     before(async () => {
-        await mongoose.connection.collection('food_delivery_partners').insertOne({ _id: new mongoose.Types.ObjectId(RIDER), name: 'Rider One', phone: '9100000001', status: 'approved', availabilityStatus: 'online', createdAt: new Date(), updatedAt: new Date() });
+        // store A's own rider, so the store can assign it (who is near whom: nearby-people.test.js)
+        await mongoose.connection.collection('food_delivery_partners').insertOne({
+            _id: new mongoose.Types.ObjectId(RIDER), name: 'Rider One', phone: '9100000001', status: 'approved', availabilityStatus: 'online',
+            storeId: new mongoose.Types.ObjectId(A.storeId), franchiseId: new mongoose.Types.ObjectId(A.franchiseId), createdAt: new Date(), updatedAt: new Date(),
+        });
         const scopeA = { franchiseId: A.franchiseId, storeId: A.storeId };
         who = {
             managerA: await client(as.managerA()),
