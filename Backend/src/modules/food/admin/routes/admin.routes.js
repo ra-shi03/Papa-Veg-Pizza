@@ -77,6 +77,9 @@ router.get('/customers/:id', adminController.getCustomerById);
 router.get('/stores/complaints', adminController.getStoreComplaints);
 router.patch('/stores/complaints/:id', adminController.updateStoreComplaint);
 
+// ----- Delivery partners list: super admin sees all; a franchise admin sees only riders near / working for its own stores (read only) -----
+router.get('/delivery/partners', adminController.getDeliveryPartners);
+
 // ----- Staff / RBAC Management (the controller limits roles and franchise/store itself) -----
 router.post('/staff', staffController.createStaff);
 router.get('/staff', staffController.getStaffList);
@@ -290,7 +293,6 @@ router.post('/delivery/earning-addon-completions/check', adminController.checkEa
 router.get('/delivery/support-tickets/stats', adminController.getSupportTicketStats);
 router.get('/delivery/support-tickets', adminController.getSupportTickets);
 router.patch('/delivery/support-tickets/:id', adminController.updateSupportTicket);
-router.get('/delivery/partners', adminController.getDeliveryPartners);
 router.get('/delivery/:id', adminController.getDeliveryPartnerById);
 router.patch('/delivery/:id', adminController.updateDeliveryPartner);
 router.patch('/delivery/:id/approve', adminController.approveDeliveryPartner);

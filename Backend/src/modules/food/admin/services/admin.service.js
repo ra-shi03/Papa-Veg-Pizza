@@ -3855,7 +3855,9 @@ export async function updateDeliverySupportTicket(id, body = {}) {
 // ----- Delivery partners (approved list) -----
 export async function getDeliveryPartners(query) {
     const { page = 1, limit = 1000, search } = query;
-    const filter = { status: 'approved' };
+    // approved riders by default; ?status=approved,suspended (comma list of pending | approved | suspended) widens it
+    const wanted = String(query.status || 'approved').split(',').map((s) => s.trim()).filter((s) => ['pending', 'approved', 'suspended'].includes(s));
+    const filter = { status: { $in: wanted.length ? wanted : ['approved'] } };
     if (search && typeof search === 'string' && search.trim()) {
         const term = search.trim();
         filter.$or = [
@@ -3899,6 +3901,11 @@ export async function getDeliveryPartners(query) {
     const countsMap = new Map(
         (orderCounts || []).map((c) => [String(c._id), c.count])
     );
+    const activeCounts = await FoodOrder.aggregate([
+        { $match: { 'dispatch.deliveryPartnerId': { $in: partnerIds }, orderStatus: { $in: ['confirmed', 'preparing', 'ready_for_pickup', 'reached_pickup', 'picked_up', 'reached_drop'] } } },
+        { $group: { _id: '$dispatch.deliveryPartnerId', count: { $sum: 1 } } }
+    ]);
+    const activeMap = new Map((activeCounts || []).map((c) => [String(c._id), c.count]));
 
     const deliveryPartners = list.map((doc, index) => ({
         _id: doc._id,
@@ -3910,6 +3917,13 @@ export async function getDeliveryPartners(query) {
         zone: doc.city || doc.state || doc.address || '',
         vehicleType: doc.vehicleType || '',
         status: doc.status,
+        availability: doc.availabilityStatus || 'offline',
+        activeOrders: activeMap.get(String(doc._id)) || 0,
+        rating: doc.rating || 0,
+        lastSeen: doc.lastLocationAt || doc.updatedAt || null,
+        vehicleName: doc.vehicleName || '',
+        storeId: doc.storeId || null,
+        franchiseId: doc.franchiseId || null,
         totalOrders: countsMap.get(String(doc._id)) || 0,
         profilePhoto: doc.profilePhoto || null,
         profileImage: doc.profilePhoto ? { url: doc.profilePhoto } : null

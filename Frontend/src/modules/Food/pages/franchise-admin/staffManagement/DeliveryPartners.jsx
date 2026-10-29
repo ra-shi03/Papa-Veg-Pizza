@@ -20,11 +20,15 @@ import RiderPerformanceModal from "./components/RiderPerformanceModal"
 
 // Import Mock Data
 import { initialDeliveryPartners, initialStores, getDeliveryPartnerDashboardStats } from "./mockManagersData"
+import useFranchiseRiders, { riderKpis } from "./useFranchiseRiders"
+import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 export default function DeliveryPartners() {
   // Main Data States
-  const [riders, setRiders] = useState(initialDeliveryPartners)
-  const [kpis, setKpis] = useState(getDeliveryPartnerDashboardStats(initialDeliveryPartners))
+  // Real riders near this franchise's stores (server); the sample list and its stats only run with VITE_STANDALONE_MOCK=true
+  const { riders, setRiders, stores: realStores, error: loadError } = useFranchiseRiders(initialDeliveryPartners)
+  const storeList = STANDALONE_MOCK ? initialStores : realStores
+  const [kpis, setKpis] = useState(STANDALONE_MOCK ? getDeliveryPartnerDashboardStats(initialDeliveryPartners) : riderKpis([]))
   const [filteredRiders, setFilteredRiders] = useState([])
   const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -64,7 +68,7 @@ export default function DeliveryPartners() {
   const [drawerTab, setDrawerTab] = useState("profile")
   
   // Socket.IO simulator control
-  const [socketRunning, setSocketRunning] = useState(true)
+  const [socketRunning, setSocketRunning] = useState(STANDALONE_MOCK)
 
   // Toast notifications
   const [toast, setToast] = useState(null)
@@ -154,7 +158,8 @@ export default function DeliveryPartners() {
     const paginatedList = list.slice(startIndex, startIndex + limit)
 
     setFilteredRiders(paginatedList)
-    setKpis(getDeliveryPartnerDashboardStats(riders.filter(r => r.status !== "DELETED")))
+    const live = riders.filter(r => r.status !== "DELETED")
+    setKpis(STANDALONE_MOCK ? getDeliveryPartnerDashboardStats(live) : riderKpis(live))
     setLoading(false)
   }, [riders, debouncedSearch, storeFilter, vehicleTypeFilter, statusFilter, availabilityFilter, ratingFilter, sortKey, sortOrder, page, limit])
 
@@ -164,7 +169,7 @@ export default function DeliveryPartners() {
 
   // Real-time WebSocket Simulator (Interval updates)
   useEffect(() => {
-    if (!socketRunning) return
+    if (!STANDALONE_MOCK || !socketRunning) return
 
     const timer = setInterval(() => {
       const activeList = riders.filter((r) => r.status !== "DELETED" && r.status !== "Suspended")
@@ -221,6 +226,15 @@ export default function DeliveryPartners() {
     return () => clearInterval(timer)
   }, [riders, socketRunning])
 
+  useEffect(() => {
+    if (loadError) showToast(loadError, "error")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadError])
+
+  // A franchise admin reads this list; every change (add, edit, suspend, delete, assign, documents) is the super admin's
+  const notAvailable = () => showToast("Not available: a franchise admin can view delivery partners but not change them.", "warning")
+  const openModal = (setter) => (STANDALONE_MOCK ? setter(true) : notAvailable())
+
   const handleSort = (key) => {
     const isAsc = sortKey === key && sortOrder === "asc"
     setSortKey(key)
@@ -245,7 +259,7 @@ export default function DeliveryPartners() {
     const rows = riders
       .filter((r) => r.status !== "DELETED")
       .map((r) => {
-        const store = initialStores.find((s) => s._id === r.storeId)?.storeName || "N/A"
+        const store = storeList.find((s) => s._id === r.storeId)?.storeName || "N/A"
         return `"${r.employeeCode}","${r.name}","${r.email}","${r.phone}","${store}","${r.vehicleType}","${r.vehicleNumber}","${r.status}","${r.availability}","${r.rating}","${r.ordersToday}","₹${r.personalDetails?.salary || 0}"`
       })
       .join("\n")
@@ -260,6 +274,7 @@ export default function DeliveryPartners() {
   }
 
   const handleImportCSV = () => {
+    if (!STANDALONE_MOCK) return notAvailable()
     showToast("CSV Import Dialog Triggered. Parse complete (0 new riders onboarded).", "info")
   }
 
@@ -281,6 +296,7 @@ export default function DeliveryPartners() {
   }
 
   const handleBulkActivate = () => {
+    if (!STANDALONE_MOCK) return notAvailable()
     if (selectedRiderIds.length === 0) return
     setRiders((prev) =>
       prev.map((r) => (selectedRiderIds.includes(r.id) ? { ...r, status: "Online", availability: "Available" } : r))
@@ -290,6 +306,7 @@ export default function DeliveryPartners() {
   }
 
   const handleBulkSuspend = () => {
+    if (!STANDALONE_MOCK) return notAvailable()
     if (selectedRiderIds.length === 0) return
     setRiders((prev) =>
       prev.map((r) => (selectedRiderIds.includes(r.id) ? { ...r, status: "Suspended", availability: "Unavailable" } : r))
@@ -299,6 +316,7 @@ export default function DeliveryPartners() {
   }
 
   const handleBulkDelete = () => {
+    if (!STANDALONE_MOCK) return notAvailable()
     if (selectedRiderIds.length === 0) return
     setRiders((prev) =>
       prev.map((r) => (selectedRiderIds.includes(r.id) ? { ...r, status: "DELETED" } : r))
@@ -308,20 +326,23 @@ export default function DeliveryPartners() {
   }
 
   const handleBulkAssignStore = () => {
+    if (!STANDALONE_MOCK) return notAvailable()
     if (selectedRiderIds.length === 0) return
     // Pick the first rider in selection to mock-trigger store assignment
     const firstRider = riders.find((r) => r.id === selectedRiderIds[0])
     setSelectedRider(firstRider)
-    setIsAssignStoreOpen(true)
+    openModal(setIsAssignStoreOpen)
   }
 
   const handleBulkNotify = () => {
+    if (!STANDALONE_MOCK) return notAvailable()
     if (selectedRiderIds.length === 0) return
     showToast(`Broadcasting notifications to ${selectedRiderIds.length} riders.`, "info")
     setSelectedRiderIds([])
   }
 
   const handleBulkReport = () => {
+    if (!STANDALONE_MOCK) return notAvailable()
     if (selectedRiderIds.length === 0) return
     showToast(`Generating combined performance reports for ${selectedRiderIds.length} selected riders.`, "info")
     setSelectedRiderIds([])
@@ -466,7 +487,7 @@ export default function DeliveryPartners() {
         </div>
         <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto whitespace-nowrap scrollbar-none py-1">
           
-          {/* Socket.IO status toggle */}
+          {STANDALONE_MOCK && (
           <button
             onClick={() => setSocketRunning(!socketRunning)}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer shrink-0 ${
@@ -486,11 +507,12 @@ export default function DeliveryPartners() {
               </>
             )}
           </button>
+          )}
 
 
 
           <button
-            onClick={() => { setSelectedRider(null); setIsAddEditOpen(true); }}
+            onClick={() => { setSelectedRider(null); openModal(setIsAddEditOpen); }}
             className="flex items-center gap-1 px-3 py-2 text-white bg-[var(--primary)] hover:bg-[var(--primary-hover)] rounded-xl text-xs font-bold shadow-md shadow-[var(--primary)]/10 transition-all cursor-pointer shrink-0"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -531,10 +553,10 @@ export default function DeliveryPartners() {
               { label: "Online Riders", val: kpis.onlineRiders, sub: "App Active", icon: UserCheck, color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20" },
               { label: "Busy Riders", val: kpis.busyRiders, sub: "Delivering", icon: Truck, color: "text-blue-600 bg-blue-50 dark:bg-blue-950/20" },
               { label: "Today Orders", val: kpis.deliveredToday, sub: "Delivered MTD", icon: CheckCircle2, color: "text-purple-650 bg-purple-50 dark:bg-purple-950/20" },
-              { label: "Avg Speed/Time", val: `${kpis.avgDeliveryTime}m`, sub: "Target < 25m", icon: Clock, color: "text-amber-600 bg-amber-50 dark:bg-amber-950/20" },
+              { label: "Avg Speed/Time", val: kpis.avgDeliveryTime == null ? "—" : `${kpis.avgDeliveryTime}m`, sub: "Target < 25m", icon: Clock, color: "text-amber-600 bg-amber-50 dark:bg-amber-950/20" },
               { label: "Average Rating", val: `${kpis.avgRating} ★`, sub: "Based on orders", icon: Star, color: "text-yellow-600 bg-yellow-50 dark:bg-yellow-950/20" },
-              { label: "Today Earnings", val: `₹${kpis.todayEarnings.toLocaleString("en-IN")}`, sub: "Rider Payouts", icon: Wallet, color: "text-teal-600 bg-teal-50 dark:bg-teal-950/20" },
-              { label: "Cancelled", val: kpis.cancelledDeliveries, sub: "High Risk", icon: ShieldAlert, color: "text-rose-650 bg-rose-50 dark:bg-rose-950/20" }
+              { label: "Today Earnings", val: kpis.todayEarnings == null ? "—" : `₹${kpis.todayEarnings.toLocaleString("en-IN")}`, sub: "Rider Payouts", icon: Wallet, color: "text-teal-600 bg-teal-50 dark:bg-teal-950/20" },
+              { label: "Cancelled", val: kpis.cancelledDeliveries == null ? "—" : kpis.cancelledDeliveries, sub: "High Risk", icon: ShieldAlert, color: "text-rose-650 bg-rose-50 dark:bg-rose-950/20" }
             ].map((card, i) => (
               <div key={i} className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-850 rounded-xl p-2.5 shadow-xs relative overflow-hidden flex flex-col justify-between min-h-[82px] hover:scale-[1.02] transition-transform duration-300">
                 <div>
@@ -579,7 +601,7 @@ export default function DeliveryPartners() {
                   className="w-full px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs font-bold focus:outline-none"
                 >
                   <option value="All">Hub Store: All</option>
-                  {initialStores.map((s) => (
+                  {storeList.map((s) => (
                     <option key={s._id} value={s._id}>{s.storeName}</option>
                   ))}
                 </select>
@@ -611,6 +633,7 @@ export default function DeliveryPartners() {
                   <option value="Online">Online</option>
                   <option value="Offline">Offline</option>
                   <option value="Busy">Busy</option>
+                  <option value="Pending">Pending</option>
                   <option value="Suspended">Suspended</option>
                 </select>
               </div>
@@ -737,7 +760,7 @@ export default function DeliveryPartners() {
                   <p className="text-xs text-zinc-450 dark:text-zinc-550 mt-1">There are no riders registered or active matching your search criteria.</p>
                 </div>
                 <button
-                  onClick={() => { setSelectedRider(null); setIsAddEditOpen(true); }}
+                  onClick={() => { setSelectedRider(null); openModal(setIsAddEditOpen); }}
                   className="px-4 py-2 bg-[var(--primary)] text-white text-xs font-bold rounded-xl shadow-md cursor-pointer"
                 >
                   Add Delivery Partner
@@ -771,7 +794,7 @@ export default function DeliveryPartners() {
                     </thead>
                     <tbody className="divide-y divide-zinc-100 dark:divide-zinc-850 text-[11px] text-zinc-700 dark:text-zinc-350">
                       {filteredRiders.map((rider) => {
-                        const store = initialStores.find((s) => s._id === rider.storeId)
+                        const store = storeList.find((s) => s._id === rider.storeId)
                         const isSelected = selectedRiderIds.includes(rider.id)
                         
                         return (
@@ -799,7 +822,7 @@ export default function DeliveryPartners() {
                             <td className="px-3 py-2 font-bold text-zinc-900 dark:text-white">{rider.employeeCode}</td>
                             <td 
                               className="px-3 py-2 font-black text-[var(--primary)] cursor-pointer hover:underline"
-                              onClick={() => { setSelectedRider(rider); setDrawerTab("profile"); setIsViewOpen(true); }}
+                              onClick={() => { setSelectedRider(rider); setDrawerTab("profile"); openModal(setIsViewOpen); }}
                             >
                               {rider.name}
                             </td>
@@ -855,21 +878,21 @@ export default function DeliveryPartners() {
                                   <div className="absolute right-4 mt-1 w-44 bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-xl shadow-xl z-20 overflow-hidden divide-y divide-zinc-100 dark:divide-zinc-850 text-left">
                                     <div className="py-1">
                                       <button
-                                        onClick={() => { setSelectedRider(rider); setDrawerTab("profile"); setIsViewOpen(true); setActiveMenuId(null); }}
+                                        onClick={() => { setSelectedRider(rider); setDrawerTab("profile"); openModal(setIsViewOpen); setActiveMenuId(null); }}
                                         className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
                                       >
                                         <Eye className="w-3.5 h-3.5 text-zinc-400" />
                                         View Drawer
                                       </button>
                                       <button
-                                        onClick={() => { setSelectedRider(rider); setIsAddEditOpen(true); setActiveMenuId(null); }}
+                                        onClick={() => { setSelectedRider(rider); openModal(setIsAddEditOpen); setActiveMenuId(null); }}
                                         className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
                                       >
                                         <Clock className="w-3.5 h-3.5 text-zinc-400" />
                                         Edit Profile
                                       </button>
                                       <button
-                                        onClick={() => { setSelectedRider(rider); setIsDocumentsOpen(true); setActiveMenuId(null); }}
+                                        onClick={() => { setSelectedRider(rider); openModal(setIsDocumentsOpen); setActiveMenuId(null); }}
                                         className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
                                       >
                                         <Shield className="w-3.5 h-3.5 text-zinc-400" />
@@ -879,28 +902,28 @@ export default function DeliveryPartners() {
                                     
                                     <div className="py-1">
                                       <button
-                                        onClick={() => { setSelectedRider(rider); setIsPerformanceOpen(true); setActiveMenuId(null); }}
+                                        onClick={() => { setSelectedRider(rider); openModal(setIsPerformanceOpen); setActiveMenuId(null); }}
                                         className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
                                       >
                                         <TrendingUp className="w-3.5 h-3.5 text-zinc-400" />
                                         Performance Charts
                                       </button>
                                       <button
-                                        onClick={() => { setSelectedRider(rider); setDrawerTab("attendance"); setIsViewOpen(true); setActiveMenuId(null); }}
+                                        onClick={() => { setSelectedRider(rider); setDrawerTab("attendance"); openModal(setIsViewOpen); setActiveMenuId(null); }}
                                         className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
                                       >
                                         <Calendar className="w-3.5 h-3.5 text-zinc-400" />
                                         Attendance Logs
                                       </button>
                                       <button
-                                        onClick={() => { setSelectedRider(rider); setIsWalletOpen(true); setActiveMenuId(null); }}
+                                        onClick={() => { setSelectedRider(rider); openModal(setIsWalletOpen); setActiveMenuId(null); }}
                                         className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
                                       >
                                         <Wallet className="w-3.5 h-3.5 text-zinc-400" />
                                         Wallet Payouts
                                       </button>
                                       <button
-                                        onClick={() => { setSelectedRider(rider); setIsLiveOpen(true); setActiveMenuId(null); }}
+                                        onClick={() => { setSelectedRider(rider); openModal(setIsLiveOpen); setActiveMenuId(null); }}
                                         className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
                                       >
                                         <Compass className="w-3.5 h-3.5 text-zinc-400" />
@@ -910,14 +933,14 @@ export default function DeliveryPartners() {
 
                                     <div className="py-1">
                                       <button
-                                        onClick={() => { setSelectedRider(rider); setIsSuspendOpen(true); setActiveMenuId(null); }}
+                                        onClick={() => { setSelectedRider(rider); openModal(setIsSuspendOpen); setActiveMenuId(null); }}
                                         className="w-full px-4 py-1.5 text-xs text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-955/20 flex items-center gap-1.5 font-bold"
                                       >
                                         <Ban className="w-3.5 h-3.5 text-amber-500" />
                                         Suspend Rider
                                       </button>
                                       <button
-                                        onClick={() => { setSelectedRider(rider); setIsDeleteOpen(true); setActiveMenuId(null); }}
+                                        onClick={() => { setSelectedRider(rider); openModal(setIsDeleteOpen); setActiveMenuId(null); }}
                                         className="w-full px-4 py-1.5 text-xs text-red-650 hover:bg-red-50 dark:hover:bg-red-950/20 flex items-center gap-1.5 font-bold"
                                       >
                                         <Trash2 className="w-3.5 h-3.5 text-red-500" />
@@ -938,7 +961,7 @@ export default function DeliveryPartners() {
                 {/* CARDS LAYOUT (Visible on Mobile View) */}
                 <div className="block md:hidden divide-y divide-zinc-100 dark:divide-zinc-850">
                   {filteredRiders.map((rider) => {
-                    const store = initialStores.find((s) => s._id === rider.storeId)
+                    const store = storeList.find((s) => s._id === rider.storeId)
                     return (
                       <div key={rider.id} className="p-4 space-y-3 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30">
                         <div className="flex items-center justify-between">
@@ -951,7 +974,7 @@ export default function DeliveryPartners() {
                             <div>
                               <h3 
                                 className="text-xs font-black text-[var(--primary)] hover:underline cursor-pointer"
-                                onClick={() => { setSelectedRider(rider); setDrawerTab("profile"); setIsViewOpen(true); }}
+                                onClick={() => { setSelectedRider(rider); setDrawerTab("profile"); openModal(setIsViewOpen); }}
                               >
                                 {rider.name}
                               </h3>
@@ -991,26 +1014,26 @@ export default function DeliveryPartners() {
                         {/* Bottom sheet triggers on mobile */}
                         <div className="flex items-center gap-1 pt-1">
                           <button
-                            onClick={() => { setSelectedRider(rider); setDrawerTab("profile"); setIsViewOpen(true); }}
+                            onClick={() => { setSelectedRider(rider); setDrawerTab("profile"); openModal(setIsViewOpen); }}
                             className="flex-1 py-1 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 rounded-lg text-[9px] font-black text-zinc-700 dark:text-zinc-300 text-center hover:bg-zinc-50 cursor-pointer"
                           >
                             Details
                           </button>
                           <button
-                            onClick={() => { setSelectedRider(rider); setIsLiveOpen(true); }}
+                            onClick={() => { setSelectedRider(rider); openModal(setIsLiveOpen); }}
                             className="flex-1 py-1 bg-[var(--primary)] text-white rounded-lg text-[9px] font-black text-center hover:bg-[var(--primary-hover)] cursor-pointer"
                           >
                             GPS Track
                           </button>
                           <button
-                            onClick={() => { setSelectedRider(rider); setIsWalletOpen(true); }}
+                            onClick={() => { setSelectedRider(rider); openModal(setIsWalletOpen); }}
                             className="px-2 py-1 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-500 rounded-lg cursor-pointer"
                             title="Wallet Payouts"
                           >
                             <Wallet className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => { setSelectedRider(rider); setIsAddEditOpen(true); }}
+                            onClick={() => { setSelectedRider(rider); openModal(setIsAddEditOpen); }}
                             className="px-2 py-1 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-500 rounded-lg cursor-pointer"
                             title="Edit"
                           >

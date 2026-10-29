@@ -97,7 +97,7 @@ export default function DeliveryPartnerDetailsDrawer({ isOpen, onClose, rider, o
                 <div className="flex-1 space-y-2 w-full">
                   <div>
                     <h2 className="text-base font-extrabold text-zinc-900 dark:text-zinc-50 tracking-tight">{rider.name}</h2>
-                    <p className="text-zinc-400 font-semibold text-[9px] tracking-widest uppercase">RIDER ID: {rider.id}</p>
+                    <p className="text-zinc-400 font-semibold text-[9px] tracking-widest uppercase">RIDER ID: {rider.deliveryId || rider.id}</p>
                   </div>
 
                   <div className="flex items-center gap-3">

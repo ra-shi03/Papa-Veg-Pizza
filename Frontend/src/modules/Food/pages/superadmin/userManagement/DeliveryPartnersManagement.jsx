@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   MoreVertical,
@@ -19,9 +19,7 @@ import {
   Radio,
   PowerOff,
   Truck,
-  ShieldAlert,
-  ArrowUpRight,
-  TrendingDown
+  ShieldAlert
 } from "lucide-react"
 
 // Import custom subcomponents
@@ -29,6 +27,9 @@ import DeliveryPartnersFilters from "./DeliveryPartnersFilters"
 import DeliveryPartnerDetailsDrawer from "./DeliveryPartnerDetailsDrawer"
 import EditDeliveryPartnerModal from "./EditDeliveryPartnerModal"
 import DeliverySuspendedModal from "./DeliverySuspendedModal"
+import useDeliveryPartnerRows from "./useDeliveryPartnerRows"
+import { adminAPI } from "@food/api"
+import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 const INITIAL_RIDERS = [
   {
@@ -128,7 +129,8 @@ const INITIAL_RIDERS = [
 ]
 
 export default function DeliveryPartnersManagement() {
-  const [riders, setRiders] = useState(INITIAL_RIDERS)
+  // Real riders from the server; the sample list above only runs with VITE_STANDALONE_MOCK=true
+  const { riders, setRiders, stores: storeOptions, franchises: franchiseOptions, loading, error, reload } = useDeliveryPartnerRows(INITIAL_RIDERS)
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState("")
@@ -156,6 +158,36 @@ export default function DeliveryPartnersManagement() {
     setTimeout(() => setToast(null), 3000)
   }
 
+  useEffect(() => {
+    if (error) showToast(error, "error")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [error])
+
+  // Server writes (approve / reject / suspend / edit): refresh from the server afterwards, show the server's error otherwise
+  const serverCall = async (call, successMessage, type = "success") => {
+    try {
+      await call()
+      showToast(successMessage, type)
+      await reload()
+      return true
+    } catch (err) {
+      showToast(err?.response?.data?.message || err?.response?.data?.error || err?.message || "That did not work", "error")
+      return false
+    }
+  }
+
+  const handleApprove = (rider) => {
+    setActiveMenuId(null)
+    return serverCall(() => adminAPI.approveDeliveryPartner(rider.id), `${rider.name} is approved`)
+  }
+
+  const handleReject = (rider) => {
+    setActiveMenuId(null)
+    const reason = window.prompt(`Reject ${rider.name}? Enter a reason (the rider is told):`, "")
+    if (reason === null) return undefined
+    return serverCall(() => adminAPI.rejectDeliveryPartner(rider.id, reason), `${rider.name} is rejected`, "warning")
+  }
+
   // Calculate stats dynamically
   const kpiStats = useMemo(() => {
     return {
@@ -164,6 +196,7 @@ export default function DeliveryPartnersManagement() {
       offline: riders.filter((r) => r.status === "Offline").length,
       onDelivery: riders.filter((r) => r.status === "Busy").length,
       suspended: riders.filter((r) => r.status === "Suspended").length,
+      pending: riders.filter((r) => r.status === "Pending").length,
     }
   }, [riders])
 
@@ -175,6 +208,7 @@ export default function DeliveryPartnersManagement() {
         rider.name.toLowerCase().includes(query) ||
         rider.phone.includes(query) ||
         rider.id.toLowerCase().includes(query) ||
+        String(rider.deliveryId || "").toLowerCase().includes(query) ||
         rider.vehicle.toLowerCase().includes(query)
 
       const matchesFranchise =
@@ -201,7 +235,18 @@ export default function DeliveryPartnersManagement() {
 
   const totalPages = Math.ceil(filteredRiders.length / itemsPerPage)
 
-  const handleSaveRider = (savedData) => {
+  const handleSaveRider = async (savedData) => {
+    if (!STANDALONE_MOCK) {
+      const done = await serverCall(
+        () => adminAPI.updateDeliveryPartner(savedData.id, { name: savedData.name, email: savedData.email, phone: savedData.phone, address: savedData.address, vehicleType: savedData.vehicle }),
+        `Updated details for ${savedData.name}!`
+      )
+      if (done) {
+        setIsEditModalOpen(false)
+        setSelectedRider(null)
+      }
+      return
+    }
     const exists = riders.some((r) => r.id === savedData.id)
     if (exists) {
       // Edit mode
@@ -217,6 +262,17 @@ export default function DeliveryPartnersManagement() {
   }
 
   const handleSuspendToggle = (rider) => {
+    if (!STANDALONE_MOCK) {
+      setActiveMenuId(null)
+      if (rider.status === "Pending") return handleApprove(rider)
+      if (rider.status === "Suspended") {
+        return serverCall(() => adminAPI.updateDeliveryPartner(rider.id, { status: "approved" }), `${rider.name} has been activated!`)
+      }
+      setIsDrawerOpen(false)
+      setSelectedRider(rider)
+      setIsSuspendModalOpen(true)
+      return undefined
+    }
     if (rider.status === "Suspended") {
       setRiders((prev) =>
         prev.map((r) => (r.id === rider.id ? { ...r, status: "Online" } : r))
@@ -232,7 +288,17 @@ export default function DeliveryPartnersManagement() {
     }
   }
 
-  const handleConfirmSuspension = (rider, reason, notes) => {
+  const handleConfirmSuspension = async (rider, reason, notes) => {
+    if (!STANDALONE_MOCK) {
+      await serverCall(
+        () => adminAPI.updateDeliveryPartner(rider.id, { status: "suspended", rejectionReason: [reason, notes].filter(Boolean).join(": ") }),
+        `${rider.name} is now Suspended!`,
+        "warning"
+      )
+      setIsSuspendModalOpen(false)
+      setSelectedRider(null)
+      return
+    }
     setRiders((prev) =>
       prev.map((r) => (r.id === rider.id ? { ...r, status: "Suspended" } : r))
     )
@@ -242,6 +308,13 @@ export default function DeliveryPartnersManagement() {
   }
 
   const handleDeleteRider = (rider) => {
+    if (!STANDALONE_MOCK) {
+      setActiveMenuId(null)
+      // A pending signup is rejected here; removing an approved partner is not available
+      if (rider.status === "Pending") return handleReject(rider)
+      showToast("Removing a delivery partner is not available. Suspend the account instead.", "error")
+      return undefined
+    }
     if (window.confirm(`Are you sure you want to remove delivery partner ${rider.name}?`)) {
       setRiders((prev) => prev.filter((r) => r.id !== rider.id))
       showToast(`Removed delivery partner ${rider.name}`, "warning")
@@ -332,9 +405,6 @@ export default function DeliveryPartnersManagement() {
             <span className="text-[10px] font-bold text-black dark:text-white uppercase tracking-wider truncate">Total Riders</span>
             <div className="flex items-baseline gap-1.5 flex-wrap">
               <h3 className="text-lg font-black text-black dark:text-white mt-0.5">{kpiStats.total}</h3>
-              <span className="text-emerald-500 font-bold text-[8px] flex items-center gap-0.5">
-                <ArrowUpRight size={10} /> +12%
-              </span>
             </div>
           </div>
           <div className="p-1.5 rounded-md bg-[var(--primary)]/10 text-[var(--primary)] shrink-0 border border-[var(--primary)]/20">
@@ -348,9 +418,6 @@ export default function DeliveryPartnersManagement() {
             <span className="text-[10px] font-bold text-black dark:text-white uppercase tracking-wider truncate">Online</span>
             <div className="flex items-baseline gap-1.5 flex-wrap">
               <h3 className="text-lg font-black text-black dark:text-white mt-0.5">{kpiStats.online}</h3>
-              <span className="text-emerald-500 font-bold text-[8px] flex items-center gap-0.5">
-                <ArrowUpRight size={10} /> +5%
-              </span>
             </div>
           </div>
           <div className="p-1.5 rounded-md bg-green-500/10 text-green-600 shrink-0 border border-green-100 dark:border-green-900/30">
@@ -364,9 +431,6 @@ export default function DeliveryPartnersManagement() {
             <span className="text-[10px] font-bold text-black dark:text-white uppercase tracking-wider truncate">Offline</span>
             <div className="flex items-baseline gap-1.5 flex-wrap">
               <h3 className="text-lg font-black text-black dark:text-white mt-0.5">{kpiStats.offline}</h3>
-              <span className="text-rose-500 font-bold text-[8px] flex items-center gap-0.5">
-                <TrendingDown size={10} /> -2%
-              </span>
             </div>
           </div>
           <div className="p-1.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-black/50 dark:text-white/50 shrink-0 border border-zinc-200 dark:border-zinc-800">
@@ -380,9 +444,6 @@ export default function DeliveryPartnersManagement() {
             <span className="text-[10px] font-bold text-black dark:text-white uppercase tracking-wider truncate">On Delivery</span>
             <div className="flex items-baseline gap-1.5 flex-wrap">
               <h3 className="text-lg font-black text-black dark:text-white mt-0.5">{kpiStats.onDelivery}</h3>
-              <span className="text-emerald-500 font-bold text-[8px] flex items-center gap-0.5">
-                <ArrowUpRight size={10} /> +18%
-              </span>
             </div>
           </div>
           <div className="p-1.5 rounded-md bg-amber-500/10 text-amber-600 shrink-0 border border-amber-100 dark:border-amber-900/30">
@@ -396,9 +457,6 @@ export default function DeliveryPartnersManagement() {
             <span className="text-[10px] font-bold text-black dark:text-white uppercase tracking-wider truncate">Suspended</span>
             <div className="flex items-baseline gap-1.5 flex-wrap">
               <h3 className="text-lg font-black text-black dark:text-white mt-0.5">{kpiStats.suspended}</h3>
-              <span className="text-rose-500 font-bold text-[8px] flex items-center gap-0.5">
-                <ArrowUpRight size={10} /> +3%
-              </span>
             </div>
           </div>
           <div className="p-1.5 rounded-md bg-rose-500/10 text-rose-600 shrink-0 border border-rose-100 dark:border-rose-900/30">
@@ -422,6 +480,9 @@ export default function DeliveryPartnersManagement() {
         sortOrder={sortOrder}
         setSortOrder={setSortOrder}
         onReset={handleResetFilters}
+        franchiseOptions={STANDALONE_MOCK ? undefined : franchiseOptions}
+        storeOptions={STANDALONE_MOCK ? undefined : storeOptions}
+        vehicleOptions={STANDALONE_MOCK ? undefined : [...new Set(riders.map((r) => r.vehicle).filter(Boolean))]}
       />
 
       {/* Main Responsive Table */}
@@ -514,6 +575,8 @@ export default function DeliveryPartnersManagement() {
                           ? "bg-green-50 dark:bg-green-950/20 text-green-600 dark:text-green-400 border border-green-100 dark:border-green-900/30"
                           : rider.status === "Busy"
                             ? "bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30"
+                            : rider.status === "Pending"
+                              ? "bg-sky-50 dark:bg-sky-950/20 text-sky-600 dark:text-sky-400 border border-sky-100 dark:border-sky-900/30"
                             : rider.status === "Offline"
                               ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border border-zinc-200 dark:border-zinc-700/35"
                               : "bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/30"
@@ -548,18 +611,18 @@ export default function DeliveryPartnersManagement() {
                         </button> */}
                         <button
                           onClick={() => handleSuspendToggle(rider)}
-                          className={`p-1 rounded-lg border transition-all cursor-pointer ${rider.status === "Suspended"
+                          className={`p-1 rounded-lg border transition-all cursor-pointer ${rider.status === "Suspended" || rider.status === "Pending"
                             ? "border-emerald-200 dark:border-emerald-950 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
                             : "border-amber-200 dark:border-amber-950 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/20"
                             }`}
-                          title={rider.status === "Suspended" ? "Activate Account" : "Suspend Rider"}
+                          title={rider.status === "Pending" ? "Approve Rider" : rider.status === "Suspended" ? "Activate Account" : "Suspend Rider"}
                         >
-                          {rider.status === "Suspended" ? <UserCheck size={13} /> : <Ban size={13} />}
+                          {rider.status === "Suspended" || rider.status === "Pending" ? <UserCheck size={13} /> : <Ban size={13} />}
                         </button>
                         <button
                           onClick={() => handleDeleteRider(rider)}
                           className="p-1 rounded-lg border border-rose-200/40 dark:border-rose-950 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-550 dark:text-rose-455 transition-all cursor-pointer"
-                          title="Delete Partner"
+                          title={rider.status === "Pending" ? "Reject Rider" : "Delete Partner"}
                         >
                           <Trash2 size={13} />
                         </button>

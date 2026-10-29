@@ -8,6 +8,7 @@ import { validateAddDeliveryBonusDto } from '../validators/deliveryBonus.validat
 import { validateCheckCompletionsDto, validateEarningAddonHistoryActionDto, validateEarningAddonUpsertDto, validateToggleEarningAddonStatusDto } from '../validators/earningAddon.validator.js';
 import { validateDeliveryCommissionRuleDto, validateOptionalStatusDto, validateStoreCommissionUpsertDto } from '../validators/commission.validator.js';
 import { validateFeeSettingsUpsertDto } from '../validators/feeSettings.validator.js';
+import { franchiseDeliveryPartners } from '../services/franchiseRiders.service.js';
 import { validateDeliveryEmergencyHelpUpsertDto } from '../validators/deliveryEmergencyHelp.validator.js';
 import { validateReferralSettingsUpsertDto } from '../validators/referralSettings.validator.js';
 
@@ -1276,7 +1277,10 @@ export async function updateSupportTicket(req, res, next) {
 // ----- Delivery partners -----
 export async function getDeliveryPartners(req, res, next) {
     try {
-        const data = await adminService.getDeliveryPartners(req.query);
+        // A franchise admin gets only the riders near / working for its own stores, masked and without documents
+        const data = req.franchiseScope?.all === false
+            ? await franchiseDeliveryPartners(req.franchiseScope, req.query)
+            : await adminService.getDeliveryPartners(req.query);
         res.status(200).json({
             success: true,
             message: 'Delivery partners fetched successfully',

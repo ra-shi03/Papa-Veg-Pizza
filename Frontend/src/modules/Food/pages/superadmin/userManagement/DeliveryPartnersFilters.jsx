@@ -15,7 +15,10 @@ export default function DeliveryPartnersFilters({
   sortOrder,
   setSortOrder,
   onReset,
-  onAddPartner
+  onAddPartner,
+  franchiseOptions,
+  storeOptions,
+  vehicleOptions
 }) {
   // Local state for search to achieve responsive typing and debouncing
   const [localSearch, setLocalSearch] = useState(searchQuery)
@@ -33,10 +36,11 @@ export default function DeliveryPartnersFilters({
     return () => clearTimeout(timer)
   }, [localSearch, setSearchQuery])
 
-  const franchises = ["All Franchises", "Papa Veg Mumbai", "Papa Veg Pune", "Papa Veg Delhi", "Papa Veg Bangalore"]
-  const stores = ["All Stores", "Mumbai - Andheri West", "Pune - Koregaon Park", "Delhi - Connaught Place", "Bangalore - Indiranagar"]
-  const statuses = ["All Statuses", "Online", "Offline", "Busy", "Suspended"]
-  const vehicles = ["Vehicle Type", "Electric Bike", "Scooter", "Car"]
+  // The real franchise, store and vehicle lists come from the screen; the sample lists only run in standalone mock mode
+  const franchises = ["All Franchises", ...(franchiseOptions || ["Papa Veg Mumbai", "Papa Veg Pune", "Papa Veg Delhi", "Papa Veg Bangalore"])]
+  const stores = ["All Stores", ...(storeOptions || ["Mumbai - Andheri West", "Pune - Koregaon Park", "Delhi - Connaught Place", "Bangalore - Indiranagar"])]
+  const statuses = ["All Statuses", "Pending", "Online", "Offline", "Busy", "Suspended"]
+  const vehicles = ["Vehicle Type", ...(vehicleOptions || ["Electric Bike", "Scooter", "Car"])]
 
   return (
     <section className="bg-white dark:bg-zinc-900 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 flex items-center gap-2 shadow-sm w-full overflow-x-auto">
