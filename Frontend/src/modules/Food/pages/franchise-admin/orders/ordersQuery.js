@@ -27,6 +27,11 @@ import {
 } from "./mockOrders";
 import { toast } from "sonner";
 import { adminClient } from "@/services/api/axios";
+import { STANDALONE_MOCK } from "@/services/api/mockPolicy";
+
+// A franchise admin watches orders; the store changes them (accept, kitchen, rider, cancel). There is no franchise
+// endpoint for these, so outside standalone mock mode the actions refuse instead of changing a local copy.
+const READ_ONLY = "Orders are updated by the store. A franchise admin can view them but not change them.";
 
 // Orders come from the backend (read-only for the franchise admin); refunds / issues below are still local.
 let dbOrders = [];
@@ -294,6 +299,7 @@ export function useUpdateOrderStatus() {
   const [isLoading, setIsLoading] = useState(false);
 
   const mutateAsync = async ({ orderId, status, remarks, updatedBy = "Franchise Admin" }) => {
+    if (!STANDALONE_MOCK) throw new Error(READ_ONLY);
     setIsLoading(true);
     return new Promise((resolve, reject) => {
       setTimeout(() => {
@@ -344,6 +350,7 @@ export function useAssignRider() {
   const [isLoading, setIsLoading] = useState(false);
 
   const mutateAsync = async ({ orderId, riderId, estimatedPickupTime, notes }) => {
+    if (!STANDALONE_MOCK) throw new Error(READ_ONLY);
     setIsLoading(true);
     return new Promise((resolve, reject) => {
       setTimeout(() => {
@@ -406,6 +413,7 @@ export function useCancelOrder() {
   const [isLoading, setIsLoading] = useState(false);
 
   const mutateAsync = async ({ orderId, reason, remarks, notifyCustomer }) => {
+    if (!STANDALONE_MOCK) throw new Error(READ_ONLY);
     setIsLoading(true);
     return new Promise((resolve, reject) => {
       setTimeout(() => {
@@ -451,6 +459,7 @@ export function useCancelOrder() {
 
 // Real-time Order Simulation helper (simulates a new order arriving)
 export function simulateNewOrder() {
+  if (!STANDALONE_MOCK) throw new Error("Sample orders are available in standalone mock mode only.");
   const newId = `ORD-98${Math.floor(100 + Math.random() * 900)}`;
   const orderNum = `PVP-${newId.split("-")[1]}`;
   const randomNames = ["Vikram Malhotra", "Kriti Sanon", "Deepak Chahar", "Neha Sharma", "Arjun Kapoor"];

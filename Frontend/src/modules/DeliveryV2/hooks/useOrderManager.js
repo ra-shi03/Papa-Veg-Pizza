@@ -198,19 +198,19 @@ export const useOrderManager = () => {
       const otpToUse = otp || activeOrder?.deliveryVerification?.dropOtp?.code;
       
       // 2. Proceed to mark as complete
+      // A refused complete (unpaid QR, locked OTP, wrong step) is shown as the server's error and the trip is NOT
+      // marked completed; the outer catch toasts the message and rethrows.
       let finalOrder = activeOrder;
-      try {
-        const completeRes = await deliveryAPI.completeDelivery(orderId, { 
-          otp: otpToUse, 
-          rating: 5,
-          paymentMethod: paymentMethodOverride // Pass 'cash' or 'qr' if provided
-        });
-        if (completeRes.data?.success && completeRes.data?.data?.order) {
-          finalOrder = completeRes.data.data.order;
-        }
-      } catch (completeErr) {
-        console.warn('Complete call failed, but OTP was verified.', completeErr);
-        // If already completed, we proceed to show the summary with whatever we have
+      const completeRes = await deliveryAPI.completeDelivery(orderId, { 
+        otp: otpToUse, 
+        rating: 5,
+        paymentMethod: paymentMethodOverride // Pass 'cash' or 'qr' if provided
+      });
+      if (!completeRes?.data?.success) {
+        throw new Error(completeRes?.data?.error || completeRes?.data?.message || 'Could not complete the delivery');
+      }
+      if (completeRes.data?.data?.order) {
+        finalOrder = completeRes.data.data.order;
       }
       
       // Update local order state so Summary Modal shows 'delivered' status

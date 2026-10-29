@@ -52,7 +52,7 @@ export default function useIssueSocket() {
     });
 
     // Standalone Simulation
-    const isMock = import.meta.env?.VITE_STANDALONE_MOCK === "true" || !import.meta.env?.VITE_API_BASE_URL;
+    const isMock = import.meta.env?.VITE_STANDALONE_MOCK === "true";
     if (isMock) {
       setSocketConnected(true);
 

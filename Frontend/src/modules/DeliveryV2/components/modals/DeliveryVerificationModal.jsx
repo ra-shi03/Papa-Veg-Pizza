@@ -413,7 +413,7 @@ export const DeliveryVerificationModal = ({ order, onComplete, onClose }) => {
   // If OTP was already verified on mount and it's a non-COD order, auto-complete
   useEffect(() => {
     if (step === 'complete' && !isCod) {
-      onComplete(verifiedOtp);
+      onComplete(verifiedOtp).catch(() => {}); // a refusal is already shown by the hook; the slider stays available
     }
   }, []); // only on mount
 

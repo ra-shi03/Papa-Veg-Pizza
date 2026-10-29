@@ -96,7 +96,7 @@ export default function useDeliverySocket(trackedOrderId = null) {
     socket.on("order:delivery-progress", handleDeliveryProgress);
 
     // Standalone Simulation
-    const isMock = import.meta.env?.VITE_STANDALONE_MOCK === "true" || !import.meta.env?.VITE_API_BASE_URL;
+    const isMock = import.meta.env?.VITE_STANDALONE_MOCK === "true";
     if (isMock) {
       setSocketConnected(true);
     }
@@ -108,7 +108,7 @@ export default function useDeliverySocket(trackedOrderId = null) {
 
   // Simulation runner for active tracking order
   useEffect(() => {
-    const isMock = import.meta.env?.VITE_STANDALONE_MOCK === "true" || !import.meta.env?.VITE_API_BASE_URL;
+    const isMock = import.meta.env?.VITE_STANDALONE_MOCK === "true";
     if (!isMock || !trackedOrderId) {
       if (simulationIntervalRef.current) {
         clearInterval(simulationIntervalRef.current);

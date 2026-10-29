@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react"
 import { ShoppingBag, Eye, Navigation, Phone, RefreshCw, X, Clock, MapPin, User, ShieldAlert, Sparkles } from "lucide-react"
 import io from "socket.io-client"
 import { toast } from "sonner"
+import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 export default function LiveOrders({ orders, onRefresh, loading }) {
   const [liveOrders, setLiveOrders] = useState(orders || [])
@@ -40,8 +41,9 @@ export default function LiveOrders({ orders, onRefresh, loading }) {
     }
   }, [])
 
-  // Auto-refresh simulation for Standalone Mock mode
+  // Auto-refresh simulation: standalone mock mode only. With a backend, statuses change only when the server says so.
   useEffect(() => {
+    if (!STANDALONE_MOCK) return undefined
     const timer = setInterval(() => {
       // Choose a random order to update status
       if (liveOrders.length > 0) {

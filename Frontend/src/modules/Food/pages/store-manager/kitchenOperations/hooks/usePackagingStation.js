@@ -102,7 +102,7 @@ export function usePackagingStation(filters = {}) {
 
     // Standalone Simulation mode for demo
     let simulationTimer;
-    if (import.meta.env?.VITE_STANDALONE_MOCK === "true" || !import.meta.env?.VITE_API_BASE_URL) {
+    if (import.meta.env?.VITE_STANDALONE_MOCK === "true") {
       setSocketConnected(true);
 
       // Random simulator to change state

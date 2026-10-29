@@ -37,7 +37,7 @@ export default function useSocketAssignment() {
     });
 
     // Standalone Simulation
-    if (import.meta.env?.VITE_STANDALONE_MOCK === "true" || !import.meta.env?.VITE_API_BASE_URL) {
+    if (import.meta.env?.VITE_STANDALONE_MOCK === "true") {
       setSocketConnected(true);
     }
 

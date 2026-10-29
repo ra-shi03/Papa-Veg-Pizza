@@ -112,7 +112,7 @@ export function useDelayedOrders(filters = {}) {
 
     // Standalone Simulation Mode
     let simulationTimer;
-    if (import.meta.env?.VITE_STANDALONE_MOCK === "true" || !import.meta.env?.VITE_API_BASE_URL) {
+    if (import.meta.env?.VITE_STANDALONE_MOCK === "true") {
       setSocketConnected(true);
 
       // Simple delay simulator (randomly triggers every 70 seconds)

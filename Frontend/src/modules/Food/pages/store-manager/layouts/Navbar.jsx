@@ -9,6 +9,9 @@ import {
 import { toast } from "sonner"
 import { useSystemTheme } from "@/shared/utils/themeSync"
 import { adminAPI } from "@food/api"
+import { myTasksService } from "@/services/api/myTasksService"
+import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
+import { formatDistanceToNow } from "date-fns"
 
 export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
   const navigate = useNavigate()
@@ -43,17 +46,18 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
   const [userData, setUserData] = useState({ name: "Loading...", email: "Loading..." })
   const [franchiseData, setFranchiseData] = useState(null)
   const [storeData, setStoreData] = useState(null)
-  const [notifications, setNotifications] = useState([
-    { id: 1, title: "Order PV-729 Delayed", message: "Cheese Veg Pizza is in preparation for over 18 mins", time: "2m ago", type: "order", unread: true },
-    { id: 2, title: "Low Ingredient Stock", message: "Capsicum inventory is below 2.5kg threshold", time: "10m ago", type: "inventory", unread: true },
-    { id: 3, title: "Rider Unassigned", message: "Order PV-732 ready for delivery but no rider assigned", time: "25m ago", type: "delivery", unread: true },
-  ])
+  // Alerts are the person's own task notifications from the server (/tasks/notifications); empty until there are any.
+  const [notifications, setNotifications] = useState([])
 
-  const storeList = [
-    { id: 104, name: "Vijay Nagar", location: "Indore" },
-    { id: 105, name: "Palasia Hub", location: "Indore" },
-    { id: 201, name: "Arera Colony", location: "Bhopal" }
-  ]
+  // A store team member works in the one store on their sign-in; the list holds only that store (sample stores are for
+  // standalone mock mode).
+  const storeList = STANDALONE_MOCK
+    ? [
+        { id: 104, name: "Vijay Nagar", location: "Indore" },
+        { id: 105, name: "Palasia Hub", location: "Indore" },
+        { id: 201, name: "Arera Colony", location: "Bhopal" }
+      ]
+    : (storeData ? [{ id: storeData.code || storeData._id, name: storeData.storeName || storeData.name || "", location: "" }] : [])
 
   const dateLabels = {
     today: "Today",
@@ -129,6 +133,23 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
   }, [])
 
   useEffect(() => {
+    let live = true
+    myTasksService.getNotifications().then((res) => {
+      if (!live) return
+      const rows = Array.isArray(res?.data) ? res.data : []
+      setNotifications(rows.map((n) => ({
+        id: n.id || n._id,
+        title: n.title,
+        message: n.message,
+        type: n.type,
+        unread: !n.isRead,
+        time: n.createdAt ? formatDistanceToNow(new Date(n.createdAt), { addSuffix: true }) : "",
+      })))
+    }).catch(() => { if (live) setNotifications([]) })
+    return () => { live = false }
+  }, [])
+
+  useEffect(() => {
     function handleClickOutside(event) {
       if (searchRef.current && !searchRef.current.contains(event.target)) {
         setShowRecent(false)
@@ -169,6 +190,7 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
   }
 
   const markAllRead = () => {
+    notifications.filter(n => n.unread).forEach(n => myTasksService.markNotificationRead(n.id).catch(() => {}))
     setNotifications(prev => prev.map(n => ({ ...n, unread: false })))
     toast.success("All alerts marked as read")
   }
@@ -239,13 +261,15 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
                     <button
                       key={store.id}
                       onClick={() => {
-                        setSelectedStore(`Store #${store.id} (${store.name})`)
                         setShowStoreDropdown(false)
-                        toast.success(`Connected to Store #${store.id}`)
+                        if (STANDALONE_MOCK) {
+                          setSelectedStore(`Store #${store.id} (${store.name})`)
+                          toast.success(`Connected to Store #${store.id}`)
+                        }
                       }}
                       className="w-full text-left px-3 py-2 text-xs font-bold text-zinc-650 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                     >
-                      Store #{store.id} - {store.name} ({store.location})
+                      Store #{store.id} - {store.name}{store.location ? ` (${store.location})` : ""}
                     </button>
                   ))}
                 </div>
@@ -338,6 +362,7 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
                       key={n.id} 
                       onClick={() => {
                         setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, unread: false } : item))
+                        if (n.unread) myTasksService.markNotificationRead(n.id).catch(() => {})
                       }}
                       className={`p-2.5 rounded-xl border relative transition-colors cursor-pointer ${
                         n.unread ? "bg-[var(--primary)]/10/10 dark:bg-red-950/5 border-red-100/40 dark:border-red-950/20" : "bg-zinc-50/50 dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800"

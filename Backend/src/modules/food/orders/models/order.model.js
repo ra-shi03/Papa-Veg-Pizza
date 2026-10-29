@@ -281,7 +281,9 @@ const deliveryVerificationSchema = new mongoose.Schema(
     {
         dropOtp: {
             required: { type: Boolean, default: false },
-            verified: { type: Boolean, default: false }
+            verified: { type: Boolean, default: false },
+            // Tries spent on the customer's OTP (verify-drop-otp and complete). Five, then 429 until the store resets it.
+            failedAttempts: { type: Number, default: 0, min: 0 }
         }
     },
     { _id: false }

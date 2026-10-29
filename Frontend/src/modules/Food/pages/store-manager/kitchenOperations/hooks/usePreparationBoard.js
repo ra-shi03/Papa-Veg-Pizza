@@ -108,7 +108,7 @@ export function usePreparationBoard(filters = {}) {
 
     // Standalone Simulation for standalone mode
     let simulationTimer;
-    if (import.meta.env?.VITE_STANDALONE_MOCK === "true" || !import.meta.env?.VITE_API_BASE_URL) {
+    if (import.meta.env?.VITE_STANDALONE_MOCK === "true") {
       setSocketConnected(true);
 
       // Randomly advance stage of items for testing

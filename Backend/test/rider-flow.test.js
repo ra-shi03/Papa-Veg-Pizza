@@ -51,7 +51,9 @@ const db = (id) => fx.models.FoodOrder.findById(id).select('+deliveryOtp').lean(
 /** The parts of an order a refused step must not touch. */
 const snapshot = async (id) => {
     const o = await db(id);
-    return JSON.stringify([o.orderStatus, o.deliveryState, o.deliveryVerification, o.dispatch?.status, String(o.dispatch?.deliveryPartnerId), o.payment?.status, (o.statusHistory || []).length]);
+    const { failedAttempts, ...otp } = o.deliveryVerification?.dropOtp || {}; // the try counter is checked on its own
+    void failedAttempts;
+    return JSON.stringify([o.orderStatus, o.deliveryState, otp, o.dispatch?.status, String(o.dispatch?.deliveryPartnerId), o.payment?.status, (o.statusHistory || []).length]);
 };
 const ledgerEntries = async (id, kind) =>
     ((await FoodTransaction.findOne({ orderId: new mongoose.Types.ObjectId(id) }).lean())?.history || []).filter((h) => h.kind === kind).length;
@@ -310,5 +312,85 @@ describe('N-H1: the generic status route is gone', () => {
         }
         assert.equal(await snapshot(id), before);
         assert.equal((await customerView(id)).orderStatus, 'confirmed');
+    });
+});
+
+describe('drop OTP: five tries, then 429 until the store resets it', () => {
+    const resetOtp = (id, token) => fx.call('POST', `/v1/store/orders/${id}/reset-drop-otp`, token);
+    const wrongOf = (otp) => (otp === '0000' ? '1111' : '0000');
+
+    test('five wrong tries (verify or complete) are 400, the sixth is 429 even with the right OTP; nothing changes', async () => {
+        const id = await orderAt('atDrop');
+        const otp = String((await customerView(id)).handoverOtp);
+        const wrong = wrongOf(otp);
+        for (let i = 1; i <= 3; i++) assert.equal((await step.verifyOtp(id, wrong)).status, 400, `try ${i}`);
+        for (let i = 4; i <= 5; i++) assert.equal((await step.complete(id, { otp: wrong, paymentMethod: 'cash' })).status, 400, `try ${i}`);
+        const locked = await snapshot(id);
+        for (const res of [await step.verifyOtp(id, otp), await step.complete(id, { otp, paymentMethod: 'cash' })]) {
+            assert.equal(res.status, 429, JSON.stringify(res.body));
+            assert.match(res.body.error, /store manager/);
+        }
+        assert.equal(await snapshot(id), locked);
+        assert.equal((await db(id)).orderStatus, 'picked_up');
+        assert.equal((await customerView(id)).orderStatus, 'picked_up');
+    });
+
+    test('the right OTP on the fifth try still works', async () => {
+        const id = await orderAt('atDrop');
+        const otp = String((await customerView(id)).handoverOtp);
+        for (let i = 0; i < 4; i++) assert.equal((await step.verifyOtp(id, wrongOf(otp))).status, 400);
+        assert.equal((await step.verifyOtp(id, otp)).status, 200);
+        assert.equal((await step.complete(id, { otp, paymentMethod: 'cash' })).status, 200);
+    });
+
+    test('parallel guesses cannot get past the limit', async () => {
+        const id = await orderAt('atDrop');
+        const otp = String((await customerView(id)).handoverOtp);
+        const res = await Promise.all(Array.from({ length: 12 }, () => step.verifyOtp(id, wrongOf(otp))));
+        assert.equal(res.filter((r) => r.status === 400).length, 5);
+        assert.equal(res.filter((r) => r.status === 429).length, 7);
+        assert.equal((await db(id)).deliveryVerification.dropOtp.failedAttempts, 5);
+    });
+
+    test("the order's store manager resets it and the rider has five more tries", async () => {
+        const id = await orderAt('atDrop');
+        const otp = String((await customerView(id)).handoverOtp);
+        for (let i = 0; i < 5; i++) await step.verifyOtp(id, wrongOf(otp));
+        assert.equal((await step.verifyOtp(id, otp)).status, 429);
+        const reset = await resetOtp(id, A.managerToken);
+        assert.equal(reset.status, 200, JSON.stringify(reset.body));
+        assert.equal(reset.body.data.failedAttempts, 0);
+        assert.equal((await db(id)).deliveryVerification.dropOtp.failedAttempts, 0);
+        assert.equal((await step.verifyOtp(id, wrongOf(otp))).status, 400, 'counting from zero again');
+        assert.equal((await step.verifyOtp(id, otp)).status, 200);
+        assert.equal((await step.complete(id, { otp, paymentMethod: 'cash' })).status, 200);
+    });
+
+    test('the super admin can reset it', async () => {
+        const id = await orderAt('atDrop');
+        const otp = String((await customerView(id)).handoverOtp);
+        for (let i = 0; i < 5; i++) await step.verifyOtp(id, wrongOf(otp));
+        assert.equal((await resetOtp(id, fx.SA)).status, 200);
+        assert.equal((await step.verifyOtp(id, otp)).status, 200);
+    });
+
+    test('another store gets 404; the rider, a customer, a franchise admin and a kitchen supervisor are refused; nothing resets', async () => {
+        const id = await orderAt('atDrop');
+        const otp = String((await customerView(id)).handoverOtp);
+        for (let i = 0; i < 5; i++) await step.verifyOtp(id, wrongOf(otp));
+        assert.equal((await resetOtp(id, fx.F.B.managerToken)).status, 404, "store B's manager");
+        assert.equal((await resetOtp(id, rider.token)).status, 403, 'the rider');
+        assert.equal((await resetOtp(id, A.customerToken)).status, 403, 'a customer');
+        assert.equal((await resetOtp(id, A.adminToken)).status, 403, 'franchise admin');
+        assert.equal((await resetOtp(id, sup.token)).status, 403, 'kitchen supervisor');
+        assert.equal((await resetOtp(id)).status, 401, 'signed out');
+        assert.equal((await db(id)).deliveryVerification.dropOtp.failedAttempts, 5);
+        assert.equal((await step.verifyOtp(id, otp)).status, 429);
+    });
+
+    test('an unknown order is 404 and an order that is not out for delivery is 400', async () => {
+        assert.equal((await resetOtp(String(new mongoose.Types.ObjectId()), A.managerToken)).status, 404);
+        const id = await orderAt('accepted');
+        assert.equal((await resetOtp(id, A.managerToken)).status, 400);
     });
 });

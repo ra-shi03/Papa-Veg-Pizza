@@ -10,6 +10,7 @@ import { adminAPI } from "@food/api"
 import { clearModuleAuth, getModuleRefreshToken } from "@food/utils/auth"
 import { toast } from "sonner"
 import { useSystemTheme } from "@/shared/utils/themeSync"
+import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 export default function Navbar({ onToggleSidebar }) {
   const navigate = useNavigate()
@@ -55,7 +56,8 @@ export default function Navbar({ onToggleSidebar }) {
   const [franchiseData, setFranchiseData] = useState(null)
   const [notifications, setNotifications] = useState([])
   const [notificationTab, setNotificationTab] = useState("all") 
-  const [newOrdersCount, setNewOrdersCount] = useState(4)
+  // Sample figures, shown only with VITE_STANDALONE_MOCK=true; with a backend this screen shows what the server sent
+  const [newOrdersCount, setNewOrdersCount] = useState(STANDALONE_MOCK ? 4 : 0)
 
   const handleConfirmLogout = async () => {
     try {
@@ -72,7 +74,7 @@ export default function Navbar({ onToggleSidebar }) {
   }
 
   // Store List
-  const [storeList, setStoreList] = useState([
+  const [storeList, setStoreList] = useState(!STANDALONE_MOCK ? [] : [
     { id: 1, name: "Indore Central", address: "Vijay Nagar, Indore", location: "Indore", manager: "Rohan Sharma", hours: "11:00 AM - 11:00 PM" },
     { id: 2, name: "Bhopal Zone", address: "Arera Colony, Bhopal", location: "Bhopal", manager: "Vikram Singh", hours: "10:30 AM - 11:30 PM" },
     { id: 3, name: "Ujjain Branch", address: "Nanakheda, Ujjain", location: "Ujjain", manager: "Amit Mishra", hours: "11:00 AM - 10:00 PM" },
@@ -83,7 +85,10 @@ export default function Navbar({ onToggleSidebar }) {
   const [storeForm, setStoreForm] = useState({ name: "", address: "", location: "Indore", manager: "", hours: "11:00 AM - 11:00 PM" })
   const [broadcastForm, setBroadcastForm] = useState({ title: "", message: "", targetStore: "All Stores", priority: "medium" })
 
-  const searchCollection = [
+  // The real stores of this franchise; the sample orders, customers and products are for standalone mock mode only
+  const searchCollection = !STANDALONE_MOCK ? storeList.map((s) => ({
+    id: String(s._id || s.id), name: s.storeName || s.name || "", type: "stores", status: s.status || "", route: "/franchise-admin/stores",
+  })) : [
     { id: "ORD-98421", name: "Rajesh Kumar - Cheese Burst Pizza", type: "orders", status: "preparing", route: "/franchise-admin/live-orders?q=ORD-98421" },
     { id: "ORD-98425", name: "Aarav Mehta - Veg Supreme Meal", type: "orders", status: "delivered", route: "/franchise-admin/live-orders?q=ORD-98425" },
     { id: "ORD-98426", name: "Sunita Gupta - Capsicum Feast", type: "orders", status: "accepted", route: "/franchise-admin/live-orders?q=ORD-98426" },
@@ -110,7 +115,7 @@ export default function Navbar({ onToggleSidebar }) {
     if (adminUserStr) {
       setAdminData(JSON.parse(adminUserStr))
     } else {
-      setAdminData({ name: "Shubham Jamliya", email: "shubham@papavegpizza.com" })
+      setAdminData(STANDALONE_MOCK ? { name: "Shubham Jamliya", email: "shubham@papavegpizza.com" } : { name: "", email: "" })
     }
 
     const fetchFranchiseData = async () => {
@@ -150,12 +155,15 @@ export default function Navbar({ onToggleSidebar }) {
       { id: 4, title: "Delivery Delay Detected", message: "Rider Kabir Sengupta delayed by 14 mins on Indore Node", time: "2h ago", type: "delivery", unread: false },
       { id: 5, title: "Store Offline Signal", message: "POS Terminal disconnected at Gwalior Hub", time: "4h ago", type: "complaints", unread: false }
     ]
-    const localNotifs = localStorage.getItem("franchise_notifications")
-    if (localNotifs) {
-      setNotifications(JSON.parse(localNotifs))
-    } else {
-      setNotifications(defaultNotifications)
-      localStorage.setItem("franchise_notifications", JSON.stringify(defaultNotifications))
+    // There is no franchise notification feed on the server yet: outside standalone mock mode the list stays empty
+    if (STANDALONE_MOCK) {
+      const localNotifs = localStorage.getItem("franchise_notifications")
+      if (localNotifs) {
+        setNotifications(JSON.parse(localNotifs))
+      } else {
+        setNotifications(defaultNotifications)
+        localStorage.setItem("franchise_notifications", JSON.stringify(defaultNotifications))
+      }
     }
   }, [])
 
@@ -185,8 +193,9 @@ export default function Navbar({ onToggleSidebar }) {
     }
   }, [])
 
-  // Simulated Socket Events
+  // Simulated Socket Events (standalone mock mode only)
   useEffect(() => {
+    if (!STANDALONE_MOCK) return undefined
     const socketInterval = setInterval(() => {
       const events = [
         { event: "notificationCreated", title: "Low stock alert", message: "Paneer inventory under 3kg threshold at Bhopal Zone", type: "inventory" },
@@ -676,7 +685,7 @@ export default function Navbar({ onToggleSidebar }) {
             {showProfileMenu && (
               <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 shadow-xl py-1.5 z-50 animate-in fade-in duration-100 text-xs font-bold text-zinc-700 dark:text-zinc-300">
                 <div className="px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 mb-1.5">
-                  <p className="text-xs font-black text-zinc-900 dark:text-white leading-tight">{franchiseData?.ownerName || adminData?.name || "Shubham Jamliya"}</p>
+                  <p className="text-xs font-black text-zinc-900 dark:text-white leading-tight">{franchiseData?.ownerName || adminData?.name || (STANDALONE_MOCK ? "Shubham Jamliya" : "Franchise Admin")}</p>
                   <p className="text-[9px] text-zinc-400 truncate mt-0.5">{franchiseData?.email || adminData?.email || "shubham@papavegpizza.com"}</p>
                 </div>
                 

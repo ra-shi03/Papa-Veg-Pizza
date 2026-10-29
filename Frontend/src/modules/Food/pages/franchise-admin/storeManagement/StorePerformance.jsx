@@ -36,6 +36,7 @@ import StorePerformanceDrawer from "./components/StorePerformanceDrawer"
 import CompareStoresModal from "./components/CompareStoresModal"
 import ExportReportModal from "./components/ExportReportModal"
 import RevenueReportModal from "./components/RevenueReportModal"
+import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 import OrdersAnalyticsModal from "./components/OrdersAnalyticsModal"
 
 export default function StorePerformance() {
@@ -164,6 +165,8 @@ export default function StorePerformance() {
   }, [storesList])
 
   useEffect(() => {
+    // The drift below is a sample-data effect: standalone mock mode only. Real figures are shown as the server sent them.
+    if (!STANDALONE_MOCK) return undefined
     const interval = setInterval(() => {
       setLiveStores(prev => 
         prev.map(s => {

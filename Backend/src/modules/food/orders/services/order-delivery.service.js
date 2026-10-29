@@ -63,6 +63,25 @@ const RACED = 'This order was just updated. Refresh and try again.';
 
 const stepConflict = (message) => Object.assign(new Error(message), { name: 'ConflictError', statusCode: 409 });
 
+// The drop OTP is 4 digits, so tries are limited: DROP_OTP_MAX_TRIES per order, shared by verify-drop-otp and complete.
+// Past that the order answers 429 until the store manager (or super admin) resets it (POST /store/orders/:id/reset-drop-otp).
+export const DROP_OTP_MAX_TRIES = 5;
+const TRIES_PATH = 'deliveryVerification.dropOtp.failedAttempts';
+
+/** Uses one try, atomically (parallel guesses cannot get past the limit). Throws 429 when none are left. */
+async function spendDropOtpTry(order) {
+  const res = await FoodOrder.updateOne(
+    { _id: order._id, $or: [{ [TRIES_PATH]: { $lt: DROP_OTP_MAX_TRIES } }, { [TRIES_PATH]: { $exists: false } }] },
+    { $inc: { [TRIES_PATH]: 1 } },
+  );
+  if (res.modifiedCount !== 1) {
+    throw Object.assign(
+      new Error('Too many wrong OTP attempts. Ask the store manager to reset the OTP for this order.'),
+      { name: 'TooManyAttemptsError', statusCode: 429 },
+    );
+  }
+}
+
 /** The order must be this rider's accepted order, still on its way. */
 function assertOwnLiveOrder(order, deliveryPartnerId) {
   if (order.dispatch?.deliveryPartnerId?.toString() !== String(deliveryPartnerId)) {
@@ -916,6 +935,7 @@ export async function verifyDropOtpDelivery(orderId, deliveryPartnerId, otp) {
     throw stepConflict('Mark reached drop first: that sends the customer their OTP.');
   }
 
+  await spendDropOtpTry(order);
   if (!isOtpMatch(order.deliveryOtp, otpStr)) {
     throw new ValidationError(
       'Invalid OTP. Ask the customer for the code shown in their app.',
@@ -963,6 +983,7 @@ export async function completeDelivery(orderId, deliveryPartnerId, body = {}) {
         'Customer handover OTP is required. Verify the OTP from the customer before completing delivery.',
       );
     }
+    await spendDropOtpTry(order);
     if (!isOtpMatch(order.deliveryOtp, otp)) throw new ValidationError('Invalid handover OTP provided.');
     order.deliveryVerification = {
       ...(order.deliveryVerification?.toObject?.() || order.deliveryVerification || {}),

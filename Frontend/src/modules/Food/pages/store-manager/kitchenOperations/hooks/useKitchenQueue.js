@@ -138,7 +138,7 @@ export function useKitchenQueue(filters = {}, page = 1, limit = 20) {
 
     // Standalone Mock Socket Simulation
     let simulationTimer;
-    if (import.meta.env?.VITE_STANDALONE_MOCK === "true" || !import.meta.env?.VITE_API_BASE_URL) {
+    if (import.meta.env?.VITE_STANDALONE_MOCK === "true") {
       setSocketConnected(true);
 
       simulationTimer = setInterval(() => {

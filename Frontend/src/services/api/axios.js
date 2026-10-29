@@ -13,17 +13,14 @@ const baseURL =
     ? String(import.meta.env.VITE_API_BASE_URL).replace(/\/$/, "")
     : "/api/v1";
 
-// Dev-only safety net: when the backend 404s or is unreachable, requests are answered from
-// mockService instead, which hides endpoints that don't exist yet. Set VITE_USE_MOCK=false in
-// Frontend/.env to turn the fallback off and see what really works.
-// VITE_STANDALONE_MOCK=true (no backend at all) always keeps the mock on.
+// Sample data (mockService) answers requests only with VITE_STANDALONE_MOCK=true (no backend at all). With a backend,
+// a 404, a 5xx or a network failure is shown as the error it is, in dev as in production, so a missing endpoint is
+// never hidden behind invented data. (VITE_USE_MOCK no longer switches anything on.)
 const mockFallbackEnabled =
-  typeof import.meta !== "undefined" &&
-  ((import.meta.env?.DEV && import.meta.env?.VITE_USE_MOCK !== "false") ||
-    import.meta.env?.VITE_STANDALONE_MOCK === "true");
+  typeof import.meta !== "undefined" && import.meta.env?.VITE_STANDALONE_MOCK === "true";
 
 if (typeof import.meta !== "undefined" && import.meta.env?.DEV) {
-  console.info(`[API] mock fallback ${mockFallbackEnabled ? "ON (set VITE_USE_MOCK=false to disable)" : "OFF - real backend errors are shown"}`);
+  console.info(`[API] sample data ${mockFallbackEnabled ? "ON (VITE_STANDALONE_MOCK=true)" : "OFF - real backend errors are shown"}`);
 }
 
 const mockAdapter = (config) => {

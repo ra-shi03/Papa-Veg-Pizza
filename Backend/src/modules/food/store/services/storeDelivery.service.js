@@ -385,6 +385,39 @@ export async function requestOrderRefund(user, orderId, body = {}, q = {}) {
   };
 }
 
+/**
+ * POST /store/orders/:orderId/reset-drop-otp : gives the rider five more tries at the customer's OTP after it was locked
+ * (429). The store manager of the order's own store, or the super admin; anyone else is 403, another store's order 404.
+ */
+export async function resetDropOtp(user, orderId, q = {}) {
+  const role = normalize(user?.role);
+  let storeFilter = {};
+  if (role === 'STORE_MANAGER') {
+    if (!isId(user.storeId)) throw new ForbiddenError('No store is linked to your account.');
+    storeFilter = { storeId: toId(user.storeId) };
+  } else if (role !== 'SUPERADMIN' && role !== 'SUPER_ADMIN') {
+    throw new ForbiddenError('Only the store manager or the super admin can reset the delivery OTP.');
+  }
+  void q;
+  const identity = buildOrderIdentityFilter(orderId);
+  if (!identity) throw new NotFoundError('Order not found');
+  const order = await FoodOrder.findOne({ $and: [identity, storeFilter] }).select('order_id orderStatus deliveryVerification');
+  if (!order) throw new NotFoundError('Order not found');
+  if (!['picked_up', 'reached_drop'].includes(order.orderStatus)) {
+    throw new ValidationError('The delivery OTP can only be reset while the order is out for delivery.');
+  }
+  const was = order.deliveryVerification?.dropOtp?.failedAttempts || 0;
+  await FoodOrder.updateOne({ _id: order._id }, { $set: { 'deliveryVerification.dropOtp.failedAttempts': 0 } });
+  const fresh = await FoodOrder.findById(order._id);
+  pushStatusHistory(fresh, {
+    byRole: role === 'STORE_MANAGER' ? 'STORE_MANAGER' : 'ADMIN',
+    byId: isId(user.userId) ? toId(user.userId) : undefined,
+    from: order.orderStatus, to: order.orderStatus, note: `Delivery OTP tries reset (${was} used)`,
+  });
+  await fresh.save();
+  return { orderId: String(order._id), orderNumber: order.order_id || String(order._id), failedAttempts: 0 };
+}
+
 /** GET /store/orders/:orderId/refunds : the refund records of one of this store's orders (Refund History). */
 export async function orderRefunds(user, orderId, q = {}) {
   const ctx = await deliveryContext(user, q);
