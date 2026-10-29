@@ -527,11 +527,17 @@ export default function DeliveryPartnersManagement() {
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full overflow-hidden border border-zinc-100 dark:border-zinc-800 flex-shrink-0">
-                          <img
-                            src={getProfileImage(rider.name)}
-                            alt={rider.name}
-                            className="w-full h-full object-cover"
-                          />
+                          {rider.photo || STANDALONE_MOCK ? (
+                            <img
+                              src={rider.photo || getProfileImage(rider.name)}
+                              alt={rider.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-xs font-black">
+                              {String(rider.name || "?").trim().charAt(0).toUpperCase()}
+                            </div>
+                          )}
                         </div>
                         <div>
                           <p className="text-xs font-bold text-black dark:text-white group-hover:text-[var(--primary)] transition-colors">
@@ -704,6 +710,8 @@ export default function DeliveryPartnersManagement() {
         }}
         rider={selectedRider}
         onSuspend={handleSuspendToggle}
+        onApprove={handleApprove}
+        onReject={handleReject}
         onEdit={(rider) => {
           setIsDrawerOpen(false)
           setSelectedRider(rider)

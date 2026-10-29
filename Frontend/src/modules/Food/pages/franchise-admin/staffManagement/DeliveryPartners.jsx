@@ -633,7 +633,7 @@ export default function DeliveryPartners() {
                   <option value="Online">Online</option>
                   <option value="Offline">Offline</option>
                   <option value="Busy">Busy</option>
-                  <option value="Pending">Pending</option>
+                  <option value="Pending approval">Pending approval</option>
                   <option value="Suspended">Suspended</option>
                 </select>
               </div>

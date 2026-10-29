@@ -4,11 +4,13 @@ import { UserCheck, UserX, ShoppingBag, Clock } from "lucide-react";
 export default function RiderStatsCards({ riders = [] }) {
   const safeRiders = Array.isArray(riders) ? riders : [];
 
-  // 1. Online Riders
-  const onlineCount = safeRiders.filter((r) => r.availability === "online").length;
+  // 1. Online Riders (approved and online; the server sends status pending / online / offline)
+  const statusOf = (r) => r.status || (r.currentStatus === "pending" ? "pending" : r.availability);
+  const onlineCount = safeRiders.filter((r) => statusOf(r) === "online").length;
 
-  // 2. Offline Riders
-  const offlineCount = safeRiders.filter((r) => r.availability === "offline").length;
+  // 2. Offline Riders (approved, off shift) and riders near the store still waiting for approval
+  const offlineCount = safeRiders.filter((r) => statusOf(r) === "offline").length;
+  const pendingCount = safeRiders.filter((r) => statusOf(r) === "pending").length;
 
   // 3. Busy Riders
   const busyCount = safeRiders.filter((r) => r.currentStatus === "busy").length;
@@ -30,7 +32,7 @@ export default function RiderStatsCards({ riders = [] }) {
     {
       title: "Offline Riders",
       value: offlineCount,
-      trend: "Currently off shift duty",
+      trend: pendingCount ? `Off shift · ${pendingCount} nearby pending approval` : "Currently off shift duty",
       icon: UserX,
       color: "text-slate-500 bg-slate-50 dark:bg-zinc-800 dark:border-zinc-850 border-slate-100 dark:text-zinc-400"
     },

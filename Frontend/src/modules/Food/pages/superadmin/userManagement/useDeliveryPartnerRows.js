@@ -34,6 +34,7 @@ export function toRiderRow(p, { storeNames = new Map(), franchiseNames = new Map
     completedOrders: p.totalOrders || 0,
     cancelledOrders: "-",
     rating: p.rating ?? 0,
+    photo: p.profilePhoto || (p.profileImage && p.profileImage.url) || "",
     status,
     address: p.zone || "",
     storeManager: "",

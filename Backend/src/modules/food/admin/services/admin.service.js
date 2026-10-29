@@ -4509,11 +4509,14 @@ export async function checkEarningAddonCompletions(deliveryPartnerId, _force = f
 }
 
 export async function getDeliveryPartnerById(id) {
-    const partner = await FoodDeliveryPartner.findById(id).lean();
+    if (!mongoose.Types.ObjectId.isValid(String(id || ''))) return null;
+    // push tokens are device secrets, not profile data: never sent to a panel
+    const partner = await FoodDeliveryPartner.findById(id).select('-fcmTokens -fcmTokenMobile').lean();
     if (!partner) return null;
     const deliveryId = partner._id ? `DP-${partner._id.toString().slice(-8).toUpperCase()}` : null;
     return {
         ...partner,
+        approvalStatus: partner.status,
         email: partner.email || null,
         deliveryId,
         status: partner.status === 'rejected' ? 'blocked' : partner.status,

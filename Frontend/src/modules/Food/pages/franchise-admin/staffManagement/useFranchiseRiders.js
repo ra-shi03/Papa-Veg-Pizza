@@ -8,7 +8,7 @@ const errorText = (err) =>
 /** Server rider (franchise view: masked phone, no documents) -> the row the Delivery Partners screen renders. */
 export function toFranchiseRiderRow(p) {
   const status = p.status === "pending"
-    ? "Pending"
+    ? "Pending approval"
     : p.status === "suspended"
       ? "Suspended"
       : p.activeOrders > 0

@@ -59,6 +59,7 @@
     "GET /api/v1/settings/combo-page/build",
     "GET /api/v1/settings/coupons/public",
     "GET /api/v1/settings/nutrition/public",
+    "GET /api/v1/settings/delivery-login",
     "GET /api/v1/settings/delivery-welcome",
     "GET /api/v1/settings/faqs/public",
     "GET /api/v1/settings/home-page",

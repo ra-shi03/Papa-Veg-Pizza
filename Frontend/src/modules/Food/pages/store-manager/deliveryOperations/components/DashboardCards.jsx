@@ -13,8 +13,14 @@ export default function DashboardCards({ orders = [], riders = [] }) {
     r => r.currentStatus === "online" && r.availability === "idle"
   ).length;
 
-  // 3. Average Pickup Time (Packaging completed -> pickup, mock 6.5 minutes average)
-  const avgPickupTime = 6.5;
+  // 3. Average Pickup Time: how long the orders on this screen have waited since packaging finished (real, from the
+  // ready-orders list); a dash when no order is waiting
+  const waits = safeOrders
+    .map((o) => o.packagingCompletedAt || o.readyAt)
+    .filter(Boolean)
+    .map((t) => (Date.now() - new Date(t).getTime()) / 60000)
+    .filter((m) => Number.isFinite(m) && m >= 0);
+  const avgPickupTime = waits.length ? (waits.reduce((a, b) => a + b, 0) / waits.length).toFixed(1) : null;
 
   // 4. Delayed Pickups (Orders waiting > 10 minutes)
   const delayedPickupsCount = safeOrders.filter(o => {
@@ -43,7 +49,7 @@ export default function DashboardCards({ orders = [], riders = [] }) {
     },
     {
       title: "Average Pickup Time",
-      value: `${avgPickupTime} min`,
+      value: avgPickupTime == null ? "—" : `${avgPickupTime} min`,
       trend: "Ready to pickup duration average",
       icon: Clock,
       color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/10 border-emerald-100 dark:border-emerald-900/20"
