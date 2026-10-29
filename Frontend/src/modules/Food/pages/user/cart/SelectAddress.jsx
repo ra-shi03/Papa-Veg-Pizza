@@ -121,6 +121,14 @@ export default function SelectAddress() {
         zipCode: String(form.zipCode || "").trim(),
         phone: String(form.phone || "").trim(),
       }
+      // the coordinates the location picker already saved go with the address
+      try {
+        const picked = JSON.parse(localStorage.getItem("userLocation") || "null")
+        if (Number.isFinite(picked?.latitude) && Number.isFinite(picked?.longitude)) {
+          payload.latitude = picked.latitude
+          payload.longitude = picked.longitude
+        }
+      } catch (_) {}
       const created = await addAddress(payload)
       const newId = getAddressId(created)
       if (newId) {

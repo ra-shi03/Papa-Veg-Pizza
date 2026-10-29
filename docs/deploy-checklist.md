@@ -411,6 +411,18 @@ Fix every FAIL before the client sees the demo. WARN lines are for you to read.
 
 ---
 
+## 8b. Nearby people check (run after 8a)
+
+The store panel lists only riders and customers near the store, and auto-dispatch offers orders only to approved online riders who pass the same rule. A read-only script (no writes, no secrets) shows what each store would see:
+
+```bash
+node scripts/check-nearby.js
+```
+
+For each store it prints the coordinates and city, and how many approved, pending and online riders and nearby customers are inside `NEARBY_RADIUS_KM` (default 10 km). A store with 0 riders will get no auto-dispatched orders: fix the store's coordinates or city, or have riders open the delivery app near the store (it saves their location on open).
+
+---
+
 ## 9. Click-through before you show the client
 
 Do this on the **deployed** site after the smoke test, with one real account per role. A screen is "working" only when its data comes from the server

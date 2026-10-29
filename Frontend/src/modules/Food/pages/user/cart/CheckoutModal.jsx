@@ -110,11 +110,19 @@ export default function CheckoutModal({
       label: "Home",
       street: houseNumber.trim() || "abc",
       additionalDetails: landmark.trim() || "",
-      city: currentAddress.split(",")[1]?.trim() || "Indore",
-      state: currentAddress.split(",")[2]?.trim() || "Madhya Pradesh",
-      zipCode: currentAddress.match(/\d{6}/)?.[0] || "452001",
+      city: currentAddress.split(",")[1]?.trim() || "",
+      state: currentAddress.split(",")[2]?.trim() || "",
+      zipCode: currentAddress.match(/\d{6}/)?.[0] || "",
       isDefault: true
     }
+    // The coordinates the location picker already saved go with the address, so stores near it can see the customer
+    try {
+      const picked = JSON.parse(localStorage.getItem("userLocation") || "null")
+      if (Number.isFinite(picked?.latitude) && Number.isFinite(picked?.longitude)) {
+        newAddressObject.latitude = picked.latitude
+        newAddressObject.longitude = picked.longitude
+      }
+    } catch (_) {}
 
     // Save to profile
     try {

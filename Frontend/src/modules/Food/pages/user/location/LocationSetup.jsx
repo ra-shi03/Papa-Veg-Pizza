@@ -301,15 +301,15 @@ export default function LocationSetup() {
       }
 
       const parts = detailedAddress.split(',').map(s => s.trim());
-      const statePart = parts.length > 1 ? parts[parts.length - 1].replace(/\d+/g, '').trim() : "Unknown";
-      const cityPart = parts.length > 2 ? parts[parts.length - 2] : "Unknown";
+      const statePart = parts.length > 1 ? parts[parts.length - 1].replace(/\d+/g, '').trim() : "";
+      const cityPart = parts.length > 2 ? parts[parts.length - 2] : "";
 
       const addressObj = {
         label: addressType || "Home",
         street: detailedAddress,
         additionalDetails: flatNumber,
-        city: cityPart || "Unknown",
-        state: statePart || "Unknown",
+        city: cityPart || "",
+        state: statePart || "",
         latitude: lat,
         longitude: lng,
         isForSomeoneElse: !!isForSomeoneElse,

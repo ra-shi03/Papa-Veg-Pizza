@@ -6,6 +6,7 @@ import { FoodDeliveryCashDeposit } from '../../delivery/models/foodDeliveryCashD
 import { FoodDeliveryCashLimit } from '../../admin/models/deliveryCashLimit.model.js';
 import { ValidationError, NotFoundError } from '../../../../core/auth/errors.js';
 import { logger } from '../../../../utils/logger.js';
+import { riderScope } from '../../store/services/storeDelivery.service.js';
 import { config } from '../../../../config/env.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 import { addOrderJob } from '../../../../queues/producers/order.producer.js';
@@ -121,92 +122,39 @@ async function filterPartnersByCashLimit(partners = [], options = {}) {
     }));
 }
 
-async function listNearbyOnlineDeliveryPartners(
+// Auto-dispatch offers an order only to approved, online riders the store panel also lists for that store: the same
+// nearby rule (store/services/nearby.js via riderScope), so a rider far from the store is never offered its orders.
+export async function listNearbyOnlineDeliveryPartners(
   storeId,
   { maxKm = 15, limit = 25, requiredAmount = 0, allowOverLimitFallback = true } = {},
 ) {
   const rId = (storeId?._id || storeId).toString();
-  const store = await FoodStore.findById(rId)
-    .select("location")
+  const store = await FoodStore.findById(rId).select("franchiseId latitude longitude").lean();
+  if (!store) return { store: null, partners: [] };
+
+  const { filter } = await riderScope(store, { approvedOnly: true });
+  const online = await FoodDeliveryPartner.find({ ...filter, availabilityStatus: "online" })
+    .select("_id status lastLat lastLng lastLocationAt")
     .lean();
 
-  if (!store?.location?.coordinates?.length) {
-    const partners = await FoodDeliveryPartner.find({
-      status: "approved",
-      availabilityStatus: "online",
-    })
-      .select("_id status name")
-      .limit(Math.max(1, limit))
-      .lean();
-
-    const cashEligiblePartners = await filterPartnersByCashLimit(
-      partners.map((p) => ({ partnerId: p._id, ...p })),
-      { requiredAmount, allowOverLimitFallback },
-    );
-
-    return {
-      store: null,
-      partners: cashEligiblePartners.map((p) => ({ partnerId: p.partnerId || p._id, distanceKm: null })),
-    };
-  }
-
-  const [rLng, rLat] = store.location.coordinates;
-  const allOnline = await FoodDeliveryPartner.find({
-    availabilityStatus: "online",
-  })
-    .select("_id status lastLat lastLng lastLocationAt name")
-    .lean();
-
-  const scored = [];
-  const allowedStatuses = process.env.NODE_ENV === 'production' ? ['approved'] : ['approved', 'pending'];
+  const hasStore = Number.isFinite(store.latitude) && Number.isFinite(store.longitude);
   const STALE_GPS_MS = 10 * 60 * 1000;
-
-  for (const p of allOnline) {
-    if (!allowedStatuses.includes(p.status)) continue;
-
-    const isStale = !p.lastLocationAt || (Date.now() - new Date(p.lastLocationAt).getTime()) > STALE_GPS_MS;
-    if (p.lastLat == null || p.lastLng == null || isStale) {
+  const scored = [];
+  for (const p of online) {
+    const fresh = p.lastLocationAt && Date.now() - new Date(p.lastLocationAt).getTime() <= STALE_GPS_MS;
+    if (!hasStore || p.lastLat == null || p.lastLng == null || !fresh) {
+      // near by saved city / zone or last known position, with no fresh fix to rank by
       scored.push({ partnerId: p._id, distanceKm: 999, status: p.status });
       continue;
     }
-
-    const d = haversineKm(rLat, rLng, p.lastLat, p.lastLng);
-    if (Number.isFinite(d) && d <= maxKm) {
-      scored.push({ partnerId: p._id, distanceKm: d, status: p.status });
-    }
+    const d = haversineKm(store.latitude, store.longitude, p.lastLat, p.lastLng);
+    if (Number.isFinite(d) && d <= maxKm) scored.push({ partnerId: p._id, distanceKm: d, status: p.status });
   }
-
   scored.sort((a, b) => a.distanceKm - b.distanceKm);
   const picked = scored.slice(0, Math.max(1, limit));
 
-  if (picked.length === 0) {
-    const anyOnline = await FoodDeliveryPartner.find({
-      status: { $in: allowedStatuses },
-      availabilityStatus: "online",
-    })
-      .select("_id status name")
-      .limit(Math.max(1, limit))
-      .lean();
-
-    return {
-      partners: anyOnline.map((p) => ({
-        partnerId: p._id,
-        distanceKm: null,
-        status: p.status,
-      })),
-    };
-  }
-
-  const final = (config.env === 'production')
-    ? picked.filter(p => p.status === 'approved')
-    : picked;
-
-  const cashEligibleFinal = await filterPartnersByCashLimit(final, {
-    requiredAmount,
-    allowOverLimitFallback,
-  });
-
-  return { partners: cashEligibleFinal };
+  const partners = await filterPartnersByCashLimit(picked, { requiredAmount, allowOverLimitFallback });
+  return { partners };
 }
 
 export async function getDispatchSettings() {

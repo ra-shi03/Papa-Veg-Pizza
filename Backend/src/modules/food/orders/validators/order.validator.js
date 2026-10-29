@@ -33,8 +33,8 @@ const addressSchema = z.object({
     fullName: z.string().optional(),
     street: z.string().min(1, 'Street required'),
     additionalDetails: z.string().optional(),
-    city: z.string().min(1, 'City required'),
-    state: z.string().min(1, 'State required'),
+    city: z.string().optional().default(''),
+    state: z.string().optional().default(''),
     zipCode: z.string().optional(),
     phone: z.string().optional(),
     location: z

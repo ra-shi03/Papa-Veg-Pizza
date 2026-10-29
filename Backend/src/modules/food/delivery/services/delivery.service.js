@@ -297,12 +297,16 @@ export const updateDeliveryAvailability = async (userId, payload) => {
         throw new ValidationError('Delivery partner not found');
     }
     const { status, latitude, longitude } = payload || {};
-    let validStatus = 'offline';
-    if (status === 'online' || status === true) validStatus = 'online';
-    else if (status === 'offline' || status === false) validStatus = 'offline';
-    
-    partner.availabilityStatus = validStatus;
-    if (typeof latitude === 'number' && typeof longitude === 'number') {
+    // A location-only update (the app reporting a GPS fix when it opens) leaves the online / offline choice as it is
+    if (status !== undefined) {
+        let validStatus = 'offline';
+        if (status === 'online' || status === true) validStatus = 'online';
+        else if (status === 'offline' || status === false) validStatus = 'offline';
+        partner.availabilityStatus = validStatus;
+    }
+    const validFix = typeof latitude === 'number' && typeof longitude === 'number'
+        && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180 && !(latitude === 0 && longitude === 0);
+    if (validFix) {
         partner.lastLocation = {
             type: 'Point',
             coordinates: [longitude, latitude]

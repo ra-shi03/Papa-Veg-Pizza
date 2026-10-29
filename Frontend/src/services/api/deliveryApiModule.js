@@ -114,6 +114,9 @@ export const deliveryAPI = {
       "/food/delivery/availability",
       { status: isOnline ? "online" : "offline" }
     ),
+  /** PATCH /food/delivery/availability with a GPS fix only: saves the rider's location, keeps online / offline as it is. */
+  reportLocation: (latitude, longitude) =>
+    deliveryClient.patch("/food/delivery/availability", { latitude, longitude }),
   updateLocation: (latitude, longitude, isOnline, extras = {}) =>
     deliveryClient.patch(
       "/food/delivery/availability",
