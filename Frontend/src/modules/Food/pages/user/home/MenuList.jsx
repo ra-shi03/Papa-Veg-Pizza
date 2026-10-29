@@ -481,27 +481,14 @@ export default function MenuList() {
           } catch (_) {}
         }
 
-        // 2. Fetch Products using the same endpoint as Superadmin panel (/food/admin/products)
+        // 2. Products come from the store-priced public endpoints only (never the admin catalogue list)
+        let productsFailed = false;
         try {
-          const pRes = await adminClient.get('/food/admin/products', { params: { limit: 250, page: 1 } });
-          const items = Array.isArray(pRes?.data?.data) ? pRes.data.data : (pRes?.data?.data?.foods || []);
+          const pRes = await apiClient.get('/food/admin/products/public');
+          const items = Array.isArray(pRes?.data?.data) ? pRes.data.data : [];
           if (items.length > 0) fetchedProds = items;
-        } catch (_) {}
-
-        if (fetchedProds.length === 0) {
-          try {
-            const pRes = await apiClient.get('/food/admin/products', { params: { limit: 250, page: 1 } });
-            const items = Array.isArray(pRes?.data?.data) ? pRes.data.data : (pRes?.data?.data?.foods || []);
-            if (items.length > 0) fetchedProds = items;
-          } catch (_) {}
-        }
-
-        if (fetchedProds.length === 0) {
-          try {
-            const pRes = await apiClient.get('/food/admin/products/public');
-            const items = Array.isArray(pRes?.data?.data) ? pRes.data.data : [];
-            if (items.length > 0) fetchedProds = items;
-          } catch (_) {}
+        } catch (_) {
+          productsFailed = true;
         }
 
         if (fetchedCats.length === 0 || fetchedProds.length === 0) {
@@ -514,19 +501,9 @@ export default function MenuList() {
             if (fetchedProds.length === 0 && Array.isArray(mData?.products) && mData.products.length > 0) {
               fetchedProds = mData.products;
             }
-          } catch (_) {}
-        }
-
-        if (fetchedProds.length === 0) {
-          try {
-            const stored = localStorage.getItem("pvp_products_v2");
-            if (stored) {
-              const parsed = JSON.parse(stored);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                fetchedProds = parsed;
-              }
-            }
-          } catch (_) {}
+          } catch (_) {
+            productsFailed = true;
+          }
         }
 
         // Process Categories
@@ -610,9 +587,13 @@ export default function MenuList() {
           });
 
           setProductsMap(map);
+        } else {
+          setProductsMap({});
+          if (productsFailed) triggerToast("Could not load the menu. Please check your connection and try again.");
         }
       } catch (e) {
         console.warn("Failed to load backend category products:", e);
+        triggerToast("Could not load the menu. Please check your connection and try again.");
       }
     };
     fetchCategoryProducts();
@@ -657,72 +638,7 @@ export default function MenuList() {
   }, []);
 
   // Dynamic Products Map State
-  const [productsMap, setProductsMap] = useState(() => {
-    try {
-      const stored = localStorage.getItem("pvp_products_v2");
-      if (stored) {
-        const parsed = JSON.parse(stored).filter(p => p.status === "Active");
-        if (parsed.length > 0) {
-          const map = {};
-          const curCats = categories || [];
-          parsed.forEach(p => {
-            const catKey = getCategoryKeyForProduct(p, curCats);
-            if (!map[catKey]) map[catKey] = [];
-            const formatted = formatProductForMenu(p);
-            if (!map[catKey].some(item => item.id === formatted.id || item.title.toLowerCase() === formatted.title.toLowerCase())) {
-              map[catKey].push(formatted);
-            }
-            const pCat = p.categoryId;
-            const pCatId = typeof pCat === 'object' && pCat !== null ? pCat._id : (pCat || p.category_id);
-            if (pCatId && String(pCatId) !== catKey) {
-              const idKey = String(pCatId);
-              if (!map[idKey]) map[idKey] = [];
-              if (!map[idKey].some(item => item.id === formatted.id || item.title.toLowerCase() === formatted.title.toLowerCase())) {
-                map[idKey].push(formatted);
-              }
-            }
-          });
-          return map;
-        }
-      }
-    } catch (e) {}
-    return null;
-  });
-
-  useEffect(() => {
-    const handleProductsSync = () => {
-      try {
-        const stored = localStorage.getItem("pvp_products_v2");
-        if (stored) {
-          const parsed = JSON.parse(stored).filter(p => p.status === "Active");
-          if (parsed.length > 0) {
-            const map = {};
-            const curCats = categories || [];
-            parsed.forEach(p => {
-              const catKey = getCategoryKeyForProduct(p, curCats);
-              if (!map[catKey]) map[catKey] = [];
-              const formatted = formatProductForMenu(p);
-              if (!map[catKey].some(item => item.id === formatted.id || item.title.toLowerCase() === formatted.title.toLowerCase())) {
-                map[catKey].push(formatted);
-              }
-              const pCat = p.categoryId;
-              const pCatId = typeof pCat === 'object' && pCat !== null ? pCat._id : (pCat || p.category_id);
-              if (pCatId && String(pCatId) !== catKey) {
-                const idKey = String(pCatId);
-                if (!map[idKey]) map[idKey] = [];
-                if (!map[idKey].some(item => item.id === formatted.id || item.title.toLowerCase() === formatted.title.toLowerCase())) {
-                  map[idKey].push(formatted);
-                }
-              }
-            });
-            setProductsMap(map);
-          }
-        }
-      } catch (e) {}
-    };
-    window.addEventListener("pvp_products_changed_v2", handleProductsSync);
-    return () => window.removeEventListener("pvp_products_changed_v2", handleProductsSync);
-  }, [categories]);
+  const [productsMap, setProductsMap] = useState(null);
 
   // Dynamic Toppings State
   const [toppings, setToppings] = useState(() => {

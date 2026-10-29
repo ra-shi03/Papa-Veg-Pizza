@@ -22,7 +22,7 @@ import DeliverOnTrainModal from "@food/components/user/DeliverOnTrainModal"
 import RewardsWalletLoading from "@food/components/user/RewardsWalletLoading"
 import PreviousRewardsView from "../rewards/PreviousRewardsView"
 import { ChevronsUp, X } from "lucide-react"
-import apiClient, { adminClient } from "@/services/api/axios"
+import apiClient from "@/services/api/axios"
 import { userAPI } from "@food/api"
 import { applySystemTheme } from "@/shared/utils/themeSync"
 import { useAppConfig } from "@food/context/AppConfigContext"
@@ -402,18 +402,7 @@ export default function Home() {
   
 
   // Dynamic Products State (100% Real Dynamic Data from Backend / Database)
-  const [products, setProducts] = useState(() => {
-    try {
-      const stored = localStorage.getItem("pvp_products_v2");
-      if (stored) {
-        const parsed = JSON.parse(stored).filter(p => p.status === "Active" || !p.status);
-        if (parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch (_) {}
-    return [];
-  });
+  const [products, setProducts] = useState([]);
 
 
   
@@ -568,6 +557,7 @@ export default function Home() {
       try {
         let fetchedCats = [];
         let fetchedProds = [];
+        let productsFailed = false;
 
         // 1. Prioritize Superadmin categories endpoint with sort order
         try {
@@ -597,7 +587,9 @@ export default function Home() {
               })));
             }
           }
-        } catch (_) {}
+        } catch (_) {
+          productsFailed = true;
+        }
 
         // 3. Fallback to localStorage if needed
         if (fetchedCats.length === 0) {
@@ -649,35 +641,12 @@ export default function Home() {
 
         if (fetchedProds.length === 0) {
           try {
-            const pRes = await adminClient.get('/food/admin/products', { params: { limit: 250, page: 1 } });
-            const items = Array.isArray(pRes?.data?.data) ? pRes.data.data : (pRes?.data?.data?.foods || []);
-            if (items.length > 0) fetchedProds = items;
-          } catch (_) {}
-        }
-        if (fetchedProds.length === 0) {
-          try {
-            const pRes = await apiClient.get('/food/admin/products', { params: { limit: 250, page: 1 } });
-            const items = Array.isArray(pRes?.data?.data) ? pRes.data.data : (pRes?.data?.data?.foods || []);
-            if (items.length > 0) fetchedProds = items;
-          } catch (_) {}
-        }
-        if (fetchedProds.length === 0) {
-          try {
             const pRes = await apiClient.get('/food/admin/products/public');
             const items = Array.isArray(pRes?.data?.data) ? pRes.data.data : [];
             if (items.length > 0) fetchedProds = items;
-          } catch (_) {}
-        }
-        if (fetchedProds.length === 0) {
-          try {
-            const stored = localStorage.getItem("pvp_products_v2");
-            if (stored) {
-              const parsed = JSON.parse(stored);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                fetchedProds = parsed;
-              }
-            }
-          } catch (_) {}
+          } catch (err) {
+            productsFailed = true;
+          }
         }
 
         if (fetchedProds.length > 0) {
@@ -697,9 +666,13 @@ export default function Home() {
             sectionId: typeof p.sectionId === 'object' ? p.sectionId?._id : p.sectionId
           }));
           setProducts(mapped);
+        } else {
+          setProducts([]);
+          if (productsFailed) triggerToast("Could not load the menu. Please check your connection and try again.");
         }
       } catch (err) {
         console.warn("Failed to load category products:", err);
+        triggerToast("Could not load the menu. Please check your connection and try again.");
       }
     }
 
@@ -1080,31 +1053,6 @@ export default function Home() {
       } catch (e) { }
     }
 
-    const handleProductsSync = () => {
-      try {
-        const stored = localStorage.getItem("pvp_products_v2")
-        if (stored) {
-          const parsed = JSON.parse(stored).filter(p => p.status === "Active")
-          if (parsed.length > 0) {
-            const mapped = parsed.map(p => ({
-              ...p,
-              id: p._id || p.id || `prod-${String(p.name || '').toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-              title: p.name || p.title,
-              name: p.name || p.title,
-              price: typeof p.price === 'string' ? parseInt(p.price.replace(/[^\d]/g, ""), 10) || 0 : Number(p.price) || (p.sizes && Number(p.sizes[0]?.price)) || 0,
-              originalPrice: p.originalPrice || p.mrp || (p.sizes && (p.sizes[0]?.originalPrice || p.sizes[0]?.mrp)) || null,
-              saveAmount: p.saveAmount || (p.sizes && p.sizes[0]?.saveAmount) || null,
-              rating: p.rating || 4.5,
-              description: p.shortDescription || p.description || "",
-              image: p.image || p.imageUrl || (Array.isArray(p.images) && p.images[0]) || "",
-              category: p.category
-            }));
-            setProducts(mapped);
-          }
-        }
-      } catch (e) { }
-    }
-
     const handleHomeConfigSync = (e) => {
       const cfg = e?.detail;
       if (cfg?.deliveryCard) {
@@ -1118,7 +1066,6 @@ export default function Home() {
     window.addEventListener("pvp_coupons_changed", handleOffersSync)
     window.addEventListener("systemThemeChanged", handleBrandingSync)
     window.addEventListener("pvp_categories_changed", handleCategoriesSync)
-    window.addEventListener("pvp_products_changed_v2", handleProductsSync)
     window.addEventListener("homePageConfigUpdated", handleHomeConfigSync)
 
     return () => {
@@ -1128,7 +1075,6 @@ export default function Home() {
       window.removeEventListener("pvp_coupons_changed", handleOffersSync)
       window.removeEventListener("systemThemeChanged", handleBrandingSync)
       window.removeEventListener("pvp_categories_changed", handleCategoriesSync)
-      window.removeEventListener("pvp_products_changed_v2", handleProductsSync)
       window.removeEventListener("homePageConfigUpdated", handleHomeConfigSync)
     }
   }, [])

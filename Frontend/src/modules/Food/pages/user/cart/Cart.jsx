@@ -11,6 +11,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { toast } from "sonner"
 import { removeCartKey } from "./upsell/upsellApi"
 import apiClient from "@/services/api/axios"
+import { orderAPI } from "@food/api"
 
 const ALL_PRODUCTS = {
   "margherita-supreme": {
@@ -169,6 +170,64 @@ export default function Cart() {
       if (f) setFees((prev) => ({ ...prev, ...f }))
     }).catch(() => {})
   }, [])
+  // The server prices the cart (store prices, fees, tax, coupon); this is what the customer is charged
+  const [quote, setQuote] = useState(null)
+  const quoteKey = JSON.stringify([
+    cartItems.map((i) => [i.itemId || i.id, i.quantity, i.size, i.crust, i.toppings, i.meals, i.extraCheese, i.offerToken]),
+    appliedCoupon?.code || "",
+  ])
+  useEffect(() => {
+    if (cartItems.length === 0) {
+      setQuote(null)
+      return undefined
+    }
+    let cancelled = false
+    setQuote(null)
+    const timer = setTimeout(async () => {
+      try {
+        let coords = null
+        try {
+          const loc = JSON.parse(localStorage.getItem("userLocation") || "null")
+          if (Number.isFinite(loc?.latitude) && Number.isFinite(loc?.longitude)) coords = loc
+        } catch (_) {}
+        const resolved = await apiClient.get("/food/stores/resolve", {
+          params: coords ? { lat: coords.latitude, lng: coords.longitude } : {},
+          _isFallback: true,
+        })
+        const store = resolved?.data?.data
+        if (!store?.storeId) throw new Error("No store is available right now")
+        const res = await orderAPI.calculateOrder({
+          storeId: store.storeId,
+          items: cartItems.map((item) => ({
+            itemId: String(item.itemId || item.id),
+            name: item.name,
+            price: Number(item.price) || 0,
+            quantity: item.quantity,
+            size: item.size || "",
+            kind: item.kind || "product",
+            ...(item.crust ? { crust: item.crust } : {}),
+            ...(item.toppings?.length ? { toppings: item.toppings } : {}),
+            ...(item.meals?.length ? { meals: item.meals } : {}),
+            ...(item.extraCheese ? { extraCheese: true } : {}),
+            ...(item.offerToken ? { offerToken: item.offerToken } : {}),
+          })),
+          ...(coords ? { deliveryAddress: { location: { type: "Point", coordinates: [coords.longitude, coords.latitude] } } } : {}),
+          ...(appliedCoupon?.code ? { couponCode: appliedCoupon.code } : {}),
+        })
+        const pricing = res?.data?.data?.pricing
+        if (!cancelled && pricing) setQuote(pricing)
+      } catch (err) {
+        if (cancelled) return
+        setQuote(null)
+        toast.error(err?.response?.data?.error || err?.response?.data?.message || err?.message || "Could not get the order total from the server")
+      }
+    }, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteKey])
   const [showTaxDetails, setShowTaxDetails] = useState(false)
   const [isDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem("appTheme")
@@ -389,27 +448,33 @@ export default function Cart() {
   }
 
   // Calculate pricing sums
-  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const estimatedSubtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
-  let discount = 0
+  let estimatedDiscount = 0
   if (appliedCoupon) {
-    if (subtotal >= appliedCoupon.minOrder) {
-      discount = appliedCoupon.discount
+    if (estimatedSubtotal >= appliedCoupon.minOrder) {
+      estimatedDiscount = appliedCoupon.discount
     }
   }
 
-  // Fees are set by the super admin; the server charges the same numbers (delivery by distance is estimated here)
-  const freeDelivery = (fees.freeDeliveryUpTo > 0 && subtotal >= fees.freeDeliveryUpTo) || (fees.freeDeliveryThreshold > 0 && subtotal >= fees.freeDeliveryThreshold)
-  const handlingCharge = subtotal > 0
-    ? Number((fees.handlingFee + fees.platformFee + fees.packagingFee + (freeDelivery ? 0 : fees.deliveryFee)).toFixed(2))
+  // Until the server answers (or if it cannot), the browser estimate is shown; the server quote replaces it
+  const estFreeDelivery = (fees.freeDeliveryUpTo > 0 && estimatedSubtotal >= fees.freeDeliveryUpTo) || (fees.freeDeliveryThreshold > 0 && estimatedSubtotal >= fees.freeDeliveryThreshold)
+  const estHandling = estimatedSubtotal > 0
+    ? Number((fees.handlingFee + fees.platformFee + fees.packagingFee + (estFreeDelivery ? 0 : fees.deliveryFee)).toFixed(2))
     : 0
   const gstShare = fees.gstRate / 2
-  const taxable = subtotal - discount + (subtotal > 0 ? fees.handlingFee : 0)
-  const cgst = subtotal > 0 ? Number((taxable * gstShare / 100).toFixed(2)) : 0
-  const sgst = cgst
-  const taxesAndCharges = subtotal > 0 ? Number((handlingCharge + cgst + sgst).toFixed(2)) : 0
+  const estTaxable = estimatedSubtotal - estimatedDiscount + (estimatedSubtotal > 0 ? fees.handlingFee : 0)
+  const estCgst = estimatedSubtotal > 0 ? Number((estTaxable * gstShare / 100).toFixed(2)) : 0
+  const estTotal = estimatedSubtotal > 0 ? Number((estimatedSubtotal - estimatedDiscount + estHandling + estCgst * 2).toFixed(2)) : 0
 
-  const total = subtotal > 0 ? Number((subtotal - discount + taxesAndCharges).toFixed(2)) : 0
+  const subtotal = quote ? Number(quote.subtotal) : estimatedSubtotal
+  const discount = quote ? Number(quote.discount || 0) : estimatedDiscount
+  const handlingCharge = quote
+    ? Number((Number(quote.deliveryFee || 0) + Number(quote.platformFee || 0) + Number(quote.packagingFee || 0) + Number(quote.handlingFee || 0)).toFixed(2))
+    : estHandling
+  const cgst = quote ? Number((Number(quote.tax || 0) / 2).toFixed(2)) : estCgst
+  const sgst = cgst
+  const total = quote ? Number(quote.total) : estTotal
   const savings = Number(discount.toFixed(2))
   const beforeSavings = Number((total + savings).toFixed(2))
 

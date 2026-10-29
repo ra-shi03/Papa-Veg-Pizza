@@ -394,6 +394,23 @@ If there are results, fix those accounts first (merge or change one email). To d
 
 ---
 
+## 8a. Demo readiness check (run on the server, after the restart)
+
+A read-only script (it writes nothing and prints no secrets). From `Backend/`, with the server's `.env` in place:
+
+```bash
+node scripts/check-demo.js
+```
+
+It prints a PASS / FAIL / WARN line for each setting and a table with one row per store. The script exits with code 1 if anything FAILs.
+
+- Environment: `FRONTEND_URL` is set and is not localhost, `JWT_ACCESS_EXPIRES` is not `7d`, `NODE_ENV`, the default-OTP switch, and whether `TEST_OTP_PHONES` is set (FAIL when the production switch is on and it is empty).
+- Per store: approved and active, open right now (operating hours), has an active kitchen supervisor (an order cannot be accepted without one), and at least one approved rider is online (riders are platform-wide; the script also shows how many have a GPS fix in the last 10 minutes).
+
+Fix every FAIL before the client sees the demo. WARN lines are for you to read.
+
+---
+
 ## 9. Click-through before you show the client
 
 Do this on the **deployed** site after the smoke test, with one real account per role. A screen is "working" only when its data comes from the server
