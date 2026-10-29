@@ -4,6 +4,9 @@ import { FoodOffer } from '../../admin/models/offer.model.js';
 import { openStoreIds } from '../../franchise/services/storeHours.js';
 import { sendResponse } from '../../../../utils/response.js';
 import { NotFoundError } from '../../../../core/auth/errors.js';
+import { FoodAppConfig } from '../../settings/models/appConfig.model.js';
+import { resolveStoreForLocation } from '../../orders/services/order-store.service.js';
+import { buildSlots, SCHEDULE } from '../../orders/services/order-schedule.service.js';
 
 // Public, read-only views the customer app needs about a store and the coupons it can use. Only fields a customer
 // already sees in the app: no franchise, owner, documents, approval or internal data.
@@ -23,6 +26,31 @@ export async function getPublicStore(req, res, next) {
       address: store.address || '', city: store.city || '', state: store.state || '', pincode: store.pincode || '',
       latitude: store.latitude ?? null, longitude: store.longitude ?? null, zoneId: store.zoneId ? String(store.zoneId) : null,
       isOpen: open.has(String(store._id)),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /v1/food/stores/slots?lat=&lng= : the store serving that point and its delivery slots for "Order for later".
+ * The store is picked regardless of today's hours, so a closed store still offers tomorrow's slots.
+ */
+export async function getDeliverySlots(req, res, next) {
+  try {
+    const { store } = await resolveStoreForLocation(parseFloat(req.query.lat), parseFloat(req.query.lng), { anyHours: true });
+    const [open, config] = await Promise.all([
+      openStoreIds([store._id]),
+      FoodAppConfig.findOne().select('scheduledOrdersEnabled').lean(),
+    ]);
+    const scheduledOrdersEnabled = config?.scheduledOrdersEnabled !== false;
+    return sendResponse(res, 200, 'OK', {
+      storeId: String(store._id),
+      storeName: store.storeName,
+      openNow: open.has(String(store._id)),
+      scheduledOrdersEnabled,
+      leadMinutes: SCHEDULE.leadMinutes,
+      days: scheduledOrdersEnabled ? await buildSlots(store._id) : [],
     });
   } catch (err) {
     next(err);

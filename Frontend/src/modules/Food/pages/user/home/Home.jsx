@@ -561,7 +561,7 @@ export default function Home() {
 
         // 1. Prioritize Superadmin categories endpoint with sort order
         try {
-          const cRes = await apiClient.get('/food/admin/category-products?sort=sort_asc');
+          const cRes = await apiClient.get('/food/admin/category-products/public?sort=sort_asc');
           if (Array.isArray(cRes?.data?.data) && cRes.data.data.length > 0) {
             fetchedCats = cRes.data.data;
           }
@@ -639,6 +639,7 @@ export default function Home() {
           setActiveCategory(prev => prev === "pizza" ? parsedCats[0]?.id || "pizza" : prev);
         }
 
+        // Products: the public menu, priced for the customer's store (the admin list needs an admin sign-in)
         if (fetchedProds.length === 0) {
           try {
             const pRes = await apiClient.get('/food/admin/products/public');

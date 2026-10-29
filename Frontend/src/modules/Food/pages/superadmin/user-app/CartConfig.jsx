@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Save, Loader2, PanelBottom, Sparkles, Timer, X, Search, Check, Wand2, Hand, Pizza, Cookie, Layers } from 'lucide-react';
+import { Save, Loader2, PanelBottom, Sparkles, Timer, X, Search, Check, Wand2, Hand, Pizza, Cookie, Layers, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminClient } from '../../../../../services/api/axios';
 
@@ -292,26 +292,98 @@ function ItemPicker({ items, selectedIds, onToggle }) {
   );
 }
 
-// What the customer will see, as a small strip.
-function UpsellPreview({ title, items, mode }) {
+// What the customer will see, as a live mobile-style preview matching the reference design.
+function UpsellPreview({ title, items = [], mode = 'auto' }) {
+  const sampleItems = [
+    {
+      id: 'sample-cheesy-dip',
+      label: 'Cheesy Dip',
+      hint: '₹30',
+      group: 'Garlic Breads & Dips',
+      image: 'https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?w=300&q=80',
+    },
+    {
+      id: 'sample-veg-parcel',
+      label: 'Veg Parcel',
+      hint: '₹52',
+      group: 'Tacos & Parcels',
+      image: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=300&q=80',
+    },
+    {
+      id: 'sample-garlic-bread',
+      label: 'Garlic Breadsticks',
+      hint: '₹125',
+      group: 'Garlic Breads & Dips',
+      image: 'https://images.unsplash.com/photo-1544982503-9f984c14501a?w=300&q=80',
+    },
+  ];
+
+  const hasCustomItems = Array.isArray(items) && items.length > 0;
+  const displayItems = hasCustomItems ? items.slice(0, 8) : sampleItems;
+
   return (
-    <div className="rounded-xl bg-gray-50 border border-gray-200 p-3">
-      <p className="text-sm font-bold text-gray-900">{title || 'Complete your order now'}</p>
-      {items.length === 0 ? (
-        <p className="text-xs text-gray-500 mt-2">
-          {mode === 'manual' ? 'Pick at least one item below — nothing will be shown until you do.' : 'Items are chosen automatically from your rules and customers’ order history.'}
-        </p>
-      ) : (
-        <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-          {items.slice(0, 8).map((i) => (
-            <div key={i.id} className="shrink-0 w-24 rounded-lg bg-white border border-gray-200 overflow-hidden">
-              <div className="h-12 bg-gray-100">{i.image && <img src={i.image} alt="" className="w-full h-full object-cover" />}</div>
-              <p className="px-1.5 pt-1 text-[11px] font-semibold line-clamp-1">{i.label}</p>
-              <p className="px-1.5 pb-1 text-[11px] text-gray-500">{i.hint}</p>
+    <div className="rounded-xl bg-gray-50 border border-gray-200 p-3 sm:p-4 mt-3">
+      <div className="flex items-center justify-between mb-2.5">
+        <p className="text-sm font-bold text-gray-900">{title || 'Complete your order now'}</p>
+        {!hasCustomItems && (
+          <span className="text-[10px] font-semibold text-gray-500 bg-gray-200/80 px-2 py-0.5 rounded-full">
+            {mode === 'manual' ? 'Sample Preview (Pick items below)' : 'Sample Preview (Auto Mode)'}
+          </span>
+        )}
+      </div>
+
+      <div className="flex gap-2.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {displayItems.map((i) => (
+          <div
+            key={i.id}
+            className="shrink-0 w-[150px] rounded-xl bg-white border border-gray-200 overflow-hidden shadow-sm flex flex-col justify-between"
+          >
+            <div>
+              <div className="relative h-[90px] bg-gray-100 overflow-hidden">
+                {i.image ? (
+                  <img src={i.image} alt={i.label} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-300">
+                    <span className="text-2xl">🍕</span>
+                  </div>
+                )}
+                {/* Veg mark positioned bottom-left over the image, matching the reference image */}
+                <span className="absolute bottom-2 left-2 z-10 inline-flex items-center justify-center w-3.5 h-3.5 border-[1.5px] border-[#3ce36a] bg-white rounded-[3px] shadow-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#3ce36a]" />
+                </span>
+              </div>
+              <div className="p-2.5">
+                <p className="text-xs font-bold text-gray-900 truncate" title={i.label}>{i.label}</p>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-xs font-bold text-gray-800">{i.hint || '₹30'}</span>
+                  <span className="text-[11px] font-bold text-white bg-[#EE3A43] px-2.5 py-1 rounded-md flex items-center gap-0.5 shadow-sm">
+                    Add +
+                  </span>
+                </div>
+              </div>
             </div>
-          ))}
-        </div>
-      )}
+
+            {/* Category navigation footer preview */}
+            <button
+              type="button"
+              onClick={() => {
+                toast.info(`In User App: Clicking "All ${i.group || 'Category'} >" navigates the customer to the menu and smoothly switches to the "${i.group || 'Category'}" category tab.`);
+              }}
+              className="w-full border-t border-gray-100 px-2.5 py-1.5 flex items-center justify-between text-left hover:bg-gray-50 transition-colors cursor-pointer bg-transparent group"
+              title={`In user app, clicks navigate to ${i.group || 'Category'}`}
+            >
+              <span className="text-[11px] font-bold text-[#005a9c] truncate pr-1">
+                All {i.group || 'Category'}
+              </span>
+              <ChevronRight size={13} className="shrink-0 text-[#005a9c] group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <p className="text-[11px] text-gray-500 mt-2.5 flex items-center gap-1.5">
+        <span className="font-semibold text-blue-600">ℹ️ Category Navigation:</span>
+        <span>Each card displays "All [Category] &gt;" at the bottom. Tapping it jumps directly to that category on the Menu page.</span>
+      </p>
     </div>
   );
 }

@@ -56,7 +56,7 @@ export async function calculateOrderPricing(userId, dto) {
 
 // Everything is rebuilt from the catalogue and the fee settings; prices and totals sent by the client are ignored.
 export async function buildOrderPricing(userId, dto) {
-  const store = await getOrderableStore(dto.storeId);
+  const store = await getOrderableStore(dto.storeId, { at: dto.scheduledAt });
 
   const { items, subtotal, offerClaims } = await priceCartItems(userId, dto.items, { storeId: store._id });
 

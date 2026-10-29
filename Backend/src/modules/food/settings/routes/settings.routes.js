@@ -1,6 +1,7 @@
 import express from 'express';
 import { getWelcomeScreenConfig, updateWelcomeScreenConfig } from '../controllers/welcomeScreen.controller.js';
 import { getDeliveryWelcomeScreenConfig, updateDeliveryWelcomeScreenConfig } from '../controllers/deliveryWelcomeScreen.controller.js';
+import { getDeliveryLoginScreenConfig, updateDeliveryLoginScreenConfig } from '../controllers/deliveryLoginScreen.controller.js';
 import { getHomePageConfig, createOrUpdateHomePageConfig, updateHomePageConfig, uploadHomePageBanner, updateHomePageBanner, deleteHomePageBanner } from '../controllers/homePage.controller.js';
 import { authMiddleware, requireSuperAdmin } from '../../../../core/auth/auth.middleware.js';
 import { upload } from '../../../../middleware/upload.js';
@@ -16,6 +17,10 @@ router.put('/welcome', authMiddleware, requireSuperAdmin, updateWelcomeScreenCon
 // Delivery App Welcome Screen routes
 router.get('/delivery-welcome', getDeliveryWelcomeScreenConfig);
 router.put('/delivery-welcome', authMiddleware, requireSuperAdmin, updateDeliveryWelcomeScreenConfig);
+
+// Delivery App Login Screen routes
+router.get('/delivery-login', getDeliveryLoginScreenConfig);
+router.put('/delivery-login', authMiddleware, requireSuperAdmin, updateDeliveryLoginScreenConfig);
 
 // Home page configuration routes
 router.get('/home-page', getHomePageConfig);
@@ -114,6 +119,18 @@ router.get('/cart-config', getCartConfig);
 router.put('/cart-config', authMiddleware, requireSuperAdmin, updateCartConfig);
 router.post('/cart-config/suggestions', getCartSuggestions);
 router.post('/cart-config/offer/claim', authMiddleware, claimCartOffer);
+
+import * as nutritionController from '../controllers/nutrition.controller.js';
+import { validateNutritionItem, validateNutritionItemUpdate, validateNutritionPage } from '../validators/nutrition.validator.js';
+
+// Nutrition Information page of the customer app (superadmin managed)
+router.get('/nutrition/public', nutritionController.getPublicNutrition);
+router.get('/nutrition/admin', authMiddleware, requireSuperAdmin, nutritionController.getAdminNutrition);
+router.put('/nutrition/page', authMiddleware, requireSuperAdmin, validateNutritionPage, nutritionController.updateNutritionPage);
+router.post('/nutrition/items', authMiddleware, requireSuperAdmin, validateNutritionItem, nutritionController.createNutritionItem);
+router.post('/nutrition/items/starter', authMiddleware, requireSuperAdmin, nutritionController.addStarterNutritionItems);
+router.put('/nutrition/items/:id', authMiddleware, requireSuperAdmin, validateNutritionItemUpdate, nutritionController.updateNutritionItem);
+router.delete('/nutrition/items/:id', authMiddleware, requireSuperAdmin, nutritionController.deleteNutritionItem);
 
 export default router;
 

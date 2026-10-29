@@ -60,7 +60,7 @@ export default function UserSearchPage() {
       } catch (_) {}
 
       try {
-        const catRes = await apiClient.get('/food/admin/categories');
+        const catRes = await apiClient.get('/food/categories/public');
         const catList = catRes?.data?.data?.categories || catRes?.data?.data || [];
         if (Array.isArray(catList) && catList.length > 0) {
           setCategories(catList.filter(c => c.status !== 'Inactive'));

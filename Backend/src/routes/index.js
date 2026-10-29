@@ -36,11 +36,12 @@ import { customersRouter as storeCustomersRoutes, complaintsRouter as storeCompl
 import { storeDashboardRouter, adminDashboardRouter } from '../modules/food/dashboard/routes/dashboard.routes.js';
 import { storeAttendanceRouter } from '../modules/food/store/routes/attendance.routes.js';
 import { storeProfileRouter } from '../modules/food/store/routes/storeProfile.routes.js';
-import { getPublicStore, getPublicOffers } from '../modules/food/store/controllers/storePublic.controller.js';
+import { getPublicStore, getPublicOffers, getDeliverySlots } from '../modules/food/store/controllers/storePublic.controller.js';
 import { storeDeliveryRouter, zonesRouter } from '../modules/food/store/routes/storeDelivery.routes.js';
 import { storePerformanceRouter, operatingHoursRouter, storeExtrasRouter, storePricingRouter, storeDetailsRouter } from '../modules/food/franchise/routes/storeOps.routes.js';
 import { listFranchiseOrders } from '../modules/food/store/controllers/storeOrders.controller.js';
 import { resolveStoreForLocation } from '../modules/food/orders/services/order-store.service.js';
+import { ValidationError } from '../core/auth/errors.js';
 import { trackOrderPublicController, getOrderHistoryPublicController, getOrderMethodsController, getFeeConfigController } from '../modules/food/orders/controllers/order.controller.js';
 import {
   submitInquiryPublic,
@@ -101,7 +102,10 @@ router.get('/v1/food/stores/resolve', async (req, res, next) => {
     try {
         const lat = parseFloat(req.query.lat);
         const lng = parseFloat(req.query.lng);
-        const { store, distanceKm } = await resolveStoreForLocation(lat, lng);
+        // ?at=<ISO> for a scheduled order: a store that can deliver then, even if it is closed now
+        const at = req.query.at ? new Date(String(req.query.at)) : null;
+        if (at && Number.isNaN(at.getTime())) throw new ValidationError('Invalid delivery time');
+        const { store, distanceKm } = await resolveStoreForLocation(lat, lng, { at });
         res.json({
             success: true,
             data: {
@@ -119,6 +123,7 @@ router.get('/v1/food/stores/resolve', async (req, res, next) => {
 });
 
 // Public, read-only: a store's public details and the coupons a customer can use (customer app)
+router.get('/v1/food/stores/slots', getDeliverySlots);
 router.get('/v1/food/stores/:id', getPublicStore);
 router.get('/v1/food/offers/public', getPublicOffers);
 

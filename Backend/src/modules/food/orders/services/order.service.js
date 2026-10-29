@@ -132,7 +132,7 @@ export async function calculateOrder(userId, dto) {
 
 // ----- Create order -----
 export async function createOrder(userId, dto) {
-  const store = await getOrderableStore(dto.storeId);
+  const store = await getOrderableStore(dto.storeId, { at: dto.scheduledAt });
 
   // Prices, fees, tax, discount and total are all computed here from the catalogue; the client's are ignored.
   const priced = await buildOrderPricing(userId, { ...dto, deliveryAddress: dto.address });

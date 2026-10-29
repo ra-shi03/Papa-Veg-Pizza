@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { ChevronRight, ShoppingCart, ChevronsRight, Clock, X, Plus } from "lucide-react"
 import {
   OFFER_KEY_PREFIX,
@@ -76,10 +77,10 @@ const useSuggestions = (cartIds, enabled) => {
 function VegMark({ size = 14 }) {
   return (
     <span
-      className="inline-flex items-center justify-center border-2 border-[#3ce36a] bg-white rounded-[3px]"
+      className="inline-flex items-center justify-center border-[1.5px] border-[#3ce36a] bg-white rounded-[3px] shadow-sm"
       style={{ width: size, height: size }}
     >
-      <span className="rounded-full bg-[#3ce36a]" style={{ width: size / 2.4, height: size / 2.4 }} />
+      <span className="rounded-full bg-[#3ce36a]" style={{ width: size / 2.3, height: size / 2.3 }} />
     </span>
   )
 }
@@ -154,7 +155,8 @@ export function CartBottomBar({ products = NO_PRODUCTS, dark = false, onViewCart
 // Menu: "Complete your order now" strip shown right under a pizza card once that pizza is in the cart
 // ---------------------------------------------------------------------------------------------
 
-export function InlineUpsell({ productId, products = NO_PRODUCTS, dark = false }) {
+export function InlineUpsell({ productId, products = NO_PRODUCTS, dark = false, categories = [], onSelectCategory }) {
+  const navigate = useNavigate()
   const config = useCartConfig()
   const summary = useCartSummary(products)
   const inCart = summary.ids.includes(String(productId))
@@ -165,37 +167,130 @@ export function InlineUpsell({ productId, products = NO_PRODUCTS, dark = false }
   if (!enabled || items.length === 0) return null
 
   const surface = dark ? "bg-[#18181a] text-white" : "bg-white text-zinc-900"
-  const muted = dark ? "text-zinc-400" : "text-zinc-500"
+
+  const resolveItemCategory = (item) => {
+    let group = item.group
+    let groupId = item.groupId
+
+    // Cross reference products array if group is missing or generic
+    if (!group || group === "Menu" || group === "Products" || group === "Add-ons") {
+      const match = products.find((p) => String(p.id || p._id) === String(item.id))
+      if (match) {
+        group = match.categoryLabel || match.category || match.categoryName || group
+        groupId = match.categoryId || match.category_id || groupId
+      }
+    }
+
+    return {
+      name: group || "Category",
+      id: groupId || group,
+    }
+  }
+
+  const handleCategoryClick = (item) => {
+    const cat = resolveItemCategory(item)
+
+    if (typeof onSelectCategory === "function") {
+      onSelectCategory(cat.id || cat.name)
+      return
+    }
+
+    const menuBasePath = window.location.pathname.startsWith("/food") ? "/food/user/menu" : "/user/menu"
+    navigate(`${menuBasePath}?category=${encodeURIComponent(cat.id || cat.name)}`)
+  }
 
   return (
-    <div className={`${surface} w-full pt-3 pb-3 border-y ${dark ? "border-zinc-800" : "border-zinc-200"}`} onClick={(e) => e.stopPropagation()}>
-      <h3 className="px-4 text-sm font-bold">{data?.title || "Complete your order now"}</h3>
-      <div className="flex gap-3 overflow-x-auto px-4 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {items.map((item) => (
-          <div
-            key={suggestionKey(item)}
-            className={`shrink-0 w-[150px] rounded-xl overflow-hidden border ${dark ? "border-zinc-700 bg-zinc-900" : "border-zinc-200 bg-white"}`}
-          >
-            <div className="relative h-[84px] bg-zinc-100">
-              {item.image && <img src={item.image} alt={item.name} className="w-full h-full object-cover" loading="lazy" />}
-              <span className="absolute top-1.5 left-1.5"><VegMark size={13} /></span>
-            </div>
-            <div className="p-2">
-              <p className="text-xs font-semibold leading-tight line-clamp-2 min-h-[30px]">{item.name}</p>
-              <div className="flex items-center justify-between mt-1.5">
-                <span className={`text-xs font-medium ${muted}`}>₹{item.price}</span>
-                <button
-                  type="button"
-                  onClick={() => addSuggestionToCart(item)}
-                  className="border-0 cursor-pointer text-white text-xs font-bold rounded-md px-2.5 py-1 flex items-center gap-0.5"
-                  style={{ backgroundColor: PRIMARY }}
-                >
-                  Add <Plus size={12} strokeWidth={3} />
-                </button>
+    <div
+      className={`${surface} w-full pt-3 pb-3 border-y ${dark ? "border-zinc-800" : "border-zinc-200"}`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <h3 className={`px-4 text-[15px] font-bold ${dark ? "text-white" : "text-zinc-900"}`}>
+        {data?.title || "Complete your order now"}
+      </h3>
+      <div className="flex gap-3 overflow-x-auto px-4 pt-2.5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {items.map((item) => {
+          const cat = resolveItemCategory(item)
+          return (
+            <div
+              key={suggestionKey(item)}
+              className={`shrink-0 w-[156px] rounded-xl overflow-hidden border flex flex-col justify-between transition-all ${
+                dark
+                  ? "border-zinc-800 bg-[#1c1c1e] text-white shadow-none"
+                  : "border-zinc-200/90 bg-white text-zinc-900 shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+              }`}
+            >
+              <div>
+                <div className="relative h-[95px] w-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                  {item.image ? (
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none"
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-zinc-300 dark:text-zinc-600">
+                      <span className="text-2xl">🍕</span>
+                    </div>
+                  )}
+                  {/* Veg mark positioned bottom-left over the image, matching the reference image */}
+                  <span className="absolute bottom-2 left-2 z-10 drop-shadow-sm">
+                    <VegMark size={14} />
+                  </span>
+                </div>
+
+                <div className="p-2.5">
+                  <p className="text-[13px] font-bold leading-tight line-clamp-1" title={item.name}>
+                    {item.name}
+                  </p>
+                  <div className="flex items-center justify-between mt-2.5">
+                    <span className={`text-[13px] font-bold ${dark ? "text-zinc-200" : "text-zinc-800"}`}>
+                      ₹{item.price}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        addSuggestionToCart(item)
+                      }}
+                      className="border-0 cursor-pointer text-white text-xs font-bold rounded-md px-3 py-1 flex items-center gap-0.5 shadow-sm active:scale-95 transition-transform"
+                      style={{ backgroundColor: PRIMARY }}
+                    >
+                      Add <Plus size={12} strokeWidth={3} />
+                    </button>
+                  </div>
+                </div>
               </div>
+
+              {/* Category navigation footer: All <Category> > */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleCategoryClick(item)
+                }}
+                className={`w-full border-t px-2.5 py-2 flex items-center justify-between text-left transition-colors cursor-pointer bg-transparent group ${
+                  dark
+                    ? "border-zinc-800/80 hover:bg-white/5"
+                    : "border-zinc-100 hover:bg-zinc-50"
+                }`}
+                title={`View all in ${cat.name}`}
+              >
+                <span className="text-[11px] font-bold text-[#005a9c] dark:text-blue-400 truncate pr-1">
+                  All {cat.name}
+                </span>
+                <ChevronRight
+                  size={13}
+                  strokeWidth={2.5}
+                  className="shrink-0 text-[#005a9c] dark:text-blue-400 group-hover:translate-x-0.5 transition-transform"
+                />
+              </button>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
@@ -236,7 +331,7 @@ export function CartMealSuggestions({ dark = false, cartIds = [] }) {
       </div>
 
       {data?.showCategoryChips && groups.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto px-5 pt-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex flex-wrap items-center justify-center gap-2 px-4 pt-3 pb-1">
           {["All", ...groups].map((g) => {
             const active = g === group
             return (
@@ -244,10 +339,12 @@ export function CartMealSuggestions({ dark = false, cartIds = [] }) {
                 key={g}
                 type="button"
                 onClick={() => setGroup(g)}
-                className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer border ${
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer border transition-all active:scale-95 ${
                   active
-                    ? "bg-zinc-900 text-white border-zinc-900"
-                    : dark ? "bg-transparent text-zinc-300 border-zinc-600" : "bg-white text-zinc-700 border-zinc-300"
+                    ? "bg-[#1c1b1b] text-white border-[#1c1b1b] dark:bg-white dark:text-black dark:border-white shadow-sm"
+                    : dark
+                    ? "bg-transparent text-zinc-300 border-zinc-700 hover:border-zinc-500"
+                    : "bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300 shadow-sm"
                 }`}
               >
                 {g}

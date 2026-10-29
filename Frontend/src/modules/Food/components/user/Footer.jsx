@@ -65,7 +65,7 @@ export default function Footer() {
     stores: [
       { name: "Partner With Us", href: "/user/help" },
       { name: "Store Login", href: "/store" },
-      { name: "Delivery", href: "/delivery" },
+      { name: "Delivery", href: "/food/delivery/welcome" },
     ],
   }
 

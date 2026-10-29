@@ -80,7 +80,8 @@ export function AppRoutes() {
         <Route path="/store/auth/*" element={<Suspense fallback={<PageLoader />}><AuthApp /></Suspense>} />
 
         {/* Delivery V2 Module */}
-        <Route path="/delivery/*" element={<Navigate to="/food/delivery" replace />} />
+        <Route path="/delivery" element={<Navigate to="/food/delivery/welcome" replace />} />
+        <Route path="/delivery/*" element={<Navigate to="/food/delivery/welcome" replace />} />
         <Route path="/food/delivery/*" element={<Suspense fallback={<PageLoader />}><DeliveryV2App /></Suspense>} />
 
         {/* Food Module - Handle both /food and root / for the user app */}

@@ -12,6 +12,8 @@ import noAddressesImg from "@/assets/no-addresses.png";
 export default function LocationSetup() {
   const navigate = useNavigate();
   const locationState = useLocation().state || {};
+  // Opened from the cart ("change location"): go back there once the new location is confirmed
+  const afterConfirmPath = typeof locationState.from === "string" && /cart|checkout/.test(locationState.from) ? locationState.from : "/food/user";
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
@@ -46,6 +48,9 @@ export default function LocationSetup() {
       setStatus("my_addresses");
     } else if (locationState.mode === 'manual') {
       setStatus("manual");
+    } else if (afterConfirmPath !== "/food/user") {
+      // Changing location from the cart: let the user choose instead of silently re-using the GPS position
+      setStatus("prompt");
     } else if (locationState.autoCheck === true) {
       fetchCurrentLocation(false);
     } else {
@@ -147,7 +152,7 @@ export default function LocationSetup() {
         });
         
         localStorage.setItem("customer_has_visited", "true");
-        navigate("/food/user", { replace: true });
+        navigate(afterConfirmPath, { replace: true });
       } else {
         setErrorMessage(message);
         setStatus("not_serviceable");
@@ -192,7 +197,7 @@ export default function LocationSetup() {
             
             // Go to home
             localStorage.setItem("customer_has_visited", "true");
-            navigate("/food/user", { replace: true });
+            navigate(afterConfirmPath, { replace: true });
           } else {
             setErrorMessage(message);
             setStatus("not_serviceable");
@@ -247,7 +252,7 @@ export default function LocationSetup() {
       });
       
       localStorage.setItem("customer_has_visited", "true");
-      navigate("/food/user", { replace: true });
+      navigate(afterConfirmPath, { replace: true });
     } catch(err) {
       setStatus("manual");
       setErrorMessage("Error selecting saved address.");
@@ -364,7 +369,7 @@ export default function LocationSetup() {
       });
       
       localStorage.setItem("customer_has_visited", "true");
-      navigate("/food/user", { replace: true });
+      navigate(afterConfirmPath, { replace: true });
 
     } catch(err) {
       setStatus("manual");

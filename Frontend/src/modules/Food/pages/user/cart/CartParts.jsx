@@ -49,7 +49,7 @@ function PopNumber({ value, color }) {
       initial={reduce ? false : { scale: 1.4, opacity: 0.4 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ type: "spring", stiffness: 500, damping: 22 }}
-      className="min-w-[18px] text-center text-sm font-semibold inline-block"
+      className="min-w-[16px] px-0.5 text-center text-xs font-bold inline-block"
       style={{ color }}
     >
       {value}
@@ -59,10 +59,24 @@ function PopNumber({ value, color }) {
 
 const SWIPE_REMOVE_AT = -90
 
-// One cart line. Swipe left to remove (Undo is offered by the parent); the stepper removes at 1.
+// One cart line. Swipe left or decrement at 1 to remove item.
 export function CartItemRow({ item, index, ui, onQty, onRemove }) {
   const reduce = useReducedMotion()
-  const [imgFailed, setImgFailed] = useState(false)
+
+  // Clean pizza name (remove trailing (Regular) / (Medium) etc. if already appended in title)
+  const cleanName = (item.name || "").replace(/\s*\((Regular|Medium|Large|Small)\)\s*$/i, "").trim() || item.name
+
+  // Dynamic size & crust
+  const size = item.size || (item.name?.match(/\((Regular|Medium|Large|Small)\)/i)?.[1]) || "Regular"
+  let crust = item.crust || ""
+  if (!crust && item.description) {
+    const m = item.description.match(/Crust:\s*([^,\n]+)/i)
+    if (m) crust = m[1].trim()
+  }
+  if (!crust && (item.kind === "pizza" || !item.kind || item.kind === "product")) {
+    crust = item.defaultCrust || "New Hand Tossed"
+  }
+  const variantLine = crust ? `${size} | ${crust}` : size
 
   return (
     <motion.div
@@ -91,30 +105,22 @@ export function CartItemRow({ item, index, ui, onQty, onRemove }) {
           }
         }}
         whileTap={{ cursor: "grabbing" }}
-        className="relative p-4 flex items-start gap-3 touch-pan-y"
+        className="relative px-3.5 py-3 flex items-start gap-2.5 touch-pan-y"
         style={{ backgroundColor: ui.card }}
       >
-        <span className="mt-1 inline-flex items-center justify-center border-2 border-[#3ce36a] rounded-[3px] w-4 h-4 shrink-0">
+        {/* Veg mark */}
+        <span className="mt-1 inline-flex items-center justify-center border-[1.5px] border-[#3ce36a] bg-white rounded-[3px] w-3.5 h-3.5 shrink-0 shadow-sm">
           <span className="rounded-full bg-[#3ce36a] w-1.5 h-1.5" />
         </span>
 
-        {item.image && !imgFailed && (
-          <img
-            src={item.image}
-            alt=""
-            draggable={false}
-            onError={() => setImgFailed(true)}
-            className="w-12 h-12 rounded-lg object-cover shrink-0"
-            style={{ backgroundColor: ui.line }}
-          />
-        )}
-
-        <div className="flex-1 min-w-0 text-left">
-          <h4 className="text-[15px] font-semibold leading-snug" style={{ color: ui.text }}>{item.name}</h4>
-          {item.size && <p className="text-xs mt-0.5" style={{ color: ui.muted }}>{item.size}</p>}
-          {item.description && item.kind !== "addon" && item.kind !== "topping" && (
-            <p className="text-xs mt-0.5 line-clamp-2" style={{ color: ui.muted }}>{item.description}</p>
-          )}
+        {/* Product details (Title in max 2 lines, variant in single line) */}
+        <div className="flex-1 min-w-0 pr-1.5 text-left">
+          <h4 className="text-[13.5px] font-bold leading-snug line-clamp-2" style={{ color: ui.text }}>
+            {cleanName}
+          </h4>
+          <p className="text-[11px] mt-0.5 capitalize font-medium whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: ui.muted }}>
+            {variantLine}
+          </p>
           {item.isLimitedOffer && (
             <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: "#1b8a3a" }}>
               LIMITED TIME OFFER
@@ -122,28 +128,29 @@ export function CartItemRow({ item, index, ui, onQty, onRemove }) {
           )}
         </div>
 
-        <div className="flex flex-col items-end gap-2 shrink-0">
-          <div className="flex items-center rounded-lg h-8 select-none" style={{ border: `1px solid ${ui.line}` }}>
+        {/* Stepper + Price in same line */}
+        <div className="flex items-center gap-2 shrink-0 self-start mt-0.5">
+          <div className="flex items-center rounded-lg h-7 select-none" style={{ border: `1px solid ${ui.line}` }}>
             <button
               onClick={() => { haptic(); onQty(-1) }}
-              aria-label={item.quantity === 1 ? `Remove ${item.name}` : `Decrease ${item.name}`}
-              className="w-8 h-full bg-transparent border-0 cursor-pointer text-lg active:scale-90 transition-transform"
+              aria-label={item.quantity === 1 ? `Remove ${cleanName}` : `Decrease ${cleanName}`}
+              className="w-6 h-full bg-transparent border-0 cursor-pointer text-sm flex items-center justify-center active:scale-90 transition-transform"
               style={{ color: ui.text }}
             >
-              {item.quantity === 1 ? <Trash2 size={14} className="mx-auto" /> : "−"}
+              {item.quantity === 1 ? <Trash2 size={12} className="mx-auto" /> : "−"}
             </button>
             <PopNumber value={item.quantity} color={ui.text} />
             <button
               onClick={() => { haptic(); onQty(1) }}
               disabled={item.isLimitedOffer}
-              aria-label={`Increase ${item.name}`}
-              className="w-8 h-full bg-transparent border-0 cursor-pointer text-lg disabled:opacity-30 active:scale-90 transition-transform"
+              aria-label={`Increase ${cleanName}`}
+              className="w-6 h-full bg-transparent border-0 cursor-pointer text-sm flex items-center justify-center disabled:opacity-30 active:scale-90 transition-transform"
               style={{ color: ui.text }}
             >
               +
             </button>
           </div>
-          <p className="text-sm font-bold" style={{ color: ui.text }}>
+          <p className="text-[13px] font-bold text-right shrink-0" style={{ color: ui.text }}>
             <AnimatedNumber value={item.price * item.quantity} />
           </p>
         </div>
