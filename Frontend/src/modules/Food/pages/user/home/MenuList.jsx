@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { ArrowLeft, Search, ArrowUpDown, Check, X, Star, ChevronRight, ChevronUp, UtensilsCrossed } from "lucide-react"
-import apiClient, { adminClient } from "@/services/api/axios"
+import apiClient from "@/services/api/axios"
 import DeliveryMapModal from "@food/components/user/DeliveryMapModal"
 import DeliveryOrCollectionModal from "@food/components/user/DeliveryOrCollectionModal"
 import { useLocationStore } from "@food/store/locationStore"
@@ -153,6 +153,24 @@ export default function MenuList() {
     if (targetClean.includes('pasta')) {
       const pastaCat = categoryList.find(c => String(c.label || c.name || c.id).toLowerCase().includes('pasta'));
       if (pastaCat) return pastaCat.id;
+    }
+    if (targetClean.includes('dip')) {
+      const dipCat = categoryList.find(c => {
+        const l = String(c.label || c.name || c.id).toLowerCase();
+        return l.includes('dip') || l.includes('side') || l.includes('bread');
+      });
+      if (dipCat) return dipCat.id;
+    }
+    if (targetClean.includes('taco') || targetClean.includes('parcel')) {
+      const tacoCat = categoryList.find(c => {
+        const l = String(c.label || c.name || c.id).toLowerCase();
+        return l.includes('taco') || l.includes('parcel') || l.includes('side');
+      });
+      if (tacoCat) return tacoCat.id;
+    }
+    if (targetClean.includes('side')) {
+      const sideCat = categoryList.find(c => String(c.label || c.name || c.id).toLowerCase().includes('side'));
+      if (sideCat) return sideCat.id;
     }
 
     return null;
@@ -455,48 +473,16 @@ export default function MenuList() {
         let fetchedCats = [];
         let fetchedProds = [];
 
-        // 1. Fetch Categories using the same endpoint as Superadmin panel (/food/admin/category-products)
+        // 1. Categories: the public list (the admin list needs an admin sign-in and includes hidden categories)
         try {
-          const cRes = await adminClient.get('/food/admin/category-products?sort=sort_asc');
+          const cRes = await apiClient.get('/food/admin/category-products/public?sort=sort_asc');
           if (Array.isArray(cRes?.data?.data) && cRes.data.data.length > 0) {
             fetchedCats = cRes.data.data;
           }
         } catch (_) {}
 
-        if (fetchedCats.length === 0) {
-          try {
-            const cRes = await apiClient.get('/food/admin/category-products?sort=sort_asc');
-            if (Array.isArray(cRes?.data?.data) && cRes.data.data.length > 0) {
-              fetchedCats = cRes.data.data;
-            }
-          } catch (_) {}
-        }
-
-        if (fetchedCats.length === 0) {
-          try {
-            const cRes = await apiClient.get('/food/admin/category-products/public?sort=sort_asc');
-            if (Array.isArray(cRes?.data?.data) && cRes.data.data.length > 0) {
-              fetchedCats = cRes.data.data;
-            }
-          } catch (_) {}
-        }
-
-        // 2. Fetch Products using the same endpoint as Superadmin panel (/food/admin/products)
-        try {
-          const pRes = await adminClient.get('/food/admin/products', { params: { limit: 250, page: 1 } });
-          const items = Array.isArray(pRes?.data?.data) ? pRes.data.data : (pRes?.data?.data?.foods || []);
-          if (items.length > 0) fetchedProds = items;
-        } catch (_) {}
-
-        if (fetchedProds.length === 0) {
-          try {
-            const pRes = await apiClient.get('/food/admin/products', { params: { limit: 250, page: 1 } });
-            const items = Array.isArray(pRes?.data?.data) ? pRes.data.data : (pRes?.data?.data?.foods || []);
-            if (items.length > 0) fetchedProds = items;
-          } catch (_) {}
-        }
-
-        if (fetchedProds.length === 0) {
+        // 2. Products: the public menu, priced for the customer's store (the admin list has drafts and catalogue prices)
+        {
           try {
             const pRes = await apiClient.get('/food/admin/products/public');
             const items = Array.isArray(pRes?.data?.data) ? pRes.data.data : [];
@@ -1686,9 +1672,10 @@ export default function MenuList() {
   // Smooth scroll handler when a category tab is clicked
   const handleCategoryTabClick = (catId) => {
     userManuallySelectedCategoryRef.current = true;
-    setActiveTab(catId);
+    const resolvedId = resolveCategoryTab(catId, categories) || catId;
+    setActiveTab(resolvedId);
 
-    const targetEl = document.getElementById(`category-section-${catId}`);
+    const targetEl = document.getElementById(`category-section-${resolvedId}`);
     if (targetEl) {
       isProgrammaticScrollRef.current = true;
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
@@ -1708,6 +1695,12 @@ export default function MenuList() {
     } else {
       isProgrammaticScrollRef.current = false;
     }
+
+    try {
+      const searchParams = new URLSearchParams(location.search);
+      searchParams.set("category", resolvedId);
+      navigate({ pathname: location.pathname, search: searchParams.toString() }, { replace: true });
+    } catch (_) {}
   };
 
   const modalTextPrimary = isDarkMode ? "text-white" : "text-zinc-900"
@@ -2373,7 +2366,13 @@ export default function MenuList() {
                         </div>
                       </div>
                     </div>
-                    <InlineUpsell productId={item.id} products={allFlattenedProducts} dark={localStorage.getItem("appTheme") === "dark"} />
+                    <InlineUpsell
+                      productId={item.id}
+                      products={allFlattenedProducts}
+                      dark={localStorage.getItem("appTheme") === "dark"}
+                      categories={categories}
+                      onSelectCategory={handleCategoryTabClick}
+                    />
                     </React.Fragment>
                   );
                 })}

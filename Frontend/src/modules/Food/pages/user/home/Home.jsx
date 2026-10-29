@@ -22,7 +22,7 @@ import DeliverOnTrainModal from "@food/components/user/DeliverOnTrainModal"
 import RewardsWalletLoading from "@food/components/user/RewardsWalletLoading"
 import PreviousRewardsView from "../rewards/PreviousRewardsView"
 import { ChevronsUp, X } from "lucide-react"
-import apiClient, { adminClient } from "@/services/api/axios"
+import apiClient from "@/services/api/axios"
 import { userAPI } from "@food/api"
 import { applySystemTheme } from "@/shared/utils/themeSync"
 import { useAppConfig } from "@food/context/AppConfigContext"
@@ -571,7 +571,7 @@ export default function Home() {
 
         // 1. Prioritize Superadmin categories endpoint with sort order
         try {
-          const cRes = await apiClient.get('/food/admin/category-products?sort=sort_asc');
+          const cRes = await apiClient.get('/food/admin/category-products/public?sort=sort_asc');
           if (Array.isArray(cRes?.data?.data) && cRes.data.data.length > 0) {
             fetchedCats = cRes.data.data;
           }
@@ -647,20 +647,7 @@ export default function Home() {
           setActiveCategory(prev => prev === "pizza" ? parsedCats[0]?.id || "pizza" : prev);
         }
 
-        if (fetchedProds.length === 0) {
-          try {
-            const pRes = await adminClient.get('/food/admin/products', { params: { limit: 250, page: 1 } });
-            const items = Array.isArray(pRes?.data?.data) ? pRes.data.data : (pRes?.data?.data?.foods || []);
-            if (items.length > 0) fetchedProds = items;
-          } catch (_) {}
-        }
-        if (fetchedProds.length === 0) {
-          try {
-            const pRes = await apiClient.get('/food/admin/products', { params: { limit: 250, page: 1 } });
-            const items = Array.isArray(pRes?.data?.data) ? pRes.data.data : (pRes?.data?.data?.foods || []);
-            if (items.length > 0) fetchedProds = items;
-          } catch (_) {}
-        }
+        // Products: the public menu, priced for the customer's store (the admin list needs an admin sign-in)
         if (fetchedProds.length === 0) {
           try {
             const pRes = await apiClient.get('/food/admin/products/public');

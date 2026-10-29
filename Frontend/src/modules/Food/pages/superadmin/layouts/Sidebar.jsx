@@ -47,7 +47,9 @@ import {
   ChevronRight,
   Smartphone,
   Award,
-  ShoppingCart } from "lucide-react"
+  ShoppingCart,
+  Apple,
+  LogIn } from "lucide-react"
 
 export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, isCollapsed = false, onToggleCollapse }) {
   const navigate = useNavigate()
@@ -153,13 +155,15 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
         { name: "Showcase Sections", icon: Sparkles },
         { name: "Search Overlay", icon: Search },
         { name: "Combo Page", icon: Sparkles },
-        { name: "Cart & Upsell", icon: ShoppingCart }
+        { name: "Cart & Upsell", icon: ShoppingCart },
+        { name: "Nutrition Info", icon: Apple }
       ]
     },
     {
       title: "Delivery App",
       items: [
-        { name: "Delivery Welcome Page", icon: Bike }
+        { name: "Delivery Welcome Page", icon: Bike },
+        { name: "Delivery Login Page", icon: LogIn }
       ]
     }
 
@@ -409,8 +413,12 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
                                 navigate("/food/superadmin/user-app/combo-page")
                               } else if (item.name === "Cart & Upsell") {
                                 navigate("/food/superadmin/user-app/cart-config")
+                              } else if (item.name === "Nutrition Info") {
+                                navigate("/food/superadmin/user-app/nutrition")
                               } else if (item.name === "Delivery Welcome Page") {
                                 navigate("/food/superadmin/delivery-app/welcome-page")
+                              } else if (item.name === "Delivery Login Page") {
+                                navigate("/food/superadmin/delivery-app/login-page")
                               }
                               // On mobile, close sidebar when clicking a menu item
                               if (window.innerWidth < 1024) {

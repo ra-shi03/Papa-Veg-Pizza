@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import Loader from "@food/components/Loader";
+import { isModuleAuthenticated } from "@food/utils/auth";
 
 // Auth Pages (Lazy loaded)
 const Welcome = lazy(() => import("./pages/auth/Welcome"))
@@ -30,7 +31,14 @@ import TermsAndConditionsV2 from './pages/TermsAndConditionsV2';
 import PrivacyPolicyV2 from './pages/PrivacyPolicyV2';
 import NotificationsV2 from './pages/NotificationsV2';
 
-
+// Delivery root handler: if authenticated, show feed; if not, default to welcome page
+function DeliveryRoot() {
+  const isAuthenticated = isModuleAuthenticated("delivery");
+  if (isAuthenticated) {
+    return <DeliveryHomeV2 tab="feed" />;
+  }
+  return <Navigate to="/food/delivery/welcome" replace />;
+}
 
 const DeliveryV2Router = () => {
   return (
@@ -48,7 +56,8 @@ const DeliveryV2Router = () => {
         <Route path="profile/terms" element={<TermsAndConditionsV2 />} />
 
         {/* Protected Core Routes */}
-        <Route path="/" element={<ProtectedRoute><DeliveryHomeV2 tab="feed" /></ProtectedRoute>} />
+        <Route path="/" element={<DeliveryRoot />} />
+        <Route path="" element={<DeliveryRoot />} />
         <Route path="feed" element={<ProtectedRoute><DeliveryHomeV2 tab="feed" /></ProtectedRoute>} />
         <Route path="pocket" element={<ProtectedRoute><DeliveryHomeV2 tab="pocket" /></ProtectedRoute>} />
         <Route path="history" element={<ProtectedRoute><DeliveryHomeV2 tab="history" /></ProtectedRoute>} />
@@ -76,7 +85,7 @@ const DeliveryV2Router = () => {
         <Route path="pocket/details" element={<ProtectedRoute><PocketDetailsV2 /></ProtectedRoute>} />
 
         {/* Fallback */}
-        <Route path="*" element={<Navigate to="/food/delivery" replace />} />
+        <Route path="*" element={<DeliveryRoot />} />
       </Routes>
     </Suspense>
   );

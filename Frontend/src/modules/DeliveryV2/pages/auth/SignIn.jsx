@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react"
+import React, { useState, useRef, useEffect } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { motion } from "framer-motion"
 import { ShieldCheck, Heart, ArrowRight, ArrowLeft, Loader2, ShieldQuestion } from "lucide-react"
@@ -6,15 +6,80 @@ import { toast } from "sonner"
 import { deliveryAPI } from "@food/api"
 import { clearModuleAuth } from "@food/utils/auth"
 import { useSystemTheme } from "@/shared/utils/themeSync"
+import { deliveryClient } from "@/services/api/axios"
 import heroPizza from "@/assets/hero-pizza.png"
 
 const DEFAULT_COUNTRY_CODE = "+91"
 
 export default function DeliverySignIn() {
   const navigate = useNavigate()
-  const { primaryColor, companyName = "Papa Veg Pizza" } = useSystemTheme()
-  // User app light theme: vibrant brand red/coral (no dark/black tint)
-  const brandColor = primaryColor && primaryColor !== "#a43c12" ? primaryColor : "#EE3A43"
+  const { primaryColor, companyName: systemCompanyName = "Papa Veg Pizza" } = useSystemTheme()
+  const fallbackBrandColor = primaryColor && primaryColor !== "#a43c12" ? primaryColor : "#EE3A43"
+
+  const [config, setConfig] = useState({
+    companyName: systemCompanyName,
+    partnerBadgeText: "DELIVERY PARTNER",
+    loginTitle: "PARTNER SIGN IN",
+    loginSubtitle: "Enter your mobile number to log in or register",
+    phoneLabel: "Mobile Number",
+    phonePlaceholder: "00000 00000",
+    buttonText: "Continue Delivery",
+    riderBadgeImageUrl: "/MapRider.png",
+    cornerPlateImageUrl: "/hero-pizza.png",
+    termsText: "By continuing, you agree to",
+    termsLinkText: "Terms of Service",
+    privacyLinkText: "Privacy Policy",
+    badge1Text: "Safe & Secure",
+    badge2Text: "Earning Opportunities",
+    supportButtonText: "Support",
+    backButtonText: "Welcome",
+    primaryColor: fallbackBrandColor,
+    secondaryColor: "#FF5722",
+    isActive: true
+  })
+
+  useEffect(() => {
+    let isMounted = true
+    const fetchConfig = async () => {
+      try {
+        const { data } = await deliveryClient.get("/settings/delivery-login")
+        if (data?.data && isMounted) {
+          const cfg = data.data
+          setConfig(prev => ({
+            ...prev,
+            ...cfg,
+            companyName: cfg.companyName || prev.companyName,
+            partnerBadgeText: cfg.partnerBadgeText || prev.partnerBadgeText,
+            loginTitle: cfg.loginTitle || prev.loginTitle,
+            loginSubtitle: cfg.loginSubtitle || prev.loginSubtitle,
+            phoneLabel: cfg.phoneLabel || prev.phoneLabel,
+            phonePlaceholder: cfg.phonePlaceholder || prev.phonePlaceholder,
+            buttonText: cfg.buttonText || prev.buttonText,
+            riderBadgeImageUrl: cfg.riderBadgeImageUrl || prev.riderBadgeImageUrl,
+            cornerPlateImageUrl: cfg.cornerPlateImageUrl || prev.cornerPlateImageUrl,
+            termsText: cfg.termsText || prev.termsText,
+            termsLinkText: cfg.termsLinkText || prev.termsLinkText,
+            privacyLinkText: cfg.privacyLinkText || prev.privacyLinkText,
+            badge1Text: cfg.badge1Text || prev.badge1Text,
+            badge2Text: cfg.badge2Text || prev.badge2Text,
+            supportButtonText: cfg.supportButtonText || prev.supportButtonText,
+            backButtonText: cfg.backButtonText || prev.backButtonText,
+            primaryColor: cfg.primaryColor || fallbackBrandColor,
+            secondaryColor: cfg.secondaryColor || "#FF5722",
+            isActive: cfg.isActive !== false
+          }))
+        }
+      } catch (err) {
+        console.warn("[DeliverySignIn] Using default config:", err?.message)
+      }
+    }
+
+    fetchConfig()
+    return () => { isMounted = false }
+  }, [fallbackBrandColor])
+
+  const effectivePrimary = config.primaryColor || fallbackBrandColor
+  const effectiveSecondary = config.secondaryColor || "#FF5722"
 
   const [phone, setPhone] = useState(() => {
     const stored = sessionStorage.getItem("deliveryAuthData")
@@ -71,12 +136,12 @@ export default function DeliverySignIn() {
 
   return (
     <div className="min-h-screen bg-white text-gray-900 flex flex-col justify-between relative overflow-hidden font-['Poppins',sans-serif] select-none">
-      {/* Top Section with Light Curved Wave Banner */}
+      {/* Top Section with Curved Wave Banner */}
       <div>
         <div 
           className="relative w-full pt-6 pb-20 px-6 overflow-hidden rounded-b-[40px] sm:rounded-b-[48px] shadow-md"
           style={{
-            background: `linear-gradient(145deg, ${brandColor} 0%, #FF5722 100%)`
+            background: `linear-gradient(145deg, ${effectivePrimary} 0%, ${effectiveSecondary} 100%)`
           }}
         >
           {/* Soft Accent Circles */}
@@ -90,7 +155,7 @@ export default function DeliverySignIn() {
               className="flex items-center gap-1.5 text-white text-xs font-semibold px-3.5 py-1.5 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md transition-all active:scale-95 shadow-sm"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Welcome</span>
+              <span>{config.backButtonText}</span>
             </Link>
 
             <Link 
@@ -98,22 +163,22 @@ export default function DeliverySignIn() {
               className="flex items-center gap-1.5 text-white text-xs font-semibold px-3.5 py-1.5 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md transition-all active:scale-95 shadow-sm"
             >
               <ShieldQuestion className="w-4 h-4" />
-              <span>Support</span>
+              <span>{config.supportButtonText}</span>
             </Link>
           </div>
 
           {/* Header Title */}
           <div className="relative z-10 text-center mt-3">
             <p className="text-[11px] font-bold tracking-[0.25em] text-white uppercase drop-shadow-sm">
-              {companyName}
+              {config.companyName}
             </p>
             <h2 className="text-xl sm:text-2xl font-black text-white tracking-wider uppercase drop-shadow-sm mt-0.5">
-              Delivery Partner
+              {config.partnerBadgeText}
             </h2>
           </div>
         </div>
 
-        {/* Overlapping Circular Rider Badge (Catrider Style) */}
+        {/* Overlapping Circular Rider Badge */}
         <div className="relative -mt-14 mb-2 flex justify-center z-20">
           <motion.div 
             initial={{ scale: 0.8, opacity: 0 }}
@@ -123,12 +188,13 @@ export default function DeliverySignIn() {
           >
             <div 
               className="absolute inset-0 rounded-full opacity-10"
-              style={{ backgroundColor: brandColor }}
+              style={{ backgroundColor: effectivePrimary }}
             />
             <img 
-              src="/MapRider.png" 
+              src={config.riderBadgeImageUrl || "/MapRider.png"} 
               alt="Delivery Rider" 
-              className="w-full h-full object-contain relative z-10 drop-shadow-sm group-hover:scale-105 transition-transform duration-300" 
+              className="w-full h-full object-contain relative z-10 drop-shadow-sm group-hover:scale-105 transition-transform duration-300"
+              onError={(e) => { e.currentTarget.src = "/MapRider.png"; }}
             />
           </motion.div>
         </div>
@@ -144,10 +210,10 @@ export default function DeliverySignIn() {
             {/* Title */}
             <div className="text-center mb-6">
               <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight uppercase font-['Poppins']">
-                Partner Sign In
+                {config.loginTitle}
               </h1>
               <p className="text-xs sm:text-sm text-gray-500 mt-1 font-medium">
-                Enter your mobile number to log in or register
+                {config.loginSubtitle}
               </p>
             </div>
 
@@ -155,14 +221,14 @@ export default function DeliverySignIn() {
             <form onSubmit={handleSendOTP} className="space-y-5">
               <div>
                 <label className="block text-[11px] font-bold text-gray-400 tracking-wider uppercase mb-1.5 ml-1">
-                  Mobile Number
+                  {config.phoneLabel}
                 </label>
                 <div 
                   className="flex items-center bg-gray-50 border-2 border-gray-200 rounded-2xl px-4 py-3 transition-all focus-within:border-[#EE3A43] focus-within:bg-white focus-within:ring-4 focus-within:ring-red-500/10"
                 >
                   <span 
                     className="text-base font-bold pr-3 border-r border-gray-300 select-none"
-                    style={{ color: brandColor }}
+                    style={{ color: effectivePrimary }}
                   >
                     +91
                   </span>
@@ -173,7 +239,7 @@ export default function DeliverySignIn() {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                     maxLength={10}
-                    placeholder="00000 00000"
+                    placeholder={config.phonePlaceholder || "00000 00000"}
                     className="w-full bg-transparent pl-3 text-lg font-bold text-gray-900 outline-none tracking-wider placeholder:text-gray-300 font-mono"
                   />
                 </div>
@@ -182,17 +248,17 @@ export default function DeliverySignIn() {
               <button
                 type="submit"
                 disabled={loading || phone.length < 10}
-                className="w-full py-4 rounded-full font-bold text-base text-white shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:pointer-events-none"
+                className="w-full py-4 rounded-full font-bold text-base text-white shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
                 style={{
-                  backgroundColor: brandColor,
-                  boxShadow: `0 10px 24px -4px ${brandColor}55`
+                  backgroundColor: effectivePrimary,
+                  boxShadow: `0 10px 24px -4px ${effectivePrimary}55`
                 }}
               >
                 {loading ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
                   <>
-                    <span>Continue Delivery</span>
+                    <span>{config.buttonText}</span>
                     <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </>
                 )}
@@ -203,35 +269,36 @@ export default function DeliverySignIn() {
       </div>
 
       {/* Footer & Badges */}
-      <div className="relative z-10 max-w-md mx-auto px-6 py-6 text-center">
-        <p className="text-[11px] text-gray-400 font-medium leading-relaxed">
-          By continuing, you agree to {companyName}'s <br />
-          <Link to="/food/delivery/profile/terms" className="font-bold underline text-gray-700 hover:text-[#EE3A43] transition-colors">
-            Terms of Service
+      <div className="relative z-20 max-w-md mx-auto px-6 pb-20 sm:pb-24 pt-3 text-center">
+        <p className="text-[11px] text-gray-500 font-medium leading-relaxed">
+          {config.termsText} {config.companyName}'s <br />
+          <Link to="/food/delivery/profile/terms" className="font-bold underline text-gray-800 hover:text-[#EE3A43] transition-colors">
+            {config.termsLinkText}
           </Link>
-          <span className="mx-1">&</span>
-          <Link to="/food/delivery/profile/privacy" className="font-bold underline text-gray-700 hover:text-[#EE3A43] transition-colors">
-            Privacy Policy
+          <span className="mx-1">&amp;</span>
+          <Link to="/food/delivery/profile/privacy" className="font-bold underline text-gray-800 hover:text-[#EE3A43] transition-colors">
+            {config.privacyLinkText}
           </Link>
         </p>
 
-        <div className="flex items-center justify-center gap-6 mt-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-          <div className="flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            <span>Safe & Secure</span>
+        <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3.5 mt-3 text-[10px] sm:text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+          <div className="flex items-center gap-1.5 bg-white/95 backdrop-blur-xs px-3 py-1 rounded-full border border-gray-200/80 shadow-2xs">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+            <span>{config.badge1Text}</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <Heart className="w-4 h-4" style={{ color: brandColor }} />
-            <span>Earning Opportunities</span>
+          <div className="flex items-center gap-1.5 bg-white/95 backdrop-blur-xs px-3 py-1 rounded-full border border-gray-200/80 shadow-2xs">
+            <Heart className="w-3.5 h-3.5 shrink-0" style={{ color: effectivePrimary }} />
+            <span>{config.badge2Text}</span>
           </div>
         </div>
       </div>
 
-      {/* Decorative Signature Pizza Dish in Bottom-Right Corner (Catrider Style) */}
+      {/* Decorative Signature Pizza Dish in Bottom-Right Corner */}
       <img 
-        src={heroPizza} 
+        src={config.cornerPlateImageUrl || heroPizza} 
         alt="Delicious Pizza"
-        className="absolute -bottom-7 -right-7 w-36 h-36 sm:w-44 sm:h-44 object-contain pointer-events-none drop-shadow-[0_16px_25px_rgba(0,0,0,0.14)] rotate-[-12deg] z-0 select-none opacity-95" 
+        className="absolute -bottom-6 -right-6 w-28 h-28 sm:w-36 sm:h-36 object-contain pointer-events-none drop-shadow-[0_12px_24px_rgba(0,0,0,0.12)] rotate-[-12deg] z-0 select-none opacity-85" 
+        onError={(e) => { e.currentTarget.src = heroPizza; }}
       />
     </div>
   )

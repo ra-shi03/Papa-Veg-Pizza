@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
 import useDeliveryBackNavigation from "../../hooks/useDeliveryBackNavigation"
+import GooglePlacesLocationInput from "../../components/GooglePlacesLocationInput"
 import { EMAIL_REGEX } from "@/shared/utils/emailValidation"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
@@ -86,6 +87,10 @@ export default function SignupStep1() {
 
     if (name === "drivingLicenseNumber") {
       updatedValue = updatedValue.replace(/[^A-Z0-9]/g, "").slice(0, 15)
+    }
+
+    if (name === "panNumber") {
+      updatedValue = updatedValue.replace(/[^A-Z0-9]/g, "").slice(0, 10)
     }
 
     // Restrict Aadhaar to numeric only
@@ -296,40 +301,56 @@ export default function SignupStep1() {
             {errors.address && <p className="text-red-500 text-sm mt-1">{errors.address}</p>}
           </div>
 
-          {/* City and State */}
+          {/* City and State with Google Maps API Suggestion Search */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                City <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="city"
-                value={formData.city}
-                onChange={handleChange}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${errors.city ? "border-red-500" : "border-gray-300"
-                  }`}
-                placeholder="City"
-              />
-              {errors.city && <p className="text-red-500 text-sm mt-1">{errors.city}</p>}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                State <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="state"
-                value={formData.state}
-                onChange={handleChange}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${errors.state ? "border-red-500" : "border-gray-300"
-                  }`}
-                placeholder="State"
-              />
-              {errors.state && <p className="text-red-500 text-sm mt-1">{errors.state}</p>}
-            </div>
-          </div>
+            <GooglePlacesLocationInput
+              label="City"
+              name="city"
+              value={formData.city}
+              onChange={handleChange}
+              onSelectPlace={({ city, state }) => {
+                setFormData((prev) => ({
+                  ...prev,
+                  city: sanitizeLocationValue(city),
+                  ...(state ? { state: sanitizeLocationValue(state) } : {})
+                }))
+                setErrors((prev) => {
+                  const updated = { ...prev }
+                  delete updated.city
+                  if (state) delete updated.state
+                  return updated
+                })
+              }}
+              placeholder="Search City (e.g. Indore)"
+              error={errors.city}
+              searchType="(cities)"
+              align="left"
+              required
+            />
 
+            <GooglePlacesLocationInput
+              label="State"
+              name="state"
+              value={formData.state}
+              onChange={handleChange}
+              onSelectPlace={({ state }) => {
+                setFormData((prev) => ({
+                  ...prev,
+                  state: sanitizeLocationValue(state)
+                }))
+                setErrors((prev) => {
+                  const updated = { ...prev }
+                  delete updated.state
+                  return updated
+                })
+              }}
+              placeholder="Search State"
+              error={errors.state}
+              searchType="administrative_area_level_1"
+              align="right"
+              required
+            />
+          </div>
           {/* Vehicle Type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -365,8 +386,13 @@ export default function SignupStep1() {
 
           {/* Vehicle Number */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Vehicle Number <span className="text-red-500">*</span>
+            <label className="text-sm font-medium text-gray-700 mb-1 flex items-center justify-between">
+              <span>
+                Vehicle Number <span className="text-red-500">*</span>
+              </span>
+              <span className={`text-xs font-mono font-medium transition-colors ${(formData.vehicleNumber || "").length === 10 ? "text-emerald-600 font-bold" : "text-gray-400"}`}>
+                ({(formData.vehicleNumber || "").length}/10)
+              </span>
             </label>
             <input
               type="text"
@@ -374,8 +400,7 @@ export default function SignupStep1() {
               value={formData.vehicleNumber}
               onChange={handleChange}
               maxLength={10}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${errors.vehicleNumber ? "border-red-500" : "border-gray-300"
-                }`}
+              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 uppercase ${errors.vehicleNumber ? "border-red-500" : "border-gray-300"}`}
               placeholder="e.g., MH12AB1234"
             />
             {errors.vehicleNumber && <p className="text-red-500 text-sm mt-1">{errors.vehicleNumber}</p>}
@@ -383,8 +408,13 @@ export default function SignupStep1() {
 
           {/* Driving License Number */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Driving License Number <span className="text-red-500">*</span>
+            <label className="text-sm font-medium text-gray-700 mb-1 flex items-center justify-between">
+              <span>
+                Driving License Number <span className="text-red-500">*</span>
+              </span>
+              <span className={`text-xs font-mono font-medium transition-colors ${(formData.drivingLicenseNumber || "").length === 15 ? "text-emerald-600 font-bold" : "text-gray-400"}`}>
+                ({(formData.drivingLicenseNumber || "").length}/15)
+              </span>
             </label>
             <input
               type="text"
@@ -392,8 +422,7 @@ export default function SignupStep1() {
               value={formData.drivingLicenseNumber}
               onChange={handleChange}
               maxLength={15}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 uppercase ${errors.drivingLicenseNumber ? "border-red-500" : "border-gray-300"
-                }`}
+              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 uppercase ${errors.drivingLicenseNumber ? "border-red-500" : "border-gray-300"}`}
               placeholder="e.g., MH1220110012345"
             />
             {errors.drivingLicenseNumber && <p className="text-red-500 text-sm mt-1">{errors.drivingLicenseNumber}</p>}
@@ -401,8 +430,13 @@ export default function SignupStep1() {
 
           {/* PAN Number */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              PAN Number <span className="text-red-500">*</span>
+            <label className="text-sm font-medium text-gray-700 mb-1 flex items-center justify-between">
+              <span>
+                PAN Number <span className="text-red-500">*</span>
+              </span>
+              <span className={`text-xs font-mono font-medium transition-colors ${(formData.panNumber || "").length === 10 ? "text-emerald-600 font-bold" : "text-gray-400"}`}>
+                ({(formData.panNumber || "").length}/10)
+              </span>
             </label>
             <input
               type="text"
@@ -410,8 +444,7 @@ export default function SignupStep1() {
               value={formData.panNumber}
               onChange={handleChange}
               maxLength={10}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 uppercase ${errors.panNumber ? "border-red-500" : "border-gray-300"
-                }`}
+              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 uppercase ${errors.panNumber ? "border-red-500" : "border-gray-300"}`}
               placeholder="ABCDE1234F"
             />
             {errors.panNumber && <p className="text-red-500 text-sm mt-1">{errors.panNumber}</p>}
@@ -419,8 +452,13 @@ export default function SignupStep1() {
 
           {/* Aadhar Number */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Aadhar Number <span className="text-red-500">*</span>
+            <label className="text-sm font-medium text-gray-700 mb-1 flex items-center justify-between">
+              <span>
+                Aadhar Number <span className="text-red-500">*</span>
+              </span>
+              <span className={`text-xs font-mono font-medium transition-colors ${(formData.aadharNumber || "").length === 12 ? "text-emerald-600 font-bold" : "text-gray-400"}`}>
+                ({(formData.aadharNumber || "").length}/12)
+              </span>
             </label>
             <input
               type="text"
@@ -429,8 +467,7 @@ export default function SignupStep1() {
               onChange={handleChange}
               maxLength={12}
               inputMode="numeric"
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${errors.aadharNumber ? "border-red-500" : "border-gray-300"
-                }`}
+              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${errors.aadharNumber ? "border-red-500" : "border-gray-300"}`}
               placeholder="123456789012"
             />
             {errors.aadharNumber && <p className="text-red-500 text-sm mt-1">{errors.aadharNumber}</p>}

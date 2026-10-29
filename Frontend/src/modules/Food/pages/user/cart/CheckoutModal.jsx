@@ -9,6 +9,7 @@ import RazorpayPayment from "./RazorpayPayment"
 import apiClient from "@/services/api/axios"
 import { orderAPI } from "@food/api"
 import { toast } from "sonner"
+import { getCartCoords, slotLabel, toOrderItems } from "./cartHelpers"
 
 export default function CheckoutModal({
   show,
@@ -20,7 +21,9 @@ export default function CheckoutModal({
   handlingCharge,
   cgst,
   sgst,
-  total
+  total,
+  scheduledAt,
+  onChangeTime
 }) {
   const navigate = useNavigate()
   const { replaceCart, clearCart } = useCart()
@@ -30,7 +33,7 @@ export default function CheckoutModal({
   const isLoggedIn = localStorage.getItem("user_authenticated") === "true" || !!localStorage.getItem("user_accessToken")
   const isGuestCheckoutBlocked = appConfig?.guestCheckoutEnabled === false && !isLoggedIn
 
-  // Navigation / View state: "address", "checkout", "contact_edit", "timeslot_edit"
+  // Navigation / View state: "address", "checkout", "contact_edit", "payment"
   const [modalView, setModalView] = useState("address")
 
   // Form inputs
@@ -48,9 +51,6 @@ export default function CheckoutModal({
   const [editName, setEditName] = useState("")
   const [editPhone, setEditPhone] = useState("")
   const [editEmail, setEditEmail] = useState("")
-
-  // Timeslot Preference
-  const [timeOption, setTimeOption] = useState("ASAP")
 
   // Consent checkmark
   const [promoCommunication, setPromoCommunication] = useState(true)
@@ -132,14 +132,12 @@ export default function CheckoutModal({
     let orderId
     setPlacingOrder(true)
     try {
-      let coords = null
-      try {
-        const loc = JSON.parse(localStorage.getItem("userLocation") || "null")
-        if (Number.isFinite(loc?.latitude) && Number.isFinite(loc?.longitude)) coords = loc
-      } catch (_) {}
+      const point = getCartCoords()
+      const coords = point ? { latitude: point.lat, longitude: point.lng } : null
 
+      // A scheduled order needs a store that can deliver at that time (it may be closed right now)
       const resolved = await apiClient.get("/food/stores/resolve", {
-        params: coords ? { lat: coords.latitude, lng: coords.longitude } : {},
+        params: { ...(point || {}), ...(scheduledAt ? { at: scheduledAt } : {}) },
         _isFallback: true,
       })
       const store = resolved?.data?.data
@@ -160,22 +158,9 @@ export default function CheckoutModal({
           zipCode: newAddressObject.zipCode,
           ...(coords ? { location: { type: "Point", coordinates: [coords.longitude, coords.latitude] } } : {}),
         },
-        items: cartItems.map((item) => ({
-          itemId: String(item.itemId || item.id),
-          name: item.name,
-          price: Number(item.price) || 0,
-          quantity: item.quantity,
-          image: item.image || "",
-          size: item.size || "",
-          kind: item.kind || "product",
-          ...(item.crust ? { crust: item.crust } : {}),
-          ...(item.toppings?.length ? { toppings: item.toppings } : {}),
-          ...(item.meals?.length ? { meals: item.meals } : {}),
-          ...(item.extraCheese ? { extraCheese: true } : {}),
-          notes: item.description || "",
-          ...(item.offerToken ? { offerToken: item.offerToken } : {}),
-        })),
+        items: toOrderItems(cartItems),
         ...(couponCode ? { couponCode } : {}),
+        ...(scheduledAt ? { scheduledAt } : {}),
         pricing: {
           subtotal,
           tax: cgst + sgst,
@@ -467,11 +452,11 @@ export default function CheckoutModal({
                   <div className="p-4 flex items-start gap-3">
                     <Clock className="w-5 h-5 text-zinc-450 dark:text-zinc-550 shrink-0 mt-0.5" />
                     <div className="flex-1 text-left">
-                      <p className="text-xs font-semibold leading-normal">Order for {appConfig?.scheduledOrdersEnabled === false ? "ASAP" : timeOption}</p>
+                      <p className="text-xs font-semibold leading-normal">Order for {scheduledAt ? slotLabel(scheduledAt) : "Now (ASAP)"}</p>
                     </div>
-                    {appConfig?.scheduledOrdersEnabled !== false && (
+                    {appConfig?.scheduledOrdersEnabled !== false && onChangeTime && (
                       <button 
-                        onClick={() => setModalView("timeslot_edit")}
+                        onClick={onChangeTime}
                         className="text-xs font-black text-primary hover:text-primary-hover bg-transparent border-0 outline-none cursor-pointer"
                       >
                         Change
@@ -683,67 +668,6 @@ export default function CheckoutModal({
                   </button>
                 </div>
               </form>
-            )}
-
-            {/* View 4: Timeslot Selection View (Image 3) */}
-            {modalView === "timeslot_edit" && (
-              <>
-                {/* Title Header */}
-                <div className="px-4 py-4 flex items-center gap-3 border-b" style={{ borderColor: isDarkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
-                  <button 
-                    onClick={() => setModalView("checkout")} 
-                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-850 cursor-pointer border-0 bg-transparent"
-                  >
-                    <ArrowLeft className="w-5 h-5 text-zinc-800 dark:text-white stroke-[2.5px]" />
-                  </button>
-                  <h1 className="text-sm sm:text-base font-black tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    When would you like your order?
-                  </h1>
-                </div>
-
-                {/* Body options list */}
-                <div className="p-5 space-y-4">
-                  {/* ASAP Option */}
-                  <div 
-                    onClick={() => setTimeOption("ASAP")}
-                    className="flex items-center justify-between p-3 rounded-xl border border-zinc-200 dark:border-zinc-850 hover:border-primary/30 cursor-pointer transition-all text-left"
-                  >
-                    <div className="flex items-center gap-3 select-none">
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                        timeOption === "ASAP" ? "border-primary bg-transparent" : "border-zinc-300 dark:border-zinc-700 bg-transparent"
-                      }`}>
-                        {timeOption === "ASAP" && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
-                      </div>
-                      <span className="text-xs font-bold">ASAP</span>
-                    </div>
-                  </div>
-
-                  {/* Future Option */}
-                  <div 
-                    onClick={() => setTimeOption("future")}
-                    className="flex items-center justify-between p-3 rounded-xl border border-zinc-200 dark:border-zinc-850 hover:border-primary/30 cursor-pointer transition-all text-left"
-                  >
-                    <div className="flex items-center gap-3 select-none">
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                        timeOption === "future" ? "border-primary bg-transparent" : "border-zinc-300 dark:border-zinc-700 bg-transparent"
-                      }`}>
-                        {timeOption === "future" && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
-                      </div>
-                      <span className="text-xs font-semibold text-zinc-550 dark:text-zinc-400">Order for future</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer Save Button */}
-                <div className="p-5 border-t" style={{ borderColor: isDarkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
-                  <button 
-                    onClick={() => setModalView("checkout")}
-                    className="w-full h-12 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border-0 bg-primary hover:bg-primary-hover text-white active:scale-95 cursor-pointer shadow-md shadow-primary/10"
-                  >
-                    Select Timeslot
-                  </button>
-                </div>
-              </>
             )}
 
             {modalView === "payment" && (

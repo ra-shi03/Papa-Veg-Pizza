@@ -54,7 +54,9 @@ const ShowcaseSectionsConfig = lazy(() => import("../user-app/ShowcaseSectionsCo
 const SearchConfig = lazy(() => import("../user-app/SearchConfig"))
 const ComboPageConfig = lazy(() => import("../user-app/ComboPageConfig"))
 const CartConfig = lazy(() => import("../user-app/CartConfig"))
+const NutritionConfig = lazy(() => import("../user-app/NutritionConfig"))
 const DeliveryWelcomePageConfig = lazy(() => import("../delivery-app/DeliveryWelcomePageConfig"))
+const DeliveryLoginPageConfig = lazy(() => import("../delivery-app/DeliveryLoginPageConfig"))
 
 // Shared layout shell for user management pages to inherit Sidebar and Navbar
 function SuperAdminLayout() {
@@ -146,8 +148,12 @@ function SuperAdminLayout() {
     activeItem = "Showcase Sections"
   } else if (location.pathname.includes("/user-app/cart-config")) {
     activeItem = "Cart & Upsell"
+  } else if (location.pathname.includes("/user-app/nutrition")) {
+    activeItem = "Nutrition Info"
   } else if (location.pathname.includes("/delivery-app/welcome-page")) {
     activeItem = "Delivery Welcome Page"
+  } else if (location.pathname.includes("/delivery-app/login-page")) {
+    activeItem = "Delivery Login Page"
   }
 
   const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem("sa_sidebar_collapsed") === "true")
@@ -254,7 +260,9 @@ export default function SuperAdminRouter() {
             <Route path="/user-app/search-config" element={<SearchConfig />} />
             <Route path="/user-app/combo-page" element={<ComboPageConfig />} />
             <Route path="/user-app/cart-config" element={<CartConfig />} />
+            <Route path="/user-app/nutrition" element={<NutritionConfig />} />
             <Route path="/delivery-app/welcome-page" element={<DeliveryWelcomePageConfig />} />
+            <Route path="/delivery-app/login-page" element={<DeliveryLoginPageConfig />} />
           </Route>
         </Route>
 
