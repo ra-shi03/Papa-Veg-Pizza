@@ -278,18 +278,6 @@ export async function completeDeliveryController(req, res, next) {
     }
 }
 
-export async function updateOrderStatusDeliveryController(req, res, next) {
-    try {
-        const deliveryPartnerId = req.user?.userId;
-        const orderId = req.params.orderId;
-        const dto = validateOrderStatusDto(req.body);
-        const order = await orderService.updateOrderStatusDelivery(orderId, deliveryPartnerId, dto.orderStatus);
-        return sendResponse(res, 200, 'Order status updated', { order });
-    } catch (err) {
-        next(err);
-    }
-}
-
 export async function getCurrentTripDeliveryController(req, res, next) {
     try {
         const deliveryPartnerId = req.user?.userId;

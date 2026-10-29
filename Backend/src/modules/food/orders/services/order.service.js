@@ -1428,10 +1428,6 @@ export async function completeDelivery(orderId, deliveryPartnerId, body = {}) {
 
 
 
-export async function updateOrderStatusDelivery(orderId, deliveryPartnerId, orderStatus) {
-  return deliveryService.updateOrderStatusDelivery(orderId, deliveryPartnerId, orderStatus);
-}
-
 // ----- COD QR collection -----
 export async function createCollectQr(
   orderId,

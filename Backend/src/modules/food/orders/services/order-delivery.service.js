@@ -31,7 +31,6 @@ import {
   notifyOwnersSafely,
   pushStatusHistory,
   sanitizeOrderForExternal,
-  isStatusAdvance,
 } from './order.helpers.js';
 
 function normalizeOtpValue(value) {
@@ -50,6 +49,40 @@ function isOtpMatch(expectedOtp, enteredOtp) {
   }
 
   return false;
+}
+
+// Rider steps run in one order: accept -> reached pickup -> pickup (once the kitchen is done) -> reached drop
+// (sends the customer their OTP) -> customer OTP -> complete. A step on someone else's order is 403; a step repeated
+// or taken out of order is 409 and changes nothing.
+const CANCELLED_STATUSES = ['cancelled_by_user', 'cancelled_by_store', 'cancelled_by_admin'];
+const BEFORE_PICKUP = ['confirmed', 'preparing', 'ready_for_pickup'];
+const PICKUP_FROM = ['ready_for_pickup', 'reached_pickup'];
+const COMPLETE_FROM = ['picked_up', 'reached_drop'];
+const PAID_STATUSES = ['paid', 'captured', 'authorized'];
+const RACED = 'This order was just updated. Refresh and try again.';
+
+const stepConflict = (message) => Object.assign(new Error(message), { name: 'ConflictError', statusCode: 409 });
+
+/** The order must be this rider's accepted order, still on its way. */
+function assertOwnLiveOrder(order, deliveryPartnerId) {
+  if (order.dispatch?.deliveryPartnerId?.toString() !== String(deliveryPartnerId)) {
+    throw new ForbiddenError('Not your order');
+  }
+  if (order.dispatch?.status !== 'accepted') throw stepConflict('Accept this order before updating it.');
+  if (CANCELLED_STATUSES.includes(order.orderStatus)) throw stepConflict('This order was cancelled.');
+  if (order.orderStatus === 'delivered') throw stepConflict('This order is already delivered.');
+}
+
+/**
+ * Takes the step only if the order is still where the step expects it, so two taps (or the store and the rider at the
+ * same moment) cannot both succeed. False when another request got there first.
+ */
+async function claimStep(order, filter, set) {
+  const res = await FoodOrder.updateOne(
+    { _id: order._id, 'dispatch.deliveryPartnerId': order.dispatch.deliveryPartnerId, 'dispatch.status': 'accepted', ...filter },
+    { $set: set },
+  );
+  return res.modifiedCount === 1;
 }
 
 async function getPartnerCashCapacity(deliveryPartnerId) {
@@ -669,20 +702,20 @@ export async function confirmReachedPickupDelivery(orderId, deliveryPartnerId) {
 
   const order = await FoodOrder.findOne(identity).select('+deliveryOtp');
   if (!order) throw new NotFoundError('Order not found');
-  if (
-    order.dispatch?.deliveryPartnerId?.toString() !== deliveryPartnerId.toString()
-  ) {
-    throw new ForbiddenError('Not your order');
-  }
-  if (order.orderStatus === 'delivered') {
-    throw new ValidationError('Order already delivered');
-  }
+  assertOwnLiveOrder(order, deliveryPartnerId);
 
   const currentPhase = order.deliveryState?.currentPhase || '';
   const currentStatus = order.deliveryState?.status || '';
   if (currentPhase === 'at_pickup' || currentStatus === 'reached_pickup') {
-    return order.toObject();
+    throw stepConflict('Reached pickup is already marked for this order.');
   }
+  if (!BEFORE_PICKUP.includes(order.orderStatus)) throw stepConflict('This order is already picked up.');
+  const claimed = await claimStep(
+    order,
+    { orderStatus: { $in: BEFORE_PICKUP }, 'deliveryState.currentPhase': { $ne: 'at_pickup' }, 'deliveryState.status': { $ne: 'reached_pickup' } },
+    { 'deliveryState.currentPhase': 'at_pickup', 'deliveryState.status': 'reached_pickup' },
+  );
+  if (!claimed) throw stepConflict(RACED);
 
   const from = currentStatus || currentPhase || order.orderStatus;
   order.deliveryState = {
@@ -746,19 +779,19 @@ export async function confirmReachedPickupDelivery(orderId, deliveryPartnerId) {
 
 export async function confirmPickupDelivery(orderId, deliveryPartnerId, billImageUrl) {
   const identity = buildOrderIdentityFilter(orderId);
+  if (!identity) throw new ValidationError('Order id required');
   const order = await FoodOrder.findOne(identity).select('+deliveryOtp');
   if (!order) throw new NotFoundError('Order not found');
-  if (
-    order.dispatch?.deliveryPartnerId?.toString() !== deliveryPartnerId.toString()
-  ) {
-    throw new ForbiddenError('Not your order');
-  }
+  assertOwnLiveOrder(order, deliveryPartnerId);
 
+  // Only an order the kitchen has finished (ready for pickup) can leave the store.
   const from = order.orderStatus;
   const nextStatus = 'picked_up';
-  if (!isStatusAdvance(from, nextStatus)) {
-      throw new ValidationError(`Order is already at status '${from}'. Cannot re-mark as '${nextStatus}'.`);
+  if (COMPLETE_FROM.includes(from)) throw stepConflict('This order is already picked up.');
+  if (!PICKUP_FROM.includes(from)) {
+    throw stepConflict('The kitchen has not finished this order yet. Pick it up once the store marks it ready.');
   }
+  if (!(await claimStep(order, { orderStatus: { $in: PICKUP_FROM } }, { orderStatus: nextStatus }))) throw stepConflict(RACED);
   order.orderStatus = nextStatus;
   order.deliveryState = {
     ...(order.deliveryState?.toObject?.() || order.deliveryState || {}),
@@ -795,20 +828,23 @@ export async function confirmReachedDropDelivery(orderId, deliveryPartnerId) {
 
   const order = await FoodOrder.findOne(identity).select('+deliveryOtp');
   if (!order) throw new NotFoundError('Order not found');
-  if (
-    order.dispatch?.deliveryPartnerId?.toString() !== deliveryPartnerId.toString()
-  ) {
-    throw new ForbiddenError('Not your order');
-  }
+  assertOwnLiveOrder(order, deliveryPartnerId);
 
   if (order.deliveryVerification?.dropOtp?.verified) {
-    emitOrderUpdate(order, deliveryPartnerId);
-    return sanitizeOrderForExternal(order);
+    throw stepConflict("The customer's OTP is already verified. Complete the delivery.");
   }
-
   const alreadyAtDrop =
     order.deliveryState?.currentPhase === 'at_drop' ||
     order.deliveryState?.status === 'reached_drop';
+  if (alreadyAtDrop) throw stepConflict('Reached drop is already marked; the customer already has the OTP.');
+  if (order.orderStatus !== 'picked_up') throw stepConflict('Pick up the order before marking reached drop.');
+  const claimed = await claimStep(
+    order,
+    { orderStatus: 'picked_up', 'deliveryState.currentPhase': { $ne: 'at_drop' }, 'deliveryState.status': { $ne: 'reached_drop' } },
+    { 'deliveryState.currentPhase': 'at_drop', 'deliveryState.status': 'reached_drop' },
+  );
+  if (!claimed) throw stepConflict(RACED);
+
   const fromPhase =
     order.deliveryState?.status ||
     order.deliveryState?.currentPhase ||
@@ -816,23 +852,6 @@ export async function confirmReachedDropDelivery(orderId, deliveryPartnerId) {
     '';
 
   const existingOtp = String(order.deliveryOtp || '').trim();
-
-  // Idempotency: if already reached drop and OTP exists, avoid duplicate push notifications.
-  if (alreadyAtDrop && existingOtp) {
-    const hasDropOtpMeta = Boolean(order.deliveryVerification?.dropOtp);
-    if (!hasDropOtpMeta) {
-      order.deliveryVerification = {
-        ...(order.deliveryVerification?.toObject?.() ||
-          order.deliveryVerification ||
-          {}),
-        dropOtp: { required: true, verified: false },
-      };
-      await order.save();
-    }
-    // Rider explicitly requested OTP again at drop, re-emit same OTP without regenerating.
-    emitDeliveryDropOtpToUser(order, existingOtp);
-    return sanitizeOrderForExternal(order);
-  }
 
   if (!existingOtp) {
     order.deliveryOtp = generateFourDigitDeliveryOtp();
@@ -854,15 +873,13 @@ export async function confirmReachedDropDelivery(orderId, deliveryPartnerId) {
     reachedDropAt: order.deliveryState?.reachedDropAt || new Date(),
   };
 
-  if (!alreadyAtDrop) {
-    pushStatusHistory(order, {
-      byRole: 'DELIVERY_PARTNER',
-      byId: deliveryPartnerId,
-      from: fromPhase,
-      to: 'reached_drop',
-      note: 'Reached drop location',
-    });
-  }
+  pushStatusHistory(order, {
+    byRole: 'DELIVERY_PARTNER',
+    byId: deliveryPartnerId,
+    from: fromPhase,
+    to: 'reached_drop',
+    note: 'Reached drop location',
+  });
 
   await order.save();
 
@@ -880,36 +897,23 @@ export async function confirmReachedDropDelivery(orderId, deliveryPartnerId) {
 
 export async function verifyDropOtpDelivery(orderId, deliveryPartnerId, otp) {
   const identity = buildOrderIdentityFilter(orderId);
+  if (!identity) throw new ValidationError('Order id required');
   const order = await FoodOrder.findOne(identity).select('+deliveryOtp');
   if (!order) throw new NotFoundError('Order not found');
-  if (
-    order.dispatch?.deliveryPartnerId?.toString() !== deliveryPartnerId.toString()
-  ) {
-    throw new ForbiddenError('Not your order');
+  assertOwnLiveOrder(order, deliveryPartnerId);
+  if (!COMPLETE_FROM.includes(order.orderStatus)) {
+    throw stepConflict("Pick up the order before verifying the customer's OTP.");
   }
 
   const otpStr = normalizeOtpValue(otp);
   if (!otpStr) throw new ValidationError('OTP is required');
 
-  if (!order.deliveryVerification?.dropOtp?.required) {
-    const hasSecretOtp = Boolean(normalizeOtpValue(order.deliveryOtp));
-    if (!hasSecretOtp) {
-      throw new ValidationError(
-        'OTP verification is not active for this order. Confirm reached drop first.',
-      );
-    }
-
-    if (!order.deliveryVerification) order.deliveryVerification = {};
-    order.deliveryVerification.dropOtp = {
-      required: true,
-      verified: false,
-      ...(order.deliveryVerification?.dropOtp || {}),
-    };
-    order.markModified('deliveryVerification.dropOtp');
-    await order.save();
-  }
+  // Already verified: answered unchanged. The delivery app verifies in its OTP dialog and again just before completing.
   if (order.deliveryVerification?.dropOtp?.verified) {
     return { order: sanitizeOrderForExternal(order) };
+  }
+  if (!normalizeOtpValue(order.deliveryOtp)) {
+    throw stepConflict('Mark reached drop first: that sends the customer their OTP.');
   }
 
   if (!isOtpMatch(order.deliveryOtp, otpStr)) {
@@ -918,9 +922,11 @@ export async function verifyDropOtpDelivery(orderId, deliveryPartnerId, otp) {
     );
   }
 
-  if (!order.deliveryVerification) order.deliveryVerification = { dropOtp: {} };
-  order.deliveryVerification.dropOtp.verified = true;
-  order.markModified('deliveryVerification.dropOtp.verified');
+  order.deliveryVerification = {
+    ...(order.deliveryVerification?.toObject?.() || order.deliveryVerification || {}),
+    dropOtp: { required: true, verified: true },
+  };
+  order.markModified('deliveryVerification');
   await order.save();
 
   // OTP verification does not advance order status; suppress milestone push to avoid duplicates.
@@ -935,47 +941,36 @@ export async function verifyDropOtpDelivery(orderId, deliveryPartnerId, otp) {
 
 export async function completeDelivery(orderId, deliveryPartnerId, body = {}) {
   const identity = buildOrderIdentityFilter(orderId);
+  if (!identity) throw new ValidationError('Order id required');
   const order = await FoodOrder.findOne(identity).select('+deliveryOtp');
   if (!order) throw new NotFoundError('Order not found');
-  if (
-    order.dispatch?.deliveryPartnerId?.toString() !== deliveryPartnerId.toString()
-  ) {
-    throw new ForbiddenError('Not your order');
-  }
-
-  const { otp, ratings, paymentMethod: selectedPaymentMethod } = body;
-
-  // 1. Handover OTP Verification
-  if (
-    otp &&
-    order.deliveryVerification?.dropOtp?.required &&
-    !order.deliveryVerification?.dropOtp?.verified
-  ) {
-    const orderWithSecret = await FoodOrder.findById(order._id).select('+deliveryOtp');
-    if (isOtpMatch(orderWithSecret?.deliveryOtp, otp)) {
-      order.deliveryVerification.dropOtp.verified = true;
-      order.markModified('deliveryVerification.dropOtp.verified');
-    } else {
-      throw new ValidationError('Invalid handover OTP provided.');
-    }
-  }
-
-  if (
-    order.deliveryVerification?.dropOtp?.required &&
-    !order.deliveryVerification?.dropOtp?.verified &&
-    !otp
-  ) {
-    throw new ValidationError(
-      'Customer handover OTP is required. Verify the OTP from the customer before completing delivery.',
-    );
-  }
+  assertOwnLiveOrder(order, deliveryPartnerId);
 
   const from = order.orderStatus;
   const nextStatus = 'delivered';
-  if (!isStatusAdvance(from, nextStatus)) {
-      throw new ValidationError(`Order is already at status '${from}'. Cannot re-mark as '${nextStatus}'.`);
+  if (!COMPLETE_FROM.includes(from)) throw stepConflict('Pick up the order before completing the delivery.');
+
+  const { otp, ratings, paymentMethod: selectedPaymentMethod } = body;
+
+  // 1. Handover OTP: always required. Verified earlier (verify-drop-otp) or sent with this call; it exists only once
+  // the rider has marked reached drop.
+  if (!order.deliveryVerification?.dropOtp?.verified) {
+    if (!normalizeOtpValue(order.deliveryOtp)) {
+      throw stepConflict('Mark reached drop first: that sends the customer their OTP.');
+    }
+    if (!normalizeOtpValue(otp)) {
+      throw new ValidationError(
+        'Customer handover OTP is required. Verify the OTP from the customer before completing delivery.',
+      );
+    }
+    if (!isOtpMatch(order.deliveryOtp, otp)) throw new ValidationError('Invalid handover OTP provided.');
+    order.deliveryVerification = {
+      ...(order.deliveryVerification?.toObject?.() || order.deliveryVerification || {}),
+      dropOtp: { required: true, verified: true },
+    };
+    order.markModified('deliveryVerification');
   }
-  
+
   // 2. Financial Context Resolution
   const tx = await FoodTransaction.findOne({ orderId: order._id }).lean();
   const prevPayStatus = String(tx?.payment?.status || order?.payment?.status || 'cod_pending');
@@ -983,13 +978,22 @@ export async function completeDelivery(orderId, deliveryPartnerId, body = {}) {
 
   /**
    * Final Payment Method Logic:
-   * - If rider chose 'qr', we force 'razorpay_qr'.
-   * - If rider chose 'cash', we force 'cash'. 
-   * - Otherwise, we keep the original method.
+   * - Pay on delivery (cash, or a QR link the rider generated): the rider records how the customer paid,
+   *   'qr' -> 'razorpay_qr', 'cash' -> 'cash'; otherwise the current method.
+   * - Prepaid (online, wallet): the method stays, and the payment must already be verified. A rider cannot turn a
+   *   prepaid order into cash.
    */
+  const payOnDelivery = payMethod === 'cash' || payMethod === 'razorpay_qr';
   let finalPayMethod = payMethod;
-  if (selectedPaymentMethod === 'qr') finalPayMethod = 'razorpay_qr';
-  else if (selectedPaymentMethod === 'cash') finalPayMethod = 'cash';
+  if (payOnDelivery && selectedPaymentMethod === 'qr') finalPayMethod = 'razorpay_qr';
+  else if (payOnDelivery && selectedPaymentMethod === 'cash') finalPayMethod = 'cash';
+
+  if (!payOnDelivery) {
+    const statuses = [order.payment?.status, tx?.payment?.status, tx?.status].map((s) => String(s || '').toLowerCase());
+    if (!statuses.some((s) => PAID_STATUSES.includes(s))) {
+      throw new ValidationError('The online payment for this order is not verified yet. It cannot be completed until it is.');
+    }
+  }
 
   // 3. QR Payment Verification (Blocking)
   if (finalPayMethod === 'razorpay_qr') {
@@ -997,6 +1001,11 @@ export async function completeDelivery(orderId, deliveryPartnerId, body = {}) {
     if (String(syncedPayment?.status || '').toLowerCase() !== 'paid') {
       throw new ValidationError('Please wait for the customer to complete the QR payment. Payment not verified yet.');
     }
+  }
+
+  // Exactly once: only the request that moves the order to delivered goes on to the ledger (COD and cash limit).
+  if (!(await claimStep(order, { orderStatus: { $in: COMPLETE_FROM } }, { orderStatus: nextStatus }))) {
+    throw stepConflict(RACED);
   }
 
   // 4. Update Order State
@@ -1055,40 +1064,4 @@ export async function completeDelivery(orderId, deliveryPartnerId, body = {}) {
   });
 
   return sanitizeOrderForExternal(order);
-}
-
-
-export async function updateOrderStatusDelivery(orderId, deliveryPartnerId, orderStatus) {
-  const identity = buildOrderIdentityFilter(orderId);
-  if (!identity) throw new ValidationError('Order id required');
-
-  const order = await FoodOrder.findOne(identity).select('+deliveryOtp');
-  if (!order) throw new NotFoundError('Order not found');
-  if (order.dispatch.deliveryPartnerId?.toString() !== deliveryPartnerId.toString()) {
-    throw new ForbiddenError('Not your order');
-  }
-
-  const from = order.orderStatus;
-  if (!isStatusAdvance(from, orderStatus)) {
-      throw new ValidationError(`Current order status '${from}' is further ahead than '${orderStatus}'. Order cannot be moved backwards.`);
-  }
-  order.orderStatus = orderStatus;
-  pushStatusHistory(order, {
-    byRole: 'DELIVERY_PARTNER',
-    byId: deliveryPartnerId,
-    from,
-    to: orderStatus,
-  });
-  await order.save();
-
-  if (orderStatus === 'delivered') awardOrderPointsSafely(order._id);
-
-  enqueueOrderEvent('delivery_status_updated', {
-    orderMongoId: order._id?.toString?.(),
-    orderId: order._id.toString(),
-    deliveryPartnerId,
-    from,
-    to: orderStatus,
-  });
-  return order.toObject();
 }
