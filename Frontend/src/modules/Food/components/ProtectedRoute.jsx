@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { isModuleAuthenticated, getCurrentUser, getModuleToken, getRoleFromToken } from "@food/utils/auth";
 
@@ -14,6 +15,17 @@ const normalizeRole = (role) => {
  */
 export default function ProtectedRoute({ children, requiredRole, module = "user", loginPath = "/user/auth/login" }) {
   const location = useLocation();
+
+  // When the session can no longer be renewed (refresh token rejected or expired) the axios client clears the login and
+  // announces it: re-check right away so the user is sent to the login page then, not at some later navigation.
+  const [, setSessionCheck] = useState(0);
+  useEffect(() => {
+    const onSessionEnded = (event) => {
+      if (!event?.detail?.module || event.detail.module === module) setSessionCheck((n) => n + 1);
+    };
+    window.addEventListener("authRefreshFailed", onSessionEnded);
+    return () => window.removeEventListener("authRefreshFailed", onSessionEnded);
+  }, [module]);
 
   const isAuthenticated = isModuleAuthenticated(module);
 

@@ -139,7 +139,20 @@ export function getCurrentUser(module) {
  */
 export function isModuleAuthenticated(module) {
   const token = getModuleToken(module);
-  return !!token && !isTokenExpired(token);
+  if (token && !isTokenExpired(token)) return true;
+  // The access token lives only a few minutes. While the refresh token is still good the user IS signed in: the next
+  // API call gets a new access token (axios interceptor). Only when the refresh token is gone or expired is the session over.
+  return hasUsableRefreshToken(module);
+}
+
+/** True when this module holds a refresh token that has not expired (the session can be renewed without a login). */
+export function hasUsableRefreshToken(module) {
+  try {
+    const refresh = localStorage.getItem(`${module}_refreshToken`);
+    return !!refresh && !isTokenExpired(refresh);
+  } catch (_) {
+    return false;
+  }
 }
 
 /**
