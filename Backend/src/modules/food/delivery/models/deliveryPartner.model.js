@@ -98,6 +98,22 @@ const deliveryPartnerSchema = new mongoose.Schema(
         },
         rejectionReason: { type: String },
         rejectedAt: { type: Date },
+        // Approval by a franchise admin (the first franchise to approve claims the rider: franchiseId is set then)
+        approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        rejectedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        suspendedAt: { type: Date, default: null },
+        suspendedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        suspensionReason: { type: String, default: '' },
+        // Audit trail of approval decisions (there is no shared audit log): who did what, from which franchise, when
+        approvalHistory: [{
+            _id: false,
+            action: { type: String, enum: ['approved', 'rejected', 'suspended', 'activated'] },
+            byUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+            byRole: { type: String },
+            franchiseId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodFranchise', default: null },
+            reason: { type: String, default: '' },
+            at: { type: Date, default: Date.now }
+        }],
         approvedAt: { type: Date },
         bankAccountHolderName: { type: String },
         bankAccountNumber: { type: String },

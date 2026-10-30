@@ -3,6 +3,7 @@ import { requireSuperAdmin } from '../../../../core/auth/auth.middleware.js';
 import { attachFranchiseScope } from '../../shared/franchiseScope.js';
 import * as adminController from '../controllers/admin.controller.js';
 import * as staffController from '../controllers/staff.controller.js';
+import * as riderApproval from '../controllers/riderApproval.controller.js';
 import * as foodApprovalController from '../controllers/foodApproval.controller.js';
 import * as addonsApprovalController from '../controllers/addonsApproval.controller.js';
 import * as businessSettingsController from '../controllers/businessSettings.controller.js';
@@ -79,6 +80,16 @@ router.patch('/stores/complaints/:id', adminController.updateStoreComplaint);
 
 // ----- Delivery partners list: super admin sees all; a franchise admin sees only riders near / working for its own stores (read only) -----
 router.get('/delivery/partners', adminController.getDeliveryPartners);
+// Delivery partner approval: the franchise admin approves / rejects / suspends riders in its scope; the super admin
+// reads only (writes are 403). Only real ids match, so /delivery/wallets etc. below still reach their own routes.
+const RIDER = '/delivery/:id([0-9a-fA-F]{24})';
+router.get('/delivery/join-requests', riderApproval.joinRequests);
+router.get(RIDER, riderApproval.details);
+router.patch(`${RIDER}/approve`, riderApproval.approve);
+router.patch(`${RIDER}/reject`, riderApproval.reject);
+router.patch(`${RIDER}/suspend`, riderApproval.suspend);
+router.patch(`${RIDER}/activate`, riderApproval.activate);
+router.patch(RIDER, riderApproval.update);
 
 // ----- Staff / RBAC Management (the controller limits roles and franchise/store itself) -----
 router.post('/staff', staffController.createStaff);
@@ -269,7 +280,6 @@ router.patch('/delivery/withdrawals/:id', adminController.updateDeliveryWithdraw
 router.get('/delivery/cash-limit-settlements', adminController.getCashLimitSettlements);
 
 // ----- Delivery partners & general -----
-router.get('/delivery/join-requests', adminController.getDeliveryJoinRequests);
 router.get('/delivery/wallets', adminController.getDeliveryWallets);
 router.get('/delivery/bonus-transactions', adminController.getDeliveryPartnerBonusTransactions);
 router.get('/delivery/earnings', adminController.getDeliveryEarnings);
@@ -293,10 +303,6 @@ router.post('/delivery/earning-addon-completions/check', adminController.checkEa
 router.get('/delivery/support-tickets/stats', adminController.getSupportTicketStats);
 router.get('/delivery/support-tickets', adminController.getSupportTickets);
 router.patch('/delivery/support-tickets/:id', adminController.updateSupportTicket);
-router.get('/delivery/:id', adminController.getDeliveryPartnerById);
-router.patch('/delivery/:id', adminController.updateDeliveryPartner);
-router.patch('/delivery/:id/approve', adminController.approveDeliveryPartner);
-router.patch('/delivery/:id/reject', adminController.rejectDeliveryPartner);
 
 // ----- Regions, Zones, Territories -----
 router.post('/regions', geographyController.createRegion);

@@ -4,9 +4,6 @@ import {
   MoreVertical,
   Eye,
   Edit,
-  Ban,
-  UserCheck,
-  Trash2,
   CheckCircle,
   AlertCircle,
   Bike,
@@ -26,9 +23,7 @@ import {
 import DeliveryPartnersFilters from "./DeliveryPartnersFilters"
 import DeliveryPartnerDetailsDrawer from "./DeliveryPartnerDetailsDrawer"
 import EditDeliveryPartnerModal from "./EditDeliveryPartnerModal"
-import DeliverySuspendedModal from "./DeliverySuspendedModal"
 import useDeliveryPartnerRows from "./useDeliveryPartnerRows"
-import { adminAPI } from "@food/api"
 import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 const INITIAL_RIDERS = [
@@ -148,7 +143,6 @@ export default function DeliveryPartnersManagement() {
   const [selectedRider, setSelectedRider] = useState(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [isSuspendModalOpen, setIsSuspendModalOpen] = useState(false)
   const [activeMenuId, setActiveMenuId] = useState(null)
 
   // Toast notifications state
@@ -163,30 +157,8 @@ export default function DeliveryPartnersManagement() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [error])
 
-  // Server writes (approve / reject / suspend / edit): refresh from the server afterwards, show the server's error otherwise
-  const serverCall = async (call, successMessage, type = "success") => {
-    try {
-      await call()
-      showToast(successMessage, type)
-      await reload()
-      return true
-    } catch (err) {
-      showToast(err?.response?.data?.message || err?.response?.data?.error || err?.message || "That did not work", "error")
-      return false
-    }
-  }
-
-  const handleApprove = (rider) => {
-    setActiveMenuId(null)
-    return serverCall(() => adminAPI.approveDeliveryPartner(rider.id), `${rider.name} is approved`)
-  }
-
-  const handleReject = (rider) => {
-    setActiveMenuId(null)
-    const reason = window.prompt(`Reject ${rider.name}? Enter a reason (the rider is told):`, "")
-    if (reason === null) return undefined
-    return serverCall(() => adminAPI.rejectDeliveryPartner(rider.id, reason), `${rider.name} is rejected`, "warning")
-  }
+  // The super admin only views delivery partners: approval, rejection and suspension are the franchise admin's
+  const READ_ONLY = "Delivery partners are approved, rejected and suspended by the franchise admin of their area. The super admin can view them only."
 
   // Calculate stats dynamically
   const kpiStats = useMemo(() => {
@@ -237,14 +209,7 @@ export default function DeliveryPartnersManagement() {
 
   const handleSaveRider = async (savedData) => {
     if (!STANDALONE_MOCK) {
-      const done = await serverCall(
-        () => adminAPI.updateDeliveryPartner(savedData.id, { name: savedData.name, email: savedData.email, phone: savedData.phone, address: savedData.address, vehicleType: savedData.vehicle }),
-        `Updated details for ${savedData.name}!`
-      )
-      if (done) {
-        setIsEditModalOpen(false)
-        setSelectedRider(null)
-      }
+      showToast(READ_ONLY, "error")
       return
     }
     const exists = riders.some((r) => r.id === savedData.id)
@@ -259,71 +224,6 @@ export default function DeliveryPartnersManagement() {
     }
     setIsEditModalOpen(false)
     setSelectedRider(null)
-  }
-
-  const handleSuspendToggle = (rider) => {
-    if (!STANDALONE_MOCK) {
-      setActiveMenuId(null)
-      if (rider.status === "Pending") return handleApprove(rider)
-      if (rider.status === "Suspended") {
-        return serverCall(() => adminAPI.updateDeliveryPartner(rider.id, { status: "approved" }), `${rider.name} has been activated!`)
-      }
-      setIsDrawerOpen(false)
-      setSelectedRider(rider)
-      setIsSuspendModalOpen(true)
-      return undefined
-    }
-    if (rider.status === "Suspended") {
-      setRiders((prev) =>
-        prev.map((r) => (r.id === rider.id ? { ...r, status: "Online" } : r))
-      )
-      showToast(`${rider.name} has been activated!`, "success")
-      setActiveMenuId(null)
-      setSelectedRider((prev) => (prev && prev.id === rider.id ? { ...prev, status: "Online" } : prev))
-    } else {
-      setIsDrawerOpen(false)
-      setSelectedRider(rider)
-      setIsSuspendModalOpen(true)
-      setActiveMenuId(null)
-    }
-  }
-
-  const handleConfirmSuspension = async (rider, reason, notes) => {
-    if (!STANDALONE_MOCK) {
-      await serverCall(
-        () => adminAPI.updateDeliveryPartner(rider.id, { status: "suspended", rejectionReason: [reason, notes].filter(Boolean).join(": ") }),
-        `${rider.name} is now Suspended!`,
-        "warning"
-      )
-      setIsSuspendModalOpen(false)
-      setSelectedRider(null)
-      return
-    }
-    setRiders((prev) =>
-      prev.map((r) => (r.id === rider.id ? { ...r, status: "Suspended" } : r))
-    )
-    showToast(`${rider.name} is now Suspended!`, "warning")
-    setIsSuspendModalOpen(false)
-    setSelectedRider(null)
-  }
-
-  const handleDeleteRider = (rider) => {
-    if (!STANDALONE_MOCK) {
-      setActiveMenuId(null)
-      // A pending signup is rejected here; removing an approved partner is not available
-      if (rider.status === "Pending") return handleReject(rider)
-      showToast("Removing a delivery partner is not available. Suspend the account instead.", "error")
-      return undefined
-    }
-    if (window.confirm(`Are you sure you want to remove delivery partner ${rider.name}?`)) {
-      setRiders((prev) => prev.filter((r) => r.id !== rider.id))
-      showToast(`Removed delivery partner ${rider.name}`, "warning")
-      setActiveMenuId(null)
-      if (selectedRider?.id === rider.id) {
-        setIsDrawerOpen(false)
-        setSelectedRider(null)
-      }
-    }
   }
 
   const handleResetFilters = () => {
@@ -615,23 +515,6 @@ export default function DeliveryPartnersManagement() {
                         >
                           <Edit size={13} />
                         </button> */}
-                        <button
-                          onClick={() => handleSuspendToggle(rider)}
-                          className={`p-1 rounded-lg border transition-all cursor-pointer ${rider.status === "Suspended" || rider.status === "Pending"
-                            ? "border-emerald-200 dark:border-emerald-950 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
-                            : "border-amber-200 dark:border-amber-950 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/20"
-                            }`}
-                          title={rider.status === "Pending" ? "Approve Rider" : rider.status === "Suspended" ? "Activate Account" : "Suspend Rider"}
-                        >
-                          {rider.status === "Suspended" || rider.status === "Pending" ? <UserCheck size={13} /> : <Ban size={13} />}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteRider(rider)}
-                          className="p-1 rounded-lg border border-rose-200/40 dark:border-rose-950 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-550 dark:text-rose-455 transition-all cursor-pointer"
-                          title={rider.status === "Pending" ? "Reject Rider" : "Delete Partner"}
-                        >
-                          <Trash2 size={13} />
-                        </button>
                       </div>
                     </td>
                   </tr>
@@ -709,9 +592,6 @@ export default function DeliveryPartnersManagement() {
           setSelectedRider(null)
         }}
         rider={selectedRider}
-        onSuspend={handleSuspendToggle}
-        onApprove={handleApprove}
-        onReject={handleReject}
         onEdit={(rider) => {
           setIsDrawerOpen(false)
           setSelectedRider(rider)
@@ -730,16 +610,6 @@ export default function DeliveryPartnersManagement() {
         onSave={handleSaveRider}
       />
 
-      {/* Suspend Confirmation Modal */}
-      <DeliverySuspendedModal
-        isOpen={isSuspendModalOpen}
-        onClose={() => {
-          setIsSuspendModalOpen(false)
-          setSelectedRider(null)
-        }}
-        rider={selectedRider}
-        onConfirm={handleConfirmSuspension}
-      />
     </div>
   )
 }

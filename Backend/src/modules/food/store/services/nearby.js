@@ -1,10 +1,12 @@
 import { FoodStore } from '../models/store.model.js';
 import { FoodZone } from '../../admin/models/zone.model.js';
+import { FoodTerritory } from '../../admin/models/territory.model.js';
 
 // Who counts as "near" a store, for the store panel's rider and customer lists. One rule for both:
 //   1. a person with saved coordinates is near when they are within NEARBY_RADIUS_KM (default 10) of the store's
 //      coordinates; a store without coordinates uses its zone polygon instead;
-//   2. a person without coordinates is near when their saved city equals the store's city or its zone's name /
+//   2. a person without coordinates is near when their saved city equals the store's city or state field (the store form
+//      saves the region and zone names there), its zone's name /
 //      service location, or a part of those (the name in brackets, the comma-separated parts: "North India (Delhi)"
 //      also matches "Delhi"); case-insensitive, spaces trimmed and collapsed;
 //   3. anyone else is not near.
@@ -36,14 +38,17 @@ const hasPoint = (lat, lng) => Number.isFinite(lat) && Number.isFinite(lng) && !
 /** The store's saved position, zone polygon and area names: what the nearby filters are built from. */
 export async function storeArea(storeOrId) {
   const id = storeOrId?._id || storeOrId;
-  const store = await FoodStore.findById(id).select('latitude longitude city zoneId').lean();
+  const store = await FoodStore.findById(id).select('latitude longitude city state zoneId territoryId').lean();
   if (!store) return { center: null, polygon: null, labels: [] };
-  const zone = store.zoneId
-    ? await FoodZone.findOne({ _id: store.zoneId, isActive: { $ne: false } }).select('name zoneName serviceLocation coordinates').lean()
+  // the store's zone, or its territory's zone (stores created from the franchise panel only carry a territory)
+  let zoneId = store.zoneId;
+  if (!zoneId && store.territoryId) zoneId = (await FoodTerritory.findById(store.territoryId).select('zoneId').lean())?.zoneId || null;
+  const zone = zoneId
+    ? await FoodZone.findOne({ _id: zoneId, isActive: { $ne: false } }).select('name zoneName serviceLocation coordinates').lean()
     : null;
   const ring = (zone?.coordinates || []).filter((c) => hasPoint(c.latitude, c.longitude)).map((c) => [c.longitude, c.latitude]);
   if (ring.length >= 3 && (ring[0][0] !== ring.at(-1)[0] || ring[0][1] !== ring.at(-1)[1])) ring.push(ring[0]);
-  const labels = [...new Set([store.city, zone?.name, zone?.zoneName, zone?.serviceLocation].flatMap(areaNames))];
+  const labels = [...new Set([store.city, store.state, zone?.name, zone?.zoneName, zone?.serviceLocation].flatMap(areaNames))];
   return {
     center: hasPoint(store.latitude, store.longitude) ? [store.longitude, store.latitude] : null,
     polygon: ring.length >= 4 ? { type: 'Polygon', coordinates: [ring] } : null,

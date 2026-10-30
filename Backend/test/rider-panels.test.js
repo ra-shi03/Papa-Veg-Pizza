@@ -65,9 +65,13 @@ describe('super admin: the full signup record', () => {
         assert.ok(!JSON.stringify(d).includes('push-token-secret'));
         assert.equal((await fx.call('GET', '/v1/food/admin/delivery/not-an-id', fx.SA)).status, 404);
     });
-    test('franchise admin, store manager, rider and customer cannot open it', async () => {
+    test('store manager, rider and customer cannot open it; the franchise admin gets the masked verification view (rider-approval.test.js)', async () => {
         const riderToken = fx.tokenFor(oid(R.DeliveryBoy), 'DELIVERY_PARTNER');
-        for (const token of [A.adminToken, A.managerToken, riderToken, A.customerToken]) {
+        const fa = ok(await fx.call('GET', `/v1/food/admin/delivery/${R.DeliveryBoy}`, A.adminToken)).delivery;
+        assert.equal(fa.aadharNumber, 'XXXXXXXX9876');
+        assert.ok(!JSON.stringify(fa).includes(SECRET.bankAccountNumber) && !JSON.stringify(fa).includes('push-token-secret'));
+        assert.equal((await fx.call('GET', `/v1/food/admin/delivery/${R.DeliveryBoy}`, B.adminToken)).status, 404);
+        for (const token of [A.managerToken, riderToken, A.customerToken]) {
             assert.equal((await fx.call('GET', `/v1/food/admin/delivery/${R.DeliveryBoy}`, token)).status, 403);
         }
     });

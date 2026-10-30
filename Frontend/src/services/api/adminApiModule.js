@@ -236,6 +236,11 @@ export const adminAPI = {
     adminClient.patch(`/food/admin/delivery/${String(id)}/approve`, {}),
   rejectDeliveryPartner: (id, reason) =>
     adminClient.patch(`/food/admin/delivery/${String(id)}/reject`, { reason: String(reason || "").trim() }),
+  /** Franchise admin only (the super admin reads): suspend an approved rider / activate a suspended one. */
+  suspendDeliveryPartner: (id, reason) =>
+    adminClient.patch(`/food/admin/delivery/${String(id)}/suspend`, { reason: String(reason || "").trim() }),
+  activateDeliveryPartner: (id) =>
+    adminClient.patch(`/food/admin/delivery/${String(id)}/activate`, {}),
   /** GET /food/admin/delivery/support-tickets - list all delivery support tickets (query: status, priority, search, page, limit). */
   getDeliverySupportTickets: (params) =>
     adminClient.get("/food/admin/delivery/support-tickets", { params }),

@@ -4514,9 +4514,16 @@ export async function getDeliveryPartnerById(id) {
     const partner = await FoodDeliveryPartner.findById(id).select('-fcmTokens -fcmTokenMobile').lean();
     if (!partner) return null;
     const deliveryId = partner._id ? `DP-${partner._id.toString().slice(-8).toUpperCase()}` : null;
+    // Who approved the rider and which franchise claimed it (franchise admins approve; the super admin only reads)
+    const [claimedBy, approver] = await Promise.all([
+        partner.franchiseId ? mongoose.model('FoodFranchise').findById(partner.franchiseId).select('name').lean() : null,
+        partner.approvedBy ? mongoose.model('User').findById(partner.approvedBy).select('email').lean() : null,
+    ]);
     return {
         ...partner,
         approvalStatus: partner.status,
+        franchiseName: claimedBy?.name || '',
+        approvedByEmail: approver?.email || '',
         email: partner.email || null,
         deliveryId,
         status: partner.status === 'rejected' ? 'blocked' : partner.status,

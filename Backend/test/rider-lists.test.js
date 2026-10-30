@@ -61,7 +61,8 @@ after(async () => { await fx?.teardown(); });
 describe('franchise admin', () => {
     test('sees only riders near or working for its own stores', async () => {
         const a = ok(await fx.call('GET', URL, A.adminToken));
-        assert.deepEqual(names(a), ['Rider nearA', 'Rider ownA', 'Rider pendingA', 'Rider worksA']);
+        // suspended riders near its stores are listed too, so the franchise admin can activate them
+        assert.deepEqual(names(a), ['Rider nearA', 'Rider ownA', 'Rider pendingA', 'Rider suspendedA', 'Rider worksA']);
         const b = ok(await fx.call('GET', URL, B.adminToken));
         assert.deepEqual(names(b), ['Rider nearB', 'Rider ownB']);
         assert.ok(!JSON.stringify(a).includes('Rider nearB') && !JSON.stringify(b).includes('Rider nearA'));
@@ -76,9 +77,9 @@ describe('franchise admin', () => {
         assert.equal(by['Rider pendingA'].status, 'pending');
         assert.equal(by['Rider worksA'].totalOrders, 1);
         assert.deepEqual(near.storeNames, [(await fx.models.FoodStore.findById(A.storeId).lean()).storeName]);
-        assert.deepEqual(a.stats, { total: 4, pending: 1, approved: 3, suspended: 0, online: 2, offline: 1, busy: 0 });
+        assert.deepEqual(a.stats, { total: 5, pending: 1, approved: 3, suspended: 1, online: 2, offline: 1, busy: 0 });
         assert.deepEqual(a.stores.map((s) => String(s._id)), [A.storeId]);
-        assert.equal(a.pagination.total, 4);
+        assert.equal(a.pagination.total, 5);
     });
     test('never documents, bank details, Aadhaar, PAN, email, photo or the full phone', async () => {
         const a = ok(await fx.call('GET', URL, A.adminToken));
@@ -91,7 +92,7 @@ describe('franchise admin', () => {
     });
     test('?storeId=: its own store narrows the list; another franchise\'s store is 404', async () => {
         const own = ok(await fx.call('GET', `${URL}?storeId=${A.storeId}`, A.adminToken));
-        assert.equal(own.deliveryPartners.length, 4);
+        assert.equal(own.deliveryPartners.length, 5);
         assert.equal((await fx.call('GET', `${URL}?storeId=${B.storeId}`, A.adminToken)).status, 404);
         assert.equal((await fx.call('GET', `${URL}?storeId=not-an-id`, A.adminToken)).status, 404);
     });
@@ -103,11 +104,10 @@ describe('franchise admin', () => {
             delete process.env.NEARBY_RADIUS_KM;
         }
     });
-    test('read only: approve, reject and edit are 403, and change nothing', async () => {
-        for (const [method, path, body] of [['PATCH', `/v1/food/admin/delivery/${R.pendingA}/approve`, {}], ['PATCH', `/v1/food/admin/delivery/${R.pendingA}/reject`, { reason: 'x' }], ['PATCH', `/v1/food/admin/delivery/${R.pendingA}`, { name: 'Hacked' }]]) {
-            assert.equal((await fx.call(method, path, A.adminToken, body)).status, 403, `${method} ${path}`);
-        }
-        assert.equal((await fx.call('GET', '/v1/food/admin/delivery/join-requests', A.adminToken)).status, 403);
+    test('the rider\'s own details cannot be edited here; another franchise\'s rider is 404 (approval: rider-approval.test.js)', async () => {
+        assert.equal((await fx.call('PATCH', `/v1/food/admin/delivery/${R.pendingA}`, A.adminToken, { name: 'Hacked' })).status, 400);
+        assert.equal((await fx.call('PATCH', `/v1/food/admin/delivery/${R.nearB}/approve`, A.adminToken, {})).status, 404);
+        assert.ok(ok(await fx.call('GET', '/v1/food/admin/delivery/join-requests', A.adminToken)).requests.some((r) => String(r._id) === R.pendingA));
         const row = await mongoose.connection.collection('food_delivery_partners').findOne({ _id: oid(R.pendingA) });
         assert.deepEqual([row.status, row.name], ['pending', 'Rider pendingA']);
     });
@@ -126,16 +126,15 @@ describe('super admin', () => {
         const own = wide.deliveryPartners.find((r) => r.name === 'Rider ownA');
         assert.deepEqual([String(own.storeId), String(own.franchiseId)], [A.storeId, A.franchiseId]);
     });
-    test('pending signups are in join-requests, and can be approved (then they appear in the list) or rejected', async () => {
+    test('pending signups are in join-requests; the super admin reads them but approval is the franchise admin\'s', async () => {
         const pending = ok(await fx.call('GET', '/v1/food/admin/delivery/join-requests?status=pending', fx.SA)).requests;
         assert.ok(pending.some((r) => r._id === R.pendingA));
-        assert.equal((await fx.call('PATCH', `/v1/food/admin/delivery/${R.pendingA}/approve`, fx.SA, {})).status, 200);
+        assert.equal((await fx.call('PATCH', `/v1/food/admin/delivery/${R.pendingA}/approve`, fx.SA, {})).status, 403);
+        assert.equal((await fx.call('PATCH', `/v1/food/admin/delivery/${R.pendingA}/reject`, fx.SA, { reason: 'Blurry documents' })).status, 403);
+        // franchise A (the rider is near its store) approves; then it is in the super admin's list too
+        assert.equal((await fx.call('PATCH', `/v1/food/admin/delivery/${R.pendingA}/approve`, A.adminToken, {})).status, 200);
         assert.equal((await mongoose.connection.collection('food_delivery_partners').findOne({ _id: oid(R.pendingA) })).status, 'approved');
         assert.ok(names(ok(await fx.call('GET', URL, fx.SA))).includes('Rider pendingA'));
-        await rider('toReject', { status: 'pending' });
-        assert.equal((await fx.call('PATCH', `/v1/food/admin/delivery/${R.toReject}/reject`, fx.SA, { reason: 'Blurry documents' })).status, 200);
-        const row = await mongoose.connection.collection('food_delivery_partners').findOne({ _id: oid(R.toReject) });
-        assert.deepEqual([row.status, row.rejectionReason], ['rejected', 'Blurry documents']);
     });
 });
 

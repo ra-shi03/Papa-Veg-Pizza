@@ -13,9 +13,9 @@ const maskId = (n) => {
 }
 const when = (date) => (date ? new Date(date).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "")
 
-export default function DeliveryPartnerDetailsDrawer({ isOpen, onClose, rider, onSuspend, onEdit, onApprove, onReject }) {
+export default function DeliveryPartnerDetailsDrawer({ isOpen, onClose, rider, onEdit }) {
   // The full signup record from the server (documents, bank, licence, location); the list row is only a fallback
-  const { details, loading: loadingDetails, error: detailsError, reload: reloadDetails } = useDeliveryPartnerDetails(rider?.id, Boolean(isOpen && rider))
+  const { details, loading: loadingDetails, error: detailsError } = useDeliveryPartnerDetails(rider?.id, Boolean(isOpen && rider))
   if (!rider) return null
 
   const d = details || {}
@@ -34,11 +34,6 @@ export default function DeliveryPartnerDetailsDrawer({ isOpen, onClose, rider, o
     { label: "Vehicle RC", url: null, notCollected: true },
     { label: "Address proof", url: null, notCollected: true },
   ]
-  const act = async (fn) => {
-    if (!fn) return
-    await fn(rider)
-    reloadDetails()
-  }
 
   // Helper for status badge styling
   const getStatusBadge = (status) => {
@@ -93,14 +88,6 @@ export default function DeliveryPartnerDetailsDrawer({ isOpen, onClose, rider, o
                 <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-50">Partner Profile</h3>
               </div>
               <div className="flex gap-2">
-                {approval !== "rejected" && approval !== "pending" && (
-                  <button
-                    onClick={() => act(onSuspend)}
-                    className="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-colors"
-                  >
-                    {approval === "suspended" ? "Activate" : "Suspend"}
-                  </button>
-                )}
                 {/* <button
                   onClick={() => onEdit(rider)}
                   className="px-3 py-1.5 rounded-lg bg-[var(--primary)] text-white font-semibold text-xs hover:opacity-90 transition-opacity"
@@ -341,31 +328,14 @@ export default function DeliveryPartnerDetailsDrawer({ isOpen, onClose, rider, o
 
             {/* Sticky Action Footer */}
             <div className="absolute bottom-0 left-0 right-0 p-3 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 flex gap-4">
-              {approval === "pending" ? (
-                <>
-                  <button
-                    onClick={() => act(onApprove)}
-                    className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white py-1.5 rounded-lg font-bold text-xs hover:opacity-90 transition-all active:scale-[0.98] shadow-md cursor-pointer"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => act(onReject)}
-                    className="flex-1 flex items-center justify-center gap-2 bg-rose-600 text-white py-1.5 rounded-lg font-bold text-xs hover:opacity-90 transition-all active:scale-[0.98] shadow-md cursor-pointer"
-                  >
-                    Reject
-                  </button>
-                </>
-              ) : approval === "rejected" ? (
-                <p className="flex-1 text-center text-[10px] font-semibold text-zinc-400 py-1.5">Rejected. The rider can sign up again with the same phone.</p>
-              ) : (
-                <button
-                  onClick={() => act(onSuspend)}
-                  className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 py-1.5 rounded-lg font-bold text-xs hover:opacity-90 transition-all active:scale-[0.98] shadow-md shadow-zinc-900/10 cursor-pointer"
-                >
-                  {approval === "suspended" ? "Activate Rider" : "Suspend Rider"}
-                </button>
-              )}
+              {/* Read only: the franchise admin of the rider's area approves, rejects and suspends */}
+              <p className="flex-1 text-center text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 py-1.5">
+                {approval === "approved" || approval === "suspended"
+                  ? `${approval === "suspended" ? "Suspended" : "Approved"}${d.franchiseName ? ` · ${d.franchiseName}` : " · shared fleet"}${d.approvedByEmail ? ` · approved by ${d.approvedByEmail}` : ""}${d.approvedAt ? ` on ${when(d.approvedAt)}` : ""}`
+                  : approval === "rejected"
+                    ? "Rejected by the franchise admin. The rider can sign up again with the same phone."
+                    : "Waiting for the franchise admin of the rider's area to approve or reject."}
+              </p>
             </div>
           </motion.div>
         </>
