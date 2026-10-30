@@ -15,6 +15,7 @@ import { toast } from "sonner"
 import { removeCartKey } from "./upsell/upsellApi"
 import apiClient from "@/services/api/axios"
 import { orderAPI } from "@food/api"
+import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 const COUPON_KEY = "pvp_cart_coupon"
 
@@ -266,19 +267,9 @@ export default function Cart() {
         } catch (_) {}
       }
 
-      // 3. Try settings coupons endpoint
-      if (found.length === 0) {
-        try {
-          const res = await apiClient.get("/settings/coupons")
-          const list = res?.data?.data || res?.data
-          if (Array.isArray(list) && list.length > 0) {
-            found = list
-          }
-        } catch (_) {}
-      }
-
-      // 4. Try localStorage 'pvp_coupons'
-      if (found.length === 0) {
+      // Only coupons the server publishes for customers; the sample ones below are for standalone mock mode only
+      // (a coupon the server does not know would show a discount the order never gets)
+      if (found.length === 0 && STANDALONE_MOCK) {
         try {
           const stored = localStorage.getItem("pvp_coupons")
           if (stored) {
@@ -290,8 +281,7 @@ export default function Cart() {
         } catch (_) {}
       }
 
-      // 5. Default fallback active coupons so the user always sees available promotional coupons
-      if (found.length === 0) {
+      if (found.length === 0 && STANDALONE_MOCK) {
         found = [
           {
             couponCode: "WELCOME50",
@@ -594,46 +584,78 @@ export default function Cart() {
     else updateItemQty(item.key, delta)
   }
 
-  // Calculate pricing sums
-  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  // Calculate pricing sums: a browser estimate, replaced by the server's quote (POST /food/orders/calculate) as soon as
+  // it arrives. The quote is what the order will charge: store prices, fees, tax and the coupon as the server applies it.
+  const estSubtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const estDiscount = appliedCoupon && !couponRejected ? offerDiscount(appliedCoupon, estSubtotal) : 0
 
-  // Same maths as the server; 0 while the cart is under the coupon's minimum or the server refused it
-  const discount = appliedCoupon && !couponRejected ? offerDiscount(appliedCoupon, subtotal) : 0
-
-  // Ask the server whether the coupon really applies to this customer (first-order-only, per-user limits...)
+  const [quote, setQuote] = useState(null) // { key, pricing } for the cart it was asked for
+  const [quoteError, setQuoteError] = useState("")
+  const quoteKey = JSON.stringify([
+    cartItems.map((i) => [i.itemId || i.id, i.quantity, i.size, i.crust, i.toppings, i.meals, i.extraCheese, i.offerToken]),
+    appliedCoupon?.couponCode || "",
+    slotInfo?.storeId || "",
+    scheduledAt || "",
+  ])
   useEffect(() => {
     setCouponRejected("")
-    if (!appliedCoupon || !isLoggedIn || !slotInfo?.storeId || subtotal < (appliedCoupon.minOrderValue || 0) || cartItems.length === 0) return undefined
+    if (!isLoggedIn || !slotInfo?.storeId || cartItems.length === 0) {
+      setQuote(null)
+      setQuoteError("")
+      return undefined
+    }
+    let cancelled = false
     const timer = setTimeout(async () => {
       try {
+        const point = getCartCoords()
         const res = await orderAPI.calculateOrder({
           storeId: slotInfo.storeId,
           items: toOrderItems(cartItems),
-          couponCode: appliedCoupon.couponCode,
+          ...(point ? { deliveryAddress: { location: { type: "Point", coordinates: [point.lng, point.lat] } } } : {}),
+          ...(appliedCoupon?.couponCode ? { couponCode: appliedCoupon.couponCode } : {}),
           ...(scheduledAt ? { scheduledAt } : {}),
         })
-        const pricing = res?.data?.data?.pricing
-        if (pricing && !pricing.appliedCoupon) setCouponRejected("not valid on this order for your account")
-      } catch (_) {
-        // the quote is only a check; checkout reports real problems
+        if (cancelled) return
+        const pricing = res?.data?.data?.pricing || null
+        setQuote(pricing ? { key: quoteKey, pricing } : null)
+        setQuoteError("")
+        // The server is the judge of the coupon (first-order-only, per-user limits, store scope...)
+        if (pricing && appliedCoupon && !pricing.appliedCoupon && pricing.subtotal >= (appliedCoupon.minOrderValue || 0)) {
+          setCouponRejected("not valid on this order for your account")
+        }
+      } catch (err) {
+        if (cancelled) return
+        setQuote(null)
+        setQuoteError(err?.response?.data?.message || err?.response?.data?.error || "Could not get the order total from the server")
       }
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [appliedCoupon?.couponCode, subtotal, slotInfo?.storeId, scheduledAt, cartItems.length]) // eslint-disable-line react-hooks/exhaustive-deps
+    }, 400)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [quoteKey, isLoggedIn]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (quoteError) toast.error(quoteError)
+  }, [quoteError])
+  const q = quote && quote.key === quoteKey ? quote.pricing : null
 
-  // Fees are set by the super admin; the server charges the same numbers (delivery by distance is estimated here)
+  // Fees are set by the super admin; until the quote arrives the browser estimates them (delivery by distance included)
   const freeDeliveryAt = [fees.freeDeliveryUpTo, fees.freeDeliveryThreshold].filter((v) => v > 0).sort((a, b) => a - b)[0] || 0
-  const freeDelivery = freeDeliveryAt > 0 && subtotal >= freeDeliveryAt
-  const handlingCharge = subtotal > 0
-    ? Number((fees.handlingFee + fees.platformFee + fees.packagingFee + (freeDelivery ? 0 : fees.deliveryFee)).toFixed(2))
-    : 0
+  const estFreeDelivery = freeDeliveryAt > 0 && estSubtotal >= freeDeliveryAt
   const gstShare = fees.gstRate / 2
-  const taxable = subtotal - discount + (subtotal > 0 ? fees.handlingFee : 0)
-  const cgst = subtotal > 0 ? Number((taxable * gstShare / 100).toFixed(2)) : 0
-  const sgst = cgst
-  const taxesAndCharges = subtotal > 0 ? Number((handlingCharge + cgst + sgst).toFixed(2)) : 0
+  const estTaxable = estSubtotal - estDiscount + (estSubtotal > 0 ? fees.handlingFee : 0)
+  const estCgst = estSubtotal > 0 ? Number((estTaxable * gstShare / 100).toFixed(2)) : 0
 
-  const total = subtotal > 0 ? Number((subtotal - discount + taxesAndCharges).toFixed(2)) : 0
+  const subtotal = q ? Number(q.subtotal) : estSubtotal
+  const discount = q ? Number(q.discount || 0) : estDiscount
+  const billDeliveryFee = q ? Number(q.deliveryFee || 0) : (estFreeDelivery ? 0 : fees.deliveryFee)
+  const billPlatformPackaging = q ? Number(q.platformFee || 0) + Number(q.packagingFee || 0) : fees.platformFee + fees.packagingFee
+  const billHandlingFee = q ? Number(q.handlingFee || 0) : fees.handlingFee
+  const freeDelivery = q ? billDeliveryFee === 0 && fees.deliveryFee > 0 : estFreeDelivery
+  const handlingCharge = subtotal > 0 ? Number((billDeliveryFee + billPlatformPackaging + billHandlingFee).toFixed(2)) : 0
+  const cgst = q ? Number((Number(q.tax || 0) / 2).toFixed(2)) : estCgst
+  const sgst = cgst
+  const total = q ? Number(q.total) : (subtotal > 0 ? Number((subtotal - discount + handlingCharge + cgst + sgst).toFixed(2)) : 0)
   const deliverySaved = freeDelivery && fees.deliveryFee > 0 ? fees.deliveryFee : 0
   const savings = Number((discount + deliverySaved).toFixed(2))
   const beforeSavings = Number((total + savings).toFixed(2))
@@ -1026,12 +1048,12 @@ export default function Cart() {
                       <BillRow label={`Item total (${itemCount})`} value={`₹${subtotal}`} />
                       {discount > 0 && <BillRow label={`Coupon (${appliedCoupon.couponCode})`} value={`-₹${discount}`} positive />}
                       {isDelivery && fees.deliveryFee > 0 && (
-                        <BillRow label="Delivery fee" value={freeDelivery ? <><span className="line-through mr-1.5" style={{ color: ui.muted }}>₹{fees.deliveryFee}</span><span className="text-emerald-600 font-semibold">FREE</span></> : `₹${fees.deliveryFee}`} />
+                        <BillRow label="Delivery fee" value={freeDelivery ? <><span className="line-through mr-1.5" style={{ color: ui.muted }}>₹{fees.deliveryFee}</span><span className="text-emerald-600 font-semibold">FREE</span></> : `₹${billDeliveryFee}`} />
                       )}
-                      {subtotal > 0 && fees.platformFee + fees.packagingFee > 0 && <BillRow label="Platform & packaging" value={`₹${Number((fees.platformFee + fees.packagingFee).toFixed(2))}`} />}
-                      {subtotal > 0 && fees.handlingFee > 0 && <BillRow label="Restaurant handling charges" value={`₹${fees.handlingFee}`} />}
-                      {fees.gstRate > 0 && <BillRow label={`CGST (${gstShare}%)`} value={`₹${cgst}`} />}
-                      {fees.gstRate > 0 && <BillRow label={`SGST (${gstShare}%)`} value={`₹${sgst}`} />}
+                      {subtotal > 0 && billPlatformPackaging > 0 && <BillRow label="Platform & packaging" value={`₹${Number(billPlatformPackaging.toFixed(2))}`} />}
+                      {subtotal > 0 && billHandlingFee > 0 && <BillRow label="Restaurant handling charges" value={`₹${billHandlingFee}`} />}
+                      {(q ? cgst > 0 : fees.gstRate > 0) && <BillRow label={`CGST (${gstShare}%)`} value={`₹${cgst}`} />}
+                      {(q ? sgst > 0 : fees.gstRate > 0) && <BillRow label={`SGST (${gstShare}%)`} value={`₹${sgst}`} />}
                     </div>
                   </motion.div>
                 )}

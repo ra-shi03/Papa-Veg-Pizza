@@ -116,13 +116,11 @@ export default function CheckoutModal({
       isDefault: true
     }
     // The coordinates the location picker already saved go with the address, so stores near it can see the customer
-    try {
-      const picked = JSON.parse(localStorage.getItem("userLocation") || "null")
-      if (Number.isFinite(picked?.latitude) && Number.isFinite(picked?.longitude)) {
-        newAddressObject.latitude = picked.latitude
-        newAddressObject.longitude = picked.longitude
-      }
-    } catch (_) {}
+    const pickedPoint = getCartCoords()
+    if (pickedPoint) {
+      newAddressObject.latitude = pickedPoint.lat
+      newAddressObject.longitude = pickedPoint.lng
+    }
 
     // Save to profile
     try {
@@ -185,7 +183,7 @@ export default function CheckoutModal({
       if (!orderId) throw new Error("Order could not be created")
     } catch (err) {
       setPlacingOrder(false)
-      toast.error(err?.response?.data?.message || err?.message || "Could not place your order")
+      toast.error(err?.response?.data?.message || err?.response?.data?.error || err?.message || "Could not place your order")
       return
     }
     setPlacingOrder(false)
