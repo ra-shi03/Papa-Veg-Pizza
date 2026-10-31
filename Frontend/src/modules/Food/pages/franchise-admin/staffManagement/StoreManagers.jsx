@@ -162,7 +162,7 @@ export default function StoreManagers() {
       setLoading(true)
       const [mgrRes, storeRes] = await Promise.all([
         adminAPI.getStoreManagers(),
-        adminAPI.getStores()
+        adminAPI.getStores({ includeUnapproved: true })
       ])
       if (mgrRes?.data?.success) {
         setManagers(mgrRes.data.data.map(m => ({ ...m, id: m._id })))
@@ -439,6 +439,7 @@ export default function StoreManagers() {
             >
               <option value="All">Status: All</option>
               <option value="Active">Active</option>
+              <option value="Pending Approval">Pending Approval</option>
               <option value="On Leave">On Leave</option>
               <option value="Suspended">Suspended</option>
             </select>
@@ -563,7 +564,7 @@ export default function StoreManagers() {
                         <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
                           (mgr.status === "Active" || mgr.status === "ACTIVE")
                             ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-650"
-                            : (mgr.status === "On Leave" || mgr.status === "ON_LEAVE")
+                            : (mgr.status === "On Leave" || mgr.status === "ON_LEAVE" || mgr.status === "Pending Approval")
                               ? "bg-amber-50 dark:bg-amber-950/20 text-amber-650"
                               : "bg-red-50 dark:bg-red-950/20 text-red-650"
                         }`}>

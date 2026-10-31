@@ -26,7 +26,7 @@ export default function CurrentStatusCard({ rider }) {
     : "bg-orange-50 text-orange-700 border-orange-100 dark:bg-orange-950/10 dark:text-orange-400 dark:border-orange-900/20";
 
   return (
-    <div className="bg-slate-50 dark:bg-zinc-950 p-4 rounded-2.5xl border border-slate-100 dark:border-zinc-850 space-y-3.5 text-xs font-bold text-slate-700 dark:text-zinc-300 h-full">
+    <div className="bg-white dark:bg-zinc-950 p-4 rounded-2xl border border-slate-200/70 dark:border-zinc-850 space-y-3.5 text-xs font-bold text-slate-700 dark:text-zinc-300 h-full shadow-sm">
       <div className="flex items-center gap-1.5 border-b border-slate-200/50 dark:border-zinc-800/80 pb-2">
         <Activity size={14} className="text-[var(--primary)]" />
         <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">

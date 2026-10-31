@@ -81,14 +81,15 @@ describe('franchise admin', () => {
         assert.deepEqual(a.stores.map((s) => String(s._id)), [A.storeId]);
         assert.equal(a.pagination.total, 5);
     });
-    test('never documents, bank details, Aadhaar, PAN, email, photo or the full phone', async () => {
+    test('the list has the selfie but never documents, bank details, Aadhaar, PAN, email or the full phone', async () => {
         const a = ok(await fx.call('GET', URL, A.adminToken));
         const text = JSON.stringify(a);
         const row = await mongoose.connection.collection('food_delivery_partners').findOne({ _id: oid(R.nearA) });
-        for (const secret of [row.phone, row.email, '123412341234', 'ABCDE1234F', 'MP0920200000001', 'aadhar.jpg', 'pan.jpg', 'dl.jpg', 'me.jpg', '000111222333', 'SBIN0000001', 'Holder Name', 'nearA@upi', 'MP09-']) {
+        for (const secret of [row.phone, row.email, '123412341234', 'ABCDE1234F', 'MP0920200000001', 'aadhar.jpg', 'pan.jpg', 'dl.jpg', '000111222333', 'SBIN0000001', 'Holder Name', 'nearA@upi', 'MP09-']) {
             assert.ok(!text.includes(secret), `leaked ${secret}`);
         }
-        assert.ok(!/aadhar|bank|pan(Number|Photo)|drivingLicense|upi|password|email|profilePhoto|vehicleNumber/i.test(text));
+        assert.ok(!/aadhar|bank|pan(Number|Photo)|drivingLicense|upi|password|email|vehicleNumber/i.test(text));
+        assert.equal(a.deliveryPartners.find((r) => r.name === 'Rider nearA').profilePhoto, 'https://x/me.jpg', 'the selfie shows in the Photo column');
     });
     test('?storeId=: its own store narrows the list; another franchise\'s store is 404', async () => {
         const own = ok(await fx.call('GET', `${URL}?storeId=${A.storeId}`, A.adminToken));

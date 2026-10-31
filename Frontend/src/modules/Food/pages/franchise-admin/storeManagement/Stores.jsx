@@ -96,9 +96,9 @@ export default function Stores() {
     try {
       setLoadingKpis(true)
       const [totalRes, activeRes, inactiveRes] = await Promise.all([
-        adminAPI.getStores({ limit: 1 }),
-        adminAPI.getStores({ limit: 1, status: "Active" }),
-        adminAPI.getStores({ limit: 1, status: "Inactive" })
+        adminAPI.getStores({ limit: 1, includeUnapproved: true }),
+        adminAPI.getStores({ limit: 1, status: "Active", includeUnapproved: true }),
+        adminAPI.getStores({ limit: 1, status: "Inactive", includeUnapproved: true })
       ])
       
       setKpis({
@@ -126,7 +126,9 @@ export default function Stores() {
         status: statusFilter,
         type: typeFilter,
         sort: sortKey,
-        order: sortOrder
+        order: sortOrder,
+        // stores waiting for the super admin's approval are listed too, tagged with their approval status
+        includeUnapproved: true
       }
 
       const res = await adminAPI.getStores(params)
@@ -203,8 +205,9 @@ export default function Stores() {
       setIsAddOpen(false)
       fetchStores()
       fetchKPIs()
-    } catch (_) {
-      showToast("Failed to create store.", "error")
+    } catch (err) {
+      // the server says why (e.g. the store code is already used, a required field is missing)
+      showToast(err?.response?.data?.message || err?.response?.data?.error || "Failed to create store.", "error")
     }
   }
 
@@ -215,8 +218,8 @@ export default function Stores() {
       setIsEditOpen(false)
       fetchStores()
       fetchKPIs()
-    } catch (_) {
-      showToast("Failed to save changes.", "error")
+    } catch (err) {
+      showToast(err?.response?.data?.message || err?.response?.data?.error || "Failed to save changes.", "error")
     }
   }
 
@@ -482,6 +485,11 @@ export default function Stores() {
                       }`}>
                         {store.isActive ? "Active" : "Inactive"}
                       </span>
+                      {store.approvalStatus && store.approvalStatus !== "Approved" && (
+                        <span className="ml-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-amber-50 dark:bg-amber-950/20 text-amber-600" title="This store goes live after the super admin approves it (Store Approvals)">
+                          {store.approvalStatus === "Draft" ? "Not submitted" : store.approvalStatus}
+                        </span>
+                      )}
                     </td>
                     <td className="px-2.5 py-2 text-slate-400">
                       {getRelativeTime(store.updatedAt || store.createdAt)}

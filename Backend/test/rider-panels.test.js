@@ -50,7 +50,8 @@ after(async () => { await fx?.teardown(); });
 
 const leaks = (body) => {
     const text = JSON.stringify(body);
-    return [...Object.values(SECRET), 'push-token-secret'].filter((v) => text.includes(v))
+    // the selfie (profilePhoto) shows in the franchise list's Photo column; every other document stays out
+    return [...Object.values(SECRET).filter((v) => v !== SECRET.profilePhoto), 'push-token-secret'].filter((v) => text.includes(v))
         .concat(/aadhar|bankAccount|bankIfsc|panNumber|panPhoto|drivingLicense|upiId|upiQr|fcmToken/i.test(text) ? ['a document / bank field name'] : []);
 };
 
@@ -65,10 +66,10 @@ describe('super admin: the full signup record', () => {
         assert.ok(!JSON.stringify(d).includes('push-token-secret'));
         assert.equal((await fx.call('GET', '/v1/food/admin/delivery/not-an-id', fx.SA)).status, 404);
     });
-    test('store manager, rider and customer cannot open it; the franchise admin gets the masked verification view (rider-approval.test.js)', async () => {
+    test('store manager, rider and customer cannot open it; the franchise admin gets the verification view (rider-approval.test.js)', async () => {
         const riderToken = fx.tokenFor(oid(R.DeliveryBoy), 'DELIVERY_PARTNER');
         const fa = ok(await fx.call('GET', `/v1/food/admin/delivery/${R.DeliveryBoy}`, A.adminToken)).delivery;
-        assert.equal(fa.aadharNumber, 'XXXXXXXX9876');
+        assert.equal(fa.aadharNumber, SECRET.aadharNumber);
         assert.ok(!JSON.stringify(fa).includes(SECRET.bankAccountNumber) && !JSON.stringify(fa).includes('push-token-secret'));
         assert.equal((await fx.call('GET', `/v1/food/admin/delivery/${R.DeliveryBoy}`, B.adminToken)).status, 404);
         for (const token of [A.managerToken, riderToken, A.customerToken]) {
@@ -85,7 +86,14 @@ describe('the test rider (Delhi, offline, no GPS) near the Delhi store', () => {
         assert.deepEqual([by.DeliveryBoy.status, by.DeliveryBoy.area, by.DeliveryBoy.distanceFromStore], ['offline', 'Delhi', null]);
         assert.deepEqual([by.PendingDelhi.status, by.PendingDelhi.currentStatus], ['pending', 'pending']);
         assert.deepEqual(leaks(list), []);
-        assert.deepEqual(leaks(ok(await fx.call('GET', `/v1/store/rider/${R.DeliveryBoy}`, A.managerToken))), []);
+        // the manager's detail view: full contact, address and vehicle number, but no documents, ID numbers or bank details
+        const detail = ok(await fx.call('GET', `/v1/store/rider/${R.DeliveryBoy}`, A.managerToken));
+        const row = await mongoose.connection.collection('food_delivery_partners').findOne({ _id: oid(R.DeliveryBoy) });
+        assert.deepEqual([detail.mobile, detail.email, detail.address, detail.vehicleNumber, detail.profilePhoto], [row.phone, row.email, 'karol bagh', row.vehicleNumber, SECRET.profilePhoto]);
+        const text = JSON.stringify(detail);
+        for (const secret of [SECRET.aadharNumber, SECRET.panNumber, SECRET.drivingLicenseNumber, SECRET.aadharPhoto, SECRET.panPhoto, SECRET.drivingLicensePhoto, SECRET.bankAccountNumber, SECRET.bankIfscCode, SECRET.upiId, 'push-token-secret']) {
+            assert.ok(!text.includes(secret), `leaked ${secret}`);
+        }
     });
     test('Assign Rider offers only approved online riders: not the offline test rider, not the pending one', async () => {
         const avail = ok(await fx.call('GET', '/v1/store/delivery/available-riders', A.managerToken));

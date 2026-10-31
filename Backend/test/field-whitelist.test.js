@@ -106,6 +106,8 @@ describe('createStoreManager', () => {
             address: { line1: 'a', city: 'c', state: 's', pincode: '110001', coordinates: [77.2, 28.6] }, status: 'Active',
         });
         assert.equal(res.status, 201, JSON.stringify(res.body));
+        // an approved store: the manager of a store still waiting for approval cannot sign in (store-list-unapproved.test.js)
+        assert.equal((await fx.call('PATCH', `/v1/store-approvals/${res.body.data._id}/approve`, fx.SA, {})).status, 200);
         return res.body.data._id;
     };
     const create = (storeId, fields) => {

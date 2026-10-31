@@ -19,7 +19,7 @@ export default function RiderStatsCards({ riders = [] }) {
   const activeRidersWithTime = safeRiders.filter((r) => r.averageDeliveryTime > 0);
   const avgTime = activeRidersWithTime.length > 0
     ? (activeRidersWithTime.reduce((sum, r) => sum + r.averageDeliveryTime, 0) / activeRidersWithTime.length).toFixed(1)
-    : "0.0";
+    : null;
 
   const cards = [
     {
@@ -45,7 +45,7 @@ export default function RiderStatsCards({ riders = [] }) {
     },
     {
       title: "Avg Delivery Time",
-      value: `${avgTime} mins`,
+      value: avgTime == null ? "—" : `${avgTime} mins`,
       trend: "Store-wide dispatch SLA avg",
       icon: Clock,
       color: "text-blue-500 bg-blue-50 dark:bg-blue-950/10 border-blue-100 dark:border-blue-900/20"

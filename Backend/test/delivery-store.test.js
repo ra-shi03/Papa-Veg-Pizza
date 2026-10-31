@@ -118,7 +118,7 @@ describe('riders and orders', () => {
         const r1 = list.find((r) => r.name === 'Rider 1');
         assert.deepEqual(
             [r1.mobile, r1.vehicleType, r1.availability, r1.currentStatus, r1.currentOrderId, r1.activeOrders, r1.todayDeliveries, r1.averageDeliveryTime, r1.cancellationRate],
-            ['91******10', 'Bike', 'online', 'busy', O.road.ref, 1, 1, 30, 0],
+            ['9100000010', 'Bike', 'online', 'busy', O.road.ref, 1, 1, 30, 0],
         );
         assert.equal(list.find((r) => r.name === 'Rider 4').currentStatus, 'idle');
         assert.ok(!JSON.stringify(list).includes('password'));

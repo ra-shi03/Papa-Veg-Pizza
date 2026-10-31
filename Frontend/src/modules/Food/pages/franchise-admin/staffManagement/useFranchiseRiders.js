@@ -30,7 +30,8 @@ export function toFranchiseRiderRow(p) {
     vehicleType: p.vehicleType || "",
     // the small grey line under the vehicle type: the rider's area and when they were last seen (never a plate number)
     vehicleNumber: [p.zone, p.lastSeen ? `seen ${new Date(p.lastSeen).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""].filter(Boolean).join(" · "),
-    profileImage: "/rider_alex.webp",
+    // the rider's own selfie from signup; a placeholder only when none was uploaded
+    profileImage: p.profilePhoto || "/rider_alex.webp",
     rating: p.rating || 0,
     ordersToday: p.ordersToday || 0,
     totalOrders: p.totalOrders || 0,

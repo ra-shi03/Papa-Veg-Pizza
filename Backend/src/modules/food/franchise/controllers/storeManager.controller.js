@@ -36,11 +36,14 @@ export const createStoreManager = async (req, res) => {
     }
     // The store must exist and belong to the caller's franchise (a franchise admin must pick one)
     if (data.storeId || !isSuperAdmin(req.user)) {
-      const scopedStore = await findScopedStore(req, data.storeId, '_id franchiseId storeName');
+      const scopedStore = await findScopedStore(req, data.storeId, '_id franchiseId storeName approvalStatus');
       if (!scopedStore) {
         return res.status(400).json({ success: false, message: 'Choose a store from your franchise.' });
       }
       data.storeName = scopedStore.storeName || '';
+      // The manager of a store that is not approved yet cannot sign in: the store and its manager go for approval
+      // together (Store Approvals) and the manager is activated when the super admin approves the store.
+      if (scopedStore.approvalStatus !== 'Approved') data.status = 'Pending Approval';
     }
     // Validate store manager assignment
     if (data.storeId) {
@@ -163,7 +166,7 @@ export const getStoreManagers = async (req, res) => {
     
     const storeIds = managers.map(m => m.storeId).filter(id => id && id.length === 24);
     if (storeIds.length > 0) {
-      const stores = await mongoose.model('FoodStore').find({ _id: { $in: storeIds }, approvalStatus: 'Approved' })
+      const stores = await mongoose.model('FoodStore').find({ _id: { $in: storeIds } })
         .populate('franchiseId', 'name ownerName companyName')
         .lean();
         
@@ -179,7 +182,7 @@ export const getStoreManagers = async (req, res) => {
           m.franchiseOwnerName = store.franchiseId?.ownerName || 'Unknown';
           return true;
         }
-        return false; // Store is pending/unapproved
+        return false; // Store not found (deleted)
       });
     }
 
@@ -249,13 +252,20 @@ export const updateStoreManager = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Choose a store from your franchise.' });
     }
 
-    const manager = await StoreManager.findOneAndUpdate({ _id: req.params.id, ...(await managerScope(req)) }, data, {
+    let manager = await StoreManager.findOneAndUpdate({ _id: req.params.id, ...(await managerScope(req)) }, data, {
       new: true,
       runValidators: true,
     });
     if (!manager) return res.status(404).json({ success: false, message: 'Not found' });
 
-    if (data.status && manager.userId) {
+    // A manager whose store is not approved stays "Pending Approval" and cannot sign in, whatever status is sent
+    const managedStore = manager.storeId && mongoose.Types.ObjectId.isValid(manager.storeId)
+      ? await mongoose.model('FoodStore').findById(manager.storeId).select('approvalStatus').lean()
+      : null;
+    if (managedStore && managedStore.approvalStatus !== 'Approved' && manager.status !== 'DELETED') {
+      if (manager.status !== 'Pending Approval') manager = await StoreManager.findByIdAndUpdate(manager._id, { status: 'Pending Approval' }, { new: true });
+      if (manager.userId) await FoodUser.findByIdAndUpdate(manager.userId, { isActive: false });
+    } else if (data.status && manager.userId) {
       await FoodUser.findByIdAndUpdate(manager.userId, {
         isActive: data.status === 'Active'
       });

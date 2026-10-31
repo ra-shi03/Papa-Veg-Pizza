@@ -25,4 +25,6 @@ storeDeliveryRouter.patch('/delivery/issues/:id', c.updateIssue);
 
 // Delivery app: service zones around the rider (GET /v1/food/zones/nearby)
 export const zonesRouter = express.Router();
+// Public, read only: the service-area polygons the delivery map draws (no riders, stores or customers)
+zonesRouter.get('/public', c.publicZones);
 zonesRouter.get('/nearby', authMiddleware, requireRoles('DELIVERY_PARTNER'), c.nearbyZones);

@@ -30,7 +30,7 @@ describe('route sweep: every route is guarded, or reviewed as public / sign-in-o
         assert.deepEqual(reviewed.authOnlyRoutes.filter((r) => !routes.includes(r)), []);
     });
     test('the routes of Features 1-6 are all behind authMiddleware and a role guard', () => {
-        const mine = /^\/api\/v1\/(food\/store\/|tasks|store\/|admin\/dashboard|complaints|store-performance|operating-hours|stores\/:id\/(hours|status|performance)|store-pricing|bulk-price-update|copy-pricing|price-history|orders$|inventory$|reviews$|users$|food\/zones|food\/franchise)/;
+        const mine = /^\/api\/v1\/(food\/store\/|tasks|store\/|admin\/dashboard|complaints|store-performance|operating-hours|stores\/:id\/(hours|status|performance)|store-pricing|bulk-price-update|copy-pricing|price-history|orders$|inventory$|reviews$|users$|food\/zones(?!\/public)|food\/franchise)/;
         const rows = listRoutes(app).filter((r) => mine.test(r.path));
         assert.ok(rows.length > 150, `found ${rows.length}`);
         for (const r of rows) {

@@ -63,7 +63,7 @@ const storeManagerSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Active', 'On Leave', 'Suspended', 'DELETED'],
+    enum: ['Active', 'On Leave', 'Suspended', 'Pending Approval', 'DELETED'],
     default: 'Active',
   },
   storeId: {

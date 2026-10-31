@@ -13,6 +13,7 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
     email: "",
     phone: "",
     password: "",
+    confirmPassword: "",
     employeeCode: "",
     joinedDate: "",
     status: "Active",
@@ -34,6 +35,7 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
           email: manager.email || "",
           phone: manager.phone || "",
           password: "••••••••", // Hidden for edit
+          confirmPassword: "",
           employeeCode: manager.employeeCode || "",
           joinedDate: manager.joinedDate || "",
           status: manager.status || "Active",
@@ -50,6 +52,7 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
           email: "",
           phone: "",
           password: "",
+          confirmPassword: "",
           employeeCode: "",
           joinedDate: new Date().toISOString().split("T")[0],
           status: "Active",
@@ -64,7 +67,8 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
       
       // Fetch Stores and Territories
       Promise.allSettled([
-        adminAPI.getStores(),
+        // every store of the franchise, including ones still waiting for approval, so a manager can be set up in advance
+        adminAPI.getStores({ includeUnapproved: true }),
         apiClient.get('/food/admin/territories')
       ]).then(([storesRes, territoriesRes]) => {
         let stores = [];
@@ -134,6 +138,10 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
     if (!isEditMode && !formData.password.trim()) {
       newErrors.password = "Password is required"
     }
+    if (!isEditMode) {
+      if (!formData.confirmPassword) newErrors.confirmPassword = "Please confirm the password"
+      else if (formData.confirmPassword !== formData.password) newErrors.confirmPassword = "Passwords do not match"
+    }
     if (!formData.employeeCode.trim()) {
       newErrors.employeeCode = "Employee ID is required"
     }
@@ -154,8 +162,10 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
       return
     }
 
+    // the confirmation is only checked here, never sent
+    const { confirmPassword, ...rest } = formData
     const payload = {
-      ...formData,
+      ...rest,
       salary: parseFloat(formData.salary),
       profileImage: profilePreview,
       profileImageFile: formData.profileImageFile // File object for the API service
@@ -300,6 +310,21 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
                   </div>
                 </div>
 
+                {!isEditMode && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Confirm Password</label>
+                    <input
+                      type="password"
+                      name="confirmPassword"
+                      value={formData.confirmPassword}
+                      onChange={handleInputChange}
+                      className="w-full text-xs font-semibold px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 focus:outline-none"
+                      placeholder="Re-enter the password"
+                    />
+                    {errors.confirmPassword && <p className="text-[9px] font-bold text-red-500">{errors.confirmPassword}</p>}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Employee ID</label>
@@ -392,6 +417,11 @@ export default function AddEditManagerModal({ isOpen, onClose, onConfirm, manage
                       ))}
                     </select>
                     {errors.storeId && <p className="text-[9px] font-bold text-red-500">{errors.storeId}</p>}
+                    {!isEditMode && (
+                      <p className="text-[9px] font-semibold text-zinc-400">
+                        If the store is not approved yet, this manager is saved as "Pending Approval" and can sign in once the store is approved. Then submit the store on Store Approvals.
+                      </p>
+                    )}
                   </div>
                 </div>
 

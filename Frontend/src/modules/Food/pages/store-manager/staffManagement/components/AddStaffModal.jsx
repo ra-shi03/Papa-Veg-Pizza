@@ -39,6 +39,7 @@ const staffSchema = z.object({
   email: z.string().email("Invalid email address"),
   phone: z.string().regex(/^(?:\+91)?(?:[6-9]\d{9})$/, "Invalid Indian phone number. Enter 10 digits."),
   password: z.string().min(8, "Password must be at least 8 characters"),
+  confirmPassword: z.string().min(1, "Please confirm the password"),
   role: z.enum(["Kitchen Supervisor", "Pizza Maker", "Baker", "Packager"], {
     errorMap: () => ({ message: "Please select a valid role" })
   }),
@@ -55,6 +56,9 @@ const staffSchema = z.object({
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
   address: z.string().min(1, "Residential address is required"),
+}).refine((d) => d.password === d.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
 });
 
 export default function AddStaffModal({ isOpen, onClose }) {
@@ -99,6 +103,7 @@ export default function AddStaffModal({ isOpen, onClose }) {
       email: "",
       phone: "",
       password: "",
+      confirmPassword: "",
       role: "Pizza Maker",
       experience: 0,
       salaryType: "Monthly",
@@ -122,6 +127,7 @@ export default function AddStaffModal({ isOpen, onClose }) {
         email: "",
         phone: "",
         password: "",
+        confirmPassword: "",
         role: "Pizza Maker",
         experience: 0,
         salaryType: "Monthly",
@@ -176,8 +182,10 @@ export default function AddStaffModal({ isOpen, onClose }) {
 
   const onSubmit = async (data) => {
     try {
+      // the confirmation is only checked here, never sent
+      const { confirmPassword, ...staff } = data;
       await createStaffMutation.mutateAsync({
-        ...data,
+        ...staff,
         profileImage,
         skills: selectedSkills,
         weeklyWorkingDays,
@@ -363,6 +371,24 @@ export default function AddStaffModal({ isOpen, onClose }) {
                     </span>
                   )}
                 </div>
+              </div>
+
+              {/* Confirm Password */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black tracking-wider text-zinc-500 dark:text-zinc-450 uppercase">
+                  CONFIRM PASSWORD
+                </label>
+                <input
+                  type="password"
+                  placeholder="Re-enter the password"
+                  {...register("confirmPassword")}
+                  className="w-full h-11 px-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs font-semibold bg-zinc-50/60 dark:bg-zinc-950 text-slate-800 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-primary transition-all"
+                />
+                {errors.confirmPassword && (
+                  <span className="text-[10px] font-bold text-red-650 flex items-center gap-0.5 mt-0.5">
+                    <AlertCircle size={10} /> {errors.confirmPassword.message}
+                  </span>
+                )}
               </div>
 
               {/* Employee ID & Joining Date */}

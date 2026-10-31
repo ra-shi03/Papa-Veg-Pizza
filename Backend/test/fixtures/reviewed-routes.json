@@ -44,6 +44,7 @@
     "GET /api/v1/food/stores/:id",
     "GET /api/v1/food/stores/resolve",
     "GET /api/v1/food/stores/slots",
+    "GET /api/v1/food/zones/public",
     "GET /api/v1/health",
     "GET /api/v1/landing/settings/public",
     "GET /api/v1/order-methods",

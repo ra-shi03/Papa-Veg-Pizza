@@ -81,6 +81,9 @@ export const getStoreApprovals = async (req, res) => {
         status: store.approvalStatus,
         managerId: manager ? manager._id : null,
         managerName: manager ? (manager.name || 'Not Assigned') : 'Not Assigned',
+        managerEmail: manager ? manager.email : '',
+        managerPhone: manager ? manager.phone : '',
+        managerStatus: manager ? manager.status : '',
         phone: manager ? manager.phone : store.phone,
         email: manager ? manager.email : store.email,
         documents: store.documents || []
@@ -159,6 +162,11 @@ export const submitStoreApproval = async (req, res) => {
     
     if (store.approvalStatus !== 'Draft' && store.approvalStatus !== 'Rejected' && store.approvalStatus !== 'Changes Requested') {
       return res.status(400).json({ success: false, message: `Cannot submit store with status ${store.approvalStatus}` });
+    }
+    // The store goes for approval together with its manager: create the store, then its manager, then submit
+    const manager = await StoreManager.exists({ storeId: String(store._id), status: { $ne: 'DELETED' } });
+    if (!manager) {
+      return res.status(400).json({ success: false, message: 'Create a store manager for this store first (Store Managers > Register New Store Manager), then submit it for approval.' });
     }
     
     store.approvalStatus = 'Pending';
@@ -246,6 +254,16 @@ export const uploadStoreDocuments = async (req, res) => {
   }
 };
 
+/**
+ * A store's team can sign in only while the store is approved: approval lets them in, and a rejection or a request for
+ * changes (also on a store that was already approved) signs them out at once until it is approved again.
+ */
+const moveStoreTeam = async (store, from, to) => {
+  const team = await StoreManager.find({ storeId: String(store._id), status: from }).select('userId').lean();
+  await StoreManager.updateMany({ _id: { $in: team.map((m) => m._id) } }, { status: to });
+  await FoodUser.updateMany({ _id: { $in: team.map((m) => m.userId).filter(Boolean) } }, { isActive: to === 'Active' });
+};
+
 export const approveStoreApproval = async (req, res) => {
   try {
     const storeId = req.params.id;
@@ -262,6 +280,9 @@ export const approveStoreApproval = async (req, res) => {
     store.isActive = true;
     store.approvedAt = new Date();
     await store.save();
+
+    // The store's manager (created while the store was waiting for approval) can sign in from now on
+    await moveStoreTeam(store, 'Pending Approval', 'Active');
     
     // Create Manager and User if credentials provided
     if (adminName && adminEmail && adminPhone) {
@@ -358,6 +379,7 @@ export const rejectStoreApproval = async (req, res) => {
     store.rejectionReason = reason;
     store.rejectionNotes = notes;
     await store.save();
+    await moveStoreTeam(store, 'Active', 'Pending Approval');
     
     res.status(200).json({
       success: true,
@@ -384,6 +406,7 @@ export const requestChangesStoreApproval = async (req, res) => {
     store.changesNotes = notes;
     if (deadline) store.changesDeadline = new Date(deadline);
     await store.save();
+    await moveStoreTeam(store, 'Active', 'Pending Approval');
     
     res.status(200).json({
       success: true,

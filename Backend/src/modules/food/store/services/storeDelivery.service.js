@@ -43,6 +43,8 @@ export async function deliveryContext(user, query = {}, { write = false } = {}) 
     if (role === 'FRANCHISE_ADMIN') {
       if (!isId(user.franchiseId)) throw new ForbiddenError('No franchise is linked to your account.');
       filter.franchiseId = toId(user.franchiseId);
+      // a Draft store (anywhere the franchise admin puts it) does not open up the riders near it
+      filter.approvalStatus = 'Approved';
     }
     store = await FoodStore.findOne(filter).select('_id franchiseId storeName latitude longitude address city state phone').lean();
   } else {
@@ -53,8 +55,8 @@ export async function deliveryContext(user, query = {}, { write = false } = {}) 
   return { user, role, store, storeId: store._id, franchiseId: store.franchiseId, canWrite };
 }
 
-// The only rider fields the store panel reads: never documents, bank details, Aadhaar / PAN or the full phone.
-const RIDER_FIELDS = 'name phone vehicleType status availabilityStatus city state lastLocation lastLocationAt rating totalDeliveries approvedAt createdAt updatedAt';
+// The only rider fields the store panel reads: never documents, bank details or Aadhaar / PAN. Who gets the full phone: seesFullPhone.
+const RIDER_FIELDS = 'name phone totalRatings email address vehicleName vehicleNumber profilePhoto vehicleType status availabilityStatus city state lastLocation lastLocationAt rating totalDeliveries approvedAt createdAt updatedAt';
 
 /**
  * Riders a store sees (approved and pending): the store's own riders, plus riders of its franchise or of the shared
@@ -153,10 +155,13 @@ const kmFrom = (area, p) => {
   return d == null ? null : round1(d);
 };
 
-const toRider = (p, s = {}, area = {}) => ({
+/** The store manager and the super admin see riders' full phone numbers (they call them); others a masked one. */
+const seesFullPhone = (ctx) => ctx.canWrite || ctx.role === 'SUPERADMIN' || ctx.role === 'SUPER_ADMIN';
+
+const toRider = (p, s = {}, area = {}, fullPhone = false) => ({
   _id: String(p._id),
   name: p.name,
-  mobile: maskPhone(p.phone),
+  mobile: fullPhone ? p.phone : maskPhone(p.phone),
   vehicleType: p.vehicleType || '',
   joiningDate: new Date(p.approvedAt || p.createdAt).toISOString().slice(0, 10),
   rating: p.rating || 0,
@@ -168,10 +173,12 @@ const toRider = (p, s = {}, area = {}) => ({
   currentStatus: isPending(p) ? 'pending' : s.active ? 'busy' : 'idle',
   currentOrderId: s.current || null,
   lastSeen: p.lastLocationAt || p.updatedAt,
-  lastActive: p.lastLocationAt || p.updatedAt,
+  lastActive: p.lastLocationAt || null, // the last GPS fix: nothing else counts as "active"
   totalDeliveries: Math.max(p.totalDeliveries || 0, s.delivered || 0),
-  averageDeliveryTime: s.takeN ? Math.round(s.takeSum / s.takeN) : 0,
-  cancellationRate: s.total ? round1((s.cancelled / s.total) * 100) : 0,
+  // null = nothing to measure yet (the screens show a dash, not a made-up zero)
+  averageDeliveryTime: s.takeN ? Math.round(s.takeSum / s.takeN) : null,
+  cancellationRate: s.total ? round1((s.cancelled / s.total) * 100) : null,
+  ratingCount: p.totalRatings || 0,
   customerRatings: p.rating || 0,
   todayDeliveries: s.today || 0,
   activeOrders: s.active || 0,
@@ -183,13 +190,28 @@ export async function listRiders(user, q = {}) {
   const { area, filter } = await riderScope(ctx.store);
   const partners = await FoodDeliveryPartner.find(filter).select(RIDER_FIELDS).sort({ name: 1 }).limit(300).lean();
   const stats = await riderStats(partners.map((p) => p._id));
-  return partners.map((p) => toRider(p, stats.get(String(p._id)), area));
+  return partners.map((p) => toRider(p, stats.get(String(p._id)), area, seesFullPhone(ctx)));
 }
 
+/**
+ * One rider's details for the store: everything the store needs to work with the rider (contact, address, vehicle,
+ * selfie, status, performance) except the documents: no ID card / licence / PAN images or numbers, no bank details.
+ * The store manager and the super admin get the full phone; a supervisor or franchise admin a masked one.
+ */
 export async function riderDetails(user, riderId, q = {}) {
   const ctx = await deliveryContext(user, q);
   const { _area, ...p } = await findRider(ctx, riderId);
-  return toRider(p, (await riderStats([p._id])).get(String(p._id)), _area);
+  const row = toRider(p, (await riderStats([p._id])).get(String(p._id)), _area, seesFullPhone(ctx));
+  return {
+    ...row,
+    email: p.email || '',
+    address: p.address || '',
+    city: p.city || '',
+    state: p.state || '',
+    vehicleName: p.vehicleName || '',
+    vehicleNumber: p.vehicleNumber || '',
+    profilePhoto: p.profilePhoto || null,
+  };
 }
 
 /**
@@ -205,7 +227,7 @@ export async function availableRiders(user, q = {}) {
     const active = stats.get(String(p._id))?.active || 0;
     const km = kmFrom(area, p);
     return {
-      _id: String(p._id), name: p.name, mobile: maskPhone(p.phone), vehicleType: p.vehicleType || '', currentStatus: 'online',
+      _id: String(p._id), name: p.name, mobile: seesFullPhone(ctx) ? p.phone : maskPhone(p.phone), vehicleType: p.vehicleType || '', currentStatus: 'online',
       status: 'online', area: riderAreaOf(p), lastSeen: p.lastLocationAt || p.updatedAt,
       activeOrders: active, availability: active ? 'busy' : 'idle', rating: p.rating || 0,
       distanceFromStore: km ?? 0, _known: km != null,
@@ -579,6 +601,17 @@ function edgeDistanceKm(lat, lng, polygon) {
     best = Math.min(best, Math.hypot(ax + t * dx, ay + t * dy));
   }
   return best;
+}
+
+/** GET /v1/food/zones/public : the active service zones for the delivery map. Display data only: id, name, area and the polygon. */
+export async function publicZones() {
+  const zones = await FoodZone.find({ isActive: true }).select('name zoneName serviceLocation coordinates').sort({ name: 1 }).lean();
+  return {
+    zones: zones.map((z) => ({
+      _id: String(z._id), name: z.zoneName || z.name, serviceLocation: z.serviceLocation || '',
+      coordinates: (z.coordinates || []).map((c) => ({ latitude: c.latitude, longitude: c.longitude })),
+    })),
+  };
 }
 
 export async function nearbyZones(q = {}) {

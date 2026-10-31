@@ -175,8 +175,9 @@ export default function StoreApprovals() {
       setSelectedApproval(null)
       fetchApprovals()
       fetchKPIs()
-    } catch (_) {
-      showToast("Failed to submit the store. Please try again.", "error")
+    } catch (err) {
+      // e.g. "Create a store manager for this store first"
+      showToast(err?.response?.data?.message || "Failed to submit the store. Please try again.", "error")
     }
   }
 

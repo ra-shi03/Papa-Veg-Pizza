@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react"
 import {
-  Search, Plus, Download, Upload, RefreshCw, MoreVertical, Star,
+  Search, Plus, Download, Upload, RefreshCw, MoreVertical, Star, XCircle,
   SlidersHorizontal, Trash2, Eye, Shield, Clock, Calendar,
   ChevronLeft, ChevronRight, TrendingUp, Users, AlertCircle,
   Building2, Truck, Wallet, Compass, CheckCircle2, ShieldAlert,
@@ -21,6 +21,7 @@ import RiderPerformanceModal from "./components/RiderPerformanceModal"
 // Import Mock Data
 import { initialDeliveryPartners, initialStores, getDeliveryPartnerDashboardStats } from "./mockManagersData"
 import useFranchiseRiders, { riderKpis } from "./useFranchiseRiders"
+import { adminAPI } from "@food/api"
 import RiderVerificationDrawer from "./components/RiderVerificationDrawer"
 import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
@@ -29,6 +30,7 @@ export default function DeliveryPartners() {
   // Real riders near this franchise's stores (server); the sample list and its stats only run with VITE_STANDALONE_MOCK=true
   const { riders, setRiders, stores: realStores, error: loadError, reload: reloadRiders } = useFranchiseRiders(initialDeliveryPartners)
   const [verifyRiderId, setVerifyRiderId] = useState(null)
+  const [verifyMode, setVerifyMode] = useState(null) // opens the drawer straight on the reject / suspend reason box
   const storeList = STANDALONE_MOCK ? initialStores : realStores
   const [kpis, setKpis] = useState(STANDALONE_MOCK ? getDeliveryPartnerDashboardStats(initialDeliveryPartners) : riderKpis([]))
   const [filteredRiders, setFilteredRiders] = useState([])
@@ -238,10 +240,21 @@ export default function DeliveryPartners() {
   // admin approves / rejects pending riders and suspends / activates approved ones. Riders sign up (and edit their own
   // details) in the delivery app, so adding, deleting, wallet and live tracking are not done here.
   const notAvailable = () => showToast("Not available here: delivery partners sign up and keep their details in the delivery app. Open a rider to approve, reject, suspend or activate.", "warning")
+  const callServer = async (call, message, type = "success") => {
+    try {
+      await call()
+      showToast(message, type)
+      reloadRiders()
+    } catch (err) {
+      showToast(err?.response?.data?.message || err?.response?.data?.error || err?.message || "That did not work", "error")
+    }
+  }
+  const approveNow = (rider) => callServer(() => adminAPI.approveDeliveryPartner(rider.id), `${rider.name} is approved`)
+  const activateNow = (rider) => callServer(() => adminAPI.activateDeliveryPartner(rider.id), `${rider.name} is active again`)
   const VERIFY_SETTERS = [setIsViewOpen, setIsDocumentsOpen, setIsPerformanceOpen, setIsSuspendOpen, setIsAddEditOpen]
   const openModal = (setter, rider) => {
     if (STANDALONE_MOCK) return setter(true)
-    if (rider && VERIFY_SETTERS.includes(setter)) return setVerifyRiderId(rider.id)
+    if (rider && VERIFY_SETTERS.includes(setter)) { setVerifyMode(null); return setVerifyRiderId(rider.id) }
     return notAvailable()
   }
 
@@ -874,92 +887,36 @@ export default function DeliveryPartners() {
                                 {rider.status}
                               </span>
                             </td>
-                            <td className="px-3 py-2 text-right relative">
-                              <button
-                                onClick={() => setActiveMenuId(activeMenuId === rider.id ? null : rider.id)}
-                                className="p-1 rounded-md text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors cursor-pointer"
-                              >
-                                <MoreVertical className="w-4 h-4" />
-                              </button>
-
-                              {activeMenuId === rider.id && (
-                                <>
-                                  <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-                                  <div className="absolute right-4 mt-1 w-44 bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-xl shadow-xl z-20 overflow-hidden divide-y divide-zinc-100 dark:divide-zinc-850 text-left">
-                                    <div className="py-1">
-                                      <button
-                                        onClick={() => { setSelectedRider(rider); setDrawerTab("profile"); openModal(setIsViewOpen, rider); setActiveMenuId(null); }}
-                                        className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
-                                      >
-                                        <Eye className="w-3.5 h-3.5 text-zinc-400" />
-                                        View Drawer
-                                      </button>
-                                      <button
-                                        onClick={() => { setSelectedRider(rider); openModal(setIsAddEditOpen, rider); setActiveMenuId(null); }}
-                                        className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
-                                      >
-                                        <Clock className="w-3.5 h-3.5 text-zinc-400" />
-                                        Edit Profile
-                                      </button>
-                                      <button
-                                        onClick={() => { setSelectedRider(rider); openModal(setIsDocumentsOpen, rider); setActiveMenuId(null); }}
-                                        className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
-                                      >
-                                        <Shield className="w-3.5 h-3.5 text-zinc-400" />
-                                        Verify Documents
-                                      </button>
-                                    </div>
-                                    
-                                    <div className="py-1">
-                                      <button
-                                        onClick={() => { setSelectedRider(rider); openModal(setIsPerformanceOpen, rider); setActiveMenuId(null); }}
-                                        className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
-                                      >
-                                        <TrendingUp className="w-3.5 h-3.5 text-zinc-400" />
-                                        Performance Charts
-                                      </button>
-                                      <button
-                                        onClick={() => { setSelectedRider(rider); setDrawerTab("attendance"); openModal(setIsViewOpen, rider); setActiveMenuId(null); }}
-                                        className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
-                                      >
-                                        <Calendar className="w-3.5 h-3.5 text-zinc-400" />
-                                        Attendance Logs
-                                      </button>
-                                      <button
-                                        onClick={() => { setSelectedRider(rider); openModal(setIsWalletOpen, rider); setActiveMenuId(null); }}
-                                        className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
-                                      >
-                                        <Wallet className="w-3.5 h-3.5 text-zinc-400" />
-                                        Wallet Payouts
-                                      </button>
-                                      <button
-                                        onClick={() => { setSelectedRider(rider); openModal(setIsLiveOpen, rider); setActiveMenuId(null); }}
-                                        className="w-full px-4 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5"
-                                      >
-                                        <Compass className="w-3.5 h-3.5 text-zinc-400" />
-                                        Live GPS Tracking
-                                      </button>
-                                    </div>
-
-                                    <div className="py-1">
-                                      <button
-                                        onClick={() => { setSelectedRider(rider); openModal(setIsSuspendOpen, rider); setActiveMenuId(null); }}
-                                        className="w-full px-4 py-1.5 text-xs text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-955/20 flex items-center gap-1.5 font-bold"
-                                      >
-                                        <Ban className="w-3.5 h-3.5 text-amber-500" />
-                                        Suspend Rider
-                                      </button>
-                                      <button
-                                        onClick={() => { setSelectedRider(rider); openModal(setIsDeleteOpen, rider); setActiveMenuId(null); }}
-                                        className="w-full px-4 py-1.5 text-xs text-red-650 hover:bg-red-50 dark:hover:bg-red-950/20 flex items-center gap-1.5 font-bold"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                                        Delete Rider
-                                      </button>
-                                    </div>
-                                  </div>
-                                </>
-                              )}
+                            <td className="px-3 py-2 text-right">
+                              {/* Buttons shown directly (no three-dots menu). With the server: view, verify (approve / reject) and
+                                  suspend / activate, all in the verification drawer. The extra sample-data actions are mock only. */}
+                              <div className="flex items-center justify-end gap-1">
+                                {[
+                                  { key: "view", title: "View details", Icon: Eye, cls: "text-blue-600 border-blue-200 hover:bg-blue-50", run: () => { setSelectedRider(rider); setDrawerTab("profile"); openModal(setIsViewOpen, rider) } },
+                                  { key: "verify", title: rider.status === "Pending approval" ? "Verify documents, approve or reject" : "Verify documents", Icon: Shield, cls: "text-emerald-600 border-emerald-200 hover:bg-emerald-50", run: () => { setSelectedRider(rider); openModal(setIsDocumentsOpen, rider) } },
+                                  ...(!STANDALONE_MOCK ? [
+                                    { key: "approve", title: "Approve", Icon: CheckCircle2, cls: "text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100", hide: rider.status !== "Pending approval", run: () => approveNow(rider) },
+                                    { key: "reject", title: "Reject (a reason is required)", Icon: XCircle, cls: "text-rose-700 border-rose-300 bg-rose-50 hover:bg-rose-100", hide: rider.status !== "Pending approval", run: () => { setVerifyMode("reject"); setVerifyRiderId(rider.id) } },
+                                    { key: "suspend-now", title: rider.status === "Suspended" ? "Activate rider" : "Suspend rider", Icon: rider.status === "Suspended" ? UserCheck : Ban, cls: "text-amber-700 border-amber-300 bg-amber-50 hover:bg-amber-100", hide: rider.status === "Pending approval", run: () => rider.status === "Suspended" ? activateNow(rider) : (setVerifyMode("suspend"), setVerifyRiderId(rider.id)) },
+                                  ] : [{ key: "suspend", title: rider.status === "Suspended" ? "Activate rider" : "Suspend rider", Icon: rider.status === "Suspended" ? UserCheck : Ban, cls: "text-amber-600 border-amber-200 hover:bg-amber-50", hide: rider.status === "Pending approval", run: () => { setSelectedRider(rider); openModal(setIsSuspendOpen, rider) } }]),
+                                  ...(STANDALONE_MOCK ? [
+                                    { key: "edit", title: "Edit profile", Icon: Clock, cls: "text-zinc-600 border-zinc-200 hover:bg-zinc-50", run: () => { setSelectedRider(rider); openModal(setIsAddEditOpen, rider) } },
+                                    { key: "perf", title: "Performance charts", Icon: TrendingUp, cls: "text-zinc-600 border-zinc-200 hover:bg-zinc-50", run: () => { setSelectedRider(rider); openModal(setIsPerformanceOpen, rider) } },
+                                    { key: "wallet", title: "Wallet payouts", Icon: Wallet, cls: "text-zinc-600 border-zinc-200 hover:bg-zinc-50", run: () => { setSelectedRider(rider); openModal(setIsWalletOpen, rider) } },
+                                    { key: "live", title: "Live GPS tracking", Icon: Compass, cls: "text-zinc-600 border-zinc-200 hover:bg-zinc-50", run: () => { setSelectedRider(rider); openModal(setIsLiveOpen, rider) } },
+                                    { key: "delete", title: "Delete rider", Icon: Trash2, cls: "text-red-600 border-red-200 hover:bg-red-50", run: () => { setSelectedRider(rider); openModal(setIsDeleteOpen, rider) } },
+                                  ] : []),
+                                ].filter((b) => !b.hide).map(({ key, title, Icon, cls, run }) => (
+                                  <button
+                                    key={key}
+                                    onClick={run}
+                                    title={title}
+                                    className={`p-1.5 rounded-lg border bg-white dark:bg-zinc-900 transition-colors cursor-pointer ${cls}`}
+                                  >
+                                    <Icon className="w-3.5 h-3.5" />
+                                  </button>
+                                ))}
+                              </div>
                             </td>
                           </tr>
                         )
@@ -1103,7 +1060,8 @@ export default function DeliveryPartners() {
       <RiderVerificationDrawer
         isOpen={!!verifyRiderId}
         riderId={verifyRiderId}
-        onClose={() => setVerifyRiderId(null)}
+        initialMode={verifyMode}
+        onClose={() => { setVerifyRiderId(null); setVerifyMode(null) }}
         onChanged={(what) => { showToast(`Delivery partner ${what}.`, what === "rejected" || what === "suspended" ? "warning" : "success"); reloadRiders() }}
       />
 

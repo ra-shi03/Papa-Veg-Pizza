@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { adminAPI } from "@food/api";
 import { Search, Eye, CheckCircle, XCircle, ChevronLeft, ChevronRight, SlidersHorizontal, RefreshCw, AlertCircle, FileEdit, Clock, Calendar, CheckSquare } from "lucide-react";
 
 export default function FranchiseApprovalsData({
@@ -24,6 +25,19 @@ export default function FranchiseApprovalsData({
   const [filterEmail, setFilterEmail] = useState("");
   const [filterPhone, setFilterPhone] = useState("");
   const [filterFranchiseName, setFilterFranchiseName] = useState("");
+  // The franchise filter lists the franchises that exist and are active (from the server)
+  const [franchiseOptions, setFranchiseOptions] = useState([]);
+  useEffect(() => {
+    let alive = true;
+    adminAPI.getFranchises({ status: "ACTIVE" })
+      .then((res) => {
+        const list = Array.isArray(res?.data?.data) ? res.data.data : [];
+        const names = [...new Set(list.filter((f) => f.isActive !== false).map((f) => f.name || f.companyName).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+        if (alive) setFranchiseOptions(names);
+      })
+      .catch(() => { if (alive) setFranchiseOptions([]); });
+    return () => { alive = false; };
+  }, []);
   const [filterStatus, setFilterStatus] = useState("");
 
   // Debounce hook search query (400ms delay)
@@ -65,7 +79,7 @@ export default function FranchiseApprovalsData({
     const matchesCompany = !filterCompany || app.storeName?.toLowerCase().includes(filterCompany.toLowerCase());
     const matchesEmail = !filterEmail || app.email?.toLowerCase().includes(filterEmail.toLowerCase());
     const matchesPhone = !filterPhone || app.phone?.toLowerCase().includes(filterPhone.toLowerCase());
-    const matchesFranchiseName = !filterFranchiseName || (app.franchiseName || "").toLowerCase().includes(filterFranchiseName.toLowerCase());
+    const matchesFranchiseName = !filterFranchiseName || (app.franchiseName || "").toLowerCase() === filterFranchiseName.toLowerCase();
     const matchesStatus = !filterStatus || app.status === filterStatus;
 
     return (
@@ -209,13 +223,16 @@ export default function FranchiseApprovalsData({
           </div>
           <div>
             <label className="text-[10px] font-bold text-black dark:text-zinc-300 uppercase tracking-wide">Franchise Name</label>
-            <input
-              type="text"
+            <select
               value={filterFranchiseName}
               onChange={(e) => setFilterFranchiseName(e.target.value)}
-              className="mt-1 w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 rounded-md text-xs text-black dark:text-zinc-200 outline-none focus:border-[var(--primary)] font-semibold"
-              placeholder="e.g. Papa Veg"
-            />
+              className="mt-1 w-full px-2 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 rounded-md text-xs text-black dark:text-zinc-200 outline-none focus:border-[var(--primary)] font-semibold"
+            >
+              <option value="">All Franchises</option>
+              {franchiseOptions.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="text-[10px] font-bold text-black dark:text-zinc-300 uppercase tracking-wide">Status</label>

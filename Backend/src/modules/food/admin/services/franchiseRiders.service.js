@@ -12,9 +12,9 @@ import { approveDeliveryPartner, rejectDeliveryPartner } from './admin.service.j
 // Near = the store panel's rule (store/services/nearby.js via riderScope, NEARBY_RADIUS_KM). Working for = riders who
 // have an order of this franchise. The franchise comes from the token; ?storeId= narrows to one of its own stores
 // (another franchise's store is 404). Only the fields below leave the server: never documents, bank details,
-// Aadhaar / PAN, the email, the photo or the full phone.
+// Aadhaar / PAN, the email or the full phone. Full ID numbers exist only in the one-rider verification view below.
 
-const FIELDS = 'name phone vehicleType status availabilityStatus city state lastLocationAt rating totalDeliveries createdAt updatedAt franchiseId';
+const FIELDS = 'name phone profilePhoto vehicleType status availabilityStatus city state lastLocationAt rating totalDeliveries createdAt updatedAt franchiseId';
 const MANAGEABLE = ['pending', 'approved', 'suspended'];
 const conflict = (message) => Object.assign(new Error(message), { name: 'ConflictError', statusCode: 409 });
 
@@ -23,10 +23,11 @@ const conflict = (message) => Object.assign(new Error(message), { name: 'Conflic
  *   - riders this franchise claimed (approved first) or that are assigned to it or to one of its stores, anywhere;
  *   - unclaimed riders (no franchise, no store) near one of its stores: saved GPS within NEARBY_RADIUS_KM, or the same
  *     city / zone when they have no GPS (store/services/nearby.js).
- * Riders claimed by another franchise never match. The franchise comes from the token only.
+ * Riders claimed by another franchise never match. The franchise comes from the token only. Only approved stores count:
+ * a franchise admin can create a Draft store anywhere, and that must not open up the riders (and their ID numbers) there.
  */
 export async function franchiseRiderFilter(franchiseId, { stores, statuses = MANAGEABLE } = {}) {
-  const own = stores || await FoodStore.find({ franchiseId }).select('_id').lean();
+  const own = stores || await FoodStore.find({ franchiseId, approvalStatus: 'Approved' }).select('_id').lean();
   const or = [{ franchiseId }];
   if (own.length) or.push({ storeId: { $in: own.map((s) => s._id) } });
   for (const s of own) {
@@ -39,7 +40,7 @@ const isId = (v) => mongoose.Types.ObjectId.isValid(String(v || '')) && /^[a-f0-
 const oid = (v) => new mongoose.Types.ObjectId(String(v));
 
 export async function franchiseDeliveryPartners(scope, query = {}) {
-  let stores = await FoodStore.find({ franchiseId: scope.franchiseId }).select('_id storeName franchiseId').sort({ storeName: 1 }).lean();
+  let stores = await FoodStore.find({ franchiseId: scope.franchiseId, approvalStatus: 'Approved' }).select('_id storeName franchiseId').sort({ storeName: 1 }).lean();
   if (query.storeId) {
     if (!isId(query.storeId) || !stores.some((s) => String(s._id) === String(query.storeId))) throw new NotFoundError('Store not found');
     stores = stores.filter((s) => String(s._id) === String(query.storeId));
@@ -103,6 +104,7 @@ export async function franchiseDeliveryPartners(scope, query = {}) {
       storeIds: [...storeIds],
       storeNames: [...storeIds].map((id) => storeName.get(id)).filter(Boolean),
       claimedByYou: String(doc.franchiseId || '') === String(scope.franchiseId),
+      profilePhoto: doc.profilePhoto || null,
     };
   });
 
@@ -139,12 +141,6 @@ const VERIFY_FIELDS = 'name phone email address city state vehicleType vehicleNa
   'profilePhoto aadharPhoto panPhoto drivingLicensePhoto status availabilityStatus lastLocationAt rating franchiseId storeId ' +
   'approvedAt approvedBy rejectionReason rejectedAt suspendedAt suspensionReason approvalHistory createdAt updatedAt';
 
-/** "XXXXXXXX9876": only the last 4 characters of an Aadhaar, PAN or licence number. */
-export const maskLast4 = (v) => {
-  const t = String(v || '').replace(/\s+/g, '');
-  return t ? `${'X'.repeat(Math.max(0, t.length - 4))}${t.slice(-4)}` : '';
-};
-
 /** The rider, if this franchise may manage it; 404 otherwise (another franchise's or a far rider). */
 async function findManaged(franchiseId, riderId, select = VERIFY_FIELDS) {
   if (!isId(riderId)) throw new NotFoundError('Delivery partner not found');
@@ -168,15 +164,15 @@ export async function franchiseJoinRequests(scope, query = {}) {
 }
 
 /**
- * GET /food/admin/delivery/:id for a franchise admin: what is needed to verify the rider. Aadhaar, PAN and licence
- * numbers show only their last 4 characters; bank details, UPI and push tokens are never selected.
+ * GET /food/admin/delivery/:id for a franchise admin: what is needed to verify the rider, including the full Aadhaar, PAN
+ * and licence numbers (the franchise admin checks them against the documents); bank details, UPI and push tokens are never selected.
  */
 export async function franchiseRiderDetails(scope, riderId) {
   const r = await findManaged(scope.franchiseId, riderId);
   const docs = {
-    aadhar: { number: maskLast4(r.aadharNumber), document: r.aadharPhoto || null },
-    pan: { number: maskLast4(r.panNumber), document: r.panPhoto || null },
-    drivingLicense: { number: maskLast4(r.drivingLicenseNumber), document: r.drivingLicensePhoto || null },
+    aadhar: { number: r.aadharNumber || '', document: r.aadharPhoto || null },
+    pan: { number: r.panNumber || '', document: r.panPhoto || null },
+    drivingLicense: { number: r.drivingLicenseNumber || '', document: r.drivingLicensePhoto || null },
     selfie: { document: r.profilePhoto || null },
   };
   return {
@@ -185,7 +181,7 @@ export async function franchiseRiderDetails(scope, riderId) {
     name: r.name || '', phone: r.phone || '', email: r.email || '',
     address: r.address || '', city: r.city || '', state: r.state || '',
     vehicleType: r.vehicleType || '', vehicleName: r.vehicleName || '', vehicleNumber: r.vehicleNumber || '',
-    drivingLicenseNumber: docs.drivingLicense.number, aadharNumber: docs.aadhar.number, panNumber: docs.pan.number,
+    drivingLicenseNumber: r.drivingLicenseNumber || '', aadharNumber: r.aadharNumber || '', panNumber: r.panNumber || '',
     profilePhoto: r.profilePhoto || null, aadharPhoto: r.aadharPhoto || null, panPhoto: r.panPhoto || null, drivingLicensePhoto: r.drivingLicensePhoto || null,
     documents: docs,
     status: r.status, approvalStatus: r.status, availabilityStatus: r.availabilityStatus || 'offline',

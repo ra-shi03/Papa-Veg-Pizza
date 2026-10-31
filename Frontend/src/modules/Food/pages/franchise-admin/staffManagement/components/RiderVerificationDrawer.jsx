@@ -14,7 +14,7 @@ const STATUS_STYLE = {
   rejected: "bg-zinc-100 text-zinc-600 border-zinc-200",
 }
 
-export default function RiderVerificationDrawer({ isOpen, riderId, onClose, onChanged }) {
+export default function RiderVerificationDrawer({ isOpen, riderId, initialMode = null, onClose, onChanged }) {
   const [rider, setRider] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -38,10 +38,10 @@ export default function RiderVerificationDrawer({ isOpen, riderId, onClose, onCh
   }, [isOpen, riderId])
 
   useEffect(() => {
-    setMode(null)
+    setMode(initialMode)
     setReason("")
     load()
-  }, [load])
+  }, [load, initialMode])
 
   const run = async (call, done) => {
     setBusy(true)
@@ -160,21 +160,24 @@ export default function RiderVerificationDrawer({ isOpen, riderId, onClose, onCh
 
         {rider && (
           <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 flex gap-2">
-            {status === "pending" && !mode && (
+            {/* Approve, Reject and Suspend are always shown as separate buttons; only the ones that fit the rider's status work */}
+            {!mode && (
               <>
-                <button disabled={busy} onClick={() => run(() => adminAPI.approveDeliveryPartner(rider._id), "approved")}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold disabled:opacity-60"><CheckCircle2 size={14} /> Approve</button>
-                <button disabled={busy} onClick={() => setMode("reject")}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-rose-600 text-white text-xs font-bold disabled:opacity-60"><XCircle size={14} /> Reject</button>
+                <button disabled={busy || status !== "pending"} onClick={() => run(() => adminAPI.approveDeliveryPartner(rider._id), "approved")}
+                  title={status === "pending" ? "Approve this delivery partner" : "Only a pending signup can be approved"}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed"><CheckCircle2 size={14} /> Approve</button>
+                <button disabled={busy || status !== "pending"} onClick={() => setMode("reject")}
+                  title={status === "pending" ? "Reject this signup (a reason is required)" : "Only a pending signup can be rejected"}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-rose-600 text-white text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed"><XCircle size={14} /> Reject</button>
+                {status === "suspended" ? (
+                  <button disabled={busy} onClick={() => run(() => adminAPI.activateDeliveryPartner(rider._id), "activated")}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-zinc-900 text-white text-xs font-bold disabled:opacity-40"><UserCheck size={14} /> Activate</button>
+                ) : (
+                  <button disabled={busy || status !== "approved"} onClick={() => setMode("suspend")}
+                    title={status === "approved" ? "Suspend this delivery partner" : "Only an approved delivery partner can be suspended"}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-zinc-900 text-white text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed"><Ban size={14} /> Suspend</button>
+                )}
               </>
-            )}
-            {status === "approved" && !mode && (
-              <button disabled={busy} onClick={() => setMode("suspend")}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-zinc-900 text-white text-xs font-bold disabled:opacity-60"><Ban size={14} /> Suspend</button>
-            )}
-            {status === "suspended" && (
-              <button disabled={busy} onClick={() => run(() => adminAPI.activateDeliveryPartner(rider._id), "activated")}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold disabled:opacity-60"><UserCheck size={14} /> Activate</button>
             )}
             {mode && (
               <>

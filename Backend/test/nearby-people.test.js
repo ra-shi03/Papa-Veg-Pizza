@@ -108,23 +108,31 @@ describe('riders near the store', () => {
         assert.equal(by['Rider zoned'].distanceFromStore, null);
         assert.ok(by['Rider near'].lastSeen);
     });
-    test('the store gets a masked phone and never documents, bank details, Aadhaar or the vehicle number', async () => {
+    test('manager: full phone and contact in lists and details, never documents, ID numbers or bank; supervisor and franchise admin masked. Detail view has the full contact and vehicle but still no documents or bank', async () => {
         const list = ok(await riders(A.managerToken));
         const detail = ok(await fx.call('GET', `/v1/store/rider/${R.near}`, A.managerToken));
         const avail = ok(await fx.call('GET', '/v1/store/delivery/available-riders', A.managerToken));
         const near = await mongoose.connection.collection('food_delivery_partners').findOne({ _id: oid(R.near) });
         for (const body of [list, detail, avail]) {
             const text = JSON.stringify(body);
-            for (const secret of [near.phone, '123412341234', 'ABCDE1234F', 'MP0920200000001', 'aadhar.jpg', 'pan.jpg', 'dl.jpg', '000111222333', 'SBIN0000001', 'near@upi', 'MP09-']) {
+            for (const secret of ['123412341234', 'ABCDE1234F', 'MP0920200000001', 'aadhar.jpg', 'pan.jpg', 'dl.jpg', '000111222333', 'SBIN0000001', 'near@upi']) {
                 assert.ok(!text.includes(secret), `leaked ${secret}`);
             }
             assert.ok(!/aadhar|bank|pan(Number|Photo)|drivingLicense|upi|password/i.test(text));
         }
-        assert.match(detail.mobile, /^93\*+\d{2}$/);
-        for (const role of [supA, A.adminToken, fx.SA]) {
+        // the store manager's lists show the full phone (to call the rider) but never the vehicle number
+        for (const body of [list, avail]) assert.ok(JSON.stringify(body).includes(near.phone) && !JSON.stringify(body).includes('MP09-'));
+        // a kitchen supervisor, a franchise admin and the lists they open stay masked
+        for (const token of [supA]) assert.ok(!JSON.stringify(ok(await riders(token))).includes(near.phone));
+        assert.ok(!JSON.stringify(ok(await riders(A.adminToken, `?storeId=${A.storeId}`))).includes(near.phone));
+        // the store manager's detail view: full phone, email, address, vehicle name and number
+        assert.deepEqual([detail.mobile, detail.email, detail.vehicleNumber, detail.city], [near.phone, near.email || '', near.vehicleNumber, near.city]);
+        assert.ok(detail.vehicleName !== undefined && detail.address !== undefined);
+        for (const role of [supA, A.adminToken]) {
             const qs = role === supA ? '' : `?storeId=${A.storeId}`;
             assert.match(ok(await riders(role, qs)).find((r) => r.name === 'Rider near').mobile, /^93\*+\d{2}$/);
         }
+        assert.equal(ok(await riders(fx.SA, `?storeId=${A.storeId}`)).find((r) => r.name === 'Rider near').mobile, near.phone, 'the super admin sees the full phone');
     });
     test('available riders: approved, online and near only (pending riders cannot be assigned)', async () => {
         assert.deepEqual(names(ok(await fx.call('GET', '/v1/store/delivery/available-riders', A.managerToken))), ['Rider city', 'Rider near']);

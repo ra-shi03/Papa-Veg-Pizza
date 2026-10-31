@@ -81,7 +81,7 @@ export default function RidersTable({ riders = [], isLoading, onViewRider }) {
                     <td className="py-3 px-4">
                       <span className="flex items-center gap-0.5 text-slate-900 dark:text-white">
                         <Clock size={11} className="text-slate-400" />
-                        <span>{rider.averageDeliveryTime} mins</span>
+                        <span>{rider.averageDeliveryTime != null ? `${rider.averageDeliveryTime != null ? `${rider.averageDeliveryTime} mins` : "—"}` : "—"}</span>
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right">
@@ -171,7 +171,7 @@ export default function RidersTable({ riders = [], isLoading, onViewRider }) {
                     <span className="text-slate-400 block uppercase text-[8px]">Avg Delivery Time</span>
                     <span className="font-extrabold text-slate-800 dark:text-zinc-200 flex items-center gap-0.5">
                       <Clock size={10} className="text-slate-400" />
-                      {rider.averageDeliveryTime} mins
+                      {rider.averageDeliveryTime != null ? `${rider.averageDeliveryTime} mins` : "—"}
                     </span>
                   </div>
                 </div>

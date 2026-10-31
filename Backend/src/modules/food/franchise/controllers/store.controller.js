@@ -80,6 +80,16 @@ export const createStore = async (req, res) => {
     const fallbackOwner = await getFallbackOwner(req);
     res.status(201).json({ success: true, data: formatStoreResponse(savedStore, fallbackOwner) });
   } catch (error) {
+    // a clear message instead of the raw database error
+    if (error?.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0];
+      const label = { code: 'store code', phone: 'phone number', email: 'email' }[field] || field || 'value';
+      return res.status(409).json({ success: false, message: `A store with this ${label} already exists. Use a different ${label}.` });
+    }
+    if (error?.name === 'ValidationError') {
+      const first = Object.values(error.errors || {})[0];
+      return res.status(400).json({ success: false, message: first?.message || error.message });
+    }
     res.status(400).json({ success: false, message: error.message });
   }
 };
@@ -87,8 +97,11 @@ export const createStore = async (req, res) => {
 export const getStores = async (req, res) => {
   try {
     const { status, city, search, type } = req.query;
-    // Only approved stores, and only the caller's franchise (super admin: all, or ?franchiseId=)
-    let query = { status: { $ne: 'DELETED' }, approvalStatus: 'Approved', ...franchiseFilter(req) };
+    // Only the caller's franchise (super admin: all, or ?franchiseId=). Pickers (managers, pricing, ...) get approved
+    // stores only; the Stores screen asks for ?includeUnapproved=true so a store just created (Draft, then Pending until
+    // the super admin approves it) is listed with its approval status instead of vanishing.
+    let query = { status: { $ne: 'DELETED' }, ...franchiseFilter(req) };
+    if (req.query.includeUnapproved !== 'true') query.approvalStatus = 'Approved';
     
     if (status && status !== 'All') {
       query.isActive = status === 'Active';

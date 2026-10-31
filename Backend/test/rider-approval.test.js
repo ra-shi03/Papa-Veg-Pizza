@@ -69,14 +69,14 @@ describe('before anyone approves', () => {
         }
         assert.ok((await joinIds(fx.SA)).includes(R.far), 'the super admin sees every pending signup');
     });
-    test('franchise admin: verification details with masked Aadhaar / PAN / licence numbers, documents, no bank, UPI or push tokens', async () => {
+    test('franchise admin: verification details with the full Aadhaar / PAN / licence numbers and documents, no bank, UPI or push tokens', async () => {
         const d = ok(await fx.call('GET', `${D}/${R.near}`, A.adminToken)).delivery;
         assert.deepEqual([d.name, d.address, d.city, d.vehicleType, d.vehicleName], ['Rider near', '12 MG Road', 'Indore', 'bike', 'Activa']);
         assert.ok(d.phone.startsWith('96') && !d.phone.includes('*'));
-        assert.deepEqual([d.aadharNumber, d.panNumber, d.drivingLicenseNumber], ['XXXXXXXX9012', 'XXXXXX234F', 'XXXXXXXXXXX9876']);
+        assert.deepEqual([d.aadharNumber, d.panNumber, d.drivingLicenseNumber], ['123456789012', 'ABCDE1234F', 'MP0920200009876']);
         assert.deepEqual([d.profilePhoto, d.aadharPhoto, d.panPhoto, d.drivingLicensePhoto], [DOCS.profilePhoto, DOCS.aadharPhoto, DOCS.panPhoto, DOCS.drivingLicensePhoto]);
         const text = JSON.stringify(d);
-        for (const secret of ['123456789012', 'ABCDE1234F', 'MP0920200009876', SECRET.bankAccountNumber, SECRET.bankIfscCode, 'Holder Person', 'rider@upi', 'qr.png', 'push-token-secret']) {
+        for (const secret of [SECRET.bankAccountNumber, SECRET.bankIfscCode, 'Holder Person', 'rider@upi', 'qr.png', 'push-token-secret']) {
             assert.ok(!text.includes(secret), `leaked ${secret}`);
         }
         assert.ok(!/bank|upi|fcm/i.test(text));
@@ -106,7 +106,7 @@ describe('before anyone approves', () => {
 describe('first claim', () => {
     test('franchise A approves: the rider is claimed by A (franchiseId, approvedBy, approvedAt, history)', async () => {
         const d = ok(await fx.call('PATCH', `${D}/${R.near}/approve`, A.adminToken, {}));
-        assert.deepEqual([d.status, d.claimedByYou, d.aadharNumber], ['approved', true, 'XXXXXXXX9012']);
+        assert.deepEqual([d.status, d.claimedByYou, d.aadharNumber], ['approved', true, '123456789012']);
         const row = await riders().findOne({ _id: oid(R.near) });
         assert.equal(row.status, 'approved');
         assert.equal(String(row.franchiseId), A.franchiseId);
@@ -188,4 +188,38 @@ test('stores made in the franchise panel (region in "city", zone in "state", zon
     const area = await storeArea(st.insertedId);
     for (const label of ['indore', 'vijay nagar', 'madhya pradesh']) assert.ok(area.labels.includes(label), label);
     assert.ok(area.polygon, 'the territory\'s zone polygon is used when the store has no coordinates');
+});
+
+describe('ID numbers and the reach of a franchise', () => {
+    test('full Aadhaar, PAN and licence numbers only in the one-rider view, never in a list', async () => {
+        const id = String((await riders().findOne({ aadharNumber: SECRET.aadharNumber }))._id);
+        const numbers = [SECRET.aadharNumber, SECRET.panNumber, SECRET.drivingLicenseNumber];
+        const scope = A.adminToken;
+        const lists = JSON.stringify([
+            ok(await fx.call('GET', `${D}/partners`, scope)),
+            ok(await fx.call('GET', `${D}/join-requests`, scope)),
+            ok(await fx.call('GET', `/v1/store/riders?storeId=${A.storeId}`, scope)),
+        ]);
+        for (const n of numbers) assert.ok(!lists.includes(n), n);
+        const view = JSON.stringify(ok(await fx.call('GET', `${D}/${id}`, scope)));
+        for (const n of numbers) assert.ok(view.includes(n), n);
+    });
+    test('a Draft store does not open up the riders near it; once approved, it does', async () => {
+        await rider('surat', { ...SECRET, aadharNumber: '999988887777', panNumber: 'SURAT1234F', drivingLicenseNumber: 'GJ0520200001111', city: 'Surat', state: 'GJ', lastLocation: point(21.17, 72.83) });
+        const draft = ok(await fx.call('POST', '/v1/stores', A.adminToken, {
+            storeName: 'Surat Draft', storeCode: `SD${fx.ts}`, storeType: 'DELIVERY_CARRYOUT', phone: '9852345670',
+            address: { line1: 'a', city: 'Surat', state: 'GJ', pincode: '395001', coordinates: [72.83, 21.17] }, status: 'Active',
+        }), 201);
+        const inList = async () => ok(await fx.call('GET', `${D}/partners`, A.adminToken)).deliveryPartners.some((r) => String(r._id) === R.surat);
+        assert.equal((await fx.call('GET', `${D}/${R.surat}`, A.adminToken)).status, 404);
+        assert.ok(!(await joinIds(A.adminToken)).includes(R.surat));
+        assert.ok(!(await inList()));
+        assert.equal((await fx.call('PATCH', `${D}/${R.surat}/approve`, A.adminToken)).status, 404);
+        for (const path of [`/v1/store/riders?storeId=${draft._id}`, `/v1/store/rider/${R.surat}?storeId=${draft._id}`, `/v1/store/delivery/available-riders?storeId=${draft._id}`, `${D}/partners?storeId=${draft._id}`]) {
+            assert.equal((await fx.call('GET', path, A.adminToken)).status, 404, path);
+        }
+        assert.equal((await fx.call('PATCH', `/v1/store-approvals/${draft._id}/approve`, fx.SA, {})).status, 200);
+        assert.equal((await fx.call('GET', `${D}/${R.surat}`, A.adminToken)).status, 200);
+        assert.ok(await inList());
+    });
 });

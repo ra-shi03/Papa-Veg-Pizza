@@ -26,3 +26,4 @@ export const issues = handle((req) => svc.listIssues(req.user, q(req)));
 export const createIssue = handle((req) => svc.createIssue(req.user, req.body, q(req)), 'Issue reported', 201);
 export const updateIssue = handle((req) => svc.updateIssue(req.user, req.params.id, req.body, q(req)), 'Issue updated');
 export const nearbyZones = handle((req) => svc.nearbyZones(q(req)));
+export const publicZones = handle(() => svc.publicZones());
