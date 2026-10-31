@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft, MapPin, Check, User, Clock, ShieldCheck, CreditCard, ChevronRight, AlertTriangle } from "lucide-react"
 import { useCart } from "@food/context/CartContext"
@@ -7,9 +7,19 @@ import { useAppConfig } from "@food/context/AppConfigContext"
 import { motion, AnimatePresence } from "framer-motion"
 import RazorpayPayment from "./RazorpayPayment"
 import apiClient from "@/services/api/axios"
-import { orderAPI } from "@food/api"
+import { orderAPI, userAPI } from "@food/api"
 import { toast } from "sonner"
-import { getCartCoords, slotLabel, toOrderItems } from "./cartHelpers"
+import { slotLabel, toOrderItems } from "./cartHelpers"
+import {
+  addressProblem,
+  assertOwnOrderDetails,
+  buildOrderDetails,
+  contactFromAccount,
+  contactProblem,
+  readPickedLocation,
+  selectDeliveryAddress,
+  toTenDigitPhone,
+} from "./checkoutDetails"
 
 export default function CheckoutModal({
   show,
@@ -27,7 +37,7 @@ export default function CheckoutModal({
 }) {
   const navigate = useNavigate()
   const { replaceCart, clearCart } = useCart()
-  const { addAddress, paymentMethods } = useProfile()
+  const { addAddress, addresses, paymentMethods } = useProfile()
   const { config: appConfig } = useAppConfig()
   const isPaymentOptionDisabled = appConfig?.paymentOptionEnabled === false
   const isLoggedIn = localStorage.getItem("user_authenticated") === "true" || !!localStorage.getItem("user_accessToken")
@@ -40,12 +50,18 @@ export default function CheckoutModal({
   const [houseNumber, setHouseNumber] = useState("")
   const [landmark, setLandmark] = useState("")
   const [instructions, setInstructions] = useState("")
-  const [currentAddress, setCurrentAddress] = useState("South Tukoganj, Indore, Indore Division, 452001")
+  // The address this order goes to (checkoutDetails.js); null until the customer has selected one
+  const [selectedAddress, setSelectedAddress] = useState(null)
+  const selectedAddressKey = useRef(null)
+  const currentAddress = selectedAddress?.display || ""
 
-  // Contact Details
-  const [contactName, setContactName] = useState("Rashi Jaiswal")
-  const [contactPhone, setContactPhone] = useState("9300990940")
-  const [contactEmail, setContactEmail] = useState("rashijaiswal6655@gmail.com")
+  // Contact Details: the signed-in customer's own, from their profile; empty until loaded
+  const [contactName, setContactName] = useState("")
+  const [contactPhone, setContactPhone] = useState("")
+  const [contactEmail, setContactEmail] = useState("")
+  const [contactLoading, setContactLoading] = useState(false)
+  const contactOwnerId = useRef(null)
+  const contactEdited = useRef(false)
 
   // Contact Details Temp Editing State
   const [editName, setEditName] = useState("")
@@ -64,12 +80,55 @@ export default function CheckoutModal({
   useEffect(() => {
     if (show) {
       setModalView("address") // always start with address form first
-      const savedAddress = localStorage.getItem("deliveryAddress")
-      if (savedAddress) {
-        setCurrentAddress(savedAddress)
-      }
     }
   }, [show])
+
+  // The address the customer selected. A saved address fills the form; a newly picked location still needs the house number.
+  useEffect(() => {
+    if (!show) return
+    const activeService = localStorage.getItem("activeService") || "delivery"
+    const isTrainOrder = activeService === "train" || (localStorage.getItem("deliveryAddress") || "").toLowerCase().includes("train")
+    const selected = selectDeliveryAddress({
+      saved: addresses,
+      picked: readPickedLocation(),
+      service: isTrainOrder ? "train" : activeService,
+    })
+    setSelectedAddress(selected)
+    const key = selected ? `${selected.kind}:${selected.id || selected.display}` : ""
+    if (key !== selectedAddressKey.current) {
+      selectedAddressKey.current = key
+      setHouseNumber(selected?.kind === "saved" ? selected.street : "")
+      setLandmark(selected?.kind === "saved" ? selected.additionalDetails : "")
+    }
+  }, [show, addresses])
+
+  // The customer's own contact details, always read fresh for the signed-in account
+  useEffect(() => {
+    if (!show || !isLoggedIn) return
+    let current = true
+    setContactLoading(true)
+    userAPI.getMyProfile()
+      .then((res) => {
+        if (!current) return
+        const account = res?.data?.data?.account
+        if (contactOwnerId.current !== account?.id) {
+          contactOwnerId.current = account?.id
+          contactEdited.current = false
+        }
+        if (contactEdited.current) return
+        const contact = contactFromAccount(account)
+        setContactName(contact.name)
+        setContactPhone(contact.phone)
+        setContactEmail(contact.email)
+      })
+      .catch((err) => console.warn("Could not load the customer's contact details", err))
+      .finally(() => {
+        if (current) setContactLoading(false)
+      })
+    return () => {
+      current = false
+    }
+  }, [show, isLoggedIn])
 
   // Save Contact editing
   const handleSaveContactInfo = (e) => {
@@ -86,9 +145,15 @@ export default function CheckoutModal({
       alert("Email is required")
       return
     }
-    setContactName(editName)
-    setContactPhone(editPhone)
-    setContactEmail(editEmail)
+    const problem = contactProblem({ name: editName, phone: editPhone, email: editEmail })
+    if (problem) {
+      toast.error(problem)
+      return
+    }
+    contactEdited.current = true
+    setContactName(editName.trim())
+    setContactPhone(toTenDigitPhone(editPhone))
+    setContactEmail(editEmail.trim())
     setModalView("checkout")
   }
 
@@ -100,33 +165,55 @@ export default function CheckoutModal({
     setModalView("contact_edit")
   }
 
+  // No address selected: say so and send the customer to the location screen
+  const blockedByAddress = () => {
+    const problem = addressProblem(selectedAddress)
+    if (!problem) return false
+    toast.error(problem)
+    onClose()
+    const base = window.location.pathname.startsWith("/food") ? "/food" : ""
+    navigate(`${base}/user/location/setup`, { state: { from: window.location.pathname } })
+    return true
+  }
+
+  // A contact field is empty: say so and open the contact form
+  const blockedByContact = () => {
+    if (contactLoading) {
+      toast.info("Loading your details. Please try again in a moment.")
+      return true
+    }
+    const problem = contactProblem({ name: contactName, phone: contactPhone, email: contactEmail })
+    if (!problem) return false
+    toast.error(problem)
+    triggerContactEdit()
+    return true
+  }
+
   // Final Order placement
   const [placingOrder, setPlacingOrder] = useState(false)
 
   const handleSaveAddressAndCheckout = async () => {
     if (placingOrder) return
-    // Build structured address object
-    const newAddressObject = {
-      label: "Home",
-      street: houseNumber.trim() || "abc",
-      additionalDetails: landmark.trim() || "",
-      city: currentAddress.split(",")[1]?.trim() || "",
-      state: currentAddress.split(",")[2]?.trim() || "",
-      zipCode: currentAddress.match(/\d{6}/)?.[0] || "",
-      isDefault: true
-    }
-    // The coordinates the location picker already saved go with the address, so stores near it can see the customer
-    const pickedPoint = getCartCoords()
-    if (pickedPoint) {
-      newAddressObject.latitude = pickedPoint.lat
-      newAddressObject.longitude = pickedPoint.lng
+    if (blockedByAddress() || blockedByContact()) return
+    if (!houseNumber.trim()) {
+      toast.error("House number or flat number is required")
+      setModalView("address")
+      return
     }
 
-    // Save to profile
-    try {
-      addAddress(newAddressObject)
-    } catch (e) {
-      console.warn("Failed saving address to profile context, continuing order placement", e)
+    const contact = { name: contactName, phone: contactPhone, email: contactEmail }
+    const orderDetails = buildOrderDetails({ contact, selected: selectedAddress, houseNumber, landmark })
+
+    // A location the customer has not saved yet becomes their Home address, so stores near it can see them.
+    // A Home address they already have is left as it is.
+    if (selectedAddress.kind === "picked" && !addresses.some((address) => address?.label === "Home")) {
+      Promise.resolve(addAddress({
+        ...orderDetails.address,
+        location: undefined,
+        latitude: selectedAddress.point?.lat,
+        longitude: selectedAddress.point?.lng,
+        isDefault: true,
+      })).catch((e) => console.warn("Failed saving address to profile, continuing order placement", e))
     }
 
     const activeService = localStorage.getItem("activeService") || "delivery"
@@ -138,8 +225,7 @@ export default function CheckoutModal({
     let orderId
     setPlacingOrder(true)
     try {
-      const point = getCartCoords()
-      const coords = point ? { latitude: point.lat, longitude: point.lng } : null
+      const point = selectedAddress.point
 
       // A scheduled order needs a store that can deliver at that time (it may be closed right now)
       const resolved = await apiClient.get("/food/stores/resolve", {
@@ -149,20 +235,14 @@ export default function CheckoutModal({
       const store = resolved?.data?.data
       if (!store?.storeId) throw new Error("No store is available right now")
 
-      const response = await orderAPI.createOrder({
+      const response = await orderAPI.createOrder(assertOwnOrderDetails({
         storeId: store.storeId,
-        customerName: contactName,
-        customerPhone: contactPhone,
+        customerName: orderDetails.customerName,
+        customerPhone: orderDetails.customerPhone,
         address: {
-          label: "Home",
-          name: contactName,
-          phone: contactPhone,
-          street: isTrain && savedDeliveryAddress ? savedDeliveryAddress : newAddressObject.street,
-          additionalDetails: isTrain && trainPnr ? `IRCTC Train PNR: ${trainPnr}` : newAddressObject.additionalDetails,
-          city: newAddressObject.city,
-          state: newAddressObject.state,
-          zipCode: newAddressObject.zipCode,
-          ...(coords ? { location: { type: "Point", coordinates: [coords.longitude, coords.latitude] } } : {}),
+          ...orderDetails.address,
+          street: isTrain && savedDeliveryAddress ? savedDeliveryAddress : orderDetails.address.street,
+          additionalDetails: isTrain && trainPnr ? `IRCTC Train PNR: ${trainPnr}` : orderDetails.address.additionalDetails,
         },
         items: toOrderItems(cartItems),
         ...(couponCode ? { couponCode } : {}),
@@ -177,7 +257,7 @@ export default function CheckoutModal({
         // The in-app payment screen is a preview, so orders are placed as pay-on-delivery.
         paymentMethod: "cash",
         note: instructions.trim(),
-      })
+      }, { contact, selected: selectedAddress }))
       const created = response?.data?.data?.order
       orderId = created?._id || created?.id
       if (!orderId) throw new Error("Order could not be created")
@@ -209,9 +289,9 @@ export default function CheckoutModal({
             pnr: trainPnr
           },
           deliveryAddress: {
-            street: savedDeliveryAddress || newAddressObject.street,
+            street: savedDeliveryAddress || orderDetails.address.street,
             additionalDetails: `Train delivery PNR: ${trainPnr}`,
-            city: newAddressObject.city
+            city: orderDetails.address.city
           }
         }
         localStorage.setItem("pvp_train_orders", JSON.stringify([trainOrderEntry, ...existing]))
@@ -370,6 +450,7 @@ export default function CheckoutModal({
                 <div className="p-5 border-t" style={{ borderColor: isDarkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
                   <button 
                     onClick={() => {
+                      if (blockedByAddress()) return
                       if (!houseNumber.trim()) {
                         alert("House number or flat number is required")
                         return
@@ -444,7 +525,7 @@ export default function CheckoutModal({
                     <div className="flex-1 min-w-0 text-left">
                       <p className="text-xs font-bold leading-normal">{contactName}</p>
                       <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-semibold leading-normal truncate">{contactEmail}</p>
-                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-semibold leading-normal">+91 {contactPhone}</p>
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-semibold leading-normal">{contactPhone ? `+91 ${contactPhone}` : ""}</p>
                     </div>
                     <button 
                       onClick={triggerContactEdit}
@@ -578,7 +659,10 @@ export default function CheckoutModal({
                     )
                   ) : (
                     <button 
-                      onClick={() => setModalView("payment")}
+                      onClick={() => {
+                        if (blockedByAddress() || blockedByContact()) return
+                        setModalView("payment")
+                      }}
                       className="w-full h-12 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border-0 bg-primary hover:bg-primary-hover text-white active:scale-95 cursor-pointer shadow-md shadow-primary/10"
                     >
                       Continue to payment

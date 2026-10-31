@@ -12,6 +12,7 @@ import { locationAPI, userAPI } from "@food/api"
 import { Loader } from '@googlemaps/js-api-loader'
 import AnimatedPage from "@food/components/user/AnimatedPage"
 import useAppBackNavigation from "@food/hooks/useAppBackNavigation"
+import { useLocationStore } from "@food/store/locationStore"
 
 const debugLog = (...args) => { }
 const debugWarn = (...args) => { }
@@ -250,6 +251,14 @@ export default function AddressSelectorPage() {
     if (id) {
       await setDefaultAddress(id)
       try { localStorage.setItem("deliveryAddressMode", "saved") } catch { }
+      // The cart and the checkout follow the confirmed location, so they deliver to this address too
+      const [lng, lat] = address?.location?.coordinates || []
+      useLocationStore.getState().confirmLocation({
+        address: [address?.additionalDetails, address?.street, address?.city, address?.state].filter(Boolean).join(", "),
+        serviceType: "delivery",
+        lat,
+        lng,
+      })
       toast.success("Address selected")
       handleBack()
     }

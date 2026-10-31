@@ -7,6 +7,8 @@ const debugError = (...args) => {}
 
 const ProfileContext = createContext(null)
 const USER_SESSION_PREFERENCE_KEYS = ["userVegMode", "userVegModeOption", "food-under-250-filters"]
+const LAST_ACCOUNT_KEY = "pvp_last_account_id"
+const PREVIOUS_CUSTOMER_KEYS = ["deliveryLocation", "deliveryAddress", "user_location", "user_storeId", "userLocation", "userAddresses"]
 
 export function ProfileProvider({ children }) {
   const getAddressId = (address) => address?.id || address?._id || null
@@ -161,6 +163,13 @@ export function ProfileProvider({ children }) {
         const userData = response?.data?.data?.user || response?.data?.user || response?.data
         
         if (userData) {
+          // Another customer signed in on this device: their location and saved addresses are not this customer's
+          const accountId = String(userData._id || userData.id || "")
+          const lastAccountId = localStorage.getItem(LAST_ACCOUNT_KEY)
+          if (accountId && lastAccountId && lastAccountId !== accountId) {
+            PREVIOUS_CUSTOMER_KEYS.forEach((key) => localStorage.removeItem(key))
+          }
+          if (accountId) localStorage.setItem(LAST_ACCOUNT_KEY, accountId)
           setUserProfile(userData)
           // Update localStorage
           localStorage.setItem("user_user", JSON.stringify(userData))
