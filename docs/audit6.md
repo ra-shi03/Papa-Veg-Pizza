@@ -23,6 +23,63 @@ only shows mock data), BROKEN (present but fails or does the wrong thing).
 
 ---
 
+## Decisions after this audit
+
+Taken by the project owner after the audit was committed. The figures below describe `b50b89d` and were not recalculated.
+
+| Question | Decision | Effect |
+|---|---|---|
+| Full rider numbers | Left to engineering. **Keep:** the store manager sees the full rider phone (needed to call the rider, documents stay hidden); the franchise admin sees full Aadhaar, PAN and licence numbers only in the one-rider verification view, not in lists | No code change beyond the working tree. Get a legal check on showing the full Aadhaar number before launch |
+| What a kitchen supervisor sees | **Only the store orders the store manager assigned to them** | CLAUDE.md updated. Order by id, priority, delivery reads, customers, complaints, reviews, dashboard widgets and shortages now follow it. Section 4 C gaps closed |
+| Customer screen for complaints | **Approved, including sending complaints** | New `U/complaints/MyComplaints.jsx`. Section 2 steps 17 and flow 6 link 8 closed; complaints can only be raised against the customer's own order |
+
+---
+
+## Working tree review
+
+Review of the 8 backend source files in section 11 and `GET /food/zones/public`, before committing them. Critical: none.
+
+**Checked and fine:** `?includeUnapproved` goes through `franchiseFilter` (own franchise, super admin all; only the exact value
+`true` counts; test covers another franchise). `GET /food/zones/public` returns only id, name, service location and polygon
+(test asserts the exact keys). A manager on an unapproved store is created `Pending Approval` with an inactive user, whatever
+status is sent, and an edit cannot make them Active; approval activates them. `CREATABLE_MANAGER_FIELDS` and
+`UPDATABLE_STORE_FIELDS` block mass assignment (`approvalStatus`, `franchiseId`, `userId`, `role`). Customers cannot order at an
+unapproved store (`ORDERABLE`). Lists never contain Aadhaar, PAN or licence numbers (new test); store manager full phone,
+supervisor and franchise admin masked (`nearby-people.test.js`).
+
+### High (fixed, with tests)
+
+| # | Issue | Fix |
+|---|---|---|
+| H1 | **A franchise admin could widen its own rider scope with a Draft store.** `franchiseRiderFilter` counted every store of the franchise, and a Draft store needs no approval and can be placed anywhere. Result: full Aadhaar, PAN and licence numbers and documents of unclaimed riders in any city, and the power to approve or reject them. `deliveryContext` had the same gap for `/store/riders` and `/store/rider/:id` | Only approved stores count, in `franchiseRiderFilter`, `franchiseDeliveryPartners` and the franchise branch of `deliveryContext`. Test: `rider-approval.test.js` |
+| H2 | **A store's manager kept access after the store stopped being approved.** Rejecting or requesting changes on an approved store left the team Active, able to sign in and keep working | `moveStoreTeam`: rejection and request for changes move Active team members to `Pending Approval` and deactivate their users (open sessions end at once, `authMiddleware` checks per request); approval restores them; Suspended stays Suspended. Test: `store-list-unapproved.test.js` |
+
+Both tests were confirmed to fail without the fixes.
+
+### Medium (not fixed)
+
+1. **Moving an approved store reopens H1.** `latitude`, `longitude` and `city` stay editable after approval with no re-approval, so a franchise admin can move an approved store and reach the riders there. Decide: lock them, or require re-approval.
+2. **The Draft store trick still works on two other reads,** which are outside these files: `/food/store/customers/orders?storeId=` (`customerContext`: names with masked phone and email of nearby customers) and `storeScope` dashboard widgets such as `rider-roster`. Same one-line filter.
+3. **Full ID numbers reach every nearby franchise before a rider is claimed.** Needed to verify a pending rider, but it also applies to approved riders with no franchise. Limit to pending riders plus the claiming franchise.
+4. **`GET /store/rider/:id` returns email, home address, vehicle number and selfie to a kitchen supervisor** (phone is masked, these are not; the screen is manager-only), and returns them to store managers for pending riders too, although the request was "after approval".
+5. **Approving with a different manager email creates a second login.** With a manager already on the store, `adminEmail` that differs creates an active user with a temp password and a store manager role but no `StoreManager` record; an email of an existing user gives that user the role. `AppFranchiseModal` pre-fills the field and lets it be edited (super admin only).
+6. **Approve has no status check,** so a Draft store can be approved directly, skipping the rule that a store needs a manager before it is submitted. `store-list-unapproved.test.js` currently relies on this.
+7. **Existing data:** a manager marked Active on an unapproved store before this deploy can still sign in until that store is next rejected or approved. Check production once before deploying.
+8. **`join-requests` gives a franchise admin the full phone and email** in a list, while `partners` masks the phone.
+
+### Low (not fixed)
+
+1. `createStoreManager` is not a transaction: a failed save leaves a user behind, and the email then reports "already exists".
+2. Creating a manager with no `status` on an approved store: record Active, user inactive, so they cannot sign in.
+3. A manager moved from an unapproved to an approved store with no `status` stays `Pending Approval`. A Suspended manager edited while the store is unapproved becomes Pending, and approval then activates them.
+4. `updateStoreManager` does not check that the target store has no manager, so a store can end up with two.
+5. `moveStoreTeam` and `store.save()` are not one transaction.
+6. `GET /stores` passes `search` into `$regex` unescaped (signed-in admins only).
+7. The 409 on store creation confirms that a code or phone exists in another franchise.
+8. `GET /food/zones/public` has no result limit; only the global rate limit applies.
+
+---
+
 ## 1. Summary
 
 | Role | v1 screens | Completion at `b50b89d` | If the working tree is committed |
@@ -140,7 +197,7 @@ to a high-severity scope bug.
 | 13 | Completed, cancelled, refund note | PARTIAL | `S/orders/CompletedOrders.jsx`, `CancelledOrders.jsx` | `POST /store/orders/:id/refund` | Lists are real. A refund only records a pending request that no screen processes |
 | 14 | Inventory | PARTIAL | `S/inventory/IngredientStock.jsx`, `StockRequests.jsx`, `WasteManagement.jsx`, `LowStockAlerts.jsx`, `IngredientShortages.jsx` | `/food/store/inventory/*` | Mostly real. Supplier filter from `inventory/mockData` (`InventoryFilters.jsx:11`); affected orders from `mockAffectedOrders` (`IngredientShortages.jsx:29,350`) |
 | 15 | Customers and nearby people | PARTIAL | `S/customers/CustomerOrders.jsx` | `/food/store/customers/*` | KPI and invoice from `customers/mockData` frozen date (`:21,67-80,158`); new/nearby tag and area are returned but not displayed |
-| 16 | Complaints | PARTIAL | `S/customers/Complaints.jsx` | `/food/store/complaints*`, `/respond`, `/resolve` | KPI from `mockData` (`:17,54`), resolver dropdown from `mockStaff` (`ResolveComplaintModal.jsx:4,31,185`) |
+| 16 | Complaints | PARTIAL | `S/customers/Complaints.jsx` | `/food/store/complaints*`, `/resolve` | `/respond` has no caller. KPI from `mockData` (`:17,54`), resolver dropdown from `mockStaff` (`ResolveComplaintModal.jsx:4,31,185`) |
 | 17 | Reviews | PARTIAL | `S/customers/Reviews.jsx` | `/food/store/reviews*` | KPI from `mockData` (`:19,64`) |
 | 18 | Own tasks and profile | DONE | `S/myTasks/MyTasks.jsx`, `S/profile/Profile.jsx` | `/tasks*`, profile routes | |
 
@@ -151,9 +208,10 @@ PHASE2: `S/staffManagement/Performance.jsx` (`GET /store/performance`, `/store/p
 Store routes use `requireRoles` and take `storeId` from the token, never the body. The franchise and super admin variants
 check `?storeId`. Gaps:
 
-- The UI limits delivery, complaints and customer screens to the manager, but the backend also allows the supervisor on
-  `/store/riders`, `/store/delivery/*`, `/food/store/complaints*`, `/food/store/customers/*`, and `/store/orders/:id/refund`.
-  It stays inside the store. Decide whether the backend should match the UI.
+- The UI limits delivery, complaints and customer screens to the manager, but the backend also lets the supervisor read
+  `/store/riders`, `/store/delivery/*`, `/food/store/complaints*` and `/food/store/customers/*`. Writes there are refused
+  in the service layer (`canWrite`, `mustManager`), including `/store/orders/:id/refund` and `reset-drop-otp`, although the
+  route lists the role. It stays inside the store. Decide whether the backend should match the UI.
 - Open from audit3: M6 (staff `status: 'Inactive'` causes a 500, `kitchenStaff.controller.js:402`), M7 (staff delete is a hard
   delete, `:535`), L2 (no schema validation), L10 (leave dates not stored).
 
@@ -451,7 +509,7 @@ Status names differ from CLAUDE.md. In code: `created` → `confirmed` → `prep
 | 4 | Refund requested | PARTIAL | `POST /store/orders/:id/refund` records `pending`. No customer screen |
 | 5 | Refund processed | MISSING | `/food/admin/refunds*` exist, but `A/orderManagement/RefundRequests.jsx` is PHASE2 mock. Requests dead-end |
 | 6 | Complaint raised | PARTIAL | `POST /food/user/support/ticket`; no ownership check |
-| 7 | Store responds and resolves | PARTIAL | Real endpoints; mock KPI and resolver dropdown |
+| 7 | Store responds and resolves | PARTIAL | Resolve works from the screen. `POST /food/store/complaints/:id/respond` exists but no screen calls it, so a store cannot send a reply before resolving. Mock KPI and resolver dropdown |
 | 8 | Customer sees the answer | MISSING | No caller of `getMyTickets` |
 | 9 | Franchise and super admin see it | MISSING | Both screens are mock |
 

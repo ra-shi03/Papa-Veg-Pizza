@@ -17,7 +17,7 @@ Also: customer, delivery_partner.
 - Super admin creates franchise admins (email + temp password; they change password/profile later).
 - Franchise admin creates store managers. Store manager creates kitchen supervisor/staff.
 - Everyone except super admin is scoped to franchiseId/storeId.
-- Kitchen supervisor sees store orders and assigns staff. Kitchen staff sees only assigned tasks.
+- Kitchen supervisor sees only the store orders the store manager assigned to them, and assigns staff on those. Kitchen staff sees only assigned tasks.
 
 ## Status
 DONE: auth; super admin control of user-app content.
