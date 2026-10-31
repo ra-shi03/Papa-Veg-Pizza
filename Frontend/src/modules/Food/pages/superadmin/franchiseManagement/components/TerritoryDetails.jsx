@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { GoogleMap, Polygon, useJsApiLoader } from "@react-google-maps/api";
+import { ADMIN_GOOGLE_MAPS_LOADER } from "@food/utils/adminGoogleMaps"
 import {
   X,
   MapPin,
@@ -37,12 +38,7 @@ export default function TerritoryDetails({
   // Search inside postal code chips
   const [postalSearch, setPostalSearch] = useState("");
 
-  const { isLoaded } = useJsApiLoader({
-    id: "google-map-script",
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
-    libraries: LIBRARIES,
-    version: "3.64"
-  });
+  const { isLoaded } = useJsApiLoader(ADMIN_GOOGLE_MAPS_LOADER);
 
   const [detailedTerritory, setDetailedTerritory] = useState(null);
   const [zoneCoordinates, setZoneCoordinates] = useState([]);

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { X, User, Mail, Phone, Store, MapPin, Layers, Save, Lock, Clock, Hash, Loader2, LocateFixed } from "lucide-react"
 import apiClient from "../../../../../../services/api/axios"
 import { useJsApiLoader } from "@react-google-maps/api"
+import { ADMIN_GOOGLE_MAPS_LOADER } from "@food/utils/adminGoogleMaps"
 
 const libraries = ["places"];
 
@@ -12,6 +13,7 @@ export default function AddFranchiseModal({ isOpen, onClose, onSave }) {
     email: "",
     phone: "",
     password: "",
+    confirmPassword: "",
     franchiseName: "",
     franchiseCode: "",
     regionId: "",
@@ -34,11 +36,7 @@ export default function AddFranchiseModal({ isOpen, onClose, onSave }) {
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
   
-  const { isLoaded } = useJsApiLoader({
-    id: "google-map-script",
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
-    libraries
-  })
+  const { isLoaded } = useJsApiLoader(ADMIN_GOOGLE_MAPS_LOADER)
 
   const cityInputRef = React.useRef(null)
   const stateInputRef = React.useRef(null)
@@ -73,6 +71,7 @@ export default function AddFranchiseModal({ isOpen, onClose, onSave }) {
         email: "",
         phone: "",
         password: "",
+    confirmPassword: "",
         franchiseName: "",
         franchiseCode: "",
         regionId: "",
@@ -157,6 +156,8 @@ export default function AddFranchiseModal({ isOpen, onClose, onSave }) {
       newErrors.panNumber = "PAN number must be 10 characters"
     }
     if (!formData.password.trim()) newErrors.password = "Password is required"
+    if (!formData.confirmPassword) newErrors.confirmPassword = "Please confirm the password"
+    else if (formData.confirmPassword !== formData.password) newErrors.confirmPassword = "Passwords do not match"
     if (!formData.franchiseName.trim()) newErrors.franchiseName = "Franchise name is required"
     if (!formData.franchiseCode.trim()) newErrors.franchiseCode = "Franchise code is required"
     if (!formData.regionId) newErrors.regionId = "Region is required"
@@ -227,7 +228,9 @@ export default function AddFranchiseModal({ isOpen, onClose, onSave }) {
 
     try {
       setIsLoading(true)
-      const response = await apiClient.post('/food/admin/franchises', formData)
+      // the confirmation is only checked here, never sent
+      const { confirmPassword, ...payload } = formData
+      const response = await apiClient.post('/food/admin/franchises', payload)
       
       const newFranchise = response.data.data.franchise
       
@@ -547,6 +550,25 @@ export default function AddFranchiseModal({ isOpen, onClose, onSave }) {
                       />
                     </div>
                     {errors.password && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.password}</p>}
+                  </div>
+
+                  <div>
+                    <label htmlFor="confirmPassword" className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Confirm Password</label>
+                    <div className="relative">
+                      <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                      <input
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        type="password"
+                        value={formData.confirmPassword}
+                        onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                        placeholder="Re-enter the password"
+                        className={`w-full text-xs pl-8.5 pr-3 py-1.5 border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:bg-white transition-all ${
+                          errors.confirmPassword ? "border-rose-500" : "border-zinc-200 dark:border-zinc-800"
+                        }`}
+                      />
+                    </div>
+                    {errors.confirmPassword && <p className="text-[9px] text-rose-500 font-bold mt-1">{errors.confirmPassword}</p>}
                   </div>
                 </div>
 

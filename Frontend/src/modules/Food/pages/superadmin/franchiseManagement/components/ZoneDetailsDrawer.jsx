@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Layers, Map, Compass, Activity, ShieldCheck, Milestone, Loader2 } from "lucide-react";
 import { GoogleMap, Polygon, useJsApiLoader } from "@react-google-maps/api";
+import { ADMIN_GOOGLE_MAPS_LOADER } from "@food/utils/adminGoogleMaps"
 import apiClient from "../../../../../../services/api/axios";
 
 const LIBRARIES = Object.freeze(['geometry', 'places']);
@@ -9,12 +10,7 @@ export default function ZoneDetailsDrawer({ isOpen, onClose, zone, onEdit, onAss
   const [fetchedZone, setFetchedZone] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const { isLoaded } = useJsApiLoader({
-    id: "google-map-script",
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
-    libraries: LIBRARIES,
-    version: "3.64"
-  });
+  const { isLoaded } = useJsApiLoader(ADMIN_GOOGLE_MAPS_LOADER);
 
   useEffect(() => {
     if (isOpen && zone?.id) {

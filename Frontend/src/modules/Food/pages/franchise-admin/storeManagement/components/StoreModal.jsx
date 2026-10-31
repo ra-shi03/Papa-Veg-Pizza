@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import { adminAPI } from "@food/api"
 import apiClient from "@food/api/axios"
 import { GoogleMap, useJsApiLoader, Polygon, Marker, useGoogleMap } from "@react-google-maps/api"
+import { ADMIN_GOOGLE_MAPS_LOADER } from "@food/utils/adminGoogleMaps"
 
 // Helper component to trigger bounds fitting when territory/zone changes
 function MapBoundsFitter({ territoryCoordinates, zoneCoordinates, hasTerritory }) {
@@ -57,10 +58,7 @@ export default function StoreModal({ isOpen, onClose, onConfirm, store = null })
   const [longitude, setLongitude] = useState(75.8763)
   const [zoneCoordinates, setZoneCoordinates] = useState([])
 
-  const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
-  })
+  const { isLoaded } = useJsApiLoader(ADMIN_GOOGLE_MAPS_LOADER)
 
   // Manager & Capacity State
   const [managerId, setManagerId] = useState("")

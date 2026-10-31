@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { X, User, Mail, Phone, Store, MapPin, Layers, Save, Lock, Clock, Hash, Loader2, LocateFixed } from "lucide-react"
 import apiClient from "../../../../../../services/api/axios"
 import { useJsApiLoader } from "@react-google-maps/api"
+import { ADMIN_GOOGLE_MAPS_LOADER } from "@food/utils/adminGoogleMaps"
 
 const libraries = ["places"];
 // Fetch dynamic data from API
@@ -35,11 +36,7 @@ export default function EditFranchiseModal({ isOpen, onClose, admin, onSave }) {
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
   
-  const { isLoaded } = useJsApiLoader({
-    id: "google-map-script",
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
-    libraries
-  })
+  const { isLoaded } = useJsApiLoader(ADMIN_GOOGLE_MAPS_LOADER)
 
   const cityInputRef = React.useRef(null)
   const stateInputRef = React.useRef(null)

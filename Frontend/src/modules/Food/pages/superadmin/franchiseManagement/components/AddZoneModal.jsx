@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { X, Info, Trash2 } from "lucide-react";
 import { GoogleMap, useJsApiLoader, Polygon, Marker } from "@react-google-maps/api";
+import { ADMIN_GOOGLE_MAPS_LOADER } from "@food/utils/adminGoogleMaps"
 
 const LIBRARIES = Object.freeze(['geometry', 'places']);
 
@@ -16,12 +17,7 @@ export default function AddZoneModal({ isOpen, onClose, onSubmit, regions = [], 
   const [mapSearchInput, setMapSearchInput] = useState("");
   const [searchMarker, setSearchMarker] = useState(null);
 
-  const { isLoaded } = useJsApiLoader({
-    id: "google-map-script",
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
-    libraries: LIBRARIES,
-    version: "3.64"
-  });
+  const { isLoaded } = useJsApiLoader(ADMIN_GOOGLE_MAPS_LOADER);
 
   useEffect(() => {
     if (!isLoaded || !zoneName.trim()) return;

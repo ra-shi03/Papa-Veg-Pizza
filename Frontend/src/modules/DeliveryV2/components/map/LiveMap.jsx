@@ -11,6 +11,7 @@ import {
 import { useDeliveryStore } from '@/modules/DeliveryV2/store/useDeliveryStore';
 import { zoneAPI } from '@food/api';
 import { useSystemTheme } from '@/shared/utils/themeSync';
+import { ADMIN_GOOGLE_MAPS_LOADER } from '@food/utils/adminGoogleMaps';
 
 const mapContainerStyle = {
   width: '100%',
@@ -27,28 +28,32 @@ const mapOptions = {
   streetViewControl: false,
   rotateControl: true,
   fullscreenControl: false,
+  // Light, clean style with enough contrast to read: roads outlined, parks green, water blue, labels dark
   styles: [
-    { elementType: "geometry", stylers: [{ color: "#f5f5f5" }] },
+    { elementType: "geometry", stylers: [{ color: "#f1f1f1" }] },
     { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-    { elementType: "labels.text.fill", stylers: [{ color: "#616161" }] },
-    { elementType: "labels.text.stroke", stylers: [{ color: "#f5f5f5" }] },
-    { featureType: "administrative.land_parcel", elementType: "labels.text.fill", stylers: [{ color: "#bdbdbd" }] },
-    { featureType: "poi", elementType: "geometry", stylers: [{ color: "#eeeeee" }] },
-    { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
-    { featureType: "water", elementType: "geometry", stylers: [{ color: "#c9c9c9" }] },
-    { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#9e9e9e" }] }
+    { elementType: "labels.text.fill", stylers: [{ color: "#4b4b4b" }] },
+    { elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }] },
+    { featureType: "administrative.land_parcel", elementType: "labels.text.fill", stylers: [{ color: "#9e9e9e" }] },
+    { featureType: "poi", elementType: "geometry", stylers: [{ color: "#e3e3e3" }] },
+    { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#cfe8cf" }] },
+    { featureType: "road", elementType: "geometry.fill", stylers: [{ color: "#ffffff" }] },
+    { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#cfcfcf" }, { weight: 1 }] },
+    { featureType: "road.arterial", elementType: "geometry.fill", stylers: [{ color: "#fff7e0" }] },
+    { featureType: "road.highway", elementType: "geometry.fill", stylers: [{ color: "#fde6b3" }] },
+    { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#e4c27a" }] },
+    { featureType: "transit", elementType: "geometry", stylers: [{ color: "#dcdcdc" }] },
+    { featureType: "water", elementType: "geometry", stylers: [{ color: "#b9d7f0" }] },
+    { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#6b8fb0" }] }
   ]
 };
-const LIBRARIES = ['places', 'geometry'];
 
 export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineReceived, zoom = 12 }) => {
   const { riderLocation, activeOrder, tripStatus } = useDeliveryStore();
   const { primaryColor } = useSystemTheme();
   
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-    libraries: LIBRARIES
-  });
+  // the same loader options as every other screen: the Maps script loads once with one key and one set of libraries
+  const { isLoaded, loadError } = useJsApiLoader(ADMIN_GOOGLE_MAPS_LOADER);
 
   const [directions, setDirections] = useState(null);
   const [baselineDirections, setBaselineDirections] = useState(null);
