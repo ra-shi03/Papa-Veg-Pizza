@@ -606,6 +606,11 @@ describe('recipes and shortages', () => {
                 items: [{ itemId: 'x', name: 'Margherita (Medium)', quantity: 2, price: 200 }], createdAt: new Date(), updatedAt: new Date(),
             });
             liveOrder = { id: String(r.insertedId), ref };
+            // On this supervisor's and this chef's orders: kitchen roles see only the orders they are on
+            await fx.models.FoodOrder.collection.updateOne({ _id: r.insertedId }, { $set: {
+                'kitchen.supervisor.userId': new mongoose.Types.ObjectId(sup.id),
+                'kitchen.staff.pizza_chef.userId': new mongoose.Types.ObjectId(chef.id),
+            } });
         });
         const report = (who, extra = {}) => call(who, 'POST', '/ingredient-shortages', { ingredientId: mozzarella._id, missingQuantity: 4, urgency: 'high', remarks: 'Bag ripped', notifyManager: true, ...extra });
 
@@ -638,6 +643,7 @@ describe('recipes and shortages', () => {
             assert.ok(dash.activeShortages >= 1 && dash.criticalShortages >= 1);
             assert.equal(dash.affectedOrders, 1);
             assert.equal(dash.estimatedRevenueLoss, 400);
+            assert.equal((await get(chef2, '/ingredient-shortages/dashboard')).body.affectedOrders, 0, 'not on this order');
             const d = (await get(sup, `/ingredient-shortages/${shortage._id}`)).body;
             assert.equal(d.shortage.status, 'active');
             assert.equal(d.affectedOrders[0]._id, liveOrder.ref);

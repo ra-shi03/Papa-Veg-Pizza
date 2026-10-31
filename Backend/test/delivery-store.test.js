@@ -215,6 +215,9 @@ describe('delivery issues', () => {
         }), 201);
         issueId = i._id;
         assert.deepEqual([i.orderId, i.riderName, i.issueType, i.severity, i.status, i.refundAmount], [O.road.ref, 'Rider 1', 'Rider Not Responding', 'critical', 'open', 0]);
+        // the supervisor reads it only once the order is assigned to them
+        assert.deepEqual(ok(await fx.call('GET', `${S}/delivery/issues`, sup)), []);
+        await fx.models.FoodOrder.collection.updateOne({ order_id: O.road.ref }, { $set: { 'kitchen.supervisor.userId': new mongoose.Types.ObjectId(A.adminUserId) } });
         assert.deepEqual(ok(await fx.call('GET', `${S}/delivery/issues`, sup)).map((x) => x._id), [issueId]);
         assert.deepEqual(ok(await fx.call('GET', `${S}/delivery/issues`, B.managerToken)), []);
         assert.equal((await fx.call('PATCH', `${S}/delivery/issues/${issueId}`, B.managerToken, { status: 'resolved' })).status, 404);

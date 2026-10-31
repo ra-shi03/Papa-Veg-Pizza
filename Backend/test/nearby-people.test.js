@@ -194,19 +194,16 @@ describe('customers near the store', () => {
         assert.equal((await fx.call('GET', `/v1/food/store/customers/${C.Near.id}`, B.managerToken)).status, 404);
         assert.equal((await fx.call('GET', `/v1/food/store/customers/${C.Nowhere.id}`, A.managerToken)).status, 404);
     });
-    test('masking: manager full phone, masked email; supervisor and franchise admin both masked; super admin full phone', async () => {
+    test('masking: manager full phone, masked email; franchise admin both masked; super admin full phone; a supervisor does not get people who never ordered', async () => {
         const of = async (token, qs = '') => (await custs(token, qs)).find((c) => c._id === C.Near.id);
         const mgr = await of(A.managerToken);
         assert.deepEqual([mgr.mobile, mgr.email], [C.Near.mobile, `n***@example.invalid`]);
-        const sup = await of(supA);
-        assert.match(sup.mobile, /^94\*+\d{2}$/);
-        assert.equal(sup.email, 'n***@example.invalid');
+        assert.equal(await of(supA), undefined);
         const fa = await of(A.adminToken, `&storeId=${A.storeId}`);
         assert.match(fa.mobile, /^94\*+\d{2}$/);
         const sa = await of(fx.SA, `&storeId=${A.storeId}`);
         assert.deepEqual([sa.mobile, sa.email], [C.Near.mobile, 'n***@example.invalid']);
-        const profile = ok(await fx.call('GET', `/v1/food/store/customers/${C.Near.id}`, supA));
-        assert.match(profile.customerProfile.mobile, /^94\*+\d{2}$/);
+        assert.equal((await fx.call('GET', `/v1/food/store/customers/${C.Near.id}`, supA)).status, 404);
     });
 });
 

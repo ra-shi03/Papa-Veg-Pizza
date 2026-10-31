@@ -97,10 +97,13 @@ async function issueRider(ctx, order, riderId) {
   return findRider(ctx, riderId, { approvedOnly: true });
 }
 
+/** A kitchen supervisor reads only the orders the store manager assigned to them. */
+const assignedOnly = (ctx) => (ctx.role === 'KITCHEN_SUPERVISOR' ? { 'kitchen.supervisor.userId': toId(ctx.user.userId) } : {});
+
 async function findOrder(ctx, orderId, select) {
   const identity = buildOrderIdentityFilter(orderId);
   if (!identity) throw new NotFoundError('Order not found');
-  const order = await FoodOrder.findOne({ $and: [identity, { storeId: ctx.storeId }] }).select(select || '').lean();
+  const order = await FoodOrder.findOne({ $and: [identity, { storeId: ctx.storeId, ...assignedOnly(ctx) }] }).select(select || '').lean();
   if (!order) throw new NotFoundError('Order not found');
   return order;
 }
@@ -254,7 +257,7 @@ const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 export async function readyOrders(user, q = {}) {
   const ctx = await deliveryContext(user, q);
-  const filter = { storeId: ctx.storeId, orderStatus: { $in: ['ready_for_pickup', 'reached_pickup'] } };
+  const filter = { storeId: ctx.storeId, ...assignedOnly(ctx), orderStatus: { $in: ['ready_for_pickup', 'reached_pickup'] } };
   const search = String(q.search || '').trim().slice(0, 60);
   if (search) {
     const rx = new RegExp(escapeRegex(search), 'i');
@@ -283,6 +286,7 @@ export async function liveDeliveries(user, q = {}) {
   const ctx = await deliveryContext(user, q);
   const docs = await FoodOrder.find({
     storeId: ctx.storeId,
+    ...assignedOnly(ctx),
     'dispatch.deliveryPartnerId': { $ne: null },
     $or: [{ orderStatus: { $in: ON_ROAD } }, { orderStatus: 'delivered', updatedAt: { $gte: startOfDay() } }],
   }).select('order_id customerName deliveryAddress.name orderStatus dispatch statusHistory').sort({ updatedAt: -1 }).limit(200).lean();
@@ -518,7 +522,9 @@ const emitToStore = (ctx, event, payload) => getIO()?.to(rooms.store(ctx.storeId
 
 export async function listIssues(user, q = {}) {
   const ctx = await deliveryContext(user, q);
-  return (await DeliveryIssue.find({ storeId: ctx.storeId }).sort({ createdAt: -1 }).limit(200).lean()).map(toIssue);
+  const filter = { storeId: ctx.storeId };
+  if (ctx.role === 'KITCHEN_SUPERVISOR') filter.orderId = { $in: await FoodOrder.distinct('_id', { storeId: ctx.storeId, ...assignedOnly(ctx) }) };
+  return (await DeliveryIssue.find(filter).sort({ createdAt: -1 }).limit(200).lean()).map(toIssue);
 }
 
 export async function createIssue(user, body = {}, q = {}) {

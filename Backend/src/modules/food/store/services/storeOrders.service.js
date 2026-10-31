@@ -284,6 +284,10 @@ export async function listStoreOrders(user, query = {}) {
 export async function getStoreOrder(user, orderId) {
   const storeId = requireStore(user);
   const order = await findOrder(orderId, storeId);
+  // Kitchen roles open only the orders they are on, the same rule as the lists.
+  const role = normalizeRole(user.role);
+  if (role === 'KITCHEN_SUPERVISOR' && !isOrderSupervisor(order, user.userId)) throw new NotFoundError('Order not found');
+  if (role === 'KITCHEN_STAFF' && staffSlotsOf(order, user.userId).length === 0) throw new NotFoundError('Order not found');
   return toOpsOrder(order);
 }
 
@@ -534,9 +538,9 @@ export async function moveToStage(user, storeId, order, stage) {
 
 export async function setPriority(user, orderId, priority) {
   const storeId = requireStore(user);
-  const role = normalizeRole(user.role);
-  if (role === 'KITCHEN_STAFF') throw new ForbiddenError('Not allowed.');
   const order = await findOrder(orderId, storeId);
+  const allowed = normalizeRole(user.role) === 'STORE_MANAGER' || isOrderSupervisor(order, user.userId);
+  if (!allowed) throw new ForbiddenError('Only the store manager or the order supervisor can change the priority.');
   order.kitchen.priority = priority === 'urgent' ? 'urgent' : 'normal';
   logStep(order, user, `Priority set to ${order.kitchen.priority}`);
   await order.save();

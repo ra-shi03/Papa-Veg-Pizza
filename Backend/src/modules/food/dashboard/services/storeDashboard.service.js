@@ -11,7 +11,7 @@ import { User } from '../../../../core/users/models/user.model.js';
 import { todaySummary, todayRoster } from '../../store/services/attendance.service.js';
 import { clockOf } from '../../store/services/attendanceTime.js';
 import { riderScope, riderAreaOf } from '../../store/services/storeDelivery.service.js';
-import { storeScope, startOfDay, daysAgo, hourLabel, ago, round1, round2, CANCELLED, SALE } from './dashboardAccess.js';
+import { storeScope, ordersOf, startOfDay, daysAgo, hourLabel, ago, round1, round2, CANCELLED, SALE } from './dashboardAccess.js';
 
 // Store manager dashboard (/v1/store/dashboard/*). Every widget is computed from live data of ONE store, chosen by
 // storeScope() from the token. Shapes are exactly what the widgets render (see the dashboard components).
@@ -42,18 +42,18 @@ export async function todaySales(user, q) {
 
 export async function todayOrders(user, q) {
   const store = await storeScope(user, q, 'today-orders');
-  return { totalOrders: await FoodOrder.countDocuments({ storeId: store._id, createdAt: { $gte: startOfDay() } }) };
+  return { totalOrders: await FoodOrder.countDocuments({ ...ordersOf(user, store), createdAt: { $gte: startOfDay() } }) };
 }
 
 export async function activeOrders(user, q) {
   const store = await storeScope(user, q, 'active-orders');
-  return { activeOrders: await FoodOrder.countDocuments({ storeId: store._id, orderStatus: { $in: ACTIVE } }) };
+  return { activeOrders: await FoodOrder.countDocuments({ ...ordersOf(user, store), orderStatus: { $in: ACTIVE } }) };
 }
 
 /** Average minutes from the kitchen accepting an order to it being ready, for orders that became ready today. */
-async function avgPrepMinutes(storeId) {
+async function avgPrepMinutes(orders) {
   const [r] = await FoodOrder.aggregate([
-    { $match: { storeId, 'kitchen.readyAt': { $gte: startOfDay() }, 'kitchen.acceptedAt': { $ne: null } } },
+    { $match: { ...orders, 'kitchen.readyAt': { $gte: startOfDay() }, 'kitchen.acceptedAt': { $ne: null } } },
     { $project: { m: { $divide: [{ $subtract: ['$kitchen.readyAt', '$kitchen.acceptedAt'] }, 60000] } } },
     { $match: { m: { $gte: 0 } } },
     { $group: { _id: null, avg: { $avg: '$m' } } },
@@ -63,12 +63,12 @@ async function avgPrepMinutes(storeId) {
 
 export async function prepTime(user, q) {
   const store = await storeScope(user, q, 'prep-time');
-  return { avgPrepTime: await avgPrepMinutes(store._id) };
+  return { avgPrepTime: await avgPrepMinutes(ordersOf(user, store)) };
 }
 
 export async function pendingDeliveries(user, q) {
   const store = await storeScope(user, q, 'pending-deliveries');
-  return { pendingDeliveries: await FoodOrder.countDocuments({ storeId: store._id, orderStatus: { $in: ['ready_for_pickup', 'reached_pickup', ...OUT] } }) };
+  return { pendingDeliveries: await FoodOrder.countDocuments({ ...ordersOf(user, store), orderStatus: { $in: ['ready_for_pickup', 'reached_pickup', ...OUT] } }) };
 }
 
 const lowStockFilter = (storeId) => ({ storeId, tracked: true, $expr: { $lte: ['$currentStock', '$reorderLevel'] } });
@@ -136,7 +136,7 @@ const isoDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,
 export async function orderStatus(user, q) {
   const store = await storeScope(user, q, 'order-status');
   const rows = await FoodOrder.aggregate([
-    { $match: { storeId: store._id, createdAt: { $gte: startOfDay() } } },
+    { $match: { ...ordersOf(user, store), createdAt: { $gte: startOfDay() } } },
     { $group: { _id: { s: '$orderStatus', k: '$kitchen.stage' }, n: { $sum: 1 } } },
   ]);
   const out = { incoming: 0, preparing: 0, baking: 0, packaging: 0, ready: 0, delivered: 0, cancelled: 0 };
@@ -161,7 +161,7 @@ function bucketOf(status, stage) {
 /** Today's orders behind the order-status donut, one row per order, in the donut's own slices. */
 export async function orderList(user, q) {
   const store = await storeScope(user, q, 'order-list');
-  const orders = await FoodOrder.find({ storeId: store._id, createdAt: { $gte: startOfDay() } })
+  const orders = await FoodOrder.find({ ...ordersOf(user, store), createdAt: { $gte: startOfDay() } })
     .select('order_id customerName orderStatus kitchen.stage createdAt').sort({ createdAt: -1 }).limit(300).lean();
   return orders
     .map((o) => ({ orderNumber: o.order_id || String(o._id), customer: o.customerName || 'Customer', status: bucketOf(o.orderStatus, o.kitchen?.stage), createdTime: clockOf(new Date(o.createdAt)) }))
@@ -185,7 +185,7 @@ export async function topProducts(user, q) {
 /** Orders on the floor right now, by column. */
 export async function liveOrders(user, q) {
   const store = await storeScope(user, q, 'live-orders');
-  const orders = await FoodOrder.find({ storeId: store._id, orderStatus: { $in: [...ACTIVE, ...OUT] } })
+  const orders = await FoodOrder.find({ ...ordersOf(user, store), orderStatus: { $in: [...ACTIVE, ...OUT] } })
     .select('order_id customerName pricing.total orderStatus kitchen.expectedReadyAt createdAt').sort({ createdAt: 1 }).limit(200).lean();
   const out = { incoming: [], preparing: [], ready: [], delivery: [] };
   for (const o of orders) {
@@ -203,12 +203,12 @@ export async function liveOrders(user, q) {
 export async function kitchenPerformance(user, q) {
   const store = await storeScope(user, q, 'kitchen-performance');
   const [avg, delayed, staff, items, ovens, packing] = await Promise.all([
-    avgPrepMinutes(store._id),
-    FoodOrder.countDocuments({ storeId: store._id, orderStatus: { $in: ['confirmed', 'preparing'] }, 'kitchen.expectedReadyAt': { $lt: new Date() }, 'kitchen.delayResolvedAt': null }),
+    avgPrepMinutes(ordersOf(user, store)),
+    FoodOrder.countDocuments({ ...ordersOf(user, store), orderStatus: { $in: ['confirmed', 'preparing'] }, 'kitchen.expectedReadyAt': { $lt: new Date() }, 'kitchen.delayResolvedAt': null }),
     staffOf(store._id),
     KitchenItem.find({ storeId: store._id, rejected: false, stage: { $in: ['dough_prep', 'sauce', 'toppings', 'baking'] }, paused: false }).select('stage ovenId').lean(),
     KitchenOven.find({ storeId: store._id, state: 'active' }).select('_id').lean(),
-    FoodOrder.countDocuments({ storeId: store._id, orderStatus: 'preparing', 'kitchen.packaging.status': { $in: ['packaging_started', 'quality_checked'] } }),
+    FoodOrder.countDocuments({ ...ordersOf(user, store), orderStatus: 'preparing', 'kitchen.packaging.status': { $in: ['packaging_started', 'quality_checked'] } }),
   ]);
   const titles = staff.filter((s) => s.status === 'Active').map((s) => String(s.role || '').toLowerCase());
   const chefs = titles.filter((t) => !/supervisor|manager|bak|packag/.test(t)).length;
@@ -233,7 +233,7 @@ export async function kitchenPerformance(user, q) {
 export async function riderRoster(user, q) {
   const store = await storeScope(user, q, 'rider-roster');
   const [orders, allBusy] = await Promise.all([
-    FoodOrder.find({ storeId: store._id, orderStatus: { $in: ['ready_for_pickup', 'reached_pickup', ...OUT] }, 'dispatch.deliveryPartnerId': { $ne: null } })
+    FoodOrder.find({ ...ordersOf(user, store), orderStatus: { $in: ['ready_for_pickup', 'reached_pickup', ...OUT] }, 'dispatch.deliveryPartnerId': { $ne: null } })
       .select('order_id orderStatus dispatch.deliveryPartnerId statusHistory updatedAt').lean(),
     FoodOrder.distinct('dispatch.deliveryPartnerId', { orderStatus: { $in: ['ready_for_pickup', 'reached_pickup', ...OUT] }, 'dispatch.deliveryPartnerId': { $ne: null } }),
   ]);
@@ -274,9 +274,9 @@ export async function staffRoster(user, q) {
 export async function deliveryOverview(user, q) {
   const store = await storeScope(user, q, 'delivery-overview');
   const [onOrders, allBusy, out] = await Promise.all([
-    FoodOrder.distinct('dispatch.deliveryPartnerId', { storeId: store._id, orderStatus: { $in: ['ready_for_pickup', 'reached_pickup', ...OUT] }, 'dispatch.deliveryPartnerId': { $ne: null } }),
+    FoodOrder.distinct('dispatch.deliveryPartnerId', { ...ordersOf(user, store), orderStatus: { $in: ['ready_for_pickup', 'reached_pickup', ...OUT] }, 'dispatch.deliveryPartnerId': { $ne: null } }),
     FoodOrder.distinct('dispatch.deliveryPartnerId', { orderStatus: { $in: ['ready_for_pickup', 'reached_pickup', ...OUT] }, 'dispatch.deliveryPartnerId': { $ne: null } }),
-    FoodOrder.find({ storeId: store._id, orderStatus: { $in: OUT } }).select('statusHistory updatedAt').lean(),
+    FoodOrder.find({ ...ordersOf(user, store), orderStatus: { $in: OUT } }).select('statusHistory updatedAt').lean(),
   ]);
   const { filter } = await riderScope(store, { approvedOnly: true });
   const available = await FoodDeliveryPartner.countDocuments({ ...filter, availabilityStatus: 'online', _id: { $nin: allBusy } });

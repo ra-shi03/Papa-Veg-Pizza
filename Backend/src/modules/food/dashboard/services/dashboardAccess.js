@@ -20,6 +20,13 @@ export const SUPERVISOR_WIDGETS = new Set([
   'order-list', 'rider-roster',
 ]);
 
+/** The orders a widget counts: the store's; a kitchen supervisor only those the store manager assigned to them. */
+export const ordersOf = (user, store) => (
+  normalize(user?.role) === 'KITCHEN_SUPERVISOR'
+    ? { storeId: store._id, 'kitchen.supervisor.userId': toId(user.userId) }
+    : { storeId: store._id }
+);
+
 /** The one store a store-dashboard call is about. */
 export async function storeScope(user, query = {}, widget) {
   const role = normalize(user?.role);

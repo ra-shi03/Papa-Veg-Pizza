@@ -489,7 +489,11 @@ export async function deleteRecipe(user, id, q = {}) {
 async function affectedOrdersOf(ctx, ingredientIds) {
   const recipes = await Recipe.find({ storeId: ctx.storeId, 'ingredients.ingredientId': { $in: ingredientIds } }).select('nameKey ingredients.ingredientId').lean();
   if (!recipes.length) return new Map();
-  const orders = await FoodOrder.find({ storeId: ctx.storeId, orderStatus: { $in: ['confirmed', 'preparing'] } })
+  const filter = { storeId: ctx.storeId, orderStatus: { $in: ['confirmed', 'preparing'] } };
+  // Kitchen roles see only the orders they are on.
+  if (ctx.role === 'supervisor') filter['kitchen.supervisor.userId'] = toId(ctx.user.userId);
+  if (ctx.role === 'staff') filter.$or = ['pizza_chef', 'baking_chef', 'packaging_staff'].map((slot) => ({ [`kitchen.staff.${slot}.userId`]: toId(ctx.user.userId) }));
+  const orders = await FoodOrder.find(filter)
     .select('order_id customerName items orderStatus kitchen.expectedReadyAt').lean();
   const out = new Map(ingredientIds.map((id) => [String(id), []]));
   for (const order of orders) {

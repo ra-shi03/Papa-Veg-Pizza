@@ -3,7 +3,7 @@
 //
 //   store manager      -> own store; replies to reviews, responds to and resolves complaints; full phone (the
 //                         Customers screens mask the email, complaints and reviews show it)
-//   kitchen supervisor -> own store, read only, phone and email masked
+//   kitchen supervisor -> only the orders assigned to them (supervisor-assigned-only.test.js), read only, phone and email masked
 //   franchise admin, super admin -> Customers screens read only via ?storeId= (nearby-people.test.js)
 //   kitchen staff, customers -> 403 on the store screens; franchise / super admin -> 403 on complaints and reviews
 //   another store / franchise -> 404
@@ -63,6 +63,11 @@ before(async () => {
     orders.ab2 = await order(A, both.id, { total: 200, rating: 3, name: 'Both Kumar', phone: both.mobile, daysAgo: 4 });
     orders.b1 = await order(B, B.customerId, { total: 999, rating: 4, comment: 'Good', name: 'Bob Das', phone: '9123456780', daysAgo: 1 });
     orders.bb1 = await order(B, both.id, { total: 7000, name: 'Both Kumar', phone: both.mobile, daysAgo: 1 });
+    // The store manager assigned all of store A's orders to this supervisor
+    await fx.models.FoodOrder.collection.updateMany(
+        { storeId: new mongoose.Types.ObjectId(A.storeId) },
+        { $set: { 'kitchen.supervisor.userId': new mongoose.Types.ObjectId(sup.id) } },
+    );
 });
 after(async () => { await fx?.teardown(); });
 

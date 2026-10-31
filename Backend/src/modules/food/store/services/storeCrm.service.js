@@ -34,8 +34,22 @@ function context(user) {
   const role = normalize(user?.role);
   if (role !== 'STORE_MANAGER' && role !== 'KITCHEN_SUPERVISOR') throw new ForbiddenError('You do not have access to customers.');
   if (!isId(user.storeId)) throw new ForbiddenError('No store is linked to your account.');
-  return { user, storeId: toId(user.storeId), isManager: role === 'STORE_MANAGER' };
+  return { user, storeId: toId(user.storeId), isManager: role === 'STORE_MANAGER', supervisorId: supervisorIdOf(role, user) };
 }
+
+/** A kitchen supervisor reads only the orders the store manager assigned to them; everyone else the whole store. */
+const supervisorIdOf = (role, user) => (role === 'KITCHEN_SUPERVISOR' ? toId(user.userId) : null);
+const ordersIn = (ctx, extra = {}) => ({
+  storeId: ctx.storeId,
+  ...(ctx.supervisorId ? { 'kitchen.supervisor.userId': ctx.supervisorId } : {}),
+  ...extra,
+});
+/** Complaints follow the order they are about, so a supervisor gets only those of their own orders. */
+const ticketsIn = async (ctx, extra = {}) => ({
+  storeId: ctx.storeId,
+  ...(ctx.supervisorId ? { orderId: { $in: await FoodOrder.distinct('_id', ordersIn(ctx)) } } : {}),
+  ...extra,
+});
 /**
  * Who may read the Customers screens (/food/store/customers/*), from the token:
  *   store manager      -> own store; full phone, masked email
@@ -49,7 +63,7 @@ async function customerContext(user, q = {}) {
   if (role === 'STORE_MANAGER' || role === 'KITCHEN_SUPERVISOR') {
     if (!isId(user.storeId)) throw new ForbiddenError('No store is linked to your account.');
     if (q.storeId && String(q.storeId) !== String(user.storeId)) throw new NotFoundError('Store not found');
-    return { user, storeId: toId(user.storeId), isManager: role === 'STORE_MANAGER', fullPhone: role === 'STORE_MANAGER' };
+    return { user, storeId: toId(user.storeId), isManager: role === 'STORE_MANAGER', supervisorId: supervisorIdOf(role, user), fullPhone: role === 'STORE_MANAGER' };
   }
   if (role === 'FRANCHISE_ADMIN' || role === 'SUPERADMIN' || role === 'SUPER_ADMIN') {
     if (!isId(q.storeId)) throw new ValidationError('Choose a store (storeId).');
@@ -133,7 +147,7 @@ const orderSummary = (o) => ({
 /** Every customer of this store with their totals here and their latest order here. */
 async function storeCustomers(ctx) {
   const rows = await FoodOrder.aggregate([
-    { $match: { storeId: ctx.storeId } },
+    { $match: ordersIn(ctx) },
     { $sort: { createdAt: -1 } },
     {
       $group: {
@@ -216,7 +230,9 @@ async function nearbyCustomers(ctx, { exclude = [], only } = {}) {
 export async function listCustomers(user, q = {}) {
   const ctx = await customerContext(user, q);
   const ordered = await storeCustomers(ctx);
-  let list = [...ordered, ...(await nearbyCustomers(ctx, { exclude: ordered.map((c) => toId(c._id)) }))];
+  // people near the store who never ordered are not on any order, so a supervisor does not get them
+  const near = ctx.supervisorId ? [] : await nearbyCustomers(ctx, { exclude: ordered.map((c) => toId(c._id)) });
+  let list = [...ordered, ...near];
   const search = str(q.search, 80).toLowerCase();
   if (search) list = list.filter((c) => [c.name, c.email, c.mobile].some((v) => String(v).toLowerCase().includes(search)));
   if (String(q.returning) === 'true') list = list.filter((c) => c.totalOrders > 1);
@@ -237,10 +253,10 @@ export async function listCustomers(user, q = {}) {
 export async function customerProfile(user, customerId, q = {}) {
   const ctx = await customerContext(user, q);
   if (!isId(customerId)) throw new NotFoundError('Customer not found');
-  const orders = await FoodOrder.find({ storeId: ctx.storeId, userId: toId(customerId) }).sort({ createdAt: -1 }).limit(50).lean();
+  const orders = await FoodOrder.find(ordersIn(ctx, { userId: toId(customerId) })).sort({ createdAt: -1 }).limit(50).lean();
   if (!orders.length) {
     // Never ordered here: a customer of this store only when their saved address is near it
-    const [near] = await nearbyCustomers(ctx, { only: toId(customerId) });
+    const [near] = ctx.supervisorId ? [] : await nearbyCustomers(ctx, { only: toId(customerId) });
     if (!near) throw new NotFoundError('Customer not found');
     const { recentOrder, ...profile } = near;
     return { customerProfile: maskedCustomer(ctx, profile), recentOrders: [], complaints: await complaintsOf(ctx, { userId: toId(customerId) }), reviews: [] };
@@ -258,7 +274,7 @@ export async function customerProfile(user, customerId, q = {}) {
 export async function orderDetails(user, orderId, q = {}) {
   const ctx = await customerContext(user, q);
   if (!isId(orderId)) throw new NotFoundError('Order not found');
-  const order = await FoodOrder.findOne({ _id: toId(orderId), storeId: ctx.storeId }).lean();
+  const order = await FoodOrder.findOne(ordersIn(ctx, { _id: toId(orderId) })).lean();
   if (!order) throw new NotFoundError('Order not found');
   const [store, u, refunds] = await Promise.all([
     FoodStore.findById(ctx.storeId).select('storeName').lean(),
@@ -291,7 +307,7 @@ const PRIORITY_RANK = { low: 1, medium: 2, high: 3, critical: 4 };
 export const complaintTypeOf = (issueType) => String(issueType || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
 async function complaintsOf(ctx, extra = {}) {
-  const tickets = await FoodSupportTicket.find({ storeId: ctx.storeId, ...extra }).sort({ createdAt: -1 }).limit(2000).lean();
+  const tickets = await FoodSupportTicket.find(await ticketsIn(ctx, extra)).sort({ createdAt: -1 }).limit(2000).lean();
   return decorate(ctx, tickets);
 }
 
@@ -356,7 +372,7 @@ export async function listComplaints(user, q = {}) {
 
 const findTicket = async (ctx, id) => {
   if (!isId(id)) throw new NotFoundError('Complaint not found');
-  const t = await FoodSupportTicket.findOne({ _id: toId(id), storeId: ctx.storeId });
+  const t = await FoodSupportTicket.findOne(await ticketsIn(ctx, { _id: toId(id) }));
   if (!t) throw new NotFoundError('Complaint not found');
   return t;
 };
@@ -465,7 +481,7 @@ function toReview(ctx, o, customer) {
 }
 
 async function storeReviews(ctx) {
-  const orders = await FoodOrder.find({ storeId: ctx.storeId, 'ratings.store.rating': { $gte: 1 } })
+  const orders = await FoodOrder.find(ordersIn(ctx, { 'ratings.store.rating': { $gte: 1 } }))
     .select('order_id userId storeId customerName customerPhone ratings updatedAt').sort({ 'ratings.store.ratedAt': -1 }).limit(2000).lean();
   const customers = new Map((await storeCustomers(ctx)).map((c) => [c._id, c]));
   return orders.map((o) => toReview(ctx, o, customers.get(String(o.userId))));
@@ -491,7 +507,7 @@ export async function listReviews(user, q = {}) {
 
 const findRatedOrder = async (ctx, id) => {
   if (!isId(id)) throw new NotFoundError('Review not found');
-  const o = await FoodOrder.findOne({ _id: toId(id), storeId: ctx.storeId, 'ratings.store.rating': { $gte: 1 } });
+  const o = await FoodOrder.findOne(ordersIn(ctx, { _id: toId(id), 'ratings.store.rating': { $gte: 1 } }));
   if (!o) throw new NotFoundError('Review not found');
   return o;
 };
@@ -500,7 +516,7 @@ export async function reviewDetails(user, id) {
   const ctx = context(user);
   const o = (await findRatedOrder(ctx, id)).toObject();
   const customer = (await storeCustomers(ctx)).find((c) => c._id === String(o.userId)) || null;
-  const theirs = await FoodOrder.find({ storeId: ctx.storeId, userId: o.userId, 'ratings.store.rating': { $gte: 1 } }).select('ratings.store.rating').lean();
+  const theirs = await FoodOrder.find(ordersIn(ctx, { userId: o.userId, 'ratings.store.rating': { $gte: 1 } })).select('ratings.store.rating').lean();
   const avg = theirs.length ? theirs.reduce((n, x) => n + x.ratings.store.rating, 0) / theirs.length : 0;
   return {
     review: toReview(ctx, o, customer),
