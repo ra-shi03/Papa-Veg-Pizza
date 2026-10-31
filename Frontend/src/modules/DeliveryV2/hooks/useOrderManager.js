@@ -86,7 +86,7 @@ export const useOrderManager = () => {
       console.error('Accept Order Error:', error);
       const msg = error?.response?.data?.error || error?.response?.data?.message || 'Network error. Please try again.';
       // If the backend says already accepted by another — show friendly message
-      if (error?.response?.status === 403 || msg.toLowerCase().includes('already accepted')) {
+      if (error?.response?.status === 403 || msg.toLowerCase().includes('another partner')) {
         toast.error('This order was just taken by another delivery partner.', { duration: 4000 });
       } else {
         toast.error(msg);

@@ -122,6 +122,7 @@ to a high-severity scope bug.
 | "Indore fallback removed" from checkout | Partly. `CheckoutModal.jsx:43` still starts from an Indore address unless localStorage has `deliveryAddress` |
 | Batch 2: no invented live data in admin panels | `F/staffManagement/KitchenStaff.jsx:177-193` still fires fake socket toasts from `Math.random`, not gated |
 | Batch 2 removed mock paths safely | Removing the mock path from the store socket hooks exposed that they never connect. That is the OFFLINE badge in your screenshots. I did not catch it then |
+| Blocker 2 below, and section 6: the delivery home screen polls the list and pops the first order as an offer, so far riders were being offered other stores' orders in the real app | **Wrong about the popup.** The API returns the list under `data.data`, but `DeliveryHomeV2.jsx` read only `docs` or `items`, so the poll never showed an offer; offers reached riders only by socket. The real problems were that any rider's token could read the list with customer details, and that accept had no scope. Found while fixing batch 3, which also made the poll work |
 | Your prompt counted ~27 uncommitted files | The working tree has 42 (40 modified, 2 new). All are listed in section 11 |
 
 ---

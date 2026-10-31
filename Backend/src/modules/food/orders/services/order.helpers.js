@@ -229,6 +229,52 @@ export function buildDeliverySocketPayload(orderDoc, storeDoc = null) {
   };
 }
 
+/**
+ * What a rider sees of an order before accepting it, on every channel (poll, socket, order by id): the store, the area
+ * it goes to, the order total, the distance and the item count. Never the customer's name, phone, email, street or
+ * coordinates: those arrive with the accepted order, and only for the rider who accepted it.
+ */
+export function buildDeliveryOfferPayload(orderDoc, storeDoc = null, { pickupDistanceKm, total, paymentMethod } = {}) {
+  const order = orderDoc?.toObject ? orderDoc.toObject() : orderDoc || {};
+  const store = storeDoc || (order.storeId?.storeName ? order.storeId : null) || {};
+  const location = store.location || {};
+  const area = String(order.deliveryAddress?.city || '').trim();
+  const storeAddress = location.address || location.formattedAddress || store.addressLine1 || store.address || '';
+  const orderTotal = total ?? order.pricing?.total ?? 0;
+  const mongoId = (order._id || '').toString();
+  return {
+    _id: mongoId,
+    orderMongoId: mongoId,
+    orderId: order.order_id || mongoId,
+    status: order.orderStatus,
+    orderStatus: order.orderStatus,
+    dispatch: { status: order.dispatch?.status },
+    storeId: (order.storeId?._id || order.storeId || '').toString(),
+    storeName: store.storeName || store.name || order.storeName || '',
+    storeAddress,
+    storeLocation: {
+      latitude: store.latitude ?? location.latitude,
+      longitude: store.longitude ?? location.longitude,
+      address: storeAddress,
+      area: location.area || store.area || '',
+      city: location.city || store.city || '',
+      state: location.state || store.state || '',
+    },
+    area,
+    // the field the delivery app's offer screen shows for the drop-off
+    customerAddress: area,
+    total: orderTotal,
+    pricing: { total: orderTotal },
+    itemCount: (order.items || []).reduce((n, item) => n + (Number(item?.quantity) || 1), 0),
+    paymentMethod: paymentMethod || order.payment?.method,
+    earnings: order.riderEarning || order.pricing?.deliveryFee || 0,
+    riderEarning: order.riderEarning || 0,
+    ...(Number.isFinite(pickupDistanceKm) ? { pickupDistanceKm } : {}),
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
+  };
+}
+
 export function canExposeOrderToStore(orderLike) {
   const method = String(orderLike?.payment?.method || "").toLowerCase();
   const status = String(orderLike?.payment?.status || "").toLowerCase();

@@ -11,12 +11,26 @@ import { config } from '../../../../config/env.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 import { addOrderJob } from '../../../../queues/producers/order.producer.js';
 import {
-  buildDeliverySocketPayload,
+  buildDeliveryOfferPayload,
   buildOrderIdentityFilter,
   haversineKm,
   notifyOwnerSafely,
   notifyOwnersSafely,
 } from './order.helpers.js';
+
+/**
+ * Of these stores, the ones whose orders this rider may take: the same rule as auto-dispatch (riderScope, approved
+ * riders only): the store's own rider, or a rider of its franchise or of the shared fleet who is near it. The rider app's
+ * poll and accept use this, so they work without Redis and can never reach further than dispatch does.
+ */
+export async function storesServedByRider(partnerId, storeIds = []) {
+  const stores = await FoodStore.find({ _id: { $in: storeIds } }).select('_id franchiseId').lean();
+  const served = await Promise.all(stores.map(async (store) => {
+    const { filter } = await riderScope(store, { approvedOnly: true });
+    return (await FoodDeliveryPartner.exists({ $and: [{ _id: partnerId }, filter] })) ? store._id : null;
+  }));
+  return served.filter(Boolean);
+}
 
 async function filterPartnersByCashLimit(partners = [], options = {}) {
   if (!Array.isArray(partners) || partners.length === 0) return [];
@@ -265,7 +279,7 @@ export async function tryAutoAssign(orderId, options = {}) {
       // If we ran out of new eligible partners, we might want to re-offer to everyone (Phase 2 style)
       const io = getIO();
       if (io && partners.length > 0) {
-        const payload = buildDeliverySocketPayload(order, order.storeId);
+        const payload = buildDeliveryOfferPayload(order, order.storeId);
         for (const p of partners) {
           const roomName = rooms.delivery(p.partnerId);
           io.to(roomName).emit('new_order_available', { ...payload, pickupDistanceKm: p.distanceKm });
@@ -284,7 +298,7 @@ export async function tryAutoAssign(orderId, options = {}) {
     }
 
     const io = getIO();
-    const payload = buildDeliverySocketPayload(order, order.storeId);
+    const payload = buildDeliveryOfferPayload(order, order.storeId);
 
     const phase1Batch = eligible.slice(0, Math.min(3, eligible.length));
 

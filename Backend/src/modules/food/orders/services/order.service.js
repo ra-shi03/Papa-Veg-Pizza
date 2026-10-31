@@ -51,6 +51,7 @@ import {
   pushStatusHistory,
   normalizeOrderForClient,
   applyAggregateRating,
+  buildDeliveryOfferPayload,
   buildDeliverySocketPayload,
   notifyStoreNewOrder,
   isStatusAdvance,
@@ -624,7 +625,14 @@ export async function getOrderById(
   if (deliveryPartnerId && orderPartnerId !== deliveryPartnerId.toString())
     throw new ForbiddenError("Not assigned to you");
 
-  if (deliveryPartnerId || storeId) {
+  if (deliveryPartnerId) {
+    // A rider gets customer details only once they have accepted the order, and never the email
+    if (order.dispatch?.status !== "accepted") return buildDeliveryOfferPayload(order, order.storeId);
+    if (order.userId?.email !== undefined) delete order.userId.email;
+    return sanitizeOrderForExternal(order);
+  }
+
+  if (storeId) {
     return sanitizeOrderForExternal(order);
   }
 
@@ -1246,7 +1254,10 @@ export async function updateOrderStatusStore(
                 if (assignedId) {
                     console.log(`[DEBUG] Notifying assigned partner ${assignedId} that order is ready.`);
                     const store = await FoodStore.findById(order.storeId).select('storeName location addressLine1 area city state').lean();
-                    const payload = buildDeliverySocketPayload(order, store);
+                    // Customer details only for the rider who has accepted it
+                    const payload = order.dispatch?.status === 'accepted'
+                      ? buildDeliverySocketPayload(order, store)
+                      : buildDeliveryOfferPayload(order, store);
                     logger.info(
                       `[DeliveryDispatch] Emitting order_ready to ${rooms.delivery(assignedId)} for order ${order._id.toString()}`,
                     );

@@ -76,6 +76,8 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
   const { items: broadcastItems, unreadCount: notificationUnreadCount, markAsRead: markBroadcastAsRead, dismissAll: dismissAllBroadcast } = useNotificationInbox("delivery", { limit: 20 });
 
   const [incomingOrder, setIncomingOrder] = useState(null);
+  // Offers this rider dismissed: the poll below must not bring them straight back
+  const declinedOffers = useRef(new Set());
   const [cashLimitNotice, setCashLimitNotice] = useState(null);
   const [currentTab, setCurrentTab] = useState(tab);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -609,7 +611,9 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
           availableResponse?.data?.data ||
           availableResponse?.data ||
           {};
-        const availableOrders = Array.isArray(availablePayload?.docs)
+        const availableOrders = Array.isArray(availablePayload?.data)
+          ? availablePayload.data
+          : Array.isArray(availablePayload?.docs)
           ? availablePayload.docs
           : Array.isArray(availablePayload?.items)
             ? availablePayload.items
@@ -625,6 +629,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
           const dispatchStatus = String(order?.dispatch?.status || '').toLowerCase();
           const orderStatus = String(order?.orderStatus || order?.status || '').toLowerCase();
           return (
+            !declinedOffers.current.has(String(order?.orderMongoId || order?._id)) &&
             ['unassigned', 'assigned'].includes(dispatchStatus) &&
             ['confirmed', 'preparing', 'ready_for_pickup'].includes(orderStatus)
           );
@@ -1013,10 +1018,10 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                         // - "Order already accepted by another partner" (403)
                         // - Network/timeout errors
                         // Keep the modal visible only if it's not a "taken" error
-                        const msg = String(err?.response?.data?.message || err?.message || '');
+                        const msg = String(err?.response?.data?.error || err?.response?.data?.message || err?.message || '');
                         const isTaken = msg.toLowerCase().includes('already accepted') || 
                                         msg.toLowerCase().includes('another partner') ||
-                                        (err?.response?.status === 403);
+                                        [403, 409].includes(err?.response?.status);
                         if (isTaken) {
                           // Dismiss modal — the order is no longer available
                           setIncomingOrder(null);
@@ -1025,7 +1030,11 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                         // For other errors (network, etc.), keep showing the modal so they can retry
                       }
                     }}
-                    onReject={() => { setIncomingOrder(null); clearNewOrder(); }}
+                    onReject={() => {
+                      declinedOffers.current.add(String(incomingOrder?.orderMongoId || incomingOrder?._id));
+                      setIncomingOrder(null);
+                      clearNewOrder();
+                    }}
                     onMinimize={() => setIsModalMinimized(true)}
                   />
                 )}

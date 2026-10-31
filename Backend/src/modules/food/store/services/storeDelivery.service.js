@@ -4,7 +4,7 @@ import { DeliveryIssue } from '../models/deliveryIssue.model.js';
 import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
 import { FoodZone } from '../../admin/models/zone.model.js';
 import { Refund } from '../../../../core/payments/models/refund.model.js';
-import { buildOrderIdentityFilter, buildDeliverySocketPayload, pushStatusHistory, enqueueOrderEvent } from '../../orders/services/order.helpers.js';
+import { buildOrderIdentityFilter, buildDeliveryOfferPayload, pushStatusHistory, enqueueOrderEvent } from '../../orders/services/order.helpers.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 import { isId, toId, startOfDay, round1 } from '../../dashboard/services/dashboardAccess.js';
@@ -354,7 +354,7 @@ export async function timeline(user, orderId, q = {}) {
 function notifyAssignment(ctx, order, rider, previousRiderId) {
   const io = getIO();
   if (!io) return;
-  io.to(rooms.delivery(rider._id)).emit('new_order_available', buildDeliverySocketPayload(order, {
+  io.to(rooms.delivery(rider._id)).emit('new_order_available', buildDeliveryOfferPayload(order, {
     storeName: ctx.store.storeName, phone: ctx.store.phone, city: ctx.store.city, state: ctx.store.state, addressLine1: ctx.store.address,
     location: { latitude: ctx.store.latitude, longitude: ctx.store.longitude },
   }));

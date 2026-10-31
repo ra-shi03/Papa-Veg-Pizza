@@ -23,11 +23,13 @@ import * as foodTransactionService from './foodTransaction.service.js';
 import * as dispatchService from './order-dispatch.service.js';
 import { awardOrderPointsSafely } from '../../user/services/rewards.service.js';
 import {
+  buildDeliveryOfferPayload,
   buildOrderIdentityFilter,
   emitDeliveryDropOtpToUser,
   enqueueOrderEvent,
   generateFourDigitDeliveryOtp,
   notifyOwnerSafely,
+  haversineKm,
   notifyOwnersSafely,
   pushStatusHistory,
   sanitizeOrderForExternal,
@@ -60,6 +62,10 @@ const PICKUP_FROM = ['ready_for_pickup', 'reached_pickup'];
 const COMPLETE_FROM = ['picked_up', 'reached_drop'];
 const PAID_STATUSES = ['paid', 'captured', 'authorized'];
 const RACED = 'This order was just updated. Refresh and try again.';
+
+// The store fields a rider's order needs (the app reads the coordinates off the populated store)
+const RIDER_STORE_FIELDS = 'storeName name address addressLine1 phone location latitude longitude area city state profileImage';
+const OFFER_STATUSES = ['confirmed', 'preparing', 'ready_for_pickup'];
 
 const stepConflict = (message) => Object.assign(new Error(message), { name: 'ConflictError', statusCode: 409 });
 
@@ -385,12 +391,22 @@ export async function listOrdersAvailableDelivery(deliveryPartnerId, query) {
     },
   };
 
+  // Offers: the rule auto-dispatch uses, or an order already offered to this rider (they may have moved since)
+  const partnerId = new mongoose.Types.ObjectId(deliveryPartnerId);
+  const openOrders = { 'dispatch.status': 'unassigned', orderStatus: { $in: OFFER_STATUSES } };
+  const servedStores = partnerCapacity.hasCapacity
+    ? await dispatchService.storesServedByRider(partnerId, await FoodOrder.distinct('storeId', openOrders))
+    : [];
+
   const filter = partnerCapacity.hasCapacity
     ? {
         $or: [
           {
-            'dispatch.status': 'unassigned',
-            orderStatus: { $in: ['confirmed', 'preparing', 'ready_for_pickup'] },
+            ...openOrders,
+            $or: [
+              { storeId: { $in: servedStores } },
+              { 'dispatch.offeredTo': { $elemMatch: { partnerId, action: { $ne: 'rejected' } } } },
+            ],
           },
           activeOwnOrderFilter,
         ],
@@ -402,14 +418,12 @@ export async function listOrdersAvailableDelivery(deliveryPartnerId, query) {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate('userId', 'name phone email')
-      .populate(
-        'storeId',
-        'storeName name address phone phone location profileImage',
-      )
+      .populate('userId', 'name phone')
+      .populate('storeId', RIDER_STORE_FIELDS)
       .lean(),
     FoodOrder.countDocuments(filter),
   ]);
+  const rider = await FoodDeliveryPartner.findById(partnerId).select('lastLat lastLng').lean();
 
   const orderIds = (docs || []).map((d) => d?._id).filter(Boolean);
   const txRows = orderIds.length
@@ -419,6 +433,18 @@ export async function listOrdersAvailableDelivery(deliveryPartnerId, query) {
 
   const enriched = (docs || []).map((doc) => {
     const tx = txByOrderId.get(String(doc?._id)) || null;
+    const accepted = doc?.dispatch?.status === 'accepted' && String(doc?.dispatch?.deliveryPartnerId) === String(partnerId);
+    if (!accepted) {
+      const store = doc?.storeId || {};
+      const km = Number.isFinite(rider?.lastLat) && Number.isFinite(rider?.lastLng) && Number.isFinite(store.latitude) && Number.isFinite(store.longitude)
+        ? Math.round(haversineKm(rider.lastLat, rider.lastLng, store.latitude, store.longitude) * 10) / 10
+        : undefined;
+      return buildDeliveryOfferPayload(doc, store, {
+        pickupDistanceKm: km,
+        total: tx?.pricing?.total,
+        paymentMethod: tx?.payment?.method || tx?.paymentMethod,
+      });
+    }
     if (!tx) return doc;
     return {
       ...doc,
@@ -443,9 +469,28 @@ export async function acceptOrderDelivery(orderId, deliveryPartnerId) {
   const partnerId = new mongoose.Types.ObjectId(deliveryPartnerId);
 
   const existingOrder = await FoodOrder.findOne(identity)
-    .select('pricing payment dispatch orderStatus')
+    .select('pricing payment dispatch orderStatus storeId')
     .lean();
   if (!existingOrder) throw new NotFoundError('Order not found');
+
+  const refuseIfTaken = (dispatch) => {
+    const mine = String(dispatch?.deliveryPartnerId || '') === String(deliveryPartnerId);
+    if (dispatch?.status === 'accepted') {
+      throw stepConflict(mine ? 'You have already accepted this order.' : 'Order already accepted by another partner');
+    }
+    if (dispatch?.status === 'assigned' && !mine) throw stepConflict('Order already accepted by another partner');
+  };
+  refuseIfTaken(existingOrder.dispatch);
+
+  // The same rule as the offers: nobody accepts an order that was never theirs to see
+  if (existingOrder.dispatch?.status === 'unassigned') {
+    const wasOffered = (existingOrder.dispatch?.offeredTo || []).some(
+      (entry) => String(entry?.partnerId || '') === String(deliveryPartnerId) && entry?.action !== 'rejected',
+    );
+    if (!wasOffered && !(await dispatchService.storesServedByRider(partnerId, [existingOrder.storeId])).length) {
+      throw new ForbiddenError('This order is not available to you.');
+    }
+  }
 
   const paymentMethod = String(existingOrder?.payment?.method || 'cash').toLowerCase();
   const isCashOrder = paymentMethod === 'cash';
@@ -507,7 +552,9 @@ export async function acceptOrderDelivery(orderId, deliveryPartnerId) {
       },
     },
     { new: true },
-  ).populate('storeId userId');
+  )
+    .populate('storeId', RIDER_STORE_FIELDS)
+    .populate('userId', 'name phone');
 
   if (!order) {
     const existing = await FoodOrder.findOne(identity)
@@ -524,22 +571,8 @@ export async function acceptOrderDelivery(orderId, deliveryPartnerId) {
     if (!acceptedStatuses.includes(existing.orderStatus)) {
       throw new ValidationError('Order not ready for delivery assignment');
     }
-    if (
-      existing.dispatch?.status === 'accepted' &&
-      String(existing.dispatch?.deliveryPartnerId || '') === String(deliveryPartnerId)
-    ) {
-      const acceptedOrder = await FoodOrder.findOne(identity)
-        .populate('storeId userId');
-      return acceptedOrder
-        ? sanitizeOrderForExternal(acceptedOrder)
-        : null;
-    }
-    if (
-      existing.dispatch?.status === 'accepted' &&
-      String(existing.dispatch?.deliveryPartnerId || '') !== String(deliveryPartnerId)
-    ) {
-      throw new ForbiddenError('Order already accepted by another partner');
-    }
+    // Lost the race to another rider, or a second tap
+    refuseIfTaken(existing.dispatch);
 
     throw new ValidationError('Order is no longer available to accept');
   }
