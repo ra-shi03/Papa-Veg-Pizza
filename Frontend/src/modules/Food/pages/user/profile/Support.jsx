@@ -52,7 +52,7 @@ export default function Support() {
 
     try {
       const payload = {
-        type: "coupon",
+        type: "other",
         issueType: selectedIssues[0], // primary issue selected
         description
       }

@@ -365,6 +365,7 @@ export default function ProfileDetails() {
     ...(appConfig?.walletEnabled !== false ? [{ key: "wallet", label: "Papa Veg Wallet", icon: "account_balance_wallet", badge: `${points} Points`, onClick: () => go("/user/wallet") }] : []),
     { key: "addresses", label: "My Addresses", icon: "location_on", onClick: () => go("/user/location/setup", { mode: "my_addresses", from: "/user/account/profile-details" }) },
     { key: "orders", label: "My Orders", icon: "receipt_long", onClick: () => go("/user/order-history") },
+    { key: "complaints", label: "My Complaints", icon: "report", onClick: () => go("/user/complaints") },
     { key: "help", label: "Need Help", icon: "support_agent", onClick: () => go("/user/help") },
     { key: "delete", label: "Delete my account", icon: "person_remove", onClick: () => setShowDeleteModal(true) },
     { key: "logout", label: "Logout", icon: "power_settings_new", onClick: () => setShowLogoutModal(true), danger: true },

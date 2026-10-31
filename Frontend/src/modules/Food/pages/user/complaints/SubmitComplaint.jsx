@@ -123,9 +123,7 @@ export default function SubmitComplaint() {
 
       if (response?.data?.success) {
         toast.success("Complaint submitted successfully")
-        // Navigate back to order details using the orderId from URL or order._id
-        const orderIdForNav = order?._id || orderId
-        navigate(`/user/orders/${orderIdForNav}/details`)
+        navigate("/user/complaints", { replace: true })
       } else {
         toast.error(response?.data?.message || "Failed to submit complaint")
       }
@@ -163,7 +161,7 @@ export default function SubmitComplaint() {
         <h1 className="text-lg font-semibold text-gray-800 ml-3">Submit Complaint</h1>
         <button
           type="button"
-          onClick={() => navigate("/user/account/coupons/support")}
+          onClick={() => navigate("/user/complaints")}
           className="ml-auto text-sm font-semibold text-[#7e3866]"
         >
           View History

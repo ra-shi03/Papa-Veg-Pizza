@@ -96,6 +96,7 @@ const Rewards = lazy(() => import("@food/pages/user/Rewards"))
 
 // Complaints
 const SubmitComplaint = lazy(() => import("@food/pages/user/complaints/SubmitComplaint"))
+const MyComplaints = lazy(() => import("@food/pages/user/complaints/MyComplaints"))
 
 export default function UserRouter() {
   return (
@@ -357,6 +358,14 @@ export default function UserRouter() {
           <Route path="rewards" element={<Rewards />} />
 
           {/* Complaints - Protected (user auth) */}
+          <Route
+            path="complaints"
+            element={
+              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
+                <MyComplaints />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="complaints/submit/:orderId"
             element={
