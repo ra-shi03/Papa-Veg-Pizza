@@ -56,6 +56,17 @@ const pricingSchema = z.object({
     currency: z.string().optional()
 });
 
+// What the customer enters for a train order. Every field is trimmed and limited to plain characters: no HTML.
+// The PNR is optional, is never looked up or checked against anything, and only ends up in the rider's delivery note.
+const trainSchema = z.object({
+    stationCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,8}$/, 'Choose a station from the list').optional().or(z.literal('')),
+    stationName: z.string().trim().max(80, 'Station name is too long').regex(/^[\p{L}\p{N} .,'()&/-]*$/u, 'Station name has characters that are not allowed').optional(),
+    trainNo: z.string().trim().regex(/^[A-Za-z0-9-]{1,10}$/, 'Train number must be 1-10 letters or digits'),
+    coach: z.string().trim().regex(/^[A-Za-z0-9-]{1,6}$/, 'Coach must be 1-6 letters or digits'),
+    seat: z.string().trim().regex(/^[A-Za-z0-9/-]{1,8}$/, 'Seat must be 1-8 letters or digits'),
+    pnr: z.string().trim().regex(/^\d{10}$/, 'PNR must be 10 digits').optional().or(z.literal('')),
+}).refine((t) => t.stationCode || (t.stationName && t.stationName.trim()), { message: 'Choose your station', path: ['stationCode'] });
+
 export function validateCalculateOrderDto(body) {
     const schema = z.object({
         items: z.array(orderItemSchema).min(1, 'At least one item required'),
@@ -102,16 +113,7 @@ export function validateCreateOrderDto(body) {
         storeNote: z.string().optional(),
         sendCutlery: z.boolean().optional(),
         // A train order: the store and the address come from the server (order-store.service.js resolveTrainStore)
-        train: z.object({
-            pnr: z.string().trim().regex(/^\d{10}$/, 'PNR must be 10 digits').optional(),
-            coach: z.string().trim().max(10).optional(),
-            seat: z.string().trim().max(10).optional(),
-            details: z.string().trim().max(120).optional(),
-            stationCode: z.string().trim().max(8).optional(),
-            stationName: z.string().trim().max(80).optional(),
-            trainName: z.string().trim().max(80).optional(),
-            trainNo: z.string().trim().max(10).optional(),
-        }).optional(),
+        train: trainSchema.optional(),
         // 'razorpay_qr' means COD-style flow, but payment is collected via Razorpay QR at delivery.
         paymentMethod: z.enum(['cash', 'razorpay', 'razorpay_qr', 'card', 'wallet']),
         zoneId: z.string().nullable().optional(),

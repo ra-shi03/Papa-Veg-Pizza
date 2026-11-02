@@ -8,6 +8,9 @@ import {
   addressProblem, assertOwnOrderDetails, buildOrderDetails, contactFromAccount, contactProblem, parseAddressText,
   readPickedLocation, selectDeliveryAddress, toTenDigitPhone,
 } from '../../Frontend/src/modules/Food/pages/user/cart/checkoutDetails.js';
+import {
+    cleanJourney, journeyProblem, readTrainJourney, saveTrainJourney, trainOrderFields, trainOrderProblem, trainStoreQuery,
+} from '../../Frontend/src/modules/Food/utils/trainJourney.js';
 
 const CART = new URL('../../Frontend/src/modules/Food/pages/user/cart/', import.meta.url);
 const source = (file) => readFileSync(new URL(file, CART), 'utf8');
@@ -152,14 +155,114 @@ describe('after the order', () => {
 describe('train orders', () => {
     const FOOD = new URL('../../Frontend/src/modules/Food/', import.meta.url);
     const read = (file) => readFileSync(new URL(file, FOOD), 'utf8');
-    test('both train screens confirm the location (the cart only opens for a confirmed one)', () => {
-        for (const file of ['pages/user/location/DeliveryLocation.jsx', 'components/user/DeliverOnTrainModal.jsx']) {
-            assert.match(read(file), /confirmLocation\(\{ address: [\s\S]{0,120}?serviceType: "train" \}\)/, file);
-            assert.ok(!/setItem\("activeService", "train"\)/.test(read(file)), `${file}: not set by hand`);
+    const TRAIN_SCREENS = ['pages/user/location/DeliveryLocation.jsx', 'components/user/DeliverOnTrainModal.jsx'];
+
+    test('both train screens use the same fields and the same helper, and save through it (which confirms the location)', () => {
+        for (const file of TRAIN_SCREENS) {
+            const text = read(file);
+            assert.match(text, /<TrainJourneyFields/, `${file}: the shared fields`);
+            assert.match(text, /journeyProblem\(journey, trainInfo\)/, `${file}: the shared check`);
+            assert.match(text, /saveTrainJourney\(journey, \(details\) => useLocationStore\.getState\(\)\.confirmLocation\(details\)\)/, `${file}: the shared save`);
+            assert.ok(!/setItem\("activeService", "train"\)/.test(text), `${file}: not set by hand`);
         }
     });
-    test('the store records the train journey as the address and the service', () => {
+    test('no fake lookup and no sample train or station data in either screen', () => {
+        for (const file of TRAIN_SCREENS) {
+            const text = read(file);
+            for (const sample of ['GATIMAN', 'NIZAMUDDIN', 'Mathura', 'Agra Cantt', '12050', 'Simulate', 'journeyData', 'handlePnrSubmit', 'PNR VERIFIED']) assert.ok(!text.includes(sample), `${file}: ${sample}`);
+        }
+        assert.ok(!/with the IRCTC database/.test(read('components/user/DeliverOnTrainModal.jsx')), 'no claim that the PNR is verified');
+    });
+    test('the location store records the train service', () => {
         assert.match(read('store/locationStore.js'), /serviceType === "train"[\s\S]{0,260}setItem\("activeService", "train"\)/);
+    });
+
+    test('the cart: a train order with nothing set up shows the message and the order button is disabled', () => {
+        const cart = read('pages/user/cart/Cart.jsx');
+        assert.match(cart, /trainOrderProblem\(trainJourney, trainInfo\)/);
+        assert.match(cart, /<button\s+onClick=\{proceed\}\s+disabled=\{!!trainProblem\}/);
+        assert.match(cart, /\{trainProblem && \(\s*<p role="alert"/);
+        assert.match(cart, /if \(trainProblem\) \{\s*toast\.error\(trainProblem\)\s*return/, 'the handler refuses too');
+        assert.match(cart, /blockedMessage=\{trainProblem\}/);
+        assert.match(read('pages/user/cart/CheckoutModal.jsx'), /if \(blockedMessage\) \{\s*toast\.error\(blockedMessage\)\s*return false/);
+    });
+    test('a refused order shows the server\'s reason and never "Payment Successful"', () => {
+        const pay = read('pages/user/cart/RazorpayPayment.jsx');
+        assert.match(pay, /const placed = await onPaymentSuccess\(\)/);
+        assert.match(pay, /if \(placed !== false\) toast\.success\("Payment Successful!"\)/);
+        assert.ok(!/toast\.success\("Payment Successful!"\)\s*\n\s*onPaymentSuccess/.test(pay), 'success is not announced before the order');
+        const modal = read('pages/user/cart/CheckoutModal.jsx');
+        assert.match(modal, /toast\.error\(err\?\.response\?\.data\?\.error \|\| err\?\.response\?\.data\?\.message/, 'the server\'s reason');
+        const failure = modal.slice(modal.indexOf('} catch (err) {'), modal.indexOf('setPlacingOrder(false)', modal.indexOf('} catch (err) {') + 40) + 400);
+        assert.match(failure, /return false/);
+        assert.match(modal, /navigate\(`\/user\/orders\/\$\{orderId\}\?confirmed=true`\)\s*return true/);
+    });
+    test('the franchise navbar shows the signed-in user\'s own email, or none', () => {
+        const nav = read('pages/franchise-admin/layout/Navbar.jsx');
+        assert.ok(!/shubham/i.test(nav));
+        assert.match(nav, /\{\(franchiseData\?\.email \|\| adminData\?\.email\) && \(/);
+    });
+});
+
+describe('the shared train journey helper', () => {
+    const memory = (values = {}) => {
+        const data = { ...values };
+        return { getItem: (k) => (k in data ? data[k] : null), setItem: (k, v) => { data[k] = String(v); }, data };
+    };
+    const INFO = { available: true, defaultAvailable: false, stations: [{ name: 'Bhopal Jn', code: 'BPL' }, { name: 'Itarsi', code: 'ET' }] };
+    const GOOD = { stationCode: 'BPL', stationName: 'Bhopal Jn', trainNo: '12301', coach: 'B2', seat: '14', pnr: '' };
+
+    test('a complete journey from the list passes', () => assert.equal(journeyProblem(GOOD, INFO), null));
+    test('the station is required, and must come from the list', () => {
+        assert.match(journeyProblem({ ...GOOD, stationCode: '', stationName: '' }, INFO), /station/i);
+        assert.match(journeyProblem({ ...GOOD, stationCode: 'NZM' }, INFO), /from the list/);
+        assert.match(journeyProblem({ ...GOOD, stationCode: '', stationName: 'Anywhere' }, INFO), /from the list/, 'a typed station needs a default store');
+        assert.equal(journeyProblem({ ...GOOD, stationCode: '', stationName: 'Anywhere' }, { ...INFO, defaultAvailable: true }), null);
+    });
+    test('train number, coach and seat are required and limited to plain characters', () => {
+        for (const [change, text] of [[{ trainNo: '' }, /train number/i], [{ trainNo: '12 3' }, /train number/i], [{ coach: '' }, /coach/i], [{ coach: 'B2<x>' }, /coach/i], [{ seat: '' }, /seat/i], [{ seat: '1;2' }, /seat/i]]) {
+            assert.match(journeyProblem({ ...GOOD, ...change }, INFO), text, JSON.stringify(change));
+        }
+        assert.match(journeyProblem({ ...GOOD, stationCode: '', stationName: '<b>x</b>' }, { ...INFO, defaultAvailable: true }), /not allowed/);
+    });
+    test('the PNR is optional, but 10 digits when given, and is only digits', () => {
+        assert.equal(journeyProblem({ ...GOOD, pnr: '' }, INFO), null);
+        assert.equal(journeyProblem({ ...GOOD, pnr: '1234567890' }, INFO), null);
+        assert.equal(cleanJourney({ pnr: '12ab34' }).pnr, '1234');
+    });
+    test('values are trimmed, upper-cased and cut to length', () => {
+        assert.deepEqual(cleanJourney({ stationCode: ' bpl ', stationName: ' Bhopal Jn ', trainNo: ' 12301a ', coach: ' b2 ', seat: ' 14 ', pnr: ' 1234567890 ' }),
+            { stationCode: 'BPL', stationName: 'Bhopal Jn', trainNo: '12301A', coach: 'B2', seat: '14', pnr: '1234567890' });
+        assert.equal(cleanJourney({ coach: 'ABCDEFGHIJ' }).coach.length, 6);
+    });
+    test('nothing set up: unavailable, before any order, with the exact message', () => {
+        const none = { available: false, defaultAvailable: false, stations: [] };
+        assert.equal(journeyProblem(GOOD, none), 'Train delivery is not available yet');
+        assert.equal(trainOrderProblem(GOOD, none), 'Train delivery is not available yet');
+        assert.equal(trainOrderProblem(null, none), null, 'an order that is not for a train is never blocked');
+        assert.equal(trainOrderProblem(GOOD, null), null, 'while the list loads');
+    });
+    test('a saved station that is no longer offered blocks the cart', () => {
+        assert.match(trainOrderProblem({ ...GOOD, stationCode: 'NZM' }, INFO), /not available for train delivery/);
+        assert.equal(trainOrderProblem(GOOD, INFO), null);
+    });
+    test('saving stores the journey and confirms the location with the journey as the address text', () => {
+        const storage = memory();
+        let confirmed;
+        saveTrainJourney({ ...GOOD, pnr: '1234567890' }, (details) => { confirmed = details; }, storage);
+        assert.deepEqual(JSON.parse(storage.data.pvp_train), { ...GOOD, pnr: '1234567890' });
+        assert.deepEqual(confirmed, { address: 'Train 12301, Coach B2, Seat 14, Station: Bhopal Jn', serviceType: 'train' });
+    });
+    test('reading it back only for a train order', () => {
+        assert.equal(readTrainJourney(memory({ pvp_train: JSON.stringify(GOOD) })), null);
+        assert.deepEqual(readTrainJourney(memory({ activeService: 'train', pvp_train: JSON.stringify(GOOD) })), GOOD);
+        assert.equal(readTrainJourney(memory({ activeService: 'train' })).coach, '');
+    });
+    test('the order request carries the PNR only when there is one, and no address of its own', () => {
+        assert.equal('pnr' in trainOrderFields(GOOD), false);
+        assert.equal(trainOrderFields({ ...GOOD, pnr: '1234567890' }).pnr, '1234567890');
+        assert.deepEqual(trainStoreQuery(GOOD), { train: '1', stationCode: 'BPL' });
+        assert.equal(trainStoreQuery(null), null);
     });
 });
 

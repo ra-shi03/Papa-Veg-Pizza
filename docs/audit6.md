@@ -123,17 +123,22 @@ Step 1 of the business information work: what existed before it. File and line n
 
 ## Train delivery
 
-Routing lives in the business settings record (`trainDelivery`, never public), edited on the Settings screen's Train Delivery tab.
+Routing lives in the business settings record (`trainDelivery`, never public), edited on the Settings screen's Train Delivery tab. No PNR service is used and no train or station data is hardcoded.
 
-- **Rule:** station's store, else the default train store, else a 400 with "Train delivery is not available yet". The client's `storeId` is ignored. A store that is unapproved, inactive or closed is refused, and the order does not move to the default.
-- **Rider:** PNR, coach and seat go in the order's `note`, which the app shows as delivery instructions after accept. The street is the station name.
+- **Customer enters:** station (from a list), train number, coach, seat and an optional PNR, on both train screens (`TrainJourneyFields.jsx`, `utils/trainJourney.js`). Lengths and characters are checked in the browser and again on the server (`order.validator.js`); no HTML.
+- **Station list:** `GET /food/train/stations` (public, cached 60 s) returns `{ name, code }` only, for stations whose store is approved and active, plus `available` and `defaultAvailable`.
+- **Rule:** the station's store, else the default train store, else a 400 "Train delivery is not available yet". The client's `storeId` is ignored. A store that is unapproved, inactive or closed is refused, and the order never moves to another store.
+- **Before an order:** with nothing mapped and no default store, the cart shows "Train delivery is not available yet" and its order button is disabled.
+- **PNR:** never looked up or checked. It is not stored on the order's train record, only inside the delivery note.
+- **Rider:** station, train, coach and seat (and the PNR if given) are the order's `note`, which the app shows as delivery instructions after accept. The street is the station name.
+- **Admin:** stations can be added, edited and removed. Saving refuses an unapproved or switched-off store, naming the station; a store that is only closed right now is saved with a warning.
 
 Still open:
 
-- **The PNR lookup is simulated.** `DeliverOnTrainModal.jsx` shows a hardcoded train and stations after a timer, so its station codes (NZM, MTJ, AGC) are sample data. Real routing needs a real PNR service, or a station picker fed from the mapping.
-- **The other train screen asks only for a PNR** (`DeliveryLocation.jsx`), so it has no station, and those orders always use the default store.
-- **Customers see "Payment Successful!" before the order is placed.** `RazorpayPayment.jsx` is a preview, so a refused order shows that toast next to the refusal. Orders are placed as cash.
-- **The cart does not show the refusal until checkout.** The slot error is stored, but the customer first sees the message when placing the order.
+- **"Another station"** (typed by name) exists only when a default train store is set, and always goes to it.
+- **The IRCTC history screen** (`IrctcOrderHistoryModal.jsx`) still reads local records and shows PNR numbers it finds in old text.
+- **The T&C text** on the train screens still mentions IRCTC ordering rules and online-only payment, which this app does not enforce (orders are cash).
+- **A refused train order** is refused at the store lookup, before the order request; the customer sees the server's reason and no success message.
 
 ---
 

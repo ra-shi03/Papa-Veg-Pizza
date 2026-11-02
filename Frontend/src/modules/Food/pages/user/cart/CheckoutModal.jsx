@@ -10,6 +10,7 @@ import apiClient from "@/services/api/axios"
 import { orderAPI, userAPI } from "@food/api"
 import { toast } from "sonner"
 import { slotLabel, toOrderItems } from "./cartHelpers"
+import { readTrainJourney, trainOrderFields, trainStoreQuery } from "@food/utils/trainJourney"
 import {
   addressProblem,
   assertOwnOrderDetails,
@@ -17,9 +18,7 @@ import {
   contactFromAccount,
   contactProblem,
   readPickedLocation,
-  readTrainJourney,
   selectDeliveryAddress,
-  trainStoreQuery,
   toTenDigitPhone,
 } from "./checkoutDetails"
 
@@ -36,7 +35,8 @@ export default function CheckoutModal({
   total,
   scheduledAt,
   onChangeTime,
-  onOrderPlaced
+  onOrderPlaced,
+  blockedMessage
 }) {
   const navigate = useNavigate()
   const { replaceCart, clearCart } = useCart()
@@ -100,7 +100,9 @@ export default function CheckoutModal({
     const key = selected ? `${selected.kind}:${selected.id || selected.display}` : ""
     if (key !== selectedAddressKey.current) {
       selectedAddressKey.current = key
-      setHouseNumber(selected?.kind === "saved" ? selected.street : "")
+      // A train has no house number: the coach and seat fill the field, so the delivery partner finds the seat
+      const journey = selected?.kind === "service" ? readTrainJourney() : null
+      setHouseNumber(selected?.kind === "saved" ? selected.street : journey ? `Coach ${journey.coach}, Seat ${journey.seat}` : "")
       setLandmark(selected?.kind === "saved" ? selected.additionalDetails : "")
     }
   }, [show, addresses])
@@ -192,12 +194,17 @@ export default function CheckoutModal({
   const [placingOrder, setPlacingOrder] = useState(false)
 
   const handleSaveAddressAndCheckout = async () => {
-    if (placingOrder) return
-    if (blockedByAddress() || blockedByContact()) return
+    // true only when the order was placed: the payment screen shows success from this
+    if (placingOrder) return false
+    if (blockedMessage) {
+      toast.error(blockedMessage)
+      return false
+    }
+    if (blockedByAddress() || blockedByContact()) return false
     if (!houseNumber.trim()) {
       toast.error("House number or flat number is required")
       setModalView("address")
-      return
+      return false
     }
 
     const contact = { name: contactName, phone: contactPhone, email: contactEmail }
@@ -218,8 +225,8 @@ export default function CheckoutModal({
     const activeService = localStorage.getItem("activeService") || "delivery"
     const savedDeliveryAddress = localStorage.getItem("deliveryAddress") || ""
     const isTrain = activeService === "train" || savedDeliveryAddress.toLowerCase().includes("train")
-    const trainPnr = localStorage.getItem("pvp_train_pnr") || ""
     const trainJourney = readTrainJourney()
+    const trainPnr = trainJourney?.pnr || ""
 
     // Pick the store that serves this delivery location, then place the order with it.
     let orderId
@@ -245,7 +252,7 @@ export default function CheckoutModal({
           additionalDetails: isTrain && trainPnr ? `IRCTC Train PNR: ${trainPnr}` : orderDetails.address.additionalDetails,
         },
         // The server turns these into the address and the rider's delivery notes
-        ...(trainJourney ? { train: { ...trainJourney, details: houseNumber.trim() } } : {}),
+        ...(trainJourney ? { train: trainOrderFields(trainJourney) } : {}),
         items: toOrderItems(cartItems),
         ...(couponCode ? { couponCode } : {}),
         ...(scheduledAt ? { scheduledAt } : {}),
@@ -265,8 +272,8 @@ export default function CheckoutModal({
       if (!orderId) throw new Error("Order could not be created")
     } catch (err) {
       setPlacingOrder(false)
-      toast.error(err?.response?.data?.message || err?.response?.data?.error || err?.message || "Could not place your order")
-      return
+      toast.error(err?.response?.data?.error || err?.response?.data?.message || err?.message || "Could not place your order")
+      return false
     }
     setPlacingOrder(false)
 
@@ -318,6 +325,7 @@ export default function CheckoutModal({
 
     // Redirect to order tracking details page
     navigate(`/user/orders/${orderId}?confirmed=true`)
+    return true
   }
 
   return (

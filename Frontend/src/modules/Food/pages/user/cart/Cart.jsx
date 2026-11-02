@@ -7,7 +7,8 @@ import ApplyCoupon from "./ApplyCoupon"
 import CheckoutModal from "./CheckoutModal"
 import CartOffers, { CheesyRewardsCard } from "./CartOffers"
 import DeliveryTimeSheet from "./DeliveryTimeSheet"
-import { readTrainJourney, trainStoreQuery } from "./checkoutDetails"
+import { readTrainJourney, trainOrderProblem, trainStoreQuery } from "@food/utils/trainJourney"
+import { useTrainStations } from "@food/hooks/useTrainStations"
 import { getCartCoords, isSlotStillValid, loadSlot, saveSlot, slotDay, slotLabel, time12, offerDiscount, toOrderItems } from "./cartHelpers"
 import { CartMealSuggestions, LimitedOffer } from "./upsell/CartUpsell"
 import { AnimatedNumber, CartItemRow, CartSkeleton, haptic } from "./CartParts"
@@ -683,7 +684,16 @@ export default function Cart() {
     billRef.current?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" })
   }
 
+  // A train order is refused before it is placed when no station or default train store is set up
+  const trainJourney = readTrainJourney()
+  const { info: trainInfo, failed: trainFailed } = useTrainStations(!!trainJourney)
+  const trainProblem = trainJourney ? (trainFailed ? "Train delivery is not available yet" : trainOrderProblem(trainJourney, trainInfo)) : null
+
   const proceed = () => {
+    if (trainProblem) {
+      toast.error(trainProblem)
+      return
+    }
     if (slotInfo && slotInfo.openNow === false && !scheduledAt) {
       toast("The store is closed right now. Pick a delivery time to schedule your order.")
       openTimeSheet()
@@ -1081,6 +1091,9 @@ export default function Cart() {
               <span>You saved <b>₹{savings}</b> on this order</span>
             </motion.div>
           )}
+          {trainProblem && (
+            <p role="alert" className="mx-3 mt-3 text-sm font-semibold text-left" style={{ color: "#d32f3a" }}>{trainProblem}</p>
+          )}
           <div className="flex items-center gap-3 px-3 py-3 pb-6">
             <div className="shrink-0 text-left pl-1">
               <p className="text-[17px] font-extrabold leading-tight" style={{ color: ui.text }}><AnimatedNumber value={total} /></p>
@@ -1088,7 +1101,8 @@ export default function Cart() {
             </div>
             <button
               onClick={proceed}
-              className="flex-1 h-12 rounded-xl text-white font-bold text-[15px] border-0 cursor-pointer flex items-center justify-center gap-1.5 active:scale-[0.97] transition-transform"
+              disabled={!!trainProblem}
+              className="flex-1 h-12 rounded-xl text-white font-bold text-[15px] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 active:scale-[0.97] transition-transform"
               style={{ backgroundColor: "#d32f3a" }}
             >
               {scheduledAt ? "Schedule & Pay" : "Proceed to Pay"}
@@ -1140,6 +1154,7 @@ export default function Cart() {
         scheduledAt={scheduledAt}
         onChangeTime={() => { setShowCheckoutModal(false); openTimeSheet() }}
         onOrderPlaced={() => { orderJustPlaced.current = true }}
+        blockedMessage={trainProblem}
       />
       </div>
     </div>

@@ -10,7 +10,7 @@ const ADMIN = '/v1/food/admin/business-settings';
 let fx; let A; let B; let pizza; let StoreHours;
 
 const save = (trainDelivery, token = fx.SA) => fx.call('PATCH', ADMIN, token, { trainDelivery });
-const JOURNEY = { pnr: '1234567890', coach: 'B2', seat: '14', details: 'Near the door', trainName: 'Rajdhani', trainNo: '12301' };
+const JOURNEY = { pnr: '1234567890', coach: 'B2', seat: '14', trainNo: '12301' };
 const place = (train, storeId = B.storeId) => fx.call('POST', '/v1/food/orders', A.customerToken, {
     items: [{ itemId: String(pizza._id), name: 'Margherita', price: 200, quantity: 1, size: 'Regular', kind: 'product' }],
     // what the checkout sends: the server replaces the store and the address
@@ -92,8 +92,13 @@ describe('routing', () => {
     test('an unmapped station goes to the default store', async () => {
         assert.equal(await storeOf(await place({ ...JOURNEY, stationCode: 'NZM' }, A.storeId)), B.storeId);
     });
-    test('no station at all (PNR only) goes to the default store', async () => {
-        assert.equal(await storeOf(await place({ pnr: JOURNEY.pnr }, A.storeId)), B.storeId);
+    test('a station typed by name (not in the list) goes to the default store', async () => {
+        assert.equal(await storeOf(await place({ ...JOURNEY, stationName: 'Some Halt' }, A.storeId)), B.storeId);
+    });
+    test('no station at all is refused: nothing is guessed', async () => {
+        const res = await place({ ...JOURNEY });
+        assert.equal(res.status, 400);
+        assert.match(res.body.error || res.body.message, /station/i);
     });
     test('the store lookups give the same store, for the quote', async () => {
         const store = async (path) => (await fx.call('GET', path)).body.data.storeId;
@@ -107,8 +112,32 @@ describe('routing', () => {
         assert.equal(await storeOf(await place({ ...JOURNEY, stationCode: 'BPL' })), A.storeId);
         await save({ defaultStoreId: B.storeId, stations: [{ name: 'Bhopal Jn', code: 'BPL', storeId: A.storeId }] });
     });
-    test('a bad PNR is refused', async () => {
-        assert.equal((await place({ pnr: '123', stationCode: 'BPL' })).status, 400);
+    for (const [name, change, message] of [
+        ['a PNR of the wrong length', { pnr: '123' }, /PNR/],
+        ['letters in the PNR', { pnr: '12345abcde' }, /PNR/],
+        ['no train number', { trainNo: '' }, /Train number/],
+        ['a train number with symbols', { trainNo: '12<3>' }, /Train number/],
+        ['no coach', { coach: '' }, /Coach/],
+        ['a coach that is too long', { coach: 'ABCDEFG' }, /Coach/],
+        ['no seat', { seat: '' }, /Seat/],
+        ['HTML in the seat', { seat: '<b>1</b>' }, /Seat/],
+        ['HTML in the station name', { stationCode: '', stationName: '<script>x</script>' }, /Station name/],
+        ['a station name that is too long', { stationCode: '', stationName: 'x'.repeat(81) }, /too long/],
+        ['a station code with symbols', { stationCode: 'B!L' }, /station/i],
+    ]) {
+        test(`refused: ${name}`, async () => {
+            const res = await place({ ...JOURNEY, stationCode: 'BPL', ...change });
+            assert.equal(res.status, 400, JSON.stringify(res.body));
+            assert.match(res.body.error || res.body.message, message);
+        });
+    }
+    test('the PNR is optional, and fields are trimmed', async () => {
+        const { pnr, ...noPnr } = JOURNEY;
+        const res = await place({ ...noPnr, stationCode: 'BPL', coach: ' b2 ', seat: ' 14 ' });
+        assert.equal(res.status, 201, JSON.stringify(res.body));
+        const db = await fx.models.FoodOrder.findById(res.body.data.order._id).lean();
+        assert.deepEqual([db.train.coach, db.train.seat], ['b2', '14']);
+        assert.ok(!db.note.includes('PNR'));
     });
 });
 
@@ -150,10 +179,15 @@ describe('what is saved and what the rider sees', () => {
         assert.ok(!db.deliveryAddress.location?.coordinates);
         assert.deepEqual([db.deliveryAddress.name, db.deliveryAddress.phone, db.customerName], ['Asha Rao', '9812345678', 'Asha Rao']);
     });
-    test('PNR, coach and seat are the delivery notes, joined to the customer\'s own note', async () => {
+    test('station, train, coach and seat are the delivery notes; the PNR is only part of that note', async () => {
         const db = await fx.models.FoodOrder.findById(order._id).lean();
-        assert.equal(db.note, 'PNR: 1234567890, Coach: B2, Seat: 14, Near the door, Train: Rajdhani (12301)');
-        assert.deepEqual([db.train.pnr, db.train.coach, db.train.seat, db.train.stationCode, db.train.stationName], ['1234567890', 'B2', '14', 'BPL', 'Bhopal Jn']);
+        assert.equal(db.note, 'Station: Bhopal Jn, Train: 12301, Coach: B2, Seat: 14, PNR: 1234567890');
+        assert.deepEqual([db.train.trainNo, db.train.coach, db.train.seat, db.train.stationCode, db.train.stationName], ['12301', 'B2', '14', 'BPL', 'Bhopal Jn']);
+    });
+    test('the PNR is kept nowhere else: not in the train record, not as a field', async () => {
+        const db = await fx.models.FoodOrder.findById(order._id).lean();
+        assert.ok(!('pnr' in db.train));
+        assert.ok(!JSON.stringify({ ...db, note: '' }).includes(JOURNEY.pnr));
     });
     test('before accepting, the rider sees no PNR, coach, seat or notes', async () => {
         await fx.models.FoodOrder.updateOne({ _id: order._id }, { $set: { orderStatus: 'confirmed', 'dispatch.offeredTo': [{ partnerId: new mongoose.Types.ObjectId(rider.id), at: new Date(), action: 'offered' }] } });
@@ -161,12 +195,99 @@ describe('what is saved and what the rider sees', () => {
         const offer = list.find((o) => o._id === String(order._id));
         assert.ok(offer);
         assert.equal(offer.area, 'Bhopal Jn');
-        for (const secret of [JOURNEY.pnr, 'Coach', 'Seat', 'Near the door']) assert.ok(!JSON.stringify(offer).includes(secret), secret);
+        for (const secret of [JOURNEY.pnr, 'Coach', 'Seat', 'Train: ']) assert.ok(!JSON.stringify(offer).includes(secret), secret);
     });
     test('after accepting, the rider reads them where the app shows delivery instructions', async () => {
         const res = await fx.call('PATCH', `/v1/food/delivery/orders/${order._id}/accept`, rider.token, {});
         assert.equal(res.status, 200, JSON.stringify(res.body));
-        assert.ok(res.body.data.order.note.includes('PNR: 1234567890'));
+        assert.ok(['Station: Bhopal Jn', 'Train: 12301', 'Coach: B2', 'Seat: 14'].every((part) => res.body.data.order.note.includes(part)));
         assert.equal(res.body.data.order.deliveryAddress.street, 'Bhopal Jn station');
+    });
+});
+
+describe('the station list for the picker', () => {
+    const list = async () => (await fx.call('GET', '/v1/food/train/stations')).body.data;
+    const set = (v) => save(v);
+    before(async () => {
+        await set({ defaultStoreId: '', stations: [] });
+        await fx.models.FoodStore.updateMany({}, { $set: { approvalStatus: 'Approved', isActive: true } });
+        const { clearBusinessInfoCache } = await import('../src/modules/food/admin/services/businessSettings.service.js');
+        clearBusinessInfoCache();
+    });
+    const clear = async () => (await import('../src/modules/food/admin/services/businessSettings.service.js')).clearBusinessInfoCache();
+
+    test('nothing mapped and no default: unavailable, and no stations', async () => {
+        assert.deepEqual(await list(), { available: false, defaultAvailable: false, stations: [] });
+    });
+    test('only name and code leave the server: no store ids, no audit fields', async () => {
+        assert.equal((await set({ stations: [{ name: 'Bhopal Jn', code: 'BPL', storeId: A.storeId }] })).status, 200);
+        const res = await fx.call('GET', '/v1/food/train/stations');
+        assert.match(res.headers['cache-control'], /max-age=60/);
+        assert.deepEqual(res.body.data, { available: true, defaultAvailable: false, stations: [{ name: 'Bhopal Jn', code: 'BPL' }] });
+        const text = JSON.stringify(res.body);
+        for (const secret of [A.storeId, B.storeId, '_id', 'storeId', 'createdAt', 'updatedAt']) assert.ok(!text.includes(secret), secret);
+    });
+    test('works without signing in, and a station whose store is unapproved or inactive is not listed', async () => {
+        await set({ stations: [{ name: 'Bhopal Jn', code: 'BPL', storeId: A.storeId }, { name: 'Itarsi', code: 'ET', storeId: B.storeId }] });
+        for (const change of [{ approvalStatus: 'Pending' }, { isActive: false }]) {
+            await fx.models.FoodStore.updateOne({ _id: B.storeId }, { $set: change });
+            await clear();
+            assert.deepEqual((await list()).stations.map((s) => s.code), ['BPL']);
+            await fx.models.FoodStore.updateOne({ _id: B.storeId }, { $set: { approvalStatus: 'Approved', isActive: true } });
+            await clear();
+        }
+        assert.deepEqual((await list()).stations.map((s) => s.code), ['BPL', 'ET']);
+    });
+    test('an unmapped station cannot be ordered when there is no default store', async () => {
+        await set({ defaultStoreId: '', stations: [{ name: 'Bhopal Jn', code: 'BPL', storeId: A.storeId }] });
+        refused(await place({ ...JOURNEY, stationCode: 'NZM' }));
+        refused(await place({ ...JOURNEY, stationCode: '', stationName: 'Anywhere' }));
+        assert.equal(await storeOf(await place({ ...JOURNEY, stationCode: 'BPL' })), A.storeId);
+    });
+    test('only a default store: available, with no stations to pick', async () => {
+        await set({ defaultStoreId: B.storeId, stations: [] });
+        assert.deepEqual(await list(), { available: true, defaultAvailable: true, stations: [] });
+    });
+    test('an unapproved default store alone is unavailable', async () => {
+        await fx.models.FoodStore.updateOne({ _id: B.storeId }, { $set: { approvalStatus: 'Pending' } });
+        await clear();
+        assert.equal((await list()).available, false);
+        await fx.models.FoodStore.updateOne({ _id: B.storeId }, { $set: { approvalStatus: 'Approved' } });
+        await clear();
+    });
+});
+
+describe('saving the mapping: clear errors', () => {
+    const msg = (res) => res.body.error || res.body.message;
+    test('a station can be added, edited and removed', async () => {
+        assert.equal((await save({ stations: [{ name: 'Bhopal Jn', code: 'BPL', storeId: A.storeId }, { name: 'Itarsi', code: 'ET', storeId: B.storeId }] })).status, 200);
+        assert.equal((await save({ stations: [{ name: 'Bhopal Junction', code: 'BPL', storeId: B.storeId }] })).status, 200);
+        const got = (await fx.call('GET', ADMIN, fx.SA)).body.data.trainDelivery;
+        assert.deepEqual(got.stations.map((s) => [s.name, s.code, String(s.storeId)]), [['Bhopal Junction', 'BPL', B.storeId]]);
+        assert.equal((await save({ stations: [] })).status, 200);
+        assert.equal((await fx.call('GET', ADMIN, fx.SA)).body.data.trainDelivery.stations.length, 0);
+    });
+    test('an unapproved store is refused, naming the station and the store', async () => {
+        await fx.models.FoodStore.updateOne({ _id: A.storeId }, { $set: { approvalStatus: 'Pending' } });
+        const res = await save({ stations: [{ name: 'Bhopal Jn', code: 'BPL', storeId: A.storeId }] });
+        assert.equal(res.status, 400);
+        assert.match(msg(res), /Station Bhopal Jn: .* is not approved yet/);
+        const def = await save({ defaultStoreId: A.storeId });
+        assert.match(msg(def), /default train store: .* is not approved yet/);
+        await fx.models.FoodStore.updateOne({ _id: A.storeId }, { $set: { approvalStatus: 'Approved' } });
+    });
+    test('a switched-off store is refused', async () => {
+        await fx.models.FoodStore.updateOne({ _id: A.storeId }, { $set: { isActive: false } });
+        assert.match(msg(await save({ stations: [{ name: 'Bhopal Jn', code: 'BPL', storeId: A.storeId }] })), /switched off/);
+        await fx.models.FoodStore.updateOne({ _id: A.storeId }, { $set: { isActive: true } });
+    });
+    test('a store that is closed right now is saved, with a warning naming the station', async () => {
+        await closeStore(A.storeId);
+        const res = await save({ stations: [{ name: 'Bhopal Jn', code: 'BPL', storeId: A.storeId }] });
+        assert.equal(res.status, 200, JSON.stringify(res.body));
+        assert.equal(res.body.data.warnings.length, 1);
+        assert.match(res.body.data.warnings[0], /Station Bhopal Jn: .* is closed right now/);
+        await StoreHours.deleteOne({ storeId: A.storeId });
+        assert.deepEqual((await save({ stations: [{ name: 'Bhopal Jn', code: 'BPL', storeId: A.storeId }] })).body.data.warnings, []);
     });
 });

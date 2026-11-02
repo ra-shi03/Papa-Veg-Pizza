@@ -164,6 +164,8 @@ router.use('/v1/uploads', uploadRoutes);
 
 // Mark business-settings/public as truly public
 router.get('/v1/food/admin/business-settings/public', businessSettingsController.getPublicBusinessSettings);
+// Public: the stations a customer can choose for train delivery (name and code only)
+router.get('/v1/food/train/stations', businessSettingsController.getPublicTrainStations);
 
 // Public menu route
 router.get('/v1/food/admin/menu/public', productController.getPublicMenu);

@@ -44,6 +44,7 @@
     "GET /api/v1/food/stores/:id",
     "GET /api/v1/food/stores/resolve",
     "GET /api/v1/food/stores/slots",
+    "GET /api/v1/food/train/stations",
     "GET /api/v1/food/zones/public",
     "GET /api/v1/health",
     "GET /api/v1/landing/settings/public",
@@ -59,11 +60,11 @@
     "GET /api/v1/settings/combo-page",
     "GET /api/v1/settings/combo-page/build",
     "GET /api/v1/settings/coupons/public",
-    "GET /api/v1/settings/nutrition/public",
     "GET /api/v1/settings/delivery-login",
     "GET /api/v1/settings/delivery-welcome",
     "GET /api/v1/settings/faqs/public",
     "GET /api/v1/settings/home-page",
+    "GET /api/v1/settings/nutrition/public",
     "GET /api/v1/settings/promise-campaign",
     "GET /api/v1/settings/search-config/public",
     "GET /api/v1/settings/showcase-sections",
@@ -148,6 +149,7 @@
     "PUT /api/v1/food/auth/profile/personal"
   ],
   "publicReasons": {
-    "GET /api/v1/food/admin/business-settings/public": "Business name, logo and contact details every app shows before sign-in. Display fields only (toPublicBusinessInfo): no ids, no audit fields, no storage references, no train mapping. Cached for 60 seconds."
+    "GET /api/v1/food/admin/business-settings/public": "Business name, logo and contact details every app shows before sign-in. Display fields only (toPublicBusinessInfo): no ids, no audit fields, no storage references, no train mapping. Cached for 60 seconds.",
+    "GET /api/v1/food/train/stations": "The station picker for train delivery before sign-in. { name, code } of stations whose store is approved and active, plus two booleans: no store ids, no audit fields. Cached for 60 seconds."
   }
 }

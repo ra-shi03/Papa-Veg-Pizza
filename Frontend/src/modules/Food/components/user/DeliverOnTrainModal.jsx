@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom"
 import IrctcOrderHistoryModal from "@food/components/user/IrctcOrderHistoryModal"
 import { useScrollLock } from "@food/hooks/useScrollLock"
 import { useLocationStore } from "@food/store/locationStore"
-import { stationCodeOf } from "@food/pages/user/cart/checkoutDetails"
+import TrainJourneyFields from "@food/components/user/TrainJourneyFields"
+import { useTrainStations } from "@food/hooks/useTrainStations"
+import { emptyJourney, journeyProblem, saveTrainJourney } from "@food/utils/trainJourney"
 
 export default function DeliverOnTrainModal({ show, onClose }) {
   const navigate = useNavigate()
@@ -16,15 +18,11 @@ export default function DeliverOnTrainModal({ show, onClose }) {
     return localStorage.getItem("theme") === "light" ? false : true
   })
 
-  // States for PNR flow
-  const [pnr, setPnr] = useState("")
+  // The train details the customer enters (nothing is looked up: no PNR service)
+  const [journey, setJourney] = useState(emptyJourney)
   const [agreed, setAgreed] = useState(true)
-  const [loading, setLoading] = useState(false)
-  const [journeyData, setJourneyData] = useState(null)
-  const [selectedStation, setSelectedStation] = useState("")
-  const [seatNo, setSeatNo] = useState("")
-  const [coachNo, setCoachNo] = useState("")
-  const [pnrError, setPnrError] = useState("")
+  const { info: trainInfo, failed: trainFailed } = useTrainStations(Boolean(show))
+  const trainProblem = trainFailed ? "Train delivery is not available yet" : journeyProblem(journey, trainInfo)
 
   // Modal / Drawer states
   const [showHistoryModal, setShowHistoryModal] = useState(false)
@@ -61,69 +59,18 @@ export default function DeliverOnTrainModal({ show, onClose }) {
     localStorage.setItem("theme", isDarkMode ? "dark" : "light")
   }, [isDarkMode])
 
-  // PNR submit logic
-  const handlePnrSubmit = (e) => {
-    e.preventDefault()
-    
-    // PNR number validation (exactly 10 digits)
-    const cleanPnr = pnr.replace(/\D/g, "")
-    if (cleanPnr.length !== 10) {
-      setPnrError("Please enter a valid 10-digit IRCTC PNR number.")
+  // Save the journey and go to the menu
+  const handleConfirmOrder = () => {
+    if (trainProblem) {
+      triggerToast(trainProblem)
       return
     }
-    
     if (!agreed) {
       triggerToast("You must agree to the Terms & Conditions")
       return
     }
-
-    setPnrError("")
-    setLoading(true)
-    
-    // Simulate real IRCTC API retrieval
-    setTimeout(() => {
-      setLoading(false)
-      setJourneyData({
-        trainNo: "12050",
-        trainName: "GATIMAN EXPRESS",
-        date: "Tomorrow, 03 Jun 2026",
-        from: "H. NIZAMUDDIN (NZM)",
-        to: "AGRA CANTT (AGC)",
-        stations: [
-          { name: "H. Nizamuddin (NZM)", time: "08:10 AM", catered: false },
-          { name: "Mathura Jn (MTJ)", time: "09:15 AM", catered: true },
-          { name: "Agra Cantt (AGC)", time: "09:50 AM", catered: true }
-        ]
-      })
-      triggerToast("Journey details retrieved!")
-    }, 1800)
-  }
-
-  // Handle station selection & routing
-  const handleConfirmOrder = () => {
-    if (!selectedStation) {
-      triggerToast("Please select a delivery station")
-      return
-    }
-    if (!coachNo || !seatNo) {
-      triggerToast("Please enter your Coach and Seat number")
-      return
-    }
-
-    // Save journey delivery details to localStorage
-    const deliveryDetails = `Train: ${journeyData.trainName} (${journeyData.trainNo}), Coach: ${coachNo.toUpperCase()}, Seat: ${seatNo}, Station: ${selectedStation}`
-    localStorage.setItem("pvp_train", JSON.stringify({
-      pnr: pnr.replace(/\D/g, ""),
-      coach: coachNo.toUpperCase(),
-      seat: seatNo,
-      stationName: selectedStation.replace(/\s*\([^)]*\)\s*$/, ""),
-      stationCode: stationCodeOf(selectedStation),
-      trainName: journeyData.trainName,
-      trainNo: journeyData.trainNo,
-    }))
-    // Confirms the location too, so the cart opens for the order
-    useLocationStore.getState().confirmLocation({ address: deliveryDetails, serviceType: "train" })
-    
+    // Saves the journey and confirms the location too, so the cart opens for the order
+    saveTrainJourney(journey, (details) => useLocationStore.getState().confirmLocation(details))
     triggerToast("Delivery details set! Redirecting to menu...")
     setTimeout(() => {
       navigate("/user/menu")
@@ -235,191 +182,47 @@ export default function DeliverOnTrainModal({ show, onClose }) {
           </div>
         </section>
 
-        {/* Enter PNR Form Card */}
+        {/* Train details card */}
         <section className="glass-card rounded-2xl p-5 space-y-4">
           <h3 className={`font-semibold text-base ${isDarkMode ? "text-white" : "text-[#1c1b1b]"}`} style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-            Enter PNR to get started
+            Enter your train details
           </h3>
 
-          <form onSubmit={handlePnrSubmit} className="space-y-4">
-            <div className="space-y-1">
-              <div className="relative">
-                <input
-                  type="text"
-                  maxLength="10"
-                  pattern="\d*"
-                  value={pnr}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/\D/g, "")
-                    setPnr(val)
-                    if (pnrError) setPnrError("")
-                  }}
-                  placeholder="Enter PNR"
-                  className={`w-full h-12 bg-white/5 border rounded-xl px-4 text-sm font-semibold outline-none transition-all ${
-                    pnrError 
-                      ? "border-red-500 text-red-500" 
-                      : pnr.length === 10 
-                        ? "border-green-500 focus:border-green-500" 
-                        : "border-white/10 focus:border-[#E53935]/50"
-                  } ${isDarkMode ? "text-white" : "text-zinc-900 bg-[#FAF9F6]"}`}
-                />
-                {pnr.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setPnr("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-white/40 hover:text-white/80 bg-transparent border-0"
-                  >
-                    cancel
-                  </button>
-                )}
-              </div>
+          <TrainJourneyFields
+            journey={journey}
+            onChange={setJourney}
+            info={trainInfo}
+            failed={trainFailed}
+            classes={{
+              label: `block text-[10px] uppercase opacity-60 font-semibold tracking-wider ${isDarkMode ? "text-white" : "text-zinc-800"}`,
+              input: `w-full h-11 bg-white/5 border border-white/10 rounded-xl px-3 text-xs font-semibold outline-none focus:border-[#E53935]/50 ${isDarkMode ? "text-white" : "text-zinc-900 bg-[#FAF9F6]"}`,
+              note: "text-[10px] opacity-60 font-semibold",
+              error: "text-red-500 text-xs font-semibold",
+            }}
+          />
 
-              {pnrError ? (
-                <p className="text-red-500 text-[11px] font-semibold mt-1">{pnrError}</p>
-              ) : (
-                <p className="text-[#00C853] text-[11px] font-semibold mt-1 flex items-center gap-1">
-                  <span className="material-symbols-outlined text-xs">check_circle</span>
-                  Valid PNR Number is Mandatory
-                </p>
-              )}
-            </div>
+          {/* Checkbox agreement */}
+          <label className="flex items-center gap-2.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="w-4 h-4 rounded accent-[#E53935] cursor-pointer"
+            />
+            <span className={`text-xs opacity-75 font-semibold leading-snug ${isDarkMode ? "text-white" : "text-zinc-800"}`}>
+              I agree to the IRCTC Ordering Terms & Conditions
+            </span>
+          </label>
 
-            {/* Checkbox agreement */}
-            <label className="flex items-center gap-2.5 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={agreed}
-                onChange={(e) => setAgreed(e.target.checked)}
-                className="w-4 h-4 rounded accent-[#E53935] cursor-pointer"
-              />
-              <span className={`text-xs opacity-75 font-semibold leading-snug ${isDarkMode ? "text-white" : "text-zinc-800"}`}>
-                I agree to the IRCTC Ordering Terms & Conditions
-              </span>
-            </label>
-
-            {/* Submit CTA */}
-            <button
-              type="submit"
-              disabled={loading || pnr.length < 10}
-              className={`w-full h-12 rounded-xl bg-[#E53935] hover:bg-red-700 text-white font-semibold text-sm tracking-wider uppercase transition-all shadow-md active:scale-98 flex items-center justify-center gap-2 cursor-pointer ${
-                pnr.length < 10 ? "opacity-50 cursor-not-allowed" : ""
-              }`}
-            >
-              {loading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Submitting...</span>
-                </>
-              ) : (
-                <span>Submit</span>
-              )}
-            </button>
-          </form>
+          <button
+            onClick={handleConfirmOrder}
+            disabled={!!trainProblem || !agreed}
+            className="w-full h-12 rounded-xl bg-[#00C853] hover:bg-green-700 text-white font-semibold text-xs uppercase tracking-widest shadow-lg flex items-center justify-center gap-1.5 cursor-pointer border-0 outline-none transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span>Proceed to Order Food</span>
+            <span className="material-symbols-outlined text-sm">arrow_forward</span>
+          </button>
         </section>
-
-        {/* Dynamic Journey Details Drawer (Rendered after successful PNR retrieval) */}
-        {journeyData && (
-          <section className="glass-card rounded-2xl p-5 space-y-4 border border-[#00C853]/30 animate-fadeIn">
-            <div className="flex items-center justify-between border-b border-white/10 pb-2">
-              <div>
-                <h4 className="text-[#00C853] font-semibold text-xs uppercase tracking-wider flex items-center gap-1">
-                  <span className="material-symbols-outlined text-sm">check_circle</span>
-                  PNR VERIFIED
-                </h4>
-                <p className={`text-base font-semibold mt-0.5 ${isDarkMode ? "text-white" : "text-[#1c1b1b]"}`}>
-                  {journeyData.trainName} ({journeyData.trainNo})
-                </p>
-              </div>
-              <span className="text-[10px] bg-[#E53935]/15 text-[#E53935] px-2 py-0.5 rounded font-semibold uppercase">
-                {journeyData.date}
-              </span>
-            </div>
-
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-4 text-xs opacity-80">
-                <div>
-                  <span className="block opacity-50 uppercase tracking-widest text-[9px] font-semibold">From Station</span>
-                  <span className="font-semibold">{journeyData.from}</span>
-                </div>
-                <div>
-                  <span className="block opacity-50 uppercase tracking-widest text-[9px] font-semibold">To Station</span>
-                  <span className="font-semibold">{journeyData.to}</span>
-                </div>
-              </div>
-
-              {/* Station Selection */}
-              <div className="space-y-2 pt-2 border-t border-white/5">
-                <label className={`block text-xs font-semibold ${isDarkMode ? "text-white" : "text-zinc-800"}`}>
-                  1. Select Station to Order Food
-                </label>
-                <div className="grid grid-cols-1 gap-2">
-                  {journeyData.stations.map((st) => (
-                    <button
-                      key={st.name}
-                      type="button"
-                      disabled={!st.catered}
-                      onClick={() => setSelectedStation(st.name)}
-                      className={`w-full p-3 rounded-xl text-left border flex items-center justify-between transition-all ${
-                        !st.catered 
-                          ? "opacity-40 cursor-not-allowed border-transparent bg-white/2" 
-                          : selectedStation === st.name 
-                            ? "bg-[#E53935]/10 border-[#E53935] text-[#E53935]" 
-                            : "bg-white/5 border-white/10 hover:bg-white/10 text-inherit"
-                      }`}
-                    >
-                      <div className="flex flex-col">
-                        <span className="text-xs font-semibold">{st.name}</span>
-                        <span className="text-[10px] opacity-60">Arrival: {st.time}</span>
-                      </div>
-                      {st.catered ? (
-                        <span className="text-[9px] bg-[#00C853]/15 text-[#00C853] px-2 py-0.5 rounded font-semibold uppercase">
-                          Papa Veg Pizza Available
-                        </span>
-                      ) : (
-                        <span className="text-[9px] bg-white/10 opacity-70 px-2 py-0.5 rounded font-semibold uppercase">
-                          Not Catered
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Coach & Seat Number details */}
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase opacity-60 font-semibold tracking-wider">Coach No.</label>
-                  <input 
-                    type="text"
-                    placeholder="e.g. A1, S3"
-                    value={coachNo}
-                    onChange={(e) => setCoachNo(e.target.value)}
-                    className={`w-full h-11 bg-white/5 border border-white/10 rounded-xl px-3 text-xs font-semibold outline-none focus:border-[#E53935]/40 ${isDarkMode ? "text-white" : "text-zinc-900 bg-white"}`}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase opacity-60 font-semibold tracking-wider">Seat No.</label>
-                  <input 
-                    type="text"
-                    placeholder="e.g. 24, 45"
-                    value={seatNo}
-                    onChange={(e) => setSeatNo(e.target.value)}
-                    className={`w-full h-11 bg-white/5 border border-white/10 rounded-xl px-3 text-xs font-semibold outline-none focus:border-[#E53935]/40 ${isDarkMode ? "text-white" : "text-zinc-900 bg-white"}`}
-                  />
-                </div>
-              </div>
-
-              {/* Confirm & Proceed Button */}
-              <button
-                onClick={handleConfirmOrder}
-                className="w-full h-12 mt-2 rounded-xl bg-[#00C853] hover:bg-green-700 text-white font-semibold text-xs uppercase tracking-widest shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
-              >
-                <span>Proceed to Order Food</span>
-                <span className="material-symbols-outlined text-sm">arrow_forward</span>
-              </button>
-            </div>
-          </section>
-        )}
 
         {/* IRCTC Order History Card */}
         <section 
@@ -506,7 +309,7 @@ export default function DeliverOnTrainModal({ show, onClose }) {
 
               <div className="space-y-1">
                 <h4 className="font-semibold text-[#E53935]">Is a PNR number mandatory?</h4>
-                <p className="opacity-75">Yes. We verify live journey details with the IRCTC database. Without a valid, active PNR number, we are unable to process the order or guarantee deliveries.</p>
+                <p className="opacity-75">No. Tell us your station, train number, coach and seat so the delivery partner can find you. A PNR is optional and is only passed on as a note; we do not check it with IRCTC.</p>
               </div>
             </div>
 

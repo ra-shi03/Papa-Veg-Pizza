@@ -115,7 +115,7 @@ export default function Navbar({ onToggleSidebar }) {
     if (adminUserStr) {
       setAdminData(JSON.parse(adminUserStr))
     } else {
-      setAdminData(STANDALONE_MOCK ? { name: "Shubham Jamliya", email: "shubham@papavegpizza.com" } : { name: "", email: "" })
+      setAdminData({ name: "", email: "" })
     }
 
     const fetchFranchiseData = async () => {
@@ -685,8 +685,10 @@ export default function Navbar({ onToggleSidebar }) {
             {showProfileMenu && (
               <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 shadow-xl py-1.5 z-50 animate-in fade-in duration-100 text-xs font-bold text-zinc-700 dark:text-zinc-300">
                 <div className="px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 mb-1.5">
-                  <p className="text-xs font-black text-zinc-900 dark:text-white leading-tight">{franchiseData?.ownerName || adminData?.name || (STANDALONE_MOCK ? "Shubham Jamliya" : "Franchise Admin")}</p>
-                  <p className="text-[9px] text-zinc-400 truncate mt-0.5">{franchiseData?.email || adminData?.email || "shubham@papavegpizza.com"}</p>
+                  <p className="text-xs font-black text-zinc-900 dark:text-white leading-tight">{franchiseData?.ownerName || adminData?.name || "Franchise Admin"}</p>
+                  {(franchiseData?.email || adminData?.email) && (
+                    <p className="text-[9px] text-zinc-400 truncate mt-0.5">{franchiseData?.email || adminData?.email}</p>
+                  )}
                 </div>
                 
                 {/* Theme Selector Inside Profile Dropdown */}

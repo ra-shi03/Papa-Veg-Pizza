@@ -172,6 +172,8 @@ export default function Settings() {
       const res = await adminAPI.updateBusinessSettings({ trainDelivery });
       setTrainDelivery(fromTrainDelivery(res?.data?.data?.trainDelivery));
       addToast('Train delivery saved.', 'success');
+      // A store that is closed right now is saved, with a warning for each
+      (res?.data?.data?.warnings || []).forEach((warning) => addToast(warning, 'warning'));
     } catch (err) {
       addToast(err?.response?.data?.error || err?.response?.data?.message || 'Could not save train delivery.', 'error');
     }

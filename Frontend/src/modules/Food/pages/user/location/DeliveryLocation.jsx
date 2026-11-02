@@ -5,6 +5,9 @@ import { useLocationStore } from '@food/store/locationStore';
 import { locationAPI } from '@/services/api/location';
 import apiClient from '@/services/api/axios';
 import IrctcOrderHistoryModal from '@food/components/user/IrctcOrderHistoryModal';
+import TrainJourneyFields from '@food/components/user/TrainJourneyFields';
+import { useTrainStations } from '@food/hooks/useTrainStations';
+import { emptyJourney, journeyProblem, saveTrainJourney } from '@food/utils/trainJourney';
 
 export default function DeliveryLocation() {
   const navigate = useNavigate();
@@ -24,7 +27,9 @@ export default function DeliveryLocation() {
   }, [location.state?.activeService, serviceFromQuery]);
   const [nearbyStores, setNearbyStores] = useState([]);
   const [isLoadingStores, setIsLoadingStores] = useState(false);
-  const [pnr, setPnr] = useState('');
+  const [journey, setJourney] = useState(emptyJourney);
+  const { info: trainInfo, failed: trainFailed } = useTrainStations(activeService === 'train');
+  const trainProblem = trainFailed ? 'Train delivery is not available yet' : journeyProblem(journey, trainInfo);
   const [agreed, setAgreed] = useState(false);
   const [showIrctcHistoryModal, setShowIrctcHistoryModal] = useState(false);
 
@@ -65,7 +70,7 @@ export default function DeliveryLocation() {
     const defaultTrainConfig = {
       bannerTitle: 'Pizza On Your Seat',
       bannerSubtitle: 'We will deliver your favourite Pizza right on your train seat while you travel.',
-      formTitle: 'Enter PNR to get started',
+      formTitle: 'Enter your train details',
       terms: [
         'Ordering is only allowed for stations which are catered by us and are ahead by 2 hours or more.',
         'Delivery is available only between 12:00 and 23:00 hours. The order would get cancelled if train reaches selected station outside of these operational hours.',
@@ -339,14 +344,18 @@ export default function DeliveryLocation() {
             {/* PNR Form */}
             <div className="bg-white rounded-2xl p-5 border border-zinc-200 shadow-sm">
               <h4 className="font-bold text-zinc-900 text-[14px] mb-4">{trainConfig.formTitle}</h4>
-              <input
-                type="text"
-                placeholder="Enter 10 digit PNR"
-                value={pnr}
-                onChange={(e) => setPnr(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3.5 text-[15px] font-medium text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-[#E53935] focus:bg-white transition-colors"
+              <TrainJourneyFields
+                journey={journey}
+                onChange={setJourney}
+                info={trainInfo}
+                failed={trainFailed}
+                classes={{
+                  label: 'block text-[11px] font-bold text-zinc-500 uppercase tracking-wide ml-1',
+                  input: 'w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-3 text-[14px] font-medium text-zinc-900 outline-none focus:border-[#E53935]',
+                  note: 'text-zinc-500 text-[11px] font-medium ml-1',
+                  error: 'text-[#E53935] text-[13px] font-semibold',
+                }}
               />
-              <p className="text-[#2e7d32] text-[11px] font-semibold mt-2 ml-1">Valid PNR Number is Mandatory</p>
 
               <label className="flex items-start gap-2.5 mt-5 cursor-pointer">
                 <input 
@@ -362,13 +371,11 @@ export default function DeliveryLocation() {
 
               <button 
                 type="button"
-                disabled={pnr.length !== 10 || !agreed}
+                disabled={!!trainProblem || !agreed}
                 onClick={() => {
-                  if (pnr.length === 10 && agreed) {
-                    localStorage.setItem("pvp_train_pnr", pnr);
-                    localStorage.setItem("pvp_train", JSON.stringify({ pnr }));
-                    // Confirms the location too, so the cart opens for the order
-                    useLocationStore.getState().confirmLocation({ address: `Delivery on Train (PNR: ${pnr})`, serviceType: "train" });
+                  if (!trainProblem && agreed) {
+                    // Saves the journey and confirms the location too, so the cart opens for the order
+                    saveTrainJourney(journey, (details) => useLocationStore.getState().confirmLocation(details));
                     navigate("/user/menu");
                   }
                 }}

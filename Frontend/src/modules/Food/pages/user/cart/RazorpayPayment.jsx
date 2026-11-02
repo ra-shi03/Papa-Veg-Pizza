@@ -62,10 +62,11 @@ export default function RazorpayPayment({
   const handleContinuePayment = () => {
     setProcessing(true)
     // Simulated payment processing loader
-    setTimeout(() => {
+    setTimeout(async () => {
+      // Success is shown only when the order was placed: a refused order shows the server's reason (from the checkout) instead
+      const placed = await onPaymentSuccess()
       setProcessing(false)
-      toast.success("Payment Successful!")
-      onPaymentSuccess()
+      if (placed !== false) toast.success("Payment Successful!")
     }, 2000)
   }
 

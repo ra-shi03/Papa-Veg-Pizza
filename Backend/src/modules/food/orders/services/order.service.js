@@ -138,14 +138,14 @@ export async function calculateOrder(userId, dto) {
  * as the delivery instructions (only to the rider who accepted the order).
  */
 function withTrainDelivery(dto, { store, station }) {
-  const { train } = dto;
+  const { pnr, ...train } = dto.train;
   const stationName = station?.name || train.stationName || "";
   const notes = [
-    train.pnr && `PNR: ${train.pnr}`,
+    stationName && `Station: ${stationName}`,
+    train.trainNo && `Train: ${train.trainNo}`,
     train.coach && `Coach: ${train.coach}`,
     train.seat && `Seat: ${train.seat}`,
-    train.details,
-    train.trainName && `Train: ${train.trainName}${train.trainNo ? ` (${train.trainNo})` : ""}`,
+    pnr && `PNR: ${pnr}`,
   ].filter(Boolean).join(", ");
   return {
     ...dto,

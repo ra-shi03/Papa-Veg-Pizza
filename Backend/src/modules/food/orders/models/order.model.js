@@ -396,14 +396,12 @@ const orderSchema = new mongoose.Schema(
         storeNote: { type: String, default: '', trim: true },
         note: { type: String, default: '', trim: true },
         train: {
+            // The PNR is not kept here: it is only part of the rider's delivery note (note)
             type: new mongoose.Schema({
-                pnr: { type: String, default: '' },
                 coach: { type: String, default: '' },
                 seat: { type: String, default: '' },
-                details: { type: String, default: '' },
                 stationCode: { type: String, default: '' },
                 stationName: { type: String, default: '' },
-                trainName: { type: String, default: '' },
                 trainNo: { type: String, default: '' },
             }, { _id: false }),
             default: undefined,

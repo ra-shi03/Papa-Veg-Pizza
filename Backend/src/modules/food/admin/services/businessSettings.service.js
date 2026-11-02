@@ -1,6 +1,7 @@
 import { FoodBusinessSettings } from '../models/businessSettings.model.js';
 import { isValidEmail, isValidPhone } from '../validators/businessSettings.validator.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
+import { FoodStore } from '../../store/models/store.model.js';
 
 // The one business settings record: the only source of the business name and contact details. Super admin writes it;
 // the apps read toPublicBusinessInfo through GET /food/admin/business-settings/public.
@@ -40,7 +41,26 @@ export const toPublicBusinessInfo = (doc) => ({
 });
 
 let cached = null;
-export const clearBusinessInfoCache = () => { cached = null; };
+let cachedStations = null;
+export const clearBusinessInfoCache = () => { cached = null; cachedStations = null; };
+
+/**
+ * GET /food/train/stations: the stations a customer can pick, as { name, code } only: no store ids, no audit fields.
+ * A station is listed when its store is approved and active. `available` is false when there is nothing to order from
+ * (no such station and no usable default train store): the cart then says so before an order is placed.
+ */
+export async function getTrainStations() {
+  if (cachedStations && Date.now() - cachedStations.at < PUBLIC_CACHE_MS) return cachedStations.info;
+  const settings = await FoodBusinessSettings.findOne().sort({ createdAt: 1 }).select('trainDelivery').lean();
+  const { stations = [], defaultStoreId = null } = settings?.trainDelivery || {};
+  const ids = [...stations.map((s) => s.storeId), defaultStoreId].filter(Boolean);
+  const usable = new Set((await FoodStore.find({ _id: { $in: ids }, approvalStatus: 'Approved', isActive: { $ne: false } }).select('_id').lean()).map((s) => String(s._id)));
+  const defaultAvailable = !!defaultStoreId && usable.has(String(defaultStoreId));
+  const listed = stations.filter((s) => usable.has(String(s.storeId))).map(({ name, code }) => ({ name, code }));
+  const info = { available: listed.length > 0 || defaultAvailable, defaultAvailable, stations: listed };
+  cachedStations = { at: Date.now(), info };
+  return info;
+}
 
 /** Read often by public pages, so kept for a minute; a save clears it at once on this instance. */
 export async function getBusinessInfo() {
