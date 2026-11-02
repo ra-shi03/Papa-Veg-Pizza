@@ -101,6 +101,17 @@ export function validateCreateOrderDto(body) {
         note: z.string().optional(),
         storeNote: z.string().optional(),
         sendCutlery: z.boolean().optional(),
+        // A train order: the store and the address come from the server (order-store.service.js resolveTrainStore)
+        train: z.object({
+            pnr: z.string().trim().regex(/^\d{10}$/, 'PNR must be 10 digits').optional(),
+            coach: z.string().trim().max(10).optional(),
+            seat: z.string().trim().max(10).optional(),
+            details: z.string().trim().max(120).optional(),
+            stationCode: z.string().trim().max(8).optional(),
+            stationName: z.string().trim().max(80).optional(),
+            trainName: z.string().trim().max(80).optional(),
+            trainNo: z.string().trim().max(10).optional(),
+        }).optional(),
         // 'razorpay_qr' means COD-style flow, but payment is collected via Razorpay QR at delivery.
         paymentMethod: z.enum(['cash', 'razorpay', 'razorpay_qr', 'card', 'wallet']),
         zoneId: z.string().nullable().optional(),

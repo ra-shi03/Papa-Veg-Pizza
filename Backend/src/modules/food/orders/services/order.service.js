@@ -37,7 +37,7 @@ import * as dispatchService from './order-dispatch.service.js';
 import * as deliveryService from './order-delivery.service.js';
 import * as paymentService from './order-payment.service.js';
 import { spendOfferClaims, releaseOfferClaims } from './order-offer.service.js';
-import { getOrderableStore } from './order-store.service.js';
+import { getOrderableStore, resolveTrainStore } from './order-store.service.js';
 import {
   enqueueOrderEvent,
   haversineKm,
@@ -132,8 +132,44 @@ export async function calculateOrder(userId, dto) {
 }
 
 // ----- Create order -----
+
+/**
+ * A train has no street: the station is the place, and PNR, coach and seat are delivery notes, which the rider app shows
+ * as the delivery instructions (only to the rider who accepted the order).
+ */
+function withTrainDelivery(dto, { store, station }) {
+  const { train } = dto;
+  const stationName = station?.name || train.stationName || "";
+  const notes = [
+    train.pnr && `PNR: ${train.pnr}`,
+    train.coach && `Coach: ${train.coach}`,
+    train.seat && `Seat: ${train.seat}`,
+    train.details,
+    train.trainName && `Train: ${train.trainName}${train.trainNo ? ` (${train.trainNo})` : ""}`,
+  ].filter(Boolean).join(", ");
+  return {
+    ...dto,
+    storeId: String(store._id),
+    train: { ...train, stationName, stationCode: station?.code || train.stationCode || "" },
+    address: {
+      label: dto.address?.label,
+      name: dto.address?.name,
+      phone: dto.address?.phone,
+      street: stationName ? `${stationName} station` : "On the train",
+      additionalDetails: "",
+      city: stationName || "On train",
+      state: "Train delivery",
+      zipCode: "",
+    },
+    note: [notes, dto.note].filter(Boolean).join(" | "),
+  };
+}
+
 export async function createOrder(userId, dto) {
-  const store = await getOrderableStore(dto.storeId, { at: dto.scheduledAt });
+  // A train order: the super admin's station mapping decides the store, whatever the client sent
+  const trainStore = dto.train ? await resolveTrainStore(dto.train.stationCode, { at: dto.scheduledAt }) : null;
+  if (trainStore) dto = withTrainDelivery(dto, trainStore);
+  const store = trainStore ? trainStore.store : await getOrderableStore(dto.storeId, { at: dto.scheduledAt });
 
   // Prices, fees, tax, discount and total are all computed here from the catalogue; the client's are ignored.
   const priced = await buildOrderPricing(userId, { ...dto, deliveryAddress: dto.address });
@@ -253,6 +289,7 @@ export async function createOrder(userId, dto) {
       },
     ],
     note: dto.note || "",
+    ...(dto.train ? { train: dto.train } : {}),
     storeNote: dto.storeNote || "",
     sendCutlery: dto.sendCutlery !== false,
     deliveryFleet: dto.deliveryFleet || "standard",

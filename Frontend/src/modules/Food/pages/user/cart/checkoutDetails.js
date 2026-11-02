@@ -98,6 +98,25 @@ export function readPickedLocation(storage = localStorage) {
   return text ? { address: text, point: null } : null
 }
 
+/** The train journey the customer entered, when this order goes to a train. */
+export function readTrainJourney(storage = localStorage) {
+  if (storage.getItem("activeService") !== "train") return null
+  try {
+    const journey = JSON.parse(storage.getItem("pvp_train") || "null")
+    if (journey) return journey
+  } catch (_) {}
+  const pnr = clean(storage.getItem("pvp_train_pnr"))
+  return pnr ? { pnr } : {}
+}
+
+/** Query for the store endpoints: for a train the super admin's station mapping picks the store, not a map point. */
+export function trainStoreQuery(journey) {
+  return journey ? { train: "1", ...(journey.stationCode ? { stationCode: journey.stationCode } : {}) } : null
+}
+
+/** The code in a station label such as "Mathura Jn (MTJ)". */
+export const stationCodeOf = (label) => clean(label).match(/\(([A-Za-z0-9]{2,8})\)\s*$/)?.[1]?.toUpperCase() || ""
+
 const fromSaved = (address) => ({
   kind: "saved",
   id: address?.id || address?._id || "",

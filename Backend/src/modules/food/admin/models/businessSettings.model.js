@@ -30,6 +30,19 @@ const businessSettingsSchema = new mongoose.Schema(
         whatsappNumber: { type: String, default: '', trim: true },
         gstin: { type: String, default: '', trim: true },
         faqContactText: { type: String, default: '', trim: true },
+        // Train delivery: which store serves each station (never public). No store here means no train delivery.
+        trainDelivery: {
+            defaultStoreId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodStore', default: null },
+            stations: {
+                type: [{
+                    _id: false,
+                    name: { type: String, required: true, trim: true },
+                    code: { type: String, required: true, trim: true, uppercase: true },
+                    storeId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodStore', required: true },
+                }],
+                default: [],
+            },
+        },
         // Theme / branding colors set by Superadmin — applied across all panels
         primaryColor: { type: String, default: '#a43c12' },
         secondaryColor: { type: String, default: '#ff7f50' },

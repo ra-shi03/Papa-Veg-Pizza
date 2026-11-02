@@ -17,7 +17,9 @@ import {
   contactFromAccount,
   contactProblem,
   readPickedLocation,
+  readTrainJourney,
   selectDeliveryAddress,
+  trainStoreQuery,
   toTenDigitPhone,
 } from "./checkoutDetails"
 
@@ -217,6 +219,7 @@ export default function CheckoutModal({
     const savedDeliveryAddress = localStorage.getItem("deliveryAddress") || ""
     const isTrain = activeService === "train" || savedDeliveryAddress.toLowerCase().includes("train")
     const trainPnr = localStorage.getItem("pvp_train_pnr") || ""
+    const trainJourney = readTrainJourney()
 
     // Pick the store that serves this delivery location, then place the order with it.
     let orderId
@@ -226,7 +229,7 @@ export default function CheckoutModal({
 
       // A scheduled order needs a store that can deliver at that time (it may be closed right now)
       const resolved = await apiClient.get("/food/stores/resolve", {
-        params: { ...(point || {}), ...(scheduledAt ? { at: scheduledAt } : {}) },
+        params: { ...(trainStoreQuery(trainJourney) || point || {}), ...(scheduledAt ? { at: scheduledAt } : {}) },
         _isFallback: true,
       })
       const store = resolved?.data?.data
@@ -241,6 +244,8 @@ export default function CheckoutModal({
           street: isTrain && savedDeliveryAddress ? savedDeliveryAddress : orderDetails.address.street,
           additionalDetails: isTrain && trainPnr ? `IRCTC Train PNR: ${trainPnr}` : orderDetails.address.additionalDetails,
         },
+        // The server turns these into the address and the rider's delivery notes
+        ...(trainJourney ? { train: { ...trainJourney, details: houseNumber.trim() } } : {}),
         items: toOrderItems(cartItems),
         ...(couponCode ? { couponCode } : {}),
         ...(scheduledAt ? { scheduledAt } : {}),

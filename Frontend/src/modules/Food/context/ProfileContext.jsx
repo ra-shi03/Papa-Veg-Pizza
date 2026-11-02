@@ -8,7 +8,7 @@ const debugError = (...args) => {}
 const ProfileContext = createContext(null)
 const USER_SESSION_PREFERENCE_KEYS = ["userVegMode", "userVegModeOption", "food-under-250-filters"]
 const LAST_ACCOUNT_KEY = "pvp_last_account_id"
-const PREVIOUS_CUSTOMER_KEYS = ["deliveryLocation", "deliveryAddress", "user_location", "user_storeId", "userLocation", "userAddresses"]
+const PREVIOUS_CUSTOMER_KEYS = ["deliveryLocation", "deliveryAddress", "user_location", "user_storeId", "userLocation", "userAddresses", "pvp_train", "pvp_train_pnr"]
 
 export function ProfileProvider({ children }) {
   const getAddressId = (address) => address?.id || address?._id || null

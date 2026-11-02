@@ -67,6 +67,11 @@ function useToast() {
   return { toasts, addToast };
 }
 
+const fromTrainDelivery = (saved = {}) => ({
+  defaultStoreId: saved.defaultStoreId ? String(saved.defaultStoreId) : '',
+  stations: (saved.stations || []).map((s) => ({ name: s.name || '', code: s.code || '', storeId: s.storeId ? String(s.storeId) : '' })),
+});
+
 export default function Settings() {
   const { toasts, addToast } = useToast();
   
@@ -86,6 +91,9 @@ export default function Settings() {
   
   // Tab control
   const [activeTab, setActiveTab] = useState('company');
+
+  const [trainDelivery, setTrainDelivery] = useState(() => fromTrainDelivery());
+  const [trainStores, setTrainStores] = useState([]);
 
   // Main Controlled State matching MongoDB 'system_settings' collection
   const [settings, setSettings] = useState(() => {
@@ -143,9 +151,31 @@ export default function Settings() {
         const saved = fromBusinessSettings(res?.data?.data);
         setSettings((prev) => ({ ...prev, ...saved }));
         setOriginalSettings((prev) => ({ ...prev, ...saved }));
+        setTrainDelivery(fromTrainDelivery(res?.data?.data?.trainDelivery));
       })
       .catch(() => addToast('Could not load the saved company information.', 'error'));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    adminAPI.getStores()
+      .then((res) => setTrainStores(res?.data?.data?.stores || []))
+      .catch(() => {});
+  }, []);
+
+  const updateTrainStation = (idx, change) => setTrainDelivery((prev) => ({
+    ...prev,
+    stations: prev.stations.map((station, i) => (i === idx ? { ...station, ...change } : station)),
+  }));
+
+  const saveTrainDelivery = async () => {
+    try {
+      const res = await adminAPI.updateBusinessSettings({ trainDelivery });
+      setTrainDelivery(fromTrainDelivery(res?.data?.data?.trainDelivery));
+      addToast('Train delivery saved.', 'success');
+    } catch (err) {
+      addToast(err?.response?.data?.error || err?.response?.data?.message || 'Could not save train delivery.', 'error');
+    }
+  };
 
   const saveCompanyInformation = async (data, files = {}) => {
     const { logo, favicon, ...fields } = data;
@@ -597,7 +627,8 @@ export default function Settings() {
               { id: 'orders', label: 'Order Settings', icon: Clock },
               { id: 'taxation', label: 'Tax Settings', icon: Percent },
               { id: 'invoices', label: 'Invoice Settings', icon: FileText },
-              { id: 'security', label: 'Security Settings', icon: Shield }
+              { id: 'security', label: 'Security Settings', icon: Shield },
+              { id: 'train', label: 'Train Delivery', icon: MapPin }
             ].map(tab => {
               const Icon = tab.icon;
               return (
@@ -744,6 +775,74 @@ export default function Settings() {
 
                   <div className="pt-2 flex justify-between items-center text-[10px] text-black dark:text-zinc-100 border-t border-zinc-150 dark:border-zinc-800">
                                         <span>Last saved: {settings.updatedAt ? new Date(settings.updatedAt).toLocaleString('en-IN') : '-'}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab: Train delivery (saved on the server) */}
+              {activeTab === 'train' && (
+                <div className="p-4 space-y-4">
+                  <header className="flex justify-between items-center pb-2 border-b border-zinc-200 dark:border-zinc-800">
+                    <div>
+                      <h2 className="text-xs font-black uppercase text-black dark:text-zinc-100 tracking-wider">Train Delivery</h2>
+                      <p className="text-[10px] text-black dark:text-zinc-100 mt-0.5">Which store serves each station. With no store here, train delivery is refused.</p>
+                    </div>
+                    <button
+                      onClick={() => setTrainDelivery((prev) => ({ ...prev, stations: [...prev.stations, { name: '', code: '', storeId: '' }] }))}
+                      className="px-2.5 py-1 text-[10px] font-bold text-[var(--primary)] hover:bg-[var(--primary)]/5 rounded border border-[var(--primary)]/30"
+                    >
+                      Add Station
+                    </button>
+                  </header>
+
+                  <div className="space-y-1 max-w-sm">
+                    <label className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">Default Train Store (stations not listed)</label>
+                    <select
+                      value={trainDelivery.defaultStoreId}
+                      onChange={(e) => setTrainDelivery((prev) => ({ ...prev, defaultStoreId: e.target.value }))}
+                      className="w-full h-8 px-2.5 border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-xs focus:ring-1 focus:ring-[var(--primary)] outline-none text-zinc-900 dark:text-zinc-50"
+                    >
+                      <option value="">None</option>
+                      {trainStores.map((store) => <option key={store._id} value={store._id}>{store.storeName}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    {trainDelivery.stations.map((station, idx) => (
+                      <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+                        <div className="space-y-1 md:col-span-4">
+                          <label className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">Station Name</label>
+                          <input type="text" value={station.name} onChange={(e) => updateTrainStation(idx, { name: e.target.value })} className="w-full h-8 px-2.5 border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-xs focus:ring-1 focus:ring-[var(--primary)] outline-none text-zinc-900 dark:text-zinc-50" />
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                          <label className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">Code</label>
+                          <input type="text" value={station.code} onChange={(e) => updateTrainStation(idx, { code: e.target.value.toUpperCase() })} className="w-full h-8 px-2.5 border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-xs focus:ring-1 focus:ring-[var(--primary)] outline-none text-zinc-900 dark:text-zinc-50" />
+                        </div>
+                        <div className="space-y-1 md:col-span-5">
+                          <label className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">Store</label>
+                          <select value={station.storeId} onChange={(e) => updateTrainStation(idx, { storeId: e.target.value })} className="w-full h-8 px-2.5 border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-xs focus:ring-1 focus:ring-[var(--primary)] outline-none text-zinc-900 dark:text-zinc-50">
+                            <option value="">Choose a store</option>
+                            {trainStores.map((store) => <option key={store._id} value={store._id}>{store.storeName}</option>)}
+                          </select>
+                        </div>
+                        <button
+                          onClick={() => setTrainDelivery((prev) => ({ ...prev, stations: prev.stations.filter((_, i) => i !== idx) }))}
+                          aria-label="Remove station"
+                          className="md:col-span-1 h-8 flex items-center justify-center text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="pt-2 flex justify-end border-t border-zinc-200 dark:border-zinc-800">
+                    <button
+                      onClick={saveTrainDelivery}
+                      className="px-3 py-1.5 bg-[var(--primary)] text-white text-[10px] font-bold rounded"
+                    >
+                      Save Train Delivery
+                    </button>
                   </div>
                 </div>
               )}

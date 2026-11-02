@@ -19,6 +19,17 @@ const phone = (label) => text(label, 25).refine((v) => !v || isValidPhone(v), `$
 const email = (label) => text(label, 100).refine((v) => !v || isValidEmail(v), `${label} is not a valid email address`);
 const color = (label) => z.string().trim().regex(/^#[0-9a-fA-F]{3,8}$/, `${label} must be a hex colour`);
 
+const storeId = z.string().regex(/^[a-f0-9]{24}$/i, 'Choose a store from the list');
+
+const trainDelivery = z.object({
+    defaultStoreId: z.union([storeId, z.literal(''), z.null()]).optional(),
+    stations: z.array(z.object({
+        name: text('Station name', 80).refine((v) => v.length >= 2, 'Enter the station name'),
+        code: text('Station code', 8).transform((v) => v.toUpperCase()).refine((v) => /^[A-Z0-9]{2,8}$/.test(v), 'Station code must be 2-8 letters or digits'),
+        storeId,
+    })).max(500, 'Too many stations').optional(),
+}).refine((v) => new Set((v.stations || []).map((s) => s.code)).size === (v.stations || []).length, 'Each station code can appear only once');
+
 const schema = z.object({
     companyName: text('Business name', 80).refine((v) => v.length >= 2, 'Business name must be at least 2 characters'),
     email: email('Email'),
@@ -41,6 +52,7 @@ const schema = z.object({
     secondaryColor: color('Secondary colour'),
     accentColor: color('Accent colour'),
     themeMode: z.enum(['light', 'dark']),
+    trainDelivery,
 }).partial();
 
 /** Only the fields above survive; everything else in the request is ignored. */

@@ -4,6 +4,7 @@ import { ValidationError } from '../../../../core/auth/errors.js';
 import { haversineKm } from './order.helpers.js';
 import { hoursByStore, openStoreIds } from '../../franchise/services/storeHours.js';
 import { assertSchedulable, isDeliverableAt } from './order-schedule.service.js';
+import { FoodBusinessSettings } from '../../admin/models/businessSettings.model.js';
 
 const CLOSED = 'The store is closed right now. Please order during its opening hours.';
 
@@ -38,6 +39,26 @@ export async function getOrderableStore(storeId, { at } = {}) {
   if (at) await assertSchedulable(store._id, new Date(at));
   else if (!(await openStoreIds([store._id])).has(String(store._id))) throw new ValidationError(CLOSED);
   return withLocation(store);
+}
+
+export const TRAIN_NOT_AVAILABLE = 'Train delivery is not available yet';
+
+/**
+ * The store for a train order, from the super admin's settings: the station's store, else the default train store,
+ * else none (refused). Never any other store. The store must be approved and active, and open now, or at `at` for a
+ * scheduled order (`anyHours` skips this, for listing delivery slots).
+ */
+export async function resolveTrainStore(stationCode, { at, anyHours = false } = {}) {
+  const settings = await FoodBusinessSettings.findOne().sort({ createdAt: 1 }).select('trainDelivery').lean();
+  const code = String(stationCode || '').trim().toUpperCase();
+  const station = code ? (settings?.trainDelivery?.stations || []).find((s) => s.code === code) : null;
+  const storeId = station?.storeId || settings?.trainDelivery?.defaultStoreId;
+  if (!storeId) throw new ValidationError(TRAIN_NOT_AVAILABLE);
+  const store = await FoodStore.findOne({ _id: storeId, ...ORDERABLE }).select(STORE_FIELDS).lean();
+  if (!store) throw new ValidationError(TRAIN_NOT_AVAILABLE);
+  if (at) await assertSchedulable(store._id, new Date(at));
+  else if (!anyHours && !(await openStoreIds([store._id])).has(String(store._id))) throw new ValidationError(CLOSED);
+  return { store: withLocation(store), station: station || null };
 }
 
 // Nearest orderable, open store to a delivery point. Stores whose zone contains the point win; with a single

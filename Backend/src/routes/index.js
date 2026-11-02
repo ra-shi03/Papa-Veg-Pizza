@@ -40,7 +40,7 @@ import { getPublicStore, getPublicOffers, getDeliverySlots } from '../modules/fo
 import { storeDeliveryRouter, zonesRouter } from '../modules/food/store/routes/storeDelivery.routes.js';
 import { storePerformanceRouter, operatingHoursRouter, storeExtrasRouter, storePricingRouter, storeDetailsRouter } from '../modules/food/franchise/routes/storeOps.routes.js';
 import { listFranchiseOrders } from '../modules/food/store/controllers/storeOrders.controller.js';
-import { resolveStoreForLocation } from '../modules/food/orders/services/order-store.service.js';
+import { resolveStoreForLocation, resolveTrainStore } from '../modules/food/orders/services/order-store.service.js';
 import { ValidationError } from '../core/auth/errors.js';
 import { trackOrderPublicController, getOrderHistoryPublicController, getOrderMethodsController, getFeeConfigController } from '../modules/food/orders/controllers/order.controller.js';
 import {
@@ -105,7 +105,9 @@ router.get('/v1/food/stores/resolve', async (req, res, next) => {
         // ?at=<ISO> for a scheduled order: a store that can deliver then, even if it is closed now
         const at = req.query.at ? new Date(String(req.query.at)) : null;
         if (at && Number.isNaN(at.getTime())) throw new ValidationError('Invalid delivery time');
-        const { store, distanceKm } = await resolveStoreForLocation(lat, lng, { at });
+        const { store, distanceKm } = req.query.train === '1'
+            ? { ...(await resolveTrainStore(req.query.stationCode, { at })), distanceKm: null }
+            : await resolveStoreForLocation(lat, lng, { at });
         res.json({
             success: true,
             data: {

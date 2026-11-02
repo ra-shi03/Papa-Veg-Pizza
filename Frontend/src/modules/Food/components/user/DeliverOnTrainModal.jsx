@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import IrctcOrderHistoryModal from "@food/components/user/IrctcOrderHistoryModal"
 import { useScrollLock } from "@food/hooks/useScrollLock"
 import { useLocationStore } from "@food/store/locationStore"
+import { stationCodeOf } from "@food/pages/user/cart/checkoutDetails"
 
 export default function DeliverOnTrainModal({ show, onClose }) {
   const navigate = useNavigate()
@@ -111,6 +112,15 @@ export default function DeliverOnTrainModal({ show, onClose }) {
 
     // Save journey delivery details to localStorage
     const deliveryDetails = `Train: ${journeyData.trainName} (${journeyData.trainNo}), Coach: ${coachNo.toUpperCase()}, Seat: ${seatNo}, Station: ${selectedStation}`
+    localStorage.setItem("pvp_train", JSON.stringify({
+      pnr: pnr.replace(/\D/g, ""),
+      coach: coachNo.toUpperCase(),
+      seat: seatNo,
+      stationName: selectedStation.replace(/\s*\([^)]*\)\s*$/, ""),
+      stationCode: stationCodeOf(selectedStation),
+      trainName: journeyData.trainName,
+      trainNo: journeyData.trainNo,
+    }))
     // Confirms the location too, so the cart opens for the order
     useLocationStore.getState().confirmLocation({ address: deliveryDetails, serviceType: "train" })
     

@@ -3,6 +3,8 @@ import { sendResponse } from '../../../../utils/response.js';
 import { uploadImageBufferDetailed } from '../../../../services/cloudinary.service.js';
 import { validateBusinessSettingsDto } from '../validators/businessSettings.validator.js';
 import { clearBusinessInfoCache, findBusinessSettings, getBusinessInfo } from '../services/businessSettings.service.js';
+import { FoodStore } from '../../store/models/store.model.js';
+import { ValidationError } from '../../../../core/auth/errors.js';
 
 /** Public: display fields only, briefly cached. Reading never creates a record. */
 export async function getPublicBusinessSettings(req, res, next) {
@@ -34,6 +36,12 @@ export async function updateBusinessSettings(req, res, next) {
             return res.status(400).json({ success: false, message: 'Invalid data format' });
         }
         const { phoneCountryCode, phoneNumber, ...fields } = validateBusinessSettingsDto(body);
+
+        if (fields.trainDelivery) {
+            const ids = [...new Set([...(fields.trainDelivery.stations || []).map((s) => s.storeId), fields.trainDelivery.defaultStoreId].filter(Boolean))];
+            if ((await FoodStore.countDocuments({ _id: { $in: ids } })) !== ids.length) throw new ValidationError('Choose a store from the list');
+            fields.trainDelivery = { stations: fields.trainDelivery.stations || [], defaultStoreId: fields.trainDelivery.defaultStoreId || null };
+        }
 
         const settings = (await findBusinessSettings()) || new FoodBusinessSettings();
         settings.set(fields);

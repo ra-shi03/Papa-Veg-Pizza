@@ -5,7 +5,7 @@ import { openStoreIds } from '../../franchise/services/storeHours.js';
 import { sendResponse } from '../../../../utils/response.js';
 import { NotFoundError } from '../../../../core/auth/errors.js';
 import { FoodAppConfig } from '../../settings/models/appConfig.model.js';
-import { resolveStoreForLocation } from '../../orders/services/order-store.service.js';
+import { resolveStoreForLocation, resolveTrainStore } from '../../orders/services/order-store.service.js';
 import { buildSlots, SCHEDULE } from '../../orders/services/order-schedule.service.js';
 
 // Public, read-only views the customer app needs about a store and the coupons it can use. Only fields a customer
@@ -38,7 +38,9 @@ export async function getPublicStore(req, res, next) {
  */
 export async function getDeliverySlots(req, res, next) {
   try {
-    const { store } = await resolveStoreForLocation(parseFloat(req.query.lat), parseFloat(req.query.lng), { anyHours: true });
+    const { store } = req.query.train === '1'
+      ? await resolveTrainStore(req.query.stationCode, { anyHours: true })
+      : await resolveStoreForLocation(parseFloat(req.query.lat), parseFloat(req.query.lng), { anyHours: true });
     const [open, config] = await Promise.all([
       openStoreIds([store._id]),
       FoodAppConfig.findOne().select('scheduledOrdersEnabled').lean(),

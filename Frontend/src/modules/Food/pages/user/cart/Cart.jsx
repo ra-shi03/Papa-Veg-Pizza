@@ -7,6 +7,7 @@ import ApplyCoupon from "./ApplyCoupon"
 import CheckoutModal from "./CheckoutModal"
 import CartOffers, { CheesyRewardsCard } from "./CartOffers"
 import DeliveryTimeSheet from "./DeliveryTimeSheet"
+import { readTrainJourney, trainStoreQuery } from "./checkoutDetails"
 import { getCartCoords, isSlotStillValid, loadSlot, saveSlot, slotDay, slotLabel, time12, offerDiscount, toOrderItems } from "./cartHelpers"
 import { CartMealSuggestions, LimitedOffer } from "./upsell/CartUpsell"
 import { AnimatedNumber, CartItemRow, CartSkeleton, haptic } from "./CartParts"
@@ -193,10 +194,10 @@ export default function Cart() {
     setSlotError("")
     try {
       const coords = getCartCoords()
-      const res = await apiClient.get("/food/stores/slots", { params: coords || {}, _isFallback: true })
+      const res = await apiClient.get("/food/stores/slots", { params: trainStoreQuery(readTrainJourney()) || coords || {}, _isFallback: true })
       setSlotInfo(res?.data?.data || null)
     } catch (err) {
-      setSlotError(err?.response?.data?.message || "Couldn't load delivery slots")
+      setSlotError(err?.response?.data?.error || err?.response?.data?.message || "Couldn't load delivery slots")
     } finally {
       setSlotLoading(false)
     }
@@ -608,7 +609,7 @@ export default function Cart() {
     let cancelled = false
     const timer = setTimeout(async () => {
       try {
-        const point = getCartCoords()
+        const point = readTrainJourney() ? null : getCartCoords()
         const res = await orderAPI.calculateOrder({
           storeId: slotInfo.storeId,
           items: toOrderItems(cartItems),

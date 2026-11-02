@@ -366,6 +366,7 @@ export default function DeliveryLocation() {
                 onClick={() => {
                   if (pnr.length === 10 && agreed) {
                     localStorage.setItem("pvp_train_pnr", pnr);
+                    localStorage.setItem("pvp_train", JSON.stringify({ pnr }));
                     // Confirms the location too, so the cart opens for the order
                     useLocationStore.getState().confirmLocation({ address: `Delivery on Train (PNR: ${pnr})`, serviceType: "train" });
                     navigate("/user/menu");
