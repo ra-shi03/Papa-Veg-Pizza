@@ -80,6 +80,30 @@ Both tests were confirmed to fail without the fixes.
 
 ---
 
+## Hardcoded contact numbers
+
+The developer's personal mobile number (shown as `<DEV_PHONE>` here) is used as the business phone in many places.
+Found with a search of `Frontend/src` and `Backend/src`; it was removed from checkout in `7573e3b`. **Not changed yet:** waiting for the real
+business number. The developer's email appeared only in checkout (removed).
+
+| Where | File and line | What it does |
+|---|---|---|
+| Customer app, side menu | `Frontend/src/modules/Food/components/user/UserSidebarDrawer.jsx:417`, `:421`, `:425` | "Call Catering Desk" link, its label, and a WhatsApp link |
+| Customer app, Help | `Frontend/src/modules/Food/pages/user/help/Help.jsx:27` | Default support phone (used until the server answers) |
+| Customer app, Bulk order | `Frontend/src/modules/Food/pages/user/BulkOrder.jsx:163`, `:181` | Default corporate phone |
+| Super admin, Bulk orders | `Frontend/src/modules/Food/pages/superadmin/orderManagement/BulkOrdersManagement.jsx:222`, `:240` | Default corporate phone in the form |
+| Super admin, FAQ and support | `Frontend/src/modules/Food/pages/superadmin/settings/FaqManagement.jsx:19`, `:642` | Default support phone and the input's example text |
+| Backend default, support page | `Backend/src/modules/food/admin/services/pageContent.service.js:42` | Default contact phone stored the first time the page is read |
+| Backend default, bulk orders | `Backend/src/modules/food/orders/models/bulkOrderConfig.model.js:31`, `:75` | Schema default for `corporatePhone` |
+| Backend default, bulk orders | `Backend/src/modules/food/orders/controllers/bulkOrder.controller.js:17`, `:43` | Default config returned when none is saved |
+| Sample data only (`VITE_STANDALONE_MOCK` and dev fallback) | `Frontend/src/services/api/mockService.js:747`, `:751`, `:766`, `:1768`, `:1835`, `:1914`, `:1940`, `:2685`, `:2705`, `:2775` | Mock responses, never shown with the real backend |
+
+Also in the database: any record saved from these defaults already holds the number (support page content, bulk order config), so
+changing the code alone does not change what customers see. After the number is given: replace it in one place per layer
+(a backend constant for the defaults, read by the three backend files), then update the saved records.
+
+---
+
 ## 1. Summary
 
 | Role | v1 screens | Completion at `b50b89d` | If the working tree is committed |

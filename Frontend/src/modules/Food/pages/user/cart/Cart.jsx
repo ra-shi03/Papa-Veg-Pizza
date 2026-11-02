@@ -395,9 +395,10 @@ export default function Cart() {
     return window.location.pathname.startsWith("/food") ? "/food/user/menu" : "/user/menu"
   }
 
-  // Navigate directly to menu page when cart is empty
+  // Navigate directly to menu page when cart is empty (not right after an order: the customer goes to its tracking)
+  const orderJustPlaced = useRef(false)
   useEffect(() => {
-    if (cartLoaded && cartItems.length === 0) {
+    if (cartLoaded && cartItems.length === 0 && !orderJustPlaced.current) {
       navigate(getMenuPath(), { replace: true })
     }
   }, [cartLoaded, cartItems.length, navigate])
@@ -1137,6 +1138,7 @@ export default function Cart() {
         total={total}
         scheduledAt={scheduledAt}
         onChangeTime={() => { setShowCheckoutModal(false); openTimeSheet() }}
+        onOrderPlaced={() => { orderJustPlaced.current = true }}
       />
       </div>
     </div>

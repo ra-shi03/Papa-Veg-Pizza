@@ -28,12 +28,13 @@ describe('contact', () => {
     test('the phone is the 10 digits, however it was saved', () => {
         for (const v of ['9812345678', '+91 98123 45678', '919812345678', '09812345678']) assert.equal(toTenDigitPhone(v), '9812345678', v);
     });
-    test('every empty field is required before the order is placed', () => {
+    test('name and phone are required before the order is placed; the email is optional', () => {
         assert.equal(contactProblem(ME), null);
         assert.match(contactProblem({ ...ME, name: ' ' }), /name/);
         assert.match(contactProblem({ ...ME, phone: '' }), /mobile/);
         assert.match(contactProblem({ ...ME, phone: '12345' }), /mobile/);
-        assert.match(contactProblem({ ...ME, email: '' }), /email/);
+        assert.equal(contactProblem({ ...ME, email: '' }), null);
+        assert.equal(contactProblem({ name: ME.name, phone: ME.phone }), null);
     });
 });
 
@@ -127,6 +128,17 @@ describe('the order payload', () => {
     test('refused when the contact is empty, even if the payload matches it', () => {
         const empty = { name: '', phone: '', email: '' };
         assert.throws(() => assertOwnOrderDetails(buildOrderDetails({ contact: empty, selected, houseNumber: 'x', landmark: '' }), { contact: empty, selected }));
+    });
+});
+
+describe('after the order', () => {
+    test('the cart does not redirect to the menu when the order was just placed, and the customer lands on its tracking', () => {
+        const cart = source('Cart.jsx');
+        assert.match(cart, /cartItems\.length === 0 && !orderJustPlaced\.current/);
+        assert.match(cart, /onOrderPlaced=\{\(\) => \{ orderJustPlaced\.current = true \}\}/);
+        const modal = source('CheckoutModal.jsx');
+        assert.ok(modal.indexOf('onOrderPlaced?.()') < modal.indexOf('replaceCart([])'), 'told before the cart is emptied');
+        assert.match(modal, /navigate\(`\/user\/orders\/\$\{orderId\}\?confirmed=true`\)/);
     });
 });
 

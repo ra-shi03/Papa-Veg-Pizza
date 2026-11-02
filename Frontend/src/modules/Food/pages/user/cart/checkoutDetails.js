@@ -24,10 +24,10 @@ export const contactFromAccount = (account) => ({
   email: clean(account?.email),
 })
 
-export function contactProblem({ name, phone, email } = {}) {
+export function contactProblem({ name, phone } = {}) {
   if (!clean(name)) return "Please add your name to place the order."
   if (!/^\d{10}$/.test(toTenDigitPhone(phone))) return "Please add your 10-digit mobile number to place the order."
-  if (!clean(email)) return "Please add your email to place the order."
+  // The email is optional: orders do not use it
   return null
 }
 

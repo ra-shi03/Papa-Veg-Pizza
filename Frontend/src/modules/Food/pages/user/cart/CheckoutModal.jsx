@@ -33,7 +33,8 @@ export default function CheckoutModal({
   sgst,
   total,
   scheduledAt,
-  onChangeTime
+  onChangeTime,
+  onOrderPlaced
 }) {
   const navigate = useNavigate()
   const { replaceCart, clearCart } = useCart()
@@ -141,11 +142,7 @@ export default function CheckoutModal({
       alert("Mobile number is required")
       return
     }
-    if (!editEmail.trim()) {
-      alert("Email is required")
-      return
-    }
-    const problem = contactProblem({ name: editName, phone: editPhone, email: editEmail })
+    const problem = contactProblem({ name: editName, phone: editPhone })
     if (problem) {
       toast.error(problem)
       return
@@ -182,7 +179,7 @@ export default function CheckoutModal({
       toast.info("Loading your details. Please try again in a moment.")
       return true
     }
-    const problem = contactProblem({ name: contactName, phone: contactPhone, email: contactEmail })
+    const problem = contactProblem({ name: contactName, phone: contactPhone })
     if (!problem) return false
     toast.error(problem)
     triggerContactEdit()
@@ -297,6 +294,9 @@ export default function CheckoutModal({
         localStorage.setItem("pvp_train_orders", JSON.stringify([trainOrderEntry, ...existing]))
       } catch (_) {}
     }
+
+    // Tell the cart this order is placed: an empty cart must not send the customer to the menu now
+    onOrderPlaced?.()
 
     // Clear cart in storage & context
     try {
