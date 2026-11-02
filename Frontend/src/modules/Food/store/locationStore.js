@@ -86,6 +86,10 @@ export const useLocationStore = create((set, get) => {
         if (addressDetails.serviceType === "delivery") {
           localStorage.setItem("deliveryAddress", addressDetails.address)
           localStorage.setItem("activeService", "delivery")
+        } else if (addressDetails.serviceType === "train") {
+          // Delivery on a train has no map point: the journey text is the address
+          localStorage.setItem("deliveryAddress", addressDetails.address)
+          localStorage.setItem("activeService", "train")
         } else if (addressDetails.serviceType === "takeaway") {
           localStorage.setItem("takeawayHut", addressDetails.address)
           localStorage.setItem("activeService", "takeaway")

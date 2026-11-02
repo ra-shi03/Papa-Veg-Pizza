@@ -60,6 +60,15 @@ export function parseAddressText(text) {
   return { area: parts.join(", "), city, state, zipCode }
 }
 
+/**
+ * City and state for a train order (the order needs both): the station when the journey text names one, else "On train"; the
+ * state is "Train delivery". The street is the journey text itself (PNR, coach, seat), which the rider needs.
+ */
+export function serviceArea(text) {
+  const station = clean(text).match(/Station:\s*([^,]+)/i)?.[1]
+  return { area: clean(text), city: clean(station) || "On train", state: "Train delivery", zipCode: "" }
+}
+
 /** The location the customer last picked on this device (the one the cart shows and quotes), from the location screens. */
 export function readPickedLocation(storage = localStorage) {
   const read = (key) => {
@@ -75,20 +84,18 @@ export function readPickedLocation(storage = localStorage) {
   const current = read("userLocation")
   const setupPoint = toPoint(setup?.lat, setup?.lng)
   const currentPoint = toPoint(current?.latitude, current?.longitude)
-  const nearestKnown = toPoint(picked?.lat, picked?.lng) || setupPoint || currentPoint
 
-  if (picked) return { address: clean(picked.address) || text, point: toPoint(picked.lat, picked.lng), nearestKnown }
-  if (setupPoint) return { address: clean(setup.address) || text, point: setupPoint, nearestKnown }
+  if (picked) return { address: clean(picked.address) || text, point: toPoint(picked.lat, picked.lng) }
+  if (setupPoint) return { address: clean(setup.address) || text, point: setupPoint }
   if (currentPoint) {
     return {
       address: clean(current.formattedAddress || current.address) || text,
       point: currentPoint,
-      nearestKnown,
       city: clean(current.city),
       state: clean(current.state),
     }
   }
-  return text ? { address: text, point: null, nearestKnown } : null
+  return text ? { address: text, point: null } : null
 }
 
 const fromSaved = (address) => ({
@@ -112,7 +119,8 @@ const fromSaved = (address) => ({
 export function selectDeliveryAddress({ saved = [], picked = null, service = "delivery" } = {}) {
   if (service !== "delivery") {
     if (!clean(picked?.address)) return null
-    return { kind: "service", id: "", label: "Home", ...parseAddressText(picked.address), additionalDetails: "", point: picked.nearestKnown || null, display: clean(picked.address) }
+    // No map point: a train has none, and a stale location from earlier must not become the drop-off
+    return { kind: "service", id: "", label: "Home", ...serviceArea(picked.address), additionalDetails: "", point: null, display: clean(picked.address) }
   }
   if (picked) {
     const match = saved.find((address) => {

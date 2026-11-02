@@ -73,6 +73,13 @@ describe('which address', () => {
         const selected = selectDeliveryAddress({ saved: [HOME], picked: { address: 'Delivery on Train (PNR: 123)', point: null, nearestKnown: null }, service: 'train' });
         assert.equal(selected.kind, 'service');
         assert.equal(addressProblem(selected), null);
+        // the order needs a city and a state: neither is invented from the PNR text
+        assert.deepEqual([selected.city, selected.state, selected.point], ['On train', 'Train delivery', null]);
+        const named = selectDeliveryAddress({ picked: { address: 'Train: Rajdhani (12301), Coach: B2, Seat: 14, Station: Bhopal Jn', point: null }, service: 'train' });
+        assert.equal(named.city, 'Bhopal Jn');
+        const d = buildOrderDetails({ contact: ME, selected, houseNumber: 'Coach B2', landmark: 'PNR 1234567890' });
+        assert.ok(d.address.city && d.address.state && !d.address.location);
+        assert.doesNotThrow(() => assertOwnOrderDetails(d, { contact: ME, selected }));
         assert.equal(selectDeliveryAddress({ saved: [HOME], picked: null, service: 'train' }), null);
     });
     test('reading the picked location, in the same order the cart uses', () => {
@@ -139,6 +146,20 @@ describe('after the order', () => {
         const modal = source('CheckoutModal.jsx');
         assert.ok(modal.indexOf('onOrderPlaced?.()') < modal.indexOf('replaceCart([])'), 'told before the cart is emptied');
         assert.match(modal, /navigate\(`\/user\/orders\/\$\{orderId\}\?confirmed=true`\)/);
+    });
+});
+
+describe('train orders', () => {
+    const FOOD = new URL('../../Frontend/src/modules/Food/', import.meta.url);
+    const read = (file) => readFileSync(new URL(file, FOOD), 'utf8');
+    test('both train screens confirm the location (the cart only opens for a confirmed one)', () => {
+        for (const file of ['pages/user/location/DeliveryLocation.jsx', 'components/user/DeliverOnTrainModal.jsx']) {
+            assert.match(read(file), /confirmLocation\(\{ address: [\s\S]{0,120}?serviceType: "train" \}\)/, file);
+            assert.ok(!/setItem\("activeService", "train"\)/.test(read(file)), `${file}: not set by hand`);
+        }
+    });
+    test('the store records the train journey as the address and the service', () => {
+        assert.match(read('store/locationStore.js'), /serviceType === "train"[\s\S]{0,260}setItem\("activeService", "train"\)/);
     });
 });
 
