@@ -8,9 +8,16 @@ export default function UpdateCompanyModal({ isOpen, onClose, initialData, onSav
     supportEmail: '',
     supportPhone: '',
     website: '',
+    cateringPhone: '',
+    cateringEmail: '',
+    whatsappNumber: '',
+    address: '',
+    gstin: '',
+    faqContactText: '',
     logo: '',
     favicon: ''
   });
+  const [files, setFiles] = useState({});
   const [logoPreview, setLogoPreview] = useState('');
   const [faviconPreview, setFaviconPreview] = useState('');
   const [error, setError] = useState('');
@@ -22,11 +29,18 @@ export default function UpdateCompanyModal({ isOpen, onClose, initialData, onSav
         supportEmail: initialData.supportEmail || '',
         supportPhone: initialData.supportPhone || '',
         website: initialData.website || '',
+        cateringPhone: initialData.cateringPhone || '',
+        cateringEmail: initialData.cateringEmail || '',
+        whatsappNumber: initialData.whatsappNumber || '',
+        address: initialData.address || '',
+        gstin: initialData.gstin || '',
+        faqContactText: initialData.faqContactText || '',
         logo: initialData.logo || '',
         favicon: initialData.favicon || ''
       });
       setLogoPreview(initialData.logo || '');
       setFaviconPreview(initialData.favicon || '');
+      setFiles({});
     }
   }, [initialData, isOpen]);
 
@@ -41,6 +55,7 @@ export default function UpdateCompanyModal({ isOpen, onClose, initialData, onSav
         return;
       }
       
+      setFiles(prev => ({ ...prev, [type]: file }));
       const reader = new FileReader();
       reader.onloadend = () => {
         if (type === 'logo') {
@@ -56,26 +71,24 @@ export default function UpdateCompanyModal({ isOpen, onClose, initialData, onSav
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.companyName.trim()) {
       setError('Company Name is required.');
-      return;
-    }
-    if (!formData.supportEmail.trim()) {
-      setError('Support Email is required.');
       return;
     }
 
     setIsSaving(true);
     setError('');
 
-    // Simulate API request (PUT /api/system/settings)
-    setTimeout(() => {
-      setIsSaving(false);
-      onSave(formData);
+    try {
+      await onSave(formData, files);
       onClose();
-    }, 1500);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.response?.data?.message || 'Could not save the settings. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -131,7 +144,7 @@ export default function UpdateCompanyModal({ isOpen, onClose, initialData, onSav
                   type="url" 
                   value={formData.website}
                   onChange={(e) => setFormData(prev => ({ ...prev, website: e.target.value }))}
-                  placeholder="https://papavegpizza.com"
+                  placeholder="https://"
                   className="w-full h-8.5 px-3 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 text-xs focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] transition-all outline-none text-zinc-900 dark:text-zinc-150"
                 />
               </div>
@@ -139,15 +152,92 @@ export default function UpdateCompanyModal({ isOpen, onClose, initialData, onSav
               {/* Support Email */}
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-black dark:text-zinc-100 dark:text-black dark:text-zinc-100 uppercase tracking-wider block">
-                  Support Email <span className="text-red-500">*</span>
+                  Support Email
                 </label>
                 <input 
                   type="email" 
-                  required 
                   value={formData.supportEmail}
                   onChange={(e) => setFormData(prev => ({ ...prev, supportEmail: e.target.value }))}
-                  placeholder="support@papavegpizza.com"
+                  placeholder="Support email address"
                   className="w-full h-8.5 px-3 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 text-xs focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] transition-all outline-none text-zinc-900 dark:text-zinc-150"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-black dark:text-zinc-100 dark:text-black dark:text-zinc-100 uppercase tracking-wider block">
+                  Catering / Bulk-Order Phone
+                </label>
+                <input
+                  type="tel"
+                  value={formData.cateringPhone}
+                  onChange={(e) => setFormData(prev => ({ ...prev, cateringPhone: e.target.value }))}
+                  placeholder="Shown on the catering and bulk-order screens"
+                  className="w-full h-8.5 px-3 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 text-xs focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] outline-none text-zinc-950 dark:text-zinc-50"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-black dark:text-zinc-100 dark:text-black dark:text-zinc-100 uppercase tracking-wider block">
+                  Catering / Bulk-Order Email
+                </label>
+                <input
+                  type="email"
+                  value={formData.cateringEmail}
+                  onChange={(e) => setFormData(prev => ({ ...prev, cateringEmail: e.target.value }))}
+                  placeholder="Shown on the bulk-order screen"
+                  className="w-full h-8.5 px-3 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 text-xs focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] outline-none text-zinc-950 dark:text-zinc-50"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-black dark:text-zinc-100 dark:text-black dark:text-zinc-100 uppercase tracking-wider block">
+                  WhatsApp Number
+                </label>
+                <input
+                  type="tel"
+                  value={formData.whatsappNumber}
+                  onChange={(e) => setFormData(prev => ({ ...prev, whatsappNumber: e.target.value }))}
+                  placeholder="Number for the WhatsApp button"
+                  className="w-full h-8.5 px-3 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 text-xs focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] outline-none text-zinc-950 dark:text-zinc-50"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-black dark:text-zinc-100 dark:text-black dark:text-zinc-100 uppercase tracking-wider block">
+                  GSTIN
+                </label>
+                <input
+                  type="text"
+                  value={formData.gstin}
+                  onChange={(e) => setFormData(prev => ({ ...prev, gstin: e.target.value }))}
+                  placeholder="15-character GSTIN"
+                  className="w-full h-8.5 px-3 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 text-xs focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] outline-none text-zinc-950 dark:text-zinc-50"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-black dark:text-zinc-100 dark:text-black dark:text-zinc-100 uppercase tracking-wider block">
+                  Business Address
+                </label>
+                <input
+                  type="text"
+                  value={formData.address}
+                  onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                  placeholder="Registered or head office address"
+                  className="w-full h-8.5 px-3 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 text-xs focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] outline-none text-zinc-950 dark:text-zinc-50"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-black dark:text-zinc-100 dark:text-black dark:text-zinc-100 uppercase tracking-wider block">
+                  FAQ Contact Text
+                </label>
+                <input
+                  type="text"
+                  value={formData.faqContactText}
+                  onChange={(e) => setFormData(prev => ({ ...prev, faqContactText: e.target.value }))}
+                  placeholder="Shown above the contact details on Help"
+                  className="w-full h-8.5 px-3 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 text-xs focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] outline-none text-zinc-950 dark:text-zinc-50"
                 />
               </div>
 
@@ -160,7 +250,7 @@ export default function UpdateCompanyModal({ isOpen, onClose, initialData, onSav
                   type="tel" 
                   value={formData.supportPhone}
                   onChange={(e) => setFormData(prev => ({ ...prev, supportPhone: e.target.value }))}
-                  placeholder="+91 9999999999"
+                  placeholder="Support phone number"
                   className="w-full h-8.5 px-3 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 text-xs focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] transition-all outline-none text-zinc-900 dark:text-zinc-150"
                 />
               </div>

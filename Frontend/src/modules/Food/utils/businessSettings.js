@@ -9,6 +9,8 @@ import { API_ENDPOINTS } from "@food/api/config";
 import { publicGetOnce } from "@food/api";
 
 const SETTINGS_KEY = 'food_business_settings';
+// Only when the super admin has not named the business yet
+const DEFAULT_COMPANY_NAME = "Papa Veg Pizza";
 
 // Initialize from localStorage immediately so it's available for components on mount
 let cachedSettings = (() => {
@@ -58,6 +60,14 @@ export const applyThemeColors = (settings) => {
   }
 };
 
+// The customer and admin screens read the logo and name from these keys
+const rememberBranding = (settings) => {
+  try {
+    if (settings?.logo?.url) localStorage.setItem('sa_logo', settings.logo.url);
+    if (settings?.companyName) localStorage.setItem('sa_companyName', settings.companyName);
+  } catch (e) { }
+};
+
 // Apply cached settings immediately on module load (before API call returns)
 if (cachedSettings) {
   applyThemeColors(cachedSettings);
@@ -96,6 +106,7 @@ export const loadBusinessSettings = async () => {
 
         // Apply theme colors from DB to ALL CSS variables — this is the global fix
         applyThemeColors(settings);
+        rememberBranding(settings);
 
         updateFavicon(settings.favicon?.url);
         updateTitle(settings.companyName);
@@ -168,6 +179,7 @@ export const setCachedSettings = (settings) => {
     } catch (e) { }
 
     applyThemeColors(settings);
+    rememberBranding(settings);
     updateFavicon(settings.favicon?.url);
     updateTitle(settings.companyName);
 
@@ -175,6 +187,14 @@ export const setCachedSettings = (settings) => {
       window.dispatchEvent(new Event("systemThemeChanged"));
     }
   }
+};
+
+/** WhatsApp link for a saved number; empty when there is no number, so the caller hides the link. */
+export const whatsappLink = (number, message = "") => {
+  const digits = String(number || "").replace(/\D/g, "");
+  if (!digits) return "";
+  const full = digits.length === 10 ? `91${digits}` : digits;
+  return `https://wa.me/${full}${message ? `?text=${encodeURIComponent(message)}` : ""}`;
 };
 
 /**
@@ -199,7 +219,7 @@ export const getCachedSettings = () => {
  */
 export const getCompanyName = () => {
   const settings = getCachedSettings();
-  return settings?.companyName || "Papa Veg Pizza";
+  return settings?.companyName || DEFAULT_COMPANY_NAME;
 };
 
 /**
@@ -208,8 +228,8 @@ export const getCompanyName = () => {
 export const getCompanyNameAsync = async () => {
   try {
     const settings = await loadBusinessSettings();
-    return settings?.companyName || "Papa Veg Pizza";
+    return settings?.companyName || DEFAULT_COMPANY_NAME;
   } catch (error) {
-    return "Papa Veg Pizza";
+    return DEFAULT_COMPANY_NAME;
   }
 };

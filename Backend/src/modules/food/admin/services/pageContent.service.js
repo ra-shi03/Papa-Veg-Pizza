@@ -1,3 +1,4 @@
+import { getBusinessInfo, writeThroughBusinessContact } from './businessSettings.service.js';
 import { FoodPageContent } from '../models/pageContent.model.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 
@@ -39,11 +40,21 @@ export const DEFAULT_SUPPORT_DATA = {
     title: 'Customer Support',
     description: 'Have an issue with your order or questions about our menu? Get in touch directly:',
     contactInfo: {
-        phone: '+91 9300990940',
-        email: 'papafoodcorporation@gmail.com',
+        // Phone and email are served from the business settings (withBusinessContact)
+        phone: '',
+        email: '',
         hours: 'Support Hours: 10:00 AM – 11:30 PM Everyday'
     }
 };
+
+/** The support page's phone and email always come from the business settings, never a value saved on this page. */
+const withBusinessContact = (data, info) => ({
+    ...data,
+    description: info.faqContactText || data.description,
+    contactInfo: { ...data.contactInfo, phone: info.supportPhone, email: info.supportEmail },
+    phone: info.supportPhone,
+    email: info.supportEmail,
+});
 
 const normalizeSupportForResponse = (support) => {
     if (!support || typeof support !== 'object') {
@@ -192,11 +203,16 @@ export const getPublicPageByKey = async (key) => {
                 doc = doc.toObject ? doc.toObject() : doc;
             } catch (_) {}
         }
-        return { key: k, data: normalizeSupportForResponse(doc?.support || null) };
+        return { key: k, data: withBusinessContact(normalizeSupportForResponse(doc?.support || null), await getBusinessInfo()) };
     }
 
     if (!doc) return { key: k, data: null };
-    if (k === 'about') return { key: k, data: normalizeAboutForResponse(doc.about || null) };
+    if (k === 'about') {
+        const about = normalizeAboutForResponse(doc.about || null);
+        // Never the old template's name: the business name when none of its own was saved
+        if (about && (!about.appName || about.appName === 'Foodelo')) about.appName = (await getBusinessInfo()).companyName;
+        return { key: k, data: about };
+    }
     const normalized = normalizeLegalForResponse(doc.legal || null);
     if ((k === 'terms' || k === 'terms_user') && (!normalized || !normalized.content || normalized.content.trim().length < 50)) {
         return {
@@ -279,8 +295,15 @@ export const upsertAboutPage = async (payload, updatedBy) => {
 export const upsertSupportPage = async (payload, updatedBy) => {
     const title = decodeHtmlEntities(String(payload?.title || '')).trim() || DEFAULT_SUPPORT_DATA.title;
     const description = decodeHtmlEntities(String(payload?.description || '')).trim() || DEFAULT_SUPPORT_DATA.description;
-    const phone = decodeHtmlEntities(String(payload?.contactInfo?.phone ?? payload?.phone ?? '')).trim() || DEFAULT_SUPPORT_DATA.contactInfo.phone;
-    const email = decodeHtmlEntities(String(payload?.contactInfo?.email ?? payload?.email ?? '')).trim() || DEFAULT_SUPPORT_DATA.contactInfo.email;
+    // The screen's phone and email inputs edit the business settings
+    const sentPhone = payload?.contactInfo?.phone ?? payload?.phone;
+    const sentEmail = payload?.contactInfo?.email ?? payload?.email;
+    const phone = decodeHtmlEntities(String(sentPhone ?? '')).trim();
+    const email = decodeHtmlEntities(String(sentEmail ?? '')).trim();
+    await writeThroughBusinessContact({
+        supportPhone: sentPhone === undefined ? undefined : phone,
+        supportEmail: sentEmail === undefined ? undefined : email,
+    });
     const hours = decodeHtmlEntities(String(payload?.contactInfo?.hours ?? payload?.hours ?? '')).trim() || DEFAULT_SUPPORT_DATA.contactInfo.hours;
 
     const doc = await FoodPageContent.findOneAndUpdate(
@@ -306,7 +329,7 @@ export const upsertSupportPage = async (payload, updatedBy) => {
         { upsert: true, new: true }
     ).lean();
 
-    return { key: 'support', data: normalizeSupportForResponse(doc?.support || null) };
+    return { key: 'support', data: withBusinessContact(normalizeSupportForResponse(doc?.support || null), await getBusinessInfo()) };
 };
 
 

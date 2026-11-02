@@ -23,11 +23,12 @@ import * as orderController from '../../orders/controllers/order.controller.js';
 import * as refundAdminController from '../controllers/refundAdmin.controller.js';
 import { getAdminPageController, upsertAdminPageController } from '../controllers/pageContent.controller.js';
 import { upload } from '../../../../middleware/upload.js';
+import { safeUpload } from '../../../../middleware/safeUpload.js';
 
 const router = express.Router();
 
 // ----- Public Business Settings (No Admin Required) -----
-router.get('/business-settings/public', businessSettingsController.getBusinessSettings);
+router.get('/business-settings/public', businessSettingsController.getPublicBusinessSettings);
 
 // ----- Public Category Products -----
 router.get('/category-products', categoryProductController.getCategoryProducts);
@@ -257,9 +258,8 @@ router.get('/referral-settings', adminController.getReferralSettings);
 router.put('/referral-settings', adminController.createOrUpdateReferralSettings);
 
 // ----- Business Settings -----
-router.get('/business-settings/public', businessSettingsController.getBusinessSettings); // Public endpoint
 router.get('/business-settings', businessSettingsController.getBusinessSettings);
-router.patch('/business-settings', upload.fields([
+router.patch('/business-settings', safeUpload('image', [
     { name: 'logo', maxCount: 1 },
     { name: 'favicon', maxCount: 1 }
 ]), businessSettingsController.updateBusinessSettings);

@@ -218,8 +218,8 @@ export default function BulkOrdersManagement() {
       title2: "CELEBRATIONS MADE EASY",
       description2: "Convert your work from home into party from home with Papa Veg Pizza's Virtual Feast. Order some good old favourites from Papa Veg Pizza and celebrate with your colleagues in a new and safer way.",
       featureImage: "https://images.unsplash.com/photo-1577962917302-cd874c4e31d2?auto=format&fit=crop&w=1000&q=80",
-      corporateEmail: "corporate.sales@papavegpizza.com",
-      corporatePhone: "+91 9300990940"
+      corporateEmail: "",
+      corporatePhone: ""
     },
     egiftVoucher: {
       isActive: true,
@@ -236,8 +236,8 @@ export default function BulkOrdersManagement() {
       heading2: "SMALL GESTURES GO A LONG WAY",
       description2: "Ultimate gifting for corporate and businesses. The Papa Veg Pizza's E-Gift Voucher is a great solution when it comes to rewarding and recognizing employees, customers and supporters with a sophisticated gifting platform.",
       featureImage: "https://images.unsplash.com/photo-1577962917302-cd874c4e31d2?auto=format&fit=crop&w=1000&q=80",
-      corporateEmail: "corporate.sales@papavegpizza.com",
-      corporatePhone: "+91 9300990940",
+      corporateEmail: "",
+      corporatePhone: "",
       denominationOptions: [
         "25 - 50 Vouchers",
         "50 - 100 Vouchers",
@@ -288,18 +288,18 @@ export default function BulkOrdersManagement() {
     },
     contactPage: {
       feedbackHeading: "Have any feedback or queries? We'd love to hear from you. Write to us at",
-      feedbackEmail: "guestcare@papavegpizza.com",
+      feedbackEmail: "",
       outletButtonText: "FIND YOUR NEAREST OUTLET",
       outletButtonLink: "/food/user/delivery-location",
       outletHelpText: "Try our delicious treats and satisfy hunger with Papa Veg Pizza.",
       locateLinkText: "Locate Nearby Pizza Restaurants",
       locateLinkUrl: "/food/user/delivery-location",
       customerCareTitle: "Papa Veg Pizza Customer Care Number",
-      customerCareNumber: "1800-889-1234",
+      customerCareNumber: "",
       corporateOfficeTitle: "Papa Veg Pizza Corporate Office",
-      companyName: "Papa Veg Pizza Private Limited",
-      addressLine1: "12/2 M.G. Road, Near Palasia Square",
-      addressLine2: "Indore - 452001, Madhya Pradesh, India",
+      companyName: "",
+      addressLine1: "",
+      addressLine2: "",
       mapEmbedUrl:
         "https://maps.google.com/maps?q=Rajasthan&t=&z=7&ie=UTF8&iwloc=&output=embed",
       mapExternalUrl: "https://maps.google.com/?q=Rajasthan",

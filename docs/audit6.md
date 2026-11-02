@@ -80,7 +80,50 @@ Both tests were confirmed to fail without the fixes.
 
 ---
 
+## Business settings
+
+Step 1 of the business information work: what existed before it. File and line numbers are from commit `c1ad68d`.
+
+### What existed
+
+| Piece | State found | Real? |
+|---|---|---|
+| Model `FoodBusinessSettings` (`admin/models/businessSettings.model.js`) | A real record: name, email, phone, address, state, pincode, region, logo, favicon, support email, phone and hours, theme colours. **Defaults came from other companies:** `Appzeto`, `admin@appzeto.com`, `support@foodelo.com`, `+91 1234567890` | Real, wrong defaults |
+| Admin routes `GET` and `PATCH /food/admin/business-settings` | Super admin only (after `requireSuperAdmin`). Hand-written checks. Bare `upload` with no file signature check (audit3 M3) | Real |
+| Public route `GET .../business-settings/public` | **Returned the whole document,** including `_id`, timestamps and storage ids. The first read also wrote a record with the `Appzeto` defaults | Real, too open |
+| `Frontend/.../utils/businessSettings.js`, `hooks/useCompanyName.js` | Real reads of the public route, cached in localStorage. They supply theme, logo and name. Fallbacks disagreed: `Papa Veg Pizza` and `Papa Veg Pizza Food` | Real |
+| Super admin `settings/Settings.jsx`, Company Info tab | **Not connected.** Never called the API. Name and logo from localStorage. Support email, phone, website, GST (`22AAAAA0000A1Z5`) and address hardcoded | Mock |
+| `settings/UpdateCompanyModal.jsx` | Fake save: a 1.5-second timer | Mock |
+| Other Settings tabs (Localization, Orders, Tax, Invoices, Security), and the Sync and Configuration History panels | Local state or localStorage, fake names such as "Rohan Sharma" | **Still mock:** not part of this work |
+| Help page, bulk-order page, catering buttons | Each kept its own contacts, separate from this record | Disconnected |
+
+### Personal and hardcoded details found
+
+| What | Where it was | Now |
+|---|---|---|
+| Developer's phone (`<DEV_PHONE>`) | The list in "Hardcoded contact numbers" below | Removed everywhere |
+| Developer's email (`<DEV_EMAIL>`) | Checkout only (removed in `7573e3b`) | Gone |
+| Another personal Gmail (`papafood...`) | `pageContent.service.js:43`, `Help.jsx:28`, `FaqManagement.jsx:20,657`, `mockService.js` | Removed |
+| A third person's Gmail and phone (`rbfoods...`, `99408...`) | `auth/pages/PublicSupport.jsx:68,69,79,80`, `mockService.js` | Removed |
+| Invented business contacts | `corporate.sales@` and `guestcare@papavegpizza.com`, `1800-889-1234`, `12/2 M.G. Road, Palasia`, `Papa Veg Pizza Private Limited` (`bulkOrder.controller.js`, `bulkOrderConfig.model.js`, `BulkOrder.jsx`, `BulkOrdersManagement.jsx`) | Removed; served from the setting |
+| Template names | `Appzeto` (`email.js:39,50,57`, `razorpay.js:69`), `Foodelo` (`pageContent.model.js:25`) | Removed |
+
+### Not changed, and why
+
+- **SMS text `Foodelo`** (`core/otp/otp.service.js:48`). SMS wording in India must match a registered DLT template, so changing it here could stop OTP delivery. It needs a new template first.
+- **Appzeto brand image URL** in push notifications (about 14 places in `order.service.js`, `admin.service.js`, `foodApproval.service.js`, `admin.controller.js`). An image, not a name. Customers can see it, so it needs replacing with the logo.
+- **"Papa Veg Pizza" in screen text:** 131 lines across 35 customer and delivery files, mostly marketing copy ("Papa Veg Pizza's Virtual Feast"). This is the correct brand, and replacing it with a setting that can be empty would produce broken sentences. Decide if a rename is planned.
+- **Super admin CMS defaults** (`deliveryWelcomeScreen`, `deliveryLoginScreen`, `welcomeScreen` and others): editable content with the correct brand.
+- **Fallback address text** `Regal Circle, South Tukoganj` on `LocationSetup.jsx:796` and `DeliveryLocation.jsx:13`: placeholder text on the map screens until a location is found.
+- **Sample contacts** in mock data files and admin placeholders (`admin@papavegpizza.com` on the login screens, `shubham@papavegpizza.com` in the franchise navbar `layout/Navbar.jsx:118,689`, the `info@papavegpizza.in` samples in notification templates). The franchise navbar one looks like a real person's and should be replaced with the signed-in user.
+- **Delivery `Signup.jsx:371`** demo credentials: an older screen, sample number only.
+- **Saved database records:** old numbers stored in the support page and bulk-order records stay in the database, but are never served, because those reads now take contacts from this record. The git history still holds the removed values.
+
+---
+
 ## Hardcoded contact numbers
+
+**Resolved:** this list is what was removed by the business settings work above.
 
 The developer's personal mobile number (shown as `<DEV_PHONE>` here) is used as the business phone in many places.
 Found with a search of `Frontend/src` and `Backend/src`; it was removed from checkout in `7573e3b`. **Not changed yet:** waiting for the real

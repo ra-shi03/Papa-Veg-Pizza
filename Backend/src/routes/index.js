@@ -161,7 +161,7 @@ router.use('/v1/food/search', searchRoutes);
 router.use('/v1/uploads', uploadRoutes);
 
 // Mark business-settings/public as truly public
-router.get('/v1/food/admin/business-settings/public', businessSettingsController.getBusinessSettings);
+router.get('/v1/food/admin/business-settings/public', businessSettingsController.getPublicBusinessSettings);
 
 // Public menu route
 router.get('/v1/food/admin/menu/public', productController.getPublicMenu);

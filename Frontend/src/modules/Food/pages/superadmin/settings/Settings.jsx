@@ -34,6 +34,25 @@ import UpdateCompanyModal from './UpdateCompanyModal';
 import { applySystemTheme } from '@/shared/utils/themeSync';
 import UpdateTaxModal from './UpdateTaxModal';
 import MaintenanceModeModal from './MaintenanceModeModal';
+import { adminAPI } from '@/services/api';
+import { setCachedSettings } from '@food/utils/businessSettings';
+
+// The saved business settings, in the shape this screen shows
+const fromBusinessSettings = (saved = {}) => ({
+  companyName: saved.companyName || '',
+  supportEmail: saved.supportEmail || '',
+  supportPhone: saved.supportPhone || '',
+  website: saved.website || '',
+  cateringPhone: saved.cateringPhone || '',
+  cateringEmail: saved.cateringEmail || '',
+  whatsappNumber: saved.whatsappNumber || '',
+  address: saved.address || '',
+  gstin: saved.gstin || '',
+  faqContactText: saved.faqContactText || '',
+  logo: saved.logo?.url || '',
+  favicon: saved.favicon?.url || '',
+  updatedAt: saved.updatedAt || null,
+});
 
 // Mock Toast Hook/Component for beautiful notifications
 function useToast() {
@@ -70,16 +89,8 @@ export default function Settings() {
 
   // Main Controlled State matching MongoDB 'system_settings' collection
   const [settings, setSettings] = useState(() => {
-    const defaultLogo = 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&q=80&w=150';
-    const defaultFavicon = 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&q=80&w=40';
-    
     return {
-      companyName: localStorage.getItem("sa_companyName") || 'Papa Veg Pizza India Ltd.',
-      supportEmail: 'care@papavegpizza.in',
-      supportPhone: '+91 98765 43210',
-      website: 'https://papavegpizza.in',
-      logo: localStorage.getItem("sa_logo") || defaultLogo,
-      favicon: localStorage.getItem("sa_favicon") || defaultFavicon,
+      ...fromBusinessSettings(),
       currency: 'INR',
       currencySymbol: '₹',
       timezone: 'Asia/Kolkata',
@@ -104,8 +115,6 @@ export default function Settings() {
       otpExpirySeconds: 60,
       loginAttemptsLimit: 5,
       require2FA: true,
-      updatedBy: 'Rohan Sharma (Super Admin)',
-      updatedAt: '2026-06-19T16:51:00Z'
     };
   });
 
@@ -126,6 +135,27 @@ export default function Settings() {
   // Keep a tracking state for unsaved edits alert
   const [originalSettings, setOriginalSettings] = useState(() => ({ ...settings }));
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // The business information is saved on the server (the other tabs on this screen are still local)
+  useEffect(() => {
+    adminAPI.getBusinessSettings()
+      .then((res) => {
+        const saved = fromBusinessSettings(res?.data?.data);
+        setSettings((prev) => ({ ...prev, ...saved }));
+        setOriginalSettings((prev) => ({ ...prev, ...saved }));
+      })
+      .catch(() => addToast('Could not load the saved company information.', 'error'));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const saveCompanyInformation = async (data, files = {}) => {
+    const { logo, favicon, ...fields } = data;
+    const res = await adminAPI.updateBusinessSettings(fields, files);
+    const saved = res?.data?.data || {};
+    setSettings((prev) => ({ ...prev, ...fromBusinessSettings(saved) }));
+    setOriginalSettings((prev) => ({ ...prev, ...fromBusinessSettings(saved) }));
+    setCachedSettings(saved);
+    addToast('Company information saved.', 'success');
+  };
 
   // Debouncing Search Query
   useEffect(() => {
@@ -357,10 +387,7 @@ export default function Settings() {
         isOpen={isCompanyModalOpen} 
         onClose={() => setIsCompanyModalOpen(false)}
         initialData={settings}
-        onSave={(data) => {
-          setSettings(prev => ({ ...prev, ...data }));
-          addToast('Branding changes saved locally. Remember to click "Save All Changes" to persist.', 'warning');
-        }}
+        onSave={saveCompanyInformation}
       />
       
       <UpdateTaxModal 
@@ -666,16 +693,36 @@ export default function Settings() {
                     </div>
 
                     <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">Catering / Bulk-Order Phone</span>
+                      <p className="text-xs font-bold text-zinc-900 dark:text-zinc-50">{settings.cateringPhone || '-'}</p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">Catering / Bulk-Order Email</span>
+                      <p className="text-xs font-bold text-zinc-900 dark:text-zinc-50">{settings.cateringEmail || '-'}</p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">WhatsApp Number</span>
+                      <p className="text-xs font-bold text-zinc-900 dark:text-zinc-50">{settings.whatsappNumber || '-'}</p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">FAQ Contact Text</span>
+                      <p className="text-xs font-bold text-zinc-900 dark:text-zinc-50">{settings.faqContactText || '-'}</p>
+                    </div>
+
+                    <div className="space-y-1">
                       <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">Logo Preview</span>
                       <div className="w-16 h-16 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850 flex items-center justify-center overflow-hidden">
-                        <img src={settings.logo} alt="Brand Logo" className="w-full h-full object-contain" />
+                        {settings.logo && <img src={settings.logo} alt="Brand Logo" className="w-full h-full object-contain" />}
                       </div>
                     </div>
 
                     <div className="space-y-1">
                       <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">Favicon Preview</span>
                       <div className="w-8 h-8 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850 flex items-center justify-center overflow-hidden">
-                        <img src={settings.favicon} alt="Favicon" className="w-full h-full object-contain" />
+                        {settings.favicon && <img src={settings.favicon} alt="Favicon" className="w-full h-full object-contain" />}
                       </div>
                     </div>
 
@@ -683,7 +730,7 @@ export default function Settings() {
                       <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">GST Number</span>
                       <input 
                         type="text"
-                        value="22AAAAA0000A1Z5"
+                        value={settings.gstin || ''}
                         disabled
                         className="w-full h-8 px-3 border border-zinc-200 dark:border-zinc-800 rounded bg-zinc-50 dark:bg-zinc-900 text-xs text-black dark:text-zinc-100 cursor-not-allowed outline-none"
                       />
@@ -691,13 +738,12 @@ export default function Settings() {
 
                     <div className="space-y-1">
                       <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">Store Location / Address</span>
-                      <p className="text-xs text-zinc-900 dark:text-zinc-50">Bholaram Ustad Marg, Indore, Madhya Pradesh - 452001</p>
+                      <p className="text-xs text-zinc-900 dark:text-zinc-50">{settings.address || '-'}</p>
                     </div>
                   </div>
 
                   <div className="pt-2 flex justify-between items-center text-[10px] text-black dark:text-zinc-100 border-t border-zinc-150 dark:border-zinc-800">
-                    <span>Last updated by: <strong>{settings.updatedBy}</strong></span>
-                    <span>Sync: {new Date(settings.updatedAt).toLocaleString('en-IN')}</span>
+                                        <span>Last saved: {settings.updatedAt ? new Date(settings.updatedAt).toLocaleString('en-IN') : '-'}</span>
                   </div>
                 </div>
               )}
@@ -1251,7 +1297,7 @@ export default function Settings() {
             <hr className="border-zinc-200 dark:border-zinc-800" />
             
             <div className="flex flex-col gap-1.5 text-[9px] text-black dark:text-zinc-100 leading-normal">
-              <span><strong>Updated By:</strong> {settings.updatedBy}</span>
+              <span><strong>Updated By:</strong> {settings.updatedBy || '-'}</span>
               <span><strong>Last Saved:</strong> {new Date(settings.updatedAt).toLocaleString('en-IN')}</span>
             </div>
           </div>

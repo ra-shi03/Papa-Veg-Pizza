@@ -159,8 +159,8 @@ export default function BulkOrder() {
       title2: "CELEBRATIONS MADE EASY",
       description2: "Convert your work from home into party from home with Papa Veg Pizza's Virtual Feast. Order some good old favourites from Papa Veg Pizza and celebrate with your colleagues in a new and safer way.",
       featureImage: "https://images.unsplash.com/photo-1577962917302-cd874c4e31d2?auto=format&fit=crop&w=1000&q=80",
-      corporateEmail: "corporate.sales@papavegpizza.com",
-      corporatePhone: "+91 9300990940"
+      corporateEmail: "",
+      corporatePhone: ""
     },
     egiftVoucher: {
       isActive: true,
@@ -177,8 +177,8 @@ export default function BulkOrder() {
       heading2: "SMALL GESTURES GO A LONG WAY",
       description2: "Ultimate gifting for corporate and businesses. The Papa Veg Pizza's E-Gift Voucher is a great solution when it comes to rewarding and recognizing employees, customers and supporters with a sophisticated gifting platform.",
       featureImage: "https://images.unsplash.com/photo-1577962917302-cd874c4e31d2?auto=format&fit=crop&w=1000&q=80",
-      corporateEmail: "corporate.sales@papavegpizza.com",
-      corporatePhone: "+91 9300990940",
+      corporateEmail: "",
+      corporatePhone: "",
       denominationOptions: [
         "25 - 50 Vouchers",
         "50 - 100 Vouchers",
@@ -192,18 +192,18 @@ export default function BulkOrder() {
     },
     contactPage: {
       feedbackHeading: "Have any feedback or queries? We'd love to hear from you. Write to us at",
-      feedbackEmail: "guestcare@papavegpizza.com",
+      feedbackEmail: "",
       outletButtonText: "FIND YOUR NEAREST OUTLET",
       outletButtonLink: "/food/user/delivery-location",
       outletHelpText: "Try our delicious treats and satisfy hunger with Papa Veg Pizza.",
       locateLinkText: "Locate Nearby Pizza Restaurants",
       locateLinkUrl: "/food/user/delivery-location",
       customerCareTitle: "Papa Veg Pizza Customer Care Number",
-      customerCareNumber: "1800-889-1234",
+      customerCareNumber: "",
       corporateOfficeTitle: "Papa Veg Pizza Corporate Office",
-      companyName: "Papa Veg Pizza Private Limited",
-      addressLine1: "12/2 M.G. Road, Near Palasia Square",
-      addressLine2: "Indore - 452001, Madhya Pradesh, India",
+      companyName: "",
+      addressLine1: "",
+      addressLine2: "",
       mapEmbedUrl:
         "https://maps.google.com/maps?q=Rajasthan&t=&z=7&ie=UTF8&iwloc=&output=embed",
       mapExternalUrl: "https://maps.google.com/?q=Rajasthan",
@@ -811,7 +811,7 @@ export default function BulkOrder() {
                       <div className="grid grid-cols-3 border-t border-zinc-200/80 dark:border-zinc-800 text-xs font-bold divide-x divide-zinc-200/80 dark:divide-zinc-800">
                         {/* Call */}
                         <a
-                          href={`tel:${(store.phone || "1800-889-1234").replace(/\s+/g, "")}`}
+                          href={(store.phone || cp.customerCareNumber) ? `tel:${(store.phone || cp.customerCareNumber).replace(/\s+/g, "")}` : undefined}
                           className="py-2.5 px-2 flex items-center justify-center gap-1.5 text-zinc-700 dark:text-zinc-300 hover:text-[#E53935] hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors no-underline"
                         >
                           <Phone className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400" />
@@ -883,12 +883,14 @@ export default function BulkOrder() {
                 <p className="text-sm text-zinc-600 dark:text-zinc-300 font-medium m-0 leading-relaxed">
                   {cp.feedbackHeading || "Have any feedback or queries? We'd love to hear from you. Write to us at"}
                 </p>
+                {cp.feedbackEmail && (
                 <a
-                  href={`mailto:${cp.feedbackEmail || "guestcare@papavegpizza.com"}`}
+                  href={`mailto:${cp.feedbackEmail}`}
                   className="text-sm sm:text-base font-normal text-[#E53935] hover:underline block break-all tracking-tight"
                 >
-                  {cp.feedbackEmail || "guestcare@papavegpizza.com"}
+                  {cp.feedbackEmail}
                 </a>
+                )}
 
                 {/* Nearest Outlet Button in Papa Veg Pizza Red */}
                 <div className="pt-1">
@@ -927,13 +929,15 @@ export default function BulkOrder() {
                 {cp.customerCareTitle || "Papa Veg Pizza Customer Care Number"}
               </h2>
               <div className="flex flex-wrap items-center gap-3 pt-1">
+                {cp.customerCareNumber && (
                 <a
-                  href={`tel:${(cp.customerCareNumber || "1800-889-1234").replace(/\s+/g, "")}`}
+                  href={`tel:${cp.customerCareNumber.replace(/\s+/g, "")}`}
                   className="text-base sm:text-lg font-bold text-[#E53935] hover:underline inline-flex items-center gap-2"
                 >
                   <Phone className="w-4 h-4 text-[#E53935]" />
-                  <span>{cp.customerCareNumber || "1800-889-1234"}</span>
+                  <span>{cp.customerCareNumber}</span>
                 </a>
+                )}
               </div>
             </section>
 
@@ -945,10 +949,10 @@ export default function BulkOrder() {
               </h2>
               <div className="text-xs text-zinc-600 dark:text-zinc-400 space-y-1 leading-relaxed">
                 <p className="font-normal text-zinc-700 dark:text-zinc-300 m-0">
-                  {cp.companyName || "Papa Veg Pizza Private Limited"}
+                  {cp.companyName}
                 </p>
-                <p className="m-0">{cp.addressLine1 || "12/2 M.G. Road, Near Palasia Square"}</p>
-                <p className="m-0">{cp.addressLine2 || "Indore - 452001, Madhya Pradesh, India"}</p>
+                {cp.addressLine1 && <p className="m-0">{cp.addressLine1}</p>}
+                {cp.addressLine2 && <p className="m-0">{cp.addressLine2}</p>}
               </div>
             </section>
 
@@ -1454,13 +1458,15 @@ export default function BulkOrder() {
           </h2>
 
           <div className="space-y-2">
+            {(activeTab === "virtual_party" ? vp.corporateEmail : gv.corporateEmail) && (
             <a
-              href={`mailto:${(activeTab === "virtual_party" ? vp.corporateEmail : gv.corporateEmail) || "corporate.sales@papavegpizza.com"}`}
+              href={`mailto:${activeTab === "virtual_party" ? vp.corporateEmail : gv.corporateEmail}`}
               className="text-xs sm:text-sm font-bold text-[#E53935] hover:underline inline-flex items-center gap-1.5 justify-center"
             >
               <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span>{(activeTab === "virtual_party" ? vp.corporateEmail : gv.corporateEmail) || "corporate.sales@papavegpizza.com"}</span>
+              <span>{activeTab === "virtual_party" ? vp.corporateEmail : gv.corporateEmail}</span>
             </a>
+          )}
           </div>
         </section>
 

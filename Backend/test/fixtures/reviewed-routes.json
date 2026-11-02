@@ -146,5 +146,8 @@
     "PUT /api/auth/profile/personal",
     "PUT /api/v1/auth/profile/personal",
     "PUT /api/v1/food/auth/profile/personal"
-  ]
+  ],
+  "publicReasons": {
+    "GET /api/v1/food/admin/business-settings/public": "Business name, logo and contact details every app shows before sign-in. Display fields only (toPublicBusinessInfo): no ids, no audit fields, no storage references, no train mapping. Cached for 60 seconds."
+  }
 }

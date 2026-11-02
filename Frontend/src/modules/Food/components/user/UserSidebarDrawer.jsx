@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Phone, MessageCircle } from 'lucide-react';
 import { useAppConfig } from "@food/context/AppConfigContext";
+import { useBusinessInfo } from "@food/hooks/useBusinessInfo";
+import { getCompanyName, whatsappLink } from "@food/utils/businessSettings";
 
 export default function UserSidebarDrawer({
   isOpen,
@@ -30,6 +32,8 @@ export default function UserSidebarDrawer({
 
   // Modal for Bulk Orders
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const business = useBusinessInfo();
+  const whatsappUrl = whatsappLink(business.whatsappNumber, `Hello ${getCompanyName()}, I want to inquire about a Bulk Party Order`);
 
   // Sync user state on open or storage change
   useEffect(() => {
@@ -413,16 +417,19 @@ export default function UserSidebarDrawer({
                 </p>
 
                 <div className="space-y-2 pt-2">
+                  {business.cateringPhone && (
                   <a
-                    href="tel:+919300990940"
+                    href={`tel:${business.cateringPhone.replace(/[^\d+]/g, "")}`}
                     className="w-full py-2.5 px-4 bg-[#E53935] hover:bg-[#D32F2F] text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-95 no-underline"
                   >
                     <Phone size={15} />
-                    <span>Call Catering Desk (+91 9300990940)</span>
+                    <span>Call Catering Desk ({business.cateringPhone})</span>
                   </a>
+                  )}
 
+                  {whatsappUrl && (
                   <a
-                    href="https://wa.me/919300990940?text=Hello%20Papa%20Veg%20Pizza%2C%20I%20want%20to%20inquire%20about%20a%20Bulk%20Party%20Order"
+                    href={whatsappUrl}
                     target="_blank"
                     rel="noreferrer"
                     className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-95 no-underline"
@@ -430,6 +437,7 @@ export default function UserSidebarDrawer({
                     <MessageCircle size={15} />
                     <span>Chat on WhatsApp</span>
                   </a>
+                  )}
                 </div>
               </div>
             </div>

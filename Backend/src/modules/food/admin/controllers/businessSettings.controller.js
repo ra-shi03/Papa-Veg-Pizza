@@ -1,17 +1,23 @@
 import { FoodBusinessSettings } from '../models/businessSettings.model.js';
 import { sendResponse } from '../../../../utils/response.js';
 import { uploadImageBufferDetailed } from '../../../../services/cloudinary.service.js';
+import { validateBusinessSettingsDto } from '../validators/businessSettings.validator.js';
+import { clearBusinessInfoCache, findBusinessSettings, getBusinessInfo } from '../services/businessSettings.service.js';
 
+/** Public: display fields only, briefly cached. Reading never creates a record. */
+export async function getPublicBusinessSettings(req, res, next) {
+    try {
+        res.set('Cache-Control', 'public, max-age=60');
+        return sendResponse(res, 200, 'Business settings fetched successfully', await getBusinessInfo());
+    } catch (error) {
+        next(error);
+    }
+}
+
+/** Super admin: the record itself. */
 export async function getBusinessSettings(req, res, next) {
     try {
-        let settings = await FoodBusinessSettings.findOne().lean();
-        if (!settings) {
-            // Create default settings if none exist
-            settings = await FoodBusinessSettings.create({
-                companyName: 'Appzeto',
-                email: 'admin@appzeto.com'
-            });
-        }
+        const settings = (await findBusinessSettings().lean()) || (await FoodBusinessSettings.create({})).toObject();
         return sendResponse(res, 200, 'Business settings fetched successfully', settings);
     } catch (error) {
         next(error);
@@ -20,107 +26,37 @@ export async function getBusinessSettings(req, res, next) {
 
 export async function updateBusinessSettings(req, res, next) {
     try {
-        // Safer data parsing that handles both JSON and multipart/form-data
-        let data = {};
+        // Handles both JSON and multipart/form-data
+        let body;
         try {
-            if (req.body.data) {
-                data = typeof req.body.data === 'string' ? JSON.parse(req.body.data) : req.body.data;
-            } else {
-                data = req.body;
-            }
+            body = req.body?.data ? (typeof req.body.data === 'string' ? JSON.parse(req.body.data) : req.body.data) : req.body;
         } catch (err) {
             return res.status(400).json({ success: false, message: 'Invalid data format' });
         }
+        const { phoneCountryCode, phoneNumber, ...fields } = validateBusinessSettingsDto(body);
 
-        const { 
-            companyName, email, phoneCountryCode, phoneNumber, address, state, pincode, region,
-            supportEmail, supportPhone, supportHours 
-        } = data;
-
-        // Ensure string inputs for validation to prevent crashes from non-string values
-        const s_companyName = String(companyName || "").trim();
-        const s_email = String(email || "").trim();
-        const s_phoneNumber = String(phoneNumber || "").trim();
-        const s_address = String(address || "").trim();
-        const s_state = String(state || "").trim();
-        const s_pincode = String(pincode || "").trim();
-        const s_supportEmail = String(supportEmail || "").trim();
-        const s_supportPhone = String(supportPhone || "").trim();
-        const s_supportHours = String(supportHours || "").trim();
-
-        // Validation - only validate if the field is explicitly provided in the payload
-        if (companyName !== undefined) {
-            if (!s_companyName || s_companyName.length < 2 || s_companyName.length > 50) {
-                return res.status(400).json({ success: false, message: 'Company name must be between 2 and 50 characters' });
-            }
-        }
-        if (email !== undefined) {
-            if (!s_email || s_email.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s_email)) {
-                return res.status(400).json({ success: false, message: 'Invalid email address (max 100 characters)' });
-            }
-        }
-        if (phoneNumber !== undefined) {
-            if (!s_phoneNumber || !/^\d{7,15}$/.test(s_phoneNumber)) {
-                return res.status(400).json({ success: false, message: 'Invalid phone number (7-15 digits required)' });
-            }
-        }
-        if (address !== undefined && s_address.length > 250) {
-            return res.status(400).json({ success: false, message: 'Address is too long (max 250 characters)' });
-        }
-        if (state !== undefined && s_state.length > 50) {
-            return res.status(400).json({ success: false, message: 'State name is too long (max 50 characters)' });
-        }
-        if (pincode !== undefined && s_pincode && !/^\d{4,10}$/.test(s_pincode)) {
-            return res.status(400).json({ success: false, message: 'Invalid pincode (4-10 digits required)' });
-        }
-        if (supportEmail !== undefined && s_supportEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s_supportEmail)) {
-            return res.status(400).json({ success: false, message: 'Invalid support email address' });
-        }
-
-        let settings = await FoodBusinessSettings.findOne();
-        if (!settings) {
-            settings = new FoodBusinessSettings();
-        }
-
-        if (companyName !== undefined) settings.companyName = s_companyName;
-        if (email !== undefined) settings.email = s_email;
+        const settings = (await findBusinessSettings()) || new FoodBusinessSettings();
+        settings.set(fields);
         if (phoneCountryCode !== undefined || phoneNumber !== undefined) {
             settings.phone = {
-                countryCode: phoneCountryCode !== undefined ? String(phoneCountryCode).trim() : settings.phone?.countryCode || '+91',
-                number: phoneNumber !== undefined ? s_phoneNumber : settings.phone?.number || ''
+                countryCode: phoneCountryCode ?? settings.phone?.countryCode ?? '+91',
+                number: phoneNumber ?? settings.phone?.number ?? '',
             };
         }
-        if (address !== undefined) settings.address = s_address;
-        if (state !== undefined) settings.state = s_state;
-        if (pincode !== undefined) settings.pincode = s_pincode;
-        if (region !== undefined) settings.region = String(region).trim();
-        if (supportEmail !== undefined) settings.supportEmail = s_supportEmail;
-        if (supportPhone !== undefined) settings.supportPhone = s_supportPhone;
-        if (supportHours !== undefined) settings.supportHours = s_supportHours;
-        if (data.primaryColor !== undefined) settings.primaryColor = data.primaryColor;
-        if (data.secondaryColor !== undefined) settings.secondaryColor = data.secondaryColor;
-        if (data.themeMode !== undefined) settings.themeMode = data.themeMode;
-        if (data.accentColor !== undefined) settings.accentColor = data.accentColor;
 
-        // Handle file uploads
-        if (req.files) {
-            if (req.files.logo) {
-                const logoResult = await uploadImageBufferDetailed(req.files.logo[0].buffer, 'business/logos');
-                settings.logo = {
-                    url: logoResult.secure_url,
-                    publicId: logoResult.public_id
-                };
-            }
-            if (req.files.favicon) {
-                const faviconResult = await uploadImageBufferDetailed(req.files.favicon[0].buffer, 'business/favicons');
-                settings.favicon = {
-                    url: faviconResult.secure_url,
-                    publicId: faviconResult.public_id
-                };
-            }
+        const logo = req.files?.logo?.[0];
+        if (logo) {
+            const uploaded = await uploadImageBufferDetailed(logo.buffer, 'business/logos');
+            settings.logo = { url: uploaded.secure_url, publicId: uploaded.public_id };
+        }
+        const favicon = req.files?.favicon?.[0];
+        if (favicon) {
+            const uploaded = await uploadImageBufferDetailed(favicon.buffer, 'business/favicons');
+            settings.favicon = { url: uploaded.secure_url, publicId: uploaded.public_id };
         }
 
         await settings.save();
+        clearBusinessInfoCache();
         return sendResponse(res, 200, 'Business settings updated successfully', settings);
     } catch (error) {
         next(error);

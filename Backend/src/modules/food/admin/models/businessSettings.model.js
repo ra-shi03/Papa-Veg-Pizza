@@ -2,8 +2,10 @@ import mongoose from 'mongoose';
 
 const businessSettingsSchema = new mongoose.Schema(
     {
-        companyName: { type: String, required: true, default: 'Appzeto' },
-        email: { type: String, required: true, default: 'admin@appzeto.com' },
+        // Empty until the super admin fills them in: an empty contact is hidden in the apps
+        companyName: { type: String, default: '', trim: true },
+        email: { type: String, default: '', trim: true },
+        website: { type: String, default: '', trim: true },
         phone: {
             countryCode: { type: String, default: '+91' },
             number: { type: String, default: '' }
@@ -20,9 +22,14 @@ const businessSettingsSchema = new mongoose.Schema(
             url: { type: String, default: '' },
             publicId: { type: String, default: '' }
         },
-        supportEmail: { type: String, default: 'support@foodelo.com' },
-        supportPhone: { type: String, default: '+91 1234567890' },
-        supportHours: { type: String, default: '24/7 Availability' },
+        supportEmail: { type: String, default: '', trim: true },
+        supportPhone: { type: String, default: '', trim: true },
+        supportHours: { type: String, default: '', trim: true },
+        cateringPhone: { type: String, default: '', trim: true },
+        cateringEmail: { type: String, default: '', trim: true },
+        whatsappNumber: { type: String, default: '', trim: true },
+        gstin: { type: String, default: '', trim: true },
+        faqContactText: { type: String, default: '', trim: true },
         // Theme / branding colors set by Superadmin — applied across all panels
         primaryColor: { type: String, default: '#a43c12' },
         secondaryColor: { type: String, default: '#ff7f50' },

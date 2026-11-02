@@ -744,12 +744,12 @@ export function handleMockRequest(config) {
           title: "Customer Support",
           description: "Have an issue with your order or questions about our menu? Get in touch directly:",
           contactInfo: {
-            phone: "+91 9300990940",
-            email: "papafoodcorporation@gmail.com",
+            phone: "+91 9000000000",
+            email: "support@example.invalid",
             hours: "Support Hours: 10:00 AM – 11:30 PM Everyday"
           },
-          phone: "+91 9300990940",
-          email: "papafoodcorporation@gmail.com",
+          phone: "+91 9000000000",
+          email: "support@example.invalid",
           hours: "Support Hours: 10:00 AM – 11:30 PM Everyday"
         };
         return successRes(storedSupport);
@@ -763,8 +763,8 @@ export function handleMockRequest(config) {
 
     if (method === "put" || method === "post") {
       if (pageKey === "support") {
-        const phone = data?.contactInfo?.phone || data?.phone || "+91 9300990940";
-        const email = data?.contactInfo?.email || data?.email || "papafoodcorporation@gmail.com";
+        const phone = data?.contactInfo?.phone || data?.phone || "+91 9000000000";
+        const email = data?.contactInfo?.email || data?.email || "support@example.invalid";
         const hours = data?.contactInfo?.hours || data?.hours || "Support Hours: 10:00 AM – 11:30 PM Everyday";
         const title = data?.title || "Customer Support";
         const description = data?.description || "Have an issue with your order or questions about our menu? Get in touch directly:";
@@ -1765,7 +1765,7 @@ export function handleMockRequest(config) {
       body = typeof config.data === "string" ? JSON.parse(config.data) : (config.data || config.params || {});
     } catch (_) {}
     const orderId = body.orderId || body.order_id || "ORD-1002";
-    const phone = body.phone || body.mobileNumber || "9300990940";
+    const phone = body.phone || body.mobileNumber || "9000000000";
     
     const existing = (db.orders || []).find(o => 
       String(o.orderId || o.id || o._id).toLowerCase() === String(orderId).toLowerCase()
@@ -1832,7 +1832,7 @@ export function handleMockRequest(config) {
       body = typeof config.data === "string" ? JSON.parse(config.data) : (config.data || config.params || {});
     } catch (_) {}
     const orderId = body.orderId || body.order_id || "ORD-1002";
-    const phone = body.phone || body.mobileNumber || "9300990940";
+    const phone = body.phone || body.mobileNumber || "9000000000";
     
     const existing = (db.orders || []).find(o => 
       String(o.orderId || o.id || o._id).toLowerCase() === String(orderId).toLowerCase()
@@ -1910,8 +1910,8 @@ export function handleMockRequest(config) {
           title2: "CELEBRATIONS MADE EASY",
           description2: "Convert your work from home into party from home with Papa Veg Pizza's Virtual Feast. Order some good old favourites from Papa Veg Pizza and celebrate with your colleagues in a new and safer way.",
           featureImage: "https://images.unsplash.com/photo-1577962917302-cd874c4e31d2?auto=format&fit=crop&w=1000&q=80",
-          corporateEmail: "corporate.sales@papavegpizza.com",
-          corporatePhone: "+91 9300990940",
+          corporateEmail: "support@example.invalid",
+          corporatePhone: "+91 9000000000",
           partySizeOptions: [
             "Corporate Gathering (20-50 people)",
             "Team Celebration (50-100 people)",
@@ -1936,8 +1936,8 @@ export function handleMockRequest(config) {
           heading2: "SMALL GESTURES GO A LONG WAY",
           description2: "Ultimate gifting for corporate and businesses. The Papa Veg Pizza's E-Gift Voucher is a great solution when it comes to rewarding and recognizing employees, customers and supporters with a sophisticated gifting platform.",
           featureImage: "https://images.unsplash.com/photo-1577962917302-cd874c4e31d2?auto=format&fit=crop&w=1000&q=80",
-          corporateEmail: "corporate.sales@papavegpizza.com",
-          corporatePhone: "+91 9300990940",
+          corporateEmail: "support@example.invalid",
+          corporatePhone: "+91 9000000000",
           denominationOptions: [
             "25 - 50 Vouchers",
             "50 - 100 Vouchers",
@@ -1948,7 +1948,7 @@ export function handleMockRequest(config) {
         },
         contactPage: {
           feedbackHeading: "Have any feedback or queries? We'd love to hear from you. Write to us at",
-          feedbackEmail: "guestcare@papavegpizza.com",
+          feedbackEmail: "support@example.invalid",
           outletButtonText: "FIND YOUR NEAREST OUTLET",
           outletButtonLink: "/food/user/delivery-location",
           outletHelpText: "Try our delicious treats and satisfy hunger with Papa Veg Pizza.",
@@ -1978,7 +1978,7 @@ export function handleMockRequest(config) {
       if (!db.bulk_order_config.contactPage) {
         db.bulk_order_config.contactPage = {
           feedbackHeading: "Have any feedback or queries? We'd love to hear from you. Write to us at",
-          feedbackEmail: "guestcare@papavegpizza.com",
+          feedbackEmail: "support@example.invalid",
           outletButtonText: "FIND YOUR NEAREST OUTLET",
           outletButtonLink: "/food/user/delivery-location",
           outletHelpText: "Try our delicious treats and satisfy hunger with Papa Veg Pizza.",
@@ -2682,7 +2682,7 @@ export function handleMockRequest(config) {
     let userData = {
       id: "cust-1",
       name: "Rashi",
-      phone: "9300990940",
+      phone: "9000000000",
       email: "",
       profileCompleted: true
     };
@@ -2702,7 +2702,7 @@ export function handleMockRequest(config) {
 
     const name =
       (userData.name || [userData.firstName, userData.lastName].filter(Boolean).join(" ")).trim() || "Rashi";
-    const phone = userData.phone || userData.mobile || userData.phoneNumber || "9300990940";
+    const phone = userData.phone || userData.mobile || userData.phoneNumber || "9000000000";
     const email = userData.email || "";
 
     const accountObj = {
@@ -2772,7 +2772,7 @@ export function handleMockRequest(config) {
 
     const name =
       (updatedUser.name || [updatedUser.firstName, updatedUser.lastName].filter(Boolean).join(" ")).trim() || "Rashi";
-    const phone = updatedUser.phone || updatedUser.mobile || "9300990940";
+    const phone = updatedUser.phone || updatedUser.mobile || "9000000000";
     const email = updatedUser.email || "";
 
     const accountObj = {

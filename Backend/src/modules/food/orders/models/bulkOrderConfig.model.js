@@ -27,8 +27,9 @@ const bulkOrderConfigSchema = new mongoose.Schema(
         type: String,
         default: 'https://images.unsplash.com/photo-1577962917302-cd874c4e31d2?auto=format&fit=crop&w=1000&q=80'
       },
-      corporateEmail: { type: String, default: 'corporate.sales@papavegpizza.com' },
-      corporatePhone: { type: String, default: '+91 9300990940' },
+      // Served from the business settings (bulkOrder.controller.js)
+      corporateEmail: { type: String, default: '' },
+      corporatePhone: { type: String, default: '' },
       partySizeOptions: {
         type: [String],
         default: [
@@ -71,8 +72,9 @@ const bulkOrderConfigSchema = new mongoose.Schema(
         type: String,
         default: 'https://images.unsplash.com/photo-1577962917302-cd874c4e31d2?auto=format&fit=crop&w=1000&q=80'
       },
-      corporateEmail: { type: String, default: 'corporate.sales@papavegpizza.com' },
-      corporatePhone: { type: String, default: '+91 9300990940' },
+      // Served from the business settings (bulkOrder.controller.js)
+      corporateEmail: { type: String, default: '' },
+      corporatePhone: { type: String, default: '' },
       denominationOptions: {
         type: [String],
         default: [
@@ -147,7 +149,7 @@ const bulkOrderConfigSchema = new mongoose.Schema(
       },
       feedbackEmail: {
         type: String,
-        default: 'guestcare@papavegpizza.com'
+        default: ''
       },
       outletButtonText: {
         type: String,
@@ -175,7 +177,7 @@ const bulkOrderConfigSchema = new mongoose.Schema(
       },
       customerCareNumber: {
         type: String,
-        default: '1800-889-1234'
+        default: ''
       },
       corporateOfficeTitle: {
         type: String,
@@ -183,15 +185,15 @@ const bulkOrderConfigSchema = new mongoose.Schema(
       },
       companyName: {
         type: String,
-        default: 'Papa Veg Pizza Private Limited'
+        default: ''
       },
       addressLine1: {
         type: String,
-        default: '12/2 M.G. Road, Near Palasia Square'
+        default: ''
       },
       addressLine2: {
         type: String,
-        default: 'Indore - 452001, Madhya Pradesh, India'
+        default: ''
       },
       mapEmbedUrl: {
         type: String,

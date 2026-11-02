@@ -65,9 +65,9 @@ export default function PublicSupport() {
   })
   const [loading, setLoading] = useState(false)
   const [settings, setSettings] = useState({
-    supportEmail: "rbfoodscorp@gmail.com",
-    supportPhone: "9940837039",
-    supportHours: "24/7 Availability"
+    supportEmail: "",
+    supportPhone: "",
+    supportHours: ""
   })
 
   React.useEffect(() => {
@@ -76,9 +76,9 @@ export default function PublicSupport() {
         const data = res?.data?.data || res?.data
         if (data) {
           setSettings({
-            supportEmail: data.supportEmail || "rbfoodscorp@gmail.com",
-            supportPhone: data.supportPhone || "+91 9940837039",
-            supportHours: data.supportHours || "24/7 Availability"
+            supportEmail: data.supportEmail || "",
+            supportPhone: data.supportPhone || "",
+            supportHours: data.supportHours || ""
           })
         }
       })
@@ -256,6 +256,7 @@ export default function PublicSupport() {
 
         {/* Contact Info Footer */}
         <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8 border-t pt-12 dark:border-gray-800">
+          {settings.supportPhone && (
           <div className="flex items-start gap-4">
             <div className="p-3 bg-gray-50 dark:bg-[#1a1a1a] rounded-xl">
               <Phone className="h-6 w-6 text-[#7e3866]" />
@@ -265,6 +266,8 @@ export default function PublicSupport() {
               <p className="text-sm text-gray-500">{settings.supportPhone}</p>
             </div>
           </div>
+          )}
+          {settings.supportEmail && (
           <div className="flex items-start gap-4">
             <div className="p-3 bg-gray-50 dark:bg-[#1a1a1a] rounded-xl">
               <Mail className="h-6 w-6 text-[#7e3866]" />
@@ -274,6 +277,8 @@ export default function PublicSupport() {
               <p className="text-sm text-gray-500">{settings.supportEmail}</p>
             </div>
           </div>
+          )}
+          {settings.supportHours && (
           <div className="flex items-start gap-4">
             <div className="p-3 bg-gray-50 dark:bg-[#1a1a1a] rounded-xl">
               <Clock className="h-6 w-6 text-[#7e3866]" />
@@ -283,6 +288,7 @@ export default function PublicSupport() {
               <p className="text-sm text-gray-500">{settings.supportHours}</p>
             </div>
           </div>
+          )}
         </div>
       </div>
     </AnimatedPage>

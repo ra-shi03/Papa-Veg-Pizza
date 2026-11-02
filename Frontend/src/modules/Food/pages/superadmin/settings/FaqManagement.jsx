@@ -16,8 +16,8 @@ const DEFAULT_CATEGORIES = [
 const DEFAULT_SUPPORT_SETTINGS = {
   title: 'Customer Support',
   description: 'Have an issue with your order or questions about our menu? Get in touch directly:',
-  phone: '+91 9300990940',
-  email: 'papafoodcorporation@gmail.com',
+  phone: '',
+  email: '',
   hours: 'Support Hours: 10:00 AM – 11:30 PM Everyday'
 };
 
@@ -639,7 +639,7 @@ export default function FaqManagement() {
                   <input 
                     type="text"
                     required
-                    placeholder="e.g. +91 9300990940"
+                    placeholder="Support phone number"
                     value={supportFormData.phone}
                     onChange={e => setSupportFormData(prev => ({ ...prev, phone: e.target.value }))}
                     className="w-full px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:border-red-500 font-medium text-zinc-800 dark:text-zinc-100"
@@ -654,7 +654,7 @@ export default function FaqManagement() {
                   <input 
                     type="email"
                     required
-                    placeholder="e.g. papafoodcorporation@gmail.com"
+                    placeholder="Support email address"
                     value={supportFormData.email}
                     onChange={e => setSupportFormData(prev => ({ ...prev, email: e.target.value }))}
                     className="w-full px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:border-red-500 font-medium text-zinc-800 dark:text-zinc-100"

@@ -1,3 +1,4 @@
+import { getCompanyName } from "@food/utils/businessSettings"
 /**
  * Razorpay Payment Integration Utility
  * Handles Razorpay payment initialization and verification
@@ -66,7 +67,7 @@ export const initRazorpayPayment = async (options) => {
       amount: options.amount,
       currency: options.currency || 'INR',
       order_id: options.order_id,
-      name: options.name || 'Appzeto Food',
+      name: options.name || getCompanyName(),
       description: options.description || 'Order Payment',
       image: options.image || '/logo.png',
       prefill: {

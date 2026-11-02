@@ -24,8 +24,8 @@ import { faqAPI, publicAPI } from "@/services/api"
 const DEFAULT_SUPPORT = {
   title: "Customer Support",
   description: "Have an issue with your order or questions about our menu? Get in touch directly:",
-  phone: "+91 9300990940",
-  email: "papafoodcorporation@gmail.com",
+  phone: "",
+  email: "",
   hours: "Support Hours: 10:00 AM – 11:30 PM Everyday"
 }
 
@@ -97,8 +97,8 @@ export default function Help() {
           setSupportInfo({
             title: data.title || DEFAULT_SUPPORT.title,
             description: data.description || DEFAULT_SUPPORT.description,
-            phone: data.contactInfo?.phone || data.phone || DEFAULT_SUPPORT.phone,
-            email: data.contactInfo?.email || data.email || DEFAULT_SUPPORT.email,
+            phone: data.contactInfo?.phone || data.phone || "",
+            email: data.contactInfo?.email || data.email || "",
             hours: data.contactInfo?.hours || data.hours || DEFAULT_SUPPORT.hours
           })
         }
@@ -375,6 +375,7 @@ export default function Help() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Phone Support */}
+            {supportInfo.phone && (
             <a
               href={`tel:${String(supportInfo.phone || "").replace(/\s+/g, '')}`}
               className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-red-400 dark:hover:border-red-900 bg-zinc-50/60 dark:bg-zinc-800/30 flex items-center gap-3 transition-colors no-underline group"
@@ -389,8 +390,10 @@ export default function Help() {
                 </p>
               </div>
             </a>
+            )}
 
             {/* Email Support */}
+            {supportInfo.email && (
             <a
               href={`mailto:${supportInfo.email || ""}`}
               className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-red-400 dark:hover:border-red-900 bg-zinc-50/60 dark:bg-zinc-800/30 flex items-center gap-3 transition-colors no-underline group"
@@ -405,6 +408,7 @@ export default function Help() {
                 </p>
               </div>
             </a>
+            )}
           </div>
 
           <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center gap-2 text-zinc-500 dark:text-zinc-400 text-xs">
