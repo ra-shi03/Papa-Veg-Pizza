@@ -10,7 +10,7 @@ import { FoodZone } from '../../admin/models/zone.model.js';
 import { FoodFeeSettings } from '../../admin/models/feeSettings.model.js';
 import { ValidationError, ForbiddenError, NotFoundError } from '../../../../core/auth/errors.js';
 import { buildPaginationOptions, buildPaginatedResult } from '../../../../utils/helpers.js';
-import { FoodOffer } from '../../admin/models/offer.model.js';
+import { FoodCoupon } from '../../settings/models/foodCoupon.model.js';
 import { FoodOfferUsage } from '../../admin/models/offerUsage.model.js';
 import { FoodDeliveryCommissionRule } from '../../admin/models/deliveryCommissionRule.model.js';
 import { FoodStoreCommission } from '../../admin/models/storeCommission.model.js';
@@ -32,7 +32,7 @@ import * as foodTransactionService from './foodTransaction.service.js';
 import { reserveFunds, confirmReservation, releaseReservation, rupeesToPaise } from '../../user/services/walletLedger.service.js';
 import { awardOrderPointsSafely, reverseOrderPointsSafely } from '../../user/services/rewards.service.js';
 import { refundCancelledOrderToWallet, recordGatewayRefund } from '../../../../core/payments/refund.service.js';
-import { calculateOrderPricing, buildOrderPricing } from './order-pricing.service.js';
+import { calculateOrderPricing, buildOrderPricing, getCouponEligibility } from './order-pricing.service.js';
 import * as dispatchService from './order-dispatch.service.js';
 import * as deliveryService from './order-delivery.service.js';
 import * as paymentService from './order-payment.service.js';
@@ -129,6 +129,10 @@ export async function updateDispatchSettings(dispatchMode, adminId) {
 // ----- Calculate (validation + return pricing from payload) -----
 export async function calculateOrder(userId, dto) {
   return calculateOrderPricing(userId, dto);
+}
+
+export async function couponEligibility(userId, dto) {
+  return getCouponEligibility(userId, dto);
 }
 
 // ----- Create order -----
@@ -408,9 +412,9 @@ export async function createOrder(userId, dto) {
   }
   const couponCode = priced.pricing.appliedCoupon?.code || "";
   if (couponCode) {
-    const offer = await FoodOffer.findOne({ couponCode }).lean();
+    const offer = await FoodCoupon.findOne({ code: couponCode }).lean();
     if (offer) {
-      await FoodOffer.updateOne({ _id: offer._id }, { $inc: { usedCount: 1 } });
+      await FoodCoupon.updateOne({ _id: offer._id }, { $inc: { usageCount: 1 } });
       if (userId) {
         await FoodOfferUsage.updateOne(
           { offerId: offer._id, userId: new mongoose.Types.ObjectId(userId) },

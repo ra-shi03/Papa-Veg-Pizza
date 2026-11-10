@@ -1,10 +1,11 @@
 import mongoose from 'mongoose';
 import { FoodStore } from '../models/store.model.js';
-import { FoodOffer } from '../../admin/models/offer.model.js';
 import { openStoreIds } from '../../franchise/services/storeHours.js';
 import { sendResponse } from '../../../../utils/response.js';
 import { NotFoundError } from '../../../../core/auth/errors.js';
 import { FoodAppConfig } from '../../settings/models/appConfig.model.js';
+import { FoodCoupon } from '../../settings/models/foodCoupon.model.js';
+import { couponToOffer } from '../../settings/services/couponOffer.service.js';
 import { resolveStoreForLocation, resolveTrainStore } from '../../orders/services/order-store.service.js';
 import { buildSlots, SCHEDULE } from '../../orders/services/order-schedule.service.js';
 
@@ -64,28 +65,18 @@ export async function getPublicOffers(req, res, next) {
   try {
     const now = new Date();
     const storeId = mongoose.isValidObjectId(String(req.query.storeId || '')) ? String(req.query.storeId) : null;
-    const filter = {
-      status: 'active',
-      showInCart: { $ne: false },
-      $and: [
-        { $or: [{ startDate: null }, { startDate: { $exists: false } }, { startDate: { $lte: now } }] },
-        { $or: [{ endDate: null }, { endDate: { $exists: false } }, { endDate: { $gt: now } }] },
-        storeId
-          ? { $or: [{ storeScope: { $ne: 'selected' } }, { storeId }] }
-          : { storeScope: { $ne: 'selected' } },
-      ],
-    };
-    const offers = await FoodOffer.find(filter).sort({ createdAt: -1 }).limit(100).lean();
-    const allOffers = offers
-      .filter((o) => !(Number(o.usageLimit) > 0 && Number(o.usedCount || 0) >= Number(o.usageLimit)))
-      .map((o) => ({
-        id: String(o._id), _id: String(o._id), couponCode: o.couponCode,
-        title: o.discountType === 'percentage' ? `${o.discountValue}% OFF` : `FLAT ₹${o.discountValue} OFF`,
-        description: [o.minOrderValue > 0 ? `On orders above ₹${o.minOrderValue}` : 'On any order', o.maxDiscount ? `Up to ₹${o.maxDiscount} off` : ''].filter(Boolean).join('. '),
-        discountType: o.discountType, discountValue: o.discountValue, minOrderValue: o.minOrderValue || 0, maxDiscount: o.maxDiscount ?? null,
-        customerScope: o.customerScope, startDate: o.startDate || null, endDate: o.endDate || null, status: 'active', offerType: 'online', showInCart: true,
-      }));
-    return sendResponse(res, 200, 'OK', { allOffers });
+    const coupons = await FoodCoupon.find({
+      isActive: { $ne: false },
+      status: { $nin: ['disabled', 'Disabled', 'inactive', 'Inactive', 'expired', 'Expired'] },
+      $or: [{ endDate: null }, { endDate: { $exists: false } }, { endDate: { $gte: now } }],
+    }).sort({ createdAt: -1 }).limit(100).lean();
+    const couponOffers = coupons
+      .map(couponToOffer)
+      .filter((o) => o.discountType !== 'unsupported')
+      .filter((o) => !o.startDate || new Date(o.startDate) <= now)
+      .filter((o) => !(o.usageLimit > 0 && o.usedCount >= o.usageLimit))
+      .filter((o) => !storeId || o.storeIds.length === 0 || o.storeIds.includes(storeId));
+    return sendResponse(res, 200, 'OK', { allOffers: couponOffers });
   } catch (err) {
     next(err);
   }

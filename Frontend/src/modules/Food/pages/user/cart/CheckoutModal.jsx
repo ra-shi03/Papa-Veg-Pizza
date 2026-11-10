@@ -9,7 +9,7 @@ import RazorpayPayment from "./RazorpayPayment"
 import apiClient from "@/services/api/axios"
 import { orderAPI, userAPI } from "@food/api"
 import { toast } from "sonner"
-import { slotLabel, toOrderItems } from "./cartHelpers"
+import { slotLabel, toOrderItems, readPaymentMethod } from "./cartHelpers"
 import { readTrainJourney, trainOrderFields, trainStoreQuery } from "@food/utils/trainJourney"
 import {
   addressProblem,
@@ -43,6 +43,8 @@ export default function CheckoutModal({
   const { addAddress, addresses, paymentMethods } = useProfile()
   const { config: appConfig } = useAppConfig()
   const isPaymentOptionDisabled = appConfig?.paymentOptionEnabled === false
+  // Chosen on the Payment Options page
+  const payMethod = readPaymentMethod(appConfig)
   const isLoggedIn = localStorage.getItem("user_authenticated") === "true" || !!localStorage.getItem("user_accessToken")
   const isGuestCheckoutBlocked = appConfig?.guestCheckoutEnabled === false && !isLoggedIn
 
@@ -597,14 +599,14 @@ export default function CheckoutModal({
                           </p>
                         </>
                       ) : (
-                        <p className="text-xs font-semibold leading-normal">UPI</p>
+                        <p className="text-xs font-semibold leading-normal">{payMethod.title}</p>
                       )}
                     </div>
                     {!isPaymentOptionDisabled && (
                       <button 
                         onClick={() => {
                           onClose()
-                          navigate("/user/account/profile-details/payments")
+                          navigate("/user/account/profile-details/payments", { state: { from: "checkout", total } })
                         }}
                         className="text-xs font-black text-primary hover:text-primary-hover bg-transparent border-0 outline-none cursor-pointer"
                       >
@@ -670,6 +672,14 @@ export default function CheckoutModal({
                         </button>
                       </div>
                     )
+                  ) : payMethod.id === "cash" ? (
+                    <button
+                      onClick={handleSaveAddressAndCheckout}
+                      disabled={placingOrder}
+                      className="w-full h-12 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border-0 bg-primary hover:bg-primary-hover text-white active:scale-95 cursor-pointer shadow-md shadow-primary/10 disabled:opacity-60"
+                    >
+                      {placingOrder ? "Placing order..." : "Place Order (Cash / UPI on Delivery)"}
+                    </button>
                   ) : (
                     <button 
                       onClick={() => {

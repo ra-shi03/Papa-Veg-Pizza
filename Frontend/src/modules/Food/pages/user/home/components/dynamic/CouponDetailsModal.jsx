@@ -13,7 +13,7 @@ export function CouponDetailsModal({ offer, isOpen, onClose, onApply, isDarkMode
   if (!isOpen || !offer) return null;
 
   const code = offer.couponCode || offer.code || "PVPDEAL";
-  const minOrder = offer.minOrderValue || offer.minimumOrderAmount || 199;
+  const minOrder = offer.minOrderValue || offer.minimumOrderAmount || 0;
   const maxDiscount = offer.maxDiscount || offer.maximumDiscount || 80;
   const isPercentage = offer.isPercentage || offer.couponType === "Percentage" || offer.discountType === "percentage";
   const discountText = offer.discountText || (isPercentage ? `${offer.value || 40}% (up to ₹${maxDiscount})` : `₹${offer.value || maxDiscount}`);

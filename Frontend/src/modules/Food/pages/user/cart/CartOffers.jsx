@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react"
 import { motion, useReducedMotion } from "framer-motion"
 import { Tag, Sparkles, ChevronRight, Lock, Check, Info } from "lucide-react"
-import { offerDiscount } from "./cartHelpers"
+import { offerDiscount, offerLocked, offerLockText } from "./cartHelpers"
 
 /** Offers sorted for the cart: usable ones first (biggest saving first), then closest to unlock. */
 export function rankOffers(offers, subtotal) {
@@ -26,8 +26,7 @@ export function rankOffers(offers, subtotal) {
 function CouponTicket({ offer, subtotal, isApplied, onApply, onRemove, onView, ui }) {
   const saving = offerDiscount(offer, subtotal)
   const minOrder = Number(offer.minOrderValue) || 0
-  const isUnlocked = subtotal >= minOrder
-  const short = Math.max(0, Math.ceil(minOrder - subtotal))
+  const isUnlocked = !offerLocked(offer, subtotal)
   const progress = minOrder > 0 ? Math.min(100, Math.round((subtotal / minOrder) * 100)) : 100
 
   return (
@@ -75,9 +74,9 @@ function CouponTicket({ offer, subtotal, isApplied, onApply, onRemove, onView, u
               ? `Applied: Saved ₹${saving}`
               : saving > 0
               ? `Save ₹${saving}`
-              : offer.discountPercent
-              ? `${offer.discountPercent}% OFF`
-              : `Flat ₹${offer.discountAmount || 0} OFF`}
+              : offer.discountType === "percentage"
+              ? `${offer.discountValue}% OFF`
+              : `Flat ₹${offer.discountValue ?? offer.discountAmount ?? 0} OFF`}
           </span>
         </div>
 
@@ -85,15 +84,15 @@ function CouponTicket({ offer, subtotal, isApplied, onApply, onRemove, onView, u
           <button
             type="button"
             onClick={onRemove}
-            className="shrink-0 px-3 py-1 rounded-lg text-xs font-bold border border-[#16a34a] text-[#16a34a] bg-emerald-50 dark:bg-emerald-950/40 cursor-pointer active:scale-95 transition-all flex items-center gap-1"
+            className="shrink-0 px-3.5 py-1 rounded-lg text-xs font-bold border border-[#E53935] text-[#E53935] bg-red-50 dark:bg-red-950/30 cursor-pointer active:scale-95 transition-all flex items-center gap-1"
           >
-            <Check size={12} strokeWidth={2.5} /> Applied
+            Remove
           </button>
         ) : isUnlocked ? (
           <button
             type="button"
             onClick={() => onApply(offer)}
-            className="shrink-0 px-3.5 py-1 rounded-lg text-xs font-bold border border-[#E53935] text-[#E53935] bg-transparent hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer active:scale-95 transition-all"
+            className="shrink-0 px-3.5 py-1 rounded-lg text-xs font-bold border border-[#16a34a] text-[#16a34a] bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 cursor-pointer active:scale-95 transition-all"
           >
             Apply
           </button>
@@ -118,7 +117,7 @@ function CouponTicket({ offer, subtotal, isApplied, onApply, onRemove, onView, u
         ) : (
           <span className="flex items-center gap-1" style={{ color: ui.muted }}>
             <Lock size={12} className="shrink-0" />
-            Add ₹{short} more to unlock
+            {offerLockText(offer, subtotal)}
           </span>
         )}
       </div>
@@ -168,7 +167,7 @@ export default function CartOffers({
 
   // 2. Count unlocked vs total
   const unlockedOffers = useMemo(() => {
-    return activeOffers.filter((o) => subtotal >= (Number(o.minOrderValue) || 0))
+    return activeOffers.filter((o) => !offerLocked(o, subtotal))
   }, [activeOffers, subtotal])
 
   // 3. Ranked offers for display (applied first, then ranked)
@@ -185,7 +184,7 @@ export default function CartOffers({
 
   // Smallest shortfall needed to unlock the next active coupon
   const closestShortfall = useMemo(() => {
-    const locked = activeOffers.filter((o) => (Number(o.minOrderValue) || 0) > subtotal)
+    const locked = activeOffers.filter((o) => (Number(o.minOrderValue) || 0) > subtotal && o.eligibility?.eligible !== false)
     if (locked.length === 0) return null
     return Math.min(...locked.map((o) => Math.ceil((Number(o.minOrderValue) || 0) - subtotal)))
   }, [activeOffers, subtotal])
@@ -254,7 +253,7 @@ export default function CartOffers({
                 key={offer.couponCode}
                 offer={offer}
                 subtotal={subtotal}
-                isApplied={applied?.couponCode === offer.couponCode && !rejectedReason && appliedSaving > 0}
+                isApplied={applied?.couponCode === offer.couponCode}
                 onApply={onApply}
                 onRemove={onRemove}
                 onView={onViewAll}

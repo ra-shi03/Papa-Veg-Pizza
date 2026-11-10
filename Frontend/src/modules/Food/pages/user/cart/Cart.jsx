@@ -1,15 +1,16 @@
-import React, { useState, useEffect, useCallback, useRef } from "react"
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
-import { ArrowLeft, ChevronRight, ChevronUp, ChevronDown, Plus, Sparkles, MapPin, Clock, CalendarClock, Bike } from "lucide-react"
+import { ArrowLeft, ChevronRight, ChevronUp, ChevronDown, Plus, Sparkles, MapPin, Clock, CalendarClock, Bike, IndianRupee } from "lucide-react"
 import { useCart } from "@food/context/CartContext"
 import { useAppConfig } from "@food/context/AppConfigContext"
 import ApplyCoupon from "./ApplyCoupon"
 import CheckoutModal from "./CheckoutModal"
 import CartOffers, { CheesyRewardsCard } from "./CartOffers"
+import CouponAppliedPopup from "./CouponAppliedPopup"
 import DeliveryTimeSheet from "./DeliveryTimeSheet"
 import { readTrainJourney, trainOrderProblem, trainStoreQuery } from "@food/utils/trainJourney"
 import { useTrainStations } from "@food/hooks/useTrainStations"
-import { getCartCoords, isSlotStillValid, loadSlot, saveSlot, slotDay, slotLabel, time12, offerDiscount, toOrderItems } from "./cartHelpers"
+import { getCartCoords, isSlotStillValid, loadSlot, saveSlot, slotDay, slotLabel, time12, offerDiscount, toOrderItems, readPaymentMethod } from "./cartHelpers"
 import { CartMealSuggestions, LimitedOffer } from "./upsell/CartUpsell"
 import { AnimatedNumber, CartItemRow, CartSkeleton, haptic } from "./CartParts"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
@@ -17,7 +18,6 @@ import { toast } from "sonner"
 import { removeCartKey } from "./upsell/upsellApi"
 import apiClient from "@/services/api/axios"
 import { orderAPI } from "@food/api"
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 const COUPON_KEY = "pvp_cart_coupon"
 
@@ -269,69 +269,7 @@ export default function Cart() {
         } catch (_) {}
       }
 
-      // Only coupons the server publishes for customers; the sample ones below are for standalone mock mode only
-      // (a coupon the server does not know would show a discount the order never gets)
-      if (found.length === 0 && STANDALONE_MOCK) {
-        try {
-          const stored = localStorage.getItem("pvp_coupons")
-          if (stored) {
-            const list = JSON.parse(stored)
-            if (Array.isArray(list) && list.length > 0) {
-              found = list
-            }
-          }
-        } catch (_) {}
-      }
-
-      if (found.length === 0 && STANDALONE_MOCK) {
-        found = [
-          {
-            couponCode: "WELCOME50",
-            title: "50% OFF up to ₹150",
-            description: "Get 50% discount up to ₹150 on your order. Min order ₹249",
-            discountType: "percentage",
-            discountValue: 50,
-            minOrderValue: 249,
-            maxDiscount: 150,
-            status: "active",
-            showInCart: true,
-          },
-          {
-            couponCode: "PVP100",
-            title: "FLAT ₹100 OFF",
-            description: "Save ₹100 instantly on fresh pizzas. Min order ₹399",
-            discountType: "flat-price",
-            discountValue: 100,
-            minOrderValue: 399,
-            maxDiscount: 100,
-            status: "active",
-            showInCart: true,
-          },
-          {
-            couponCode: "FEAST20",
-            title: "20% OFF Feast Deal",
-            description: "Enjoy 20% off up to ₹200 on all orders above ₹499",
-            discountType: "percentage",
-            discountValue: 20,
-            minOrderValue: 499,
-            maxDiscount: 200,
-            status: "active",
-            showInCart: true,
-          },
-          {
-            couponCode: "SUPERVEG",
-            title: "FLAT ₹50 OFF",
-            description: "Flat ₹50 off on delicious pizzas. Min order ₹199",
-            discountType: "flat-price",
-            discountValue: 50,
-            minOrderValue: 199,
-            maxDiscount: 50,
-            status: "active",
-            showInCart: true,
-          },
-        ]
-      }
-
+      // Only the coupons the super admin created (Marketing > Coupons); nothing is made up here.
       // Normalize all offers into standard shape
       const normalized = found.map((o) => {
         const isPct = o.discountType === "percentage" || o.couponType === "Percentage"
@@ -349,6 +287,7 @@ export default function Cart() {
           status: o.status || (o.isActive !== false ? "active" : "inactive"),
           showInCart: o.showInCart !== false,
           endDate: o.endDate || null,
+          applicableOn: o.applicableOn || "All",
         }
       })
 
@@ -364,6 +303,40 @@ export default function Cart() {
     }
   }, [couponsOn, slotInfo?.storeId])
 
+  // The server decides which coupons work for this cart (category / product / store / first order / limits), so the
+  // list only offers "Apply" on the ones that do. Re-asked whenever the cart or store changes.
+  const [eligibility, setEligibility] = useState({})
+  const eligibilityKey = JSON.stringify([
+    cartItems.map((i) => [i.itemId || i.id, i.quantity, i.size, i.crust, i.toppings, i.meals, i.extraCheese, i.offerToken]),
+    slotInfo?.storeId || "",
+  ])
+  useEffect(() => {
+    if (!isLoggedIn || !slotInfo?.storeId || cartItems.length === 0 || offers.length === 0) {
+      setEligibility({})
+      return undefined
+    }
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      try {
+        const res = await orderAPI.couponEligibility({ storeId: slotInfo.storeId, items: toOrderItems(cartItems) })
+        if (cancelled) return
+        const map = {}
+        for (const c of res?.data?.data?.coupons || []) map[c.couponCode] = c
+        setEligibility(map)
+      } catch (_) {
+        if (!cancelled) setEligibility({})
+      }
+    }, 400)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [eligibilityKey, isLoggedIn, offers.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  const offersWithEligibility = useMemo(
+    () => offers.map((o) => (eligibility[o.couponCode] ? { ...o, eligibility: eligibility[o.couponCode] } : o)),
+    [offers, eligibility],
+  )
+
   // Keep the applied coupon while this tab is open (e.g. across a trip to the location screen)
   useEffect(() => {
     if (appliedCoupon || offers.length === 0) return
@@ -374,6 +347,10 @@ export default function Cart() {
     } catch (_) {}
   }, [offers]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Chosen on the Payment Options page; read again when this page opens
+  const payMethod = readPaymentMethod(appConfig)
+  const [couponPopup, setCouponPopup] = useState(null)
+  const closeCouponPopup = useCallback(() => setCouponPopup(null), [])
   const applyCoupon = (offer) => {
     haptic(12)
     setCouponRejected("")
@@ -653,11 +630,15 @@ export default function Cart() {
   const discount = q ? Number(q.discount || 0) : estDiscount
   const billDeliveryFee = q ? Number(q.deliveryFee || 0) : (estFreeDelivery ? 0 : fees.deliveryFee)
   const billPlatformPackaging = q ? Number(q.platformFee || 0) + Number(q.packagingFee || 0) : fees.platformFee + fees.packagingFee
+  const billPlatformFee = q ? Number(q.platformFee || 0) : fees.platformFee
+  const billPackagingFee = q ? Number(q.packagingFee || 0) : fees.packagingFee
   const billHandlingFee = q ? Number(q.handlingFee || 0) : fees.handlingFee
   const freeDelivery = q ? billDeliveryFee === 0 && fees.deliveryFee > 0 : estFreeDelivery
   const handlingCharge = subtotal > 0 ? Number((billDeliveryFee + billPlatformPackaging + billHandlingFee).toFixed(2)) : 0
   const cgst = q ? Number((Number(q.tax || 0) / 2).toFixed(2)) : estCgst
   const sgst = cgst
+  const billTaxes = Number((cgst + sgst).toFixed(2))
+  const billTaxesAndCharges = Number((billTaxes + billPlatformFee + billPackagingFee + billHandlingFee).toFixed(2))
   const total = q ? Number(q.total) : (subtotal > 0 ? Number((subtotal - discount + handlingCharge + cgst + sgst).toFixed(2)) : 0)
   const deliverySaved = freeDelivery && fees.deliveryFee > 0 ? fees.deliveryFee : 0
   const savings = Number((discount + deliverySaved).toFixed(2))
@@ -885,9 +866,9 @@ export default function Cart() {
       {!cartLoaded ? (
         <CartSkeleton ui={ui} />
       ) : cartItems.length === 0 ? null : (
-        <div className="px-4 pt-4 space-y-4">
+        <div className="px-2 pt-3 space-y-3">
           {/* When + Where: 2-column compact layout (Delivery left, Deliver To right, each 2 rows) */}
-          <div className="rounded-2xl overflow-hidden border shadow-sm" style={{ backgroundColor: ui.card, borderColor: ui.line }}>
+          <div className="rounded-lg overflow-hidden border shadow-sm" style={{ backgroundColor: ui.card, borderColor: ui.line }}>
             <div className="flex items-stretch">
               {/* Left Column: Delivery (2 rows) */}
               <button
@@ -988,22 +969,22 @@ export default function Cart() {
           </div>
 
           {/* Complete your meal with */}
-          <div className="-mx-5">
+          <div className="-mx-2">
             <CartMealSuggestions dark={isDarkMode} cartIds={cartItems.map((i) => String(i.itemId))} />
           </div>
 
           {/* Savings & Rewards: coupons section matching Image 5 */}
           {couponsOn && (
             <CartOffers
-              offers={offers}
+              offers={offersWithEligibility}
               subtotal={subtotal}
-              applied={appliedCoupon}
+              applied={appliedCoupon ? offersWithEligibility.find((o) => o.couponCode === appliedCoupon.couponCode) || appliedCoupon : null}
               rejectedReason={couponRejected}
               deliverySaved={deliverySaved}
               freeDelivery={freeDelivery}
               onApply={(offer) => {
                 applyCoupon(offer)
-                toast.success(`${offer.couponCode} applied! You save ₹${offerDiscount(offer, subtotal)}`)
+                setCouponPopup({ code: offer.couponCode, saving: offerDiscount(offer, subtotal), at: Date.now() })
               }}
               onRemove={removeCoupon}
               onViewAll={() => setShowCouponModal(true)}
@@ -1023,17 +1004,51 @@ export default function Cart() {
           <div className="pt-2 pb-4" ref={billRef}>
             <SectionTitle ui={ui}>Bill Details</SectionTitle>
             <div className="mt-3 rounded-2xl p-4 text-left" style={{ backgroundColor: ui.card }}>
-              <div className="flex items-start justify-between">
+              <div className="space-y-2 text-sm" style={{ color: ui.muted }}>
+                <BillRow label={`Item total (${itemCount})`} value={`₹${subtotal}`} />
+                {discount > 0 && <BillRow label={`Coupon (${appliedCoupon.couponCode})`} value={`-₹${discount}`} positive />}
+                {isDelivery && fees.deliveryFee > 0 && (
+                  <BillRow label="Delivery fee" value={freeDelivery ? <><span className="line-through mr-1.5" style={{ color: ui.muted }}>₹{fees.deliveryFee}</span><span className="text-emerald-600 font-semibold">FREE</span></> : `₹${billDeliveryFee}`} />
+                )}
+                {subtotal > 0 && billTaxesAndCharges > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setShowTaxDetails(!showTaxDetails)}
+                      aria-expanded={showTaxDetails}
+                      className="w-full flex justify-between items-center bg-transparent border-0 p-0 cursor-pointer text-left text-sm"
+                      style={{ color: ui.muted }}
+                    >
+                      <span className="flex items-center gap-1">Taxes &amp; charges {showTaxDetails ? <ChevronUp size={14} /> : <ChevronRight size={14} />}</span>
+                      <span className="font-medium">₹{billTaxesAndCharges}</span>
+                    </button>
+                    <AnimatePresence initial={false}>
+                      {showTaxDetails && (
+                        <motion.div
+                          key="bill-breakdown"
+                          initial={reduceMotion ? false : { height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                          transition={{ duration: 0.22 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="pl-3 space-y-2 text-[13px]">
+                            {billTaxes > 0 && <BillRow label="Taxes" value={`₹${billTaxes}`} />}
+                            {billPlatformFee > 0 && <BillRow label="Platform fee" value={`₹${billPlatformFee}`} />}
+                            {billPackagingFee > 0 && <BillRow label="Packaging fee" value={`₹${billPackagingFee}`} />}
+                            {billHandlingFee > 0 && <BillRow label="Handling fee" value={`₹${billHandlingFee}`} />}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </>
+                )}
+              </div>
+
+              <div className="mt-3 pt-3 flex items-start justify-between" style={{ borderTop: `1px dashed ${ui.line}` }}>
                 <div>
                   <p className="text-base font-bold" style={{ color: ui.text }}>To Pay</p>
-                  <button
-                    onClick={() => setShowTaxDetails(!showTaxDetails)}
-                    aria-expanded={showTaxDetails}
-                    className="mt-0.5 text-xs bg-transparent border-0 p-0 cursor-pointer underline flex items-center"
-                    style={{ color: ui.muted }}
-                  >
-                    {showTaxDetails ? "Hide details" : "View details"} {showTaxDetails ? <ChevronUp size={13} /> : <ChevronRight size={13} />}
-                  </button>
+                  <p className="text-[11px]" style={{ color: ui.muted }}>Incl. taxes and charges</p>
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold" style={{ color: ui.text }}>
@@ -1045,31 +1060,6 @@ export default function Cart() {
                   )}
                 </div>
               </div>
-
-              <AnimatePresence initial={false}>
-                {showTaxDetails && (
-                  <motion.div
-                    key="bill-breakdown"
-                    initial={reduceMotion ? false : { height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
-                    transition={{ duration: 0.22 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="mt-3 pt-3 space-y-2 text-sm" style={{ borderTop: `1px dashed ${ui.line}`, color: ui.muted }}>
-                      <BillRow label={`Item total (${itemCount})`} value={`₹${subtotal}`} />
-                      {discount > 0 && <BillRow label={`Coupon (${appliedCoupon.couponCode})`} value={`-₹${discount}`} positive />}
-                      {isDelivery && fees.deliveryFee > 0 && (
-                        <BillRow label="Delivery fee" value={freeDelivery ? <><span className="line-through mr-1.5" style={{ color: ui.muted }}>₹{fees.deliveryFee}</span><span className="text-emerald-600 font-semibold">FREE</span></> : `₹${billDeliveryFee}`} />
-                      )}
-                      {subtotal > 0 && billPlatformPackaging > 0 && <BillRow label="Platform & packaging" value={`₹${Number(billPlatformPackaging.toFixed(2))}`} />}
-                      {subtotal > 0 && billHandlingFee > 0 && <BillRow label="Restaurant handling charges" value={`₹${billHandlingFee}`} />}
-                      {(q ? cgst > 0 : fees.gstRate > 0) && <BillRow label={`CGST (${gstShare}%)`} value={`₹${cgst}`} />}
-                      {(q ? sgst > 0 : fees.gstRate > 0) && <BillRow label={`SGST (${gstShare}%)`} value={`₹${sgst}`} />}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </div>
             <p className="mt-3 px-1 text-[11px] leading-relaxed text-left" style={{ color: ui.muted }}>
               Review your order and address before paying. Orders can't be cancelled once the kitchen starts preparing them.
@@ -1078,36 +1068,49 @@ export default function Cart() {
         </div>
       )}
 
-      {/* Sticky pay bar */}
+      {/* Sticky pay bar: the saved badge floats just above the white bar */}
       {cartItems.length > 0 && (
-        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30" style={{ backgroundColor: ui.card, boxShadow: "0 -4px 20px rgba(0,0,0,0.12)" }}>
+        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30">
           {savings > 0 && (
             <motion.div
               key={`saved-${savings}`}
               initial={reduceMotion ? false : { opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mx-3 mt-3 rounded-xl px-3 py-2.5 flex items-center gap-2 text-sm text-left" style={{ backgroundColor: isDarkMode ? "rgba(27,138,58,0.18)" : "#e8f5ec", color: isDarkMode ? "#9be7b0" : "#1b5e30" }}>
+              className="mx-3 mb-2 rounded-xl px-3 py-2.5 flex items-center gap-2 text-sm text-left shadow-md" style={{ backgroundColor: isDarkMode ? "#16301f" : "#e8f5ec", color: isDarkMode ? "#9be7b0" : "#1b5e30", border: `1px solid ${isDarkMode ? "rgba(155,231,176,0.18)" : "rgba(27,94,48,0.12)"}` }}>
               <Sparkles size={16} className="shrink-0" />
               <span>You saved <b>₹{savings}</b> on this order</span>
             </motion.div>
           )}
+          <div style={{ backgroundColor: ui.card, boxShadow: "0 -4px 20px rgba(0,0,0,0.12)" }}>
           {trainProblem && (
-            <p role="alert" className="mx-3 mt-3 text-sm font-semibold text-left" style={{ color: "#d32f3a" }}>{trainProblem}</p>
+            <p role="alert" className="mx-3 pt-3 text-sm font-semibold text-left" style={{ color: "#d32f3a" }}>{trainProblem}</p>
           )}
-          <div className="flex items-center gap-3 px-3 py-3 pb-6">
-            <div className="shrink-0 text-left pl-1">
-              <p className="text-[17px] font-extrabold leading-tight" style={{ color: ui.text }}><AnimatedNumber value={total} /></p>
-              <button onClick={viewBill} className="text-[11px] font-bold text-[#E53935] bg-transparent border-0 p-0 cursor-pointer">View detailed bill</button>
-            </div>
+          <div className="flex items-center gap-3 px-3 pt-3 pb-6">
+            {/* Payment method: opens the Payment Options page */}
+            <button
+              type="button"
+              onClick={() => navigate("/user/account/profile-details/payments", { state: { from: "cart", total } })}
+              aria-label={`Payment method: ${payMethod.title}. Change`}
+              className="shrink-0 flex items-center gap-2 rounded-xl px-2 py-1.5 cursor-pointer active:scale-[0.97] transition-transform text-left"
+              style={{ backgroundColor: "transparent", border: "none" }}
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border" style={{ borderColor: ui.line, backgroundColor: isDarkMode ? "rgba(255,255,255,0.06)" : "#ffffff", color: ui.text }}>
+                <IndianRupee size={17} strokeWidth={2.4} />
+              </span>
+              <span className="whitespace-pre-line text-[12px] font-semibold leading-tight" style={{ color: ui.text }}>{payMethod.short}</span>
+              <ChevronDown size={14} style={{ color: ui.muted }} />
+            </button>
             <button
               onClick={proceed}
               disabled={!!trainProblem}
-              className="flex-1 h-12 rounded-xl text-white font-bold text-[15px] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 active:scale-[0.97] transition-transform"
+              className="flex-1 min-w-0 h-12 rounded-xl text-white font-bold text-[15px] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 active:scale-[0.97] transition-transform"
               style={{ backgroundColor: "#d32f3a" }}
             >
-              {scheduledAt ? "Schedule & Pay" : "Proceed to Pay"}
-              <ChevronRight size={18} />
+              <span>{scheduledAt ? "Schedule & Pay" : "Pay"} ₹{Number(total.toFixed(2))}</span>
+              {savings > 0 && <span className="text-[12px] font-medium line-through opacity-80">₹{beforeSavings}</span>}
+              <ChevronRight size={18} className="shrink-0" />
             </button>
+          </div>
           </div>
         </div>
       )}
@@ -1127,14 +1130,16 @@ export default function Cart() {
         ui={ui}
       />
 
+      <CouponAppliedPopup popup={couponPopup} onDone={closeCouponPopup} />
+
       {/* All offers + coupon code */}
       <ApplyCoupon
         show={showCouponModal}
         onClose={() => setShowCouponModal(false)}
-        offers={offers}
+        offers={offersWithEligibility}
         subtotal={subtotal}
         appliedCode={appliedCoupon?.couponCode}
-        onApply={(offer) => { applyCoupon(offer); toast.success(`${offer.couponCode} applied! You save ₹${offerDiscount(offer, subtotal)}`) }}
+        onApply={(offer) => { applyCoupon(offer); setCouponPopup({ code: offer.couponCode, saving: offerDiscount(offer, subtotal), at: Date.now() }) }}
         onRemove={removeCoupon}
         ui={ui}
       />

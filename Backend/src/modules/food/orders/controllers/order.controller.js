@@ -23,6 +23,16 @@ export async function getFeeConfigController(req, res, next) {
     }
 }
 
+export async function couponEligibilityController(req, res, next) {
+    try {
+        const dto = validateCalculateOrderDto(req.body);
+        const result = await orderService.couponEligibility(req.user?.userId, dto);
+        return sendResponse(res, 200, 'Coupon eligibility', result);
+    } catch (err) {
+        next(err);
+    }
+}
+
 export async function calculateOrderController(req, res, next) {
     try {
         const userId = req.user?.userId;

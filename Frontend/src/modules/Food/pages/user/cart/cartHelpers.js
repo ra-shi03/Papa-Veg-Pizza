@@ -72,7 +72,25 @@ export const slotLabel = (at) => `${slotDay(at)}, ${time12(at)}`
 
 // ---- coupons (same maths as the server's order pricing)
 
+// `offer.eligibility` is the server's verdict for this cart (POST /food/orders/coupon-eligibility): the coupon's
+// category / product / store / first-order rules are decided there, so the saving it gives is used as is.
+// A coupon limited to categories / items cannot be judged from the cart total, so until the server has said which
+// lines qualify it is not offered (never estimated against the whole cart).
+const scoped = (offer) => !offer?.eligibility && (offer?.applicableOn === "Category" || offer?.applicableOn === "Product")
+
+export const offerLocked = (offer, subtotal) =>
+  subtotal < (Number(offer?.minOrderValue) || 0) || offer?.eligibility?.eligible === false || scoped(offer)
+
+export const offerLockText = (offer, subtotal) => {
+  const min = Number(offer?.minOrderValue) || 0
+  if (offer?.eligibility?.eligible === false && offer.eligibility.reason) return offer.eligibility.reason
+  if (scoped(offer)) return offer.applicableOn === "Product" ? "Only on selected items" : "Only on selected categories"
+  return `Add items worth ₹${Math.max(0, Math.ceil(min - subtotal))} more to unlock`
+}
+
 export function offerDiscount(offer, subtotal) {
+  if (offer?.eligibility) return offer.eligibility.eligible ? Number(offer.eligibility.saving) || 0 : 0
+  if (scoped(offer)) return 0
   if (!offer || subtotal < (Number(offer.minOrderValue) || 0)) return 0
   if (offer.discountType === "percentage") {
     const raw = subtotal * (Number(offer.discountValue) / 100)
@@ -111,3 +129,20 @@ export const toOrderItems = (cartItems) => cartItems.map((item) => ({
   notes: item.description || "",
   ...(item.offerToken ? { offerToken: item.offerToken } : {}),
 }))
+
+// ---- payment method (chosen on the Payment Options page, kept on the device)
+
+export const PAYMENT_METHODS = {
+  cash: { id: "cash", title: "Cash / UPI on Delivery", short: "Cash / UPI on\nDelivery" },
+  razorpay_test: { id: "razorpay_test", title: "Razorpay (Test)", short: "Razorpay\n(Test mode)" },
+}
+
+// Cash is the default. If the super admin turned cash on delivery off, the online (test) method is used instead.
+export function readPaymentMethod(appConfig) {
+  let saved = ""
+  try { saved = localStorage.getItem("preferred_payment_method") || "" } catch (_) {}
+  const id = saved === "razorpay_test" ? "razorpay_test" : "cash"
+  if (id === "cash" && appConfig?.codEnabled === false && appConfig?.paymentOptionEnabled !== false) return PAYMENT_METHODS.razorpay_test
+  if (id === "razorpay_test" && appConfig?.paymentOptionEnabled === false) return PAYMENT_METHODS.cash
+  return PAYMENT_METHODS[id]
+}

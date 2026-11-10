@@ -6,7 +6,6 @@ import { useLocationStore } from "@food/store/locationStore"
 import { useLocationGuard } from "@food/hooks/useLocationGuard"
 import { useScrollLock } from "@food/hooks/useScrollLock"
 import logoNew from "@/assets/logo1.png"
-import { DEALS } from "./HomeData"
 import { HomeStyles } from "./components/HomeStyles"
 import { HomeHeader } from "./components/HomeHeader"
 import { HomeSections } from "./components/HomeSections"
@@ -21,7 +20,7 @@ import UserSidebarDrawer from "@food/components/user/UserSidebarDrawer"
 import DeliverOnTrainModal from "@food/components/user/DeliverOnTrainModal"
 import RewardsWalletLoading from "@food/components/user/RewardsWalletLoading"
 import PreviousRewardsView from "../rewards/PreviousRewardsView"
-import { ChevronsUp, X } from "lucide-react"
+import { ChevronsUp, ChevronRight, ShoppingCart, X } from "lucide-react"
 import apiClient from "@/services/api/axios"
 import { userAPI } from "@food/api"
 import { applySystemTheme } from "@/shared/utils/themeSync"
@@ -255,109 +254,12 @@ export default function Home() {
       }
     } catch (e) { }
 
-    try {
-      const local = localStorage.getItem("franchise_admin_coupons")
-      if (local) {
-        const parsed = JSON.parse(local).filter(c => c.status === "active")
-        if (parsed.length > 0) {
-          return parsed.map(c => ({
-            id: c._id,
-            badge: c.discountType === "percentage" ? "Save" : "Flat",
-            title: c.couponCode,
-            description: c.title
-          }))
-        }
-      }
-    } catch (e) { }
-
-    try {
-      const superadmin = localStorage.getItem("pvp_coupons")
-      if (superadmin) {
-        const parsed = JSON.parse(superadmin).filter(c => c.status === "active")
-        if (parsed.length > 0) {
-          return parsed.map(c => ({
-            id: c._id,
-            badge: c.couponType === "Percentage" ? "Save" : "Flat",
-            title: c.code,
-            description: c.title
-          }))
-        }
-      }
-    } catch (e) { }
-
-    return DEALS
+    return []
   })
-
-  // Default fallback coupons matching Domino's style with Papa Veg brand theme
-  const DEFAULT_COUPONS = [
-    {
-      _id: "coupon-get80",
-      code: "GET80",
-      title: "Get up to ₹80 Off",
-      description: "Up to ₹80 Off on orders worth ₹199 or more",
-      couponType: "Percentage",
-      discountType: "percentage",
-      value: 40,
-      discountValue: 40,
-      minimumOrderAmount: 199,
-      minOrderValue: 199,
-      maximumDiscount: 80,
-      maxDiscount: 80,
-      status: "active",
-      isActive: true,
-      endDate: "2026-12-31T23:59:59.000Z"
-    },
-    {
-      _id: "coupon-welcome50",
-      code: "WELCOME50",
-      title: "50% Off First Order",
-      description: "Get 50% discount up to ₹150 on your first Papa Veg Pizza order",
-      couponType: "Percentage",
-      discountType: "percentage",
-      value: 50,
-      discountValue: 50,
-      minimumOrderAmount: 249,
-      minOrderValue: 249,
-      maximumDiscount: 150,
-      maxDiscount: 150,
-      status: "active",
-      isActive: true,
-      endDate: "2026-12-31T23:59:59.000Z"
-    },
-    {
-      _id: "coupon-pvp100",
-      code: "PAPAVEG100",
-      title: "Flat ₹100 Off Special",
-      description: "Flat ₹100 off on delicious pizzas on orders above ₹499",
-      couponType: "Flat Amount",
-      discountType: "flat-price",
-      value: 100,
-      discountValue: 100,
-      minimumOrderAmount: 499,
-      minOrderValue: 499,
-      maximumDiscount: 100,
-      maxDiscount: 100,
-      status: "active",
-      isActive: true,
-      endDate: "2026-12-31T23:59:59.000Z"
-    }
-  ];
 
   // Superadmin Dynamic Coupons State
-  const [coupons, setCoupons] = useState(() => {
-    try {
-      const cachedCfg = JSON.parse(localStorage.getItem('pvp_app_config') || '{}');
-      if (cachedCfg.couponEnabled === false) return [];
-      const superadmin = localStorage.getItem("pvp_coupons")
-      if (superadmin) {
-        const parsed = JSON.parse(superadmin).filter(c => (c.status === "active" || c.isActive) && (!c.endDate || new Date(c.endDate) > new Date()))
-        if (parsed.length > 0) {
-          return parsed
-        }
-      }
-    } catch (e) { }
-    return [];
-  })
+  // Only what the server publishes from Marketing > Coupons; no cached or built-in coupons.
+  const [coupons, setCoupons] = useState([])
 
   // Immediately clear coupons if disabled globally
   useEffect(() => {
@@ -720,17 +622,6 @@ export default function Home() {
         console.warn("Public coupons fetch error:", err);
       }
 
-      try {
-        const superadmin = localStorage.getItem("pvp_coupons");
-        if (superadmin && appConfig?.couponEnabled !== false) {
-          const parsed = JSON.parse(superadmin).filter(c => (c.status === "active" || c.isActive) && (!c.endDate || new Date(c.endDate) > new Date()));
-          if (parsed.length > 0) {
-            setCoupons(parsed);
-            return;
-          }
-        }
-      } catch (_) {}
-
       setCoupons([]);
     };
 
@@ -865,7 +756,7 @@ export default function Home() {
 
   const handleOpenCouponModal = (c) => {
     const code = c.code || c.couponCode || "PVPDEAL";
-    const minOrder = c.minimumOrderAmount || c.minOrderValue || 199;
+    const minOrder = c.minimumOrderAmount || c.minOrderValue || 0;
     const maxDiscount = c.maximumDiscount || c.maxDiscount || c.value || c.discountValue || 80;
     const val = c.value || c.discountValue || 80;
     const isPercentage = c.couponType === "Percentage" || c.discountType === "percentage";
@@ -965,7 +856,6 @@ export default function Home() {
     }
 
     const handleOffersSync = () => {
-      let list = []
       try {
         const homeConfig = localStorage.getItem("pvp_home_config")
         if (homeConfig) {
@@ -977,42 +867,6 @@ export default function Home() {
         }
       } catch (e) { }
 
-      try {
-        const local = localStorage.getItem("franchise_admin_coupons")
-        if (local) {
-          const parsed = JSON.parse(local).filter(c => c.status === "active")
-          if (parsed.length > 0) {
-            list = parsed.map(c => ({
-              id: c._id,
-              badge: c.discountType === "percentage" ? "Save" : "Flat",
-              title: c.couponCode,
-              description: c.title
-            }))
-          }
-        }
-      } catch (e) { }
-
-      if (list.length === 0) {
-        try {
-          const superadmin = localStorage.getItem("pvp_coupons")
-          if (superadmin) {
-            const parsed = JSON.parse(superadmin).filter(c => c.status === "active" || c.isActive)
-            if (parsed.length > 0) {
-              setCoupons(parsed);
-              list = parsed.map(c => ({
-                id: c._id,
-                badge: c.couponType === "Percentage" ? "Save" : "Flat",
-                title: c.code,
-                description: c.title
-              }))
-            }
-          }
-        } catch (e) { }
-      }
-
-      if (list.length > 0) {
-        setOffers(list)
-      }
     }
 
     // handleOrderMethodsSync removed
@@ -1493,7 +1347,7 @@ export default function Home() {
                 className="flex overflow-x-auto hide-scrollbar gap-3 pb-2 pt-1 px-2 sm:px-3"
               >
                 {coupons.map((c) => {
-                  const minOrder = c.minimumOrderAmount || c.minOrderValue || 199;
+                  const minOrder = c.minimumOrderAmount || c.minOrderValue || 0;
                   const maxDiscount = c.maximumDiscount || c.maxDiscount || c.value || c.discountValue || 80;
                   const isPercentage = c.couponType === 'Percentage' || c.discountType === 'percentage';
                   const titleText = c.title || (isPercentage ? `Get up to ₹${maxDiscount} Off` : `Flat ₹${c.value || c.discountValue || maxDiscount} Off`);
@@ -1595,6 +1449,35 @@ export default function Home() {
           />
         )}
 
+        {/* Floating "View Cart" pill: shows once something is in the cart, above the promo strip and bottom nav */}
+        <AnimatePresence>
+          {totalCartCount > 0 && locationConfirmed && !selectedProductForCustomize && (
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 24 }}
+              transition={{ type: "spring", stiffness: 320, damping: 28 }}
+              className={`fixed left-1/2 -translate-x-1/2 w-full max-w-md z-40 flex justify-center pointer-events-none ${deliveryCardData && deliveryCardData.enabled !== false ? 'bottom-[132px]' : 'bottom-[78px]'}`}
+            >
+              <button
+                type="button"
+                onClick={() => navigate("/user/cart")}
+                aria-label={`View cart, ${totalCartCount} item${totalCartCount === 1 ? "" : "s"}`}
+                className="pointer-events-auto flex items-center gap-3 pl-3 pr-4 h-12 rounded-full bg-[#D32F3B] text-white font-bold text-sm shadow-xl shadow-black/30 border-0 cursor-pointer active:scale-95 transition-transform"
+              >
+                <span className="relative flex items-center">
+                  <ShoppingCart size={22} strokeWidth={2.2} />
+                  <span className="absolute -top-2.5 -right-2.5 min-w-[18px] h-[18px] px-1 rounded-full bg-zinc-900 text-white text-[10px] font-bold flex items-center justify-center border border-white/80">
+                    {totalCartCount}
+                  </span>
+                </span>
+                <span className="ml-1">View Cart</span>
+                <ChevronRight size={18} strokeWidth={2.5} />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* BottomNavBar & Floating Cart */}
         <BottomNavBar
           navigate={navigate}
@@ -1688,8 +1571,8 @@ export default function Home() {
                 value: offer.value || offer.maxDiscount || 80,
                 discountValue: offer.value || offer.maxDiscount || 80,
                 discountType: offer.isPercentage ? 'percentage' : 'flat-price',
-                minOrder: offer.minOrderValue || 199,
-                minimumOrderAmount: offer.minOrderValue || 199,
+                minOrder: offer.minOrderValue || 0,
+                minimumOrderAmount: offer.minOrderValue || 0,
                 maxDiscount: offer.maxDiscount || 80
               };
               localStorage.setItem("pvp_applied_coupon", JSON.stringify(couponObj));

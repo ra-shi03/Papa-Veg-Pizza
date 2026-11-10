@@ -2,28 +2,29 @@ import mongoose from 'mongoose';
 import { FoodOrder } from '../models/order.model.js';
 import { FoodStore as FoodStore } from '../../store/models/store.model.js';
 import { FoodFeeSettings } from '../../admin/models/feeSettings.model.js';
-import { FoodOffer } from '../../admin/models/offer.model.js';
-import { FoodOfferUsage } from '../../admin/models/offerUsage.model.js';
 import { FoodAppConfig } from '../../settings/models/appConfig.model.js';
+import { FoodCoupon } from '../../settings/models/foodCoupon.model.js';
+import { couponToOffer, evaluateCoupon, findCouponOfferByCode } from '../../settings/services/couponOffer.service.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { haversineKm } from './order.helpers.js';
 import { priceCartItems } from './catalog-pricing.service.js';
 import { getOrderableStore } from './order-store.service.js';
 
+// Until the super admin saves fees, nothing is charged.
 const DEFAULT_FEES = {
-  deliveryFee: 25,
+  deliveryFee: 0,
   deliveryFeeRanges: [],
   freeDeliveryUpTo: 0,
-  freeDeliveryThreshold: 149,
-  platformFee: 5,
+  freeDeliveryThreshold: 0,
+  platformFee: 0,
   packagingFee: 0,
   handlingFee: 0,
   cancellationFee: 0,
   cancellationFreeMinutes: 0,
-  gstRate: 5,
+  gstRate: 0,
 };
 
-// The fees the super admin configured (the built-in defaults apply only until they save any).
+// The fees the super admin configured (all zero until they save any).
 async function loadFeeSettings() {
   const doc = await FoodFeeSettings.findOne({ isActive: true }).sort({ createdAt: -1 }).lean();
   // Once the super admin has saved settings, a field they left blank means 0, not the built-in default.
@@ -155,72 +156,12 @@ export async function buildOrderPricing(userId, dto) {
     if (appConfig && appConfig.couponEnabled === false) {
       throw new ValidationError("Coupon system is currently disabled globally");
     }
-    const now = new Date();
-    const offer = await FoodOffer.findOne({ couponCode: codeRaw }).lean();
+    // Only coupons the super admin manages (Marketing > Coupons); the rules are in evaluateCoupon.
+    const offer = await findCouponOfferByCode(codeRaw);
     if (offer) {
-      const statusOk = offer.status === "active";
-      const startOk = !offer.startDate || now >= new Date(offer.startDate);
-      const endOk = !offer.endDate || now < new Date(offer.endDate);
-      const scopeOk =
-        offer.storeScope !== "selected" ||
-        String(offer.storeId || "") === String(dto.storeId || "");
-      const minOk = subtotal >= (Number(offer.minOrderValue) || 0);
-      let usageOk = true;
-      if (
-        Number(offer.usageLimit) > 0 &&
-        Number(offer.usedCount || 0) >= Number(offer.usageLimit)
-      ) {
-        usageOk = false;
-      }
-
-      let perUserOk = true;
-      if (userId && Number(offer.perUserLimit) > 0) {
-        const usage = await FoodOfferUsage.findOne({
-          offerId: offer._id,
-          userId,
-        }).lean();
-        if (usage && Number(usage.count) >= Number(offer.perUserLimit)) {
-          perUserOk = false;
-        }
-      }
-
-      let firstOrderOk = true;
-      if (userId && offer.customerScope === "first-time") {
-        const c = await FoodOrder.countDocuments({
-          userId: new mongoose.Types.ObjectId(userId),
-        });
-        firstOrderOk = c === 0;
-      }
-      if (userId && offer.isFirstOrderOnly === true) {
-        const c2 = await FoodOrder.countDocuments({
-          userId: new mongoose.Types.ObjectId(userId),
-        });
-        if (c2 > 0) firstOrderOk = false;
-      }
-
-      const allowed =
-        statusOk &&
-        startOk &&
-        endOk &&
-        scopeOk &&
-        minOk &&
-        usageOk &&
-        perUserOk &&
-        firstOrderOk;
-
-      if (allowed) {
-        if (offer.discountType === "percentage") {
-          const raw = subtotal * (Number(offer.discountValue) / 100);
-          const capped = Number(offer.maxDiscount)
-            ? Math.min(raw, Number(offer.maxDiscount))
-            : raw;
-          discount = Math.max(0, Math.min(subtotal, Math.floor(capped)));
-        } else {
-          discount = Math.max(
-            0,
-            Math.min(subtotal, Math.floor(Number(offer.discountValue) || 0)),
-          );
-        }
+      const result = await evaluateCoupon(offer, { userId, store, items, subtotal });
+      if (result.ok) {
+        discount = result.discount;
         appliedCoupon = { code: codeRaw, discount };
       }
     }
@@ -259,4 +200,23 @@ export async function buildOrderPricing(userId, dto) {
       appliedCoupon,
     },
   };
+}
+
+// For each coupon the super admin published: does it work for this cart, why not, and what would it save.
+// The cart uses this to enable or lock the Apply button.
+export async function getCouponEligibility(userId, dto) {
+  // Whether a coupon fits this cart does not depend on opening hours, so a closed store must not hide the answer.
+  const store = await FoodStore.findOne({ _id: dto.storeId, approvalStatus: 'Approved', isActive: { $ne: false } }).select('_id').lean();
+  if (!store) throw new ValidationError('Store not accepting orders');
+  const { items, subtotal } = await priceCartItems(userId, dto.items, { storeId: store._id });
+  const appConfig = await FoodAppConfig.findOne().lean();
+  if (appConfig && appConfig.couponEnabled === false) return { coupons: [] };
+  const coupons = await FoodCoupon.find({ isActive: { $ne: false } }).lean();
+  const out = [];
+  for (const c of coupons) {
+    const offer = couponToOffer(c);
+    const r = await evaluateCoupon(offer, { userId, store, items, subtotal });
+    out.push({ couponCode: offer.couponCode, eligible: r.ok, reason: r.reason, saving: r.discount, eligibleSubtotal: r.eligibleSubtotal });
+  }
+  return { coupons: out };
 }

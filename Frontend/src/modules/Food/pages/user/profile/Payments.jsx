@@ -1,252 +1,145 @@
-import React, { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
-import { ChevronLeft, Send, CreditCard, Wallet, Landmark, Banknote, AlertTriangle } from "lucide-react"
+import React, { useState } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
+import { ChevronLeft, Banknote, ShieldCheck, AlertTriangle, Check } from "lucide-react"
 import { toast } from "sonner"
 import AnimatedPage from "@food/components/user/AnimatedPage"
 import { useAppConfig } from "@food/context/AppConfigContext"
+import { PAYMENT_METHODS, readPaymentMethod } from "../cart/cartHelpers"
 
+/**
+ * Payment Options: how the customer pays. The choice is kept on the device and read by the cart's pay bar and by
+ * checkout. Opened from the cart (or checkout) it shows the amount to pay and goes back once a method is picked.
+ */
 export default function Payments() {
   const navigate = useNavigate()
+  const { state } = useLocation()
+  const { config: appConfig } = useAppConfig()
+  const cameFromCart = state?.from === "cart" || state?.from === "checkout"
+  const total = Number(state?.total)
 
   const [isDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem("appTheme")
     return savedTheme ? savedTheme === "dark" : false
   })
 
-  // Load selection from localStorage, defaulting to 'upi'
-  const [selectedMethod, setSelectedMethod] = useState(() => {
-    return localStorage.getItem("preferred_payment_method") || "upi"
-  })
+  const [selected, setSelected] = useState(() => readPaymentMethod(appConfig).id)
 
-  const { config: appConfig } = useAppConfig()
-  const isPaymentDisabled = appConfig?.paymentOptionEnabled === false
+  const onlineDisabled = appConfig?.paymentOptionEnabled === false
+  const cashDisabled = appConfig?.codEnabled === false
 
-  const handleSave = () => {
-    if (isPaymentDisabled) {
-      toast.error("Payment options are currently disabled by administrator.")
+  const choose = (id, disabled) => {
+    if (disabled) {
+      toast.error("This payment option is not available right now.")
       return
     }
+    setSelected(id)
     try {
-      localStorage.setItem("preferred_payment_method", selectedMethod)
-      toast.success("Preferred payment method saved successfully!")
-      navigate(-1)
-    } catch (e) {
-      toast.error("Failed to save preferred payment method.")
-    }
+      localStorage.setItem("preferred_payment_method", id)
+    } catch (_) {}
+    toast.success(`${PAYMENT_METHODS[id].title} selected`)
+    if (cameFromCart) setTimeout(() => navigate(-1), 250)
   }
 
-  const paymentOptions = [
-    {
-      id: "upi",
-      title: "UPI",
-      icon: <Send className="w-5 h-5 text-zinc-400 dark:text-zinc-500" />,
-      subLogos: (
-        <div className="flex items-center gap-4 mt-2.5 flex-wrap">
-          {/* G Pay */}
-          <span className="flex items-center font-sans font-extrabold text-sm select-none tracking-tight">
-            <span className="text-[#4285F4]">G</span>
-            <span className="text-[#EA4335]">P</span>
-            <span className="text-[#FBBC05]">a</span>
-            <span className="text-[#34A853]">y</span>
-          </span>
-          {/* PhonePe */}
-          <span className="inline-flex items-center justify-center px-2 py-0.5 bg-[#5f259f] text-white rounded text-[10px] font-extrabold select-none">
-            PhonePe
-          </span>
-          {/* Amazon Pay */}
-          <span className="flex items-center gap-0.5 text-[#FF9900] font-sans font-bold text-[11px] select-none">
-            amazon<span className="text-zinc-900 dark:text-zinc-100 font-black">pay</span>
-          </span>
-          {/* Paytm */}
-          <span className="font-sans font-black text-xs select-none">
-            <span className="text-[#00B9F5]">pay</span>
-            <span className="text-[#002E6E] dark:text-[#80ccff]">tm</span>
-          </span>
-        </div>
-      )
-    },
-    {
-      id: "cards",
-      title: "Cards",
-      icon: <CreditCard className="w-5 h-5 text-zinc-400 dark:text-zinc-500" />,
-      subLogos: (
-        <div className="flex items-center gap-4 mt-2.5 flex-wrap">
-          {/* Visa */}
-          <span className="font-serif italic font-black text-sm text-[#1A1F71] dark:text-[#4d86ff] select-none tracking-wider">
-            VISA
-          </span>
-          {/* Mastercard */}
-          <span className="flex items-center select-none shrink-0">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#EB001B] z-10"></span>
-            <span className="w-2.5 h-2.5 rounded-full bg-[#FF5F00] -ml-1"></span>
-          </span>
-          {/* RuPay */}
-          <span className="font-sans font-black italic text-xs text-[#0A2240] dark:text-zinc-100 select-none">
-            RuPay<span className="text-[#F26722]">▸</span>
-          </span>
-        </div>
-      )
-    },
-    {
-      id: "wallet",
-      title: "Wallet",
-      icon: <Wallet className="w-5 h-5 text-zinc-400 dark:text-zinc-500" />,
-      subLogos: (
-        <div className="flex items-center gap-4 mt-2.5 flex-wrap">
-          {/* Freecharge */}
-          <span className="inline-flex items-center justify-center px-2 py-0.5 bg-[#FF5A5F] text-white rounded text-[9px] font-extrabold select-none uppercase tracking-tight">
-            freecharge
-          </span>
-          {/* Mobikwik */}
-          <span className="font-sans font-black text-[10px] text-[#005CA9] dark:text-[#3894e6] select-none">
-            MobiKwik
-          </span>
-          {/* PhonePe Wallet */}
-          <span className="inline-flex items-center justify-center px-2 py-0.5 bg-[#5f259f] text-white rounded text-[9px] font-extrabold select-none">
-            PhonePe
-          </span>
-          {/* Ola Money */}
-          <span className="font-sans font-black text-[9px] bg-black text-white dark:bg-zinc-800 dark:border dark:border-white/10 px-2 py-0.5 rounded select-none">
-            OLA
-          </span>
-          {/* Amazon Pay Wallet */}
-          <span className="flex items-center gap-0.5 text-[#FF9900] font-sans font-bold text-[10px] select-none">
-            amazon<span className="text-zinc-900 dark:text-zinc-100 font-extrabold">pay</span>
-          </span>
-        </div>
-      )
-    },
-    {
-      id: "net_banking",
-      title: "Net banking",
-      icon: <Landmark className="w-5 h-5 text-zinc-400 dark:text-zinc-500" />,
-      subLogos: (
-        <div className="flex items-center gap-4 mt-2.5 flex-wrap">
-          {/* SBI */}
-          <span className="flex items-center gap-1 select-none">
-            <span className="w-3.5 h-3.5 rounded-full border border-[#00BFFF] bg-transparent flex items-center justify-center relative shrink-0">
-              <span className="w-1.5 h-1.5 bg-white dark:bg-[#111] rounded-full"></span>
-              <span className="absolute bottom-0 w-0.5 h-1.5 bg-[#00BFFF]"></span>
-            </span>
-            <span className="text-[10px] font-black text-[#002E6E] dark:text-[#66ccff]">SBI</span>
-          </span>
-          {/* HDFC */}
-          <span className="inline-block px-1.5 py-0.5 bg-[#1d3557] text-white font-sans font-black text-[8px] rounded select-none">
-            HDFC
-          </span>
-          {/* ICICI */}
-          <span className="font-sans font-black italic text-[10px] text-[#b22222] dark:text-red-400 select-none">
-            ICICI
-          </span>
-        </div>
-      )
-    },
-    {
-      id: "cash",
-      title: "Cash",
-      icon: <Banknote className="w-5 h-5 text-zinc-400 dark:text-zinc-500" />,
-      subLogos: null
-    }
-  ]
+  const ui = isDarkMode
+    ? { page: "#111111", card: "#1b1b1d", line: "rgba(255,255,255,0.08)", text: "#f4f4f5", muted: "#a1a1aa" }
+    : { page: "#F5F3EF", card: "#ffffff", line: "rgba(0,0,0,0.07)", text: "#1c1b1b", muted: "#71717a" }
+
+  const Radio = ({ on, disabled }) => (
+    <span
+      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all"
+      style={{ borderColor: on ? "#E53935" : isDarkMode ? "#52525b" : "#d4d4d8", backgroundColor: on ? "#E53935" : "transparent", opacity: disabled ? 0.5 : 1 }}
+    >
+      {on && <Check size={12} strokeWidth={3.5} color="#fff" />}
+    </span>
+  )
+
+  const Section = ({ title, children }) => (
+    <section className="mt-5">
+      <h2 className="px-4 text-[15px] font-extrabold" style={{ color: ui.text }}>{title}</h2>
+      <div className="mx-3 mt-2 overflow-hidden rounded-xl border" style={{ backgroundColor: ui.card, borderColor: ui.line }}>{children}</div>
+    </section>
+  )
 
   return (
-    <AnimatedPage className={`min-h-screen pb-32 flex flex-col transition-colors duration-300 ${isDarkMode ? "dark bg-[#111111]" : "bg-[#ffffff]"}`}>
-      
-      {/* Header */}
-      <header className={`fixed top-0 left-0 w-full z-50 h-16 flex items-center px-4 justify-between border-b ${
-        isDarkMode ? "bg-[#111111] border-white/10 text-white" : "bg-[#ffffff] border-zinc-200 text-zinc-950"
-      }`}>
+    <AnimatedPage className="flex min-h-screen flex-col transition-colors duration-300">
+      <div className="flex min-h-screen flex-1 flex-col pb-10" style={{ backgroundColor: ui.page }}>
+      <header
+        className="fixed top-0 left-1/2 z-50 flex h-16 w-full max-w-md -translate-x-1/2 items-center gap-2 border-b px-3"
+        style={{ backgroundColor: ui.card, borderColor: ui.line, color: ui.text }}
+      >
         <button
           onClick={() => navigate(-1)}
-          className={`flex items-center justify-center p-2 rounded-full cursor-pointer transition-all active:scale-95 bg-transparent border-0 outline-none ${
-            isDarkMode ? "text-white hover:bg-white/10" : "text-zinc-950 hover:bg-zinc-100"
-          }`}
+          aria-label="Back"
+          className="flex items-center justify-center rounded-full border-0 bg-transparent p-2 cursor-pointer active:scale-95"
+          style={{ color: ui.text }}
         >
-          <ChevronLeft className="w-6 h-6" />
+          <ChevronLeft className="h-6 w-6" />
         </button>
-        
-        <h1 className="text-lg font-bold text-center flex-1 font-headline-lg-mobile pl-6">
-          Preferred payment
-        </h1>
-
-        <button
-          onClick={handleSave}
-          disabled={isPaymentDisabled}
-          className={`font-bold text-sm px-3 py-1.5 rounded-lg active:scale-95 cursor-pointer bg-transparent border-0 outline-none transition-all font-sans ${
-            isPaymentDisabled 
-              ? "text-zinc-400 dark:text-zinc-600 cursor-not-allowed opacity-60" 
-              : "text-[#E53935] hover:text-red-700"
-          }`}
-        >
-          Save
-        </button>
+        <div className="text-left">
+          <h1 className="text-lg font-bold leading-tight">Payment Options</h1>
+          {Number.isFinite(total) && total > 0 && (
+            <p className="text-xs leading-tight" style={{ color: ui.muted }}>To Pay: ₹{Number(total.toFixed(2))}</p>
+          )}
+        </div>
       </header>
 
-      {/* Main Options List */}
-      <main className="mt-20 flex-1 flex flex-col max-w-md mx-auto w-full select-none">
-        {isPaymentDisabled && (
-          <div className="mx-4 mb-4 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-800 dark:text-amber-300 flex items-start gap-2.5 text-xs font-semibold animate-fade">
-            <AlertTriangle size={18} className="shrink-0 text-amber-500 mt-0.5" />
+      <main className="mx-auto mt-16 w-full max-w-md flex-1 select-none pt-1">
+        {(onlineDisabled || cashDisabled) && (
+          <div className="mx-3 mt-4 flex items-start gap-2.5 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3.5 text-left text-xs text-amber-800 dark:text-amber-300">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-500" />
             <div>
-              <p className="font-bold">Payment Options Disabled</p>
-              <p className="text-[11px] opacity-90 mt-0.5">Online customer payment options are currently turned off globally by store administrator.</p>
+              <p className="font-bold">{onlineDisabled && cashDisabled ? "Payments are switched off" : onlineDisabled ? "Online payments are switched off" : "Cash on delivery is switched off"}</p>
+              <p className="mt-0.5 text-[11px] opacity-90">The store administrator has turned these off. Pick one of the available options.</p>
             </div>
           </div>
         )}
 
-        {paymentOptions
-          .filter(option => option.id !== 'wallet' || appConfig?.walletEnabled !== false)
-          .map((option) => (
-          <div
-            key={option.id}
-            onClick={() => {
-              if (!isPaymentDisabled) {
-                setSelectedMethod(option.id);
-              }
-            }}
-            className={`flex items-start justify-between px-6 py-5 border-b transition-colors ${
-              isPaymentDisabled 
-                ? "opacity-50 cursor-not-allowed" 
-                : "cursor-pointer"
-            } ${
-              isDarkMode 
-                ? "border-white/5 hover:bg-white/[0.02]" 
-                : "border-zinc-100 hover:bg-zinc-50/50"
-            }`}
+        <Section title="Pay on Delivery">
+          <button
+            type="button"
+            onClick={() => choose("cash", cashDisabled)}
+            className="flex w-full items-center gap-3 border-0 bg-transparent px-4 py-4 text-left cursor-pointer"
+            style={{ opacity: cashDisabled ? 0.55 : 1 }}
           >
-            {/* Left part: Icon + Text */}
-            <div className="flex gap-4 items-start text-left">
-              <div className="mt-0.5 shrink-0">
-                {option.icon}
-              </div>
-              <div className="flex flex-col">
-                <span className={`text-base font-bold font-headline-lg-mobile ${
-                  isDarkMode ? "text-white" : "text-zinc-800"
-                }`}>
-                  {option.title}
-                </span>
-                {option.subLogos}
-              </div>
-            </div>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border" style={{ borderColor: ui.line, color: ui.text }}>
+              <Banknote size={20} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold" style={{ color: ui.text }}>Cash / UPI on Delivery</span>
+              <span className="mt-0.5 block text-xs" style={{ color: ui.muted }}>Pay the delivery partner in cash, or scan a UPI QR when your order arrives.</span>
+            </span>
+            <Radio on={selected === "cash"} disabled={cashDisabled} />
+          </button>
+        </Section>
 
-            {/* Right part: Radio button */}
-            <div className="flex items-center h-full pt-1.5">
-              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                selectedMethod === option.id
-                  ? "border-[#E53935] bg-[#E53935]"
-                  : isDarkMode
-                    ? "border-zinc-700"
-                    : "border-zinc-300"
-              }`}>
-                {selectedMethod === option.id && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
+        <Section title="Pay Online">
+          <button
+            type="button"
+            onClick={() => choose("razorpay_test", onlineDisabled)}
+            className="flex w-full items-center gap-3 border-0 bg-transparent px-4 py-4 text-left cursor-pointer"
+            style={{ opacity: onlineDisabled ? 0.55 : 1 }}
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border" style={{ borderColor: ui.line, color: "#2563eb" }}>
+              <ShieldCheck size={20} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: ui.text }}>
+                Razorpay
+                <span className="rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide" style={{ backgroundColor: "rgba(229,57,53,0.12)", color: "#E53935" }}>Test mode</span>
+              </span>
+              <span className="mt-0.5 block text-xs" style={{ color: ui.muted }}>UPI, cards, wallets and net banking through Razorpay. Test mode: no real money is charged.</span>
+            </span>
+            <Radio on={selected === "razorpay_test"} disabled={onlineDisabled} />
+          </button>
+        </Section>
+
+        {!cameFromCart && (
+          <p className="mx-4 mt-5 text-left text-[11px]" style={{ color: ui.muted }}>
+            Your choice is used at checkout. You can change it any time from the cart.
+          </p>
+        )}
       </main>
-
+      </div>
     </AnimatedPage>
   )
 }

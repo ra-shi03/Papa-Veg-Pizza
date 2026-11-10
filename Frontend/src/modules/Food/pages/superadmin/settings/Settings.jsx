@@ -13,7 +13,6 @@ import {
   DollarSign,
   Briefcase,
   Shield,
-  Percent,
   Lock,
   Globe,
   UploadCloud,
@@ -32,8 +31,6 @@ import {
 } from 'lucide-react';
 import UpdateCompanyModal from './UpdateCompanyModal';
 import { applySystemTheme } from '@/shared/utils/themeSync';
-import UpdateTaxModal from './UpdateTaxModal';
-import MaintenanceModeModal from './MaintenanceModeModal';
 import { adminAPI } from '@/services/api';
 import { setCachedSettings } from '@food/utils/businessSettings';
 
@@ -77,8 +74,6 @@ export default function Settings() {
   
   // Modals state
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
-  const [isTaxModalOpen, setIsTaxModalOpen] = useState(false);
-  const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
 
   // Search & Debouncing
   const [searchQuery, setSearchQuery] = useState('');
@@ -103,21 +98,11 @@ export default function Settings() {
       currencySymbol: '₹',
       timezone: 'Asia/Kolkata',
       language: 'English (IN)',
-      gstPercent: 5,
-      serviceTaxPercent: 2.5,
-      packagingCharge: 30,
-      taxIncluded: false,
-      orderCancellationTime: 5, // minutes
       refundWindowHours: 24, // hours
       maxDeliveryRadius: 15, // km
       minimumOrderAmount: 299, // ₹
       invoicePrefix: 'PVP-IND-',
       invoiceFooter: 'Thank you for choosing Papa Veg Pizza! Visit again.',
-      maintenanceMode: false,
-      maintenanceReason: '',
-      maintenanceStart: '',
-      maintenanceEnd: '',
-      maintenanceAffectedModules: [],
       passwordExpiryDays: 90,
       sessionTimeoutMinutes: 30,
       otpExpirySeconds: 60,
@@ -235,22 +220,6 @@ export default function Settings() {
     }
   });
 
-  const useUpdateTaxSettings = () => ({
-    mutateAsync: async (taxValues) => {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          setSettings(prev => ({
-            ...prev,
-            ...taxValues,
-            updatedBy: 'Rohan Sharma (Super Admin)',
-            updatedAt: new Date().toISOString()
-          }));
-          resolve(true);
-        }, 1000);
-      });
-    }
-  });
-
   const useUpdateSecuritySettings = () => ({
     mutateAsync: async (secValues) => {
       return new Promise((resolve) => {
@@ -267,44 +236,9 @@ export default function Settings() {
     }
   });
 
-  const useMaintenanceMode = () => ({
-    toggleMaintenance: async (payload) => {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          if (payload) {
-            setSettings(prev => ({
-              ...prev,
-              maintenanceMode: true,
-              maintenanceReason: payload.reason,
-              maintenanceStart: payload.startTime,
-              maintenanceEnd: payload.endTime,
-              maintenanceAffectedModules: payload.affectedModules,
-              updatedBy: 'Rohan Sharma (Super Admin)',
-              updatedAt: new Date().toISOString()
-            }));
-          } else {
-            setSettings(prev => ({
-              ...prev,
-              maintenanceMode: false,
-              maintenanceReason: '',
-              maintenanceStart: '',
-              maintenanceEnd: '',
-              maintenanceAffectedModules: [],
-              updatedBy: 'Rohan Sharma (Super Admin)',
-              updatedAt: new Date().toISOString()
-            }));
-          }
-          resolve(true);
-        }, 1000);
-      });
-    }
-  });
-
   const { refetch } = useSettings();
   const updateSettingsHook = useUpdateSettings();
-  const updateTaxHook = useUpdateTaxSettings();
   const updateSecurityHook = useUpdateSecuritySettings();
-  const maintenanceHook = useMaintenanceMode();
 
   // Submit handlers for specific sections
   const handleSaveTabChanges = async (tabName) => {
@@ -350,24 +284,6 @@ export default function Settings() {
     }
   };
 
-  const handleToggleMaintenanceMode = async () => {
-    if (settings.maintenanceMode) {
-      setIsLoading(true);
-      await maintenanceHook.toggleMaintenance(null);
-      setIsLoading(false);
-      addToast('Maintenance mode deactivated. All modules live.', 'success');
-    } else {
-      setIsMaintenanceModalOpen(true);
-    }
-  };
-
-  const handleEnableMaintenanceConfirm = async (payload) => {
-    setIsLoading(true);
-    await maintenanceHook.toggleMaintenance(payload);
-    setIsLoading(false);
-    addToast('Maintenance mode activated successfully.', 'warning');
-  };
-
   const handleExportConfig = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(settings, null, 2));
     const downloadAnchor = document.createElement('a');
@@ -382,7 +298,6 @@ export default function Settings() {
   // Activity Log history mock
   const recentChanges = [
     { type: 'TAX', desc: 'GST rate adjusted to 5%', time: '10 mins ago', user: 'Rohan Sharma' },
-    { type: 'MAINTENANCE', desc: 'Disabled system-wide maintenance', time: '2 hours ago', user: 'Rohan Sharma' },
     { type: 'ORDER', desc: 'Minimum order amount changed to ₹299', time: '1 day ago', user: 'Aman Verma' },
     { type: 'INVOICE', desc: 'Invoice footer modified', time: '3 days ago', user: 'Sarah D.' }
   ];
@@ -421,22 +336,6 @@ export default function Settings() {
         initialData={settings}
         onSave={saveCompanyInformation}
       />
-      
-      <UpdateTaxModal 
-        isOpen={isTaxModalOpen} 
-        onClose={() => setIsTaxModalOpen(false)}
-        initialData={settings}
-        onSave={async (data) => {
-          await updateTaxHook.mutateAsync(data);
-          addToast('Taxation settings saved successfully!', 'success');
-        }}
-      />
-
-      <MaintenanceModeModal 
-        isOpen={isMaintenanceModalOpen} 
-        onClose={() => setIsMaintenanceModalOpen(false)}
-        onConfirm={handleEnableMaintenanceConfirm}
-      />
 
       {/* Unsaved Changes Banner */}
       {hasUnsavedChanges && (
@@ -456,33 +355,6 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Maintenance Mode Top Banner */}
-      {settings.maintenanceMode && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400 p-4 rounded-xl space-y-2 animate-in slide-in-from-top-3">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-            <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 bg-red-600 text-white text-[9px] font-extrabold rounded-full uppercase tracking-wider animate-pulse">
-                Maintenance Active
-              </span>
-              <span className="text-xs font-bold">Affected Modules: {settings.maintenanceAffectedModules.join(', ')}</span>
-            </div>
-            <button 
-              onClick={handleToggleMaintenanceMode}
-              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[10px] font-bold shadow-sm transition-all"
-            >
-              Disable Maintenance
-            </button>
-          </div>
-          <p className="text-[11px] leading-relaxed opacity-90 font-medium">
-            <strong>Reason: </strong> {settings.maintenanceReason}
-          </p>
-          <div className="flex gap-4 text-[9px] font-semibold opacity-70">
-            <span><strong>Start: </strong>{new Date(settings.maintenanceStart).toLocaleString()}</span>
-            <span><strong>End (Est): </strong>{new Date(settings.maintenanceEnd).toLocaleString()}</span>
-          </div>
-        </div>
-      )}
-
       {/* Top Header App Bar */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3">
         <div>
@@ -493,7 +365,7 @@ export default function Settings() {
             </span>
           </div>
           <p className="text-xs text-black dark:text-zinc-100 dark:text-black dark:text-zinc-100 mt-0.5">
-            Manage platform-wide configurations, localization, taxation, security, delivery, invoices and maintenance mode.
+            Manage platform-wide configurations, localization, security, delivery and invoices.
           </p>
         </div>
 
@@ -515,16 +387,6 @@ export default function Settings() {
             className="p-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 shadow-sm shrink-0"
           >
             <RefreshCw size={13} />
-          </button>
-          <button 
-            onClick={handleToggleMaintenanceMode}
-            className={`px-3 py-1.5 rounded-lg text-[10px] font-extrabold transition-all border shadow-sm shrink-0 whitespace-nowrap ${
-              settings.maintenanceMode 
-                ? 'bg-red-500/10 border-red-500/20 text-red-600 hover:bg-red-500/20' 
-                : 'bg-amber-500/10 border-amber-500/20 text-amber-600 hover:bg-amber-500/20'
-            }`}
-          >
-            {settings.maintenanceMode ? 'Disable Maintenance' : 'Enable Maintenance'}
           </button>
           <button 
             onClick={handleExportConfig}
@@ -550,19 +412,11 @@ export default function Settings() {
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 p-2.5 rounded-xl shadow-sm relative group hover:shadow-md transition-all">
           <span className="text-[8px] font-bold text-black dark:text-zinc-100 dark:text-black dark:text-zinc-100 uppercase tracking-wider block">Platform Status</span>
           <span className="text-xs font-black text-zinc-900 dark:text-zinc-50 mt-0.5 block flex items-center gap-1">
-            {settings.maintenanceMode ? 'Maintenance' : 'Active'}
+            Active
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
           </span>
           <span className="text-[8px] text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-500/10 px-1 py-0.2 rounded font-extrabold absolute right-2.5 top-2.5">
             Live
-          </span>
-        </div>
-
-        {/* KPI 2 */}
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 p-2.5 rounded-xl shadow-sm hover:shadow-md transition-all">
-          <span className="text-[8px] font-bold text-black dark:text-zinc-100 dark:text-black dark:text-zinc-100 uppercase tracking-wider block">Maintenance Mode</span>
-          <span className={`text-xs font-black mt-0.5 block ${settings.maintenanceMode ? 'text-red-500' : 'text-black dark:text-zinc-100'}`}>
-            {settings.maintenanceMode ? 'Enabled' : 'Disabled'}
           </span>
         </div>
 
@@ -571,14 +425,6 @@ export default function Settings() {
           <span className="text-[8px] font-bold text-black dark:text-zinc-100 dark:text-black dark:text-zinc-100 uppercase tracking-wider block">Default Currency</span>
           <span className="text-xs font-black text-zinc-900 dark:text-zinc-50 mt-0.5 block font-mono">
             {settings.currencySymbol} {settings.currency}
-          </span>
-        </div>
-
-        {/* KPI 4 */}
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 p-2.5 rounded-xl shadow-sm hover:shadow-md transition-all">
-          <span className="text-[8px] font-bold text-black dark:text-zinc-100 dark:text-black dark:text-zinc-100 uppercase tracking-wider block">Tax Index</span>
-          <span className="text-xs font-black text-zinc-900 dark:text-zinc-50 mt-0.5 block">
-            {settings.gstPercent + settings.serviceTaxPercent}% GST
           </span>
         </div>
 
@@ -627,7 +473,6 @@ export default function Settings() {
               { id: 'company', label: 'Company Info', icon: Briefcase },
               { id: 'localization', label: 'Localization', icon: Globe },
               { id: 'orders', label: 'Order Settings', icon: Clock },
-              { id: 'taxation', label: 'Tax Settings', icon: Percent },
               { id: 'invoices', label: 'Invoice Settings', icon: FileText },
               { id: 'security', label: 'Security Settings', icon: Shield },
               { id: 'train', label: 'Train Delivery', icon: MapPin }
@@ -981,18 +826,6 @@ export default function Settings() {
                       </div>
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-black dark:text-zinc-100 dark:text-black dark:text-zinc-100 uppercase tracking-wider block">Order Cancellation Window (Minutes)</label>
-                      <div className="relative">
-                        <input 
-                          type="number"
-                          value={settings.orderCancellationTime}
-                          onChange={(e) => setSettings({ ...settings, orderCancellationTime: parseInt(e.target.value) || 0 })}
-                          className="w-full h-8.5 pl-3 pr-10 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 text-xs focus:ring-1 focus:ring-[var(--primary)] outline-none text-zinc-850 dark:text-zinc-150"
-                        />
-                        <div className="absolute inset-y-0 right-3 flex items-center text-black dark:text-zinc-100 text-[10px] font-semibold">mins</div>
-                      </div>
-                    </div>
 
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-black dark:text-zinc-100 dark:text-black dark:text-zinc-100 uppercase tracking-wider block">Refund Request Window (Hours)</label>
@@ -1089,98 +922,6 @@ export default function Settings() {
                       className="px-3 py-1.5 bg-[var(--primary)] text-white text-[10px] font-bold rounded-lg hover:opacity-90"
                     >
                       Save Order Settings
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Tab: Tax Settings */}
-              {activeTab === 'taxation' && (
-                <div className="p-4 space-y-4">
-                  <header className="flex justify-between items-center pb-2 border-b border-zinc-200 dark:border-zinc-800">
-                    <div>
-                      <h2 className="text-xs font-black uppercase text-black dark:text-zinc-100 tracking-wider">Tax & Calculations</h2>
-                      <p className="text-[10px] text-black dark:text-zinc-100 mt-0.5">GST rates, service fee structure, packaging charges, and tax policies</p>
-                    </div>
-                    <button 
-                      onClick={() => setIsTaxModalOpen(true)}
-                      className="px-2.5 py-1 text-[10px] font-bold text-[var(--primary)] hover:bg-[var(--primary)]/5 rounded border border-[var(--primary)]/20 transition-all"
-                    >
-                      Quick Tax Adjust
-                    </button>
-                  </header>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-black dark:text-zinc-100 dark:text-black dark:text-zinc-100 uppercase tracking-wider block">GST Rate (%)</label>
-                      <div className="relative">
-                        <input 
-                          type="number"
-                          step="0.1"
-                          value={settings.gstPercent}
-                          onChange={(e) => setSettings({ ...settings, gstPercent: parseFloat(e.target.value) || 0 })}
-                          className="w-full h-8.5 pl-3 pr-8 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 text-xs focus:ring-1 focus:ring-[var(--primary)] outline-none text-zinc-850 dark:text-zinc-150"
-                        />
-                        <div className="absolute inset-y-0 right-3 flex items-center text-black dark:text-zinc-100 text-xs">%</div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-black dark:text-zinc-100 dark:text-black dark:text-zinc-100 uppercase tracking-wider block">Service Charge (%)</label>
-                      <div className="relative">
-                        <input 
-                          type="number"
-                          step="0.1"
-                          value={settings.serviceTaxPercent}
-                          onChange={(e) => setSettings({ ...settings, serviceTaxPercent: parseFloat(e.target.value) || 0 })}
-                          className="w-full h-8.5 pl-3 pr-8 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 text-xs focus:ring-1 focus:ring-[var(--primary)] outline-none text-zinc-850 dark:text-zinc-150"
-                        />
-                        <div className="absolute inset-y-0 right-3 flex items-center text-black dark:text-zinc-100 text-xs">%</div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-black dark:text-zinc-100 dark:text-black dark:text-zinc-100 uppercase tracking-wider block">Packaging Charge (₹)</label>
-                      <div className="relative">
-                        <input 
-                          type="number"
-                          value={settings.packagingCharge}
-                          onChange={(e) => setSettings({ ...settings, packagingCharge: parseFloat(e.target.value) || 0 })}
-                          className="w-full h-8.5 pl-7 pr-3 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 text-xs focus:ring-1 focus:ring-[var(--primary)] outline-none text-zinc-850 dark:text-zinc-150"
-                        />
-                        <div className="absolute inset-y-0 left-3 flex items-center text-black dark:text-zinc-100 text-[11px] font-extrabold">₹</div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between p-3.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 rounded-lg self-end">
-                      <div>
-                        <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Include Tax in Product Prices</p>
-                        <p className="text-[9px] text-black dark:text-zinc-100 dark:text-black dark:text-zinc-100 mt-0.5">Toggle taxes calculation layout</p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          checked={settings.taxIncluded}
-                          onChange={(e) => setSettings({ ...settings, taxIncluded: e.target.checked })}
-                          className="sr-only peer" 
-                        />
-                        <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 rounded-full peer peer-checked:bg-[var(--primary)] transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-2">
-                    <button 
-                      onClick={handleResetSettings}
-                      className="px-3 py-1.5 border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-[10px] font-bold rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                    >
-                      Reset
-                    </button>
-                    <button 
-                      onClick={() => handleSaveTabChanges('Tax')}
-                      className="px-3 py-1.5 bg-[var(--primary)] text-white text-[10px] font-bold rounded-lg hover:opacity-90"
-                    >
-                      Update Tax Settings
                     </button>
                   </div>
                 </div>

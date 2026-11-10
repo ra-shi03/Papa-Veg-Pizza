@@ -1,6 +1,7 @@
 import express from 'express';
 import {
     calculateOrderController,
+    couponEligibilityController,
     createOrderController,
     verifyPaymentController,
     listOrdersUserController,
@@ -19,6 +20,7 @@ router.get('/methods', getOrderMethodsController);
 router.get('/order-methods', getOrderMethodsController);
 
 router.post('/calculate', calculateOrderController);
+router.post('/coupon-eligibility', couponEligibilityController);
 router.post('/', createOrderController);
 router.post('/verify-payment', verifyPaymentController);
 router.get('/', listOrdersUserController);

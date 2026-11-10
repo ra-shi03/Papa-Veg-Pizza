@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from "react"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { ArrowLeft, ChevronDown, BadgePercent, Check, AlertCircle } from "lucide-react"
-import { offerDiscount } from "./cartHelpers"
+import { offerDiscount, offerLocked, offerLockText } from "./cartHelpers"
 import apiClient from "@/services/api/axios"
 
 /**
@@ -15,8 +15,7 @@ import apiClient from "@/services/api/axios"
 function CouponCard({ offer, subtotal, isApplied, onApply, onRemove, onAddItems, ui }) {
   const [expanded, setExpanded] = useState(false)
   const minOrder = Number(offer.minOrderValue) || 0
-  const isUnlocked = subtotal >= minOrder
-  const shortfall = Math.max(0, Math.ceil(minOrder - subtotal))
+  const isUnlocked = !offerLocked(offer, subtotal)
   const saving = offerDiscount(offer, subtotal)
 
   // Dynamic description matching Papa Veg Pizza coupon structure
@@ -118,15 +117,15 @@ function CouponCard({ offer, subtotal, isApplied, onApply, onRemove, onAddItems,
               <button
                 type="button"
                 onClick={onRemove}
-                className="w-full py-1.5 rounded-lg text-xs font-bold bg-[#16a34a] text-white border-0 cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1"
+                className="w-full py-1.5 rounded-lg text-xs font-bold bg-[#E53935] hover:bg-[#d32f2f] text-white border-0 cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1"
               >
-                <Check size={12} strokeWidth={2.5} /> Applied
+                Remove
               </button>
             ) : isUnlocked ? (
               <button
                 type="button"
                 onClick={() => onApply(offer)}
-                className="w-full py-1.5 rounded-lg text-xs font-bold bg-[#E53935] hover:bg-[#d32f2f] text-white border-0 cursor-pointer active:scale-95 transition-all shadow-sm"
+                className="w-full py-1.5 rounded-lg text-xs font-bold bg-[#16a34a] hover:bg-[#15803d] text-white border-0 cursor-pointer active:scale-95 transition-all shadow-sm"
               >
                 Apply
               </button>
@@ -163,6 +162,8 @@ function CouponCard({ offer, subtotal, isApplied, onApply, onRemove, onAddItems,
               </li>
             )}
             {offer.customerScope === "first-time" && <li>Valid on 1st order only</li>}
+            {offer.applicableOn === "Category" && <li>Valid only on items from the selected categories</li>}
+            {offer.applicableOn === "Product" && <li>Valid only on the selected items</li>}
             <li>Applicable only for orders placed via Papa Veg Pizza app</li>
           </ul>
         </div>
@@ -175,7 +176,7 @@ function CouponCard({ offer, subtotal, isApplied, onApply, onRemove, onAddItems,
           onClick={onAddItems}
           className="w-full bg-[#212121] text-white text-xs font-bold py-2 px-3 text-center border-0 cursor-pointer hover:bg-black active:opacity-90 transition-colors flex items-center justify-center gap-1"
         >
-          <span>Add Items worth ₹{shortfall} or more to unlock</span>
+          <span>{offerLockText(offer, subtotal)}</span>
         </button>
       )}
     </div>
@@ -310,10 +311,8 @@ export default function ApplyCoupon({
       return
     }
 
-    const minOrder = Number(matched.minOrderValue) || 0
-    if (subtotal < minOrder) {
-      const short = Math.ceil(minOrder - subtotal)
-      setError(`Add ₹${short} more to apply code "${matched.couponCode}"`)
+    if (offerLocked(matched, subtotal)) {
+      setError(`${matched.couponCode}: ${offerLockText(matched, subtotal)}`)
       return
     }
 

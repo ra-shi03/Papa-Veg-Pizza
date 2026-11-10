@@ -50,6 +50,8 @@ export const uploadAPI = {
 export const orderAPI = {
   calculateOrder: (payload) =>
     userClient.post("/food/orders/calculate", payload ?? {}),
+  couponEligibility: (payload) =>
+    userClient.post("/food/orders/coupon-eligibility", payload ?? {}),
   createOrder: (payload) =>
     userClient.post("/food/orders", payload ?? {}),
   verifyPayment: (body) =>

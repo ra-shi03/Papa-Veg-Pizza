@@ -10,7 +10,7 @@ const FIELDS = [
   { key: 'packagingFee', label: 'Packaging fee (₹)', hint: 'Flat amount added to every order.' },
   { key: 'deliveryFee', label: 'Delivery fee (₹)', hint: 'Used when no distance range below matches.' },
   { key: 'freeDeliveryThreshold', label: 'Free delivery above (₹)', hint: 'Order subtotal at or above this ships free. 0 turns it off.' },
-  { key: 'gstRate', label: 'GST (%)', hint: 'Total rate; shown to customers split equally into CGST and SGST.' },
+  { key: 'gstRate', label: 'GST (%)', hint: 'Total tax rate; customers see it as a single "Taxes" line.' },
   { key: 'cancellationFee', label: 'Cancellation fee (₹)', hint: 'Kept from prepaid orders cancelled after the free window. Cash orders are never charged.' },
   { key: 'cancellationFreeMinutes', label: 'Free cancellation window (minutes)', hint: 'Cancelling within this time after ordering costs nothing.' },
 ];

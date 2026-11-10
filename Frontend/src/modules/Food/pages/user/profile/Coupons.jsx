@@ -67,30 +67,6 @@ export default function Coupons() {
       console.warn("Public coupons fetch error:", err)
     }
 
-    // 2. Fallback to /settings/coupons if empty (only if couponEnabled is not false)
-    if (items.length === 0 && appConfig?.couponEnabled !== false) {
-      try {
-        const res = await apiClient.get("/settings/coupons")
-        const data = res?.data?.data || res?.data
-        if (Array.isArray(data) && data.length > 0) {
-          items = data
-        }
-      } catch (_) {}
-    }
-
-    // 3. Fallback to localStorage 'pvp_coupons' (superadmin cache) (only if couponEnabled is not false)
-    if (items.length === 0 && appConfig?.couponEnabled !== false) {
-      try {
-        const stored = localStorage.getItem("pvp_coupons")
-        if (stored) {
-          const parsed = JSON.parse(stored)
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            items = parsed
-          }
-        }
-      } catch (_) {}
-    }
-
     // Strictly filter out inactive and expired coupons
     const now = Date.now()
     const activeCoupons = items.filter((c) => {
@@ -320,15 +296,15 @@ export default function Coupons() {
               let descriptionText = coupon.description
               if (!descriptionText) {
                 if (isPercentage) {
-                  descriptionText = `Get ${coupon.value || 50}% off on orders of ₹${minOrder || 199} or more${
+                  descriptionText = `Get ${coupon.value || 0}% off on orders of ₹${minOrder || 0} or more${
                     maxDiscount ? ` (up to ₹${maxDiscount})` : ""
                   }`
                 } else if (coupon.couponType === "Flat Amount") {
-                  descriptionText = `Flat ₹${coupon.value || maxDiscount} Off on orders of ₹${minOrder || 199} or more`
+                  descriptionText = `Flat ₹${coupon.value || maxDiscount} Off on orders of ₹${minOrder || 0} or more`
                 } else if (coupon.couponType === "Buy One Get One") {
-                  descriptionText = `Buy 1 Get 1 Free on selected orders of ₹${minOrder || 299} or more`
+                  descriptionText = `Buy 1 Get 1 Free on selected orders of ₹${minOrder || 0} or more`
                 } else {
-                  descriptionText = `Special offer on orders of ₹${minOrder || 199} or more`
+                  descriptionText = `Special offer on orders of ₹${minOrder || 0} or more`
                 }
               }
 

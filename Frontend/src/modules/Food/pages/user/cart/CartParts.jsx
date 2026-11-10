@@ -165,7 +165,7 @@ export function CartSkeleton({ ui }) {
     <div className="rounded animate-pulse" style={{ width: w, height: h, backgroundColor: ui.line }} />
   )
   return (
-    <div className="px-4 pt-4 space-y-4" aria-busy="true" aria-label="Loading your cart">
+    <div className="px-2 pt-3 space-y-3" aria-busy="true" aria-label="Loading your cart">
       <div className="rounded-2xl p-4 flex items-center gap-4" style={{ backgroundColor: ui.card }}>
         <div className="space-y-2">{bar(56, 10)}{bar(80, 22)}</div>
         <div className="flex-1 space-y-2">{bar("90%")}{bar("60%")}</div>
