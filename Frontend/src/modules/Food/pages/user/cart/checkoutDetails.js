@@ -157,14 +157,22 @@ export function addressProblem(selected) {
   return null
 }
 
+// The email the customer typed in their own contact form, or "" when there is none or it is not an email.
+const ownEmail = (contact) => {
+  const email = clean(contact?.email).toLowerCase()
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : ""
+}
+
 /** The customer and address fields of the order. `houseNumber` and `landmark` are what the checkout form shows. */
 export function buildOrderDetails({ contact, selected, houseNumber, landmark }) {
   const name = clean(contact?.name)
   const phone = toTenDigitPhone(contact?.phone)
   const house = clean(houseNumber)
+  const email = ownEmail(contact)
   return {
     customerName: name,
     customerPhone: phone,
+    ...(email ? { customerEmail: email } : {}),
     address: {
       label: selected.label,
       name,
@@ -193,7 +201,9 @@ export function assertOwnOrderDetails(payload, { contact, selected }) {
     payload?.customerName === name && payload?.address?.name === name &&
     payload?.customerPhone === phone && payload?.address?.phone === phone &&
     clean(payload?.address?.street) &&
-    !("email" in (payload || {})) && !("customerEmail" in (payload || {})) && !("email" in (payload?.address || {})) &&
+    !("email" in (payload || {})) && !("email" in (payload?.address || {})) &&
+    // an email may only be this customer's own, as they typed it
+    (!("customerEmail" in (payload || {})) || payload.customerEmail === ownEmail(contact)) &&
     (point ? location?.[0] === point.lng && location?.[1] === point.lat : !location)
   if (!own) throw new Error("Please check your contact details and delivery address, then try again.")
   return payload

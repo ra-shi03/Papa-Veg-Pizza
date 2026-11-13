@@ -512,6 +512,18 @@ export const adminAPI = {
   createOrUpdateFeeSettings: (body) =>
     adminClient.put("/food/admin/fee-settings", body ?? {}),
 
+  /** Payment gateways (admin): keys are write-only, responses carry masked values */
+  getPaymentGateways: () => adminClient.get("/settings/payment-gateways"),
+  createPaymentGateway: (body) => adminClient.post("/settings/payment-gateways", body ?? {}),
+  updatePaymentGateway: (id, body) => adminClient.put(`/settings/payment-gateways/${String(id)}`, body ?? {}),
+  setPaymentGatewayStatus: (id, status) => adminClient.patch(`/settings/payment-gateways/${String(id)}/status`, { status }),
+  makePaymentGatewayDefault: (id) => adminClient.patch(`/settings/payment-gateways/${String(id)}/default`),
+  testPaymentGateway: (id) => adminClient.post(`/settings/payment-gateways/${String(id)}/test`),
+  deletePaymentGateway: (id) => adminClient.delete(`/settings/payment-gateways/${String(id)}`),
+  getPaymentGatewayEvents: () => adminClient.get("/settings/payment-gateways/events"),
+  getPaymentGatewayLogs: (params = {}) => adminClient.get("/settings/payment-gateways/logs", { params }),
+  resyncPaymentGatewayLog: (id) => adminClient.post(`/settings/payment-gateways/logs/${String(id)}/resync`),
+
   /** Referral Settings (admin) */
   getReferralSettings: () =>
     adminClient.get("/food/admin/referral-settings"),

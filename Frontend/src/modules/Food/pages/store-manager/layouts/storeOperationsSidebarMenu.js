@@ -4,7 +4,7 @@ export const storeOperationsSidebarMenu = [
     label: "Dashboard",
     path: "/store-operations/dashboard",
     icon: "LayoutDashboard",
-    allowedRoles: ["store_manager", "kitchen_supervisor", "kitchen_staff"]
+    allowedRoles: ["store_manager", "kitchen_supervisor"]
   },
   {
     type: "section",
@@ -156,7 +156,7 @@ export const storeOperationsSidebarMenu = [
         label: "Waste Management",
         path: "/store-operations/inventory/waste",
         icon: "Trash2",
-        allowedRoles: ["store_manager", "kitchen_supervisor"]
+        allowedRoles: ["store_manager", "kitchen_supervisor", "kitchen_staff"]
       },
       {
         type: "link",

@@ -15,13 +15,9 @@ import ReplyToReviewModal from "./components/ReplyToReviewModal";
 import CustomerHistoryModal from "./components/CustomerHistoryModal";
 import OrderDetailsModal from "./components/OrderDetailsModal";
 
-// Local fallback mock database imports for real-time stats calculation
-import { mockReviews, mockCustomers, mockOrders, mockOrderItems } from "./mockData";
 
 export default function Reviews() {
   const { role } = useOutletContext(); // Retrieve user role from outlet context
-
-  // Mock auto-seeding removed as part of cleanup
 
   // ----------------------------------------------------
   // States: Filters, Pagination & Sorting
@@ -57,32 +53,17 @@ export default function Reviews() {
   const { data, isLoading, isError, refetch } = useReviewsList(filters);
 
   // ----------------------------------------------------
-  // Dynamic Real-time Stats Calculation (Independent of table filters)
+  // Headline numbers: computed by the server over every review of the store
   // ----------------------------------------------------
-  const stats = useMemo(() => {
-    // Read from localStorage to reflect updates in real-time
-    const localReviews = mockReviews;
-
-    const totalCount = localReviews.length;
-    const totalRating = localReviews.reduce((sum, r) => sum + r.rating, 0);
-    const averageRating = totalCount > 0 ? (totalRating / totalCount).toFixed(1) : "0.0";
-    const fiveStarCount = localReviews.filter(r => r.rating === 5).length;
-    const negativeCount = localReviews.filter(r => r.sentiment?.toLowerCase() === "negative").length;
-    
-    // Reviews in current active demo month (June 2026)
-    const monthCount = localReviews.filter(r => r.createdAt.startsWith("2026-06")).length;
-    const repliedCount = localReviews.filter(r => r.reply !== null && r.reply !== undefined).length;
-    const pendingReplyCount = localReviews.filter(r => r.reply === null || r.reply === undefined).length;
-
-    return {
-      averageRating,
-      fiveStarCount,
-      negativeCount,
-      monthCount,
-      repliedCount,
-      pendingReplyCount
-    };
-  }, [data]); // Re-calculate when query data changes (e.g. after invalidation/refetch)
+  const stats = useMemo(() => ({
+    averageRating: "0.0",
+    fiveStarCount: 0,
+    negativeCount: 0,
+    monthCount: 0,
+    repliedCount: 0,
+    pendingReplyCount: 0,
+    ...(data?.stats || {}),
+  }), [data]);
 
   // ----------------------------------------------------
   // Callbacks: Filters, Pagination, & Sorting
@@ -198,14 +179,8 @@ export default function Reviews() {
   };
 
   const handleRefresh = () => {
-    try {
-      // Removed mock DB seeding
-      
-      
-      
-    } catch (_) {}
     refetch();
-    toast.success("Reviews database re-seeded & synced successfully.");
+    toast.success("Reviews refreshed.");
   };
 
   return (

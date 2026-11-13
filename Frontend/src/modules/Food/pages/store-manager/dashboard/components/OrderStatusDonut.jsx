@@ -4,38 +4,6 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts"
 import { X, Search, ChevronUp, ChevronDown, ClipboardList } from "lucide-react"
 import { toast } from "sonner"
 import apiClient from "@/services/api/axios"
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
-
-// Mock order status breakdown
-const MOCK_STATUS_DATA = {
-  incoming: 5,
-  preparing: 8,
-  baking: 3,
-  packaging: 4,
-  ready: 2,
-  delivered: 70,
-  cancelled: 5
-}
-
-// Mock orders for status list drill-down
-const MOCK_ORDERS = [
-  { orderNumber: "PV-8842", customer: "Rohan Malhotra", status: "preparing", createdTime: "10:30 AM" },
-  { orderNumber: "PV-8841", customer: "Isha Sharma", status: "preparing", createdTime: "10:32 AM" },
-  { orderNumber: "PV-8840", customer: "Amit Verma", status: "preparing", createdTime: "10:35 AM" },
-  { orderNumber: "PV-8839", customer: "Pooja Patel", status: "preparing", createdTime: "10:38 AM" },
-  { orderNumber: "PV-8838", customer: "Deepak Rawat", status: "preparing", createdTime: "10:40 AM" },
-  { orderNumber: "PV-8837", customer: "Karan Singh", status: "preparing", createdTime: "10:42 AM" },
-  { orderNumber: "PV-8836", customer: "Sanjay Jha", status: "preparing", createdTime: "10:45 AM" },
-  { orderNumber: "PV-8835", customer: "Neha Sen", status: "preparing", createdTime: "10:48 AM" },
-  
-  { orderNumber: "PV-8850", customer: "Ravi Kumar", status: "incoming", createdTime: "10:55 AM" },
-  { orderNumber: "PV-8849", customer: "Alok Gupta", status: "incoming", createdTime: "10:56 AM" },
-  
-  { orderNumber: "PV-8830", customer: "Sunil Dutt", status: "delivered", createdTime: "09:15 AM" },
-  { orderNumber: "PV-8828", customer: "Kriti Sen", status: "delivered", createdTime: "09:20 AM" },
-  
-  { orderNumber: "PV-8812", customer: "Manish Dev", status: "cancelled", createdTime: "08:40 AM" }
-]
 
 export default function OrderStatusDonut({ storeId, refreshKey }) {
   const [showStatusModal, setShowStatusModal] = useState(false)
@@ -65,8 +33,7 @@ export default function OrderStatusDonut({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/order-status", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
-        return MOCK_STATUS_DATA
+        throw e
       }
     }
   })
@@ -98,8 +65,7 @@ export default function OrderStatusDonut({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/order-list", { params: { storeId } })
         return response.data?.data || []
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e
-        return MOCK_ORDERS
+        throw e
       }
     }
   })

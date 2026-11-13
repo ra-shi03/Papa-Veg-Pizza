@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Eye, EyeOff, Loader2, AlertCircle, Info, ShieldCheck } from 'lucide-react';
+import { fieldsFor } from './gatewayFields';
 
-export default function EditGatewayModal({ isOpen, onClose, gateway, onSave }) {
+export default function EditGatewayModal({ isOpen, onClose, gateway, onSave, webhookBase = '' }) {
   const [isSaving, setIsSaving] = useState(false);
   const [showSecretKey, setShowSecretKey] = useState(false);
   const [showWebhookSecret, setShowWebhookSecret] = useState(false);
@@ -24,8 +25,8 @@ export default function EditGatewayModal({ isOpen, onClose, gateway, onSave }) {
         gatewayName: gateway.gatewayName || 'Razorpay',
         merchantId: gateway.merchantId || '',
         keyId: gateway.keyId || '',
-        secretKey: gateway.secretKey || '',
-        webhookSecret: gateway.webhookSecret || '',
+        secretKey: '',
+        webhookSecret: '',
         environment: gateway.environment || 'Sandbox',
         status: gateway.status || 'Active',
         defaultGateway: gateway.defaultGateway || false
@@ -35,9 +36,11 @@ export default function EditGatewayModal({ isOpen, onClose, gateway, onSave }) {
 
   if (!isOpen) return null;
 
+  const cfg = fieldsFor(formData.gatewayName);
+
   const handleUpdate = (e) => {
     e.preventDefault();
-    if (!formData.merchantId.trim()) {
+    if (cfg.merchant && !formData.merchantId.trim()) {
       setError('Merchant ID is required.');
       return;
     }
@@ -49,15 +52,14 @@ export default function EditGatewayModal({ isOpen, onClose, gateway, onSave }) {
     setIsSaving(true);
     setError('');
 
-    // Simulate API request (PUT /api/payment-gateways/:id)
-    setTimeout(() => {
-      setIsSaving(false);
-      onSave({ ...gateway, ...formData });
-      onClose();
-    }, 1200);
+    // Secrets left empty keep the ones already saved
+    Promise.resolve(onSave({ ...gateway, ...formData }))
+      .then(() => onClose())
+      .catch((err) => setError(err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Could not save the gateway.'))
+      .finally(() => setIsSaving(false));
   };
 
-  const webhookUrlPreview = `https://api.papavegpizza.in/v1/payments/webhooks/${formData.gatewayName.toLowerCase()}`;
+  const webhookUrlPreview = `${webhookBase}/${formData.gatewayName.toLowerCase()}`;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-zinc-950/60 backdrop-blur-sm transition-all duration-350 p-0 md:p-4 animate-fade">
@@ -106,28 +108,31 @@ export default function EditGatewayModal({ isOpen, onClose, gateway, onSave }) {
               </div>
 
               {/* Merchant ID */}
+              {cfg.merchant && (
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-black dark:text-zinc-100 uppercase tracking-wider block">
                   Merchant ID <span className="text-red-505">*</span>
                 </label>
                 <input 
                   type="text" 
-                  required
+                  required={cfg.merchant}
                   value={formData.merchantId}
                   onChange={(e) => setFormData(prev => ({ ...prev, merchantId: e.target.value }))}
                   className="w-full h-8.5 px-3 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 text-xs focus:ring-1 focus:ring-[var(--primary)] outline-none text-black dark:text-zinc-100"
                 />
               </div>
+              )}
 
-              {/* Key ID */}
+                            {/* Key ID */}
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-black dark:text-zinc-100 uppercase tracking-wider block">
-                  Key ID <span className="text-red-505">*</span>
+                  {cfg.keyLabel} <span className="text-red-500">*</span>
                 </label>
                 <input 
                   type="text" 
                   required
                   value={formData.keyId}
+                  placeholder={cfg.keyHint}
                   onChange={(e) => setFormData(prev => ({ ...prev, keyId: e.target.value }))}
                   className="w-full h-8.5 px-3 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 text-xs focus:ring-1 focus:ring-[var(--primary)] outline-none text-black dark:text-zinc-100"
                 />
@@ -136,12 +141,13 @@ export default function EditGatewayModal({ isOpen, onClose, gateway, onSave }) {
               {/* Secret Key with visibility toggle */}
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-black dark:text-zinc-100 uppercase tracking-wider block">
-                  Secret Key <span className="text-red-505">*</span>
+                  {cfg.secretLabel}
                 </label>
                 <div className="relative">
                   <input 
                     type={showSecretKey ? 'text' : 'password'} 
-                    required
+                    placeholder={gateway?.secretKey ? `Saved (${gateway.secretKey}). Leave empty to keep it.` : ''}
+                    autoComplete="new-password"
                     value={formData.secretKey}
                     onChange={(e) => setFormData(prev => ({ ...prev, secretKey: e.target.value }))}
                     className="w-full h-8.5 pl-3 pr-10 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 text-xs focus:ring-1 focus:ring-[var(--primary)] outline-none text-black dark:text-zinc-100"
@@ -157,6 +163,7 @@ export default function EditGatewayModal({ isOpen, onClose, gateway, onSave }) {
               </div>
 
               {/* Webhook Secret */}
+              {cfg.webhook && (
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-black dark:text-zinc-100 uppercase tracking-wider block">
                   Webhook Secret Key
@@ -164,6 +171,8 @@ export default function EditGatewayModal({ isOpen, onClose, gateway, onSave }) {
                 <div className="relative">
                   <input 
                     type={showWebhookSecret ? 'text' : 'password'} 
+                    placeholder={gateway?.webhookSecret ? 'Saved. Leave empty to keep it.' : ''}
+                    autoComplete="new-password"
                     value={formData.webhookSecret}
                     onChange={(e) => setFormData(prev => ({ ...prev, webhookSecret: e.target.value }))}
                     className="w-full h-8.5 pl-3 pr-10 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 text-xs focus:ring-1 focus:ring-[var(--primary)] outline-none text-black dark:text-zinc-100"
@@ -177,8 +186,9 @@ export default function EditGatewayModal({ isOpen, onClose, gateway, onSave }) {
                   </button>
                 </div>
               </div>
+              )}
 
-              {/* Environment Radio Options */}
+                            {/* Environment Radio Options */}
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-black dark:text-zinc-100 uppercase tracking-wider block">
                   Target Environment
@@ -208,9 +218,10 @@ export default function EditGatewayModal({ isOpen, onClose, gateway, onSave }) {
               </div>
             </div>
 
-            <hr className="border-zinc-200 dark:border-zinc-800" />
+            {cfg.webhook && <hr className="border-zinc-200 dark:border-zinc-800" />}
 
             {/* Webhook Preview Alert */}
+            {cfg.webhook && (
             <div className="bg-zinc-550 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 space-y-1.5 text-black dark:text-zinc-100">
               <span className="text-[10px] font-black uppercase tracking-wider block">Webhook URL Callback Preview</span>
               <div className="flex items-center justify-between gap-2 bg-white dark:bg-zinc-800/80 p-2 rounded-lg border border-zinc-100 dark:border-zinc-700 font-mono text-[10px] select-all text-black dark:text-zinc-100">
@@ -218,9 +229,10 @@ export default function EditGatewayModal({ isOpen, onClose, gateway, onSave }) {
                 <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-600 rounded text-[9px] font-extrabold shrink-0 border border-emerald-500/25">Auto-generated</span>
               </div>
             </div>
+            )}
 
             {/* Toggles */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div className="flex items-center justify-between p-3 bg-zinc-550 border border-zinc-202 dark:border-zinc-800 rounded-lg">
                 <div>
                   <p className="text-xs font-bold text-black dark:text-zinc-100">Gateway Status</p>
@@ -231,22 +243,6 @@ export default function EditGatewayModal({ isOpen, onClose, gateway, onSave }) {
                     type="checkbox" 
                     checked={formData.status === 'Active'}
                     onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.checked ? 'Active' : 'Inactive' }))}
-                    className="sr-only peer" 
-                  />
-                  <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 rounded-full peer peer-checked:bg-[var(--primary)] transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
-                </label>
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-zinc-550 border border-zinc-202 dark:border-zinc-800 rounded-lg">
-                <div>
-                  <p className="text-xs font-bold text-black dark:text-zinc-100">Set as Default Gateway</p>
-                  <p className="text-[9px] text-black dark:text-zinc-100 mt-0.5">Use as primary card/UPI payment route</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={formData.defaultGateway}
-                    onChange={(e) => setFormData(prev => ({ ...prev, defaultGateway: e.target.checked }))}
                     className="sr-only peer" 
                   />
                   <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 rounded-full peer peer-checked:bg-[var(--primary)] transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>

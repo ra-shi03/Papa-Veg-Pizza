@@ -14,7 +14,10 @@ import {
   Activity, 
   Coins, 
   Calendar, 
-  ShieldAlert
+  ShieldAlert,
+  Eye,
+  EyeOff,
+  Check
 } from "lucide-react";
 import {
   Dialog,
@@ -37,7 +40,7 @@ const skillsOptions = [
 const staffSchema = z.object({
   fullName: z.string().min(1, "Full name is required"),
   email: z.string().email("Invalid email address"),
-  phone: z.string().regex(/^(?:\+91)?(?:[6-9]\d{9})$/, "Invalid Indian phone number. Enter 10 digits."),
+  phone: z.string().regex(/^(?:\+91)?(?:[6-9]\d{9})$/, "Enter a valid 10-digit mobile number starting with 6, 7, 8 or 9."),
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string().min(1, "Please confirm the password"),
   role: z.enum(["Kitchen Supervisor", "Pizza Maker", "Baker", "Packager"], {
@@ -47,7 +50,7 @@ const staffSchema = z.object({
   salaryType: z.enum(["Monthly", "Hourly"]),
   salary: z.preprocess((val) => (val === "" ? undefined : Number(val)), z.number().min(1, "Salary must be greater than 0")),
   joiningDate: z.string().min(1, "Joining date is required"),
-  emergencyContact: z.string().min(1, "Emergency contact is required"),
+  emergencyContact: z.string().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit mobile number starting with 6, 7, 8 or 9."),
   
   // New fields
   employeeId: z.string().min(1, "Employee ID is required"),
@@ -61,7 +64,24 @@ const staffSchema = z.object({
   path: ["confirmPassword"],
 });
 
+// How strong a password is, from its length and the kinds of characters in it
+function passwordStrength(value = "") {
+  if (!value) return null;
+  let points = 0;
+  if (value.length >= 8) points += 1;
+  if (value.length >= 12) points += 1;
+  if (/[a-z]/.test(value) && /[A-Z]/.test(value)) points += 1;
+  if (/\d/.test(value)) points += 1;
+  if (/[^A-Za-z0-9]/.test(value)) points += 1;
+  if (value.length < 8) return { label: "Too short", width: "w-1/4", bar: "bg-red-500", text: "text-red-600" };
+  if (points <= 2) return { label: "Weak", width: "w-2/4", bar: "bg-orange-500", text: "text-orange-600" };
+  if (points <= 3) return { label: "Good", width: "w-3/4", bar: "bg-amber-500", text: "text-amber-600" };
+  return { label: "Strong", width: "w-full", bar: "bg-emerald-500", text: "text-emerald-600" };
+}
+
 export default function AddStaffModal({ isOpen, onClose }) {
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const createStaffMutation = useCreateStaff();
   const [profileImage, setProfileImage] = useState("");
   const [selectedSkills, setSelectedSkills] = useState([]);
@@ -95,6 +115,7 @@ export default function AddStaffModal({ isOpen, onClose }) {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(staffSchema),
@@ -119,9 +140,17 @@ export default function AddStaffModal({ isOpen, onClose }) {
     },
   });
 
+  const phoneValue = watch("phone") || "";
+  const emergencyValue = watch("emergencyContact") || "";
+  const passwordValue = watch("password") || "";
+  const confirmValue = watch("confirmPassword") || "";
+  const strength = passwordStrength(passwordValue);
+
   // Reset form when modal opens/closes
   useEffect(() => {
     if (isOpen) {
+      setShowPassword(false);
+      setShowConfirm(false);
       reset({
         fullName: "",
         email: "",
@@ -339,12 +368,23 @@ export default function AddStaffModal({ isOpen, onClose }) {
               {/* Phone & Password */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-black tracking-wider text-zinc-500 dark:text-zinc-450 uppercase">
-                    PHONE
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="staff-phone" className="text-[10px] font-black tracking-wider text-zinc-500 dark:text-zinc-450 uppercase">
+                      PHONE
+                    </label>
+                    <span className={`text-[10px] font-bold tabular-nums ${phoneValue.length === 10 ? "text-emerald-600" : "text-zinc-400"}`}>
+                      {phoneValue.length}/10
+                    </span>
+                  </div>
                   <input
-                    type="text"
-                    placeholder="98260 11111"
+                    id="staff-phone"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={10}
+                    placeholder="9826011111"
+                    // digits only, at most 10: cleaned before the form reads the value (onInput runs ahead of onChange)
+                    onInput={(e) => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 10); }}
                     {...register("phone")}
                     className="w-full h-11 px-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs font-semibold bg-zinc-50/60 dark:bg-zinc-950 text-slate-800 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-primary transition-all"
                   />
@@ -359,12 +399,31 @@ export default function AddStaffModal({ isOpen, onClose }) {
                   <label className="text-[10px] font-black tracking-wider text-zinc-500 dark:text-zinc-450 uppercase">
                     PASSWORD
                   </label>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    {...register("password")}
-                    className="w-full h-11 px-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs font-semibold bg-zinc-50/60 dark:bg-zinc-950 text-slate-800 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-primary transition-all"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      placeholder="At least 8 characters"
+                      {...register("password")}
+                      className="w-full h-11 px-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs font-semibold bg-zinc-50/60 dark:bg-zinc-950 text-slate-800 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-primary transition-all pr-11"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 bg-transparent border-0 cursor-pointer p-1"
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  {strength && !errors.password && (
+                    <div className="mt-1 space-y-1">
+                      <div className="h-1 w-full rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+                        <div className={`h-full rounded-full transition-all ${strength.bar} ${strength.width}`} />
+                      </div>
+                      <span className={`text-[10px] font-bold ${strength.text}`}>{strength.label}</span>
+                    </div>
+                  )}
                   {errors.password && (
                     <span className="text-[10px] font-bold text-red-650 flex items-center gap-0.5 mt-0.5">
                       <AlertCircle size={10} /> {errors.password.message}
@@ -378,12 +437,28 @@ export default function AddStaffModal({ isOpen, onClose }) {
                 <label className="text-[10px] font-black tracking-wider text-zinc-500 dark:text-zinc-450 uppercase">
                   CONFIRM PASSWORD
                 </label>
-                <input
-                  type="password"
-                  placeholder="Re-enter the password"
-                  {...register("confirmPassword")}
-                  className="w-full h-11 px-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs font-semibold bg-zinc-50/60 dark:bg-zinc-950 text-slate-800 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-primary transition-all"
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirm ? "text" : "password"}
+                    autoComplete="new-password"
+                    placeholder="Re-enter the password"
+                    {...register("confirmPassword")}
+                    className="w-full h-11 px-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs font-semibold bg-zinc-50/60 dark:bg-zinc-950 text-slate-800 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-primary transition-all pr-11"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm((v) => !v)}
+                    aria-label={showConfirm ? "Hide password" : "Show password"}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 bg-transparent border-0 cursor-pointer p-1"
+                  >
+                    {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                {confirmValue && !errors.confirmPassword && (
+                  <span className={`text-[10px] font-bold flex items-center gap-1 mt-0.5 ${confirmValue === passwordValue ? "text-emerald-600" : "text-red-600"}`}>
+                    {confirmValue === passwordValue ? <><Check size={11} /> Passwords match</> : <><AlertCircle size={10} /> Passwords do not match yet</>}
+                  </span>
+                )}
                 {errors.confirmPassword && (
                   <span className="text-[10px] font-bold text-red-650 flex items-center gap-0.5 mt-0.5">
                     <AlertCircle size={10} /> {errors.confirmPassword.message}
@@ -613,12 +688,23 @@ export default function AddStaffModal({ isOpen, onClose }) {
 
               {/* Emergency Contact */}
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-black tracking-wider text-zinc-500 dark:text-zinc-455 uppercase">
-                  EMERGENCY CONTACT
-                </label>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="staff-emergency" className="text-[10px] font-black tracking-wider text-zinc-500 dark:text-zinc-455 uppercase">
+                    EMERGENCY CONTACT NUMBER
+                  </label>
+                  <span className={`text-[10px] font-bold tabular-nums ${emergencyValue.length === 10 ? "text-emerald-600" : "text-zinc-400"}`}>
+                    {emergencyValue.length}/10
+                  </span>
+                </div>
                 <input
-                  type="text"
-                  placeholder="Name (Relation) - Phone"
+                  id="staff-emergency"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={10}
+                  placeholder="Mobile number of a family member"
+                  // digits only, at most 10: cleaned before the form reads the value (onInput runs ahead of onChange)
+                  onInput={(e) => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 10); }}
                   {...register("emergencyContact")}
                   className="w-full h-11 px-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs font-semibold bg-zinc-50/60 dark:bg-zinc-950 text-slate-800 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-primary transition-all"
                 />

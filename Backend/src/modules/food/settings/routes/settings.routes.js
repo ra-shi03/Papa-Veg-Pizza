@@ -132,5 +132,20 @@ router.post('/nutrition/items/starter', authMiddleware, requireSuperAdmin, nutri
 router.put('/nutrition/items/:id', authMiddleware, requireSuperAdmin, validateNutritionItemUpdate, nutritionController.updateNutritionItem);
 router.delete('/nutrition/items/:id', authMiddleware, requireSuperAdmin, nutritionController.deleteNutritionItem);
 
+import * as paymentGatewayController from '../controllers/paymentGateway.controller.js';
+
+// Payment gateways: the super admin manages them, customers only see which methods are on (no keys)
+router.get('/payment-gateways/public', paymentGatewayController.listPublicGateways);
+router.get('/payment-gateways/events', authMiddleware, requireSuperAdmin, paymentGatewayController.listEvents);
+router.get('/payment-gateways/logs', authMiddleware, requireSuperAdmin, paymentGatewayController.listLogs);
+router.post('/payment-gateways/logs/:id/resync', authMiddleware, requireSuperAdmin, paymentGatewayController.resyncLog);
+router.get('/payment-gateways', authMiddleware, requireSuperAdmin, paymentGatewayController.listGateways);
+router.post('/payment-gateways', authMiddleware, requireSuperAdmin, paymentGatewayController.createGateway);
+router.put('/payment-gateways/:id', authMiddleware, requireSuperAdmin, paymentGatewayController.updateGateway);
+router.patch('/payment-gateways/:id/status', authMiddleware, requireSuperAdmin, paymentGatewayController.setStatus);
+router.patch('/payment-gateways/:id/default', authMiddleware, requireSuperAdmin, paymentGatewayController.makeDefault);
+router.post('/payment-gateways/:id/test', authMiddleware, requireSuperAdmin, paymentGatewayController.testGateway);
+router.delete('/payment-gateways/:id', authMiddleware, requireSuperAdmin, paymentGatewayController.deleteGateway);
+
 export default router;
 

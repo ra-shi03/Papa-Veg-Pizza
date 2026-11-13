@@ -69,7 +69,8 @@ function getAccessToken(module) {
         path.includes("/superadmin") ||
         path.includes("/admin") ||
         path.includes("/franchise-admin") ||
-        path.includes("/store-manager")
+        path.includes("/store-manager") ||
+        path.includes("/store-operations")
       ) {
         const adminTok = localStorage.getItem("admin_accessToken") || localStorage.getItem("accessToken") || localStorage.getItem("token");
         if (adminTok) return adminTok;
@@ -86,6 +87,16 @@ function getAccessToken(module) {
     return null;
   } catch {
     return null;
+  }
+}
+
+/** Milliseconds until a JWT access token expires (Infinity when it cannot be read, so it is never refreshed early). */
+function msUntilExpiry(token) {
+  try {
+    const payload = JSON.parse(atob(String(token).split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return payload?.exp ? payload.exp * 1000 - Date.now() : Infinity;
+  } catch {
+    return Infinity;
   }
 }
 
@@ -112,6 +123,9 @@ function clearModuleAuth(module) {
   } catch (_) {}
 }
 
+// Every role client registers its token refresh here, so the shared client below refreshes the same way
+const tokenRefreshers = {};
+
 /**
  * Factory to create role-specific API clients.
  * Benefit: Isolation of tokens, refresh logic, and error handling.
@@ -127,27 +141,45 @@ function createModuleClient(moduleName) {
     client.defaults.adapter = mockAdapter;
   }
 
-  let isRefreshing = false;
-  let subscribers = [];
-
-  const subscribeToRefresh = (cb) => subscribers.push(cb);
-  const onRefreshed = (newToken) => {
-    subscribers.forEach((cb) => cb(newToken));
-    subscribers = [];
-  };
-
   const onRefreshFailed = () => {
     clearModuleAuth(moduleName);
-    subscribers.forEach((cb) => cb(null));
-    subscribers = [];
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("authRefreshFailed", { detail: { module: moduleName } }));
     }
   };
 
+  // One refresh at a time per client. Refresh tokens rotate, so two parallel refreshes would race.
+  let refreshInFlight = null;
+  const refreshTokens = () => {
+    if (refreshInFlight) return refreshInFlight;
+    const refreshToken = getRefreshToken(moduleName);
+    if (!refreshToken) return Promise.resolve(null);
+    refreshInFlight = (async () => {
+      try {
+        const refreshUrl = baseURL ? `${baseURL}/food/auth/refresh-token` : "/api/v1/food/auth/refresh-token";
+        const { data } = await axios.post(refreshUrl, { refreshToken }, { timeout: 10000 });
+        const newAccessToken = data?.data?.accessToken || data?.accessToken;
+        if (!newAccessToken) return null;
+        localStorage.setItem(`${moduleName}_accessToken`, newAccessToken);
+        // The response carries the new refresh token; the old one stops working shortly
+        const newRefreshToken = data?.data?.refreshToken || data?.refreshToken;
+        if (newRefreshToken) localStorage.setItem(`${moduleName}_refreshToken`, newRefreshToken);
+        window.dispatchEvent(new CustomEvent("authRefreshed", { detail: { module: moduleName, token: newAccessToken } }));
+        return newAccessToken;
+      } catch (_) {
+        return null;
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+    return refreshInFlight;
+  };
+
+  tokenRefreshers[moduleName] = refreshTokens;
+
   // Request Interceptor
   client.interceptors.request.use(
-    (config) => {
+    async (config) => {
       config.contextModule = moduleName;
       
       // FormData handling
@@ -157,7 +189,12 @@ function createModuleClient(moduleName) {
         }
       }
 
-      const token = getAccessToken(moduleName);
+      let token = getAccessToken(moduleName);
+      // About to expire (or already expired): get a fresh one first, so the request does not fail with a 401 at all
+      if (token && !config._skipRefresh && msUntilExpiry(token) < 45000 && getRefreshToken(moduleName)) {
+        const fresh = await refreshTokens();
+        if (fresh) token = fresh;
+      }
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -199,56 +236,19 @@ function createModuleClient(moduleName) {
         return Promise.reject(err);
       }
 
-      const refreshToken = getRefreshToken(moduleName);
-      if (!refreshToken) {
+      if (!getRefreshToken(moduleName)) {
         onRefreshFailed();
         return Promise.reject(err);
       }
 
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          subscribeToRefresh((newToken) => {
-            if (newToken) {
-              original.headers.Authorization = `Bearer ${newToken}`;
-              resolve(client(original));
-            } else {
-              reject(err);
-            }
-          });
-        });
+      const newAccessToken = await refreshTokens();
+      if (!newAccessToken) {
+        onRefreshFailed();
+        return Promise.reject(err);
       }
-
       original._retry = true;
-      isRefreshing = true;
-
-      try {
-        const refreshUrl = baseURL ? `${baseURL}/food/auth/refresh-token` : "/api/v1/food/auth/refresh-token";
-        const { data } = await axios.post(refreshUrl, { refreshToken }, { timeout: 10000 });
-        const newAccessToken = data?.data?.accessToken || data?.accessToken;
-
-        if (newAccessToken) {
-          localStorage.setItem(`${moduleName}_accessToken`, newAccessToken);
-          // Refresh tokens rotate: the response carries the new one, the old one stops working shortly
-          const newRefreshToken = data?.data?.refreshToken || data?.refreshToken;
-          if (newRefreshToken) {
-            localStorage.setItem(`${moduleName}_refreshToken`, newRefreshToken);
-          }
-          window.dispatchEvent(new CustomEvent("authRefreshed", { 
-            detail: { module: moduleName, token: newAccessToken } 
-          }));
-          onRefreshed(newAccessToken);
-          original.headers.Authorization = `Bearer ${newAccessToken}`;
-          return client(original);
-        }
-      } catch (_) {
-        onRefreshFailed();
-        return Promise.reject(err);
-      } finally {
-        isRefreshing = false;
-      }
-
-      onRefreshFailed();
-      return Promise.reject(err);
+      original.headers.Authorization = `Bearer ${newAccessToken}`;
+      return client(original);
     }
   );
 
@@ -287,6 +287,7 @@ function getModuleFromUrl(url = "") {
     normalized.includes("/food/admin/") ||
     normalized.includes("/store/") ||
     normalized.includes("/food/store/") ||
+    normalized.startsWith("/tasks") ||
     normalized.includes("/settings") ||
     normalized.includes("/app-config") ||
     normalized.includes("/app-configurations")
@@ -300,7 +301,8 @@ function getModuleFromUrl(url = "") {
       path.includes("/superadmin") ||
       path.includes("/admin") ||
       path.includes("/franchise-admin") ||
-      path.includes("/store-manager")
+      path.includes("/store-manager") ||
+      path.includes("/store-operations")
     ) {
       return "admin";
     }
@@ -337,10 +339,15 @@ function publicTwin(config) {
 }
 
 apiClient.interceptors.request.use(
-  (config) => {
+  async (config) => {
     withMenuLocation(config);
     const module = config.contextModule || getModuleFromUrl(config.url);
-    const token = getAccessToken(module);
+    let token = getAccessToken(module);
+    // About to expire (or already expired): refresh first, so the request does not fail with a 401 at all
+    if (token && msUntilExpiry(token) < 45000 && getRefreshToken(module) && tokenRefreshers[module]) {
+      const fresh = await tokenRefreshers[module]();
+      if (fresh) token = fresh;
+    }
     if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
@@ -364,6 +371,22 @@ apiClient.interceptors.response.use(
       }
     }
     const status = err?.response?.status;
+    // An expired login: refresh once and repeat the request (a signed-out visitor has no refresh token and skips this)
+    if (status === 401 && original && !original._retry) {
+      const module = original.contextModule || getModuleFromUrl(original.url);
+      if (getRefreshToken(module) && tokenRefreshers[module]) {
+        const fresh = await tokenRefreshers[module]();
+        if (fresh) {
+          original._retry = true;
+          original.headers.Authorization = `Bearer ${fresh}`;
+          return apiClient(original);
+        }
+        clearModuleAuth(module);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("authRefreshFailed", { detail: { module } }));
+        }
+      }
+    }
     const twin = (status === 401 || status === 403) && publicTwin(original);
     if (twin) return apiClient(twin);
     return Promise.reject(err);

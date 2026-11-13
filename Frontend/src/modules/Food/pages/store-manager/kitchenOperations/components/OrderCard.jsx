@@ -12,6 +12,7 @@ import {
   ArrowRight
 } from "lucide-react";
 import { Tooltip, Tag } from "antd";
+import { useOutletContext } from "react-router-dom";
 
 export default function OrderCard({
   order,
@@ -22,6 +23,11 @@ export default function OrderCard({
   onOpenDetails,
   onMarkPreparing
 }) {
+  // Accepting, starting prep, assigning a chef and rejecting an item are for the store manager and the order's
+  // supervisor (the server refuses everyone else); kitchen staff only look at the card.
+  const { role } = useOutletContext() || {};
+  const canManage = !role || role === "store_manager" || role === "kitchen_supervisor";
+
   const isOverdue = new Date(order.expectedReadyTime) < new Date() && order.status !== "ready_for_pickup";
 
   const getPriorityColor = (priority) => {
@@ -154,7 +160,7 @@ export default function OrderCard({
           )}
         </div>
 
-        {order.status !== "confirmed" && (
+        {canManage && order.status !== "confirmed" && (
           <button
             onClick={() => onOpenAssignChef(order)}
             className="text-[9px] font-black text-[var(--secondary)] hover:text-[var(--sa-secondary-hover)] cursor-pointer"
@@ -175,7 +181,8 @@ export default function OrderCard({
           Details
         </button>
 
-        {/* Reject Item always available for fine tuning */}
+        {/* Reject Item: a lead action */}
+        {canManage && (
         <button
           onClick={() => onOpenRejectItem(order)}
           className="py-1.5 px-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-900/35 text-rose-600 dark:text-rose-450 font-black rounded-xl text-[10px] transition-all flex items-center justify-center cursor-pointer"
@@ -183,9 +190,10 @@ export default function OrderCard({
         >
           <AlertTriangle size={10} />
         </button>
+        )}
 
         {/* Conditional status triggers */}
-        {order.status === "confirmed" && (
+        {canManage && order.status === "confirmed" && (
           <button
             onClick={() => onAccept(order._id)}
             className="flex-1 py-1.5 bg-[var(--primary)] hover:bg-[var(--sa-primary-hover)] text-white font-black rounded-xl text-[10px] transition-all shadow-sm flex items-center justify-center gap-1 cursor-pointer"
@@ -195,7 +203,7 @@ export default function OrderCard({
           </button>
         )}
 
-        {order.status === "queued" && (
+        {canManage && order.status === "queued" && (
           <button
             onClick={() => onMarkPreparing(order._id)}
             className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl text-[10px] transition-all shadow-sm flex items-center justify-center gap-1 cursor-pointer"
@@ -203,6 +211,12 @@ export default function OrderCard({
             Start Prep
             <ArrowRight size={10} />
           </button>
+        )}
+
+        {!canManage && ["confirmed", "queued"].includes(order.status) && (
+          <p className="flex-1 py-1.5 text-center text-[10px] font-semibold text-slate-400 dark:text-zinc-500 leading-tight">
+            {order.status === "confirmed" ? "Your supervisor will accept this order" : "Waiting for your supervisor to start preparation"}
+          </p>
         )}
       </div>
     </div>

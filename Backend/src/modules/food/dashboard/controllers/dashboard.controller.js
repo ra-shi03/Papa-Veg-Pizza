@@ -25,6 +25,7 @@ export const storeWidgets = {
   'top-products': wrap(store.topProducts),
   'live-orders': wrap(store.liveOrders),
   'kitchen-performance': wrap(store.kitchenPerformance),
+  'delayed-orders': wrap(store.delayedOrders),
   'delivery-overview': wrap(store.deliveryOverview),
   'inventory-alerts': wrap(store.inventoryAlerts),
   'staff-overview': wrap(store.staffOverview),

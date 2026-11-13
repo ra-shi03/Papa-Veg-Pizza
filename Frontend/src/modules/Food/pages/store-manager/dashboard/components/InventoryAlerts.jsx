@@ -3,17 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { AlertTriangle, AlertOctagon, Info, X, ClipboardList, Sparkles, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import apiClient from "@/services/api/axios"
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
-
-// Mock inventory alerts
-const MOCK_INVENTORY_ALERTS = {
-  lowStock: [
-    { ingredient: "Processed Cheese", availableQty: 2, minQty: 15, reorderLevel: 10, unit: "kg", supplier: "Amul Dairy Corp", severity: "Critical" },
-    { ingredient: "Olives", availableQty: 0.5, minQty: 5, reorderLevel: 3, unit: "kg", supplier: "Del Monte Foods", severity: "Critical" },
-    { ingredient: "Pizza Sauce", availableQty: 4, minQty: 12, reorderLevel: 8, unit: "litres", supplier: "Kissan Food Systems", severity: "Warning" },
-    { ingredient: "Capsicum", availableQty: 6, minQty: 10, reorderLevel: 5, unit: "kg", supplier: "Local Mandi Vendor", severity: "Normal" }
-  ]
-}
 
 export default function InventoryAlerts({ storeId, refreshKey }) {
   const queryClient = useQueryClient()
@@ -29,8 +18,7 @@ export default function InventoryAlerts({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/inventory-alerts", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
-        return MOCK_INVENTORY_ALERTS
+        throw e
       }
     }
   })

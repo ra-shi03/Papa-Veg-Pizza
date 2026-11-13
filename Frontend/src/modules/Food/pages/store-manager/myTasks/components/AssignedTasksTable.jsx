@@ -40,18 +40,18 @@ export default function AssignedTasksTable({ tasks = [], onStartTask = () => {} 
     <div className="space-y-3">
       {/* DESKTOP TABLE */}
       <div className="hidden md:block overflow-x-auto bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-2xl shadow-sm">
-        <table className="w-full min-w-[800px]">
+        <table className="w-full min-w-[760px] text-left">
           <thead>
             <tr className="border-b border-zinc-150 dark:border-zinc-800 text-[10px] font-black text-slate-450 dark:text-zinc-550 uppercase tracking-wider text-left bg-zinc-50/40 dark:bg-zinc-950/10">
-              <th className="py-2.5 px-4">Task ID</th>
-              <th className="py-2.5 px-3">Order Number</th>
-              <th className="py-2.5 px-3">Task Details</th>
-              <th className="py-2.5 px-3">Station</th>
-              <th className="py-2.5 px-3">Priority</th>
-              <th className="py-2.5 px-3">Est. Duration</th>
-              <th className="py-2.5 px-3">Assigned By</th>
-              <th className="py-2.5 px-3">Assigned At</th>
-              <th className="py-2.5 px-4 text-right">Action</th>
+              <th className="py-3 px-4 whitespace-nowrap">Task ID</th>
+              <th className="py-3 px-3 whitespace-nowrap">Order Number</th>
+              <th className="py-3 px-3 whitespace-nowrap">Task Details</th>
+              <th className="py-3 px-3 whitespace-nowrap">Station</th>
+              <th className="py-3 px-3 whitespace-nowrap">Priority</th>
+              <th className="py-3 px-3 whitespace-nowrap">Est. Duration</th>
+              <th className="py-3 px-3 whitespace-nowrap">Assigned By</th>
+              <th className="py-3 px-3 whitespace-nowrap">Assigned At</th>
+              <th className="py-3 px-4 text-right whitespace-nowrap">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -60,39 +60,39 @@ export default function AssignedTasksTable({ tasks = [], onStartTask = () => {} 
                 key={task._id}
                 className="border-b border-zinc-100 dark:border-zinc-800/60 hover:bg-zinc-50/40 dark:hover:bg-zinc-950/10 text-xs text-left transition-colors"
               >
-                <td className="py-2.5 px-4 font-mono font-bold text-slate-450 dark:text-zinc-550">
-                  {task._id}
+                <td className="py-3 px-4 whitespace-nowrap font-mono font-bold text-slate-450 dark:text-zinc-550" title={String(task._id)}>
+                  #{String(task._id).slice(-6).toUpperCase()}
                 </td>
-                <td className="py-2.5 px-3 font-extrabold text-[var(--primary)]">
+                <td className="py-3 px-3 whitespace-nowrap font-extrabold text-[var(--primary)]">
                   {task.orderId}
                 </td>
-                <td className="py-2.5 px-3 max-w-[200px]">
+                <td className="py-3 px-3 min-w-[170px] max-w-[260px]">
                   <div className="flex flex-col">
-                    <span className="font-bold text-slate-800 dark:text-zinc-200 line-clamp-1">{task.title}</span>
-                    <span className="text-[9px] font-semibold text-slate-450 dark:text-zinc-500 line-clamp-1 mt-0.5">{task.description}</span>
+                    <span className="font-bold text-slate-800 dark:text-zinc-200 leading-snug">{task.title}</span>
+                    <span className="text-[10px] font-semibold text-slate-450 dark:text-zinc-500 line-clamp-2 mt-0.5 leading-snug">{task.description}</span>
                   </div>
                 </td>
-                <td className="py-2.5 px-3">
+                <td className="py-3 px-3 whitespace-nowrap">
                   <div className="flex items-center gap-1 font-semibold text-slate-650 dark:text-zinc-300">
                     <MapPin size={10} className="text-slate-400" />
                     <span>{task.station}</span>
                   </div>
                 </td>
-                <td className="py-2.5 px-3">
-                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${getPriorityBadge(task.priority)}`}>
+                <td className="py-3 px-3 whitespace-nowrap">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border capitalize ${getPriorityBadge(task.priority)}`}>
                     {task.priority}
                   </span>
                 </td>
-                <td className="py-2.5 px-3 font-semibold text-slate-700 dark:text-zinc-300">
+                <td className="py-3 px-3 whitespace-nowrap font-semibold text-slate-700 dark:text-zinc-300">
                   {task.estimatedMinutes} mins
                 </td>
-                <td className="py-2.5 px-3 text-slate-500 dark:text-zinc-450 font-medium">
+                <td className="py-3 px-3 text-slate-500 dark:text-zinc-450 font-medium min-w-[110px]">
                   {task.assignedBy}
                 </td>
-                <td className="py-2.5 px-3 text-slate-500 dark:text-zinc-450 font-mono font-semibold">
+                <td className="py-3 px-3 whitespace-nowrap text-slate-500 dark:text-zinc-450 font-mono font-semibold">
                   {formatTime(task.createdAt)}
                 </td>
-                <td className="py-2.5 px-4 text-right">
+                <td className="py-3 px-4 text-right whitespace-nowrap">
                   <button
                     onClick={() => onStartTask(task)}
                     className="text-[9px] font-bold py-1 px-2.5 rounded-md bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] shadow-sm active:scale-[0.98] transition-all flex items-center gap-1.5 ml-auto cursor-pointer"
@@ -118,7 +118,7 @@ export default function AssignedTasksTable({ tasks = [], onStartTask = () => {} 
             <div className="flex justify-between items-start gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-2">
               <div className="space-y-0.5">
                 <span className="text-[8px] font-black text-slate-400 dark:text-zinc-550 uppercase font-mono block">
-                  Task ID: {task._id}
+                  Task #{String(task._id).slice(-6).toUpperCase()}
                 </span>
                 <span className="text-xs font-black text-[var(--primary)] block">
                   Order: {task.orderId}

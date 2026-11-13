@@ -111,7 +111,7 @@ describe('the order payload', () => {
         assert.deepEqual([d.customerName, d.customerPhone, d.address.name, d.address.phone], [ME.name, ME.phone, ME.name, ME.phone]);
         assert.deepEqual([d.address.label, d.address.street, d.address.city, d.address.zipCode], ['Home', '12 MG Road', 'Pune', '411001']);
         assert.deepEqual(d.address.location.coordinates, [73.85, 18.52]);
-        assert.ok(!JSON.stringify(d).includes(ME.email), 'the email is not part of an order');
+        assert.equal(d.customerEmail, ME.email.toLowerCase(), 'the order carries only the customer\'s own email, as they typed it');
         assert.deepEqual(check(d), d);
     });
     test('a new location keeps the house number and the area for the rider', () => {
@@ -124,6 +124,7 @@ describe('the order payload', () => {
         ['another name on the address', (p) => { p.address.name = 'Someone Else'; }],
         ['another phone on the address', (p) => { p.address.phone = '9000000000'; }],
         ['an email', (p) => { p.email = 'x@example.invalid'; }],
+        ['someone else\'s email', (p) => { p.customerEmail = 'x@example.invalid'; }],
         ['an email on the address', (p) => { p.address.email = 'x@example.invalid'; }],
         ['no street', (p) => { p.address.street = ' '; }],
         ['other coordinates', (p) => { p.address.location.coordinates = [75.86, 22.72]; }],

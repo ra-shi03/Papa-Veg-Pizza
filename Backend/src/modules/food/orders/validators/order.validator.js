@@ -105,6 +105,7 @@ export function validateCreateOrderDto(body) {
         storeName: z.string().optional(),
         customerName: z.string().optional(),
         customerPhone: z.string().optional(),
+        customerEmail: z.string().trim().email().optional(),
         // Accepted for older clients but never used: the server prices the order itself.
         pricing: pricingSchema.partial().optional(),
         couponCode: z.string().optional(),

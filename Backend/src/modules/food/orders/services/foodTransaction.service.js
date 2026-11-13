@@ -97,7 +97,12 @@ export async function createInitialTransaction(order) {
             ? storeCommissionFromOrder
             : (commissionAmount || 0);
     const storeNet = (order.pricing?.subtotal || 0) + (order.pricing?.packagingFee || 0) - storeCommission;
-    const platformNetProfit = (order.pricing?.platformFee || 0) + (order.pricing?.deliveryFee || 0) + storeCommission - riderShare;
+    // Same rule as the order's own platformProfit: fees the platform keeps, minus the rider's pay, never below 0
+    // (a free-delivery order can cost more in rider pay than it earns in fees, and the record cannot go negative).
+    const platformNetProfit = Math.max(
+        0,
+        (order.pricing?.platformFee || 0) + (order.pricing?.deliveryFee || 0) + (order.pricing?.handlingFee || 0) + storeCommission - riderShare,
+    );
 
     const transaction = new FoodTransaction({
         orderId: order._id,

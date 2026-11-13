@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X, Sparkles, AlertTriangle, ShieldCheck, HelpCircle } from "lucide-react";
 import { useResolveComplaint, useComplaintDetails } from "../hooks/useComplaints";
-import { mockStaff } from "../mockData";
 import { Skeleton } from "@food/components/ui/skeleton";
 import { toast } from "sonner";
 
@@ -28,7 +27,7 @@ export default function ResolveComplaintModal({
   // Pre-fill fields or reset when modal opens
   useEffect(() => {
     if (complaint) {
-      setStaff(complaint.resolvedBy || mockStaff[0]?.fullName || "");
+      setStaff(complaint.resolvedBy || "");
       setCouponCode("");
       setRefundAmount(0);
       setReplacementOrderId("");
@@ -177,16 +176,12 @@ export default function ResolveComplaintModal({
                     Staff Assignee / Resolved By
                   </label>
                   <select
-                    disabled={isReadOnly}
+                    disabled
                     value={staff}
                     onChange={(e) => setStaff(e.target.value)}
                     className="w-full text-xs font-semibold px-3 py-2 bg-neutral-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-zinc-800 dark:text-white outline-none focus:border-[var(--primary)] transition-all cursor-pointer disabled:opacity-50"
                   >
-                    {mockStaff.map((st) => (
-                      <option key={st._id} value={st.fullName}>
-                        {st.fullName} ({st.role})
-                      </option>
-                    ))}
+                    <option value={staff}>{staff || "You (the signed-in store manager)"}</option>
                   </select>
                 </div>
 

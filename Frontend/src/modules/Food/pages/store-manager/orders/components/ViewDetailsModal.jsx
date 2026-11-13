@@ -108,7 +108,7 @@ export default function ViewDetailsModal({
             </div>
             <div>
               <p className="text-zinc-400 font-semibold mb-0.5">Scheduled Time</p>
-              <p className="text-slate-800 dark:text-zinc-350 font-bold">{formatDate(order.scheduledTime) || "Immediate"}</p>
+              <p className="text-slate-800 dark:text-zinc-350 font-bold">{order.scheduledTime ? formatDate(order.scheduledTime) : "Instant"}</p>
             </div>
             <div>
               <p className="text-zinc-400 font-semibold mb-0.5">Priority</p>
@@ -343,6 +343,7 @@ export default function ViewDetailsModal({
             <div>
               <p className="text-zinc-400 font-semibold mb-0.5">Method</p>
               <p className="text-foreground font-extrabold">{order.paymentMethod || "Online"}</p>
+              {order.paymentMethod === "COD" && <p className="text-[10px] text-zinc-400 font-semibold mt-0.5">Customer pays on delivery</p>}
             </div>
             <div>
               <p className="text-zinc-400 font-semibold mb-0.5">Payment Status</p>
@@ -352,7 +353,7 @@ export default function ViewDetailsModal({
             </div>
             <div>
               <p className="text-zinc-400 font-semibold mb-0.5">Txn ID</p>
-              <p className="text-foreground font-mono text-[10px] truncate">{order.transactionId || "TXN-8840192A"}</p>
+              <p className="text-foreground font-mono text-[10px] truncate">{order.transactionId || "-"}</p>
             </div>
           </div>
 
@@ -361,9 +362,9 @@ export default function ViewDetailsModal({
               <span>Subtotal</span>
               <span>{formatCurrency(order.subtotal)}</span>
             </div>
-            {order.couponId && (
+            {Number(order.discountAmount) > 0 && (
               <div className="flex justify-between font-bold text-emerald-600">
-                <span>Coupon Discount ({order.couponId})</span>
+                <span>Coupon Discount{order.couponId ? ` (${order.couponId})` : ""}</span>
                 <span>-{formatCurrency(order.discountAmount || 0)}</span>
               </div>
             )}
@@ -379,6 +380,18 @@ export default function ViewDetailsModal({
               <span>Delivery Charges</span>
               <span>{formatCurrency(order.deliveryCharges || 0)}</span>
             </div>
+            {Number(order.platformFee) > 0 && (
+              <div className="flex justify-between font-bold text-zinc-550">
+                <span>Platform Fee</span>
+                <span>{formatCurrency(order.platformFee)}</span>
+              </div>
+            )}
+            {Number(order.handlingFee) > 0 && (
+              <div className="flex justify-between font-bold text-zinc-550">
+                <span>Handling Fee</span>
+                <span>{formatCurrency(order.handlingFee)}</span>
+              </div>
+            )}
             <Divider className="my-1.5 border-border" />
             <div className="flex justify-between items-center text-sm font-black text-foreground">
               <span>Grand Total</span>
@@ -400,7 +413,8 @@ export default function ViewDetailsModal({
         <div className="py-2 pl-4 text-xs">
           <div className="relative border-l-2 border-zinc-200 dark:border-zinc-800 space-y-6">
             
-            {/* Timeline Item: Payment Verified */}
+            {/* Timeline Item: Payment Verified (only when it was really paid) */}
+            {order.paymentStatus === "paid" && (
             <div className="relative pl-6">
               <span className="absolute -left-[7px] top-0 w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-emerald-500/10" />
               <div>
@@ -411,6 +425,7 @@ export default function ViewDetailsModal({
                 <p className="text-[10px] text-zinc-500 font-bold mt-1">{formatDate(order.createdAt)}</p>
               </div>
             </div>
+            )}
 
             {/* Timeline Item: Order Created */}
             <div className="relative pl-6">

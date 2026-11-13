@@ -8,44 +8,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import apiClient from "@/services/api/axios"
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
-
-// Mock Sales Data
-const MOCK_SALES_HOURLY = [
-  { hour: "10 AM", sales: 3200 },
-  { hour: "11 AM", sales: 4800 },
-  { hour: "12 PM", sales: 8500 },
-  { hour: "01 PM", sales: 12000 },
-  { hour: "02 PM", sales: 9400 },
-  { hour: "03 PM", sales: 5500 },
-  { hour: "04 PM", sales: 4200 },
-  { hour: "05 PM", sales: 6800 },
-  { hour: "06 PM", sales: 11000 },
-  { hour: "07 PM", sales: 18500 },
-  { hour: "08 PM", sales: 24000 },
-  { hour: "09 PM", sales: 19000 },
-  { hour: "10 PM", sales: 12500 },
-  { hour: "11 PM", sales: 6200 }
-]
-
-const MOCK_SALES_WEEKLY = [
-  { hour: "Mon", sales: 42000 },
-  { hour: "Tue", sales: 48000 },
-  { hour: "Wed", sales: 51000 },
-  { hour: "Thu", sales: 58000 },
-  { hour: "Fri", sales: 74000 },
-  { hour: "Sat", sales: 92000 },
-  { hour: "Sun", sales: 86000 }
-]
-
-const MOCK_SALES_MONTHLY = [
-  { hour: "Jan", sales: 1420000 },
-  { hour: "Feb", sales: 1550000 },
-  { hour: "Mar", sales: 1680000 },
-  { hour: "Apr", sales: 1820000 },
-  { hour: "May", sales: 2010000 },
-  { hour: "Jun", sales: 1980000 }
-]
 
 export default function SalesAnalytics({ storeId, refreshKey }) {
   const [filterType, setFilterType] = useState("daily") // daily, weekly, monthly
@@ -65,12 +27,7 @@ export default function SalesAnalytics({ storeId, refreshKey }) {
         })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
-        return filterType === "daily" 
-          ? MOCK_SALES_HOURLY 
-          : filterType === "weekly" 
-            ? MOCK_SALES_WEEKLY 
-            : MOCK_SALES_MONTHLY
+        throw e
       }
     }
   })

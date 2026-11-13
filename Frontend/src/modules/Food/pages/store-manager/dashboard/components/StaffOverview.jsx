@@ -2,30 +2,6 @@ import React, { useState, useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Users, UserCheck, Clock, UserX, X, Search, ChevronRight } from "lucide-react"
 import apiClient from "@/services/api/axios"
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
-
-// Mock staff overview
-const MOCK_STAFF_OVERVIEW = {
-  present: 12,
-  late: 2,
-  absent: 1
-}
-
-// Mock staff attendance details
-const MOCK_STAFF_ATTENDANCE = [
-  { employee: "Alok Gupta", role: "Store Manager", shift: "Morning", status: "Present" },
-  { employee: "Karan Malhotra", role: "Head Pizza Chef", shift: "Morning", status: "Present" },
-  { employee: "Sunil Verma", role: "Kitchen Helper", shift: "Morning", status: "Present" },
-  { employee: "Ramesh Singh", role: "Delivery Rider", shift: "Morning", status: "Present" },
-  { employee: "Vijay Kadam", role: "Delivery Rider", shift: "Morning", status: "Present" },
-  { employee: "Sanjay Dutt", role: "Delivery Rider", shift: "Morning", status: "Late" },
-  { employee: "Ashish Kumar", role: "Delivery Rider", shift: "Morning", status: "Late" },
-  { employee: "Suresh Patil", role: "Cook Specialist", shift: "Morning", status: "Absent" },
-  
-  { employee: "Pooja Rawat", role: "Assistant Manager", shift: "Evening", status: "Present" },
-  { employee: "Irfan Khan", role: "Oven Specialist", shift: "Evening", status: "Present" },
-  { employee: "Deepak Jha", role: "Prep Chef", shift: "Evening", status: "Present" }
-]
 
 export default function StaffOverview({ storeId, refreshKey }) {
   const [showRosterModal, setShowRosterModal] = useState(false)
@@ -53,8 +29,7 @@ export default function StaffOverview({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/staff-overview", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
-        return MOCK_STAFF_OVERVIEW
+        throw e
       }
     }
   })
@@ -76,8 +51,7 @@ export default function StaffOverview({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/staff-roster", { params: { storeId } })
         return response.data?.data || []
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e
-        return MOCK_STAFF_ATTENDANCE
+        throw e
       }
     }
   })

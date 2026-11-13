@@ -72,7 +72,7 @@ export default function StoreLogin() {
       toast.success(`Signed in as ${storeUser.name || 'Store Operations'}`)
 
       // Role-based routing
-      navigate("/store-operations/dashboard", { replace: true })
+      navigate(storeUser.role === "kitchen_staff" ? "/store-operations/tasks" : "/store-operations/dashboard", { replace: true })
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || "Login failed. Check your credentials."
       toast.error(msg)

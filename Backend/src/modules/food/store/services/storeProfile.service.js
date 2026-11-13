@@ -256,9 +256,11 @@ export async function permissions(user) {
     const role = normalize(user?.role);
     if (!ROLE_KEY[role]) throw new ForbiddenError('This is for the store team.');
     const manager = role === 'STORE_MANAGER'; const staff = role === 'KITCHEN_STAFF';
+    // Same rules as the sidebar and the server: kitchen staff have no dashboard, incoming or active order lists; they do
+    // work the stations and file stock requests and waste reports (their own).
     return {
-        Dashboard: true, IncomingOrders: !staff, ActiveOrders: true, KitchenQueue: true, PizzaStation: true, BakingStation: true, PackagingStation: true,
-        DeliveryOperations: manager, Inventory: !staff, StockRequests: !staff, WasteManagement: true, StaffManagement: manager, Reports: manager,
+        Dashboard: !staff, IncomingOrders: !staff, ActiveOrders: !staff, KitchenQueue: true, PizzaStation: true, BakingStation: true, PackagingStation: true,
+        DeliveryOperations: manager, Inventory: true, StockRequests: true, WasteManagement: true, StaffManagement: manager, Reports: manager,
     };
 }
 

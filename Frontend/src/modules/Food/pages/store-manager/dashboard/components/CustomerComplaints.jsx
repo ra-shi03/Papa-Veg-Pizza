@@ -3,15 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { MessageSquare, X, ShieldAlert, Check, RefreshCw, User, Clipboard, Clock, UserCog, StickyNote } from "lucide-react"
 import { toast } from "sonner"
 import apiClient from "@/services/api/axios"
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
-
-// Mock customer complaints
-const MOCK_COMPLAINTS = [
-  { orderNumber: "PV-8839", customer: "Rohan Malhotra", issueType: "Cold food delivered", priority: "High", status: "Open", phone: "9826012431", time: "15m ago" },
-  { orderNumber: "PV-8835", customer: "Isha Sharma", issueType: "Missing beverage", priority: "Medium", status: "Open", phone: "9977544021", time: "28m ago" },
-  { orderNumber: "PV-8830", customer: "Amit Verma", issueType: "Delayed courier", priority: "Low", status: "In Progress", phone: "9893012903", time: "1h ago" },
-  { orderNumber: "PV-8822", customer: "Pooja Patel", issueType: "Incorrect pizza base", priority: "Critical", status: "Open", phone: "9111223344", time: "2h ago" }
-]
 
 export default function CustomerComplaints({ storeId, refreshKey }) {
   const queryClient = useQueryClient()
@@ -28,8 +19,7 @@ export default function CustomerComplaints({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/recent-complaints", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
-        return MOCK_COMPLAINTS
+        throw e
       }
     }
   })

@@ -227,6 +227,12 @@ async function nearbyCustomers(ctx, { exclude = [], only } = {}) {
   });
 }
 
+const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+
+/** Refund requests on this store's orders that are still waiting. */
+const pendingRefundsOf = async (ctx) =>
+  Refund.countDocuments({ orderId: { $in: await FoodOrder.distinct('_id', ordersIn(ctx)) }, status: { $in: ['pending', 'processing'] } });
+
 export async function listCustomers(user, q = {}) {
   const ctx = await customerContext(user, q);
   const ordered = await storeCustomers(ctx);
@@ -247,7 +253,23 @@ export async function listCustomers(user, q = {}) {
   }[by] ?? c.name);
   list.sort(sorter(q, keyOf, { by: 'name', order: 'asc' }));
   const { page, limit } = pageOf(q);
-  return { customers: list.slice((page - 1) * limit, page * limit).map((c) => maskedCustomer(ctx, c)), pagination: pagination(list.length, page, limit) };
+  // The headline numbers cover the whole store, whatever the table is filtered to
+  const since = Date.now() - 30 * 86400000;
+  const [todayOrders, billedOrders, pendingRefunds] = await Promise.all([
+    FoodOrder.countDocuments(ordersIn(ctx, { createdAt: { $gte: startOfToday() } })),
+    FoodOrder.countDocuments(ordersIn(ctx, { orderStatus: { $nin: CANCELLED } })),
+    pendingRefundsOf(ctx),
+  ]);
+  const revenue = ordered.reduce((n, c) => n + c.totalSpent, 0);
+  const stats = {
+    totalCustomers: ordered.length + near.length,
+    active30Days: ordered.filter((c) => new Date(c.lastOrderDate).getTime() >= since).length,
+    todayOrders,
+    returningCustomers: ordered.filter((c) => c.totalOrders > 1).length,
+    avgOrderValue: billedOrders ? round2(revenue / billedOrders) : 0,
+    pendingRefunds,
+  };
+  return { customers: list.slice((page - 1) * limit, page * limit).map((c) => maskedCustomer(ctx, c)), pagination: pagination(list.length, page, limit), stats };
 }
 
 export async function customerProfile(user, customerId, q = {}) {
@@ -367,7 +389,25 @@ export async function listComplaints(user, q = {}) {
   }[by] ?? new Date(c.createdAt).getTime());
   list.sort(sorter(q, keyOf));
   const { page, limit } = pageOf(q);
-  return { complaints: list.slice((page - 1) * limit, page * limit), pagination: pagination(list.length, page, limit) };
+
+  // Headline numbers over every complaint of the store, whatever the table is filtered to
+  const all = await complaintsOf(ctx, {});
+  const today = startOfToday().getTime();
+  const resolved = all.filter((c) => c.status === 'resolved');
+  const hours = resolved
+    .map((c) => (new Date(c.resolution?.resolvedAt || c.updatedAt).getTime() - new Date(c.createdAt).getTime()) / 3600000)
+    .filter((h) => Number.isFinite(h) && h >= 0);
+  const rated = await storeReviews(ctx);
+  const stats = {
+    openComplaints: all.filter((c) => c.status === 'pending' || c.status === 'investigating').length,
+    criticalComplaints: all.filter((c) => c.priority === 'critical' && c.status !== 'resolved').length,
+    resolvedToday: resolved.filter((c) => new Date(c.resolution?.resolvedAt || c.updatedAt).getTime() >= today).length,
+    pendingRefunds: await pendingRefundsOf(ctx),
+    avgResolutionTime: hours.length ? `${round2(hours.reduce((n, h) => n + h, 0) / hours.length)} hours` : 'N/A',
+    // share of this store's rated orders that were rated 4 stars or more
+    satisfactionScore: rated.length ? `${Math.round((rated.filter((r) => r.rating >= 4).length / rated.length) * 100)}%` : 'N/A',
+  };
+  return { complaints: list.slice((page - 1) * limit, page * limit), pagination: pagination(list.length, page, limit), stats };
 }
 
 const findTicket = async (ctx, id) => {
@@ -490,6 +530,7 @@ async function storeReviews(ctx) {
 export async function listReviews(user, q = {}) {
   const ctx = context(user);
   let list = await storeReviews(ctx);
+  const everyReview = list; // the headline numbers cover all reviews, whatever the table is filtered to
   const stars = Number(String(q.rating || '').replace(/[^0-9]/g, ''));
   if (!isAll(q.rating) && stars) list = list.filter((r) => r.rating === stars);
   if (!isAll(q.sentiment)) list = list.filter((r) => r.sentiment.toLowerCase() === String(q.sentiment).toLowerCase());
@@ -502,7 +543,16 @@ export async function listReviews(user, q = {}) {
   const keyOf = (r, by) => ({ createdAt: new Date(r.createdAt).getTime(), rating: r.rating, sentiment: r.sentiment, customerName: r.customerName }[by] ?? new Date(r.createdAt).getTime());
   list.sort(sorter(q, keyOf));
   const { page, limit } = pageOf(q);
-  return { reviews: list.slice((page - 1) * limit, page * limit), pagination: pagination(list.length, page, limit) };
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+  const stats = {
+    averageRating: everyReview.length ? (everyReview.reduce((n, r) => n + r.rating, 0) / everyReview.length).toFixed(1) : '0.0',
+    fiveStarCount: everyReview.filter((r) => r.rating === 5).length,
+    negativeCount: everyReview.filter((r) => r.sentiment === 'Negative').length,
+    monthCount: everyReview.filter((r) => new Date(r.createdAt).getTime() >= monthStart).length,
+    repliedCount: everyReview.filter((r) => r.reply).length,
+    pendingReplyCount: everyReview.filter((r) => !r.reply).length,
+  };
+  return { reviews: list.slice((page - 1) * limit, page * limit), pagination: pagination(list.length, page, limit), stats };
 }
 
 const findRatedOrder = async (ctx, id) => {

@@ -179,7 +179,30 @@ export async function topProducts(user, q) {
     { $sort: { sold: -1, revenue: -1 } },
     { $limit: 5 },
   ]);
-  return rows.map((r) => ({ productName: r._id, sold: r.sold, revenue: round2(r.revenue) }));
+  // Units sold per day for the last 7 days, for the chart that opens from a row
+  const days = Array.from({ length: 7 }, (_, i) => daysAgo(6 - i));
+  const names = new Set(rows.map((r) => r._id));
+  const recent = rows.length
+    ? await FoodOrder.find({ storeId: store._id, createdAt: { $gte: days[0] }, ...SALE }).select('createdAt items.name items.quantity').lean()
+    : [];
+  const sold = new Map(); // "product|day index" -> units, by the server's local day
+  for (const o of recent) {
+    const day = Math.floor((startOfDay(o.createdAt).getTime() - days[0].getTime()) / 86400000 + 0.5);
+    for (const it of o.items || []) {
+      if (!names.has(it.name)) continue;
+      const k = `${it.name}|${day}`;
+      sold.set(k, (sold.get(k) || 0) + (Number(it.quantity) || 0));
+    }
+  }
+  return rows.map((r) => ({
+    productName: r._id,
+    sold: r.sold,
+    revenue: round2(r.revenue),
+    trend: days.map((d, i) => ({
+      name: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      sales: sold.get(`${r._id}|${i}`) || 0,
+    })),
+  }));
 }
 
 /** Orders on the floor right now, by column. */
@@ -197,6 +220,20 @@ export async function liveOrders(user, q) {
     });
   }
   return out;
+}
+
+/** The orders behind the "delayed" count: still in the kitchen past the time promised for them. */
+export async function delayedOrders(user, q) {
+  const store = await storeScope(user, q, 'delayed-orders');
+  const now = new Date();
+  const orders = await FoodOrder.find({ ...ordersOf(user, store), orderStatus: { $in: ['confirmed', 'preparing'] }, 'kitchen.expectedReadyAt': { $lt: now }, 'kitchen.delayResolvedAt': null })
+    .select('order_id createdAt statusHistory kitchen.expectedReadyAt').sort({ 'kitchen.expectedReadyAt': 1 }).limit(50).lean();
+  return orders.map((o) => {
+    const started = historyAt(o, 'confirmed') || o.createdAt;
+    const target = Math.max(0, Math.round(minutesBetween(started, o.kitchen.expectedReadyAt)));
+    const actual = Math.max(0, Math.round(minutesBetween(started, now)));
+    return { orderNumber: o.order_id || String(o._id), expectedTime: `${target}m`, actualTime: `${actual}m`, delayMinutes: Math.max(0, Math.round(minutesBetween(o.kitchen.expectedReadyAt, now))) };
+  });
 }
 
 /** Kitchen load: average prep time, delayed orders, and how busy each station is (0-100). */

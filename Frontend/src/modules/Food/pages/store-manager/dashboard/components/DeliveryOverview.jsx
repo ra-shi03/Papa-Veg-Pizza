@@ -3,24 +3,6 @@ import { useQuery } from "@tanstack/react-query"
 import { Truck, ToggleLeft, ToggleRight, MapPin, X, Map, ShieldAlert, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
 import apiClient from "@/services/api/axios"
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
-
-// Mock delivery data
-const MOCK_DELIVERY_OVERVIEW = {
-  availableRiders: 6,
-  assignedRiders: 9,
-  delayedDeliveries: 2
-}
-
-// Mock active riders list
-const MOCK_RIDERS = [
-  { name: "Rahul Dev", status: "Delivering", ordersAssigned: "PV-8830", location: "Vijay Nagar Crossing" },
-  { name: "Vikram Rathore", status: "Delivering", ordersAssigned: "PV-8828", location: "Palasia square" },
-  { name: "Karan Singh", status: "Waiting at Store", ordersAssigned: "None", location: "Store Hub #104" },
-  { name: "Amit Kumar", status: "Delivering (Delayed)", ordersAssigned: "PV-8839", location: "Bombay Hospital Road" },
-  { name: "Suresh Patil", status: "Idle", ordersAssigned: "None", location: "Store Hub #104" },
-  { name: "Rajesh Joshi", status: "Idle", ordersAssigned: "None", location: "Store Hub #104" }
-]
 
 export default function DeliveryOverview({ storeId, refreshKey }) {
   const [showRiderModal, setShowRiderModal] = useState(false)
@@ -34,8 +16,7 @@ export default function DeliveryOverview({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/delivery-overview", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
-        return MOCK_DELIVERY_OVERVIEW
+        throw e
       }
     }
   })
@@ -57,8 +38,7 @@ export default function DeliveryOverview({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/rider-roster", { params: { storeId } })
         return response.data?.data || []
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e
-        return MOCK_RIDERS
+        throw e
       }
     }
   })

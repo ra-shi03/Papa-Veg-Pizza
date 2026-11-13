@@ -5,19 +5,6 @@ import {
   AlertTriangle, Users, Star, IndianRupee 
 } from "lucide-react"
 import apiClient from "@/services/api/axios"
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
-
-// Mock statistics for offline fallback
-const MOCK_KPIS = {
-  sales: { todaySales: 45230, percentageChange: 12 },
-  orders: { totalOrders: 136 },
-  active: { activeOrders: 23 },
-  prep: { avgPrepTime: 14 },
-  delivery: { pendingDeliveries: 8 },
-  stock: { lowStockItems: 5 },
-  staff: { staffOnDuty: 12 },
-  rating: { rating: 4.7 }
-}
 
 export default function KpiCards({ storeId, refreshKey }) {
   // Today's Sales Query
@@ -28,8 +15,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/today-sales", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
-        return MOCK_KPIS.sales
+        throw e
       }
     }
   })
@@ -42,8 +28,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/today-orders", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
-        return MOCK_KPIS.orders
+        throw e
       }
     }
   })
@@ -56,8 +41,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/active-orders", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
-        return MOCK_KPIS.active
+        throw e
       }
     }
   })
@@ -70,8 +54,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/prep-time", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
-        return MOCK_KPIS.prep
+        throw e
       }
     }
   })
@@ -84,8 +67,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/pending-deliveries", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
-        return MOCK_KPIS.delivery
+        throw e
       }
     }
   })
@@ -98,8 +80,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/low-stock", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
-        return MOCK_KPIS.stock
+        throw e
       }
     }
   })
@@ -112,8 +93,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/staff-duty", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
-        return MOCK_KPIS.staff
+        throw e
       }
     }
   })
@@ -126,8 +106,7 @@ export default function KpiCards({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/customer-rating", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
-        return MOCK_KPIS.rating
+        throw e
       }
     }
   })

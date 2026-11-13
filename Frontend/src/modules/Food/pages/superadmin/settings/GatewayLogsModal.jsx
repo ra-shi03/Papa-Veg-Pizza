@@ -1,187 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { adminAPI } from '@food/api';
 import { X, Search, Filter, Calendar, AlertCircle, CheckCircle, XCircle, RotateCcw, Copy, Check, Terminal, ExternalLink, RefreshCw, Eye, Download } from 'lucide-react';
 
-const MOCK_LOGS = [
-  {
-    _id: "log_001",
-    transactionId: "pay_Rzp982341908",
-    orderId: "ord_PVP_29104",
-    gatewayName: "Razorpay",
-    environment: "Production",
-    amount: 549.00,
-    currency: "INR",
-    status: "Success",
-    statusCode: "200 OK",
-    apiEndpoint: "/v1/charges",
-    timestamp: "2026-06-19T17:15:32Z",
-    errorDetails: null,
-    requestPayload: {
-      amount: 54900,
-      currency: "INR",
-      receipt: "ord_PVP_29104",
-      payment_capture: 1,
-      notes: { customer_phone: "+919876543210" }
-    },
-    responsePayload: {
-      id: "pay_Rzp982341908",
-      entity: "payment",
-      amount: 54900,
-      currency: "INR",
-      status: "captured",
-      order_id: "order_K8d82ld9s",
-      method: "upi",
-      vpa: "customer@okaxis",
-      email: "customer@example.com",
-      contact: "+919876543210",
-      created_at: 1781868341
-    }
-  },
-  {
-    _id: "log_002",
-    transactionId: "pay_Phpe34109823",
-    orderId: "ord_PVP_29105",
-    gatewayName: "PhonePe",
-    environment: "Production",
-    amount: 1299.00,
-    currency: "INR",
-    status: "Success",
-    statusCode: "200 OK",
-    apiEndpoint: "/pg/v1/pay",
-    timestamp: "2026-06-19T17:10:11Z",
-    errorDetails: null,
-    requestPayload: {
-      merchantId: "PAPA_VEG_PRODUCTION",
-      merchantTransactionId: "pay_Phpe34109823",
-      amount: 129900,
-      redirectUrl: "https://papavegpizza.in/payment-callback",
-      paymentInstrument: { type: "PAY_PAGE" }
-    },
-    responsePayload: {
-      success: true,
-      code: "PAYMENT_SUCCESS",
-      message: "Payment completed successfully",
-      data: {
-        merchantId: "PAPA_VEG_PRODUCTION",
-        merchantTransactionId: "pay_Phpe34109823",
-        transactionId: "T26061917101112",
-        amount: 129900,
-        state: "COMPLETED",
-        paymentInstrument: { type: "UPI", utr: "617283910293" }
-      }
-    }
-  },
-  {
-    _id: "log_003",
-    transactionId: "pay_Rzp982341912",
-    orderId: "ord_PVP_29106",
-    gatewayName: "Razorpay",
-    environment: "Production",
-    amount: 320.00,
-    currency: "INR",
-    status: "Failed",
-    statusCode: "400 Bad Request",
-    apiEndpoint: "/v1/charges",
-    timestamp: "2026-06-19T16:54:19Z",
-    errorDetails: "BAD_REQUEST_ERROR: Payment signature check failed or expired",
-    requestPayload: {
-      amount: 32000,
-      currency: "INR",
-      receipt: "ord_PVP_29106",
-      payment_capture: 1
-    },
-    responsePayload: {
-      error: {
-        code: "BAD_REQUEST_ERROR",
-        description: "Payment signature verification failed.",
-        source: "internal",
-        step: "payment_authentication",
-        reason: "signature_verification_failed"
-      }
-    }
-  },
-  {
-    _id: "log_004",
-    transactionId: "pay_Cf_982310239",
-    orderId: "ord_PVP_29107",
-    gatewayName: "Cashfree",
-    environment: "Sandbox",
-    amount: 180.00,
-    currency: "INR",
-    status: "Failed",
-    statusCode: "422 Unprocessable Entity",
-    apiEndpoint: "/pg/orders/pay",
-    timestamp: "2026-06-19T16:45:00Z",
-    errorDetails: "DECLINED: Insufficient funds in customer test instrument",
-    requestPayload: {
-      order_id: "ord_PVP_29107",
-      order_amount: 180.00,
-      order_currency: "INR",
-      customer_details: { customer_id: "cust_9921", customer_phone: "9988776655" }
-    },
-    responsePayload: {
-      order_status: "FAILED",
-      payment_status: "FAILED",
-      payment_message: "Transaction declined due to insufficient credit/debit limit.",
-      tx_time: "2026-06-19 16:45:02"
-    }
-  },
-  {
-    _id: "log_005",
-    transactionId: "ch_stripe_9d8s2d7s",
-    orderId: "ord_PVP_29108",
-    gatewayName: "Stripe",
-    environment: "Production",
-    amount: 15.99,
-    currency: "USD",
-    status: "Success",
-    statusCode: "200 OK",
-    apiEndpoint: "/v3/payment_intents",
-    timestamp: "2026-06-19T16:30:12Z",
-    errorDetails: null,
-    requestPayload: {
-      amount: 1599,
-      currency: "usd",
-      payment_method_types: ["card"],
-      metadata: { orderId: "ord_PVP_29108" }
-    },
-    responsePayload: {
-      id: "pi_3Mxt52LkdIwHu7ix2",
-      object: "payment_intent",
-      amount: 1599,
-      currency: "usd",
-      status: "succeeded",
-      client_secret: "pi_3Mxt52LkdIwHu7ix2_secret_xxxx",
-      charges: { data: [{ id: "ch_3Mxt52LkdIwHu7ix2", receipt_url: "https://stripe.com/receipt" }] }
-    }
-  },
-  {
-    _id: "log_006",
-    transactionId: "pay_Paytm_77210982",
-    orderId: "ord_PVP_29109",
-    gatewayName: "Paytm",
-    environment: "Sandbox",
-    amount: 450.00,
-    currency: "INR",
-    status: "Pending",
-    statusCode: "200 OK",
-    apiEndpoint: "/theia/api/v1/initiateTransaction",
-    timestamp: "2026-06-19T16:12:00Z",
-    errorDetails: null,
-    requestPayload: {
-      body: { requestType: "Payment", mid: "PAYTM_SANDBOX_01", orderId: "ord_PVP_29109" }
-    },
-    responsePayload: {
-      body: {
-        resultInfo: { resultStatus: "S", resultCode: "0000", resultMsg: "Success" },
-        txnToken: "tkn_82910892010292",
-        isPromoCodeValid: false
-      }
-    }
-  }
-];
-
-export default function GatewayLogsModal({ isOpen, onClose, initialGateway = 'All' }) {
-  const [logs, setLogs] = useState(MOCK_LOGS);
+export default function GatewayLogsModal({ isOpen, onClose, initialGateway = 'All', gatewayNames = [] }) {
+  const [logs, setLogs] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
   const [selectedGateway, setSelectedGateway] = useState(initialGateway);
   const [selectedStatus, setSelectedStatus] = useState('All');
@@ -191,6 +15,20 @@ export default function GatewayLogsModal({ isOpen, onClose, initialGateway = 'Al
   const [copiedRes, setCopiedRes] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [retryResult, setRetryResult] = useState(null);
+
+  // Real online payments recorded by the server (opens fresh every time)
+  useEffect(() => {
+    if (!isOpen) return;
+    setSelectedGateway(initialGateway);
+    setSelectedLog(null);
+    setRetryResult(null);
+    setLoadingLogs(true);
+    setLoadError('');
+    adminAPI.getPaymentGatewayLogs()
+      .then((res) => setLogs(res?.data?.data || []))
+      .catch((err) => setLoadError(err?.response?.data?.message || err?.message || 'Could not load the payment logs'))
+      .finally(() => setLoadingLogs(false));
+  }, [isOpen, initialGateway]);
 
   // Filtered Logs
   const filteredLogs = useMemo(() => {
@@ -210,19 +48,32 @@ export default function GatewayLogsModal({ isOpen, onClose, initialGateway = 'Al
 
   if (!isOpen) return null;
 
-  const handleRetryWebhook = (log) => {
+  // Asks the provider what it says about this payment (read only)
+  const handleRetryWebhook = async (log) => {
     setRetrying(true);
     setRetryResult(null);
-
-    // Simulate mock webhook dispatch
-    setTimeout(() => {
+    try {
+      const res = await adminAPI.resyncPaymentGatewayLog(log._id);
+      const out = res?.data?.data;
+      setRetryResult({ success: Boolean(out?.ok), message: out?.message || 'No answer from the provider' });
+    } catch (err) {
+      setRetryResult({ success: false, message: err?.response?.data?.message || err?.message || 'Could not reach the provider' });
+    } finally {
       setRetrying(false);
-      setRetryResult({
-        success: true,
-        statusCode: 200,
-        message: "Webhook processed. Order sync completed on MongoDB system settings constraints."
-      });
-    }, 1500);
+    }
+  };
+
+  const exportCsv = () => {
+    const header = ['Time', 'Transaction ID', 'Order ID', 'Gateway', 'Environment', 'Amount', 'Currency', 'Status', 'Failure reason'];
+    const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows = filteredLogs.map((l) => [new Date(l.timestamp).toISOString(), l.transactionId, l.orderId, l.gatewayName, l.environment, l.amount.toFixed(2), l.currency, l.status, l.errorDetails || '']);
+    const csv = [header, ...rows].map((r) => r.map(cell).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `payment-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const copyText = (text, type) => {
@@ -281,12 +132,7 @@ export default function GatewayLogsModal({ isOpen, onClose, initialGateway = 'Al
               className="h-8.5 px-3 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-xs text-black dark:text-zinc-100 font-bold outline-none"
             >
               <option value="All">All Gateways</option>
-              <option value="Razorpay">Razorpay</option>
-              <option value="PhonePe">PhonePe</option>
-              <option value="Cashfree">Cashfree</option>
-              <option value="Paytm">Paytm</option>
-              <option value="Stripe">Stripe</option>
-              <option value="PayPal">PayPal</option>
+              {[...new Set(['Razorpay', ...gatewayNames])].map((name) => <option key={name} value={name}>{name}</option>)}
             </select>
 
             {/* Status filter */}
@@ -321,7 +167,7 @@ export default function GatewayLogsModal({ isOpen, onClose, initialGateway = 'Al
               <RotateCcw size={12} /> Reset
             </button>
             <button 
-              onClick={() => alert('Download logs triggered (PDF/CSV export simulation)')}
+              onClick={exportCsv}
               className="h-8.5 px-3 bg-[var(--primary)] text-white text-xs font-semibold rounded-lg hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 shadow-sm"
             >
               <Download size={12} /> Export CSV
@@ -336,7 +182,7 @@ export default function GatewayLogsModal({ isOpen, onClose, initialGateway = 'Al
             {filteredLogs.length === 0 ? (
               <div className="p-8 text-center flex flex-col items-center justify-center">
                 <AlertCircle className="text-zinc-400 mb-2" size={24} />
-                <p className="text-xs font-bold text-black dark:text-zinc-100">No logs match your filter criteria.</p>
+                <p className="text-xs font-bold text-black dark:text-zinc-100">{loadingLogs ? 'Loading payments...' : loadError || (logs.length === 0 ? 'No online payments have been made yet.' : 'No logs match your filter criteria.')}</p>
               </div>
             ) : (
               <table className="w-full text-left text-xs border-collapse">

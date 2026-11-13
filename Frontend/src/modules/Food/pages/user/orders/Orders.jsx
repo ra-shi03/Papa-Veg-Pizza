@@ -378,14 +378,17 @@ export default function Orders() {
               backendStatus === 'cancelled' ||
               backendStatus === 'cancelled_by_user' ||
               backendStatus === 'cancelled_by_restaurant' ||
+              backendStatus === 'cancelled_by_store' ||
               backendStatus === 'cancelled_by_admin'
             const cancellationReason = order.cancellationReason || ''
+            const cancellationMessage = order.cancellationMessage || ''
             // Check cancelledBy field first, then fallback to cancellation reason pattern
             const isRestaurantCancelled = isCancelled && (
               order.cancelledBy === 'restaurant' ||
+              backendStatus === 'cancelled_by_store' || backendStatus === 'cancelled_by_restaurant' ||
               /rejected by restaurant|restaurant rejected|restaurant cancelled|restaurant is too busy|item not available|outside delivery area|kitchen closing|technical issue|order not accepted within time limit|restaurant did not respond/i.test(cancellationReason)
             )
-            const isUserCancelled = isCancelled && order.cancelledBy === 'user'
+            const isUserCancelled = isCancelled && (order.cancelledBy === 'user' || backendStatus === 'cancelled_by_user')
 
             // Get original status from backend before transformation
             const originalStatus = backendStatus
@@ -431,6 +434,7 @@ export default function Orders() {
               review: order.review || null,
               tracking: order.tracking || {},
               cancellationReason: cancellationReason,
+              cancellationMessage: cancellationMessage,
               isRestaurantCancelled: isRestaurantCancelled,
               isUserCancelled: isUserCancelled,
               cancelledBy: order.cancelledBy,
@@ -1321,6 +1325,9 @@ Order again from this restaurant in the ${companyName} app.`
                         {order.cancellationReason && (
                           <p className="text-[10px] text-red-400 italic">Reason: {order.cancellationReason}</p>
                         )}
+                        {order.cancellationMessage && (
+                          <p className="text-[10px] text-gray-500 dark:text-gray-400">{order.cancellationMessage}</p>
+                        )}
                       </div>
                     )}
                     {isUserCancelled && (
@@ -1356,6 +1363,9 @@ Order again from this restaurant in the ${companyName} app.`
                       </div>
                       {order.cancellationReason && (
                         <p className="text-xs text-red-600 dark:text-red-400 font-medium ml-7 mb-1">Reason: {order.cancellationReason}</p>
+                      )}
+                      {order.cancellationMessage && (
+                        <p className="text-xs text-gray-700 dark:text-gray-300 ml-7 mb-1">{order.cancellationMessage}</p>
                       )}
                       <p className="text-xs text-gray-600 dark:text-gray-400 ml-7">Refund will be processed in 24-48 hours</p>
                     </div>

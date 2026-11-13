@@ -132,17 +132,36 @@ export const toOrderItems = (cartItems) => cartItems.map((item) => ({
 
 // ---- payment method (chosen on the Payment Options page, kept on the device)
 
-export const PAYMENT_METHODS = {
-  cash: { id: "cash", title: "Cash / UPI on Delivery", short: "Cash / UPI on\nDelivery" },
-  razorpay_test: { id: "razorpay_test", title: "Razorpay (Test)", short: "Razorpay\n(Test mode)" },
+export const CASH_METHOD = { id: "cash", kind: "cash", title: "Cash / UPI on Delivery", short: "Cash / UPI on\nDelivery" }
+
+// An online method comes from a gateway the super admin switched on (see usePaymentGateways).
+export const onlineMethod = (gateway) => {
+  const test = gateway.environment === "Sandbox"
+  return {
+    id: `online:${gateway.id}`,
+    kind: "online",
+    gatewayId: gateway.id,
+    provider: gateway.provider,
+    test,
+    title: `${gateway.displayName}${test ? " (Test)" : ""}`,
+    short: `${gateway.displayName}\n${test ? "(Test mode)" : "(Online)"}`,
+  }
 }
 
-// Cash is the default. If the super admin turned cash on delivery off, the online (test) method is used instead.
-export function readPaymentMethod(appConfig) {
+// What the customer pays with: their saved choice when it is still on offer, otherwise the best available method.
+// Cash is switched off by `codEnabled`, online payment by `paymentOptionEnabled` or by having no active gateway.
+export function readPaymentMethod(appConfig, gateways = []) {
+  const cashOn = appConfig?.codEnabled !== false
+  const online = appConfig?.paymentOptionEnabled === false ? [] : gateways
+  const fallbackOnline = online.find((g) => g.isDefault) || online[0]
   let saved = ""
   try { saved = localStorage.getItem("preferred_payment_method") || "" } catch (_) {}
-  const id = saved === "razorpay_test" ? "razorpay_test" : "cash"
-  if (id === "cash" && appConfig?.codEnabled === false && appConfig?.paymentOptionEnabled !== false) return PAYMENT_METHODS.razorpay_test
-  if (id === "razorpay_test" && appConfig?.paymentOptionEnabled === false) return PAYMENT_METHODS.cash
-  return PAYMENT_METHODS[id]
+
+  if (saved === "cash" && cashOn) return CASH_METHOD
+  if (saved.startsWith("online:") || saved === "razorpay_test") {
+    const chosen = online.find((g) => `online:${g.id}` === saved) || fallbackOnline
+    if (chosen) return onlineMethod(chosen)
+  }
+  if (cashOn) return CASH_METHOD
+  return fallbackOnline ? onlineMethod(fallbackOnline) : CASH_METHOD
 }

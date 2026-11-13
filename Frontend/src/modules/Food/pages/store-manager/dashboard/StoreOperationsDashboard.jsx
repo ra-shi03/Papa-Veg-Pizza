@@ -1,11 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react"
-import { useSearchParams } from "react-router-dom"
-import { 
-  Store, RefreshCw, AlertTriangle, ShieldCheck, Clock, Bell,
-  Calendar, CheckCircle, Wifi, Play, Pause, AlertOctagon, HelpCircle
-} from "lucide-react"
-import { toast } from "sonner"
-import apiClient from "@/services/api/axios"
+import React, { useState, useEffect } from "react"
 import { useOrderEvents } from "../api/storeOrdersApi"
 
 // Import modular components
@@ -23,45 +16,15 @@ import ActivityTimeline from "./components/ActivityTimeline"
 import NotificationsDrawer from "./components/NotificationsDrawer"
 
 export default function StoreOperationsDashboard() {
-  const [searchParams, setSearchParams] = useSearchParams()
-
   // Primary States
-  const [storeList, setStoreList] = useState([
-    { _id: "st-indore-01", name: "Indore Central (Vijay Nagar)" },
-    { _id: "st-bhopal-01", name: "Bhopal Hub (Arera Colony)" },
-    { _id: "st-ujjain-01", name: "Ujjain Express (Nanakheda)" }
-  ])
-  const [selectedStoreId, setSelectedStoreId] = useState(() => {
-    return localStorage.getItem("store_active_id") || "st-indore-01"
-  })
-  const [shiftStatus, setShiftStatus] = useState("Open") // Open, Closed, Busy
-  const [currentTime, setCurrentTime] = useState(new Date())
+  // A store manager's own store comes from their login on the server; a store is named here only when an admin
+  // opens a specific one.
+  const [selectedStoreId] = useState(() => localStorage.getItem("store_active_id") || undefined)
   const [refreshKey, setRefreshKey] = useState(0)
   
   // Real-Time Notification State
   const [showNotifDrawer, setShowNotifDrawer] = useState(false)
   const [notifications, setNotifications] = useState([])
-
-  // Clock Update
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
-    return () => clearInterval(timer)
-  }, [])
-
-  // API Call: Fetch stores
-  useEffect(() => {
-    const fetchStores = async () => {
-      try {
-        const response = await apiClient.get("/stores/list")
-        if (response.data?.stores) {
-          setStoreList(response.data.stores)
-        }
-      } catch (err) {
-        console.warn("Failed to fetch stores list from API, using high-fidelity mock list.", err)
-      }
-    }
-    fetchStores()
-  }, [])
 
   // Real-time: every order_event of this store (pushed by the server over the socket) refreshes the widgets.
   // A burst of events (one order moving through several steps) is folded into one refresh.

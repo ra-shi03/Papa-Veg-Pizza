@@ -14,7 +14,6 @@ import ComplaintDetailsModal from "./components/ComplaintDetailsModal";
 import ResolveComplaintModal from "./components/ResolveComplaintModal";
 
 // Local fallback database seeds for real-time stats calculation
-import { mockComplaints } from "./mockData";
 
 export default function Complaints() {
   const { role } = useOutletContext(); // Retrieve user role from outlet context
@@ -48,41 +47,17 @@ export default function Complaints() {
   const { data, isLoading, isError, refetch } = useComplaintsList(filters);
 
   // ----------------------------------------------------
-  // Dynamic Real-time Stats Calculation (Reads from localStorage if updated)
+  // Headline numbers: computed by the server over every complaint of the store
   // ----------------------------------------------------
-  const stats = useMemo(() => {
-    let localComplaints = mockComplaints;
-    let localRefunds = [];
-
-    const openComplaints = localComplaints.filter(c => c.status === "pending" || c.status === "investigating").length;
-    const criticalComplaints = localComplaints.filter(c => c.priority === "critical" && c.status !== "resolved").length;
-    
-    // Resolved Today relative to active demo date (June 25, 2026)
-    const resolvedToday = localComplaints.filter(c => {
-      if (c.status !== "resolved") return false;
-      const resDate = c.resolution?.resolvedAt || c.updatedAt;
-      return resDate && resDate.startsWith("2026-06-25");
-    }).length;
-
-    const pendingRefunds = localRefunds.filter(r => r.status === "pending").length || 1; // PVP-9085 is pending refund request
-    
-    // Average resolution time calculated from mock data
-    const resolvedComplaints = localComplaints.filter(c => c.status === "resolved");
-    let avgResolutionTime = "2.4 hours";
-    if (resolvedComplaints.length > 0) {
-      // Mock average logic
-      avgResolutionTime = "2.2 hours";
-    }
-
-    return {
-      openComplaints,
-      criticalComplaints,
-      resolvedToday,
-      pendingRefunds,
-      avgResolutionTime,
-      satisfactionScore: "94%"
-    };
-  }, [data]); // Recalculate whenever lists update or mutations succeed
+  const stats = useMemo(() => ({
+    openComplaints: 0,
+    criticalComplaints: 0,
+    resolvedToday: 0,
+    pendingRefunds: 0,
+    avgResolutionTime: "N/A",
+    satisfactionScore: "N/A",
+    ...(data?.stats || {}),
+  }), [data]);
 
   // ----------------------------------------------------
   // Callbacks: Filters, Pagination, & Sorting

@@ -10,20 +10,39 @@ try {
 
 import { config } from '../../../../config/env.js';
 
-const KEY_ID = config.razorpayKeyId || process.env.RAZORPAY_KEY_ID || '';
-const KEY_SECRET = config.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || '';
+const ENV_CREDENTIALS = {
+    keyId: config.razorpayKeyId || process.env.RAZORPAY_KEY_ID || '',
+    keySecret: config.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || '',
+    webhookSecret: config.razorpayWebhookSecret || process.env.RAZORPAY_WEBHOOK_SECRET || ''
+};
+
+// The active gateway saved by the super admin (Settings > Payment Gateways). null means none saved yet: .env is used.
+let activeCredentials = null;
+
+export function setRazorpayCredentials(credentials) {
+    activeCredentials = credentials || null;
+}
+
+const credentials = () => activeCredentials || ENV_CREDENTIALS;
 
 export function isRazorpayConfigured() {
-    return Boolean(KEY_ID && KEY_SECRET && Razorpay);
+    const { keyId, keySecret } = credentials();
+    return Boolean(keyId && keySecret && Razorpay);
 }
 
 export function getRazorpayKeyId() {
-    return KEY_ID;
+    return credentials().keyId;
 }
 
-export function getRazorpayInstance() {
-    if (!isRazorpayConfigured()) return null;
-    return new Razorpay({ key_id: KEY_ID, key_secret: KEY_SECRET });
+export function getRazorpayWebhookSecret() {
+    return credentials().webhookSecret || ENV_CREDENTIALS.webhookSecret;
+}
+
+// `override` lets the admin screen test keys before they are used for orders.
+export function getRazorpayInstance(override) {
+    const { keyId, keySecret } = override || credentials();
+    if (!(keyId && keySecret && Razorpay)) return null;
+    return new Razorpay({ key_id: keyId, key_secret: keySecret });
 }
 
 export function createRazorpayOrder(amountPaise, currency = 'INR', receipt = '') {
@@ -52,9 +71,10 @@ export function createPaymentLink({ amountPaise, currency = 'INR', description, 
 }
 
 export function verifyPaymentSignature(orderId, paymentId, signature) {
-    if (!KEY_SECRET) return false;
+    const secret = credentials().keySecret;
+    if (!secret) return false;
     const body = `${orderId}|${paymentId}`;
-    const expected = crypto.createHmac('sha256', KEY_SECRET).update(body).digest('hex');
+    const expected = crypto.createHmac('sha256', secret).update(body).digest('hex');
     return expected === signature;
 }
 

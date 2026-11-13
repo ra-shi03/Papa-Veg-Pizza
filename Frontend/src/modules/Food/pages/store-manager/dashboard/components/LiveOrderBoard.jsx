@@ -5,31 +5,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import apiClient from "@/services/api/axios"
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
-
-// Mock order lists by status
-const MOCK_LIVE_ORDERS = {
-  incoming: [
-    { orderNumber: "PV-8850", customer: "Rohan Malhotra", amount: 640, eta: "25m", status: "Incoming" },
-    { orderNumber: "PV-8849", customer: "Alok Gupta", amount: 480, eta: "20m", status: "Incoming" },
-    { orderNumber: "PV-8848", customer: "Pooja Patel", amount: 550, eta: "30m", status: "Incoming" }
-  ],
-  preparing: [
-    { orderNumber: "PV-8842", customer: "Amit Verma", amount: 590, eta: "12m", status: "Preparing" },
-    { orderNumber: "PV-8841", customer: "Isha Sharma", amount: 390, eta: "15m", status: "Preparing" },
-    { orderNumber: "PV-8840", customer: "Deepak Rawat", amount: 720, eta: "8m", status: "Preparing" },
-    { orderNumber: "PV-8843", customer: "Neha Sen", amount: 420, eta: "14m", status: "Preparing" },
-    { orderNumber: "PV-8844", customer: "Vijay Nair", amount: 650, eta: "10m", status: "Preparing" }
-  ],
-  ready: [
-    { orderNumber: "PV-8839", customer: "Karan Singh", amount: 340, eta: "0m", status: "Ready" },
-    { orderNumber: "PV-8837", customer: "Sanjay Jha", amount: 980, eta: "0m", status: "Ready" }
-  ],
-  delivery: [
-    { orderNumber: "PV-8830", customer: "Sunil Dutt", amount: 1150, eta: "18m", status: "Out For Delivery" },
-    { orderNumber: "PV-8828", customer: "Kriti Sen", amount: 460, eta: "22m", status: "Out For Delivery" }
-  ]
-}
 
 export default function LiveOrderBoard({ storeId, refreshKey, liveCounts }) {
   const [showLiveModal, setShowLiveModal] = useState(false)
@@ -57,8 +32,7 @@ export default function LiveOrderBoard({ storeId, refreshKey, liveCounts }) {
         const response = await apiClient.get("/store/dashboard/live-orders", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
-        return MOCK_LIVE_ORDERS
+        throw e
       }
     }
   })
@@ -70,7 +44,7 @@ export default function LiveOrderBoard({ storeId, refreshKey, liveCounts }) {
   }, [refetch])
 
   const EMPTY_BOARD = { incoming: [], preparing: [], ready: [], delivery: [] }
-  const localOrders = serverOrders || (STANDALONE_MOCK ? MOCK_LIVE_ORDERS : EMPTY_BOARD)
+  const localOrders = serverOrders || EMPTY_BOARD
   const countOf = (key) => (localOrders[key] || []).length
 
   const openStatusView = (status) => {

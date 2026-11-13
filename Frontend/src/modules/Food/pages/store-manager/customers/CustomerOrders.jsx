@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useOutletContext } from "react-router-dom";
 import { RefreshCw, FileDown, Download, Users, Check, Clock } from "lucide-react";
 import { toast } from "sonner";
+import apiClient from "@/services/api/axios";
 
 // Custom Hooks & Sub-components
 import { useCustomerOrdersList } from "./hooks/useCustomerOrders";
@@ -17,8 +18,6 @@ import RefundHistoryModal from "./components/RefundHistoryModal";
 import OrderTimelineModal from "./components/OrderTimelineModal";
 import DownloadInvoiceModal from "../orders/components/DownloadInvoiceModal";
 
-// Local fallback mock database imports for real-time stats calculation
-import { mockCustomers, mockOrders } from "./mockData";
 
 export default function CustomerOrders() {
   const { role } = useOutletContext(); // Retrieve user role from outlet context
@@ -61,37 +60,17 @@ export default function CustomerOrders() {
   const { data, isLoading, isError, refetch } = useCustomerOrdersList(filters);
 
   // ----------------------------------------------------
-  // Dynamic Real-time Stats Calculation (Independent of table filters)
+  // Headline numbers: computed by the server over the whole store, whatever the table is filtered to
   // ----------------------------------------------------
-  const stats = useMemo(() => {
-    const totalCustomers = mockCustomers.length;
-    
-    // Active inside last 30 days relative to active demo date (June 25, 2026)
-    const active30Days = mockCustomers.filter(c => {
-      const diffTime = Math.abs(new Date("2026-06-25T15:44:13+05:30") - new Date(c.lastOrderDate));
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays <= 30;
-    }).length;
-
-    const todayOrders = mockOrders.filter(o => o.createdAt.startsWith("2026-06-25")).length;
-    const returningCustomers = mockCustomers.filter(c => c.totalOrders > 1).length;
-    
-    const totalRev = mockCustomers.reduce((acc, c) => acc + c.totalSpent, 0);
-    const totalOrd = mockCustomers.reduce((acc, c) => acc + c.totalOrders, 0);
-    const avgOrderValue = totalOrd > 0 ? (totalRev / totalOrd) : 0;
-    
-    // PVP-9085 is pending refund request
-    const pendingRefunds = 1;
-
-    return {
-      totalCustomers,
-      active30Days,
-      todayOrders,
-      returningCustomers,
-      avgOrderValue,
-      pendingRefunds
-    };
-  }, []);
+  const stats = useMemo(() => ({
+    totalCustomers: 0,
+    active30Days: 0,
+    todayOrders: 0,
+    returningCustomers: 0,
+    avgOrderValue: 0,
+    pendingRefunds: 0,
+    ...(data?.stats || {}),
+  }), [data]);
 
   // ----------------------------------------------------
   // Callbacks: Filters, Pagination, & Sorting
@@ -154,27 +133,21 @@ export default function CustomerOrders() {
       setSelectedOrderId(payload);
       setModalVisibility(prev => ({ ...prev, refundHistory: true }));
     } else if (action === "downloadInvoice") {
-      // Map simplified table order to full invoice order
-      const orderData = mockOrders.find(o => o._id === payload._id || o.orderNumber === payload.orderNumber);
-      if (orderData) {
-        // Mock items list inside DownloadInvoiceModal
-        const invoicePayload = {
-          ...orderData,
-          customer: {
-            name: orderData.customerId === "cust-1" ? "Aarav Sharma" : "Customer",
-            phone: "9876543210",
-            email: "cust@gmail.com"
-          },
-          items: [
-            { name: "Veg Supreme Pizza", quantity: 1, subtotal: orderData.totalAmount }
-          ],
-          grandTotal: orderData.totalAmount
-        };
-        setSelectedInvoiceOrder(invoicePayload);
-        setModalVisibility(prev => ({ ...prev, invoice: true }));
-      } else {
-        toast.error("Invoice details not found.");
-      }
+      // The invoice is built from the real order (items, customer and payment) as the server has it
+      apiClient.get(`/food/store/customers/orders/${payload._id}`)
+        .then((res) => {
+          const d = res?.data?.data;
+          if (!d?.order) throw new Error("Order not found");
+          setSelectedInvoiceOrder({
+            ...d.order,
+            customer: { name: d.order.customerName, phone: d.order.customerMobile, email: d.order.customerEmail },
+            items: d.items || [],
+            paymentMethod: d.payments?.[0]?.method || d.order.paymentMethod || "",
+            grandTotal: d.order.totalAmount,
+          });
+          setModalVisibility(prev => ({ ...prev, invoice: true }));
+        })
+        .catch((err) => toast.error(err?.response?.data?.message || "Invoice details not found."));
     }
   };
 

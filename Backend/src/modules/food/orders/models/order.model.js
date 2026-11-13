@@ -344,6 +344,7 @@ const orderSchema = new mongoose.Schema(
         },
         customerName: { type: String, default: '', trim: true },
         customerPhone: { type: String, default: '', trim: true },
+        customerEmail: { type: String, default: '', trim: true, lowercase: true },
         pricing: {
             type: pricingSchema,
             required: false
@@ -394,6 +395,12 @@ const orderSchema = new mongoose.Schema(
             default: () => ({})
         },
         storeNote: { type: String, default: '', trim: true },
+        // Why the store rejected / cancelled the order, and the message it wrote for the customer
+        cancellation: {
+            reason: { type: String, default: '', trim: true },
+            message: { type: String, default: '', trim: true },
+            at: { type: Date, default: null }
+        },
         note: { type: String, default: '', trim: true },
         train: {
             // The PNR is not kept here: it is only part of the rider's delivery note (note)

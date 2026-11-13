@@ -279,6 +279,7 @@ export async function createOrder(userId, dto) {
     deliveryAddress,
     customerName: dto.customerName || deliveryAddress.fullName || "",
     customerPhone: dto.customerPhone || deliveryAddress.phone || "",
+    customerEmail: dto.customerEmail || "",
     pricing: normalizedPricing,
     payment,
     orderStatus: "created",
@@ -365,12 +366,25 @@ export async function createOrder(userId, dto) {
     throw err;
   }
 
-  // Phase 2: store financials in ledger only.
-  await foodTransactionService.createInitialTransaction({
-    ...(order.toObject?.() || order),
-    pricing: normalizedPricing,
-    payment,
-  });
+  // Phase 2: store financials in ledger only. If this fails the order must not stay behind: the customer was told
+  // it failed and would place it again, and the store would be left with an order that has no finance record.
+  try {
+    await foodTransactionService.createInitialTransaction({
+      ...(order.toObject?.() || order),
+      pricing: normalizedPricing,
+      payment,
+    });
+  } catch (err) {
+    if (walletHold) {
+      // Money has already been taken from the wallet; undoing that needs a refund, so keep the order and shout.
+      logger.error(`Order ${order._id} was paid from the wallet but its finance record failed: ${err.message}`);
+    } else {
+      await releaseOfferClaims(spentOfferClaims);
+      await FoodOrder.deleteOne({ _id: order._id }).catch(() => {});
+      logger.error(`Order ${order._id} rolled back because its finance record failed: ${err.message}`);
+    }
+    throw err;
+  }
 
   if (paymentMethod === "razorpay" && payment?.razorpay?.orderId) {
     // Audit can still happen here or via FinanceService events
@@ -638,7 +652,7 @@ export async function getOrderById(
   const order = await FoodOrder.findOne(identity)
     .populate(
       "storeId",
-      "storeName phone profileImage area city location rating totalRatings phone",
+      "storeName phone profileImage area city state pincode address latitude longitude location rating totalRatings phone",
     )
     .populate("dispatch.deliveryPartnerId", "name fullName phone phoneNumber rating totalRatings profileImage avatar")
     .populate("userId", "name fullName phone email")
@@ -1139,7 +1153,8 @@ export async function updateOrderStatusStore(
   orderId,
   storeId,
   orderStatus,
-  note = ""
+  note = "",
+  extra = {}
 ) {
   const identity = buildOrderIdentityFilter(orderId);
   let order = await FoodOrder.findOne({
@@ -1159,6 +1174,11 @@ export async function updateOrderStatusStore(
     to: orderStatus,
     note: note || ""
   });
+  // The reason and the store's message to the customer stay with the order, so the customer app can show them.
+  const customerMessage = String(extra.customerMessage || "").trim().slice(0, 300);
+  if (String(orderStatus).includes("cancel")) {
+    order.cancellation = { reason: String(note || "").trim(), message: customerMessage, at: new Date() };
+  }
   await order.save();
 
   if (orderStatus === "delivered") awardOrderPointsSafely(order._id);
@@ -1182,7 +1202,8 @@ export async function updateOrderStatusStore(
     const refundDetail = isOnlinePaid ? ` Your refund of ₹${order.pricing.total} is being processed and will be credited to your original payment method within 5-7 working days.` : "";
     
     title = "Order Cancelled ❌";
-    body = `Unfortunately, your order has been cancelled by the store.${refundDetail}`;
+    const why = String(note || "").trim();
+    body = `Unfortunately, your order has been cancelled by the store.${why ? ` Reason: ${why}.` : ""}${customerMessage ? ` ${customerMessage}` : ""}${refundDetail}`;
   }
 
   // Real-time: status update to store room.
@@ -2067,7 +2088,7 @@ export const getOrderHistoryPublic = async (phone, orderId) => {
     },
     {
       title: isCancelled ? "Order Cancelled" : "Delivered",
-      description: isCancelled ? (order.cancellationReason || "Order was cancelled") : "Order delivered safely",
+      description: isCancelled ? (order.cancellation?.reason || order.cancellationReason || "Order was cancelled") : "Order delivered safely",
       timestamp: isCancelled ? (order.cancelledAt || order.updatedAt) : (order.deliveredAt || null),
       completed: isCancelled || ["delivered", "completed"].includes(status),
       isCancelled
@@ -2083,7 +2104,8 @@ export const getOrderHistoryPublic = async (phone, orderId) => {
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
     deliveredAt: order.deliveredAt,
-    cancellationReason: order.cancellationReason || order.note || "",
+    cancellationReason: isCancelled ? (order.cancellation?.reason || order.statusHistory?.findLast?.((h) => h.to?.includes("cancel"))?.note || order.cancellationReason || "") : "",
+    cancellationMessage: isCancelled ? (order.cancellation?.message || "") : "",
     customer: {
       name: order.customerName || order.userId?.name || order.deliveryAddress?.name || "Customer",
       phone: order.customerPhone || order.deliveryAddress?.phone || order.userId?.phone || ""

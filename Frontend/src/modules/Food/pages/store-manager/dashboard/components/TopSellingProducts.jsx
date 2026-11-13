@@ -3,27 +3,6 @@ import { useQuery } from "@tanstack/react-query"
 import { Award, Eye, X, Pizza, TrendingUp, BarChart3 } from "lucide-react"
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar } from "recharts"
 import apiClient from "@/services/api/axios"
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
-
-// Mock top products
-const MOCK_TOP_PRODUCTS = [
-  { productName: "Paneer Tikka Pizza", sold: 82, revenue: 24600 },
-  { productName: "Double Cheese Margherita", sold: 68, revenue: 18360 },
-  { productName: "Farmhouse Delight", sold: 54, revenue: 15120 },
-  { productName: "Veg Supreme Feast", sold: 41, revenue: 13530 },
-  { productName: "Capsicum Onion Classic", sold: 35, revenue: 7700 }
-]
-
-// Mock trend charts
-const MOCK_TRENDS = [
-  { name: "Mon", sales: 12 },
-  { name: "Tue", sales: 15 },
-  { name: "Wed", sales: 18 },
-  { name: "Thu", sales: 14 },
-  { name: "Fri", sales: 22 },
-  { name: "Sat", sales: 30 },
-  { name: "Sun", sales: 26 }
-]
 
 export default function TopSellingProducts({ storeId, refreshKey }) {
   const [selectedProduct, setSelectedProduct] = useState(null)
@@ -37,8 +16,7 @@ export default function TopSellingProducts({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/top-products", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
-        return MOCK_TOP_PRODUCTS
+        throw e
       }
     }
   })
@@ -141,7 +119,7 @@ export default function TopSellingProducts({ storeId, refreshKey }) {
             <div className="h-44 w-full">
               <span className="text-[9px] font-black text-slate-400 uppercase block mb-2">Demand Curve (Weekly Volume)</span>
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={MOCK_TRENDS} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}>
+                <AreaChart data={selectedProduct.trend || []} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}>
                   <defs>
                     <linearGradient id="prodColor" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor={primaryColor} stopOpacity={0.3} />

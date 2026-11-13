@@ -9,6 +9,7 @@ import { Role } from '../../../../core/roles/models/role.model.js';
 import { updateOrderStatusStore } from '../../orders/services/order.service.js';
 import { pushStatusHistory } from '../../orders/services/order.helpers.js';
 import { Refund } from '../../../../core/payments/models/refund.model.js';
+import { getIO, rooms } from '../../../../config/socket.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 
 // ---------------------------------------------------------------------------------------------
@@ -99,7 +100,7 @@ export const toOpsOrder = (order) => {
     customer: {
       name: o.customerName || user?.name || 'Customer',
       phone: o.customerPhone || user?.phone || user?.mobile || '',
-      email: user?.email || '',
+      email: o.customerEmail || user?.email || '',
       loyaltyPoints: 0,
       previousOrdersCount: 0,
     },
@@ -116,6 +117,8 @@ export const toOpsOrder = (order) => {
     orderSource: 'App',
     paymentStatus: payment.status === 'paid' ? 'paid' : payment.status === 'refunded' ? 'refunded' : 'pending',
     paymentMethod: payment.method === 'cash' ? 'COD' : 'Online',
+    transactionId: payment.razorpay?.paymentId || '',
+    scheduledTime: o.scheduledAt || null,
     deliveryAddress: {
       houseNumber: addr.street || '',
       street: '',
@@ -145,6 +148,9 @@ export const toOpsOrder = (order) => {
     })),
     subtotal: pricing.subtotal || 0,
     discountAmount: pricing.discount || 0,
+    couponId: pricing.couponCode || '',
+    platformFee: pricing.platformFee || 0,
+    handlingFee: pricing.handlingFee || 0,
     taxes: pricing.tax || 0,
     deliveryCharges: pricing.deliveryFee || 0,
     packingCharges: pricing.packagingFee || 0,
@@ -404,7 +410,7 @@ export async function rejectOrder(user, orderId, payload = {}) {
   if (order.orderStatus !== 'created') throw new ValidationError('Only new orders can be rejected here');
   const reason = String(payload.cancelReason || payload.reason || 'Rejected by store').trim();
 
-  await updateOrderStatusStore(String(order._id), storeId, 'cancelled_by_store', reason);
+  await updateOrderStatusStore(String(order._id), storeId, 'cancelled_by_store', reason, { customerMessage: payload.customerMessage });
 
   const fresh = await findOrder(order._id, storeId);
   if (payload.initiateRefund && fresh.payment?.status === 'paid') {
@@ -516,6 +522,32 @@ export async function updateKitchenStage(user, orderId, payload = {}) {
  * which also notifies the customer and starts rider dispatch), the kitchen stage, the history and the staff tasks.
  * Callers have already checked that the caller may do this.
  */
+const STAGE_MESSAGES = {
+  pending: 'Your order is in the kitchen queue',
+  preparing: 'Our chefs are preparing your pizza',
+  baking: 'Your pizza is baking in the oven',
+  packaging: 'Your order is being packed',
+  ready: 'Your order is ready',
+};
+
+// Tells the customer's tracking page (and the store panels) the kitchen moved on, so nothing needs a refresh.
+function emitKitchenStage(order, stage) {
+  try {
+    const io = getIO();
+    if (!io) return;
+    const payload = {
+      orderMongoId: String(order._id),
+      orderId: order.orderId,
+      orderStatus: order.orderStatus,
+      kitchenStage: stage,
+      title: 'Order update',
+      message: STAGE_MESSAGES[stage] || 'Your order status changed',
+    };
+    if (order.userId) io.to(rooms.user(order.userId)).emit('order_status_update', payload);
+    io.to(rooms.store(order.storeId)).emit('order_status_update', payload);
+  } catch { /* realtime is best-effort */ }
+}
+
 export async function moveToStage(user, storeId, order, stage) {
   if (stage === 'ready') {
     await updateOrderStatusStore(String(order._id), storeId, 'ready_for_pickup', 'Packed and ready for pickup');
@@ -528,6 +560,7 @@ export async function moveToStage(user, storeId, order, stage) {
   if (stage === 'ready') fresh.kitchen.readyAt = new Date();
   logStep(fresh, user, `Kitchen stage: ${stage}`);
   await fresh.save();
+  emitKitchenStage(fresh, stage);
 
   const taskUpdate = stage === 'ready'
     ? { status: 'completed', completedAt: new Date() }

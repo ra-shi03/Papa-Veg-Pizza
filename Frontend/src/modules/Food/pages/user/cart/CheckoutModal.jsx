@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft, MapPin, Check, User, Clock, ShieldCheck, CreditCard, ChevronRight, AlertTriangle } from "lucide-react"
+import { ArrowLeft, MapPin, Check, User, Clock, ShieldCheck, CreditCard, ChevronRight, AlertTriangle, Home as HomeIcon, Navigation, MessageSquare } from "lucide-react"
 import { useCart } from "@food/context/CartContext"
 import { useProfile } from "@food/context/ProfileContext"
 import { useAppConfig } from "@food/context/AppConfigContext"
 import { motion, AnimatePresence } from "framer-motion"
-import RazorpayPayment from "./RazorpayPayment"
+import { initRazorpayPayment } from "@food/utils/razorpay"
+import { usePaymentGateways } from "./usePaymentGateways"
 import apiClient from "@/services/api/axios"
 import { orderAPI, userAPI } from "@food/api"
 import { toast } from "sonner"
 import { slotLabel, toOrderItems, readPaymentMethod } from "./cartHelpers"
+import CheckoutStepper from "./CheckoutStepper"
 import { readTrainJourney, trainOrderFields, trainStoreQuery } from "@food/utils/trainJourney"
 import {
   addressProblem,
@@ -44,15 +46,18 @@ export default function CheckoutModal({
   const { config: appConfig } = useAppConfig()
   const isPaymentOptionDisabled = appConfig?.paymentOptionEnabled === false
   // Chosen on the Payment Options page
-  const payMethod = readPaymentMethod(appConfig)
+  const payMethod = readPaymentMethod(appConfig, usePaymentGateways())
   const isLoggedIn = localStorage.getItem("user_authenticated") === "true" || !!localStorage.getItem("user_accessToken")
   const isGuestCheckoutBlocked = appConfig?.guestCheckoutEnabled === false && !isLoggedIn
 
   // Navigation / View state: "address", "checkout", "contact_edit", "payment"
   const [modalView, setModalView] = useState("address")
+  // A saved address that is already complete goes straight to the summary, once per time the checkout opens
+  const skippedAddressStep = useRef(false)
 
   // Form inputs
   const [houseNumber, setHouseNumber] = useState("")
+  const [houseError, setHouseError] = useState("")
   const [landmark, setLandmark] = useState("")
   const [instructions, setInstructions] = useState("")
   // The address this order goes to (checkoutDetails.js); null until the customer has selected one
@@ -84,7 +89,8 @@ export default function CheckoutModal({
   // Sync current location on mount/show
   useEffect(() => {
     if (show) {
-      setModalView("address") // always start with address form first
+      setModalView("address") // start with the address form; a complete saved address skips it (below)
+      skippedAddressStep.current = false
     }
   }, [show])
 
@@ -106,6 +112,11 @@ export default function CheckoutModal({
       const journey = selected?.kind === "service" ? readTrainJourney() : null
       setHouseNumber(selected?.kind === "saved" ? selected.street : journey ? `Coach ${journey.coach}, Seat ${journey.seat}` : "")
       setLandmark(selected?.kind === "saved" ? selected.additionalDetails : "")
+    }
+    // The customer already saved this address with its house / flat number: nothing to ask, they can edit it from the summary
+    if (!skippedAddressStep.current && selected?.kind === "saved" && String(selected.street || "").trim()) {
+      skippedAddressStep.current = true
+      setModalView("checkout")
     }
   }, [show, addresses])
 
@@ -160,6 +171,16 @@ export default function CheckoutModal({
     setModalView("checkout")
   }
 
+  // Tapping a finished step in the progress bar goes back to it
+  const goToStep = (index) => {
+    if (index === 0) triggerContactEdit()
+    else if (index === 1) setModalView("address")
+    else if (index === 2 && !isPaymentOptionDisabled) {
+      onClose()
+      navigate("/user/account/profile-details/payments", { state: { from: "checkout", total } })
+    }
+  }
+
   // Open Contact editing
   const triggerContactEdit = () => {
     setEditName(contactName)
@@ -194,6 +215,49 @@ export default function CheckoutModal({
 
   // Final Order placement
   const [placingOrder, setPlacingOrder] = useState(false)
+
+  // Pays an online order through Razorpay's own checkout. "paid": verified by the server; "unverified": the customer
+  // paid but the server could not confirm it yet (the order stays); "abandoned": not paid, so the order is cancelled
+  // and the cart is kept for another try.
+  const collectOnlinePayment = async (orderId, razorpay) => {
+    const abandon = async (message) => {
+      try { await orderAPI.cancelOrder(orderId, { reason: "Online payment was not completed" }) } catch (_) {}
+      toast.error(message)
+      return "abandoned"
+    }
+    if (!razorpay?.key || !razorpay?.orderId) return abandon("Online payment is not available right now. Please choose Cash on Delivery.")
+    return new Promise((resolve) => {
+      let settled = false
+      const finish = (value) => { if (!settled) { settled = true; resolve(value) } }
+      initRazorpayPayment({
+        key: razorpay.key,
+        amount: razorpay.amount,
+        currency: razorpay.currency,
+        order_id: razorpay.orderId,
+        description: "Papa Veg Pizza order",
+        prefill: { name: contactName, email: contactEmail, contact: contactPhone },
+        notes: { orderId: String(orderId) },
+        handler: async (res) => {
+          try {
+            await orderAPI.verifyPayment({
+              orderId: String(orderId),
+              razorpayOrderId: res.razorpay_order_id,
+              razorpayPaymentId: res.razorpay_payment_id,
+              razorpaySignature: res.razorpay_signature,
+            })
+            finish("paid")
+          } catch (err) {
+            toast.error(`Payment received (${res.razorpay_payment_id}) but not confirmed yet. Please contact support if it does not update.`)
+            finish("unverified")
+          }
+        },
+        onClose: () => { if (!settled) abandon("Payment was cancelled. Your cart is still here.").then(finish) },
+        onError: (err) => toast.error(err?.description || "Payment failed. You can try again."),
+      }).catch(() => {
+        if (!settled) abandon("Could not open the payment window. Please try again.").then(finish)
+      })
+    })
+  }
 
   const handleSaveAddressAndCheckout = async () => {
     // true only when the order was placed: the payment screen shows success from this
@@ -232,6 +296,7 @@ export default function CheckoutModal({
 
     // Pick the store that serves this delivery location, then place the order with it.
     let orderId
+    let razorpayPayload = null
     setPlacingOrder(true)
     try {
       const point = selectedAddress.point
@@ -248,6 +313,7 @@ export default function CheckoutModal({
         storeId: store.storeId,
         customerName: orderDetails.customerName,
         customerPhone: orderDetails.customerPhone,
+        ...(orderDetails.customerEmail ? { customerEmail: orderDetails.customerEmail } : {}),
         address: {
           ...orderDetails.address,
           street: isTrain && savedDeliveryAddress ? savedDeliveryAddress : orderDetails.address.street,
@@ -265,17 +331,25 @@ export default function CheckoutModal({
           discount,
           total,
         },
-        // The in-app payment screen is a preview, so orders are placed as pay-on-delivery.
-        paymentMethod: "cash",
+        // What the customer chose on the Payment Options page: online goes through Razorpay, otherwise pay on delivery
+        paymentMethod: payMethod.kind === "online" ? "razorpay" : "cash",
         note: instructions.trim(),
       }, { contact, selected: selectedAddress }))
       const created = response?.data?.data?.order
       orderId = created?._id || created?.id
+      razorpayPayload = response?.data?.data?.razorpay || null
       if (!orderId) throw new Error("Order could not be created")
     } catch (err) {
       setPlacingOrder(false)
       toast.error(err?.response?.data?.error || err?.response?.data?.message || err?.message || "Could not place your order")
       return false
+    }
+    if (payMethod.kind === "online") {
+      const result = await collectOnlinePayment(orderId, razorpayPayload)
+      if (result === "abandoned") {
+        setPlacingOrder(false)
+        return false
+      }
     }
     setPlacingOrder(false)
 
@@ -354,127 +428,142 @@ export default function CheckoutModal({
             {modalView === "address" && (
               <>
                 {/* Step Progress Bar Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b relative" style={{ borderColor: isDarkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
-                  {/* Contact Step */}
-                  <div className="flex flex-col items-center flex-1 relative z-10">
-                    <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-white text-[9px] font-black shadow-sm">
-                      <Check className="w-3 h-3 text-white stroke-[3px]" />
-                    </div>
-                    <span className="text-[9px] font-semibold mt-1 opacity-70">Contact</span>
-                    <div className="absolute top-2.5 left-[50%] right-[-50%] h-[2px] bg-primary -z-10"></div>
-                  </div>
-                  
-                  {/* Address Step */}
-                  <div className="flex flex-col items-center flex-1 relative z-10">
-                    <div className="w-5 h-5 rounded-full border-2 border-primary flex items-center justify-center bg-white dark:bg-[#111111] shadow-sm">
-                      <div className="w-2 h-2 rounded-full bg-primary"></div>
-                    </div>
-                    <span className="text-[9px] font-black text-primary mt-1">Address</span>
-                    <div className="absolute top-2.5 left-[-50%] right-[50%] h-[2px] bg-primary -z-10"></div>
-                    <div className="absolute top-2.5 left-[50%] right-[-50%] h-[2px] bg-primary -z-10"></div>
-                  </div>
-
-                  {/* Payment Step */}
-                  <div className="flex flex-col items-center flex-1 relative z-10">
-                    <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-white text-[9px] font-black shadow-sm">
-                      <Check className="w-3 h-3 text-white stroke-[3px]" />
-                    </div>
-                    <span className="text-[9px] font-semibold mt-1 opacity-70">Payment</span>
-                    <div className="absolute top-2.5 left-[-50%] right-[50%] h-[2px] bg-primary -z-10"></div>
-                    <div className="absolute top-2.5 left-[50%] right-[-50%] h-[2px] bg-zinc-200 dark:bg-zinc-800 -z-10"></div>
-                  </div>
-
-                  {/* Checkout Step */}
-                  <div className="flex flex-col items-center flex-1 relative z-10">
-                    <div className="w-5 h-5 rounded-full border-2 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111111] shadow-sm"></div>
-                    <span className="text-[9px] font-semibold mt-1 opacity-50">Checkout</span>
-                    <div className="absolute top-2.5 left-[-50%] right-[50%] h-[2px] bg-zinc-200 dark:bg-zinc-800 -z-10"></div>
-                  </div>
-                </div>
+                <CheckoutStepper current={1} onStepClick={goToStep} isDarkMode={isDarkMode} />
 
                 {/* Title Bar */}
-                <div className="px-4 py-3.5 flex items-center gap-3 border-b" style={{ borderColor: isDarkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
-                  <button 
-                    onClick={onClose} 
-                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-850 cursor-pointer border-0 bg-transparent"
+                <div className="px-4 pt-3.5 pb-3 flex items-center gap-3">
+                  <button
+                    onClick={() => (skippedAddressStep.current ? setModalView("checkout") : onClose())}
+                    aria-label="Back"
+                    className="w-9 h-9 shrink-0 flex items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 cursor-pointer border-0 active:scale-95 transition-all"
                   >
-                    <ArrowLeft className="w-5 h-5 text-zinc-800 dark:text-white stroke-[2.5px]" />
+                    <ArrowLeft className="w-[18px] h-[18px] text-zinc-800 dark:text-white stroke-[2.5px]" />
                   </button>
-                  <h1 className="text-sm sm:text-base font-black tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    Help us deliver to you faster
-                  </h1>
-                </div>
-
-                {/* Current Location Info */}
-                <div className="px-5 py-4 border-b flex items-start gap-3" style={{ borderColor: isDarkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
-                  <MapPin className="text-zinc-400 dark:text-zinc-500 w-5 h-5 shrink-0 mt-0.5" />
-                  <div className="space-y-0.5">
-                    <span className="text-[8px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest block leading-none">Delivering to</span>
-                    <p className="text-xs font-bold leading-normal opacity-90">
-                      {currentAddress}
+                  <div className="min-w-0">
+                    <h1 className="text-[15px] font-black tracking-tight leading-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      Help us deliver to you faster
+                    </h1>
+                    <p className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 leading-tight mt-0.5">
+                      A few details help the delivery partner find you.
                     </p>
                   </div>
                 </div>
 
-                {/* Form Inputs Container */}
-                <div className="p-5 space-y-4 overflow-y-auto" style={{ maxHeight: "40vh" }}>
-                  {/* House/Flat Number */}
+                {/* Scrollable form */}
+                <div className="px-4 pb-4 space-y-4 overflow-y-auto min-h-0 flex-1">
+                  {/* Delivering to */}
+                  <div className="flex items-center gap-3 rounded-2xl p-3 border bg-primary/5 dark:bg-primary/10" style={{ borderColor: isDarkMode ? "rgba(255,255,255,0.08)" : "rgba(229,57,53,0.16)" }}>
+                    <span className="w-10 h-10 shrink-0 rounded-full bg-primary/15 flex items-center justify-center">
+                      <MapPin className="w-5 h-5 text-primary" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[9px] font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-widest block leading-none">Delivering to</span>
+                      <p className="text-xs font-bold leading-snug mt-1 line-clamp-2">{currentAddress}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose()
+                        const base = window.location.pathname.startsWith("/food") ? "/food" : ""
+                        navigate(`${base}/user/location/setup`, { state: { from: window.location.pathname } })
+                      }}
+                      className="shrink-0 text-[11px] font-black text-primary bg-transparent border-0 cursor-pointer px-1 py-1"
+                    >
+                      Change
+                    </button>
+                  </div>
+
+                  {/* House / flat number */}
                   <div className="space-y-1.5 text-left">
-                    <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                      House number or flat number
+                    <label htmlFor="checkout-house" className="text-[11px] font-bold text-zinc-600 dark:text-zinc-300 flex items-center gap-1">
+                      House / flat number <span className="text-primary">*</span>
                     </label>
-                    <input 
-                      type="text" 
-                      value={houseNumber}
-                      onChange={(e) => setHouseNumber(e.target.value)}
-                      placeholder="House number or flat number"
-                      className="w-full px-4 py-3 text-xs rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-850 dark:text-zinc-200 focus:outline-none focus:border-primary transition-all font-semibold shadow-2xs"
-                    />
+                    <div className="relative">
+                      <HomeIcon className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 ${houseError ? "text-primary" : "text-zinc-400 dark:text-zinc-500"}`} />
+                      <input
+                        id="checkout-house"
+                        type="text"
+                        value={houseNumber}
+                        onChange={(e) => { setHouseNumber(e.target.value); if (houseError) setHouseError("") }}
+                        placeholder="e.g. Flat 302, Tower B"
+                        autoComplete="address-line1"
+                        aria-invalid={!!houseError}
+                        className={`w-full pl-10 pr-4 py-3.5 text-[13px] rounded-xl border bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:bg-white dark:focus:bg-zinc-900 focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all font-semibold ${houseError ? "border-primary" : "border-zinc-200 dark:border-zinc-800"}`}
+                      />
+                    </div>
+                    {houseError && <p role="alert" className="text-[11px] font-semibold text-primary">{houseError}</p>}
                   </div>
 
                   {/* Landmark */}
                   <div className="space-y-1.5 text-left">
-                    <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                      Address Line 2 (Optional)
+                    <label htmlFor="checkout-landmark" className="text-[11px] font-bold text-zinc-600 dark:text-zinc-300">
+                      Landmark <span className="font-medium text-zinc-400">(optional)</span>
                     </label>
-                    <input 
-                      type="text" 
-                      value={landmark}
-                      onChange={(e) => setLandmark(e.target.value)}
-                      placeholder="Landmark"
-                      className="w-full px-4 py-3 text-xs rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-850 dark:text-zinc-200 focus:outline-none focus:border-primary transition-all font-semibold shadow-2xs"
-                    />
+                    <div className="relative">
+                      <Navigation className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 dark:text-zinc-500" />
+                      <input
+                        id="checkout-landmark"
+                        type="text"
+                        value={landmark}
+                        onChange={(e) => setLandmark(e.target.value)}
+                        placeholder="e.g. Near City Mall gate"
+                        autoComplete="address-line2"
+                        className="w-full pl-10 pr-4 py-3.5 text-[13px] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:bg-white dark:focus:bg-zinc-900 focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all font-semibold"
+                      />
+                    </div>
                   </div>
 
-                  {/* Delivery Instructions */}
-                  <div className="space-y-1.5 text-left">
-                    <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                      Delivery instructions (Optional)
+                  {/* Delivery instructions */}
+                  <div className="space-y-2 text-left">
+                    <label htmlFor="checkout-notes" className="text-[11px] font-bold text-zinc-600 dark:text-zinc-300">
+                      Delivery instructions <span className="font-medium text-zinc-400">(optional)</span>
                     </label>
-                    <textarea 
-                      value={instructions}
-                      onChange={(e) => setInstructions(e.target.value)}
-                      placeholder="E.g. leave at the door"
-                      rows={3}
-                      className="w-full px-4 py-3 text-xs rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-850 dark:text-zinc-200 focus:outline-none focus:border-primary transition-all font-semibold resize-none shadow-2xs"
-                    />
+                    <div className="flex flex-wrap gap-1.5">
+                      {["Leave at the door", "Call on arrival", "Don't ring the bell"].map((chip) => {
+                        const on = instructions.includes(chip)
+                        return (
+                          <button
+                            key={chip}
+                            type="button"
+                            onClick={() => setInstructions((prev) => (prev.includes(chip) ? prev.replace(chip, "").replace(/\s*[.,]\s*$/, "").trim() : (prev.trim() ? `${prev.trim().replace(/[.,]$/, "")}. ${chip}` : chip)).slice(0, 200))}
+                            className={`px-3 py-1.5 rounded-full text-[11px] font-bold border cursor-pointer transition-all active:scale-95 ${on ? "bg-primary text-white border-primary" : "bg-transparent text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:border-primary/50"}`}
+                          >
+                            {chip}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <div className="relative">
+                      <MessageSquare className="absolute left-3.5 top-3.5 w-4 h-4 text-zinc-400 dark:text-zinc-500" />
+                      <textarea
+                        id="checkout-notes"
+                        value={instructions}
+                        onChange={(e) => setInstructions(e.target.value.slice(0, 200))}
+                        placeholder="Anything else the delivery partner should know?"
+                        rows={3}
+                        className="w-full pl-10 pr-4 py-3 text-[13px] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:bg-white dark:focus:bg-zinc-900 focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all font-semibold resize-none"
+                      />
+                      <span className="absolute right-3 bottom-2 text-[10px] font-medium text-zinc-400">{instructions.length}/200</span>
+                    </div>
                   </div>
                 </div>
 
                 {/* Save/Action Button */}
-                <div className="p-5 border-t" style={{ borderColor: isDarkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
-                  <button 
+                <div className="px-4 pt-3 pb-5 border-t bg-white dark:bg-[#111111]" style={{ borderColor: isDarkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)", boxShadow: "0 -8px 20px rgba(0,0,0,0.04)" }}>
+                  <button
                     onClick={() => {
                       if (blockedByAddress()) return
                       if (!houseNumber.trim()) {
-                        alert("House number or flat number is required")
+                        setHouseError("Please add your house or flat number")
+                        document.getElementById("checkout-house")?.focus()
                         return
                       }
                       setModalView("checkout") // transition to checkout dashboard
                     }}
-                    className="w-full h-12 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border-0 bg-primary hover:bg-primary-hover text-white active:scale-95 cursor-pointer shadow-md shadow-primary/10"
+                    className="w-full h-12 rounded-xl text-[13px] font-extrabold tracking-wide transition-all border-0 bg-primary hover:bg-primary-hover text-white active:scale-[0.98] cursor-pointer shadow-lg shadow-primary/25 flex items-center justify-center gap-1.5"
                   >
-                    Save address details
+                    Save address &amp; continue
+                    <ChevronRight className="w-[18px] h-[18px]" />
                   </button>
                 </div>
               </>
@@ -484,51 +573,23 @@ export default function CheckoutModal({
             {modalView === "checkout" && (
               <>
                 {/* Step Progress Bar Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b relative" style={{ borderColor: isDarkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}>
-                  {/* Contact Step */}
-                  <div className="flex flex-col items-center flex-1 relative z-10">
-                    <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-white text-[9px] font-black shadow-sm">
-                      <Check className="w-3 h-3 text-white stroke-[3px]" />
-                    </div>
-                    <span className="text-[9px] font-semibold mt-1 opacity-70">Contact</span>
-                    <div className="absolute top-2.5 left-[50%] right-[-50%] h-[2px] bg-primary -z-10"></div>
-                  </div>
-                  
-                  {/* Address Step */}
-                  <div className="flex flex-col items-center flex-1 relative z-10">
-                    <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-white text-[9px] font-black shadow-sm">
-                      <Check className="w-3 h-3 text-white stroke-[3px]" />
-                    </div>
-                    <span className="text-[9px] font-semibold mt-1 opacity-70">Address</span>
-                    <div className="absolute top-2.5 left-[-50%] right-[50%] h-[2px] bg-primary -z-10"></div>
-                    <div className="absolute top-2.5 left-[50%] right-[-50%] h-[2px] bg-primary -z-10"></div>
-                  </div>
-
-                  {/* Payment Step */}
-                  <div className="flex flex-col items-center flex-1 relative z-10">
-                    <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-white text-[9px] font-black shadow-sm">
-                      <Check className="w-3 h-3 text-white stroke-[3px]" />
-                    </div>
-                    <span className="text-[9px] font-semibold mt-1 opacity-70">Payment</span>
-                    <div className="absolute top-2.5 left-[-50%] right-[50%] h-[2px] bg-primary -z-10"></div>
-                    <div className="absolute top-2.5 left-[50%] right-[-50%] h-[2px] bg-primary -z-10"></div>
-                  </div>
-
-                  {/* Checkout Step */}
-                  <div className="flex flex-col items-center flex-1 relative z-10">
-                    <div className="w-5 h-5 rounded-full border-2 border-primary flex items-center justify-center bg-white dark:bg-[#111111] shadow-sm">
-                      <div className="w-2 h-2 rounded-full bg-primary"></div>
-                    </div>
-                    <span className="text-[9px] font-black text-primary mt-1">Checkout</span>
-                    <div className="absolute top-2.5 left-[-50%] right-[50%] h-[2px] bg-primary -z-10"></div>
-                  </div>
-                </div>
+                <CheckoutStepper current={3} onStepClick={goToStep} isDarkMode={isDarkMode} />
 
                 {/* Header Title */}
-                <div className="px-5 pt-5 pb-2">
-                  <h1 className="text-lg font-black tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    Secure Checkout
-                  </h1>
+                <div className="px-4 pt-4 pb-2 flex items-center gap-3">
+                  <button
+                    onClick={() => setModalView("address")}
+                    aria-label="Back to address"
+                    className="w-9 h-9 shrink-0 flex items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 cursor-pointer border-0 active:scale-95 transition-all"
+                  >
+                    <ArrowLeft className="w-[18px] h-[18px] text-zinc-800 dark:text-white stroke-[2.5px]" />
+                  </button>
+                  <div className="min-w-0 text-left">
+                    <h1 className="text-lg font-black tracking-tight leading-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      Secure Checkout
+                    </h1>
+                    <p className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 leading-tight mt-0.5">Review your order before you pay.</p>
+                  </div>
                 </div>
 
                 {/* Dashboard Options List */}
@@ -574,12 +635,14 @@ export default function CheckoutModal({
                         Delivering to: <span className="text-zinc-800 dark:text-zinc-200 font-bold">{currentAddress}</span>
                       </p>
                       <p className="text-xs font-bold leading-normal mt-0.5">{houseNumber}</p>
+                      {landmark && <p className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 leading-normal">{landmark}</p>}
+                      {instructions && <p className="text-[11px] italic text-zinc-500 dark:text-zinc-400 leading-normal mt-0.5">Note: {instructions}</p>}
                     </div>
                     <button 
                       onClick={() => setModalView("address")}
                       className="text-xs font-black text-primary hover:text-primary-hover bg-transparent border-0 outline-none cursor-pointer"
                     >
-                      Change
+                      Edit
                     </button>
                   </div>
 
@@ -672,7 +735,7 @@ export default function CheckoutModal({
                         </button>
                       </div>
                     )
-                  ) : payMethod.id === "cash" ? (
+                  ) : payMethod.kind === "cash" ? (
                     <button
                       onClick={handleSaveAddressAndCheckout}
                       disabled={placingOrder}
@@ -681,14 +744,12 @@ export default function CheckoutModal({
                       {placingOrder ? "Placing order..." : "Place Order (Cash / UPI on Delivery)"}
                     </button>
                   ) : (
-                    <button 
-                      onClick={() => {
-                        if (blockedByAddress() || blockedByContact()) return
-                        setModalView("payment")
-                      }}
-                      className="w-full h-12 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border-0 bg-primary hover:bg-primary-hover text-white active:scale-95 cursor-pointer shadow-md shadow-primary/10"
+                    <button
+                      onClick={handleSaveAddressAndCheckout}
+                      disabled={placingOrder}
+                      className="w-full h-12 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border-0 bg-primary hover:bg-primary-hover text-white active:scale-95 cursor-pointer shadow-md shadow-primary/10 disabled:opacity-60"
                     >
-                      Continue to payment
+                      {placingOrder ? "Processing..." : `Pay ₹${Number(total.toFixed(2))} securely`}
                     </button>
                   )}
                 </div>
@@ -781,29 +842,6 @@ export default function CheckoutModal({
                   </button>
                 </div>
               </form>
-            )}
-
-            {modalView === "payment" && (
-              isPaymentOptionDisabled ? (
-                <div className="p-6 text-center space-y-3">
-                  <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto" />
-                  <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">Online Payments Temporarily Disabled</p>
-                  <p className="text-xs text-zinc-500">Please choose Cash on Delivery or contact store support.</p>
-                  <button 
-                    onClick={() => setModalView("checkout")}
-                    className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-lg"
-                  >
-                    Back to Checkout
-                  </button>
-                </div>
-              ) : (
-                <RazorpayPayment
-                  total={total}
-                  restaurantName={cartItems[0]?.restaurant || "Papa Veg Pizza"}
-                  onClose={() => setModalView("checkout")}
-                  onPaymentSuccess={handleSaveAddressAndCheckout}
-                />
-              )
             )}
           </motion.div>
         </div>

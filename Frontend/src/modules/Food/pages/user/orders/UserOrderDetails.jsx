@@ -398,6 +398,9 @@ export default function UserOrderDetails() {
                   <p className="text-sm text-red-600 dark:text-red-300 font-medium">
                     {order.cancellationReason || "The restaurant was unable to fulfill this order."}
                   </p>
+                  {order.cancellationMessage && (
+                    <p className="text-sm text-gray-700 dark:text-gray-300 mt-2 leading-relaxed">{order.cancellationMessage}</p>
+                  )}
                 <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-2">Refund will be initiated to your source payment method.</p>
               </div>
             )}

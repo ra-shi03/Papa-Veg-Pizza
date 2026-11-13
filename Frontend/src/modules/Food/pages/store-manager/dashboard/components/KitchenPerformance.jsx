@@ -2,23 +2,6 @@ import React, { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Flame, Clock, AlertTriangle, AlertOctagon, X, Search, ChevronRight } from "lucide-react"
 import apiClient from "@/services/api/axios"
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
-
-// Mock kitchen data
-const MOCK_KITCHEN_PERF = {
-  avgPrepTime: 13,
-  delayedOrders: 3,
-  pizzaStation: 80, // percentage busy
-  bakingStation: 50,
-  packagingStation: 20
-}
-
-// Mock delayed orders
-const MOCK_DELAYED_ORDERS = [
-  { orderNumber: "PV-8839", expectedTime: "12m", actualTime: "18m", delayMinutes: 6 },
-  { orderNumber: "PV-8835", expectedTime: "15m", actualTime: "22m", delayMinutes: 7 },
-  { orderNumber: "PV-8830", expectedTime: "10m", actualTime: "14m", delayMinutes: 4 }
-]
 
 export default function KitchenPerformance({ storeId, refreshKey }) {
   const [showDelayModal, setShowDelayModal] = useState(false)
@@ -31,9 +14,18 @@ export default function KitchenPerformance({ storeId, refreshKey }) {
         const response = await apiClient.get("/store/dashboard/kitchen-performance", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
-        return MOCK_KITCHEN_PERF
+        throw e
       }
+    }
+  })
+
+  // The orders behind the delayed count, fetched when the list is opened
+  const { data: delayedList = [], isLoading: delayedLoading } = useQuery({
+    queryKey: ["delayed-orders", storeId, refreshKey],
+    enabled: showDelayModal,
+    queryFn: async () => {
+      const response = await apiClient.get("/store/dashboard/delayed-orders", { params: { storeId } })
+      return response.data?.data || response.data || []
     }
   })
 
@@ -172,7 +164,10 @@ export default function KitchenPerformance({ storeId, refreshKey }) {
                   </tr>
                 </thead>
                 <tbody className="font-bold divide-y divide-zinc-50 dark:divide-zinc-850 text-slate-700 dark:text-zinc-300">
-                  {MOCK_DELAYED_ORDERS.map((ord) => (
+                  {!delayedLoading && delayedList.length === 0 && (
+                    <tr><td colSpan={4} className="py-6 text-center text-slate-400 font-bold">No delayed orders right now.</td></tr>
+                  )}
+                  {delayedList.map((ord) => (
                     <tr key={ord.orderNumber} className="hover:bg-slate-50/50 dark:hover:bg-zinc-850/50">
                       <td className="py-2.5 text-zinc-900 dark:text-white">{ord.orderNumber}</td>
                       <td className="py-2.5 text-slate-500">{ord.expectedTime}</td>

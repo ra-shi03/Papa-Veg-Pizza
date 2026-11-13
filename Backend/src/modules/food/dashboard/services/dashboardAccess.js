@@ -17,7 +17,7 @@ const isSuper = (role) => role === 'SUPERADMIN' || role === 'SUPER_ADMIN';
 /** Widgets a kitchen supervisor may open on the store dashboard. */
 export const SUPERVISOR_WIDGETS = new Set([
   'today-orders', 'active-orders', 'prep-time', 'pending-deliveries', 'live-orders', 'order-status', 'kitchen-performance', 'delivery-overview',
-  'order-list', 'rider-roster',
+  'order-list', 'rider-roster', 'delayed-orders',
 ]);
 
 /** The orders a widget counts: the store's; a kitchen supervisor only those the store manager assigned to them. */

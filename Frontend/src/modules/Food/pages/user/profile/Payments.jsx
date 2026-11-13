@@ -4,7 +4,8 @@ import { ChevronLeft, Banknote, ShieldCheck, AlertTriangle, Check } from "lucide
 import { toast } from "sonner"
 import AnimatedPage from "@food/components/user/AnimatedPage"
 import { useAppConfig } from "@food/context/AppConfigContext"
-import { PAYMENT_METHODS, readPaymentMethod } from "../cart/cartHelpers"
+import { CASH_METHOD, onlineMethod, readPaymentMethod } from "../cart/cartHelpers"
+import { usePaymentGateways } from "../cart/usePaymentGateways"
 
 /**
  * Payment Options: how the customer pays. The choice is kept on the device and read by the cart's pay bar and by
@@ -22,21 +23,23 @@ export default function Payments() {
     return savedTheme ? savedTheme === "dark" : false
   })
 
-  const [selected, setSelected] = useState(() => readPaymentMethod(appConfig).id)
+  const gateways = usePaymentGateways()
+  const selected = readPaymentMethod(appConfig, gateways).id
+  const [, setTick] = useState(0) // re-read the saved choice after a pick
 
   const onlineDisabled = appConfig?.paymentOptionEnabled === false
   const cashDisabled = appConfig?.codEnabled === false
 
-  const choose = (id, disabled) => {
+  const choose = (id, title, disabled) => {
     if (disabled) {
       toast.error("This payment option is not available right now.")
       return
     }
-    setSelected(id)
     try {
       localStorage.setItem("preferred_payment_method", id)
     } catch (_) {}
-    toast.success(`${PAYMENT_METHODS[id].title} selected`)
+    setTick((n) => n + 1)
+    toast.success(`${title} selected`)
     if (cameFromCart) setTimeout(() => navigate(-1), 250)
   }
 
@@ -97,7 +100,7 @@ export default function Payments() {
         <Section title="Pay on Delivery">
           <button
             type="button"
-            onClick={() => choose("cash", cashDisabled)}
+            onClick={() => choose("cash", CASH_METHOD.title, cashDisabled)}
             className="flex w-full items-center gap-3 border-0 bg-transparent px-4 py-4 text-left cursor-pointer"
             style={{ opacity: cashDisabled ? 0.55 : 1 }}
           >
@@ -113,24 +116,38 @@ export default function Payments() {
         </Section>
 
         <Section title="Pay Online">
-          <button
-            type="button"
-            onClick={() => choose("razorpay_test", onlineDisabled)}
-            className="flex w-full items-center gap-3 border-0 bg-transparent px-4 py-4 text-left cursor-pointer"
-            style={{ opacity: onlineDisabled ? 0.55 : 1 }}
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border" style={{ borderColor: ui.line, color: "#2563eb" }}>
-              <ShieldCheck size={20} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: ui.text }}>
-                Razorpay
-                <span className="rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide" style={{ backgroundColor: "rgba(229,57,53,0.12)", color: "#E53935" }}>Test mode</span>
-              </span>
-              <span className="mt-0.5 block text-xs" style={{ color: ui.muted }}>UPI, cards, wallets and net banking through Razorpay. Test mode: no real money is charged.</span>
-            </span>
-            <Radio on={selected === "razorpay_test"} disabled={onlineDisabled} />
-          </button>
+          {gateways.length === 0 ? (
+            <p className="px-4 py-4 text-left text-xs" style={{ color: ui.muted }}>No online payment method is available right now. You can pay on delivery.</p>
+          ) : (
+            gateways.map((g, i) => {
+              const method = onlineMethod(g)
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => choose(method.id, method.title, onlineDisabled)}
+                  className="flex w-full items-center gap-3 border-0 bg-transparent px-4 py-4 text-left cursor-pointer"
+                  style={{ opacity: onlineDisabled ? 0.55 : 1, borderTop: i ? `1px solid ${ui.line}` : "none" }}
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border" style={{ borderColor: ui.line, color: "#2563eb" }}>
+                    <ShieldCheck size={20} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: ui.text }}>
+                      {g.displayName}
+                      {method.test && (
+                        <span className="rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide" style={{ backgroundColor: "rgba(229,57,53,0.12)", color: "#E53935" }}>Test mode</span>
+                      )}
+                    </span>
+                    <span className="mt-0.5 block text-xs" style={{ color: ui.muted }}>
+                      UPI, cards, wallets and net banking.{method.test ? " Test mode: no real money is charged." : ""}
+                    </span>
+                  </span>
+                  <Radio on={selected === method.id} disabled={onlineDisabled} />
+                </button>
+              )
+            })
+          )}
         </Section>
 
         {!cameFromCart && (

@@ -135,8 +135,9 @@ export function normalizeOrderForClient(orderDoc) {
     rating: order?.ratings?.store?.rating ?? order?.rating ?? null,
     storeNote: order?.storeNote || "",
     cancellationReason: (order?.orderStatus?.includes('cancel') || order?.status?.includes('cancel')) 
-      ? (order.statusHistory?.findLast(h => h.to?.includes('cancel'))?.note || "")
+      ? (order.cancellation?.reason || order.statusHistory?.findLast(h => h.to?.includes('cancel'))?.note || "")
       : null,
+    cancellationMessage: (order?.orderStatus?.includes('cancel') || order?.status?.includes('cancel')) ? (order.cancellation?.message || "") : "",
     deliveryState: {
       ...(order?.deliveryState || {}),
       currentLocation: order?.lastRiderLocation?.coordinates?.length >= 2 ? {
@@ -198,11 +199,12 @@ export function buildDeliverySocketPayload(orderDoc, storeDoc = null) {
       storeLocation?.address ||
       storeLocation?.formattedAddress ||
       store?.addressLine1 ||
+      [store?.address, store?.area, store?.city, store?.state, store?.pincode].filter(Boolean).join(", ") ||
       "",
     storePhone: store?.phone || "",
     storeLocation: {
-      latitude: storeLocation?.latitude,
-      longitude: storeLocation?.longitude,
+      latitude: storeLocation?.latitude ?? store?.latitude,
+      longitude: storeLocation?.longitude ?? store?.longitude,
       address:
         storeLocation?.address ||
         storeLocation?.formattedAddress ||

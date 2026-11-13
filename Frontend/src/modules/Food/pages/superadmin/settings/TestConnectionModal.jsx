@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Play, CheckCircle, XCircle, Loader2, RefreshCw, Copy, Check, Terminal, Wifi, Database } from 'lucide-react';
 
-export default function TestConnectionModal({ isOpen, onClose, gateway }) {
+export default function TestConnectionModal({ isOpen, onClose, gateway, onRun, onDone }) {
   const [testing, setTesting] = useState(false);
   const [progress, setProgress] = useState('');
   const [result, setResult] = useState(null);
@@ -19,80 +19,50 @@ export default function TestConnectionModal({ isOpen, onClose, gateway }) {
 
   if (!isOpen || !gateway) return null;
 
-  const handleTest = () => {
+  const handleTest = async () => {
     setTesting(true);
     setResult(null);
-    setProgress('Initializing handshake with gateway...');
+    setProgress(`Contacting ${gateway.gatewayName} with the saved keys...`);
 
-    const stages = [
-      { delay: 400, text: 'Resolving gateway secure DNS endpoints...' },
-      { delay: 800, text: 'Authenticating Merchant ID & Signature Key...' },
-      { delay: 1200, text: 'Sending verification ping payload...' },
-      { delay: 1600, text: 'Parsing response signature payload...' },
-    ];
-
-    stages.forEach((stage) => {
-      setTimeout(() => {
-        if (testing) return; // avoid updating state if closed
-        setProgress(stage.text);
-      }, stage.delay);
-    });
-
-    setTimeout(() => {
-      const isSuccess = Math.random() > 0.15; // 85% success rate
-      const latency = Math.floor(Math.random() * 200) + 80;
-      
-      const mockResponse = isSuccess 
-        ? {
-            status: 200,
-            statusText: "OK",
-            data: {
-              success: true,
-              message: "Connection verified successfully",
-              gateway: gateway.gatewayName,
-              environment: gateway.environment,
-              timestamp: new Date().toISOString(),
-              features: ["UPI", "Cards", "NetBanking", "Recurring"],
-              latency_ms: latency,
-              db_sync: "active"
-            }
-          }
-        : {
-            status: 401,
-            statusText: "Unauthorized",
-            data: {
-              success: false,
-              error: "Invalid Credentials",
-              message: "The signature verification failed. Please check your Secret Key and Key ID credentials.",
-              gateway: gateway.gatewayName,
-              environment: gateway.environment,
-              timestamp: new Date().toISOString(),
-              latency_ms: latency
-            }
-          };
-
+    try {
+      const out = await onRun(gateway); // POST /settings/payment-gateways/:id/test
+      const isSuccess = Boolean(out?.ok);
       setResult({
         success: isSuccess,
-        latency,
-        statusCode: mockResponse.status,
-        statusText: mockResponse.statusText,
+        latency: out?.latencyMs ?? 0,
+        statusCode: isSuccess ? 200 : out?.notIntegrated ? 501 : 401,
+        statusText: isSuccess ? 'OK' : out?.notIntegrated ? 'Not connected' : 'Rejected',
         payload: {
-          url: `https://api.${gateway.gatewayName.toLowerCase()}.com/v1/verify-credentials`,
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer key_id_••••••••",
-            "X-Gateway-Env": gateway.environment
-          },
-          body: {
-            merchantId: gateway.merchantId,
-            keyId: gateway.keyId,
-            action: "ping"
-          }
+          url: `${gateway.gatewayName} API (called from our server)`,
+          headers: { 'X-Gateway-Env': gateway.environment },
+          body: { merchantId: gateway.merchantId || null, keyId: gateway.keyId, action: 'read one order' }
         },
-        response: mockResponse
+        response: {
+          status: isSuccess ? 200 : out?.notIntegrated ? 501 : 401,
+          data: {
+            success: isSuccess,
+            message: out?.message || 'No answer from the server',
+            gateway: gateway.gatewayName,
+            environment: gateway.environment,
+            timestamp: out?.testedAt || new Date().toISOString(),
+            latency_ms: out?.latencyMs ?? 0
+          }
+        }
       });
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'The test could not be run';
+      setResult({
+        success: false,
+        latency: 0,
+        statusCode: err?.response?.status || 500,
+        statusText: 'Error',
+        payload: { url: 'Our server', headers: {}, body: { keyId: gateway.keyId, action: 'read one order' } },
+        response: { status: err?.response?.status || 500, data: { success: false, message, gateway: gateway.gatewayName, environment: gateway.environment, timestamp: new Date().toISOString() } }
+      });
+    } finally {
       setTesting(false);
-    }, 2000);
+      onDone?.();
+    }
   };
 
   const copyToClipboard = (text) => {

@@ -2,16 +2,6 @@ import React, { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { ClipboardList, X, Play, Clock, User, AlertOctagon } from "lucide-react"
 import apiClient from "@/services/api/axios"
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
-
-// Mock activity logs
-const MOCK_ACTIVITY_LOGS = [
-  { id: 1, action: "Order PV-8842 accepted", user: "Manager (Shubham)", type: "order", timestamp: "1m ago" },
-  { id: 2, action: "Margherita pizza moved to Baking", user: "Chef (Vijay)", type: "kitchen", timestamp: "5m ago" },
-  { id: 3, action: "Low stock alert triggered: Paneer", user: "System", type: "inventory", timestamp: "14m ago" },
-  { id: 4, action: "Rider assigned: Ramesh Singh", user: "Auto-Dispatch", type: "delivery", timestamp: "20m ago" },
-  { id: 5, action: "Shift started: Assistant Manager Pooja", user: "Pooja Rawat", type: "staff", timestamp: "1h ago" }
-]
 
 export default function ActivityTimeline({ storeId, refreshKey, activities }) {
   const [selectedEvent, setSelectedEvent] = useState(null)
@@ -25,14 +15,13 @@ export default function ActivityTimeline({ storeId, refreshKey, activities }) {
         const response = await apiClient.get("/store/dashboard/activity-logs", { params: { storeId } })
         return response.data?.data || response.data
       } catch (e) {
-        if (e?.response || !STANDALONE_MOCK) throw e // the real error; sample numbers only when VITE_STANDALONE_MOCK=true
-        return MOCK_ACTIVITY_LOGS
+        throw e
       }
     }
   })
 
-  // The store's real activity (refreshed on every order_event through refreshKey); sample logs only in standalone mock mode
-  const timelineData = activities || serverLogs || (STANDALONE_MOCK ? MOCK_ACTIVITY_LOGS : [])
+  // The store's real activity (refreshed on every order_event through refreshKey)
+  const timelineData = activities || serverLogs || []
 
   const handleEventClick = (evt) => {
     setSelectedEvent(evt)

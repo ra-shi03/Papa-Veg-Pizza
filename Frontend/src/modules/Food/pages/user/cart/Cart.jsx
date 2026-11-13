@@ -7,6 +7,7 @@ import ApplyCoupon from "./ApplyCoupon"
 import CheckoutModal from "./CheckoutModal"
 import CartOffers, { CheesyRewardsCard } from "./CartOffers"
 import CouponAppliedPopup from "./CouponAppliedPopup"
+import { usePaymentGateways } from "./usePaymentGateways"
 import DeliveryTimeSheet from "./DeliveryTimeSheet"
 import { readTrainJourney, trainOrderProblem, trainStoreQuery } from "@food/utils/trainJourney"
 import { useTrainStations } from "@food/hooks/useTrainStations"
@@ -348,7 +349,8 @@ export default function Cart() {
   }, [offers]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Chosen on the Payment Options page; read again when this page opens
-  const payMethod = readPaymentMethod(appConfig)
+  const gateways = usePaymentGateways()
+  const payMethod = readPaymentMethod(appConfig, gateways)
   const [couponPopup, setCouponPopup] = useState(null)
   const closeCouponPopup = useCallback(() => setCouponPopup(null), [])
   const applyCoupon = (offer) => {

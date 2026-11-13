@@ -41,6 +41,12 @@ import MyTasks from "../myTasks/MyTasks"
 
 
 
+// Where each role lands: kitchen staff have no store dashboard (the server refuses it), their home is My Tasks
+function HomeRedirect() {
+  const { role } = useOutletContext()
+  return <Navigate to={role === "kitchen_staff" ? "tasks" : "dashboard"} replace />
+}
+
 // A role-based routing wrapper that prevents unauthorized roles from viewing pages
 function RoleProtectedRoute({ allowedRoles, children }) {
   const { role } = useOutletContext()
@@ -129,10 +135,17 @@ export default function StoreManagerRouter() {
           }
         >
           {/* Default Path Redirect */}
-          <Route path="/" element={<Navigate to="dashboard" replace />} />
+          <Route path="/" element={<HomeRedirect />} />
 
           {/* Dashboard */}
-          <Route path="dashboard" element={<StoreOperationsDashboard />} />
+          <Route
+            path="dashboard"
+            element={
+              <RoleProtectedRoute allowedRoles={["store_manager", "kitchen_supervisor"]}>
+                <StoreOperationsDashboard />
+              </RoleProtectedRoute>
+            }
+          />
 
           {/* Orders */}
           <Route
@@ -395,7 +408,7 @@ export default function StoreManagerRouter() {
           />
 
           {/* Unknown routes redirect to dashboard */}
-          <Route path="*" element={<Navigate to="dashboard" replace />} />
+          <Route path="*" element={<HomeRedirect />} />
         </Route>
       </Routes>
     </Suspense>
