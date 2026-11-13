@@ -20,7 +20,9 @@ export function couponToOffer(c) {
   // (maxDiscount, usageLimitTotal, usageLimitPerUser) that the form never updates, so they are not read.
   const maxDiscount = Number(doc.maximumDiscount) > 0 ? Number(doc.maximumDiscount) : null;
   const segments = (doc.customerSegments || []).map((s) => String(s).toLowerCase());
-  const firstTimeOnly = segments.length > 0 && segments.every((s) => s.includes('new'));
+  const legacyFirstTime = segments.length > 0 && segments.every((s) => s.includes('new'));
+  // userType is what the admin form writes; coupons saved before it existed fall back to their old segments.
+  const userType = ['new', 'old'].includes(doc.userType) ? doc.userType : legacyFirstTime ? 'new' : 'all';
   const usageLimit = Number(doc.usageLimit) || null;
   const perUserLimit = Number(doc.usagePerCustomer) || null;
   const off = doc.isActive === false || DISABLED_STATUSES.includes(String(doc.status || '').toLowerCase());
@@ -33,7 +35,8 @@ export function couponToOffer(c) {
     discountValue: Number(doc.value) || 0,
     minOrderValue: Number(doc.minimumOrderAmount) || 0,
     maxDiscount,
-    customerScope: firstTimeOnly ? 'first-time' : 'all',
+    customerScope: userType === 'new' ? 'first-time' : userType === 'old' ? 'returning' : 'all',
+    applicableSizes: (doc.applicableSizes || []).map((s) => String(s).trim()).filter(Boolean),
     usageLimit,
     perUserLimit,
     usedCount: Number(doc.usageCount) || 0,
@@ -103,24 +106,39 @@ export async function evaluateCoupon(offer, { userId, store, items, subtotal }) 
     const usage = await FoodOfferUsage.findOne({ offerId: offer._id, userId }).lean();
     if (usage && usage.count >= offer.perUserLimit) return no('You have already used this coupon');
   }
-  if (userId && offer.customerScope === 'first-time') {
-    const orders = await FoodOrder.countDocuments({ userId: new mongoose.Types.ObjectId(userId) });
-    if (orders > 0) return no('Only for your first order');
+  if (offer.customerScope === 'first-time' || offer.customerScope === 'returning') {
+    if (!userId) return no('Log in to use this coupon');
+    // An order counts once it was really placed: not cancelled, and (for online payment) actually paid.
+    const orders = await FoodOrder.countDocuments({
+      userId: new mongoose.Types.ObjectId(userId),
+      orderStatus: { $nin: ['cancelled_by_user', 'cancelled_by_store', 'cancelled_by_admin'] },
+      'payment.status': { $in: ['cod_pending', 'authorized', 'paid', 'pending_qr'] },
+    });
+    if (offer.customerScope === 'first-time' && orders > 0) return no('Only for your first order');
+    if (offer.customerScope === 'returning' && orders === 0) return no('Only for customers who have ordered before');
   }
 
   let eligibleSubtotal = subtotal;
   const scope = String(offer.applicableOn || 'All').toLowerCase();
-  if (scope === 'category' || scope === 'product') {
+  const sizes = (offer.applicableSizes || []).map((s) => String(s).trim().toLowerCase()).filter(Boolean);
+  if (scope === 'category' || scope === 'product' || sizes.length) {
     const lines = items.filter((i) => i.kind !== 'addon' && i.kind !== 'topping' && !i.isLimitedOffer && mongoose.isValidObjectId(i.itemId));
-    const products = await Product.find({ _id: { $in: lines.map((i) => i.itemId) } }).select('categoryId').lean();
+    const products = scope === 'all'
+      ? []
+      : await Product.find({ _id: { $in: lines.map((i) => i.itemId) } }).select('categoryId').lean();
     const byId = new Map(products.map((p) => [String(p._id), p]));
-    const matches = (i) => {
+    const inScope = (i) => {
+      if (scope === 'all') return true;
       const p = byId.get(String(i.itemId));
       if (!p) return false;
       return scope === 'product' ? ids(offer.productIds).includes(String(p._id)) : ids(offer.categoryIds).includes(String(p.categoryId));
     };
-    eligibleSubtotal = lines.filter(matches).reduce((n, i) => n + i.price * i.quantity, 0);
-    if (eligibleSubtotal <= 0) return no(scope === 'product' ? 'Only on selected items' : 'Only on selected categories');
+    const inSize = (i) => !sizes.length || sizes.includes(String(i.size || '').trim().toLowerCase());
+    eligibleSubtotal = lines.filter((i) => inScope(i) && inSize(i)).reduce((n, i) => n + i.price * i.quantity, 0);
+    if (eligibleSubtotal <= 0) {
+      if (sizes.length) return no(`Only on ${offer.applicableSizes.join(' / ')} size pizzas`);
+      return no(scope === 'product' ? 'Only on selected items' : 'Only on selected categories');
+    }
   }
 
   let discount;

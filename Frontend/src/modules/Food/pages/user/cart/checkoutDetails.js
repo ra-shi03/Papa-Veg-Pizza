@@ -148,6 +148,68 @@ export function selectDeliveryAddress({ saved = [], picked = null, service = "de
   return fallback ? fromSaved(fallback) : null
 }
 
+// ---- remembered delivery details
+// What the customer typed last time (house / flat, landmark, delivery instructions) is kept per account on this device,
+// and read from their last order when the device has none, so the checkout opens already filled in.
+
+const REMEMBER_KEY = (ownerId) => `pvp_last_delivery_${ownerId || "me"}`
+const SAME_PLACE_KM = 0.15
+
+export function saveRememberedDelivery(ownerId, { selected, houseNumber, landmark, instructions } = {}) {
+  try {
+    localStorage.setItem(
+      REMEMBER_KEY(ownerId),
+      JSON.stringify({
+        point: selected?.point || null,
+        display: clean(selected?.display),
+        area: clean(selected?.area),
+        house: clean(houseNumber),
+        landmark: clean(landmark),
+        instructions: clean(instructions),
+      }),
+    )
+  } catch (_) {}
+}
+
+export function readRememberedDelivery(ownerId) {
+  try {
+    const value = JSON.parse(localStorage.getItem(REMEMBER_KEY(ownerId)) || "null")
+    return value && typeof value === "object" ? value : null
+  } catch (_) {
+    return null
+  }
+}
+
+/** Is a remembered place the same place as the selected address (within 150 m, or the same text when neither has a point)? */
+export function isSamePlace(selected, place) {
+  if (!selected || !place) return false
+  if (selected.point && place.point) return distanceKm(selected.point, place.point) <= SAME_PLACE_KM
+  if (selected.point || place.point) return false
+  return !!clean(selected.display) && clean(selected.display) === clean(place.display)
+}
+
+/** A previous order's address as a remembered place: the house is the street without the area the form adds back. */
+export function rememberedFromOrderAddress(address, note) {
+  if (!address) return null
+  const point = addressPoint(address)
+  const street = clean(address.street)
+  return {
+    point,
+    display: "",
+    street,
+    landmark: clean(address.additionalDetails),
+    instructions: clean(note),
+  }
+}
+
+/** The house / flat text for the form: drops a trailing ", <area>" that buildOrderDetails will add again. */
+export function houseFromStreet(street, selected) {
+  const text = clean(street)
+  const area = clean(selected?.area)
+  if (area && text.toLowerCase().endsWith(`, ${area.toLowerCase()}`)) return text.slice(0, text.length - area.length - 2).trim()
+  return text
+}
+
 export function addressProblem(selected) {
   if (!selected) return "Please choose a delivery address to place your order."
   if (selected.kind === "service") return null

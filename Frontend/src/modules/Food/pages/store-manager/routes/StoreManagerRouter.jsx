@@ -151,7 +151,7 @@ export default function StoreManagerRouter() {
           <Route
             path="orders/incoming"
             element={
-              <RoleProtectedRoute allowedRoles={["store_manager", "kitchen_supervisor"]}>
+              <RoleProtectedRoute allowedRoles={["store_manager"]}>
                 <IncomingOrders />
               </RoleProtectedRoute>
             }

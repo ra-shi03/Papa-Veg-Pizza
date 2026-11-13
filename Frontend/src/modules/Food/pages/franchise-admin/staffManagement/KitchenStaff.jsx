@@ -16,6 +16,7 @@ import KitchenPerformanceModal from "./components/KitchenPerformanceModal"
 import SuspendKitchenStaffModal from "./components/SuspendKitchenStaffModal"
 import DeleteKitchenStaffModal from "./components/DeleteKitchenStaffModal"
 import ShiftScheduleModal from "./components/ShiftScheduleModal"
+import StaffApprovalsPanel from "./components/StaffApprovalsPanel"
 
 // Import Mock Data
 import { initialKitchenStaff, initialStores, getKitchenDashboardStats } from "./mockManagersData"
@@ -359,6 +360,9 @@ export default function KitchenStaff() {
           </button>
         </div>
       </div>
+
+      {/* New staff added by store managers wait here for approval */}
+      <StaffApprovalsPanel />
 
       {/* KPI CARDS SECTION */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">

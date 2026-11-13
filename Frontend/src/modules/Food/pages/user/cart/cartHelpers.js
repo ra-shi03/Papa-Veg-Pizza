@@ -76,7 +76,8 @@ export const slotLabel = (at) => `${slotDay(at)}, ${time12(at)}`
 // category / product / store / first-order rules are decided there, so the saving it gives is used as is.
 // A coupon limited to categories / items cannot be judged from the cart total, so until the server has said which
 // lines qualify it is not offered (never estimated against the whole cart).
-const scoped = (offer) => !offer?.eligibility && (offer?.applicableOn === "Category" || offer?.applicableOn === "Product")
+const hasSizes = (offer) => Array.isArray(offer?.applicableSizes) && offer.applicableSizes.length > 0
+const scoped = (offer) => !offer?.eligibility && (offer?.applicableOn === "Category" || offer?.applicableOn === "Product" || hasSizes(offer))
 
 export const offerLocked = (offer, subtotal) =>
   subtotal < (Number(offer?.minOrderValue) || 0) || offer?.eligibility?.eligible === false || scoped(offer)
@@ -84,7 +85,10 @@ export const offerLocked = (offer, subtotal) =>
 export const offerLockText = (offer, subtotal) => {
   const min = Number(offer?.minOrderValue) || 0
   if (offer?.eligibility?.eligible === false && offer.eligibility.reason) return offer.eligibility.reason
-  if (scoped(offer)) return offer.applicableOn === "Product" ? "Only on selected items" : "Only on selected categories"
+  if (scoped(offer)) {
+    if (hasSizes(offer)) return `Only on ${offer.applicableSizes.join(" / ")} size pizzas`
+    return offer.applicableOn === "Product" ? "Only on selected items" : "Only on selected categories"
+  }
   return `Add items worth ₹${Math.max(0, Math.ceil(min - subtotal))} more to unlock`
 }
 
@@ -108,6 +112,8 @@ export function offerTerms(offer) {
   terms.push(offer.minOrderValue > 0 ? `Valid on orders of ₹${offer.minOrderValue} or more` : "No minimum order value")
   if (offer.discountType === "percentage" && offer.maxDiscount) terms.push(`Maximum discount ₹${offer.maxDiscount}`)
   if (offer.customerScope === "first-time") terms.push("Only on your first order")
+  if (offer.customerScope === "returning") terms.push("Only for customers who have ordered before")
+  if (hasSizes(offer)) terms.push(`Valid on ${offer.applicableSizes.join(" / ")} size pizzas`)
   if (offer.endDate) terms.push(`Valid till ${new Date(offer.endDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`)
   return terms
 }

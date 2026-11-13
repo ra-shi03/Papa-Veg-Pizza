@@ -12,6 +12,7 @@ import {
   Clock,
   MessageSquare
 } from "lucide-react";
+import { useOutletContext } from "react-router-dom";
 import TimelineStepper from "./TimelineStepper";
 
 export default function OrderDetailsModal({
@@ -23,6 +24,9 @@ export default function OrderDetailsModal({
   onStartPreparation,
   onCancelOrder
 }) {
+  const { role } = useOutletContext() || {};
+  // Accept / assign / start / cancel belong to the store manager and the order supervisor, never to kitchen staff
+  const canManage = !role || role === "store_manager" || role === "kitchen_supervisor";
   if (!order) return null;
 
   const formatCurrency = (val) => {
@@ -239,7 +243,7 @@ export default function OrderDetailsModal({
             Close
           </button>
 
-          {order.status === "confirmed" && (
+          {canManage && order.status === "confirmed" && (
             <button
               onClick={() => {
                 onAccept(order._id);
@@ -251,7 +255,7 @@ export default function OrderDetailsModal({
             </button>
           )}
 
-          {order.status !== "confirmed" && (
+          {canManage && order.status !== "confirmed" && (
             <button
               onClick={() => {
                 onAssignChef(order);
@@ -263,7 +267,7 @@ export default function OrderDetailsModal({
             </button>
           )}
 
-          {order.status === "queued" && (
+          {canManage && order.status === "queued" && (
             <button
               onClick={() => {
                 onStartPreparation(order._id);
@@ -275,7 +279,7 @@ export default function OrderDetailsModal({
             </button>
           )}
 
-          {order.status !== "preparing" && order.status !== "ready_for_pickup" && order.status !== "cancelled" && (
+          {canManage && order.status !== "preparing" && order.status !== "ready_for_pickup" && order.status !== "cancelled" && (
             <button
               onClick={() => {
                 onCancelOrder(order._id);

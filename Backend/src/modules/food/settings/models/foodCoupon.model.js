@@ -29,6 +29,10 @@ const foodCouponSchema = new mongoose.Schema(
         franchiseIds: [{ type: String }],
         storeIds: [{ type: String }],
         customerSegments: [{ type: String }],
+        // Who may use it: everyone, customers with no earlier order, or customers who have ordered before.
+        userType: { type: String, enum: ['all', 'new', 'old'], default: 'all' },
+        // Pizza sizes it applies to (empty = every size). Matched against the size on each cart line.
+        applicableSizes: [{ type: String }],
         startDate: { type: Date, default: Date.now },
         endDate: { type: Date, required: true },
         status: { type: String, default: 'active' },

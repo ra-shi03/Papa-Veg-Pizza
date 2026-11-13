@@ -544,23 +544,12 @@ export default function AddStaffModal({ isOpen, onClose }) {
 
 
 
-              {/* Status */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-black tracking-wider text-zinc-500 dark:text-zinc-450 uppercase">
-                  STATUS
-                </label>
-                <select
-                  {...register("status")}
-                  className="w-full h-11 px-3 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs font-semibold bg-zinc-50/60 dark:bg-zinc-950 text-slate-800 dark:text-white focus:outline-none focus:border-primary transition-all"
-                >
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
-                {errors.status && (
-                  <span className="text-[10px] font-bold text-red-650 flex items-center gap-0.5 mt-0.5">
-                    <AlertCircle size={10} /> {errors.status.message}
-                  </span>
-                )}
+              {/* New staff wait for the franchise admin before they can sign in */}
+              <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+                <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                <p className="text-[11px] font-semibold leading-snug">
+                  New staff are sent to the franchise admin for approval. Their status stays <b>Pending Approval</b> and they can sign in and work once it is approved.
+                </p>
               </div>
 
             </div>

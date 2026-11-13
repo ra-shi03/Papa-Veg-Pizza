@@ -258,6 +258,17 @@ export const myTasksService = {
     }
   },
 
+  // Proof photos are shrunk in the browser first, then stored on Cloudinary; the task only keeps the returned URL.
+  uploadProof: async (blob) => {
+    const form = new FormData();
+    form.append("file", blob, "proof.jpg");
+    const res = await apiClient.post("/uploads/image", form, {
+      contextModule: "admin",
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res?.data?.data?.url || "";
+  },
+
   // PATCH /api/tasks/:id/complete
   completeTask: async (id, payload) => {
     try {

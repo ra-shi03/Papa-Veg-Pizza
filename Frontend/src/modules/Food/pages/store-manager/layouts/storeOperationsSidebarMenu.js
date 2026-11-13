@@ -16,7 +16,7 @@ export const storeOperationsSidebarMenu = [
         label: "Incoming Orders",
         path: "/store-operations/orders/incoming",
         icon: "Inbox",
-        allowedRoles: ["store_manager", "kitchen_supervisor"]
+        allowedRoles: ["store_manager"]
       },
       {
         type: "link",

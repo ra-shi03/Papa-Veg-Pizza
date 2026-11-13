@@ -200,15 +200,7 @@ export function IngredientsTable({
                     <RefreshCw size={14} className="text-[var(--primary)]" />
                     Update Stock
                   </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem 
-                    disabled
-                    className="text-xs font-semibold py-2 px-2.5 flex items-center gap-2 text-zinc-350 dark:text-zinc-600 cursor-not-allowed opacity-50"
-                  >
-                    <ShieldAlert size={14} />
-                    Update Stock
-                  </DropdownMenuItem>
-                )}
+                ) : null}
 
                 {/* 3. History (Store Manager & Kitchen Supervisor) */}
                 {role === "store_manager" || role === "kitchen_supervisor" ? (
@@ -219,15 +211,7 @@ export function IngredientsTable({
                     <History size={14} className="text-emerald-500" />
                     View History
                   </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem 
-                    disabled
-                    className="text-xs font-semibold py-2 px-2.5 flex items-center gap-2 text-zinc-350 dark:text-zinc-600 cursor-not-allowed opacity-50"
-                  >
-                    <ShieldAlert size={14} />
-                    View History
-                  </DropdownMenuItem>
-                )}
+                ) : null}
 
               </DropdownMenuContent>
             </DropdownMenu>

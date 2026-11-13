@@ -12,6 +12,7 @@ import { orderAPI, userAPI } from "@food/api"
 import { toast } from "sonner"
 import { slotLabel, toOrderItems, readPaymentMethod } from "./cartHelpers"
 import CheckoutStepper from "./CheckoutStepper"
+import PaymentSuccessScreen from "../orders/PaymentSuccessScreen"
 import { readTrainJourney, trainOrderFields, trainStoreQuery } from "@food/utils/trainJourney"
 import {
   addressProblem,
@@ -19,7 +20,12 @@ import {
   buildOrderDetails,
   contactFromAccount,
   contactProblem,
+  houseFromStreet,
+  isSamePlace,
   readPickedLocation,
+  readRememberedDelivery,
+  rememberedFromOrderAddress,
+  saveRememberedDelivery,
   selectDeliveryAddress,
   toTenDigitPhone,
 } from "./checkoutDetails"
@@ -63,6 +69,11 @@ export default function CheckoutModal({
   // The address this order goes to (checkoutDetails.js); null until the customer has selected one
   const [selectedAddress, setSelectedAddress] = useState(null)
   const selectedAddressKey = useRef(null)
+  // Which address the form was last pre-filled for, and where from (shown as a small note)
+  const prefilledFor = useRef("")
+  const mounted = useRef(true)
+  useEffect(() => () => { mounted.current = false }, [])
+  const [prefilledFrom, setPrefilledFrom] = useState("")
   const currentAddress = selectedAddress?.display || ""
 
   // Contact Details: the signed-in customer's own, from their profile; empty until loaded
@@ -119,6 +130,47 @@ export default function CheckoutModal({
       setModalView("checkout")
     }
   }, [show, addresses])
+
+  // Pre-fill house / flat, landmark and delivery instructions from what this customer entered before: on this device, or
+  // in their last order. The house and landmark only carry over when it is the same place; instructions follow the person.
+  useEffect(() => {
+    if (!show || !selectedAddress || !isLoggedIn) return
+    const key = `${selectedAddress.kind}:${selectedAddress.id || selectedAddress.display}`
+    if (prefilledFor.current === key) return
+    prefilledFor.current = key
+    setPrefilledFrom("")
+
+    const apply = ({ house, landmark: lm, instructions: note }, from) => {
+      let used = false
+      if (house && selectedAddress.kind !== "saved") {
+        setHouseNumber((current) => { if (current.trim()) return current; used = true; return house })
+      }
+      if (lm && selectedAddress.kind !== "saved") setLandmark((current) => (current.trim() ? current : lm))
+      if (note) setInstructions((current) => (current.trim() ? current : note.slice(0, 200)))
+      if (house || lm || note) setPrefilledFrom(from)
+      return used
+    }
+
+    const remembered = readRememberedDelivery(contactOwnerId.current)
+    if (remembered) {
+      const same = isSamePlace(selectedAddress, remembered)
+      apply({ house: same ? remembered.house : "", landmark: same ? remembered.landmark : "", instructions: remembered.instructions }, "your last order")
+      if (same && remembered.house) return
+    }
+
+    // Nothing on this device (new browser, cleared data): ask for the last order instead
+    orderAPI.getOrders({ limit: 1, page: 1 })
+      .then((res) => {
+        if (!mounted.current) return
+        const data = res?.data?.data
+        const last = (data?.orders || data?.docs || (Array.isArray(data) ? data : []))[0]
+        const place = rememberedFromOrderAddress(last?.deliveryAddress || last?.address, last?.note)
+        if (!place) return
+        const same = isSamePlace(selectedAddress, place)
+        apply({ house: same ? houseFromStreet(place.street, selectedAddress) : "", landmark: same ? place.landmark : "", instructions: place.instructions }, "your last order")
+      })
+      .catch(() => {})
+  }, [show, selectedAddress, isLoggedIn])
 
   // The customer's own contact details, always read fresh for the signed-in account
   useEffect(() => {
@@ -215,6 +267,8 @@ export default function CheckoutModal({
 
   // Final Order placement
   const [placingOrder, setPlacingOrder] = useState(false)
+  // Shown from the moment Razorpay says the payment went through, until the order page takes over
+  const [paidScreen, setPaidScreen] = useState(false)
 
   // Pays an online order through Razorpay's own checkout. "paid": verified by the server; "unverified": the customer
   // paid but the server could not confirm it yet (the order stays); "abandoned": not paid, so the order is cancelled
@@ -238,6 +292,7 @@ export default function CheckoutModal({
         prefill: { name: contactName, email: contactEmail, contact: contactPhone },
         notes: { orderId: String(orderId) },
         handler: async (res) => {
+          setPaidScreen(true)
           try {
             await orderAPI.verifyPayment({
               orderId: String(orderId),
@@ -347,6 +402,7 @@ export default function CheckoutModal({
     if (payMethod.kind === "online") {
       const result = await collectOnlinePayment(orderId, razorpayPayload)
       if (result === "abandoned") {
+        setPaidScreen(false)
         setPlacingOrder(false)
         return false
       }
@@ -384,6 +440,7 @@ export default function CheckoutModal({
     }
 
     // Tell the cart this order is placed: an empty cart must not send the customer to the menu now
+    saveRememberedDelivery(contactOwnerId.current, { selected: selectedAddress, houseNumber, landmark, instructions })
     onOrderPlaced?.()
 
     // Clear cart in storage & context
@@ -400,11 +457,13 @@ export default function CheckoutModal({
     onClose()
 
     // Redirect to order tracking details page
-    navigate(`/user/orders/${orderId}?confirmed=true`)
+    navigate(`/user/orders/${orderId}?confirmed=true${payMethod.kind === "online" ? "&paid=1" : ""}`)
     return true
   }
 
   return (
+    <>
+    <AnimatePresence>{paidScreen && <PaymentSuccessScreen key="paid" paid />}</AnimatePresence>
     <AnimatePresence>
       {show && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-xs">
@@ -474,6 +533,12 @@ export default function CheckoutModal({
                   </div>
 
                   {/* House / flat number */}
+                  {prefilledFrom && (houseNumber || landmark || instructions) && (
+                    <p className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/15 dark:text-emerald-400">
+                      <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
+                      Filled in from {prefilledFrom}. Change anything that is different this time.
+                    </p>
+                  )}
                   <div className="space-y-1.5 text-left">
                     <label htmlFor="checkout-house" className="text-[11px] font-bold text-zinc-600 dark:text-zinc-300 flex items-center gap-1">
                       House / flat number <span className="text-primary">*</span>
@@ -847,5 +912,6 @@ export default function CheckoutModal({
         </div>
       )}
     </AnimatePresence>
+    </>
   )
 }

@@ -110,7 +110,8 @@ export const createKitchenStaff = async (req, res) => {
       primaryRole: roleDoc._id,
       emailVerified: true,
       mobileVerified: true,
-      isActive: (status || 'Active') === 'Active',
+      // The franchise admin approves new staff first; until then the account cannot sign in
+      isActive: false,
     }], { session });
 
     // Step 2: Create Profile record
@@ -157,7 +158,7 @@ export const createKitchenStaff = async (req, res) => {
       employeeCode,
       storeId: callerStoreId,
       joinedDate: joiningDate ? new Date(joiningDate) : new Date(),
-      status: status || 'Active',
+      status: 'Pending Approval',
       profileImage: profileImage || '',
       reportingManager: reportingManagerName,
       personalDetails: {
@@ -179,7 +180,7 @@ export const createKitchenStaff = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: `${staffRole || 'Kitchen staff'} registered successfully.`,
+      message: `${staffRole || 'Kitchen staff'} added. They can sign in once the franchise admin approves.`,
       data: newStoreManager,
     });
   } catch (err) {
@@ -333,7 +334,8 @@ export const updateKitchenStaff = async (req, res) => {
     if (phone) staff.phone = phone.trim();
     if (role) staff.role = role.trim();
     if (joiningDate) staff.joinedDate = new Date(joiningDate);
-    if (status && status !== 'DELETED') staff.status = status;
+    // Approval is the franchise admin's call: nobody waiting for it (or turned down) can be activated from here
+    if (status && status !== 'DELETED' && !['Pending Approval', 'Rejected'].includes(staff.status) && !['Pending Approval', 'Rejected'].includes(status)) staff.status = status;
     if (profileImage) staff.profileImage = profileImage;
     if (shiftType) staff.personalDetails = { ...staff.personalDetails?.toObject?.() || staff.personalDetails || {}, shiftType };
     if (salary !== undefined || salaryType || emergencyContact || address || experience !== undefined || skills) {
@@ -409,7 +411,7 @@ export const updateStaffStatus = async (req, res) => {
     }
 
     const staff = await StoreManager.findOneAndUpdate(
-      await manageableStaff(req, { _id: id, status: { $ne: 'DELETED' } }),
+      await manageableStaff(req, { _id: id, status: { $nin: ['DELETED', 'Pending Approval', 'Rejected'] } }),
       { $set: { status } },
       { new: true }
     );
@@ -491,7 +493,7 @@ export const markLeave = async (req, res) => {
     }
 
     const staff = await StoreManager.findOneAndUpdate(
-      await manageableStaff(req, { _id: id, status: { $ne: 'DELETED' } }),
+      await manageableStaff(req, { _id: id, status: { $nin: ['DELETED', 'Pending Approval', 'Rejected'] } }),
       { $set: { status: 'On Leave' } },
       { new: true }
     );

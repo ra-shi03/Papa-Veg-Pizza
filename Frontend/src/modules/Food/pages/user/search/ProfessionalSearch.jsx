@@ -163,7 +163,7 @@ export default function ProfessionalSearch() {
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#7e3866] transition-transform group-focus-within:scale-110" strokeWidth={2.5} />
             <Input 
               autoFocus
-              placeholder="Search dishes or restaurants" 
+              placeholder="Search dishes or stores" 
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="pl-10 pr-12 h-10 sm:h-12 bg-gray-50 dark:bg-zinc-800/50 border-gray-100 dark:border-zinc-700 focus:border-[#7e3866] dark:focus:border-[#7e3866] focus:ring-4 focus:ring-[#7e3866]/5 rounded-2xl text-sm sm:text-base transition-all"
@@ -321,7 +321,7 @@ export default function ProfessionalSearch() {
             {results.restaurants.length > 0 && (
               <section>
                 <div className="flex items-center justify-between mb-5 px-1">
-                   <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest">Restaurants</h2>
+                   <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest">Stores</h2>
                    <span className="text-[10px] font-bold text-gray-400 bg-gray-100 dark:bg-zinc-900 px-2 py-0.5 rounded-full">{results.restaurants.length} stores</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">

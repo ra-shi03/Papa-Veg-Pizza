@@ -313,9 +313,6 @@ export default function MyTasks() {
                     onResume={(t) => handleStartTask(t._id, "Resuming delayed task")}
                     onRequestReassign={(t) => openModal("reassignRequest", t)}
                     onReassign={(t) => openModal("reassignTask", t)}
-                    onCancel={(t) => {
-                      toast.info(`Task ${t._id} cancellation request submitted.`);
-                    }}
                   />
                 )}
 

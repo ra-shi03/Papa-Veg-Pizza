@@ -178,7 +178,8 @@ export default function CompletedOrders() {
     });
   };
 
-  const isKitchenSupervisor = role === "kitchen_supervisor";
+  // Invoices, reorder and exports are store-manager tools: hidden for supervisors and kitchen staff
+  const isKitchenSupervisor = role === "kitchen_supervisor" || role === "kitchen_staff";
 
   // Table Columns config with sticky action column
   const columns = [

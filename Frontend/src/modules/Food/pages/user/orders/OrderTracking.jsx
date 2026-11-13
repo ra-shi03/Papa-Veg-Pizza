@@ -24,6 +24,7 @@ import {
   Calendar
 } from "lucide-react"
 import AnimatedPage from "@food/components/user/AnimatedPage"
+import PaymentSuccessScreen from "./PaymentSuccessScreen"
 import { Card, CardContent } from "@food/components/ui/card"
 import { Button } from "@food/components/ui/button"
 import {
@@ -510,8 +511,9 @@ const transformOrderForTracking = (apiOrder, previousOrder = null, explicitResta
     id: apiOrder?.orderId || apiOrder?._id,
     mongoId: apiOrder?._id || null,
     orderId: apiOrder?.orderId || apiOrder?._id,
-    restaurant: apiOrder?.storeId?.storeName || apiOrder?.storeName || apiOrder?.restaurantName || previousOrder?.restaurant || 'Restaurant',
+    restaurant: apiOrder?.storeId?.storeName || apiOrder?.storeName || apiOrder?.restaurantName || previousOrder?.restaurant || 'Papa Veg Pizza',
     restaurantPhone:
+      apiOrder?.storeContact?.phone ||
       apiOrder?.storeId?.phone ||
       apiOrder?.storePhone ||
       apiOrder?.restaurantPhone ||
@@ -720,6 +722,7 @@ export default function OrderTracking() {
   const { orderId } = useParams()
   const [searchParams] = useSearchParams()
   const confirmed = searchParams.get("confirmed") === "true"
+  const paidOnline = searchParams.get("paid") === "1"
   const { getOrderById } = useOrders()
   const { profile, getDefaultAddress } = useProfile()
   const { location: userLiveLocation } = useUserLocation()
@@ -1152,7 +1155,7 @@ export default function OrderTracking() {
     const cleanPhone = String(rawPhone).replace(/[^\d+]/g, '');
     
     if (!cleanPhone || cleanPhone.length < 5) {
-      toast.error('Restaurant phone number not available');
+      toast.error('Store phone number not available');
       return;
     }
 
@@ -1333,7 +1336,7 @@ export default function OrderTracking() {
   // Post-checkout splash only — real status comes from API / poll / socket.
   useEffect(() => {
     if (!confirmed) return
-    const timer1 = setTimeout(() => setShowConfirmation(false), 3000)
+    const timer1 = setTimeout(() => setShowConfirmation(false), 3800)
     return () => clearTimeout(timer1)
   }, [confirmed])
 
@@ -1599,6 +1602,8 @@ export default function OrderTracking() {
 
   // Loading state (moved after hooks)
   if (loading) {
+    // Straight after checkout there is no blank spinner: the success screen carries on while the order loads
+    if (showConfirmation) return <PaymentSuccessScreen paid={paidOnline} />
     return (
       <AnimatedPage className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] p-4">
         <div className="max-w-lg mx-auto text-center py-20">
@@ -1627,13 +1632,13 @@ export default function OrderTracking() {
   const statusConfig = {
     placed: {
       title: "Order Placed",
-      subtitle: "Waiting for restaurant to accept",
+      subtitle: "Waiting for the store to accept",
       color: "bg-gradient-to-br from-[#E53935] to-[#B71C1C]",
       iconType: 'food'
     },
     confirmed: {
       title: "Order Confirmed",
-      subtitle: "Restaurant has accepted your order",
+      subtitle: "The store has accepted your order",
       color: "bg-gradient-to-br from-[#E53935] to-[#B71C1C]",
       iconType: 'food'
     },
@@ -1645,12 +1650,12 @@ export default function OrderTracking() {
     },
     assigned: {
       title: "Rider is arriving",
-      subtitle: "A delivery partner is arriving at the restaurant",
+      subtitle: "A delivery partner is arriving at the store",
       color: "bg-gradient-to-br from-[#E53935] to-[#B71C1C]",
       iconType: 'rider'
     },
     at_pickup: {
-      title: "Rider at restaurant",
+      title: "Rider at the store",
       subtitle: "Rider is waiting for your order",
       color: "bg-gradient-to-br from-[#E53935] to-[#B71C1C]",
       iconType: 'rider'
@@ -1714,64 +1719,9 @@ export default function OrderTracking() {
 
   return (
     <div className="min-h-screen bg-[#F5F3EF] dark:bg-[#0a0a0a]">
-      {/* Order Confirmed Modal */}
+      {/* Order Confirmed: the same screen the customer saw while the order loaded */}
       <AnimatePresence>
-        {showConfirmation && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-white dark:bg-[#1a1a1a] flex flex-col items-center justify-center"
-          >
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.2, type: "spring" }}
-              className="text-center px-8"
-            >
-              <AnimatedCheckmark delay={0.3} />
-              <motion.h1
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.9 }}
-                className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-6"
-              >
-                {isScheduledOrder ? "Order Scheduled!" : "Order Confirmed!"}
-              </motion.h1>
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.1 }}
-                className="text-gray-600 dark:text-gray-300 mt-2"
-              >
-                {isScheduledOrder
-                  ? `Scheduled for ${scheduledDateFormatted}`
-                  : "Your order has been placed successfully"}
-              </motion.p>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1.5 }}
-                className="mt-8"
-              >
-                <div className="w-8 h-8 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin mx-auto" />
-                <p className="text-sm text-gray-500 mt-3">Loading order details...</p>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 2.0 }}
-                className="mt-12 pt-8 border-t border-gray-100 dark:border-gray-800"
-              >
-                <div className="flex items-center justify-center gap-2 text-[var(--primary)] dark:text-[var(--primary)] font-medium cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate('/user/profile/report-safety-emergency', { state: { returnTo: location.pathname } })}>
-                  <Shield className="w-4 h-4" />
-                  <span className="text-sm">Learn about delivery partner safety</span>
-                </div>
-              </motion.div>
-            </motion.div>
-          </motion.div>
-        )}
+        {showConfirmation && <PaymentSuccessScreen paid={paidOnline} scheduled={isScheduledOrder} />}
       </AnimatePresence>
 
       {/* Green Header */}
@@ -2057,7 +2007,7 @@ export default function OrderTracking() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex flex-col">
-                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Food & Restaurant</span>
+                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Food & Store</span>
                   {order?.ratings?.restaurant?.comment && (
                     <span className="text-[10px] text-gray-500 dark:text-gray-400 italic mt-0.5 line-clamp-1">"{order.ratings.restaurant.comment}"</span>
                   )}
@@ -2286,7 +2236,7 @@ export default function OrderTracking() {
             </div>
             <div className="flex-1">
               <p className="font-semibold text-gray-900 dark:text-gray-100">{order.restaurant}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{order.restaurantAddress || 'Restaurant location'}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{order.restaurantAddress || 'Store location'}</p>
             </div>
             <motion.button
               className="w-10 h-10 rounded-full bg-[var(--primary)]/10 flex items-center justify-center"
@@ -2630,7 +2580,7 @@ export default function OrderTracking() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <p className="font-semibold text-gray-800 dark:text-gray-200">How was the food?</p>
-                <span className="text-xs px-2 py-0.5 bg-[var(--primary)]/10 text-[var(--primary)] dark:bg-[var(--primary)]/20 dark:text-[var(--primary)] rounded-full font-medium">Restaurant</span>
+                <span className="text-xs px-2 py-0.5 bg-[var(--primary)]/10 text-[var(--primary)] dark:bg-[var(--primary)]/20 dark:text-[var(--primary)] rounded-full font-medium">Store</span>
               </div>
               <div className="flex justify-center gap-3">
                 {[1, 2, 3, 4, 5].map((star) => (

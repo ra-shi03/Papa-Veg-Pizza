@@ -66,7 +66,8 @@ export default function ReadyOrderDetailsModal({
   const isRiderAssigned = !!order.deliveryPartnerId;
 
   // Role permissions
-  const isKitchenStaff = role === "kitchen_staff";
+  // Handing orders to riders and confirming pickup are the store manager's; supervisors and staff only look
+  const isKitchenStaff = role !== "store_manager";
 
   const tabItems = [
     {

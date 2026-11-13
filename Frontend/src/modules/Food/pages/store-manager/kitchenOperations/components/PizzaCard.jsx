@@ -12,6 +12,7 @@ import {
   UserCheck
 } from "lucide-react";
 import { Tooltip, Tag } from "antd";
+import { useOutletContext } from "react-router-dom";
 
 export default function PizzaCard({
   item,
@@ -22,6 +23,9 @@ export default function PizzaCard({
   onOpenRecipe,
   onOpenIssue
 }) {
+  const { role } = useOutletContext() || {};
+  // Reassigning a pizza is a store manager / order supervisor action; staff only work their own pizzas
+  const canReassign = !role || role === "store_manager" || role === "kitchen_supervisor";
   const [elapsed, setElapsed] = useState(0);
 
   // Compute elapsed time dynamically
@@ -171,14 +175,16 @@ export default function PizzaCard({
 
       {/* Card Actions */}
       <div className="flex gap-1 pt-1.5 border-t border-slate-50 dark:border-zinc-850">
-        {/* Chef reassign */}
-        <button
-          onClick={() => onOpenReassign(item)}
-          className="p-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-zinc-800/80 dark:hover:bg-zinc-750 text-slate-600 dark:text-zinc-350 rounded-lg flex items-center justify-center transition-all cursor-pointer"
-          title="Reassign Chef"
-        >
-          <Shuffle size={10} />
-        </button>
+        {/* Chef reassign (leads only) */}
+        {canReassign && (
+          <button
+            onClick={() => onOpenReassign(item)}
+            className="p-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-zinc-800/80 dark:hover:bg-zinc-750 text-slate-600 dark:text-zinc-350 rounded-lg flex items-center justify-center transition-all cursor-pointer"
+            title="Reassign Chef"
+          >
+            <Shuffle size={10} />
+          </button>
+        )}
 
         {/* Pause toggle */}
         {!item.paused ? (

@@ -404,7 +404,7 @@ export default function TrackOrder() {
                 <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 p-4 shadow-xs space-y-1">
                   <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 text-xs font-semibold">
                     <Store className="w-4 h-4 text-[#E53935]" />
-                    <span>Restaurant Outlet</span>
+                    <span>Store</span>
                   </div>
                   <p className="text-xs font-bold text-zinc-900 dark:text-white m-0">
                     {orderData.store?.name || "Papa Veg Pizza"}

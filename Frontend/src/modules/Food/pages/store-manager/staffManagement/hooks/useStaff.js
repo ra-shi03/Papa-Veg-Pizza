@@ -109,7 +109,7 @@ export function useCreateStaff() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["kitchenStaff"] });
-      toast.success("Kitchen staff registered successfully!");
+      toast.success("Staff added and sent to the franchise admin for approval.");
     },
     onError: (err) => {
       toast.error(err?.message || "Failed to register staff member.");

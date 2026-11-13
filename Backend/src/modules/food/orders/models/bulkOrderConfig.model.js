@@ -165,7 +165,7 @@ const bulkOrderConfigSchema = new mongoose.Schema(
       },
       locateLinkText: {
         type: String,
-        default: 'Locate Nearby Pizza Restaurants'
+        default: 'Locate Nearby Pizza Stores'
       },
       locateLinkUrl: {
         type: String,

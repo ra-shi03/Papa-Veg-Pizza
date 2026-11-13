@@ -128,7 +128,7 @@ const DEFAULT_CONFIG = {
     outletButtonText: 'FIND YOUR NEAREST OUTLET',
     outletButtonLink: '/food/user/delivery-location',
     outletHelpText: 'Try our delicious treats and satisfy hunger with Papa Veg Pizza.',
-    locateLinkText: 'Locate Nearby Pizza Restaurants',
+    locateLinkText: 'Locate Nearby Pizza Stores',
     locateLinkUrl: '/food/user/delivery-location',
     customerCareTitle: 'Papa Veg Pizza Customer Care Number',
     customerCareNumber: '',

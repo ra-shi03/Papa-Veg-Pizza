@@ -162,6 +162,8 @@ function CouponCard({ offer, subtotal, isApplied, onApply, onRemove, onAddItems,
               </li>
             )}
             {offer.customerScope === "first-time" && <li>Valid on 1st order only</li>}
+            {offer.customerScope === "returning" && <li>Valid for returning customers only</li>}
+            {offer.applicableSizes?.length > 0 && <li>Valid only on <b>{offer.applicableSizes.join(" / ")}</b> size pizzas</li>}
             {offer.applicableOn === "Category" && <li>Valid only on items from the selected categories</li>}
             {offer.applicableOn === "Product" && <li>Valid only on the selected items</li>}
             <li>Applicable only for orders placed via Papa Veg Pizza app</li>

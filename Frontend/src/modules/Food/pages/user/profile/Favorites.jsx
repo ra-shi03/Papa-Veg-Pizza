@@ -18,9 +18,9 @@ export default function Favorites() {
   const handleRemoveFavorite = (e, slug) => {
     e.preventDefault()
     e.stopPropagation()
-    if (window.confirm("Remove this restaurant from favorites?")) {
+    if (window.confirm("Remove this store from favorites?")) {
       removeFavorite(slug)
-      toast.success("Restaurant removed from favorites")
+      toast.success("Store removed from favorites")
     }
   }
 
@@ -55,7 +55,7 @@ export default function Favorites() {
             <p className="text-muted-foreground text-lg mb-4">You haven't added any favorites yet</p>
             <Link to="/user">
               <Button className="bg-gradient-to-r bg-[#7e3866] hover:opacity-90 text-white">
-                Explore Restaurants
+                Explore Stores
               </Button>
             </Link>
           </CardContent>
@@ -79,7 +79,7 @@ export default function Favorites() {
               <div>
                 <h1 className="text-lg sm:text-xl md:text-2xl font-bold">My Favorites</h1>
                 <p className="text-gray-700 dark:text-gray-300 mt-1 text-sm font-semibold">
-                  {dishFavorites.length || 0} {dishFavorites.length === 1 ? "dish" : "dishes"} • {restaurantFavorites.length || 0} {restaurantFavorites.length === 1 ? "restaurant" : "restaurants"}
+                  {dishFavorites.length || 0} {dishFavorites.length === 1 ? "dish" : "dishes"} • {restaurantFavorites.length || 0} {restaurantFavorites.length === 1 ? "store" : "stores"}
                 </p>
               </div>
             </div>
@@ -96,7 +96,7 @@ export default function Favorites() {
                 : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             }`}
           >
-            Restaurants ({restaurantFavorites.length})
+            Stores ({restaurantFavorites.length})
           </button>
           <button
             onClick={() => setActiveTab("dishes")}
@@ -116,10 +116,10 @@ export default function Favorites() {
             {restaurantFavorites.length === 0 ? (
               <div className="col-span-full text-center py-12">
                 <Heart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground text-lg mb-4">No restaurants saved yet</p>
+                <p className="text-muted-foreground text-lg mb-4">No stores saved yet</p>
                 <Link to="/user">
                   <Button className="bg-gradient-to-r bg-[#7e3866] hover:opacity-90 text-white">
-                    Explore Restaurants
+                    Explore Stores
                   </Button>
                 </Link>
               </div>
@@ -236,7 +236,7 @@ export default function Favorites() {
                               {dish.name}
                             </CardTitle>
                             <p className="text-xs text-muted-foreground line-clamp-1">
-                              {dish.restaurantName || "Restaurant"}
+                              {dish.restaurantName || "Papa Veg Pizza"}
                             </p>
                           </div>
                           <div className="flex items-center justify-between text-xs pt-2 border-t">

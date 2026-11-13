@@ -43,7 +43,7 @@ export default function CollectionDetail() {
   const handleRemoveItem = (e, slug) => {
     e.preventDefault()
     e.stopPropagation()
-    if (window.confirm("Remove this restaurant from collection?")) {
+    if (window.confirm("Remove this store from the collection?")) {
       removeFavorite(slug)
       // Update collection state
       setCollection(prev => ({
@@ -104,7 +104,7 @@ export default function CollectionDetail() {
               <div>
                 <h1 className="text-lg sm:text-xl md:text-2xl font-bold">{collection.name}</h1>
                 <p className="text-muted-foreground mt-1">
-                  {collection.restaurants} {collection.restaurants === 1 ? "restaurant" : "restaurants"}
+                  {collection.restaurants} {collection.restaurants === 1 ? "store" : "stores"}
                 </p>
               </div>
             </div>

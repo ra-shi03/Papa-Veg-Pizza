@@ -353,7 +353,7 @@ export default function ReadyOrders() {
               />
             </Tooltip>
 
-            {role !== "kitchen_staff" && isDelivery && !hasRider && (
+            {role === "store_manager" && isDelivery && !hasRider && (
               <Tooltip title="Assign Rider">
                 <Button
                   size="small"
@@ -364,7 +364,7 @@ export default function ReadyOrders() {
               </Tooltip>
             )}
 
-            {role !== "kitchen_staff" && (!isDelivery || hasRider) && (
+            {role === "store_manager" && (!isDelivery || hasRider) && (
               <Tooltip title="Confirm Pickup">
                 <Button
                   size="small"
@@ -384,7 +384,7 @@ export default function ReadyOrders() {
               />
             </Tooltip>
 
-            {!record.isEscalated && timer.minutes >= 10 && (
+            {role !== "kitchen_staff" && !record.isEscalated && timer.minutes >= 10 && (
               <Tooltip title="Escalate Order">
                 <Button
                   size="small"
@@ -529,7 +529,7 @@ export default function ReadyOrders() {
             />
           </Tooltip>
 
-          {role !== "kitchen_staff" && isDelivery && !hasRider && (
+          {role === "store_manager" && isDelivery && !hasRider && (
             <Tooltip title="Assign Rider">
               <Button
                 size="small"
@@ -540,7 +540,7 @@ export default function ReadyOrders() {
             </Tooltip>
           )}
 
-          {role !== "kitchen_staff" && (!isDelivery || hasRider) && (
+          {role === "store_manager" && (!isDelivery || hasRider) && (
             <Tooltip title="Confirm Pickup">
               <Button
                 size="small"

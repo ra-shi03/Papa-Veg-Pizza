@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from "react"
 import { Link, useNavigate, useLocation } from "react-router-dom"
-import { ArrowLeft, Search, MoreVertical, ChevronRight, Star, RotateCcw, AlertCircle, Loader2, Clock, X, Share2, MessageCircle, Send, Copy, Mail, MessagesSquare, Link2, Plus, ShoppingCart, Check } from "lucide-react"
+import { ArrowLeft, Search, MoreVertical, ChevronRight, Star, RotateCcw, AlertCircle, Loader2, Clock, X, Share2, MessageCircle, Send, Copy, Mail, MessagesSquare, Link2, Plus, Minus, ShoppingCart, Check } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import { addLineToCart, setLineQty, lineKeyFor, replaceCartWithLines, readCartSummary } from "@food/utils/userCart"
 import { orderAPI } from "@food/api"
 import { useCart } from "@food/context/CartContext"
 import { toast } from "sonner"
@@ -72,8 +74,6 @@ export default function Orders() {
   const [searchQuery, setSearchQuery] = useState("")
   const [ratingModal, setRatingModal] = useState({ open: false, order: null })
   const [activeMenuOrderId, setActiveMenuOrderId] = useState(null)
-  const [showShareModal, setShowShareModal] = useState(false)
-  const [sharePayload, setSharePayload] = useState(null)
   const [selectedRestaurantRating, setSelectedRestaurantRating] = useState(null)
   const [selectedDeliveryRating, setSelectedDeliveryRating] = useState(null)
   const [restaurantFeedbackText, setRestaurantFeedbackText] = useState("")
@@ -412,6 +412,12 @@ export default function Orders() {
                 image: item.image || null,
                 description: item.description || null,
                 isVeg: item.isVeg === true || item.foodType === 'Veg' || item.category === 'veg' || item.type === 'veg',
+                size: item.size || '',
+                crust: item.crust || '',
+                kind: item.kind || 'product',
+                notes: item.notes || '',
+                selectedAddons: item.selectedAddons || [],
+                isLimitedOffer: item.isLimitedOffer === true,
                 _id: item._id || item.id,
                 id: item.id || item._id
               })),
@@ -422,11 +428,11 @@ export default function Orders() {
               pricing: order.pricing || {}, // Keep full pricing object for discounts, coupons
               payment: order.payment || {},
               paymentMethod: order.payment?.method || order.paymentMethod,
-              restaurant: order.restaurantId?.restaurantName || order.restaurantId?.name || order.restaurantName || 'Restaurant',
-              restaurantId: order.restaurantId?._id || order.restaurantId,
+              restaurant: order.storeId?.storeName || order.restaurantId?.restaurantName || order.restaurantId?.name || order.restaurantName || 'Papa Veg Pizza',
+              restaurantId: order.storeId?._id || order.restaurantId?._id || order.storeId || order.restaurantId,
               restaurantSlug: order.restaurantId?.slug || null,
-              restaurantImage: order.restaurantId?.profileImage?.url || order.restaurantId?.profileImage || null,
-              restaurantLocation: order.restaurantId?.location?.area || order.restaurantId?.location?.city || order.address?.city || order.deliveryAddress?.city || '',
+              restaurantImage: order.storeId?.profileImage?.url || order.storeId?.profileImage || order.restaurantId?.profileImage?.url || order.restaurantId?.profileImage || null,
+              restaurantLocation: [order.storeId?.address, order.storeId?.area].filter(Boolean).join(', ') || order.restaurantId?.location?.area || '',
               restaurantRating,
               deliveryPartnerRating,
               ratings: order.ratings || {},
@@ -609,19 +615,28 @@ export default function Orders() {
     })
   }, [previouslyOrderedDishes, searchQuery, selectedFilter])
 
+  // The cart is the same one the menu uses (localStorage), so the cart page, checkout and the View Cart bar all see it
+  const [cartSummary, setCartSummary] = useState(readCartSummary)
+  useEffect(() => {
+    const sync = () => setCartSummary(readCartSummary())
+    window.addEventListener("cartUpdated", sync)
+    window.addEventListener("storage", sync)
+    return () => {
+      window.removeEventListener("cartUpdated", sync)
+      window.removeEventListener("storage", sync)
+    }
+  }, [])
+
   const handleAddSingleDish = (dish) => {
-    addToCart({
-      id: dish.id || dish.itemId || dish._id,
-      name: dish.name || dish.foodName || "Item",
-      price: Number(dish.price) || 0,
-      image: dish.image || "",
-      restaurant: dish.restaurant || "Papa Veg Pizza",
-      restaurantId: dish.restaurantId,
-      description: dish.description || "",
-      isVeg: dish.isVeg !== false,
-      quantity: 1,
-    })
-    toast.success(`${dish.name || "Item"} added to cart`)
+    if (dish.isLimitedOffer) {
+      toast.info("That was a limited-time offer. Find it on the menu if it is still running.")
+      return
+    }
+    addLineToCart(dish, 1)
+  }
+  const changeDishQty = (dish, delta) => {
+    const key = lineKeyFor(dish)
+    setLineQty(key, (cartSummary.lines[key] || 0) + delta)
   }
 
   const ratingModalHasDeliveryPartner = !!(ratingModal.order?.deliveryPartnerId || ratingModal.order?.deliveryPartnerName)
@@ -634,7 +649,7 @@ export default function Orders() {
     const restaurantTarget = order.restaurantSlug || order.restaurantId
 
     if (!restaurantTarget || !order.items?.length) {
-      toast.info('Order items or restaurant information not available')
+      toast.info('Order items or store information not available')
       return
     }
 
@@ -648,7 +663,7 @@ export default function Orders() {
           name: item.name || item.foodName || "Item",
           price: Number(item.price) || 0,
           image: item.image || "",
-          restaurant: order.restaurant || "Restaurant",
+          restaurant: order.restaurant || "Papa Veg Pizza",
           restaurantId: order.restaurantId,
           description: item.description || "",
           isVeg: item.isVeg !== false,
@@ -663,136 +678,18 @@ export default function Orders() {
       return
     }
 
-    replaceCart(reorderItems)
-    toast.success("Items added to cart")
-    navigate("/food/user/menu")
+    const added = replaceCartWithLines(order.items)
+    if (!added) {
+      toast.error("These items cannot be reordered right now")
+      return
+    }
+    toast.success("Items added to your cart")
+    navigate("/user/cart")
   }
 
   // Three-dots menu handlers
   const toggleMenuForOrder = (orderId) => {
     setActiveMenuOrderId((current) => (current === orderId ? null : orderId))
-  }
-
-  const openShareModal = (payload) => {
-    setSharePayload(payload)
-    setShowShareModal(true)
-  }
-
-  const tryNativeShare = async (payload) => {
-    if (typeof navigator === "undefined" || !navigator.share) return false
-    try {
-      await navigator.share(payload)
-      return true
-    } catch (error) {
-      if (error?.name === "AbortError") return true
-      return false
-    }
-  }
-
-  const copyToClipboard = async (text) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      toast.success("Link copied to clipboard!")
-    } catch (error) {
-      const textArea = document.createElement("textarea")
-      textArea.value = text
-      textArea.style.position = "fixed"
-      textArea.style.opacity = "0"
-      document.body.appendChild(textArea)
-      textArea.select()
-      try {
-        document.execCommand("copy")
-        toast.success("Link copied to clipboard!")
-      } catch (err) {
-        toast.error("Failed to copy link")
-      }
-      document.body.removeChild(textArea)
-    }
-  }
-
-  const openShareTarget = (target) => {
-    if (!sharePayload?.url) return
-
-    const text = sharePayload.text || ""
-    const url = sharePayload.url
-    const encodedText = encodeURIComponent(text)
-    const encodedUrl = encodeURIComponent(url)
-
-    let shareLink = ""
-
-    if (target === "whatsapp") {
-      shareLink = `https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`
-    } else if (target === "telegram") {
-      shareLink = `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`
-    } else if (target === "email") {
-      shareLink = `mailto:?subject=${encodeURIComponent(sharePayload.title || "Check this out")}&body=${encodeURIComponent(`${text}\n\n${url}`)}`
-    } else if (target === "sms") {
-      shareLink = `sms:?body=${encodeURIComponent(`${text} ${url}`)}`
-    } else if (target === "facebook") {
-      shareLink = `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`
-    } else if (target === "x") {
-      shareLink = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`${text} ${url}`)}`
-    } else if (target === "linkedin") {
-      shareLink = `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`
-    }
-
-    if (shareLink) {
-      window.open(shareLink, "_blank", "noopener,noreferrer")
-      setShowShareModal(false)
-    }
-  }
-
-  const copyShareLink = async () => {
-    if (!sharePayload?.url) return
-    await copyToClipboard(sharePayload.url)
-    setShowShareModal(false)
-  }
-
-  const handleSystemShareFromModal = async () => {
-    if (!sharePayload) return
-    const shared = await tryNativeShare(sharePayload)
-    if (shared) {
-      setShowShareModal(false)
-      toast.success("Shared successfully")
-    }
-  }
-
-  const handleShareRestaurant = async (order) => {
-    const companyName = await getCompanyNameAsync()
-    const location =
-      order.restaurantLocation ||
-      `${order.address?.city || ""}, ${order.address?.state || ""}`.trim()
-    const restaurantPath = order.restaurantSlug || order.restaurantId
-    const shareUrl = restaurantPath
-      ? `${window.location.origin}/food/user/menu`
-      : `${window.location.origin}/food/user/orders/${order.id}`
-
-    const shareText = `Check out ${order.restaurant} on ${companyName}.
-Location: ${location || "Location not available"}
-Order again from this restaurant in the ${companyName} app.`
-
-    const payload = {
-      title: order.restaurant,
-      text: shareText,
-      url: shareUrl,
-    }
-
-    try {
-      const shared = await tryNativeShare(payload)
-      if (shared) {
-        toast.success("Restaurant shared successfully")
-        return
-      }
-
-      openShareModal(payload)
-    } catch (error) {
-      if (error?.name !== "AbortError") {
-        debugError("Error sharing restaurant:", error)
-        toast.error("Failed to share restaurant")
-      }
-    } finally {
-      setActiveMenuOrderId(null)
-    }
   }
 
   const handleViewOrderDetails = (order) => {
@@ -1043,14 +940,29 @@ Order again from this restaurant in the ${companyName} app.`
                         </p>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleAddSingleDish(dish)}
-                      className="px-3.5 py-1.5 bg-[#E53935] hover:bg-[#d92d36] text-white text-xs font-bold rounded-lg shadow-xs active:scale-95 transition-all shrink-0 flex items-center gap-1 cursor-pointer border-0"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Add
-                    </button>
+                    {(() => {
+                      const qty = cartSummary.lines[lineKeyFor(dish)] || 0
+                      return qty > 0 ? (
+                        <div className="flex shrink-0 items-center overflow-hidden rounded-lg border border-[#E53935] bg-white shadow-xs dark:bg-[#1a1a1a]">
+                          <button type="button" onClick={() => changeDishQty(dish, -1)} aria-label={`Remove one ${dish.name}`} className="flex h-8 w-8 items-center justify-center text-[#E53935] active:bg-red-50 dark:active:bg-red-900/20">
+                            <Minus className="h-3.5 w-3.5" strokeWidth={3} />
+                          </button>
+                          <motion.span key={qty} initial={{ scale: 1.4, opacity: 0.4 }} animate={{ scale: 1, opacity: 1 }} className="w-6 text-center text-sm font-extrabold text-gray-900 dark:text-white">{qty}</motion.span>
+                          <button type="button" onClick={() => changeDishQty(dish, 1)} aria-label={`Add one more ${dish.name}`} className="flex h-8 w-8 items-center justify-center bg-[#E53935] text-white active:bg-[#d92d36]">
+                            <Plus className="h-3.5 w-3.5" strokeWidth={3} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleAddSingleDish(dish)}
+                          className="px-3.5 py-1.5 bg-[#E53935] hover:bg-[#d92d36] text-white text-xs font-bold rounded-lg shadow-xs active:scale-95 transition-all shrink-0 flex items-center gap-1 cursor-pointer border-0"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          Add
+                        </button>
+                      )
+                    })()}
                   </div>
                 ))}
               </div>
@@ -1066,7 +978,7 @@ Order again from this restaurant in the ${companyName} app.`
               <Search className="w-5 h-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search by restaurant, dish or order ID"
+                placeholder="Search by store, dish or order ID"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-1 ml-3 bg-transparent outline-none text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400"
@@ -1112,19 +1024,20 @@ Order again from this restaurant in the ${companyName} app.`
             const isDelivered = order.status === 'delivered'
             const isRestaurantCancelled = order.isRestaurantCancelled || order.status === 'restaurant_cancelled'
             const isUserCancelled = order.isUserCancelled || (isCancelled && order.cancelledBy === 'user')
-            // Prefer food image from first item; fallback to restaurant image, then generic food photo
+            // Prefer food image from first item; fallback to the store image, then generic food photo
             const firstItemImage = order.items?.[0]?.image
             const restaurantImage = firstItemImage
               || order.restaurantImage
               || "https://images.unsplash.com/photo-1604908176997-125188eb3c52?auto=format&fit=crop&w=200&q=80"
-            const location = order.restaurantLocation || `${order.address?.city || ''}, ${order.address?.state || ''}`.trim() || 'Location not available'
+            // The store's own street address; never the region / franchise label or the customer's city
+            const location = order.restaurantLocation || ''
 
             return (
               <div key={order.id} className="relative bg-white dark:bg-[#121212] rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
-                {/* Card Header: Restaurant Info */}
+                {/* Card Header: Store Info */}
                 <div className="flex items-start justify-between p-4 pb-2">
                   <div className="flex gap-3">
-                    {/* Restaurant Image */}
+                    {/* Store Image */}
                     <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-gray-200 overflow-hidden flex-shrink-0">
                       <img
                         src={restaurantImage}
@@ -1141,7 +1054,7 @@ Order again from this restaurant in the ${companyName} app.`
                       <p className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
                         Order ID: <span className="font-semibold text-gray-700 dark:text-gray-300">{order.orderId || order.id}</span>
                       </p>
-                      <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{location}</p>
+                      {location && <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{location}</p>}
                       {order.deliveryPartnerName && (
                         <p className="text-xs text-gray-600 mt-1">
                           <span className="font-medium">Delivery:</span> {order.deliveryPartnerName}
@@ -1167,14 +1080,7 @@ Order again from this restaurant in the ${companyName} app.`
 
                 {/* Three-dots dropdown menu */}
                 {activeMenuOrderId === order.id && (
-                  <div className="absolute right-3 top-10 z-20 w-40 rounded-xl bg-white dark:bg-[#1a1a1a] shadow-lg border border-gray-100 dark:border-gray-800 py-1 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => handleShareRestaurant(order)}
-                      className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200"
-                    >
-                      Share restaurant
-                    </button>
+                  <div className="absolute right-3 top-10 z-20 w-36 rounded-xl bg-white dark:bg-[#1a1a1a] shadow-lg border border-gray-100 dark:border-gray-800 py-1 text-xs">
                     <button
                       type="button"
                       onClick={() => handleViewOrderDetails(order)}
@@ -1319,17 +1225,7 @@ Order again from this restaurant in the ${companyName} app.`
                     {isDelivered && !paymentFailed && (
                       <p className="text-xs font-medium text-green-600 mt-1">Delivered</p>
                     )}
-                    {isRestaurantCancelled && (
-                      <div className="flex flex-col gap-0.5">
-                        <p className="text-xs font-medium text-red-500 mt-1">Restaurant Cancelled</p>
-                        {order.cancellationReason && (
-                          <p className="text-[10px] text-red-400 italic">Reason: {order.cancellationReason}</p>
-                        )}
-                        {order.cancellationMessage && (
-                          <p className="text-[10px] text-gray-500 dark:text-gray-400">{order.cancellationMessage}</p>
-                        )}
-                      </div>
-                    )}
+                    {/* A store cancellation (reason, message, refund) is explained once, in the card footer below */}
                     {isUserCancelled && (
                       <p className="text-xs font-medium text-gray-500 mt-1">Cancelled by you</p>
                     )}
@@ -1359,7 +1255,7 @@ Order again from this restaurant in the ${companyName} app.`
                         <div className="bg-red-100 dark:bg-red-900/30 p-1 rounded-full">
                           <AlertCircle className="w-4 h-4 text-red-500 dark:text-red-400" />
                         </div>
-                        <span className="text-xs font-semibold text-red-500 dark:text-red-400">Restaurant Cancelled</span>
+                        <span className="text-xs font-semibold text-red-500 dark:text-red-400">Cancelled by store</span>
                       </div>
                       {order.cancellationReason && (
                         <p className="text-xs text-red-600 dark:text-red-400 font-medium ml-7 mb-1">Reason: {order.cancellationReason}</p>
@@ -1367,7 +1263,14 @@ Order again from this restaurant in the ${companyName} app.`
                       {order.cancellationMessage && (
                         <p className="text-xs text-gray-700 dark:text-gray-300 ml-7 mb-1">{order.cancellationMessage}</p>
                       )}
-                      <p className="text-xs text-gray-600 dark:text-gray-400 ml-7">Refund will be processed in 24-48 hours</p>
+                      {(() => {
+                        const method = order.payment?.method || order.paymentMethod
+                        const paidOnline = method === 'razorpay' || method === 'razorpay_qr' || method === 'wallet'
+                        if (!paidOnline) return null
+                        return order.payment?.status === 'refunded'
+                          ? <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 ml-7">Refund completed</p>
+                          : <p className="text-xs text-gray-600 dark:text-gray-400 ml-7">Refund will be processed in 24-48 hours</p>
+                      })()}
                     </div>
                   ) : paymentFailed ? (
                     <div className="flex items-center gap-2">
@@ -1398,7 +1301,7 @@ Order again from this restaurant in the ${companyName} app.`
                         onClick={() => handleOpenRating(order)}
                         className="text-xs text-[#E53935] font-medium mt-0.5 flex items-center hover:underline"
                       >
-                        Rate restaurant & delivery <span className="ml-0.5">&gt;</span>
+                        Rate store & delivery <span className="ml-0.5">&gt;</span>
                       </button>
                     </div>
                   ) : (
@@ -1463,7 +1366,7 @@ Order again from this restaurant in the ${companyName} app.`
             <div className="px-6 py-6 font-sans">
               <div className="mb-6">
                 <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
-                  Restaurant rating (out of 5)
+                  Store rating (out of 5)
                 </p>
                 <div className="flex items-center justify-center gap-2 mb-3">
                   {Array.from({ length: 5 }, (_, i) => i + 1).map((num) => {
@@ -1490,7 +1393,7 @@ Order again from this restaurant in the ${companyName} app.`
                   value={restaurantFeedbackText}
                   onChange={(e) => setRestaurantFeedbackText(e.target.value)}
                   className="w-full rounded-xl border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1a1a1a] px-4 py-2 text-sm text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#E53935] focus:border-[#E53935] resize-none transition-all"
-                  placeholder="Restaurant feedback (optional)"
+                  placeholder="Store feedback (optional)"
                 />
               </div>
 
@@ -1557,106 +1460,33 @@ Order again from this restaurant in the ${companyName} app.`
         </div>
       )}
 
-      {showShareModal && sharePayload && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm px-4 pb-4 pt-10 sm:items-center">
-          <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-[#121212] shadow-2xl overflow-hidden border dark:border-gray-800">
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 px-5 py-4">
-              <div>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Share restaurant</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Choose an app to share this restaurant</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowShareModal(false)}
-                className="rounded-full p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                aria-label="Close share modal"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="px-5 py-5 space-y-3 font-sans">
-              {typeof navigator !== "undefined" && navigator.share && (
-                <button
-                  type="button"
-                  onClick={handleSystemShareFromModal}
-                  className="w-full rounded-2xl bg-[#E53935] px-4 py-3 text-sm font-semibold text-white flex items-center justify-center gap-2 hover:bg-[#d92d36] transition-colors"
-                >
-                  <Share2 className="w-4 h-4" />
-                  Share via apps
-                </button>
-              )}
-
-              <div className="grid grid-cols-3 gap-3">
-                <button
-                  type="button"
-                  onClick={() => openShareTarget("whatsapp")}
-                  className="rounded-2xl border border-gray-200 dark:border-gray-800 px-3 py-4 text-xs font-medium text-gray-700 dark:text-gray-200 flex flex-col items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  <MessageCircle className="w-5 h-5 text-green-600" />
-                  WhatsApp
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openShareTarget("telegram")}
-                  className="rounded-2xl border border-gray-200 dark:border-gray-800 px-3 py-4 text-xs font-medium text-gray-700 dark:text-gray-200 flex flex-col items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  <Send className="w-5 h-5 text-sky-500" />
-                  Telegram
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openShareTarget("email")}
-                  className="rounded-2xl border border-gray-200 dark:border-gray-800 px-3 py-4 text-xs font-medium text-gray-700 dark:text-gray-200 flex flex-col items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  <Mail className="w-5 h-5 text-rose-500" />
-                  Email
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openShareTarget("sms")}
-                  className="rounded-2xl border border-gray-200 dark:border-gray-800 px-3 py-4 text-xs font-medium text-gray-700 dark:text-gray-200 flex flex-col items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  <MessagesSquare className="w-5 h-5 text-violet-500" />
-                  SMS
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openShareTarget("facebook")}
-                  className="rounded-2xl border border-gray-200 dark:border-gray-800 px-3 py-4 text-xs font-medium text-gray-700 dark:text-gray-200 flex flex-col items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  <Share2 className="w-5 h-5 text-blue-600" />
-                  Facebook
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openShareTarget("x")}
-                  className="rounded-2xl border border-gray-200 dark:border-gray-800 px-3 py-4 text-xs font-medium text-gray-700 dark:text-gray-200 flex flex-col items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  <Link2 className="w-5 h-5 text-gray-900 dark:text-gray-100" />
-                  X
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openShareTarget("linkedin")}
-                  className="rounded-2xl border border-gray-200 dark:border-gray-800 px-3 py-4 text-xs font-medium text-gray-700 dark:text-gray-200 flex flex-col items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  <Share2 className="w-5 h-5 text-blue-700" />
-                  LinkedIn
-                </button>
-                <button
-                  type="button"
-                  onClick={copyShareLink}
-                  className="rounded-2xl border border-gray-200 dark:border-gray-800 px-3 py-4 text-xs font-medium text-gray-700 dark:text-gray-200 flex flex-col items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  <Copy className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                  Copy link
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {activeTab === "previously_ordered" && cartSummary.count > 0 && <div className="h-24" aria-hidden />}
+      {/* View Cart bar: appears as soon as something is added from the Previously Ordered list */}
+      <AnimatePresence>
+        {activeTab === "previously_ordered" && cartSummary.count > 0 && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 340, damping: 30 }}
+            className="fixed bottom-4 left-0 right-0 z-30 flex justify-center px-4 pointer-events-none"
+          >
+            <button
+              type="button"
+              onClick={() => navigate("/user/cart")}
+              className="pointer-events-auto flex w-full max-w-md items-center justify-between rounded-2xl bg-[#D32F3B] px-4 py-3 text-white shadow-xl shadow-black/25 active:scale-[0.98] transition-transform"
+            >
+              <span className="flex flex-col items-start leading-tight">
+                <span className="text-sm font-extrabold">{cartSummary.count} {cartSummary.count === 1 ? "item" : "items"} added</span>
+                {cartSummary.total > 0 && <span className="text-[11px] font-medium text-white/85">₹{cartSummary.total.toLocaleString("en-IN")} + taxes</span>}
+              </span>
+              <span className="flex items-center gap-1.5 text-sm font-bold">
+                <ShoppingCart className="h-4.5 w-4.5" /> View cart <ChevronRight className="h-4 w-4" />
+              </span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -135,28 +135,28 @@ export const loadBusinessSettings = async () => {
 export const updateFavicon = (url) => {
   if (!url || typeof document === 'undefined') return;
 
-  const existingFavicons = document.querySelectorAll("link[rel*='icon']");
-  existingFavicons.forEach(el => el.remove());
+  // An address that failed once (the image was deleted from storage) is not asked for again this session
+  const badKey = `pvp_bad_favicon:${url}`;
+  try {
+    if (sessionStorage.getItem(badKey)) return;
+  } catch (_) {}
 
-  fetch(url)
-    .then(res => res.blob())
-    .then(blob => {
-      const objectUrl = URL.createObjectURL(blob);
-      const link = document.createElement("link");
-      link.rel = "icon";
-      link.type = "image/png";
-      link.href = objectUrl;
-      document.head.appendChild(link);
-    })
-    .catch(err => {
-      const link = document.createElement("link");
-      link.rel = "icon";
-      link.type = "image/png";
-      link.href = url;
-      link.crossOrigin = "anonymous";
-      link.referrerPolicy = "no-referrer";
-      document.head.appendChild(link);
-    });
+  // Only replace the current icon once the new one has really loaded; otherwise keep the one that is showing
+  const probe = new Image();
+  probe.onload = () => {
+    document.querySelectorAll("link[rel*='icon']").forEach((el) => el.remove());
+    const link = document.createElement("link");
+    link.rel = "icon";
+    link.type = "image/png";
+    link.href = url;
+    document.head.appendChild(link);
+  };
+  probe.onerror = () => {
+    try {
+      sessionStorage.setItem(badKey, "1");
+    } catch (_) {}
+  };
+  probe.src = url;
 };
 
 /**

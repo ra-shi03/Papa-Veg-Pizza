@@ -196,7 +196,7 @@ export default function BulkOrder() {
       outletButtonText: "FIND YOUR NEAREST OUTLET",
       outletButtonLink: "/food/user/delivery-location",
       outletHelpText: "Try our delicious treats and satisfy hunger with Papa Veg Pizza.",
-      locateLinkText: "Locate Nearby Pizza Restaurants",
+      locateLinkText: "Locate Nearby Pizza Stores",
       locateLinkUrl: "/food/user/delivery-location",
       customerCareTitle: "Papa Veg Pizza Customer Care Number",
       customerCareNumber: "",
@@ -917,7 +917,7 @@ export default function BulkOrder() {
                     }}
                     className="font-bold text-[#E53935] hover:underline bg-transparent border-0 p-0 inline cursor-pointer text-xs"
                   >
-                    {cp.locateLinkText || "Locate Nearby Pizza Restaurants"}
+                    {cp.locateLinkText || "Locate Nearby Pizza Stores"}
                   </button>{" "}
                   nearest to you.
                 </p>

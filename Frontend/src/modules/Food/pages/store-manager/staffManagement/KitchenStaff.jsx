@@ -183,6 +183,10 @@ export default function KitchenStaff() {
         return "bg-zinc-500/10 text-zinc-500 border-zinc-500/20";
       case "suspended":
         return "bg-rose-500/10 text-rose-600 border-rose-500/20";
+      case "pending approval":
+        return "bg-amber-500/10 text-amber-600 border-amber-500/20";
+      case "rejected":
+        return "bg-rose-500/10 text-rose-600 border-rose-500/20";
       default:
         return "bg-zinc-500/10 text-zinc-500 border-zinc-500/20";
     }
@@ -371,6 +375,8 @@ export default function KitchenStaff() {
               <option value="Inactive">Inactive</option>
               <option value="Suspended">Suspended</option>
               <option value="On Leave">On Leave</option>
+              <option value="Pending Approval">Pending Approval</option>
+              <option value="Rejected">Rejected</option>
             </select>
           </div>
         </div>
@@ -500,7 +506,7 @@ export default function KitchenStaff() {
 
                       {/* 10. Status */}
                       <td className="py-3 px-4 whitespace-nowrap">
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border capitalize inline-block whitespace-nowrap ${getStatusBadgeStyle(staff.status || "active")}`}>
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border capitalize inline-block whitespace-nowrap ${getStatusBadgeStyle(String(staff.status || "active").toLowerCase())}`}>
                           {staff.status || "active"}
                         </span>
                       </td>
@@ -522,7 +528,19 @@ export default function KitchenStaff() {
                           >
                             <Edit size={15} />
                           </button>
-                          {staff.status?.toLowerCase() === "active" ? (
+                          {["pending approval", "rejected"].includes(staff.status?.toLowerCase()) ? (
+                            <span className="px-2 text-[10px] font-bold text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                              {staff.status?.toLowerCase() === "rejected" ? "Rejected by franchise" : "Awaiting franchise approval"}
+                            </span>
+                          ) : (
+                            <>
+                          {["pending approval", "rejected"].includes(staff.status?.toLowerCase()) ? (
+                        <span className="px-1 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                          {staff.status?.toLowerCase() === "rejected" ? "Rejected" : "Awaiting approval"}
+                        </span>
+                      ) : (
+                        <>
+                      {staff.status?.toLowerCase() === "active" ? (
                             <button
                               title="Suspend Staff"
                               onClick={() => handleToggleStatus(staff._id, staff.status)}
@@ -541,6 +559,8 @@ export default function KitchenStaff() {
                               <PlayCircle size={15} />
                             </button>
                           )}
+                        </>
+                      )}
                           <button
                             title="Mark Leave"
                             onClick={() => triggerAction("leave", staff._id)}
@@ -548,6 +568,8 @@ export default function KitchenStaff() {
                           >
                             <CalendarOff size={15} />
                           </button>
+                            </>
+                          )}
                           <button
                             title="Delete Staff"
                             onClick={() => triggerAction("delete", staff._id)}

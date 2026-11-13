@@ -289,6 +289,8 @@ export default function Cart() {
           showInCart: o.showInCart !== false,
           endDate: o.endDate || null,
           applicableOn: o.applicableOn || "All",
+          applicableSizes: Array.isArray(o.applicableSizes) ? o.applicableSizes : [],
+          customerScope: o.customerScope || "all",
         }
       })
 

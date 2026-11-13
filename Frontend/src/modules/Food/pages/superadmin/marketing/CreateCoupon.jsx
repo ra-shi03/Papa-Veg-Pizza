@@ -8,6 +8,7 @@ import {
   api 
 } from './CouponsData';
 import { toast } from 'sonner';
+import CouponAudienceFields from './CouponAudienceFields';
 
 export default function CreateCoupon({ isOpen, onClose, onSuccess }) {
   const [activeTab, setActiveTab] = useState(1);
@@ -108,6 +109,8 @@ export default function CreateCoupon({ isOpen, onClose, onSuccess }) {
   const [applicableOn, setApplicableOn] = useState('All'); // 'All', 'Category', 'Product'
   const [productIds, setProductIds] = useState([]);
   const [categoryIds, setCategoryIds] = useState([]);
+  const [userType, setUserType] = useState('all'); // 'all' | 'new' | 'old'
+  const [applicableSizes, setApplicableSizes] = useState([]);
 
   // Region Assignment Tab (Dependent)
   const [regionIds, setRegionIds] = useState([]);
@@ -460,6 +463,8 @@ export default function CreateCoupon({ isOpen, onClose, onSuccess }) {
         applicableOn,
         productIds: applicableOn === 'Product' ? productIds : [],
         categoryIds: applicableOn === 'Category' ? categoryIds : [],
+        userType,
+        applicableSizes,
         regionIds,
         zoneIds,
         territoryIds,
@@ -911,6 +916,7 @@ export default function CreateCoupon({ isOpen, onClose, onSuccess }) {
                     </div>
                   )}
                 </div>
+                <CouponAudienceFields userType={userType} setUserType={setUserType} applicableSizes={applicableSizes} setApplicableSizes={setApplicableSizes} products={dbProducts} />
               </div>
             )}
 

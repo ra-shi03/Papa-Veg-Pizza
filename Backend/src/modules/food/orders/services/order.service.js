@@ -4,6 +4,7 @@ import { FoodAppConfig } from '../../settings/models/appConfig.model.js';
 // import { paymentSnapshotFromOrder } from './foodOrderPayment.service.js';
 import { logger } from '../../../../utils/logger.js';
 import { FoodUser } from '../../../../core/users/user.model.js';
+import { StoreManager } from '../../franchise/models/storeManager.model.js';
 import { FoodStore as FoodStore } from '../../store/models/store.model.js';
 import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
 import { FoodZone } from '../../admin/models/zone.model.js';
@@ -643,6 +644,26 @@ export async function listOrdersUser(userId, query) {
   });
 }
 
+/**
+ * Who the customer calls about their order: the store manager of the store that has it (name + number), falling back to
+ * the store's own number. Only ever sent to the customer who owns the order.
+ */
+async function storeContactFor(order) {
+  const storeRef = order.storeId?._id || order.storeId;
+  const store = order.storeId && typeof order.storeId === 'object' ? order.storeId : null;
+  let manager = null;
+  if (storeRef) {
+    manager = await StoreManager.findOne({
+      storeId: String(storeRef),
+      role: /^store[\s_-]*manager$/i,
+      status: 'Active',
+      phone: { $exists: true, $nin: ['', null] },
+    }).select('name phone').sort({ createdAt: 1 }).lean().catch(() => null);
+  }
+  const phone = manager?.phone || store?.phone || '';
+  return { name: manager?.name || '', phone: String(phone || ''), isManager: Boolean(manager?.phone) };
+}
+
 export async function getOrderById(
   orderId,
   { userId, storeId, deliveryPartnerId, admin, storeIds = null } = {},
@@ -706,6 +727,7 @@ export async function getOrderById(
     if (!drop.verified && secret) {
       out.handoverOtp = secret;
     }
+    out.storeContact = await storeContactFor(order);
     return out;
   }
 

@@ -63,7 +63,7 @@ const storeManagerSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Active', 'On Leave', 'Suspended', 'Pending Approval', 'DELETED'],
+    enum: ['Active', 'On Leave', 'Suspended', 'Pending Approval', 'Rejected', 'DELETED'],
     default: 'Active',
   },
   storeId: {
@@ -82,6 +82,13 @@ const storeManagerSchema = new mongoose.Schema({
   reportingManager: {
     type: String,
     trim: true,
+  },
+  // A kitchen supervisor / staff member the store manager adds waits as 'Pending Approval' until the franchise admin decides
+  approval: {
+    decidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    decidedByName: { type: String, trim: true, default: '' },
+    decidedAt: { type: Date, default: null },
+    rejectionReason: { type: String, trim: true, default: '' },
   },
   lastLoginAt: {
     type: Date,

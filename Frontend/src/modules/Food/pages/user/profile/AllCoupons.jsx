@@ -494,7 +494,7 @@ export default function AllCoupons() {
                           className="overflow-hidden mt-2"
                         >
                           <p className="text-[10px] text-zinc-400 font-medium leading-relaxed font-sans border-t border-zinc-800 border-opacity-40 pt-2 text-left">
-                            {offer.terms || "Terms and Conditions apply. This offer is valid on regular prices and combos according to standard restaurant menu listings. Expiry is subject to operational policies."}
+                            {offer.terms || "Terms and Conditions apply. This offer is valid on regular prices and combos according to standard menu listings. Expiry is subject to operational policies."}
                           </p>
                           <p className="text-[9px] text-[#E53935] font-semibold mt-1">
                             {expiryText}

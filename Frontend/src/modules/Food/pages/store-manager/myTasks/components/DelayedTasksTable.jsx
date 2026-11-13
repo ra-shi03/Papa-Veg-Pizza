@@ -1,5 +1,5 @@
 import React from "react";
-import { AlertTriangle, Play, RefreshCw, XCircle, Clock } from "lucide-react";
+import { AlertTriangle, Play, RefreshCw, Clock } from "lucide-react";
 
 export default function DelayedTasksTable({
   tasks = [],
@@ -7,7 +7,6 @@ export default function DelayedTasksTable({
   onResume = () => {},
   onRequestReassign = () => {},
   onReassign = () => {},
-  onCancel = () => {},
 }) {
   if (tasks.length === 0) {
     return (
@@ -102,15 +101,6 @@ export default function DelayedTasksTable({
                       <span>Request Reassign</span>
                     </button>
                   )}
-
-                  {/* CANCEL BUTTON */}
-                  <button
-                    onClick={() => onCancel(task)}
-                    className="p-1.5 rounded-lg border border-zinc-250 dark:border-zinc-700 text-slate-500 hover:text-red-650 hover:border-red-200 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/15 transition-all cursor-pointer"
-                    title="Cancel Task"
-                  >
-                    <XCircle size={11} />
-                  </button>
                 </div>
               </td>
             </tr>

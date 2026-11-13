@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { Outlet } from "react-router-dom"
+import AttendanceBanner from "./AttendanceBanner"
 import Sidebar from "./Sidebar"
 import Navbar from "./Navbar"
 import { API_BASE_URL } from "@food/api/config"
@@ -63,6 +64,8 @@ export default function StoreOperationsLayout() {
             Store operations live sync offline. Using simulated system data.
           </div>
         )}
+
+        <AttendanceBanner role={role} />
 
         {/* Page Content */}
         <main className="flex-1 min-h-0 w-full max-w-full overflow-x-hidden overflow-y-auto bg-neutral-100 relative pt-0">

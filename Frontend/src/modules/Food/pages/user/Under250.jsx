@@ -445,7 +445,7 @@ export default function Under250() {
                   String(restaurant?.restaurantName || restaurant?.name || "")
                     .toLowerCase()
                     .replace(/\s+/g, "-"),
-                name: restaurant?.restaurantName || restaurant?.name || "Restaurant",
+                name: restaurant?.restaurantName || restaurant?.name || "Papa Veg Pizza",
                 rating: Number(restaurant?.rating || 0),
                 totalRatings: Number(restaurant?.totalRatings || restaurant?.ratingCount || 0),
                 deliveryTime:
@@ -721,7 +721,7 @@ export default function Under250() {
         if (newQuantity > existingCartItem.quantity && sourcePosition) {
           const result = addToCart(cartItem, sourcePosition)
           if (result?.ok === false) {
-            toast.error(result.error || 'Cannot add item from different restaurant. Please clear cart first.')
+            toast.error(result.error || 'Cannot add item from different store. Please clear your cart first.')
             return
           }
           if (newQuantity > existingCartItem.quantity + 1) {
@@ -735,7 +735,7 @@ export default function Under250() {
       } else {
         const result = addToCart(cartItem, sourcePosition)
         if (result?.ok === false) {
-          toast.error(result.error || 'Cannot add item from different restaurant. Please clear cart first.')
+          toast.error(result.error || 'Cannot add item from different store. Please clear your cart first.')
           return
         }
         if (newQuantity > 1) {
@@ -1023,14 +1023,14 @@ export default function Under250() {
         {/* Restaurant Menu Sections */}
         {loadingRestaurants ? (
           <div className="flex justify-center items-center py-12">
-            <div className="text-gray-500 dark:text-gray-400">Loading restaurants...</div>
+            <div className="text-gray-500 dark:text-gray-400">Loading stores...</div>
           </div>
         ) : sortedAndFilteredRestaurants.length === 0 ? (
           <div className="flex justify-center items-center py-12">
             <div className="text-gray-500 dark:text-gray-400">
               {under250Restaurants.length === 0
                 ? `No restaurants with dishes under ${RUPEE_SYMBOL}${under250PriceLimit} found.`
-                : "No restaurants match the selected filters."}
+                : "No stores match the selected filters."}
             </div>
           </div>
         ) : (

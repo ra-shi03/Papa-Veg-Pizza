@@ -8,6 +8,7 @@ import {
   api 
 } from './CouponsData';
 import { toast } from 'sonner';
+import CouponAudienceFields from './CouponAudienceFields';
 
 export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
   const [activeTab, setActiveTab] = useState(1);
@@ -109,6 +110,8 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
   const [applicableOn, setApplicableOn] = useState('All'); 
   const [productIds, setProductIds] = useState([]);
   const [categoryIds, setCategoryIds] = useState([]);
+  const [userType, setUserType] = useState('all'); // 'all' | 'new' | 'old'
+  const [applicableSizes, setApplicableSizes] = useState([]);
 
   // Region Assignment Tab (Dependent)
   const [regionIds, setRegionIds] = useState([]);
@@ -150,6 +153,8 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
       setApplicableOn(coupon.applicableOn || 'All');
       setProductIds(coupon.productIds || []);
       setCategoryIds(coupon.categoryIds || []);
+      setUserType(['new', 'old'].includes(coupon.userType) ? coupon.userType : (coupon.customerSegments || []).some((x) => /new/i.test(x)) ? 'new' : 'all');
+      setApplicableSizes(coupon.applicableSizes || []);
 
       setRegionIds(coupon.regionIds || []);
       setZoneIds(coupon.zoneIds || []);
@@ -342,6 +347,8 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
     const arrayEquals = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
     if (!arrayEquals(productIds, coupon.productIds || [])) return true;
     if (!arrayEquals(categoryIds, coupon.categoryIds || [])) return true;
+    if (!arrayEquals(applicableSizes, coupon.applicableSizes || [])) return true;
+    if (userType !== (['new', 'old'].includes(coupon.userType) ? coupon.userType : (coupon.customerSegments || []).some((x) => /new/i.test(x)) ? 'new' : 'all')) return true;
     
     if (!arrayEquals(regionIds, coupon.regionIds || [])) return true;
     if (!arrayEquals(zoneIds, coupon.zoneIds || [])) return true;
@@ -357,7 +364,7 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
     coupon, code, title, description, couponType, value,
     minimumOrderAmount, maximumDiscount, usageLimit, usagePerCustomer,
     applicableOn, status, productIds, categoryIds, regionIds, zoneIds,
-    territoryIds, franchiseIds, storeIds, customerSegments,   ]);
+    territoryIds, franchiseIds, storeIds, customerSegments, userType, applicableSizes ]);
 
   // ----------------------------------------------------
   // Item Searching & Filtering
@@ -504,6 +511,8 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
         applicableOn,
         productIds: applicableOn === 'Product' ? productIds : [],
         categoryIds: applicableOn === 'Category' ? categoryIds : [],
+        userType,
+        applicableSizes,
         regionIds,
         zoneIds,
         territoryIds,
@@ -898,6 +907,7 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
                     </div>
                   )}
                   </div>
+                  <CouponAudienceFields userType={userType} setUserType={setUserType} applicableSizes={applicableSizes} setApplicableSizes={setApplicableSizes} products={dbProducts} />
                 </div>
               )}
 

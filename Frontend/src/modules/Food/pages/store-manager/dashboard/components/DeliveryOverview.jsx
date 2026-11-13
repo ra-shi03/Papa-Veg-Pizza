@@ -1,10 +1,14 @@
 import React, { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Truck, ToggleLeft, ToggleRight, MapPin, X, Map, ShieldAlert, AlertTriangle } from "lucide-react"
+import { useOutletContext } from "react-router-dom"
 import { toast } from "sonner"
 import apiClient from "@/services/api/axios"
 
 export default function DeliveryOverview({ storeId, refreshKey }) {
+  // Live rider tracking belongs to the store manager's Delivery Operations; a supervisor only reads the roster
+  const { role } = useOutletContext() || {}
+  const canTrackRiders = role !== "kitchen_supervisor"
   const [showRiderModal, setShowRiderModal] = useState(false)
   const [riderFilter, setRiderFilter] = useState("all") // all, available, assigned, delayed
 
@@ -148,7 +152,7 @@ export default function DeliveryOverview({ storeId, refreshKey }) {
                     <th className="py-2">Current Status</th>
                     <th className="py-2">Order Assigned</th>
                     <th className="py-2">Current Location</th>
-                    <th className="py-2 text-right">Map</th>
+                    {canTrackRiders && <th className="py-2 text-right">Map</th>}
                   </tr>
                 </thead>
                 <tbody className="font-bold divide-y divide-zinc-50 dark:divide-zinc-850 text-slate-700 dark:text-zinc-300">
@@ -168,14 +172,16 @@ export default function DeliveryOverview({ storeId, refreshKey }) {
                       </td>
                       <td className="py-2.5">{rider.ordersAssigned}</td>
                       <td className="py-2.5 text-slate-500">{rider.location}</td>
-                      <td className="py-2.5 text-right">
-                        <button 
-                          onClick={() => toast.success(`Launching active GPS radar tracking for ${rider.name}...`)}
-                          className="p-1 rounded bg-slate-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 hover:bg-slate-100 dark:hover:bg-zinc-800 text-[var(--primary)] cursor-pointer"
-                        >
-                          <MapPin size={12} />
-                        </button>
-                      </td>
+                      {canTrackRiders && (
+                        <td className="py-2.5 text-right">
+                          <button 
+                            onClick={() => toast.success(`Launching active GPS radar tracking for ${rider.name}...`)}
+                            className="p-1 rounded bg-slate-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 hover:bg-slate-100 dark:hover:bg-zinc-800 text-[var(--primary)] cursor-pointer"
+                          >
+                            <MapPin size={12} />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

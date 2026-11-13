@@ -52,7 +52,7 @@ export default function Gourmet() {
         setGourmetRestaurants(list)
       } catch (err) {
         debugError('Error fetching Gourmet restaurants:', err)
-        const errorMessage = err?.response?.data?.message || err?.message || 'Failed to load Gourmet restaurants'
+        const errorMessage = err?.response?.data?.message || err?.message || 'Failed to load Gourmet stores'
         setError(errorMessage)
         toast.error(errorMessage)
         setGourmetRestaurants([])
@@ -105,7 +105,7 @@ export default function Gourmet() {
             <span className="text-[10px] font-black tracking-[0.3em] text-white/80 uppercase">Experience Excellence</span>
           </div>
           <h1 className="text-3xl md:text-5xl font-black text-white drop-shadow-2xl">Gourmet Dining</h1>
-          <p className="text-white/70 text-sm md:text-base font-medium max-w-md">Indulge in carefully curated premium dining from the city's finest restaurants.</p>
+          <p className="text-white/70 text-sm md:text-base font-medium max-w-md">Indulge in carefully curated premium dining from the city's finest stores.</p>
         </div>
       </div>
 
@@ -140,7 +140,7 @@ export default function Gourmet() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {gourmetRestaurants.length === 0 ? (
                 <div className="col-span-full text-center py-12">
-                  <p className="text-gray-500 dark:text-gray-400">No Gourmet restaurants available at the moment</p>
+                  <p className="text-gray-500 dark:text-gray-400">No Gourmet stores available at the moment</p>
                 </div>
               ) : (
                 gourmetRestaurants.map((item) => {

@@ -139,7 +139,7 @@ export default function ProductDetail() {
         for (let i = 0; i < quantity; i++) {
           const result = addToCart(product)
           if (result?.ok === false) {
-            alert(result.error || "Cannot add item from different restaurant. Please clear cart first.")
+            alert(result.error || "Cannot add item from different store. Please clear your cart first.")
             break
           }
         }
@@ -350,7 +350,7 @@ export default function ProductDetail() {
               <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground flex-wrap">
                 <Link to="/user" className="hover:text-[#7e3866] transition-colors">Home</Link>
                 <span>/</span>
-                <span className="text-foreground font-medium truncate">{restaurant?.name || "Restaurant"}</span>
+                <span className="text-foreground font-medium truncate">{restaurant?.name || "Papa Veg Pizza"}</span>
                 <span>/</span>
                 <span className="text-foreground font-medium truncate">{product.name}</span>
               </div>

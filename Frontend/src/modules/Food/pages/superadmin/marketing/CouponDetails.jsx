@@ -402,6 +402,21 @@ export default function CouponDetails({ isOpen, onClose, coupon }) {
                     </span>
                   </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="p-3 bg-zinc-550/5 dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-xl space-y-1">
+                      <p className="font-black text-black dark:text-white uppercase text-[10px] tracking-wide">Who can use it</p>
+                      <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                        {coupon.userType === 'new' ? 'New users only' : coupon.userType === 'old' ? 'Old users only' : 'All users'}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-zinc-550/5 dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-xl space-y-1">
+                      <p className="font-black text-black dark:text-white uppercase text-[10px] tracking-wide">Pizza size</p>
+                      <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                        {(coupon.applicableSizes || []).length > 0 ? coupon.applicableSizes.join(' / ') : 'All sizes'}
+                      </p>
+                    </div>
+                  </div>
+
                   {/* Menu / Catalog Items Applicability */}
                   <div className="space-y-3">
                     <span className="text-[9px] font-black text-zinc-450 dark:text-zinc-555 uppercase tracking-widest block">Catalog Filter</span>

@@ -297,7 +297,7 @@ export default function CategoryPage() {
           restaurantsByName.get(restaurantName.toLowerCase()) ||
           null
 
-        const fallbackRestaurantName = restaurantName || "Restaurant"
+        const fallbackRestaurantName = restaurantName || "Papa Veg Pizza"
         const fallbackSlug = slugify(fallbackRestaurantName)
         const fallbackImage = normalizeImageUrl(food?.image)
 
@@ -1284,7 +1284,7 @@ export default function CategoryPage() {
             <div className="flex-1 relative max-w-2xl">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
               <Input
-                placeholder="Restaurant name or a dish..."
+                placeholder="Store name or a dish..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 pr-3 h-9 rounded-lg border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-[#1a1a1a] focus:bg-white dark:focus:bg-[#2a2a2a] focus:border-gray-500 dark:focus:border-gray-600 text-xs dark:text-white placeholder:text-gray-600 dark:placeholder:text-gray-400"
@@ -1568,7 +1568,7 @@ export default function CategoryPage() {
             {/* Loading Overlay */}
             {showRestaurantSkeleton && (
               <div className="absolute inset-0 z-10 rounded-lg bg-white/92 backdrop-blur-sm dark:bg-[#1a1a1a]/92">
-                <LoadingSkeletonRegion label="Loading restaurants" className="h-full p-1 sm:p-2">
+                <LoadingSkeletonRegion label="Loading stores" className="h-full p-1 sm:p-2">
                   <RestaurantGridSkeleton count={4} compact />
                 </LoadingSkeletonRegion>
               </div>
@@ -1720,8 +1720,8 @@ export default function CategoryPage() {
               <div className="text-center py-12 md:py-16">
                 <p className="text-gray-500 dark:text-gray-400 text-sm md:text-base">
                   {searchQuery
-                    ? `No restaurants found for "${searchQuery}"`
-                    : "No restaurants found with selected filters"}
+                    ? `No stores found for "${searchQuery}"`
+                    : "No stores found with selected filters"}
                 </p>
                 <Button
                   variant="outline"
@@ -1883,7 +1883,7 @@ export default function CategoryPage() {
                         data-section-id="rating"
                         className="space-y-4 mb-8"
                       >
-                        <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-4">Restaurant Rating</h3>
+                        <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-4">Store Rating</h3>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                           <button
                             onClick={() => toggleFilter('rating-35-plus')}
