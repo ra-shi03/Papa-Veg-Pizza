@@ -474,46 +474,6 @@ export const assignShift = async (req, res) => {
 };
 
 /**
- * PATCH /v1/food/store/staff/:id/leave
- * Mark leave for a staff member.
- * Body: { leaveType, startDate, endDate, reason? }
- */
-export const markLeave = async (req, res) => {
-  try {
-    const callerStoreId = req.user?.storeId;
-    const { id } = req.params;
-    const { leaveType, startDate, endDate, reason } = req.body;
-
-    if (!leaveType || !startDate || !endDate) {
-      return res.status(400).json({ success: false, message: 'leaveType, startDate, and endDate are required.' });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ success: false, message: 'Invalid staff ID.' });
-    }
-
-    const staff = await StoreManager.findOneAndUpdate(
-      await manageableStaff(req, { _id: id, status: { $nin: ['DELETED', 'Pending Approval', 'Rejected'] } }),
-      { $set: { status: 'On Leave' } },
-      { new: true }
-    );
-
-    if (!staff) {
-      return res.status(404).json({ success: false, message: 'Staff member not found.' });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: `Leave marked: ${leaveType} from ${startDate} to ${endDate}.`,
-      data: { ...staff.toObject(), leave: { leaveType, startDate, endDate, reason } },
-    });
-  } catch (err) {
-    console.error('[markLeave]', err);
-    return res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-/**
  * DELETE /v1/food/store/staff/:id
  * Soft-delete a staff member (sets status to DELETED, deactivates user).
  */

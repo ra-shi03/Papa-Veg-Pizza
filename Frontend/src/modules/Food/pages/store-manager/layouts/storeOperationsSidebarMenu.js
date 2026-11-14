@@ -195,6 +195,13 @@ export const storeOperationsSidebarMenu = [
       },
       {
         type: "link",
+        label: "Leave Requests",
+        path: "/store-operations/staff/leave-requests",
+        icon: "CalendarCheck2",
+        allowedRoles: ["store_manager"]
+      },
+      {
+        type: "link",
         label: "Shift Management",
         path: "/store-operations/staff/shifts",
         icon: "Clock",
@@ -236,6 +243,13 @@ export const storeOperationsSidebarMenu = [
         allowedRoles: ["store_manager", "store_owner", "assistant_manager", "customer_experience_manager"]
       }
     ]
+  },
+  {
+    type: "link",
+    label: "Attendance",
+    path: "/store-operations/attendance",
+    icon: "CalendarCheck",
+    allowedRoles: ["kitchen_supervisor", "kitchen_staff"]
   },
   {
     type: "link",

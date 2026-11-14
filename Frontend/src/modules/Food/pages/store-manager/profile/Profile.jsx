@@ -11,7 +11,6 @@ import PersonalInfoTab from "./tabs/PersonalInfoTab";
 import WorkInfoTab from "./tabs/WorkInfoTab";
 import PermissionsTab from "./tabs/PermissionsTab";
 import PerformanceTab from "./tabs/PerformanceTab";
-import AttendanceTab from "./tabs/AttendanceTab";
 import NotificationsTab from "./tabs/NotificationsTab";
 import ActivityLogsTab from "./tabs/ActivityLogsTab";
 import SecurityTab from "./tabs/SecurityTab";
@@ -127,7 +126,6 @@ export default function Profile({ forcedRole }) {
       { id: "work", label: "Work Information", icon: Briefcase, show: true },
       { id: "permissions", label: "Permissions", icon: Shield, show: !isKitchenStaff },
       { id: "performance", label: isKitchenStaff ? "My Performance" : "Performance", icon: Award, show: true },
-      { id: "attendance", label: "Attendance", icon: Calendar, show: true },
       { id: "notifications", label: "Notifications", icon: Bell, show: true },
       { id: "activity", label: "Activity Logs", icon: Activity, show: !isKitchenStaff },
       { id: "security", label: "Security", icon: Key, show: true },
@@ -159,8 +157,6 @@ export default function Profile({ forcedRole }) {
         return <PermissionsTab />;
       case "performance":
         return <PerformanceTab userRole={currentRole} />;
-      case "attendance":
-        return <AttendanceTab />;
       case "notifications":
         return <NotificationsTab />;
       case "activity":
@@ -191,7 +187,6 @@ export default function Profile({ forcedRole }) {
 
       {/* 3. PROFILE DASHBOARD KPI CARDS */}
       <ProfileStats
-        attendanceSummary={profileData?.attendanceSummary}
         performanceSummary={profileData?.performanceSummary}
         loading={loading}
       />

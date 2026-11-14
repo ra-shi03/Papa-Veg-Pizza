@@ -7,17 +7,28 @@ export default function ClockInOutButton() {
   const { data: today, isLoading } = useMyAttendanceToday();
   const clock = useClockInOut();
   const clockedIn = !!today?.clockedIn;
-  const finished = today?.state === "clocked_out" || today?.state === "marked";
+  const finished = today?.state === "clocked_out" || today?.state === "marked" || today?.state === "on_leave";
 
   let label = "Clock In";
   if (isLoading) label = "Attendance...";
   else if (clockedIn) label = `Clock Out${today?.record?.checkIn ? ` (in at ${today.record.checkIn})` : ""}`;
   else if (today?.state === "clocked_out") label = `Shift done (${today?.record?.totalHours || 0} hrs)`;
   else if (today?.state === "marked") label = "Attendance marked";
+  else if (today?.state === "on_leave") label = "On leave today";
+
+  const handleClick = () => {
+    if (clockedIn) {
+      if (window.confirm("Are you sure you want to clock out? This will end your shift for today.")) {
+        clock.mutate("out");
+      }
+    } else {
+      clock.mutate("in");
+    }
+  };
 
   return (
     <button
-      onClick={() => clock.mutate(clockedIn ? "out" : "in")}
+      onClick={handleClick}
       disabled={isLoading || finished || clock.isPending}
       className="text-[10px] font-black uppercase tracking-wider px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1.5"
     >

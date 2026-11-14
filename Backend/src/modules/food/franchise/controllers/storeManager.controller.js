@@ -11,9 +11,13 @@ import { findScopedStore, isSuperAdmin, scopedStoreIds } from '../../shared/fran
 
 // Managers are linked to a store (storeId is stored as a string); a franchise admin only sees
 // managers of its own franchise's stores. Super admin: no restriction.
+// This module is for store managers only: the kitchen supervisors and kitchen staff sit in the same collection (and the
+// same stores), but they are handled in Kitchen Staff, never here.
+const MANAGER_ROLE = /^store[\s_-]*manager$/i;
+
 const managerScope = async (req) => {
   const storeIds = await scopedStoreIds(req);
-  return storeIds === null ? {} : { storeId: { $in: storeIds.map(String) } };
+  return storeIds === null ? { role: MANAGER_ROLE } : { role: MANAGER_ROLE, storeId: { $in: storeIds.map(String) } };
 };
 
 
@@ -144,7 +148,7 @@ export const createStoreManager = async (req, res) => {
 export const getStoreManagers = async (req, res) => {
   try {
     const { status, storeId, search } = req.query;
-    let query = { status: { $ne: 'DELETED' } };
+    let query = { status: { $ne: 'DELETED' }, role: MANAGER_ROLE };
     const scope = await managerScope(req);
     
     if (status && status !== 'All') query.status = status;

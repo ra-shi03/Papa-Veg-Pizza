@@ -8,7 +8,7 @@ const taskNotificationSchema = new mongoose.Schema(
         taskId: { type: mongoose.Schema.Types.ObjectId, ref: 'KitchenTask', default: null },
         type: {
             type: String,
-            enum: ['task_assigned', 'task_delayed', 'reassign_requested', 'task_reassigned'],
+            enum: ['task_assigned', 'task_delayed', 'reassign_requested', 'task_reassigned', 'leave_requested', 'leave_approved', 'leave_rejected'],
             required: true
         },
         title: { type: String, required: true, trim: true },

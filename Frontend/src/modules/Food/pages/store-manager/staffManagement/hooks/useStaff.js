@@ -186,29 +186,6 @@ export function useAssignShift() {
   });
 }
 
-// 7. Mark Leave Mutation Hook
-export function useMarkLeave() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, payload }) => {
-      try {
-        const response = await apiClient.patch(`/food/store/staff/${id}/leave`, payload);
-        return response.data;
-      } catch (err) {
-        throw new Error(err?.response?.data?.message || "Failed to mark leave.");
-      }
-    },
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["kitchenStaff"] });
-      queryClient.invalidateQueries({ queryKey: ["staffDetails", variables.id] });
-      toast.success("Leave marked successfully!");
-    },
-    onError: () => {
-      toast.error("Failed to mark leave");
-    },
-  });
-}
-
 // 8. Delete Staff Mutation Hook
 export function useDeleteStaff() {
   const queryClient = useQueryClient();

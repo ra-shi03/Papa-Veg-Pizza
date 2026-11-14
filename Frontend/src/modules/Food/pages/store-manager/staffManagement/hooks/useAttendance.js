@@ -388,6 +388,7 @@ export function useClockInOut() {
     },
     onSuccess: (data, action) => {
       queryClient.invalidateQueries({ queryKey: ["myAttendanceToday"] });
+      queryClient.invalidateQueries({ queryKey: ["myAttendanceHistory"] });
       queryClient.invalidateQueries({ queryKey: ["kitchenAttendance"] });
       toast.success(action === "out" ? "Clocked out. See you next shift!" : "Clocked in. Have a good shift!");
     },

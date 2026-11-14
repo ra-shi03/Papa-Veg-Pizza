@@ -29,9 +29,6 @@ import { Skeleton } from "@food/components/ui/skeleton";
 import { useAttendanceList } from "./hooks/useAttendance";
 import { useStaffList } from "./hooks/useStaff";
 import AttendanceStatsCards from "./components/AttendanceStatsCards";
-import MarkAttendanceModal from "./components/MarkAttendanceModal";
-import BulkAttendanceModal from "./components/BulkAttendanceModal";
-import EditAttendanceModal from "./components/EditAttendanceModal";
 import AttendanceDetailsModal from "./components/AttendanceDetailsModal";
 import DeleteAttendanceDialog from "./components/DeleteAttendanceDialog";
 
@@ -51,9 +48,6 @@ export default function Attendance() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Modal States
-  const [isMarkOpen, setIsMarkOpen] = useState(false);
-  const [isBulkOpen, setIsBulkOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
@@ -112,7 +106,6 @@ export default function Attendance() {
     setSelectedRecord(record);
 
     if (action === "view") setIsDetailsOpen(true);
-    if (action === "edit") setIsEditOpen(true);
     if (action === "delete") setIsDeleteOpen(true);
   };
 
@@ -142,29 +135,13 @@ export default function Attendance() {
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-5 rounded-3xl border border-zinc-150 dark:border-zinc-850 shadow-sm">
         <div>
           <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">
-            Daily Shift Attendance
+            Staff Attendance
           </h1>
           <p className="text-zinc-500 dark:text-zinc-450 text-xs mt-1">
-            Monitor and record kitchen staff check-in details, working hours logs, and shift rosters.
+            Check in and check out are marked by the staff themselves. Approved leave requests show here as leave days.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setIsBulkOpen(true)}
-            className="flex items-center justify-center gap-1.5 px-4 py-2 border border-zinc-250 dark:border-zinc-800 text-slate-700 dark:text-zinc-350 bg-white dark:bg-zinc-900 text-xs font-bold rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-95 shadow-sm transition-all cursor-pointer"
-          >
-            <Users size={14} />
-            <span>Bulk Attendance</span>
-          </button>
-          <button
-            onClick={() => setIsMarkOpen(true)}
-            className="flex items-center justify-center gap-1.5 px-5 py-2.5 bg-primary text-white text-xs font-bold rounded-full hover:bg-primary-hover active:scale-95 shadow-md hover:shadow-lg transition-all cursor-pointer"
-          >
-            <Plus size={14} className="stroke-[2.5]" />
-            <span>Mark Log</span>
-          </button>
-        </div>
       </header>
 
       {/* Stats Summary cards */}
@@ -414,20 +391,15 @@ export default function Attendance() {
                             >
                               <Eye size={13} />
                             </button>
-                            <button
-                              onClick={() => triggerAction("edit", log)}
-                              className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-550 hover:text-slate-800 dark:hover:text-zinc-200 rounded-lg cursor-pointer transition-colors"
-                              title="Edit Log"
-                            >
-                              <Edit2 size={13} />
-                            </button>
-                            <button
-                              onClick={() => triggerAction("delete", log)}
-                              className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/20 text-zinc-400 hover:text-red-650 rounded-lg cursor-pointer transition-colors"
-                              title="Delete Record"
-                            >
-                              <Trash2 size={13} />
-                            </button>
+                            {log.status === "leave" && (
+                              <button
+                                onClick={() => triggerAction("delete", log)}
+                                className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/20 text-zinc-400 hover:text-red-650 rounded-lg cursor-pointer transition-colors"
+                                title="Cancel Leave"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -469,12 +441,11 @@ export default function Attendance() {
                             <DropdownMenuItem onClick={() => triggerAction("view", log)} className="cursor-pointer font-bold text-xs py-2 text-slate-800 dark:text-zinc-300 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-900">
                               View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => triggerAction("edit", log)} className="cursor-pointer font-bold text-xs py-2 text-slate-800 dark:text-zinc-300 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-900">
-                              Edit Log
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => triggerAction("delete", log)} className="cursor-pointer font-bold text-xs py-2 text-red-655 hover:bg-red-50 dark:hover:bg-red-955/20 rounded-xl">
-                              Delete Record
-                            </DropdownMenuItem>
+                            {log.status === "leave" && (
+                              <DropdownMenuItem onClick={() => triggerAction("delete", log)} className="cursor-pointer font-bold text-xs py-2 text-red-655 hover:bg-red-50 dark:hover:bg-red-955/20 rounded-xl">
+                                Cancel Leave
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -507,23 +478,6 @@ export default function Attendance() {
       </div>
 
       {/* Dialog Triggers */}
-      {isMarkOpen && (
-        <MarkAttendanceModal isOpen={isMarkOpen} onClose={() => setIsMarkOpen(false)} />
-      )}
-      {isBulkOpen && (
-        <BulkAttendanceModal isOpen={isBulkOpen} onClose={() => setIsBulkOpen(false)} />
-      )}
-      {isEditOpen && selectedRecordId && (
-        <EditAttendanceModal
-          isOpen={isEditOpen}
-          onClose={() => {
-            setIsEditOpen(false);
-            setSelectedRecordId(null);
-            setSelectedRecord(null);
-          }}
-          attendanceId={selectedRecordId}
-        />
-      )}
       {isDetailsOpen && selectedRecord && (
         <AttendanceDetailsModal
           isOpen={isDetailsOpen}

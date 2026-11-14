@@ -8,7 +8,6 @@ import {
   updateKitchenStaff,
   updateStaffStatus,
   assignShift,
-  markLeave,
   deleteKitchenStaff,
 } from '../controllers/kitchenStaff.controller.js';
 
@@ -23,7 +22,6 @@ router.get('/:id',             getKitchenStaffById);   // View profile
 router.patch('/:id',           updateKitchenStaff);    // Edit profile
 router.patch('/:id/status',    updateStaffStatus);     // Activate / Deactivate
 router.patch('/:id/shift',     assignShift);           // Assign shift
-router.patch('/:id/leave',     markLeave);             // Mark leave
 router.delete('/:id',          deleteKitchenStaff);    // Delete staff
 
 export default router;

@@ -13,17 +13,20 @@ export default function AttendanceBanner({ role }) {
   if (today.clockedIn || today.state === "marked") return null
 
   const finished = today.state === "clocked_out"
+  const onLeave = today.state === "on_leave"
   return (
     <div className="w-full bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-900/50 px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
       <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
         <Clock size={15} className="shrink-0" />
         <p className="text-xs font-bold">
-          {finished
-            ? "Your shift is finished for today, so kitchen actions are locked."
-            : "Mark your attendance first. Kitchen actions stay locked until you clock in."}
+          {onLeave
+            ? "You are on leave today, so kitchen actions are locked."
+            : finished
+              ? "Your shift is finished for today, so kitchen actions are locked."
+              : "Check in on the Attendance page first. Kitchen actions stay locked until you do."}
         </p>
       </div>
-      {!finished && <ClockInOutButton />}
+      {!finished && !onLeave && <ClockInOutButton />}
     </div>
   )
 }

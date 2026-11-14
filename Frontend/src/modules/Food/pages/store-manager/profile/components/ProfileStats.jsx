@@ -1,19 +1,11 @@
 import React from "react";
-import { Percent, ShoppingBag, Star, Calendar } from "lucide-react";
+import { ShoppingBag, Star, Calendar } from "lucide-react";
 
 export default function ProfileStats({
-  attendanceSummary = {},
   performanceSummary = {},
   loading = false,
 }) {
   const stats = [
-    {
-      title: "Attendance Rate",
-      value: attendanceSummary?.attendanceRate ? `${attendanceSummary.attendanceRate}%` : "0%",
-      subtext: `${attendanceSummary?.presentDays || 0} days present this month`,
-      icon: Percent,
-      color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/35",
-    },
     {
       title: "Orders Managed",
       value: performanceSummary?.ordersPrepared || performanceSummary?.ordersManaged || 0,
@@ -39,8 +31,8 @@ export default function ProfileStats({
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 w-full">
-        {[1, 2, 3, 4].map((i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
+        {[1, 2, 3].map((i) => (
           <div
             key={i}
             className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 p-3.5 rounded-xl shadow-sm animate-pulse flex flex-col justify-between h-[100px]"
@@ -60,7 +52,7 @@ export default function ProfileStats({
   }
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 w-full">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
       {stats.map((stat, index) => {
         const Icon = stat.icon;
         return (

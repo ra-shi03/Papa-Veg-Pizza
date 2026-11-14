@@ -35,6 +35,8 @@ import Complaints from "../customers/Complaints"
 import Reviews from "../customers/Reviews"
 import Profile from "../profile/Profile"
 import MyTasks from "../myTasks/MyTasks"
+import MyAttendance from "../attendance/MyAttendance"
+import LeaveRequests from "../staffManagement/LeaveRequests"
 
 
 
@@ -381,6 +383,26 @@ export default function StoreManagerRouter() {
             element={
               <RoleProtectedRoute allowedRoles={["store_manager", "kitchen_supervisor", "kitchen_staff"]}>
                 <MyTasks />
+              </RoleProtectedRoute>
+            }
+          />
+
+          {/* Leave requests: the store manager accepts or rejects them */}
+          <Route
+            path="staff/leave-requests"
+            element={
+              <RoleProtectedRoute allowedRoles={["store_manager"]}>
+                <LeaveRequests />
+              </RoleProtectedRoute>
+            }
+          />
+
+          {/* Attendance: kitchen supervisors and kitchen staff check in / out and see their own days */}
+          <Route
+            path="attendance"
+            element={
+              <RoleProtectedRoute allowedRoles={["kitchen_supervisor", "kitchen_staff"]}>
+                <MyAttendance />
               </RoleProtectedRoute>
             }
           />

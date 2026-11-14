@@ -1,5 +1,6 @@
 import { StoreAttendance } from '../models/attendance.model.js';
 import { StoreShift } from '../models/shift.model.js';
+import { LeaveRequest } from '../models/leaveRequest.model.js';
 import { StoreManager } from '../../franchise/models/storeManager.model.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 import { isId, toId } from '../../dashboard/services/dashboardAccess.js';
@@ -69,8 +70,6 @@ async function staffInStore(storeId, staffId) {
     return staff;
 }
 
-const notFuture = (date) => { if (date > dateKeyOf()) throw new ValidationError('date: attendance cannot be marked for a future day'); };
-
 // ---- read -------------------------------------------------------------------------------------
 
 export async function listAttendance(user, query = {}) {
@@ -89,7 +88,25 @@ export async function listAttendance(user, query = {}) {
         filter.staffId = { $in: ids.map((s) => s._id) };
     }
     const records = await StoreAttendance.find(filter).sort({ date: -1, checkInAt: -1, createdAt: -1 }).limit(Number(query.limit) || 500).lean();
-    return present(records);
+    return withLeaveDetails(await present(records));
+}
+
+/** A leave day carries the approved request behind it: category, the whole range, the reason and who approved it. */
+async function withLeaveDetails(rows) {
+    const leaveRows = rows.filter((r) => r.status === 'leave');
+    if (!leaveRows.length) return rows;
+    const dates = leaveRows.map((r) => r.date).sort();
+    const requests = await LeaveRequest.find({
+        status: 'approved', staffId: { $in: [...new Set(leaveRows.map((r) => r.staffId))].map(toId) },
+        startDate: { $lte: dates[dates.length - 1] }, endDate: { $gte: dates[0] },
+    }).lean();
+    return rows.map((r) => {
+        if (r.status !== 'leave') return r;
+        const req = requests.find((q) => String(q.staffId) === r.staffId && q.startDate <= r.date && q.endDate >= r.date);
+        return req
+            ? { ...r, leave: { category: req.category, reason: req.reason, startDate: req.startDate, endDate: req.endDate, days: req.days, requestedAt: req.createdAt, approvedBy: req.decidedByName, approvedAt: req.decidedAt } }
+            : r;
+    });
 }
 
 export async function getAttendance(user, id, query = {}) {
@@ -104,56 +121,65 @@ export async function getAttendance(user, id, query = {}) {
 
 // ---- store manager writes ---------------------------------------------------------------------
 
+// Check in and check out are the staff member's own. The store manager's one write on attendance is leave.
+const onlyLeave = () => new ForbiddenError('Attendance is marked by staff themselves (check in and check out). The store manager only marks leave.');
+
+const MAX_LEAVE_DAYS = 31;
+const dayAdd = (key, n) => { const d = new Date(`${key}T00:00:00`); d.setDate(d.getDate() + n); return dateKeyOf(d); };
+
+/**
+ * POST /store/attendance/leave { staffId, from, to, reason } : the store manager puts a supervisor / staff member on leave
+ * for a range of days, with a reason. Each day becomes a 'leave' record they and the franchise admin can see. A day the
+ * person already worked is left alone.
+ */
+export async function markLeaveRange(user, body = {}, query = {}) {
+    const scope = await attendanceScope(user, query);
+    assertCanWrite(scope);
+    const from = String(body.from || body.date || '');
+    const to = String(body.to || from);
+    const reason = String(body.reason || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) throw new ValidationError('from / to: use a date like 2026-11-20');
+    if (to < from) throw new ValidationError('to: the last day cannot be before the first day');
+    if (reason.length < 3) throw new ValidationError('reason: please say why they are on leave');
+    if (reason.length > 300) throw new ValidationError('reason: keep it under 300 characters');
+    const days = [];
+    for (let d = from; d <= to && days.length <= MAX_LEAVE_DAYS; d = dayAdd(d, 1)) days.push(d);
+    if (days.length > MAX_LEAVE_DAYS) throw new ValidationError(`Leave can cover at most ${MAX_LEAVE_DAYS} days at a time`);
+    if (from < dayAdd(dateKeyOf(), -7)) throw new ValidationError('from: leave can only be marked from the last 7 days onwards');
+
+    const staff = await staffInStore(scope.store._id, body.staffId);
+    const by = await displayNameOf(user);
+    const written = [];
+    const skipped = [];
+    for (const date of days) {
+        const existing = await StoreAttendance.findOne({ storeId: scope.store._id, staffId: staff._id, date });
+        if (existing && PRESENT.includes(existing.status)) { skipped.push(date); continue; }
+        const set = {
+            status: 'leave', notes: reason, shiftId: null, checkInAt: null, checkOutAt: null, totalHours: 0, overtimeHours: 0,
+            late: false, lateMinutes: 0, source: 'manager', markedBy: toId(user.userId), markedByName: by,
+        };
+        const rec = existing
+            ? await StoreAttendance.findOneAndUpdate({ _id: existing._id }, { $set: set }, { new: true })
+            : await StoreAttendance.create({ storeId: scope.store._id, franchiseId: scope.store.franchiseId || null, staffId: staff._id, userId: staff.userId || null, date, ...set });
+        written.push(rec.toObject());
+    }
+    return { days: written.length, skipped, records: await present(written) };
+}
+
+/** POST /store/attendance { staffId, date, status: 'leave', notes } : one day of leave (the leave endpoint takes a range). */
 export async function markAttendance(user, body, query = {}) {
     const scope = await attendanceScope(user, query);
     assertCanWrite(scope);
-    notFuture(body.date);
-    const staff = await staffInStore(scope.store._id, body.staffId);
-    const shift = (await shiftInStore(scope.store._id, body.shiftId)) || (await assignedShiftOf(scope.store._id, staff._id));
-    const off = body.status === 'absent' || body.status === 'leave';
-    if (!off && !body.checkIn) throw new ValidationError('checkIn: a check-in time is needed for a present or half-day record');
-    const { checkInAt, checkOutAt } = off ? { checkInAt: null, checkOutAt: null } : timesOn(body.date, body.checkIn, body.checkOut);
-    const late = checkInAt ? minutesLate(checkInAt, shift) : 0;
-    try {
-        const rec = await StoreAttendance.create({
-            storeId: scope.store._id, franchiseId: scope.store.franchiseId || null, staffId: staff._id, userId: staff.userId || null,
-            shiftId: shift?._id || null, date: body.date, checkInAt, checkOutAt, ...hoursFor(checkInAt, checkOutAt, shift),
-            status: body.status, late: late > 0, lateMinutes: late, source: 'manager', markedBy: toId(user.userId),
-            markedByName: await displayNameOf(user), notes: body.notes,
-        });
-        return (await present([rec.toObject()]))[0];
-    } catch (err) {
-        if (err?.code === 11000) throw conflict('Attendance for this person and day is already recorded. Edit that record instead.');
-        throw err;
-    }
+    if (body.status !== 'leave') throw onlyLeave();
+    return (await markLeaveRange(user, { staffId: body.staffId, from: body.date, to: body.date, reason: body.notes }, query)).records[0];
 }
 
 /** POST /store/attendance/bulk { date, shiftId, attendances:[{staffId,status}] } : one status per person for the day (replaces what was there). */
+/** Kept so old callers get a clear answer: check ins are the staff's own, so there is nothing to mark in bulk. */
 export async function bulkMarkAttendance(user, body, query = {}) {
     const scope = await attendanceScope(user, query);
     assertCanWrite(scope);
-    notFuture(body.date);
-    const ids = body.attendances.map((a) => a.staffId);
-    if (new Set(ids).size !== ids.length) throw new ValidationError('attendances: a person appears twice');
-    const staff = await kitchenStaffRecords(scope.store._id, { _id: { $in: ids.map(toId) } });
-    if (staff.length !== ids.length) throw new NotFoundError('Staff member not found');
-    const staffBy = new Map(staff.map((s) => [String(s._id), s]));
-    const bulkShift = await shiftInStore(scope.store._id, body.shiftId);
-    const by = await displayNameOf(user);
-    const out = [];
-    for (const item of body.attendances) {
-        const person = staffBy.get(item.staffId);
-        const shift = bulkShift || (await assignedShiftOf(scope.store._id, person._id));
-        const off = item.status === 'absent' || item.status === 'leave';
-        const existing = await StoreAttendance.findOne({ storeId: scope.store._id, staffId: person._id, date: body.date });
-        const set = { status: item.status, shiftId: shift?._id || null, source: 'manager', markedBy: toId(user.userId), markedByName: by };
-        if (off) Object.assign(set, { checkInAt: null, checkOutAt: null, totalHours: 0, overtimeHours: 0, late: false, lateMinutes: 0 });
-        const rec = existing
-            ? await StoreAttendance.findOneAndUpdate({ _id: existing._id }, { $set: set }, { new: true })
-            : await StoreAttendance.create({ storeId: scope.store._id, franchiseId: scope.store.franchiseId || null, staffId: person._id, userId: person.userId || null, date: body.date, ...set });
-        out.push(rec.toObject());
-    }
-    return present(out);
+    throw onlyLeave();
 }
 
 export async function updateAttendance(user, id, body, query = {}) {
@@ -162,8 +188,10 @@ export async function updateAttendance(user, id, body, query = {}) {
     if (!isId(id)) throw new NotFoundError('Attendance record not found');
     const rec = await StoreAttendance.findOne({ _id: toId(id), storeId: scope.store._id });
     if (!rec) throw new NotFoundError('Attendance record not found');
+    // A worked day (check in / check out) is the staff member's own record; only a leave record can be changed
+    if (rec.status !== 'leave' || (body.status !== undefined && body.status !== 'leave')) throw onlyLeave();
 
-    if (body.date !== undefined) { notFuture(body.date); rec.date = body.date; }
+    if (body.date !== undefined) { rec.date = body.date; }
     if (body.status !== undefined) rec.status = body.status;
     if (body.notes !== undefined) rec.notes = body.notes;
     if (body.shiftId !== undefined) rec.shiftId = (await shiftInStore(scope.store._id, body.shiftId))?._id || null;
@@ -194,8 +222,12 @@ export async function deleteAttendance(user, id, query = {}) {
     const scope = await attendanceScope(user, query);
     assertCanWrite(scope);
     if (!isId(id)) throw new NotFoundError('Attendance record not found');
-    const rec = await StoreAttendance.findOneAndDelete({ _id: toId(id), storeId: scope.store._id });
-    if (!rec) throw new NotFoundError('Attendance record not found');
+    // Cancelling a leave is allowed; a worked day cannot be deleted
+    const rec = await StoreAttendance.findOneAndDelete({ _id: toId(id), storeId: scope.store._id, status: 'leave' });
+    if (!rec) {
+        if (await StoreAttendance.exists({ _id: toId(id), storeId: scope.store._id })) throw onlyLeave();
+        throw new NotFoundError('Attendance record not found');
+    }
     return { id: String(rec._id) };
 }
 
@@ -219,6 +251,7 @@ export async function clockIn(user) {
     if (await openSession(store._id, me._id, now)) throw conflict('You are already clocked in.');
     const date = dateKeyOf(now);
     const today = await StoreAttendance.findOne({ storeId: store._id, staffId: me._id, date }).lean();
+    if (today?.status === 'leave') throw conflict(`You are on leave today${today.notes ? `: ${today.notes}` : ''}.`);
     if (today) throw conflict(today.checkOutAt ? 'You have already worked today.' : 'Your attendance for today was already marked by the store manager.');
 
     const shift = await assignedShiftOf(store._id, me._id);
@@ -255,7 +288,7 @@ export async function todayStatus(user) {
     const rec = open || (await StoreAttendance.findOne({ storeId: scope.store._id, staffId: scope.me._id, date: dateKeyOf(now) }).lean());
     const shift = await assignedShiftOf(scope.store._id, scope.me._id);
     return {
-        state: open ? 'clocked_in' : rec?.checkOutAt ? 'clocked_out' : rec ? 'marked' : 'not_clocked_in',
+        state: open ? 'clocked_in' : rec?.status === 'leave' ? 'on_leave' : rec?.checkOutAt ? 'clocked_out' : rec ? 'marked' : 'not_clocked_in',
         clockedIn: !!open,
         record: rec ? (await present([rec.toObject ? rec.toObject() : rec]))[0] : null,
         shift: shift ? { _id: String(shift._id), shiftName: shift.shiftName, startTime: shift.startTime, endTime: shift.endTime } : null,

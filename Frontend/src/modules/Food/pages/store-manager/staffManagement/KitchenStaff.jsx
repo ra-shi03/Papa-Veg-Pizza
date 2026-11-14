@@ -22,7 +22,6 @@ import {
   Eye,
   Edit,
   Trash2,
-  CalendarOff,
   PlayCircle,
   PauseCircle,
   RefreshCcw,
@@ -42,7 +41,6 @@ import AddStaffModal from "./components/AddStaffModal";
 import EditStaffModal from "./components/EditStaffModal";
 import StaffProfileModal from "./components/StaffProfileModal";
 import AssignShiftModal from "./components/AssignShiftModal";
-import MarkLeaveModal from "./components/MarkLeaveModal";
 import DeactivateStaffDialog from "./components/DeactivateStaffDialog";
 import DeleteStaffDialog from "./components/DeleteStaffDialog";
 
@@ -64,7 +62,6 @@ export default function KitchenStaff() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isShiftOpen, setIsShiftOpen] = useState(false);
-  const [isLeaveOpen, setIsLeaveOpen] = useState(false);
   const [isDeactivateOpen, setIsDeactivateOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedStaffId, setSelectedStaffId] = useState(null);
@@ -114,7 +111,6 @@ export default function KitchenStaff() {
     if (action === "view") setIsProfileOpen(true);
     if (action === "edit") setIsEditOpen(true);
     if (action === "shift") setIsShiftOpen(true);
-    if (action === "leave") setIsLeaveOpen(true);
     if (action === "deactivate") setIsDeactivateOpen(true);
     if (action === "delete") setIsDeleteOpen(true);
   };
@@ -509,6 +505,14 @@ export default function KitchenStaff() {
                         <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border capitalize inline-block whitespace-nowrap ${getStatusBadgeStyle(String(staff.status || "active").toLowerCase())}`}>
                           {staff.status || "active"}
                         </span>
+                        {staff.status === "Rejected" && staff.approval?.rejectionReason && (
+                          <p className="mt-1 max-w-[220px] whitespace-normal text-[10px] font-semibold leading-snug text-rose-600 dark:text-rose-400">
+                            Reason: {staff.approval.rejectionReason}
+                          </p>
+                        )}
+                        {staff.status === "Pending Approval" && (
+                          <p className="mt-1 text-[10px] font-medium text-zinc-400">Sent to the franchise admin</p>
+                        )}
                       </td>
 
                       {/* 10. Actions */}
@@ -561,13 +565,6 @@ export default function KitchenStaff() {
                           )}
                         </>
                       )}
-                          <button
-                            title="Mark Leave"
-                            onClick={() => triggerAction("leave", staff._id)}
-                            className="p-1.5 text-zinc-500 hover:text-amber-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
-                          >
-                            <CalendarOff size={15} />
-                          </button>
                             </>
                           )}
                           <button
@@ -713,14 +710,6 @@ export default function KitchenStaff() {
         staffId={selectedStaffId} 
       />
 
-      <MarkLeaveModal 
-        isOpen={isLeaveOpen} 
-        onClose={() => {
-          setIsLeaveOpen(false);
-          setSelectedStaffId(null);
-        }} 
-        staffId={selectedStaffId} 
-      />
 
       <DeactivateStaffDialog 
         isOpen={isDeactivateOpen} 
