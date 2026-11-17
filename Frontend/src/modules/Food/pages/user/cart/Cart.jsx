@@ -1,3 +1,4 @@
+import { readPickupStore } from "@food/utils/savedLocation"
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { ArrowLeft, ChevronRight, ChevronUp, ChevronDown, Plus, Sparkles, MapPin, Clock, CalendarClock, Bike, IndianRupee } from "lucide-react"
@@ -105,7 +106,9 @@ export default function Cart() {
     setSlotError("")
     try {
       const coords = getCartCoords()
-      const res = await apiClient.get("/food/stores/slots", { params: trainStoreQuery(readTrainJourney()) || coords || {}, _isFallback: true })
+      const pickup = readPickupStore()
+      // collecting at a store: that store, not the one nearest the delivery point
+      const res = await apiClient.get("/food/stores/slots", { params: pickup ? { storeId: pickup.id } : (trainStoreQuery(readTrainJourney()) || coords || {}), _isFallback: true })
       setSlotInfo(res?.data?.data || null)
     } catch (err) {
       setSlotError(err?.response?.data?.error || err?.response?.data?.message || "Couldn't load delivery slots")
@@ -471,6 +474,7 @@ export default function Cart() {
     appliedCoupon?.couponCode || "",
     slotInfo?.storeId || "",
     scheduledAt || "",
+    readPickupStore()?.service || "",
   ])
   useEffect(() => {
     setCouponRejected("")
@@ -482,9 +486,11 @@ export default function Cart() {
     let cancelled = false
     const timer = setTimeout(async () => {
       try {
-        const point = readTrainJourney() ? null : getCartCoords()
+        const pickup = readPickupStore()
+        const point = readTrainJourney() || pickup ? null : getCartCoords()
         const res = await orderAPI.calculateOrder({
           storeId: slotInfo.storeId,
+          ...(pickup ? { orderMethod: pickup.service } : {}),
           items: toOrderItems(cartItems),
           ...(point ? { deliveryAddress: { location: { type: "Point", coordinates: [point.lng, point.lat] } } } : {}),
           ...(appliedCoupon?.couponCode ? { couponCode: appliedCoupon.couponCode } : {}),

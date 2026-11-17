@@ -72,8 +72,8 @@ export default function TakeawayMapModal({
     confirmLocation({
       address: store.name,
       serviceType: "takeaway",
-      lat: store.lat,
-      lng: store.lng
+      storeId: store.id,
+      storeName: store.name
     })
     setActiveService("takeaway")
     localStorage.setItem("activeService", "takeaway")

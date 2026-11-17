@@ -28,8 +28,11 @@ export default function ConfirmPickupModal({ visible, onClose, order }) {
       ? (JSON.parse(localStorage.getItem("pvp_riders")) || []).find(r => r._id === order.deliveryPartnerId)
       : null);
 
+  // collected at the store: no rider, no code
+  const isPickup = order.orderType === "pickup" || order.isPickup === true;
+
   const handleConfirm = async () => {
-    if (!otp || otp.length !== 4) {
+    if (!isPickup && (!otp || otp.length !== 4)) {
       toast.error("Please enter a valid 4-digit OTP code");
       return;
     }
@@ -38,6 +41,7 @@ export default function ConfirmPickupModal({ visible, onClose, order }) {
       await confirmPickupMutation.mutateAsync({
         orderId: order._id,
         riderOTP: otp,
+        pickup: isPickup,
         pickedUpAt: pickupTime ? pickupTime.toISOString() : new Date().toISOString(),
         notes
       });
@@ -53,8 +57,8 @@ export default function ConfirmPickupModal({ visible, onClose, order }) {
         <div className="flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-3 pr-8">
           <ShieldCheck size={18} className="text-primary" />
           <div>
-            <h3 className="text-sm font-black text-slate-900 dark:text-white">Confirm Order Pickup</h3>
-            <p className="text-[10px] text-zinc-400 font-semibold">Verify rider credentials and OTP before dispatch</p>
+            <h3 className="text-sm font-black text-slate-900 dark:text-white">{isPickup ? "Hand Over to Customer" : "Confirm Order Pickup"}</h3>
+            <p className="text-[10px] text-zinc-400 font-semibold">{isPickup ? "The customer collects this order at the store" : "Verify rider credentials and OTP before dispatch"}</p>
           </div>
         </div>
       }
@@ -76,16 +80,17 @@ export default function ConfirmPickupModal({ visible, onClose, order }) {
           type="primary"
           loading={confirmPickupMutation.isPending}
           onClick={handleConfirm}
-          disabled={otp.length !== 4}
+          disabled={!isPickup && otp.length !== 4}
           className="!bg-primary hover:!bg-primary-hover border-0 !text-white rounded-full font-bold px-5 py-2 shadow-md hover:shadow-lg active:scale-95 transition-all cursor-pointer text-xs"
         >
-          Confirm Pickup
+          {isPickup ? "Hand Over" : "Confirm Pickup"}
         </Button>
       ]}
     >
       <div className="py-4 space-y-4">
         
         {/* Warning Banner */}
+        {!isPickup && (<>
         <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 p-3 rounded-2xl flex gap-2.5 items-start">
           <AlertTriangle className="text-amber-600 mt-0.5 shrink-0" size={16} />
           <div>
@@ -140,6 +145,7 @@ export default function ConfirmPickupModal({ visible, onClose, order }) {
           />
         </div>
 
+        </>)}
         {/* Pickup Time DatePicker */}
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">

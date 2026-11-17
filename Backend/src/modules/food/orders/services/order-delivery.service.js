@@ -396,7 +396,7 @@ export async function listOrdersAvailableDelivery(deliveryPartnerId, query) {
   const partnerId = new mongoose.Types.ObjectId(deliveryPartnerId);
   // a scheduled order is not offered until its slot is near (the same rule as auto-dispatch)
   // ($and, because the offer filter below has its own $or)
-  const openOrders = { 'dispatch.status': 'unassigned', orderStatus: { $in: OFFER_STATUSES }, $and: [dispatchDueFilter()] };
+  const openOrders = { 'dispatch.status': 'unassigned', orderStatus: { $in: OFFER_STATUSES }, isPickup: { $ne: true }, $and: [dispatchDueFilter()] };
   const servedStores = partnerCapacity.hasCapacity
     ? await dispatchService.storesServedByRider(partnerId, await FoodOrder.distinct('storeId', openOrders))
     : [];

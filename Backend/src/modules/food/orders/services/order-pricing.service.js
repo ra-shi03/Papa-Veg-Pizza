@@ -1,3 +1,4 @@
+import { isPickupMethod } from '../../settings/services/orderMethods.service.js';
 import mongoose from 'mongoose';
 import { FoodOrder } from '../models/order.model.js';
 import { FoodStore as FoodStore } from '../../store/models/store.model.js';
@@ -182,6 +183,9 @@ export async function buildOrderPricing(userId, dto) {
     Number.isFinite(gstRate) && gstRate > 0
       ? Math.round(taxable * (gstRate / 100))
       : 0;
+
+  // Collected at the store: nothing is delivered, so no delivery fee
+  if (isPickupMethod(dto.orderMethod)) { deliveryFee = 0; deliveryFeeBreakdown = null; }
 
   const total = Math.max(
     0,

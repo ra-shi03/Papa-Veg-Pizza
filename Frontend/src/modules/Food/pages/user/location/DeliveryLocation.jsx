@@ -281,8 +281,8 @@ export default function DeliveryLocation() {
                         useLocationStore.getState().confirmLocation({
                            address: store.storeName,
                            serviceType: activeService,
-                           lat: store.latitude,
-                           lng: store.longitude
+                           storeId: String(store._id),
+                           storeName: store.storeName
                         });
                         navigate('/food/user');
                      }}

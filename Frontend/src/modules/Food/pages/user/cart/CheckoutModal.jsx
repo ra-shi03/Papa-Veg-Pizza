@@ -1,3 +1,4 @@
+import { readPickupStore } from "@food/utils/savedLocation"
 import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft, MapPin, Check, User, Clock, ShieldCheck, CreditCard, ChevronRight, AlertTriangle, Home as HomeIcon, Navigation, MessageSquare } from "lucide-react"
@@ -108,8 +109,20 @@ export default function CheckoutModal({
   // The address the customer selected. A saved address fills the form; a newly picked location still needs the house number.
   useEffect(() => {
     if (!show) return
+    // Collecting at a store: no address. The order is for the chosen store and the customer comes to it.
+    const pickup = readPickupStore()
+    if (pickup) {
+      const text = `Collect at ${pickup.name || "the store"}`
+      setSelectedAddress({ kind: "service", id: "", label: "Pickup", street: text, area: "", city: "", state: "", zipCode: "", additionalDetails: "", point: null, display: text })
+      setHouseNumber(text)
+      if (!skippedAddressStep.current) {
+        skippedAddressStep.current = true
+        setModalView("checkout")
+      }
+      return
+    }
     const activeService = localStorage.getItem("activeService") || "delivery"
-    const isTrainOrder = activeService === "train" || (localStorage.getItem("deliveryAddress") || "").toLowerCase().includes("train")
+    const isTrainOrder = !pickup && (activeService === "train" || (localStorage.getItem("deliveryAddress") || "").toLowerCase().includes("train"))
     const selected = selectDeliveryAddress({
       saved: addresses,
       picked: readPickedLocation(),
@@ -345,7 +358,7 @@ export default function CheckoutModal({
 
     const activeService = localStorage.getItem("activeService") || "delivery"
     const savedDeliveryAddress = localStorage.getItem("deliveryAddress") || ""
-    const isTrain = activeService === "train" || savedDeliveryAddress.toLowerCase().includes("train")
+    const isTrain = !readPickupStore() && (activeService === "train" || savedDeliveryAddress.toLowerCase().includes("train"))
     const trainJourney = readTrainJourney()
     const trainPnr = trainJourney?.pnr || ""
 
@@ -357,11 +370,14 @@ export default function CheckoutModal({
       const point = selectedAddress.point
 
       // A scheduled order needs a store that can deliver at that time (it may be closed right now)
-      const resolved = await apiClient.get("/food/stores/resolve", {
-        params: { ...(trainStoreQuery(trainJourney) || point || {}), ...(scheduledAt ? { at: scheduledAt } : {}) },
-        _isFallback: true,
-      })
-      const store = resolved?.data?.data
+      // collecting at a store: the store the customer chose; otherwise the one that serves the delivery location
+      const pickupStore = readPickupStore()
+      const store = pickupStore
+        ? { storeId: pickupStore.id }
+        : (await apiClient.get("/food/stores/resolve", {
+            params: { ...(trainStoreQuery(trainJourney) || point || {}), ...(scheduledAt ? { at: scheduledAt } : {}) },
+            _isFallback: true,
+          }))?.data?.data
       if (!store?.storeId) throw new Error("No store is available right now")
 
       const response = await orderAPI.createOrder(assertOwnOrderDetails({
@@ -389,8 +405,8 @@ export default function CheckoutModal({
         // What the customer chose on the Payment Options page: online goes through Razorpay, otherwise pay on delivery
         paymentMethod: payMethod.kind === "online" ? "razorpay" : "cash",
         // How the customer chose to order; the server checks it against the super admin's order-method rules for the store
-        orderMethod: isTrain ? "train" : (["takeaway", "incar"].includes(activeService) ? activeService : "delivery"),
-        note: instructions.trim(),
+        orderMethod: isTrain ? "train" : (pickupStore ? pickupStore.service : "delivery"),
+        note: [instructions.trim(), pickupStore?.service === "incar" && localStorage.getItem("carNumber") ? `Car number: ${localStorage.getItem("carNumber")}` : ""].filter(Boolean).join(" | "),
       }, { contact, selected: selectedAddress }))
       const created = response?.data?.data?.order
       orderId = created?._id || created?.id

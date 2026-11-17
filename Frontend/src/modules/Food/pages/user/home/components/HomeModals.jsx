@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import DeliveryMapModal from "@food/components/user/DeliveryMapModal";
 import DeliveryOrCollectionModal from "@food/components/user/DeliveryOrCollectionModal";
 import TakeawayMapModal from "@food/components/user/TakeawayMapModal";
@@ -29,6 +30,7 @@ export function HomeModals({
   setCarNumber,
   confirmLocation
 }) {
+  const navigate = useNavigate();
   return (
     <>
       {/* Delivery Map Modal Selector */}
@@ -58,6 +60,9 @@ export function HomeModals({
             setShowCarModal(true);
           } else if (id === "train") {
             setShowTrainModal(true);
+          } else {
+            // dine-in and any method the super admin created: pick a store on the Delivery Location screen
+            navigate("/food/user/delivery-location", { state: { activeService: id } });
           }
         }}
         isDarkMode={isDarkMode}

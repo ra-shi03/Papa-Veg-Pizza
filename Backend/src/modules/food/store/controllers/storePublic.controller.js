@@ -6,7 +6,7 @@ import { NotFoundError } from '../../../../core/auth/errors.js';
 import { FoodAppConfig } from '../../settings/models/appConfig.model.js';
 import { FoodCoupon } from '../../settings/models/foodCoupon.model.js';
 import { couponToOffer } from '../../settings/services/couponOffer.service.js';
-import { resolveStoreForLocation, resolveTrainStore } from '../../orders/services/order-store.service.js';
+import { resolveStoreForLocation, resolveTrainStore, findOrderableStore } from '../../orders/services/order-store.service.js';
 import { buildSlots, SCHEDULE } from '../../orders/services/order-schedule.service.js';
 
 // Public, read-only views the customer app needs about a store and the coupons it can use. Only fields a customer
@@ -39,9 +39,12 @@ export async function getPublicStore(req, res, next) {
  */
 export async function getDeliverySlots(req, res, next) {
   try {
-    const { store } = req.query.train === '1'
-      ? await resolveTrainStore(req.query.stationCode, { anyHours: true })
-      : await resolveStoreForLocation(parseFloat(req.query.lat), parseFloat(req.query.lng), { anyHours: true });
+    // a pickup order uses the store the customer chose; train and delivery find theirs
+    const { store } = req.query.storeId
+      ? { store: await findOrderableStore(req.query.storeId) }
+      : req.query.train === '1'
+        ? await resolveTrainStore(req.query.stationCode, { anyHours: true })
+        : await resolveStoreForLocation(parseFloat(req.query.lat), parseFloat(req.query.lng), { anyHours: true });
     const [open, config] = await Promise.all([
       openStoreIds([store._id]),
       FoodAppConfig.findOne().select('scheduledOrdersEnabled').lean(),

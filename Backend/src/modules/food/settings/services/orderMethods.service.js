@@ -19,6 +19,9 @@ export const DEFAULT_ORDER_METHODS = [
     { id: 'dinein', label: 'Dine-in', icon: 'restaurant', enabled: false, scope: 'all', franchiseIds: [], storeIds: [] },
 ];
 
+/** Delivery and delivery on train go out with a rider; every other method (takeaway, in-car, dine-in, created ones) is collected at the store. */
+export const isPickupMethod = (id) => !['delivery', 'train'].includes(String(id || 'delivery'));
+
 const strs = (list) => (list || []).map(String);
 
 const cleanOne = (m, def, id) => ({

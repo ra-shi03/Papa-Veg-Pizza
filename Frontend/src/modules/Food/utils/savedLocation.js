@@ -19,3 +19,11 @@ export function readSavedCoords() {
   if (Number.isFinite(legacy?.latitude) && Number.isFinite(legacy?.longitude)) return { lat: legacy.latitude, lng: legacy.longitude }
   return null
 }
+
+/** The store the customer chose to collect from ({ id, name, service }), or null when ordering for delivery. */
+export function readPickupStore() {
+  const service = (() => { try { return localStorage.getItem("activeService") || "delivery" } catch (_) { return "delivery" } })()
+  if (service === "delivery" || service === "train") return null
+  const store = readJson("pickupStore")
+  return store?.id && store.service === service ? { id: String(store.id), name: String(store.name || ""), service } : null
+}

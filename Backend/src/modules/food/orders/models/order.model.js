@@ -427,6 +427,8 @@ const orderSchema = new mongoose.Schema(
         sendCutlery: { type: Boolean, default: true },
         // How the customer chose to order (Settings > order methods decides where each is offered)
         orderMethod: { type: String, default: 'delivery' },
+        // Collected at the store (takeaway, in-car, dine-in, ...): no delivery fee, no rider, the store hands it over
+        isPickup: { type: Boolean, default: false },
         deliveryFleet: { type: String, default: 'standard', trim: true },
         scheduledAt: { type: Date, default: null },
         riderEarning: { type: Number, default: 0, min: 0 },

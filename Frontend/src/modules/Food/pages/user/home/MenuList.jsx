@@ -1,3 +1,4 @@
+import PickupStorePicker from "@food/components/user/PickupStorePicker"
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { ArrowLeft, Search, ArrowUpDown, Check, X, Star, ChevronRight, ChevronUp, UtensilsCrossed } from "lucide-react"
@@ -990,6 +991,8 @@ export default function MenuList() {
   const [takeawayHut, setTakeawayHut] = useState(() => {
     return locationConfirmed ? (localStorage.getItem("takeawayHut") || "") : ""
   })
+  const [carStore, setCarStore] = useState(null)
+  const [takeStore, setTakeStore] = useState(null)
   const [carNumber, setCarNumber] = useState(() => {
     return locationConfirmed ? (localStorage.getItem("carNumber") || "") : ""
   })
@@ -2717,6 +2720,9 @@ export default function MenuList() {
             setShowCarModal(true)
           } else if (id === "train") {
             navigate("/user/deliver-on-train")
+          } else {
+            // dine-in and any method the super admin created: pick a store on the Delivery Location screen
+            navigate("/food/user/delivery-location", { state: { activeService: id } })
           }
         }}
         isDarkMode={isDarkMode}
@@ -2742,45 +2748,30 @@ export default function MenuList() {
               </button>
             </div>
             <p className="text-xs opacity-60 leading-relaxed text-white">
-              We suggested the following Pizza Veg Huts near your coordinates:
+              Stores near you that offer takeaway:
             </p>
 
-            {/* Store List Options */}
-            <div className="space-y-3">
-              {[
-                { id: "hut-cp", name: "Pizza Veg Hut - Connaught Place", dist: "0.8 km", status: "Open Now", hours: "11 AM - 11 PM" },
-                { id: "hut-kb", name: "Pizza Veg Hut - Karol Bagh", dist: "2.1 km", status: "Open Now", hours: "11 AM - 11 PM" },
-                { id: "hut-sk", name: "Pizza Veg Hut - Saket Terminal", dist: "4.5 km", status: "Closed", hours: "Opens tomorrow" }
-              ].map((store) => (
-                <div
-                  key={store.id}
-                  onClick={() => {
-                    setTakeawayHut(store.name)
-                    setLocationName(store.name)
-                    confirmLocation({
-                      address: store.name,
-                      serviceType: "takeaway"
-                    })
-                    setShowStoreModal(false)
-                    triggerToast(`Selected outlet: ${store.name}`)
-                  }}
-                  className="p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl flex items-center justify-between cursor-pointer active:scale-98 transition-all"
-                >
-                  <div className="text-left space-y-1">
-                    <h4 className="text-xs font-bold text-white leading-tight">{store.name}</h4>
-                    <div className="flex gap-2 text-[9px] font-bold">
-                      <span className="text-[#00C853]">{store.status}</span>
-                      <span className="opacity-50">•</span>
-                      <span className="opacity-60">{store.hours}</span>
-                    </div>
-                  </div>
-                  <div className="text-right flex flex-col items-end gap-1">
-                    <span className="text-[10px] bg-[#E53935]/10 text-[#E53935] px-2 py-0.5 rounded font-black tracking-wide">{store.dist}</span>
-                    <span className="material-symbols-outlined text-xs text-white/40">arrow_forward_ios</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {/* Real stores within the radius the super admin set */}
+            <PickupStorePicker method="takeaway" value={takeStore} onChange={setTakeStore} />
+            <button
+              disabled={!takeStore}
+              onClick={() => {
+                if (!takeStore) return
+                setTakeawayHut(takeStore.storeName)
+                setLocationName(takeStore.storeName)
+                confirmLocation({
+                  address: takeStore.storeName,
+                  serviceType: "takeaway",
+                  storeId: String(takeStore._id),
+                  storeName: takeStore.storeName
+                })
+                setShowStoreModal(false)
+                triggerToast(`Selected outlet: ${takeStore.storeName}`)
+              }}
+              className="w-full h-11 bg-[#E53935] text-on-primary font-bold rounded-xl text-xs uppercase cursor-pointer border-0 shadow-lg disabled:opacity-50"
+            >
+              Confirm Store
+            </button>
           </div>
         </div>
       )}
@@ -2825,6 +2816,8 @@ export default function MenuList() {
               </div>
             </div>
 
+            <PickupStorePicker method="incar" value={carStore} onChange={setCarStore} />
+
             {/* Confirm button */}
             <button
               onClick={() => {
@@ -2833,11 +2826,17 @@ export default function MenuList() {
                   triggerToast("Please enter a valid car number")
                   return
                 }
+                if (!carStore) {
+                  triggerToast("Choose a store near you")
+                  return
+                }
                 setCarNumber(cleanCar)
                 setLocationName(cleanCar)
                 confirmLocation({
                   address: cleanCar,
-                  serviceType: "incar"
+                  serviceType: "incar",
+                  storeId: String(carStore._id),
+                  storeName: carStore.storeName
                 })
                 setShowCarModal(false)
                 triggerToast("Car details confirmed!")

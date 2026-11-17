@@ -208,6 +208,7 @@ export async function tryAutoAssign(orderId, options = {}) {
     {
       _id: new mongoose.Types.ObjectId(orderId),
       orderStatus: { $in: Array.from(dispatchableStatuses) },
+      isPickup: { $ne: true }, // collected at the store: no rider
       $and: [
         dispatchDueFilter(),
         {

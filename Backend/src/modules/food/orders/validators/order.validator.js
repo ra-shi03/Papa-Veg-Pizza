@@ -85,6 +85,7 @@ export function validateCalculateOrderDto(body) {
         zoneId: z.string().optional(),
         couponCode: z.string().optional(),
         deliveryFleet: z.string().optional(),
+        orderMethod: z.string().regex(/^[a-z][a-z0-9_]{1,29}$/).optional(),
         scheduledAt: z.string().datetime({ offset: true }).nullable().optional()
     });
     const result = schema.safeParse(body);

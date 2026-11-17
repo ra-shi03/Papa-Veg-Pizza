@@ -209,9 +209,10 @@ export function useConfirmPickup() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ orderId, riderOTP, pickedUpAt, notes }) => {
+    mutationFn: async ({ orderId, riderOTP, pickedUpAt, notes, pickup = false }) => {
+      // An order the customer collects has no rider and no code: the store just hands it over
       // OTP Verification Check (Any 4-digit code works, but let's check it is filled)
-      if (!riderOTP || riderOTP.length !== 4) {
+      if (!pickup && (!riderOTP || riderOTP.length !== 4)) {
         throw new Error("Invalid OTP code. Must be a 4-digit number.");
       }
       // The server does not check this code: the system has no pickup code yet, so the store manager's confirmation is

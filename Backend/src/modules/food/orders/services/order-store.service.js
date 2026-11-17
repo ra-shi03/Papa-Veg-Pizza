@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { FoodStore } from '../../store/models/store.model.js';
 import { FoodZone } from '../../admin/models/zone.model.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
@@ -38,6 +39,13 @@ export async function getOrderableStore(storeId, { at } = {}) {
   if (!store) throw new ValidationError('Store not accepting orders');
   if (at) await assertSchedulable(store._id, new Date(at));
   else if (!(await openStoreIds([store._id])).has(String(store._id))) throw new ValidationError(CLOSED);
+  return withLocation(store);
+}
+
+/** A store a customer chose to collect from, whether or not it is open now (for listing its slots). */
+export async function findOrderableStore(storeId) {
+  const store = mongoose.isValidObjectId(storeId) ? await FoodStore.findOne({ _id: storeId, ...ORDERABLE }).select(STORE_FIELDS).lean() : null;
+  if (!store) throw new ValidationError('Store not accepting orders');
   return withLocation(store);
 }
 

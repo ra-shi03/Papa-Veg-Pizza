@@ -3,6 +3,9 @@ import { FoodStore } from '../models/store.model.js';
 import { DeliveryIssue } from '../models/deliveryIssue.model.js';
 import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
 import { FoodZone } from '../../admin/models/zone.model.js';
+import * as foodTransactionService from '../../orders/services/foodTransaction.service.js';
+import { FoodTransaction } from '../../orders/models/foodTransaction.model.js';
+import { awardOrderPointsSafely } from '../../user/services/rewards.service.js';
 import { Refund } from '../../../../core/payments/models/refund.model.js';
 import { buildOrderIdentityFilter, buildDeliveryOfferPayload, pushStatusHistory, enqueueOrderEvent, notifyOwnerSafely } from '../../orders/services/order.helpers.js';
 import { getIO, rooms } from '../../../../config/socket.js';
@@ -263,7 +266,7 @@ export async function readyOrders(user, q = {}) {
     const rx = new RegExp(escapeRegex(search), 'i');
     filter.$or = [{ order_id: rx }, { customerName: rx }];
   }
-  const docs = await FoodOrder.find(filter).select('order_id customerName customerPhone userId pricing.total orderStatus kitchen.readyAt dispatch deliveryAddress items updatedAt').sort({ updatedAt: 1 }).limit(100).lean();
+  const docs = await FoodOrder.find(filter).select('order_id customerName customerPhone userId pricing.total orderStatus kitchen.readyAt dispatch deliveryAddress items updatedAt orderMethod isPickup').sort({ updatedAt: 1 }).limit(100).lean();
   let rows = docs.map((o) => ({
     _id: String(o._id),
     orderNumber: o.order_id || String(o._id),
@@ -272,7 +275,10 @@ export async function readyOrders(user, q = {}) {
     customerPhone: o.customerPhone || o.deliveryAddress?.phone || '',
     totalAmount: o.pricing?.total || 0,
     orderStatus: o.orderStatus,
-    deliveryStatus: deliveryStatusOf(o),
+    orderMethod: o.orderMethod || 'delivery',
+    isPickup: o.isPickup === true,
+    orderType: o.isPickup === true ? 'pickup' : 'delivery',
+    deliveryStatus: o.isPickup === true ? 'collect' : deliveryStatusOf(o),
     packagingCompletedAt: o.kitchen?.readyAt || o.updatedAt,
     assignedRiderId: o.dispatch?.deliveryPartnerId ? String(o.dispatch.deliveryPartnerId) : null,
     deliveryAddress: addressText(o.deliveryAddress),
@@ -402,7 +408,8 @@ async function assign(ctx, order, rider) {
 export async function assignRider(user, body = {}, q = {}) {
   const ctx = await deliveryContext(user, q, { write: true });
   const dto = validateAssignDto(body);
-  const order = await findOrder(ctx, dto.orderId, 'order_id orderStatus dispatch items pricing payment deliveryAddress customerName customerPhone note storeId userId');
+  const order = await findOrder(ctx, dto.orderId, 'order_id orderStatus dispatch items pricing payment deliveryAddress customerName customerPhone note storeId userId isPickup');
+  if (order.isPickup) throw new ValidationError('This order is collected at the store, no rider is needed. Hand it over to the customer.');
   return assign(ctx, order, await findRider(ctx, dto.riderId, { approvedOnly: true }));
 }
 
@@ -421,6 +428,7 @@ export async function confirmPickup(user, orderId, body = {}, q = {}) {
   if (!['ready_for_pickup', 'reached_pickup'].includes(order.orderStatus)) {
     throw new ValidationError('Only an order that is ready for pickup can be handed to the rider.');
   }
+  if (order.isPickup) return handOverToCustomer(ctx, order, notes);
   const riderId = order.dispatch?.deliveryPartnerId;
   if (!riderId) throw new ValidationError('Assign a rider before confirming the pickup.');
   const from = order.orderStatus;
@@ -444,6 +452,36 @@ export async function confirmPickup(user, orderId, body = {}, q = {}) {
   });
   enqueueOrderEvent('picked_up', { orderMongoId: String(order._id), orderId: String(order._id), deliveryPartnerId: String(riderId) });
   return { orderId: String(order._id), orderNumber: order.order_id || String(order._id), orderStatus: order.orderStatus, pickedUpAt };
+}
+
+/**
+ * An order the customer collects (takeaway, in-car, dine-in, ...): the store hands it over and the order is delivered.
+ * Pay at the counter (cash) is recorded as collected now; a prepaid order must already be verified as paid.
+ */
+async function handOverToCustomer(ctx, order, notes) {
+  const tx = await FoodTransaction.findOne({ orderId: order._id }).lean();
+  const method = String(tx?.payment?.method || order.payment?.method || 'cash');
+  const payAtStore = method === 'cash' || method === 'razorpay_qr';
+  if (!payAtStore) {
+    const paid = [order.payment?.status, tx?.payment?.status, tx?.status].map((s) => String(s || '').toLowerCase()).some((s) => ['paid', 'captured', 'authorized'].includes(s));
+    if (!paid) throw new ValidationError('The online payment for this order is not verified yet.');
+  }
+  const from = order.orderStatus;
+  const at = new Date();
+  order.orderStatus = 'delivered';
+  order.deliveryState = { ...(order.deliveryState?.toObject?.() || order.deliveryState || {}), currentPhase: 'delivered', status: 'delivered', deliveredAt: at };
+  pushStatusHistory(order, { byRole: 'STORE_MANAGER', byId: ctx.user.userId, from, to: 'delivered', note: `Handed over to the customer${notes ? `: ${notes}` : ''}` });
+  await order.save();
+  if (payAtStore) {
+    await foodTransactionService.updateTransactionStatus(order._id, 'cod_marked_paid_on_delivery', {
+      status: 'captured', paymentMethod: method === 'razorpay_qr' ? 'cash' : method, recordedByRole: 'STORE_MANAGER', recordedById: ctx.user.userId,
+      note: 'Paid at the store when the order was collected.',
+    });
+  }
+  getIO()?.to(rooms.user(String(order.userId))).emit('order_status_update', { orderMongoId: String(order._id), orderId: String(order._id), orderStatus: 'delivered' });
+  getIO()?.to(rooms.store(String(order.storeId))).emit('order_status_update', { orderMongoId: String(order._id), orderId: String(order._id), orderStatus: 'delivered' });
+  awardOrderPointsSafely(order._id);
+  return { orderId: String(order._id), orderNumber: order.order_id || String(order._id), orderStatus: order.orderStatus, pickedUpAt: at };
 }
 
 // ---------------------------------------------------------------------------------------------

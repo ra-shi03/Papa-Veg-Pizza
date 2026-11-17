@@ -144,7 +144,10 @@ export const toOpsOrder = (order) => {
     acceptedAt: k.acceptedAt || null,
     expectedReadyAt: k.expectedReadyAt || null,
     readyAt: k.readyAt || null,
-    orderType: 'delivery',
+    // an order the customer collects (takeaway, in-car, dine-in, ...) has no rider; the store hands it over
+    orderType: o.isPickup === true ? 'pickup' : 'delivery',
+    orderMethod: o.orderMethod || 'delivery',
+    isPickup: o.isPickup === true,
     priority: k.priority || 'normal',
     orderSource: 'App',
     paymentStatus: payment.status === 'paid' ? 'paid' : payment.status === 'refunded' ? 'refunded' : 'pending',

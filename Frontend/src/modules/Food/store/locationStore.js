@@ -38,6 +38,7 @@ export const useLocationStore = create((set, get) => {
         localStorage.removeItem("activeService")
         localStorage.removeItem("takeawayHut")
         localStorage.removeItem("carNumber")
+        localStorage.removeItem("pickupStore")
       } catch (e) {
         // ignore
       }
@@ -73,31 +74,26 @@ export const useLocationStore = create((set, get) => {
 
     confirmLocation: (addressDetails) => {
       const pending = get().pendingAction
+      const service = addressDetails.serviceType || "delivery"
+      const isPickup = service !== "delivery" && service !== "train"
       const locationData = {
         locationConfirmed: true,
         selectedAddress: addressDetails
       }
 
-      // Persist deliveryLocation structure
       try {
-        localStorage.setItem("deliveryLocation", JSON.stringify(locationData))
-
-        // Also set the legacy keys so existing components pick it up
-        if (addressDetails.serviceType === "delivery") {
-          localStorage.setItem("deliveryAddress", addressDetails.address)
-          localStorage.setItem("activeService", "delivery")
-        } else if (addressDetails.serviceType === "train") {
+        if (isPickup) {
+          // Collected at a store: the customer's delivery point stays as it is. The chosen store and the service are kept apart.
+          localStorage.setItem("activeService", service)
+          localStorage.setItem("pickupStore", JSON.stringify({ id: addressDetails.storeId || "", name: addressDetails.storeName || "", service }))
+          if (service === "takeaway") localStorage.setItem("takeawayHut", addressDetails.storeName || addressDetails.address || "")
+          if (service === "incar") localStorage.setItem("carNumber", addressDetails.address || "")
+        } else {
+          localStorage.setItem("deliveryLocation", JSON.stringify(locationData))
           // Delivery on a train has no map point: the journey text is the address
           localStorage.setItem("deliveryAddress", addressDetails.address)
-          localStorage.setItem("activeService", "train")
-        } else if (addressDetails.serviceType === "takeaway") {
-          localStorage.setItem("takeawayHut", addressDetails.address)
-          localStorage.setItem("activeService", "takeaway")
-          localStorage.setItem("deliveryAddress", addressDetails.address)
-        } else if (addressDetails.serviceType === "incar") {
-          localStorage.setItem("carNumber", addressDetails.address)
-          localStorage.setItem("activeService", "incar")
-          localStorage.setItem("deliveryAddress", addressDetails.address)
+          localStorage.setItem("activeService", service)
+          localStorage.removeItem("pickupStore")
         }
       } catch (e) {
         // ignore localStorage errors

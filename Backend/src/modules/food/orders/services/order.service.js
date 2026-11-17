@@ -10,7 +10,7 @@ import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model
 import { FoodZone } from '../../admin/models/zone.model.js';
 import { FoodFeeSettings } from '../../admin/models/feeSettings.model.js';
 import { ValidationError, ForbiddenError, NotFoundError } from '../../../../core/auth/errors.js';
-import { assertMethodAllowed } from '../../settings/services/orderMethods.service.js';
+import { assertMethodAllowed, isPickupMethod } from '../../settings/services/orderMethods.service.js';
 import { buildPaginationOptions, buildPaginatedResult } from '../../../../utils/helpers.js';
 import { FoodCoupon } from '../../settings/models/foodCoupon.model.js';
 import { FoodOfferUsage } from '../../admin/models/offerUsage.model.js';
@@ -181,7 +181,25 @@ export async function createOrder(userId, dto) {
   const orderMethod = await assertMethodAllowed(trainStore ? 'train' : (dto.orderMethod === 'train' ? 'delivery' : dto.orderMethod), store);
 
   // Prices, fees, tax, discount and total are all computed here from the catalogue; the client's are ignored.
-  const priced = await buildOrderPricing(userId, { ...dto, deliveryAddress: dto.address });
+  // Collected at the store (takeaway, in-car, dine-in, ...): the customer comes to the store, so the address is the store
+  // and there is no delivery fee or rider
+  const pickup = isPickupMethod(orderMethod);
+  if (pickup) {
+    dto = {
+      ...dto,
+      address: {
+        label: dto.address?.label || 'Pickup',
+        name: dto.address?.name,
+        phone: dto.address?.phone,
+        street: `Collect at ${store.storeName || 'the store'}`,
+        additionalDetails: '',
+        city: store.city || '',
+        state: store.state || '',
+        zipCode: store.pincode || '',
+      },
+    };
+  }
+  const priced = await buildOrderPricing(userId, { ...dto, orderMethod, deliveryAddress: dto.address });
   dto = { ...dto, items: priced.items };
 
 
@@ -305,6 +323,7 @@ export async function createOrder(userId, dto) {
     storeNote: dto.storeNote || "",
     sendCutlery: dto.sendCutlery !== false,
     orderMethod,
+    isPickup: pickup,
     deliveryFleet: dto.deliveryFleet || "standard",
     scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
     riderEarning,

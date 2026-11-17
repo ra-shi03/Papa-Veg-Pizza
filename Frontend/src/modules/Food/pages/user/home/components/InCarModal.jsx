@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
+import PickupStorePicker from '@food/components/user/PickupStorePicker';
 import { useScrollLock } from "@food/hooks/useScrollLock";
 
 export const InCarModal = ({ showCarModal, setShowCarModal, carNumber, setCarNumber, confirmLocation, triggerToast }) => {
   useScrollLock(Boolean(showCarModal));
+  const [store, setStore] = useState(null);
 
   if (!showCarModal) return null;
 
@@ -45,6 +47,8 @@ export const InCarModal = ({ showCarModal, setShowCarModal, carNumber, setCarNum
           </div>
         </div>
 
+        <PickupStorePicker method="incar" value={store} onChange={setStore} />
+
         {/* Confirm button */}
         <button
           onClick={() => {
@@ -53,10 +57,16 @@ export const InCarModal = ({ showCarModal, setShowCarModal, carNumber, setCarNum
               triggerToast("Please enter a valid car number")
               return
             }
+            if (!store) {
+              triggerToast("Choose a store near you")
+              return
+            }
             setCarNumber(cleanCar)
             confirmLocation({
               address: cleanCar,
-              serviceType: "incar"
+              serviceType: "incar",
+              storeId: String(store._id),
+              storeName: store.storeName
             })
             setShowCarModal(false)
             triggerToast("Car details confirmed!")

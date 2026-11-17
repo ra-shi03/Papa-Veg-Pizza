@@ -101,7 +101,7 @@ export default function DeliveryOrCollectionModal({
 
         {/* Service Options List */}
         <div className="space-y-3">
-          {options.filter((opt) => !offered || offered.some((m) => m.id === opt.id && m.enabled)).map((opt) => (
+          {[...options, ...(offered || []).filter((m) => m.enabled && !options.some((o) => o.id === m.id)).map((m) => ({ id: m.id, title: m.label, subtitle: "Collect at the store", icon: m.icon || "storefront" }))].filter((opt) => !offered || offered.some((m) => m.id === opt.id && m.enabled)).map((opt) => (
             <div 
               key={opt.id}
               onClick={() => {
