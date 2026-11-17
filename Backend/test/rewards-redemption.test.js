@@ -154,3 +154,13 @@ describe('wallet refunds go to the franchise admin first', () => {
         assert.equal(refund.status, 'rejected');
     });
 });
+
+describe('who handed it over is shown', () => {
+    test('the store name and manager show on the code and on the customer profile', async () => {
+        const redeemed = await RewardRedemption.findOne({ userId: A.customerId, status: 'REDEEMED' }).lean();
+        const found = ok(await fx.call('GET', `/v1/food/store/rewards/codes/${redeemed.code}`, B.managerToken)).redemption;
+        assert.ok(found.storeName.includes('TEST STORE A'), found.storeName);
+        const data = ok(await fx.call('GET', `/v1/food/store/rewards/customers/${A.customerId}`, A.managerToken));
+        assert.ok(data.redemptions.find((r) => r.status === 'REDEEMED').storeName.includes('TEST STORE A'));
+    });
+});

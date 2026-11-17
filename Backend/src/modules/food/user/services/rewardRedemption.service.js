@@ -130,11 +130,20 @@ export async function createRedemption(userId, productId) {
     throw new ValidationError('Could not make a code. Please try again.');
 }
 
+/** Adds `storeName` to rows that were handed over, so it can be shown who gave the item. */
+export async function withStoreNames(rows) {
+    const ids = [...new Set(rows.map((r) => r.storeId).filter(Boolean).map(String))];
+    if (!ids.length) return rows;
+    const { FoodStore } = await import('../../store/models/store.model.js');
+    const names = new Map((await FoodStore.find({ _id: { $in: ids } }).select('storeName').lean()).map((s) => [String(s._id), s.storeName]));
+    return rows.map((r) => ({ ...r, storeName: r.storeId ? names.get(String(r.storeId)) || '' : '' }));
+}
+
 export async function listMyRedemptions(userId) {
     const userOid = oid(userId, 'User');
     await expireStale(userId);
     const rows = await RewardRedemption.find({ userId: userOid }).sort({ createdAt: -1 }).limit(30).lean();
-    return rows.map(shape);
+    return (await withStoreNames(rows.map(shape)));
 }
 
 const CODE_RE = /^\d{6}$/;
@@ -146,7 +155,8 @@ export async function lookupByCode(code) {
     const row = await RewardRedemption.findOne({ code: String(code) }).lean();
     if (!row) throw new NotFoundError('This code was not found.');
     const user = await FoodUser.findById(row.userId).select('name mobile phone').lean();
-    return { ...shape(row), customer: { id: String(row.userId), name: user?.name || '', phone: user?.mobile || user?.phone || '' } };
+    const [withStore] = await withStoreNames([shape(row)]);
+    return { ...withStore, customer: { id: String(row.userId), name: user?.name || '', phone: user?.mobile || user?.phone || '' } };
 }
 
 /** The store hands over the item: the code is used once. */

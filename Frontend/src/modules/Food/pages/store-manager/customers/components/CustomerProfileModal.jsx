@@ -53,7 +53,7 @@ function WalletRewardsPanel({ query }) {
         <h4 className="text-xs font-black uppercase text-zinc-500 mb-1">Reward codes</h4>
         {redemptions.length === 0 && <p className="text-xs text-zinc-400">None.</p>}
         {redemptions.map((r) => (
-          <Row key={r.id} left={r.product?.name} sub={`${fmtDate(r.createdAt)} · ${r.points} points${r.status === "PENDING" ? ` · code ${r.code}` : ""}`} right={r.status} cls="text-zinc-600" />
+          <Row key={r.id} left={r.product?.name} sub={`${fmtDate(r.createdAt)} · ${r.points} points${r.status === "PENDING" ? ` · code ${r.code}` : ""}${r.status === "REDEEMED" ? ` · handed over at ${r.storeName || "a store"}${r.handledByName ? ` by ${r.handledByName}` : ""}` : ""}`} right={r.status} cls="text-zinc-600" />
         ))}
       </div>
       <div>

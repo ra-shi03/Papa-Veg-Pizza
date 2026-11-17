@@ -4,7 +4,7 @@ import { FoodOrder } from '../../orders/models/order.model.js';
 import { getWalletSummary, listWalletTransactions } from '../../user/services/walletLedger.service.js';
 import { getRewardsSummary, listRewardTransactions } from '../../user/services/rewards.service.js';
 import { RewardRedemption } from '../../user/models/rewardRedemption.model.js';
-import { lookupByCode, confirmRedemption, cancelRedemption } from '../../user/services/rewardRedemption.service.js';
+import { lookupByCode, confirmRedemption, cancelRedemption, withStoreNames } from '../../user/services/rewardRedemption.service.js';
 import { customerProfile } from './storeCrm.service.js';
 import mongoose from 'mongoose';
 
@@ -39,7 +39,7 @@ export async function customerWalletAndRewards(user, customerId) {
     walletTransactions: walletTx.transactions,
     rewards,
     rewardTransactions: rewardTx.transactions,
-    redemptions: redemptions.map((r) => ({ id: String(r._id), code: r.status === 'PENDING' ? r.code : '', status: r.status, product: r.product, points: r.points, createdAt: r.createdAt, redeemedAt: r.redeemedAt || null, expiresAt: r.expiresAt })),
+    redemptions: (await withStoreNames(redemptions.map((r) => ({ id: String(r._id), code: r.status === 'PENDING' ? r.code : '', status: r.status, product: r.product, points: r.points, createdAt: r.createdAt, redeemedAt: r.redeemedAt || null, expiresAt: r.expiresAt, storeId: r.storeId, handledByName: r.handledByName || '' })))),
     walletRefunds: refunds.map((r) => ({ id: String(r._id), orderNumber: numberOf.get(String(r.orderId)) || '', amount: r.amount, reason: r.reason, status: r.status, createdAt: r.createdAt, rejectionReason: r.rejectionReason || '' })),
   };
 }

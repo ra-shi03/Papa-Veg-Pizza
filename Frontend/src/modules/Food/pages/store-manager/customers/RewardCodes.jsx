@@ -99,6 +99,9 @@ export default function RewardCodes() {
             <div><p className="text-[10px] font-bold uppercase text-zinc-400">Points used</p><p className="font-bold">{found.points}</p></div>
             <div><p className="text-[10px] font-bold uppercase text-zinc-400">Code made</p><p>{fmt(found.createdAt)}</p></div>
             <div><p className="text-[10px] font-bold uppercase text-zinc-400">{found.status === "REDEEMED" ? "Handed over" : "Valid until"}</p><p>{fmt(found.status === "REDEEMED" ? found.redeemedAt : found.expiresAt)}</p></div>
+            {found.status === "REDEEMED" && (
+              <div className="col-span-2"><p className="text-[10px] font-bold uppercase text-zinc-400">Handed over at</p><p className="font-bold">{found.storeName || "A store"}{found.handledByName ? ` · by ${found.handledByName}` : ""}</p></div>
+            )}
           </div>
 
           {found.status === "PENDING" && !cancelling && (
