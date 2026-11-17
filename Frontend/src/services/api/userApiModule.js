@@ -128,33 +128,6 @@ const getRestaurantCurrentOnce = () => {
   return restaurantCurrentInFlight;
 };
 
-/** Single in-flight + short cache for delivery /auth/me - one call per page load / refresh. */
-let deliveryMeInFlight = null;
-let deliveryMeCached = null;
-let deliveryMeCacheTime = 0;
-const DELIVERY_ME_CACHE_MS = 3000;
-
-const getDeliveryMeOnce = () => {
-  const now = Date.now();
-  if (deliveryMeCached && now - deliveryMeCacheTime < DELIVERY_ME_CACHE_MS) {
-    return Promise.resolve(deliveryMeCached);
-  }
-  if (!deliveryMeInFlight) {
-    deliveryMeInFlight = authService
-      .getMe("delivery")
-      .then((res) => {
-        deliveryMeCached = res;
-        deliveryMeCacheTime = Date.now();
-        return res;
-      })
-      .finally(() => {
-        deliveryMeInFlight = null;
-      });
-  }
-  return deliveryMeInFlight;
-};
-
-
 export const userAPI = {
   /** Get current user profile (Bearer USER). */
   getProfile: () =>
