@@ -122,9 +122,9 @@ export default function PrintReceiptPreviewModal({ visible, onClose, order }) {
         >
           <div className="text-center">
             <h2 className="font-bold text-sm">PAPA VEG PIZZA</h2>
-            <p className="text-[10px]">Indore Store Operation Panel</p>
-            <p className="text-[9px]">PVP-01, Saket Main Road, Indore</p>
-            <p className="text-[9px]">GSTIN: 23AABCP1234D1Z2</p>
+            {order.storeName && <p className="text-[10px]">{order.storeName}</p>}
+            {order.storeAddress && <p className="text-[9px]">{order.storeAddress}</p>}
+            {order.storePhone && <p className="text-[9px]">Tel: {order.storePhone}</p>}
           </div>
 
           <div className="divider"></div>
@@ -182,20 +182,37 @@ export default function PrintReceiptPreviewModal({ visible, onClose, order }) {
           <div className="space-y-0.5 text-[10px] pr-1">
             <div className="flex justify-between">
               <span>Subtotal:</span>
-              <span>{formatCurrency(order.grandTotal * 0.85)}</span>
+              <span>{formatCurrency(order.subtotal || 0)}</span>
+            </div>
+            {order.discountAmount > 0 && (
+              <div className="flex justify-between">
+                <span>Discount{order.couponId ? ` (${order.couponId})` : ""}:</span>
+                <span>-{formatCurrency(order.discountAmount)}</span>
+              </div>
+            )}
+            {order.packingCharges > 0 && (
+              <div className="flex justify-between"><span>Packing:</span><span>{formatCurrency(order.packingCharges)}</span></div>
+            )}
+            {order.platformFee > 0 && (
+              <div className="flex justify-between"><span>Platform fee:</span><span>{formatCurrency(order.platformFee)}</span></div>
+            )}
+            {order.handlingFee > 0 && (
+              <div className="flex justify-between"><span>Handling:</span><span>{formatCurrency(order.handlingFee)}</span></div>
+            )}
+            <div className="flex justify-between">
+              <span>CGST{order.gst?.rate ? ` (${order.gst.rate / 2}%)` : ""}:</span>
+              <span>{formatCurrency(order.gst?.cgst || 0)}</span>
             </div>
             <div className="flex justify-between">
-              <span>CGST (2.5%):</span>
-              <span>{formatCurrency(order.grandTotal * 0.025)}</span>
+              <span>SGST{order.gst?.rate ? ` (${order.gst.rate / 2}%)` : ""}:</span>
+              <span>{formatCurrency(order.gst?.sgst || 0)}</span>
             </div>
-            <div className="flex justify-between">
-              <span>SGST (2.5%):</span>
-              <span>{formatCurrency(order.grandTotal * 0.025)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Delivery Charge:</span>
-              <span>{formatCurrency(order.deliveryCharges || 0)}</span>
-            </div>
+            {order.deliveryCharges > 0 && (
+              <div className="flex justify-between">
+                <span>Delivery Charge:</span>
+                <span>{formatCurrency(order.deliveryCharges)}</span>
+              </div>
+            )}
             <div className="divider"></div>
             <div className="flex justify-between font-bold text-xs">
               <span>Grand Total:</span>
@@ -207,8 +224,6 @@ export default function PrintReceiptPreviewModal({ visible, onClose, order }) {
 
           <div className="text-center text-[10px] space-y-1">
             <p className="font-bold">THANK YOU FOR ORDERING!</p>
-            <p>Share feedback at feedback@papavegpizza.in</p>
-            <p className="text-[9px] text-zinc-400">--- Powered by Antigravity Ops Panel ---</p>
           </div>
         </div>
       </div>

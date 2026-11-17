@@ -250,6 +250,10 @@ export async function enrichOpsOrders(user, ops, raw) {
     const id = o.orderMethod || 'delivery';
     o.orderMethodLabel = methods.find((m) => m.id === id)?.label || id.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   }
+  // The store's own name, address and phone, for the receipts
+  const storeDoc = await FoodStore.findById(requireStore(user)).select('storeName address city state pincode phone').lean();
+  const storeAddress = [storeDoc?.address, storeDoc?.city, storeDoc?.state, storeDoc?.pincode].map((v) => String(v || '').trim()).filter(Boolean).join(', ');
+  for (const o of ops) { o.storeName = storeDoc?.storeName || ''; o.storeAddress = storeAddress; o.storePhone = storeDoc?.phone || ''; }
   const isManager = normalizeRole(user.role) === 'STORE_MANAGER';
   const riderIds = [...new Set(ops.map((o) => o.deliveryPartnerId).filter(Boolean))];
   const codes = [...new Set(ops.map((o) => o.couponCode).filter(Boolean))];

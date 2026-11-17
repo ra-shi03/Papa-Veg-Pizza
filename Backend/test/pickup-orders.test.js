@@ -110,6 +110,8 @@ describe('store panel: method label and type filter', () => {
         const all = await get('');
         assert.equal(all.find((r) => r._id === String(pick._id)).orderMethodLabel, 'In-Car');
         assert.equal(all.find((r) => r._id === String(del._id)).orderMethodLabel, 'Delivery');
+        assert.ok(all[0].storeName && 'storeAddress' in all[0], 'rows carry the store details for receipts');
+        assert.equal(all.find((r) => r._id === String(del._id)).subtotal, 200);
         const onlyPickup = await get('&orderType=pickup');
         assert.ok(onlyPickup.length && onlyPickup.every((r) => r.orderType === 'pickup'));
         const onlyDelivery = await get('&orderType=delivery');

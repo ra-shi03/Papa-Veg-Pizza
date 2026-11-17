@@ -131,9 +131,9 @@ export default function PrintReceiptModal({ visible, onClose, order }) {
           {/* Header */}
           <div className="text-center">
             <h2 className="text-sm font-bold tracking-wider uppercase mb-0.5">Papa Veg Pizza</h2>
-            <p className="text-[10px] text-zinc-500 font-semibold mb-0.5">Vijay Nagar Outlet, Indore</p>
-            <p className="text-[9px] text-zinc-400 font-semibold">FSSAI Lic No: 12345678901234</p>
-            <p className="text-[10px] text-zinc-500 mt-1">Tel: +91 731 4040990</p>
+            {order.storeName && <p className="text-[10px] text-zinc-500 font-semibold mb-0.5">{order.storeName}</p>}
+            {order.storeAddress && <p className="text-[9px] text-zinc-400 font-semibold">{order.storeAddress}</p>}
+            {order.storePhone && <p className="text-[10px] text-zinc-500 mt-1">Tel: {order.storePhone}</p>}
           </div>
 
           <div className="border-t border-dashed border-zinc-350 my-2" />
@@ -228,10 +228,16 @@ export default function PrintReceiptModal({ visible, onClose, order }) {
               <span>Packing:</span>
               <span>{formatCurrency(order.packingCharges || 0)}</span>
             </div>
-            {order.orderType === "delivery" && (
+            {order.platformFee > 0 && (
+              <div className="flex justify-between"><span>Platform fee:</span><span>{formatCurrency(order.platformFee)}</span></div>
+            )}
+            {order.handlingFee > 0 && (
+              <div className="flex justify-between"><span>Handling:</span><span>{formatCurrency(order.handlingFee)}</span></div>
+            )}
+            {order.deliveryCharges > 0 && (
               <div className="flex justify-between">
                 <span>Delivery:</span>
-                <span>{formatCurrency(order.deliveryCharges || 0)}</span>
+                <span>{formatCurrency(order.deliveryCharges)}</span>
               </div>
             )}
             <div className="border-t border-dashed border-zinc-350 my-1.5" />

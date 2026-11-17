@@ -363,11 +363,11 @@ export default function ReadyOrderDetailsModal({
           <div className="space-y-1.5">
             <div className="flex justify-between text-zinc-450 dark:text-zinc-400 font-semibold">
               <span>Subtotal</span>
-              <span>{formatCurrency(order.grandTotal * 0.85)}</span>
+              <span>{formatCurrency(order.subtotal || 0)}</span>
             </div>
             <div className="flex justify-between text-zinc-455 dark:text-zinc-400 font-semibold">
-              <span>Taxes & GST (5%)</span>
-              <span>{formatCurrency(order.grandTotal * 0.05)}</span>
+              <span>Taxes & GST{order.gst?.rate ? ` (${order.gst.rate}%)` : ""}</span>
+              <span>{formatCurrency(order.taxes || 0)}</span>
             </div>
             <div className="flex justify-between text-zinc-455 dark:text-zinc-400 font-semibold">
               <span>Delivery Charge</span>
