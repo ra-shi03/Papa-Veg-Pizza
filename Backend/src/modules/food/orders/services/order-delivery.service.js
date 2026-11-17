@@ -724,6 +724,7 @@ export async function rejectOrderDelivery(orderId, deliveryPartnerId) {
   order.dispatch.deliveryPartnerId = undefined;
   order.dispatch.assignedAt = undefined;
   order.dispatch.acceptedAt = undefined;
+  order.dispatch.manual = false; // the rider the store picked said no: auto-dispatch takes over again
   pushStatusHistory(order, {
     byRole: 'DELIVERY_PARTNER',
     byId: deliveryPartnerId,
@@ -1004,6 +1005,20 @@ export async function completeDelivery(orderId, deliveryPartnerId, body = {}) {
   if (!COMPLETE_FROM.includes(from)) throw stepConflict('Pick up the order before completing the delivery.');
 
   const { otp, ratings, paymentMethod: selectedPaymentMethod } = body;
+
+  // Proof of delivery: a photo of the handover, taken at the door, is required.
+  const handoverPhotoUrl = String(body.handoverPhotoUrl || order.deliveryVerification?.handoverPhotoUrl || '').trim();
+  if (!/^https?:\/\/\S{4,1000}$/i.test(handoverPhotoUrl)) {
+    throw new ValidationError('Upload a handover photo as proof of delivery before completing.');
+  }
+  if (order.deliveryVerification?.handoverPhotoUrl !== handoverPhotoUrl) {
+    order.deliveryVerification = {
+      ...(order.deliveryVerification?.toObject?.() || order.deliveryVerification || {}),
+      handoverPhotoUrl,
+      handoverPhotoAt: new Date(),
+    };
+    order.markModified('deliveryVerification');
+  }
 
   // 1. Handover OTP: always required. Verified earlier (verify-drop-otp) or sent with this call; it exists only once
   // the rider has marked reached drop.

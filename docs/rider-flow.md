@@ -94,3 +94,31 @@ Fix in this commit: the city fallback also accepts the parts of the store's city
 the comma-separated parts, e.g. "North India (Delhi)" gives "Delhi"), still case-insensitive with spaces trimmed and
 collapsed. With that, DeliveryBoy shows as offline for the Karol Bagh manager and its franchise admin. To appear in
 Assign Rider, the rider must go online (which also sends a GPS fix).
+
+## 5. After packaging: store manager to rider to customer (updated 2026-11-16)
+
+Order status: `ready_for_pickup` -> `picked_up` -> `delivered`. Rider side: `dispatch.status` unassigned -> assigned -> accepted.
+
+| Step | Who | Where | What happens |
+|---|---|---|---|
+| Ready | kitchen | Orders > Ready Orders | Packaging done: order is `ready_for_pickup`, rider dispatch starts |
+| Assign | store manager | Delivery Operations > Assign Rider (or Assign Rider on Ready Orders) | `POST /store/.../assign`: only an **approved, online** rider near the store. Sets `dispatch.status: assigned`, `dispatch.manual: true`, pushes `new_order_available` over the socket plus a push notification |
+| Accept | rider | delivery app | Accepts the offer; `dispatch.status: accepted`. Reject clears `manual` and the order goes back to auto-dispatch |
+| Reached pickup | rider | delivery app | `deliveryState` only; the store is notified |
+| Bill photo | rider | delivery app (pickup modal) | The rider uploads the bill photo, then swipes pickup (`billImageUrl` saved) |
+| Store handover | store manager | Ready Orders > Confirm Pickup (rider OTP) | `PATCH /store/orders/:id/pickup` moves the order to `picked_up`. **This path skips the rider's bill-photo step.** A rider who never tapped Accept is accepted here |
+| Reached drop | rider | delivery app | Generates the customer's 4-digit OTP (`deliveryOtp`) |
+| OTP | rider | Handover Code modal | The rider types what the customer says. 5 wrong tries per order, then the store manager resets (`POST /store/orders/:id/reset-drop-otp`) |
+| **Handover photo** | rider | Handover Photo modal (after the OTP) | **New.** Photo of the order at the door. Required: `completeDelivery` returns 400 without `handoverPhotoUrl`. Saved on `deliveryVerification.handoverPhotoUrl` / `handoverPhotoAt` |
+| Payment, complete | rider | delivery app | Cash or QR for pay-on-delivery; prepaid must already be verified. Order becomes `delivered` |
+
+### Bugs fixed in this area
+- **Manual rider assignment undone.** Auto-dispatch (`tryAutoAssign`), its timeout job (`processDispatchTimeout`) and the
+  startup watchdog (`recoverStuckOrders`, runs on every backend start) reset any assigned-but-not-accepted order. All three now skip
+  `dispatch.manual: true`. `rejectOrderDelivery` clears the flag.
+- **Out for delivery, nothing in the rider app.** The rider's current trip needs `dispatch.status: accepted`; Confirm Pickup now accepts at handover.
+- **Ready Orders showed "No rider assigned".** It looked the rider up in a mock `pvp_riders` list in localStorage; it now uses the order's `deliveryPartner`.
+
+### Open
+- Store Confirm Pickup bypasses the bill photo. Option: it only records the store's handover and the rider finishes pickup with the bill photo.
+- The handover photo is not yet shown in the store panel's Completed Order details.

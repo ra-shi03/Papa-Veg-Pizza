@@ -35,6 +35,8 @@ import IngredientRequestModal from "./modals/IngredientRequestModal";
 import ReassignRequestModal from "./modals/ReassignRequestModal";
 import ReassignTaskModal from "./modals/ReassignTaskModal";
 import QualityCheckModal from "./modals/QualityCheckModal";
+import AssignStaffModal from "../orders/components/AssignStaffModal";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function MyTasks() {
   // 1. Get role from layout context
@@ -45,6 +47,8 @@ export default function MyTasks() {
   const { data: tasks = [], isLoading: tasksLoading } = useMyTasksQuery();
   const { data: stats = {}, isLoading: statsLoading } = useMyTaskStats();
   const { data: teamStats = {}, isLoading: teamStatsLoading } = useTeamTasksQuery();
+
+  const queryClient = useQueryClient();
 
   // 3. Tab State
   const [activeTab, setActiveTab] = useState("assigned"); // 'assigned', 'in_progress', 'completed', 'delayed', 'history'
@@ -83,8 +87,8 @@ export default function MyTasks() {
           toast.success("Task started successfully! Go to In Progress tab.");
           closeModal();
         },
-        onError: () => {
-          toast.error("Failed to start task.");
+        onError: (err) => {
+          toast.error(err?.response?.data?.message || "Failed to start task.");
         },
       }
     );
@@ -264,6 +268,7 @@ export default function MyTasks() {
                   <AssignedTasksTable
                     tasks={pendingTasks}
                     onStartTask={(t) => openModal("start", t)}
+                    onAssignStaff={(t) => openModal("assign", t)}
                   />
                 )}
 
@@ -339,6 +344,16 @@ export default function MyTasks() {
 
       {/* 4. MODALS REGISTER */}
       
+      {/* Assign Kitchen Staff (step 1 of a supervisor task; the picker lists only people who are present) */}
+      <AssignStaffModal
+        visible={activeModal === "assign"}
+        order={selectedTask ? { _id: selectedTask.orderRef, orderNumber: selectedTask.orderId, assignedStaff: selectedTask.assignedStaff || {} } : null}
+        onClose={() => {
+          closeModal();
+          queryClient.invalidateQueries({ queryKey: ["myTasks"] });
+        }}
+      />
+
       {/* Start Task Modal */}
       <StartTaskModal
         isOpen={activeModal === "start"}

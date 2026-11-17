@@ -21,8 +21,13 @@ Also: customer, delivery_partner.
 
 ## Status
 DONE: auth; super admin control of user-app content.
-PENDING: staff management, kitchen ops/tasks, inventory, customers/menu APIs, complaints,
-dashboards, delivery/orders verification, sockets. Defer: finance, marketing, reports, rewards.
+DONE (store ops order flow, see docs/rider-flow.md section 5): store manager > supervisor > staff tasks gated by attendance
+and stations; real data in Completed Order details; manual rider assignment (`dispatch.manual`) is never undone by
+auto-dispatch, its timeout job or the startup watchdog; Confirm Pickup accepts the rider at handover; handover photo
+required to complete a delivery (`deliveryVerification.handoverPhotoUrl`).
+PENDING: staff management, inventory, customers/menu APIs, complaints, dashboards, sockets, delivery/orders
+verification (open: store Confirm Pickup skips the rider's bill photo; handover photo not shown in the store panel yet).
+Defer: finance, marketing, reports, rewards.
 
 ## Rules
 - Do NOT change user app or delivery app UI. Admin panel UI is over-built; backend only for v1 features.

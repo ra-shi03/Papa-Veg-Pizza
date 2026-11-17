@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Modal, Checkbox, Input } from "antd";
-import { ClipboardCheck, Sparkles, User, AlertCircle } from "lucide-react";
+import { ClipboardCheck, Sparkles, AlertCircle } from "lucide-react";
 
 const { TextArea } = Input;
 
@@ -141,15 +141,6 @@ export default function PackagingChecklistModal({ visible, onClose, order, onSub
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
           />
-        </div>
-
-        {/* Auto filled staff footer */}
-        <div className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-zinc-950 rounded-xl border border-slate-100 dark:border-zinc-850">
-          <div className="flex items-center gap-1.5 font-bold text-slate-500">
-            <User size={13} className="text-slate-400" />
-            <span>Inspection Officer:</span>
-          </div>
-          <span className="font-black text-slate-900 dark:text-white">Karan Johar (QA)</span>
         </div>
 
         {!isAllChecked && (

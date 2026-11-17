@@ -4,7 +4,7 @@ export { searchAPI, api } from "./core.js";
 export { authAPI } from "./authApiModule.js";
 export { supportAPI, notificationAPI } from "./supportApiModule.js";
 export { adminAPI } from "./adminApiModule.js";
-export { restaurantAPI, diningAPI } from "./restaurantApiModule.js";
+export { restaurantAPI } from "./restaurantApiModule.js";
 export { userAPI, publicGetOnce, heroBannerAPI, publicAPI } from "./userApiModule.js";
 export { deliveryAPI } from "./deliveryApiModule.js";
 export { locationAPI, zoneAPI, storeAPI } from "./locationApiModule.js";

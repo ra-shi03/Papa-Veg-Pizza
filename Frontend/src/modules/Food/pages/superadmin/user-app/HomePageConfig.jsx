@@ -458,7 +458,6 @@ export default function HomePageConfig() {
   const [isUploadingAdImage, setIsUploadingDealImage] = useState(false);
   const defaultMethods = [
     { id: "delivery", label: "Delivery", icon: "moped", enabled: false },
-    { id: "dinein", label: "Dine-In", icon: "restaurant", enabled: false },
     { id: "takeaway", label: "Takeaway", icon: "store", enabled: false },
     { id: "incar", label: "In-Car", icon: "directions_car", enabled: false },
     { id: "train", label: "Delivery on Train", icon: "train", enabled: false }

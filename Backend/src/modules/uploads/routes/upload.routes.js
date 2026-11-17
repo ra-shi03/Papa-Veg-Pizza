@@ -25,7 +25,7 @@ const SUPER_ADMIN_FOLDERS = {
     pdf: ['uploads', 'bulk-orders'],
     video: ['uploads/videos', 'welcome/videos']
 };
-const DELIVERY_FOLDERS = { image: ['appzeto/delivery/bills'], pdf: [], video: [] };
+const DELIVERY_FOLDERS = { image: ['appzeto/delivery/bills', 'appzeto/delivery/handover'], pdf: [], video: [] };
 
 export function chooseUploadFolder(user, kind, requested) {
     const role = normalizeRole(user?.role);

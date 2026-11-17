@@ -1,6 +1,6 @@
 import React from "react";
 import { Modal } from "antd";
-import { CheckCircle2, User, Clock, AlertTriangle } from "lucide-react";
+import { CheckCircle2, Clock, AlertTriangle } from "lucide-react";
 
 export default function MarkReadyModal({ visible, onClose, order, onConfirm }) {
   if (!order) return null;
@@ -65,14 +65,6 @@ export default function MarkReadyModal({ visible, onClose, order, onConfirm }) {
 
         {/* Breakdown */}
         <div className="space-y-2 px-1">
-          <div className="flex items-center justify-between text-slate-500 dark:text-zinc-450 font-bold">
-            <span>Packaging Officer:</span>
-            <span className="text-slate-900 dark:text-white font-black flex items-center gap-1">
-              <User size={12} className="text-slate-400" />
-              Karan Johar
-            </span>
-          </div>
-
           <div className="flex items-center justify-between text-slate-500 dark:text-zinc-450 font-bold">
             <span>Total Packaging Duration:</span>
             <span className="text-emerald-600 dark:text-emerald-400 font-black flex items-center gap-1">

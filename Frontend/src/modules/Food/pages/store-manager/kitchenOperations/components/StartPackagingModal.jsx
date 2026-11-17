@@ -1,6 +1,6 @@
 import React from "react";
 import { Modal } from "antd";
-import { PlayCircle, ShieldCheck, User } from "lucide-react";
+import { PlayCircle, ShieldCheck } from "lucide-react";
 
 export default function StartPackagingModal({ visible, onClose, order, onConfirm }) {
   if (!order) return null;
@@ -62,14 +62,6 @@ export default function StartPackagingModal({ visible, onClose, order, onConfirm
           <div className="flex items-center justify-between text-slate-500 dark:text-zinc-450 font-bold">
             <span>Customer Name:</span>
             <span className="text-slate-900 dark:text-white font-black">{order.customer?.name}</span>
-          </div>
-
-          <div className="flex items-center justify-between text-slate-500 dark:text-zinc-450 font-bold">
-            <span>Assigned Officer:</span>
-            <span className="text-slate-900 dark:text-white font-black flex items-center gap-1">
-              <User size={12} className="text-slate-400" />
-              Karan Johar (Pack Lead)
-            </span>
           </div>
 
           <div className="flex items-center justify-between text-slate-500 dark:text-zinc-450 font-bold">

@@ -91,7 +91,7 @@ export default function BakingTable({
                 
                 return (
                   <tr key={item._id} className="hover:bg-slate-50/50 dark:hover:bg-zinc-950/20 font-bold transition-all text-slate-800 dark:text-zinc-300">
-                    <td className="py-3 px-4 font-black">{item._id.startsWith("bake-") ? `BI-${item._id.slice(-3).toUpperCase()}` : item._id}</td>
+                    <td className="py-3 px-4 font-black">{item.pizzaId || (item._id.startsWith("bake-") ? `BI-${item._id.slice(-3).toUpperCase()}` : `PIZ-${String(item._id).slice(-4).toUpperCase()}`)}</td>
                     <td className="py-3 px-4">
                       <span className="text-[var(--primary)] cursor-pointer hover:underline flex items-center gap-0.5">
                         #{item.orderNumber}
@@ -244,7 +244,7 @@ export default function BakingTable({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] font-black text-slate-900 dark:text-white">
-                      {item._id.startsWith("bake-") ? `BI-${item._id.slice(-3).toUpperCase()}` : item._id}
+                      {item.pizzaId || (item._id.startsWith("bake-") ? `BI-${item._id.slice(-3).toUpperCase()}` : `PIZ-${String(item._id).slice(-4).toUpperCase()}`)}
                     </span>
                     <span className="text-[9px] font-bold text-slate-450">
                       Order: #{item.orderNumber}

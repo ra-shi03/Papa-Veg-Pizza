@@ -448,15 +448,15 @@ export async function getOrderMethodsController(req, res, next) {
         if (!methods || !Array.isArray(methods) || methods.length === 0) {
             methods = [
                 { id: 'delivery', label: 'Delivery', icon: 'moped', enabled: true },
-                { id: 'dine_in', label: 'Dine-In', icon: 'restaurant', enabled: true },
                 { id: 'takeaway', label: 'Takeaway', icon: 'store', enabled: true },
                 { id: 'train', label: 'Delivery on Train', icon: 'train', enabled: true },
                 { id: 'incar', label: 'In-Car', icon: 'directions_car', enabled: true }
             ];
         }
         return sendResponse(res, 200, 'Order methods retrieved successfully', {
-            methods: methods.map(m => ({
-                id: m.id === 'dinein' ? 'dine_in' : m.id,
+            // There is no dine-in flow: a stored dine-in entry is never offered
+            methods: methods.filter(m => m.id !== 'dine_in' && m.id !== 'dinein').map(m => ({
+                id: m.id,
                 label: m.label,
                 icon: m.icon || '',
                 enabled: m.enabled !== false

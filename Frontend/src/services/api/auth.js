@@ -271,30 +271,6 @@ function getMeOnce(module) {
 }
 
 /**
- * Restaurant OTP auth (backend: same phone format as user, 6-digit OTP).
- */
-export function requestRestaurantOtp(phone) {
-  const normalized = normalizePhone(phone);
-  if (normalized.length < 8) {
-    return Promise.reject(new Error("Phone must be at least 8 digits"));
-  }
-  return restaurantClient.post(AUTH.RESTAURANT_REQUEST_OTP, { phone: normalized });
-}
-
-export function verifyRestaurantOtp(phone, otp, fcmToken = null, platform = "web") {
-  const normalized = normalizePhone(phone);
-  const otpStr = String(otp).replace(/\D/g, "").slice(0, 6);
-  if (!normalized || otpStr.length !== 6) {
-    return Promise.reject(new Error("Phone and 6-digit OTP are required"));
-  }
-  return restaurantClient.post(AUTH.RESTAURANT_VERIFY_OTP, {
-    phone: normalized,
-    otp: otpStr,
-    ...(fcmToken ? { fcmToken, platform } : {}),
-  });
-}
-
-/**
  * Delivery partner OTP auth (backend: same phone + 6-digit OTP).
  */
 export function requestDeliveryOtp(phone) {

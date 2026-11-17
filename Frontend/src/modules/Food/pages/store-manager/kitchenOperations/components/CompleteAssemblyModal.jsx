@@ -49,7 +49,7 @@ export default function CompleteAssemblyModal({ visible, onClose, item, onConfir
           </button>
           <button
             onClick={handleConfirm}
-            className="px-4 py-2 bg-emerald-650 hover:bg-emerald-600 text-white font-extrabold rounded-xl text-xs transition-all shadow-sm cursor-pointer"
+            className="px-4 py-2 bg-emerald-600 text-white font-extrabold rounded-xl text-xs transition-all shadow-sm cursor-pointer"
           >
             Complete Assembly
           </button>

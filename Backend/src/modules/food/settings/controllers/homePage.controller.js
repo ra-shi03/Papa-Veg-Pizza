@@ -13,7 +13,6 @@ const DEFAULT_BOTTOM_NAV = [
 
 export const DEFAULT_ORDER_METHODS = [
     { id: 'delivery', label: 'Delivery', icon: 'moped', enabled: true },
-    { id: 'dine_in', label: 'Dine-In', icon: 'restaurant', enabled: true },
     { id: 'takeaway', label: 'Takeaway', icon: 'store', enabled: true },
     { id: 'train', label: 'Delivery on Train', icon: 'train', enabled: true },
     { id: 'incar', label: 'In-Car', icon: 'directions_car', enabled: true }

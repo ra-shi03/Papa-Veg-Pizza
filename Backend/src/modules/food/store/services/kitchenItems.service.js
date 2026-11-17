@@ -9,6 +9,7 @@ import {
   toObjectId, idStr,
 } from './storeOrders.service.js';
 import { notifyUsers } from './kitchenTasks.service.js';
+import { requirePresent } from './attendancePresence.js';
 import { recipeIndex } from './inventoryOps.service.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 
@@ -163,6 +164,7 @@ const bakingStatus = (item) => {
 
 const toBakingItem = (item, order) => ({
   ...base(item, order),
+  pizzaId: `PIZ-${String(item._id).slice(-4).toUpperCase()}`, // same short id as the Pizza Station
   assigned_oven: item.ovenId ? String(item.ovenId) : null,
   assigned_staff: ownerOf(item, order, 'baker')?.id || null,
   baking_status: bakingStatus(item),
@@ -382,6 +384,7 @@ export async function reassignItemChef(user, itemId, chefId) {
   if (!isId(chefId)) throw new ValidationError('Choose a chef');
   const chef = await StoreManager.findOne({ userId: toObjectId(chefId), storeId: String(storeId), status: 'Active' }).lean();
   if (!chef) throw new ValidationError('That person is not an active member of this store');
+  await requirePresent(storeId, chef);
   item.chefId = chef.userId;
   item.chefName = chef.name;
   await item.save();

@@ -23,9 +23,10 @@ export default function ConfirmPickupModal({ visible, onClose, order }) {
   if (!order) return null;
 
   // Retrieve assigned rider info (simulate lookup in local storage mock riders if not fully populated)
-  const assignedRider = order.deliveryPartnerId 
-    ? (JSON.parse(localStorage.getItem("pvp_riders")) || []).find(r => r._id === order.deliveryPartnerId)
-    : null;
+  const assignedRider = order.deliveryPartner
+    || (order.deliveryPartnerId
+      ? (JSON.parse(localStorage.getItem("pvp_riders")) || []).find(r => r._id === order.deliveryPartnerId)
+      : null);
 
   const handleConfirm = async () => {
     if (!otp || otp.length !== 4) {
@@ -113,8 +114,8 @@ export default function ConfirmPickupModal({ visible, onClose, order }) {
                 {assignedRider.phone}
               </div>
               <div>
-                <span className="text-[9px] text-zinc-455 block font-semibold">Employee ID</span>
-                {assignedRider.employeeId}
+                <span className="text-[9px] text-zinc-455 block font-semibold">Vehicle</span>
+                {assignedRider.vehicleName || assignedRider.vehicleType || "-"}
               </div>
             </div>
           </div>

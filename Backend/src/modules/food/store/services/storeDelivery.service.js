@@ -4,7 +4,7 @@ import { DeliveryIssue } from '../models/deliveryIssue.model.js';
 import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
 import { FoodZone } from '../../admin/models/zone.model.js';
 import { Refund } from '../../../../core/payments/models/refund.model.js';
-import { buildOrderIdentityFilter, buildDeliveryOfferPayload, pushStatusHistory, enqueueOrderEvent } from '../../orders/services/order.helpers.js';
+import { buildOrderIdentityFilter, buildDeliveryOfferPayload, pushStatusHistory, enqueueOrderEvent, notifyOwnerSafely } from '../../orders/services/order.helpers.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 import { isId, toId, startOfDay, round1 } from '../../dashboard/services/dashboardAccess.js';
@@ -352,6 +352,15 @@ export async function timeline(user, orderId, q = {}) {
 // ---------------------------------------------------------------------------------------------
 
 function notifyAssignment(ctx, order, rider, previousRiderId) {
+  // A push too, so a rider who is not looking at the app (or whose socket is not connected) still hears about it
+  void Promise.resolve(notifyOwnerSafely(
+    { ownerType: 'DELIVERY_PARTNER', ownerId: String(rider._id) },
+    {
+      title: 'New order assigned!',
+      body: `${ctx.store.storeName || 'The store'} assigned you Order #${order.order_id || order._id}. Open the app to accept it.`,
+      data: { type: 'new_order', orderId: String(order._id) },
+    },
+  )).catch(() => {});
   const io = getIO();
   if (!io) return;
   io.to(rooms.delivery(rider._id)).emit('new_order_available', buildDeliveryOfferPayload(order, {
@@ -373,7 +382,7 @@ async function assign(ctx, order, rider) {
   const updated = await FoodOrder.findOneAndUpdate(
     { _id: order._id, storeId: ctx.storeId, orderStatus: { $in: ASSIGNABLE } },
     {
-      $set: { 'dispatch.status': 'assigned', 'dispatch.deliveryPartnerId': rider._id, 'dispatch.assignedAt': new Date() },
+      $set: { 'dispatch.status': 'assigned', 'dispatch.deliveryPartnerId': rider._id, 'dispatch.assignedAt': new Date(), 'dispatch.manual': true },
       $unset: { 'dispatch.acceptedAt': '', 'dispatch.dispatchingAt': '' },
       $push: {
         statusHistory: {
@@ -416,10 +425,20 @@ export async function confirmPickup(user, orderId, body = {}, q = {}) {
   if (!riderId) throw new ValidationError('Assign a rider before confirming the pickup.');
   const from = order.orderStatus;
   const pickedUpAt = new Date();
+  // The rider's app only treats an ACCEPTED order as their current trip. The handover itself proves the rider took the
+  // order, so a rider who was assigned but never tapped Accept is accepted here; otherwise the order would be out for
+  // delivery with nothing in their app.
+  const wasAccepted = order.dispatch?.status === 'accepted';
+  if (!wasAccepted) {
+    order.dispatch.status = 'accepted';
+    order.dispatch.acceptedAt = pickedUpAt;
+    pushStatusHistory(order, { byRole: 'STORE_MANAGER', byId: ctx.user.userId, from: 'assigned', to: 'accepted', note: 'Accepted at handover (pickup confirmed by the store)' });
+  }
   order.orderStatus = 'picked_up';
   order.deliveryState = { ...(order.deliveryState?.toObject?.() || order.deliveryState || {}), currentPhase: 'en_route_to_delivery', status: 'picked_up', pickedUpAt };
   pushStatusHistory(order, { byRole: 'STORE_MANAGER', byId: ctx.user.userId, from, to: 'picked_up', note: `Pickup confirmed by the store${notes ? `: ${notes}` : ''}` });
   await order.save();
+  if (!wasAccepted) getIO()?.to(rooms.delivery(String(riderId))).emit('order_accepted', { orderMongoId: String(order._id), orderId: String(order._id) });
   getIO()?.to(rooms.delivery(String(riderId))).emit('order_status_update', {
     orderMongoId: String(order._id), orderId: String(order._id), orderStatus: order.orderStatus, deliveryState: order.deliveryState,
   });

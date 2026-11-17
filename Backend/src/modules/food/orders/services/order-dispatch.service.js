@@ -210,6 +210,7 @@ export async function tryAutoAssign(orderId, options = {}) {
         { 'dispatch.status': 'unassigned' },
         {
           'dispatch.status': 'assigned',
+          'dispatch.manual': { $ne: true }, // a rider the store picked is never taken back by auto-dispatch
           'dispatch.acceptedAt': { $exists: false },
           'dispatch.assignedAt': { $lt: new Date(Date.now() - lockTimeout) }
         }
@@ -379,6 +380,7 @@ export async function processDispatchTimeout(orderId, partnerId) {
   if (!order) return;
 
   const stillAssigned = order.dispatch?.status === 'assigned' &&
+    !order.dispatch?.manual &&
     String(order.dispatch?.deliveryPartnerId) === String(partnerId) &&
     !order.dispatch?.acceptedAt;
 

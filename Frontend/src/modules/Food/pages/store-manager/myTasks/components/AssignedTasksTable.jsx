@@ -1,7 +1,92 @@
 import React from "react";
-import { ShieldAlert, Play, MapPin, User, Clock, ArrowRight } from "lucide-react";
+import { ShieldAlert, Play, MapPin, User, Clock, ArrowRight, UserPlus, CheckCircle2, Lock } from "lucide-react";
 
-export default function AssignedTasksTable({ tasks = [], onStartTask = () => {} }) {
+export default function AssignedTasksTable({ tasks = [], onStartTask = () => {}, onAssignStaff = () => {} }) {
+  // A supervisor task is flow-wise: 1) assign present kitchen staff to every station, 2) start overseeing.
+  const isFlowTask = (task) => Array.isArray(task.flow);
+
+  const FlowSteps = ({ task }) => {
+    if (!isFlowTask(task)) return null;
+    return (
+      <div className="mt-2 space-y-1.5">
+        {Array.isArray(task.workItems) && task.workItems.length > 0 && (
+          <ul className="space-y-0.5">
+            {task.workItems.map((line, i) => (
+              <li key={i} className="text-[10px] font-bold text-slate-700 dark:text-zinc-200">• {line}</li>
+            ))}
+          </ul>
+        )}
+        {task.progress && (
+          <span className="inline-block text-[9px] font-black px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200">{task.progress}</span>
+        )}
+        <ol className="space-y-1">
+          {task.flow.map((step, i) => (
+            <li key={step.key} className="flex items-center gap-1.5 text-[10px] font-bold">
+              {step.status === "done" ? (
+                <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
+              ) : step.status === "locked" ? (
+                <Lock size={10} className="text-slate-300 dark:text-zinc-600 shrink-0" />
+              ) : (
+                <span className="w-[11px] h-[11px] rounded-full border-2 border-[var(--primary)] shrink-0" />
+              )}
+              <span className={step.status === "locked" ? "text-slate-300 dark:text-zinc-600" : step.status === "done" ? "text-emerald-600" : "text-slate-700 dark:text-zinc-200"}>
+                {i + 1}. {step.label}
+              </span>
+            </li>
+          ))}
+        </ol>
+        <div className="flex flex-wrap gap-1">
+          {(task.stations || []).map((s) => (
+            <span
+              key={s.slot}
+              className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${s.staff ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}
+            >
+              {s.station.replace(" Station", "")}: {s.staff ? s.staff.name : "not assigned"}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const ActionButton = ({ task, compact = false }) => {
+    const needsStaff = task.staffReady === false;
+    const waiting = task.canStart === false;
+    const size = compact ? "text-[9px] font-black py-1.5 px-3 rounded-lg" : "text-[9px] font-bold py-1 px-2.5 rounded-md ml-auto";
+    if (needsStaff) {
+      return (
+        <button
+          onClick={() => onAssignStaff(task)}
+          className={`${size} bg-amber-500 text-white hover:bg-amber-600 shadow-sm active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer`}
+        >
+          <UserPlus size={10} />
+          <span>Assign Staff</span>
+        </button>
+      );
+    }
+    if (waiting) {
+      return (
+        <button
+          disabled
+          title={task.waitingFor}
+          className={`${size} bg-slate-200 text-slate-500 dark:bg-zinc-800 dark:text-zinc-500 flex items-center gap-1.5 cursor-not-allowed`}
+        >
+          <Lock size={10} />
+          <span>Waiting</span>
+        </button>
+      );
+    }
+    return (
+      <button
+        onClick={() => onStartTask(task)}
+        className={`${size} bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] shadow-sm active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer`}
+      >
+        <Play size={10} className="fill-white stroke-none" />
+        <span>{compact ? "Start Task" : "Start Work"}</span>
+      </button>
+    );
+  };
+
   const getPriorityBadge = (prio) => {
     switch (prio) {
       case "high":
@@ -70,6 +155,7 @@ export default function AssignedTasksTable({ tasks = [], onStartTask = () => {} 
                   <div className="flex flex-col">
                     <span className="font-bold text-slate-800 dark:text-zinc-200 leading-snug">{task.title}</span>
                     <span className="text-[10px] font-semibold text-slate-450 dark:text-zinc-500 line-clamp-2 mt-0.5 leading-snug">{task.description}</span>
+                    <FlowSteps task={task} />
                   </div>
                 </td>
                 <td className="py-3 px-3 whitespace-nowrap">
@@ -93,13 +179,7 @@ export default function AssignedTasksTable({ tasks = [], onStartTask = () => {} 
                   {formatTime(task.createdAt)}
                 </td>
                 <td className="py-3 px-4 text-right whitespace-nowrap">
-                  <button
-                    onClick={() => onStartTask(task)}
-                    className="text-[9px] font-bold py-1 px-2.5 rounded-md bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] shadow-sm active:scale-[0.98] transition-all flex items-center gap-1.5 ml-auto cursor-pointer"
-                  >
-                    <Play size={10} className="fill-white stroke-none" />
-                    <span>Start Work</span>
-                  </button>
+                  <ActionButton task={task} />
                 </td>
               </tr>
             ))}
@@ -137,6 +217,7 @@ export default function AssignedTasksTable({ tasks = [], onStartTask = () => {} 
               <p className="text-[10px] font-medium text-slate-450 dark:text-zinc-500 leading-normal">
                 {task.description}
               </p>
+              <FlowSteps task={task} />
             </div>
 
             {/* Timings, station, and by */}
@@ -160,13 +241,7 @@ export default function AssignedTasksTable({ tasks = [], onStartTask = () => {} 
               <span className="text-[9px] font-semibold text-slate-400 dark:text-zinc-500">
                 Assigned at {formatTime(task.createdAt)}
               </span>
-              <button
-                onClick={() => onStartTask(task)}
-                className="text-[9px] font-black py-1.5 px-3 rounded-lg bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] shadow-sm active:scale-[0.98] transition-all flex items-center gap-1"
-              >
-                <Play size={9} className="fill-white stroke-none" />
-                <span>Start Task</span>
-              </button>
+              <ActionButton task={task} compact />
             </div>
           </div>
         ))}

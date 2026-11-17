@@ -204,6 +204,7 @@ export async function buildOrderPricing(userId, dto) {
       cancellationFreeMinutes,
       discount,
       total,
+      gstRate: Number.isFinite(gstRate) ? gstRate : 0,
       currency: "INR",
       couponCode: appliedCoupon?.code || codeRaw || null,
       appliedCoupon,

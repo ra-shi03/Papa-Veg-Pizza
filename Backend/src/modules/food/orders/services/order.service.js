@@ -225,8 +225,10 @@ export async function createOrder(userId, dto) {
     }
   }
 
-  const { subtotal, tax, packagingFee, deliveryFee, platformFee, handlingFee, cancellationFee, cancellationFreeMinutes, discount, total, currency } = priced.pricing;
-  const normalizedPricing = { subtotal, tax, packagingFee, deliveryFee, platformFee, handlingFee, cancellationFee, cancellationFreeMinutes, discount, total, currency };
+  const { subtotal, tax, packagingFee, deliveryFee, platformFee, handlingFee, cancellationFee, cancellationFreeMinutes, discount, total, currency, gstRate } = priced.pricing;
+  // Only a coupon that was really applied is recorded (a rejected code gives discount 0)
+  const appliedCouponCode = discount > 0 ? priced.pricing.appliedCoupon?.code || '' : '';
+  const normalizedPricing = { subtotal, tax, packagingFee, deliveryFee, platformFee, handlingFee, cancellationFee, cancellationFreeMinutes, discount, total, currency, gstRate, couponCode: appliedCouponCode };
 
   const payment = {
     method: paymentMethod,
@@ -816,6 +818,7 @@ export async function recoverStuckOrders() {
     // 1. Stuck in 'assigned' (partner never accepted) for > 2m
     const stuckAssigned = await FoodOrder.find({
       'dispatch.status': 'assigned',
+      'dispatch.manual': { $ne: true }, // a rider the store picked is not taken back by the watchdog
       'dispatch.acceptedAt': { $exists: false },
       'dispatch.assignedAt': { $lt: new Date(now - TWO_MIN) },
       orderStatus: { $nin: ['delivered', 'cancelled_by_user', 'cancelled_by_store'] }

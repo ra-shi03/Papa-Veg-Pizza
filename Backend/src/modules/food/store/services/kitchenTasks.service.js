@@ -1,10 +1,12 @@
 import mongoose from 'mongoose';
 import { KitchenTask } from '../models/kitchenTask.model.js';
+import { KitchenItem, ITEM_STAGES } from '../models/kitchenItem.model.js';
 import { TaskNotification } from '../models/taskNotification.model.js';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { StoreManager } from '../../franchise/models/storeManager.model.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 import { config } from '../../../../config/env.js';
+import { requirePresent } from './attendancePresence.js';
 
 // My Tasks: the work items behind an order in the kitchen. A task is created when the store manager
 // hands an order to a supervisor (kind 'supervisor') and when a supervisor assigns a station
@@ -20,6 +22,59 @@ const SLOT_INFO = {
   packaging_staff: { type: 'pack', verb: 'Pack', station: 'Packaging Station' },
 };
 const SUPERVISOR_INFO = { type: 'oversee', verb: 'Oversee', station: 'Kitchen Supervision' };
+
+// What each station actually does, so My Tasks shows the real job and not a generic "task".
+const stageIdx = (item) => ITEM_STAGES.indexOf(item.stage);
+const READY_FOR_BAKING = ITEM_STAGES.indexOf('ready_for_baking');
+const BAKING = ITEM_STAGES.indexOf('baking');
+const BAKED = ITEM_STAGES.indexOf('baked');
+const PACK_STARTED = ['packaging_started', 'quality_checked', 'sealed', 'ready_for_pickup'];
+
+const pizzaLine = (i) => `${i.name}${i.size ? ` (${i.size})` : ''}${i.crust ? `, ${i.crust}` : ''} x${i.quantity || 1}`;
+
+/**
+ * The real work behind a station task, from the order and its pizzas:
+ *   { lines, progress, ready, waitingFor, started, done, steps }
+ * ready false means an earlier station has not handed over yet (the task cannot be started).
+ */
+export const stationWork = (slot, order, items) => {
+  const live = items.filter((i) => !i.rejected);
+  const total = live.length || (order?.items || []).length;
+  const lines = (live.length ? live : order?.items || []).map((i) => pizzaLine(i));
+  const count = (fn) => live.filter(fn).length;
+  const prepDone = count((i) => stageIdx(i) >= READY_FOR_BAKING);
+  const bakedDone = count((i) => stageIdx(i) >= BAKED);
+  const kitchen = order?.kitchen || {};
+  const orderDone = order?.orderStatus === 'ready_for_pickup' || kitchen.stage === 'ready';
+
+  if (slot === 'pizza_chef') {
+    return {
+      lines, total, ready: true, waitingFor: '',
+      progress: `${prepDone}/${total} pizzas assembled`,
+      started: count((i) => stageIdx(i) > 0) > 0,
+      done: total > 0 && prepDone >= total,
+      steps: ['Stretch dough, add sauce and toppings at the Pizza Station', 'Mark each pizza ready for baking'],
+    };
+  }
+  if (slot === 'baking_chef') {
+    const ready = prepDone > 0;
+    return {
+      lines, total, ready, waitingFor: ready ? '' : `Waiting for the pizza chef (${prepDone}/${total} ready for baking)`,
+      progress: `${bakedDone}/${total} pizzas baked`,
+      started: count((i) => stageIdx(i) >= BAKING) > 0,
+      done: total > 0 && bakedDone >= total,
+      steps: ['Put each assembled pizza in an oven at the Baking Station', 'Take it out and mark it baked'],
+    };
+  }
+  const ready = kitchen.stage === 'packaging' || orderDone;
+  return {
+    lines, total, ready, waitingFor: ready ? '' : `Waiting for baking (${bakedDone}/${total} baked)`,
+    progress: orderDone ? 'Packed and ready for pickup' : PACK_STARTED.includes(kitchen.packaging?.status) ? 'Packing in progress' : 'Not started',
+    started: PACK_STARTED.includes(kitchen.packaging?.status),
+    done: orderDone,
+    steps: ['Start packaging at the Packaging Station', 'Tick the quality checklist and seal the order'],
+  };
+};
 
 const toId = (v) => new mongoose.Types.ObjectId(String(v));
 const idStr = (v) => (v ? String(v._id || v) : '');
@@ -68,18 +123,61 @@ const itemsSummary = (items = []) => {
   return text.length > 110 ? `${text.slice(0, 107)}...` : text;
 };
 
-const toUiTask = (t, order, names) => {
+const toUiTask = (t, order, names, items = []) => {
   const info = t.kind === 'supervisor' ? SUPERVISOR_INFO : SLOT_INFO[t.slot] || SLOT_INFO.pizza_chef;
   const orderNumber = order?.order_id || idStr(t.orderId);
   const minutes = t.startedAt && t.completedAt ? Math.round(((t.completedAt - t.startedAt) / 60000) * 10) / 10 : 0;
+  // A supervisor's work is flow-wise: staff first, then overseeing. The page shows the steps and who holds each station.
+  let supervisorFlow = {};
+  if (t.kind === 'supervisor') {
+    const assignedStaff = {};
+    const stations = STAFF_SLOTS.map((slot) => {
+      const s = order?.kitchen?.staff?.[slot];
+      const staff = s?.userId ? { _id: idStr(s.userId), name: s.name || '' } : null;
+      if (staff) assignedStaff[slot] = staff;
+      return { slot, station: SLOT_INFO[slot].station, staff };
+    });
+    const staffReady = stations.every((s) => s.staff);
+    const started = t.status !== 'pending' && t.status !== 'delayed';
+    supervisorFlow = {
+      staffReady,
+      assignedStaff,
+      stations,
+      flow: [
+        { key: 'assign_staff', label: 'Assign kitchen staff (present only)', status: staffReady ? 'done' : 'current' },
+        { key: 'start', label: 'Start overseeing the order', status: started ? 'done' : staffReady ? 'current' : 'locked' },
+        { key: 'complete', label: 'Order packed and ready', status: t.status === 'completed' ? 'done' : started ? 'current' : 'locked' },
+      ],
+    };
+  }
+  // A station task shows the real job (which pizzas, what to do, how far along) and whether it can be started yet.
+  let stationFlow = {};
+  if (t.kind !== 'supervisor' && STAFF_SLOTS.includes(t.slot)) {
+    const w = stationWork(t.slot, order, items);
+    const done = t.status === 'completed' || w.done;
+    const working = done || t.status === 'in_progress' || w.started;
+    stationFlow = {
+      workItems: w.lines,
+      progress: w.progress,
+      waitingFor: w.waitingFor,
+      canStart: w.ready,
+      flow: [
+        { key: 'wait', label: w.ready ? 'Previous station handed over' : w.waitingFor, status: w.ready ? 'done' : 'current' },
+        { key: 'work', label: w.steps[0], status: done ? 'done' : working ? 'current' : w.ready ? 'current' : 'locked' },
+        { key: 'finish', label: w.steps[1], status: done ? 'done' : 'locked' },
+      ],
+    };
+  }
   return {
+    ...supervisorFlow,
+    ...stationFlow,
     _id: String(t._id),
     storeId: idStr(t.storeId),
     orderId: orderNumber,
     orderRef: idStr(t.orderId),
     taskType: info.type,
     title: `${info.verb} ${itemsSummary(order?.items) || `order ${orderNumber}`}`,
-    description: [`Order ${orderNumber}`, order?.note ? `Note: ${order.note}` : ''].filter(Boolean).join(' · '),
+    description: [`Order ${orderNumber}`, stationFlow.progress || '', order?.note ? `Note: ${order.note}` : ''].filter(Boolean).join(' · '),
     assignedTo: names.get(idStr(t.assignedTo)) || '',
     assignedToId: idStr(t.assignedTo),
     assignedBy: names.get(idStr(t.assignedBy)) || '',
@@ -105,23 +203,63 @@ const toUiTask = (t, order, names) => {
 const serialise = async (tasks) => {
   if (!tasks.length) return [];
   const orders = await FoodOrder.find({ _id: { $in: tasks.map((t) => t.orderId) } })
-    .select('order_id items note kitchen').lean();
+    .select('order_id items note kitchen orderStatus').lean();
   const orderById = new Map(orders.map((o) => [String(o._id), o]));
+  const stationOrderIds = [...new Set(tasks.filter((t) => t.kind !== 'supervisor').map((t) => idStr(t.orderId)))];
+  const itemRows = stationOrderIds.length ? await KitchenItem.find({ orderId: { $in: stationOrderIds.map(toId) } }).sort({ index: 1 }).lean() : [];
+  const itemsByOrder = new Map();
+  itemRows.forEach((i) => itemsByOrder.set(idStr(i.orderId), [...(itemsByOrder.get(idStr(i.orderId)) || []), i]));
   const userIds = [...new Set(tasks.flatMap((t) => [idStr(t.assignedTo), idStr(t.assignedBy)]).filter(Boolean))];
   const people = await StoreManager.find({ userId: { $in: userIds } }).select('userId name').lean();
   const names = new Map(people.map((p) => [String(p.userId), p.name]));
-  return tasks.map((t) => toUiTask(t, orderById.get(idStr(t.orderId)), names));
+  return tasks.map((t) => toUiTask(t, orderById.get(idStr(t.orderId)), names, itemsByOrder.get(idStr(t.orderId)) || []));
 };
 
 // ---------------------------------------------------------------------------------------------
 // Reads
 // ---------------------------------------------------------------------------------------------
 
+const workOf = async (task) => {
+  const [order, items] = await Promise.all([
+    FoodOrder.findById(task.orderId).select('order_id items note kitchen orderStatus').lean(),
+    KitchenItem.find({ orderId: task.orderId }).sort({ index: 1 }).lean(),
+  ]);
+  return stationWork(task.slot, order, items);
+};
+
+/**
+ * A station task follows that station's real work: it starts when the first pizza reaches the station and
+ * completes when the station's work is done. Brings stored tasks (and the objects passed in) up to date.
+ */
+async function syncStaffTasks(tasks) {
+  const open = tasks.filter((t) => t.kind !== 'supervisor' && STAFF_SLOTS.includes(t.slot) && ['pending', 'in_progress', 'delayed'].includes(t.status));
+  if (!open.length) return tasks;
+  const orderIds = [...new Set(open.map((t) => idStr(t.orderId)))].map(toId);
+  const [orders, items] = await Promise.all([
+    FoodOrder.find({ _id: { $in: orderIds } }).select('order_id items note kitchen orderStatus').lean(),
+    KitchenItem.find({ orderId: { $in: orderIds } }).sort({ index: 1 }).lean(),
+  ]);
+  const orderById = new Map(orders.map((o) => [String(o._id), o]));
+  for (const t of open) {
+    const mine = items.filter((i) => idStr(i.orderId) === idStr(t.orderId));
+    const w = stationWork(t.slot, orderById.get(idStr(t.orderId)), mine);
+    const now = new Date();
+    let set = null;
+    if (w.done) set = { status: 'completed', completedAt: now, startedAt: t.startedAt || now };
+    else if (w.started && t.status === 'pending') set = { status: 'in_progress', startedAt: t.startedAt || now };
+    if (set) {
+      await KitchenTask.updateOne({ _id: t._id }, { $set: set });
+      Object.assign(t, set);
+    }
+  }
+  return tasks;
+}
+
 export async function listMyTasks(user) {
   const storeId = requireStore(user);
   const tasks = await KitchenTask.find({ storeId: toId(storeId), assignedTo: toId(user.userId) })
     .sort({ createdAt: -1 }).limit(300).lean();
-  return serialise(tasks);
+  return serialise(await syncStaffTasks(tasks));
 }
 
 const startOfToday = () => {
@@ -147,11 +285,11 @@ const taskStats = (tasks, since) => {
 export async function myTaskStats(user) {
   const storeId = requireStore(user);
   const week = new Date(Date.now() - 7 * 86400000);
-  const tasks = await KitchenTask.find({
+  const tasks = await syncStaffTasks(await KitchenTask.find({
     storeId: toId(storeId),
     assignedTo: toId(user.userId),
     $or: [{ status: { $ne: 'completed' } }, { completedAt: { $gte: week } }],
-  }).lean();
+  }).lean());
   const s = taskStats(tasks, startOfToday());
 
   // On time = finished within the order's estimated prep time
@@ -213,6 +351,20 @@ const view = async (task) => (await serialise([task.toObject()]))[0];
 export async function startTask(user, id, payload = {}) {
   const task = await findMyTask(user, id);
   if (!['pending', 'delayed'].includes(task.status)) throw new ValidationError(`Task is already ${task.status.replace('_', ' ')}`);
+  // A station cannot start before the station before it has handed over
+  if (task.kind !== 'supervisor' && STAFF_SLOTS.includes(task.slot)) {
+    const w = await workOf(task);
+    if (!w.ready) throw new ValidationError(`${w.waitingFor}. You can start once it is handed over.`);
+  }
+  // A supervisor oversees the order: nothing to oversee until every station has a person on it.
+  if (task.kind === 'supervisor') {
+    const order = await FoodOrder.findById(task.orderId).select('kitchen').lean();
+    const missing = STAFF_SLOTS.filter((slot) => !order?.kitchen?.staff?.[slot]?.userId);
+    if (missing.length) {
+      const names = missing.map((slot) => SLOT_INFO[slot].station).join(', ');
+      throw new ValidationError(`Assign kitchen staff before starting. Still unassigned: ${names}.`);
+    }
+  }
   task.status = 'in_progress';
   task.startedAt = task.startedAt || new Date();
   if (payload.notes) task.notes = str(payload.notes, 1000);
@@ -235,6 +387,10 @@ const proofUrl = (v) => {
 export async function completeTask(user, id, payload = {}) {
   const task = await findMyTask(user, id);
   if (task.status !== 'in_progress') throw new ValidationError('Start the task before completing it');
+  if (task.kind !== 'supervisor' && STAFF_SLOTS.includes(task.slot)) {
+    const w = await workOf(task);
+    if (!w.done) throw new ValidationError(`Finish the work at the ${SLOT_INFO[task.slot].station} first (${w.progress}). The task completes itself when it is done.`);
+  }
   task.status = 'completed';
   task.completedAt = new Date();
   task.completionNotes = str(payload.notes, 1000);
@@ -300,6 +456,7 @@ const findStaffTarget = async (storeId, who) => {
   const members = await StoreManager.find(filter).select('userId name').lean();
   const match = members.find((m) => String(m.userId) === key) || members.find((m) => m.name.toLowerCase() === key.toLowerCase());
   if (!match) throw new ValidationError('That person is not an active kitchen staff member of this store');
+  await requirePresent(storeId, match);
   return match;
 };
 

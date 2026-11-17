@@ -9,8 +9,12 @@ import { Role } from '../../../../core/roles/models/role.model.js';
 import { updateOrderStatusStore } from '../../orders/services/order.service.js';
 import { pushStatusHistory } from '../../orders/services/order.helpers.js';
 import { Refund } from '../../../../core/payments/models/refund.model.js';
+import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
+import { FoodCoupon } from '../../settings/models/foodCoupon.model.js';
+import { FoodOfferUsage } from '../../admin/models/offerUsage.model.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
+import { onDutyStaffIds, requirePresent } from './attendancePresence.js';
 
 // ---------------------------------------------------------------------------------------------
 // Roles & vocabulary
@@ -84,6 +88,34 @@ const uiStatus = (order) => {
 
 const person = (p) => (p?.userId ? { _id: String(p.userId), name: p.name || '' } : null);
 
+const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+const GATEWAY_LABEL = { razorpay: 'Razorpay', razorpay_qr: 'Razorpay QR', wallet: 'Wallet', cash: 'Cash on Delivery' };
+const PAYMENT_STATUS_LABEL = {
+  paid: 'Paid', refunded: 'Refunded', failed: 'Failed', created: 'Awaiting payment', authorized: 'Authorised',
+  pending_qr: 'Awaiting QR payment', cod_pending: 'Cash to collect',
+};
+
+/** The GST the customer was charged. The rate saved on the order if there is one, otherwise worked out from the tax paid. */
+const gstOf = (pricing = {}) => {
+  const tax = Number(pricing.tax) || 0;
+  const taxable = Math.max(0, (Number(pricing.subtotal) || 0) - (Number(pricing.discount) || 0) + (Number(pricing.handlingFee) || 0));
+  const saved = Number(pricing.gstRate);
+  const recorded = Number.isFinite(saved) && saved > 0;
+  // An older order did not save the rate: take the usual rate (in half-percent steps) that gives the tax that was charged
+  let rate = recorded ? saved : 0;
+  if (!recorded && taxable > 0 && tax > 0) {
+    const exact = (tax / taxable) * 100;
+    const nice = Math.round(exact * 2) / 2;
+    const candidates = [nice, nice - 0.5, nice + 0.5].filter((r) => r > 0 && Math.round(taxable * (r / 100)) === tax);
+    rate = candidates.length ? candidates.sort((a, c) => Math.abs(a - exact) - Math.abs(c - exact))[0] : round2(exact);
+  }
+  return { rate, rateRecorded: recorded, taxable, total: tax, cgst: round2(tax / 2), sgst: round2(tax / 2) };
+};
+
+const ratingOf = (r) => (r?.rating ? { rating: r.rating, comment: r.comment || '', ratedAt: r.ratedAt || null } : null);
+
+const minutesBetween = (a, b) => (a && b ? Math.max(0, Math.round((new Date(b) - new Date(a)) / 60000)) : null);
+
 export const toOpsOrder = (order) => {
   const o = order.toObject ? order.toObject() : order;
   const user = o.userId && typeof o.userId === 'object' && o.userId._id ? o.userId : null;
@@ -117,9 +149,33 @@ export const toOpsOrder = (order) => {
     orderSource: 'App',
     paymentStatus: payment.status === 'paid' ? 'paid' : payment.status === 'refunded' ? 'refunded' : 'pending',
     paymentMethod: payment.method === 'cash' ? 'COD' : 'Online',
-    transactionId: payment.razorpay?.paymentId || '',
+    paymentGateway: GATEWAY_LABEL[payment.method] || '',
+    paymentStatusLabel: PAYMENT_STATUS_LABEL[payment.status] || '',
+    transactionId: payment.razorpay?.paymentId || o.transactionId || '',
+    gatewayOrderId: payment.razorpay?.orderId || '',
+    amountPaid: payment.status === 'paid' ? pricing.total || 0 : 0,
+    refundAmount: payment.refund?.amount || 0,
+    refundTransactionId: payment.refund?.refundId || '',
+    refundProcessedAt: payment.refund?.processedAt || null,
+    deliveredAt: o.deliveryState?.deliveredAt || (o.statusHistory || []).find((h) => h.to === 'delivered')?.at || null,
+    // Whole order, from the customer placing it to it being delivered
+    totalDuration: o.orderStatus === 'delivered'
+      ? minutesBetween(o.createdAt, o.deliveryState?.deliveredAt || (o.statusHistory || []).find((h) => h.to === 'delivered')?.at)
+      : null,
+    couponCode: pricing.couponCode || '',
+    gst: gstOf(pricing),
+    feedback: {
+      store: ratingOf(o.ratings?.store),
+      deliveryPartner: ratingOf(o.ratings?.deliveryPartner),
+      storeReply: o.ratings?.storeReply?.text ? { text: o.ratings.storeReply.text, repliedBy: o.ratings.storeReply.repliedBy || '', repliedAt: o.ratings.storeReply.repliedAt || null } : null,
+    },
+    sendCutlery: o.sendCutlery !== false,
     scheduledTime: o.scheduledAt || null,
     deliveryAddress: {
+      label: addr.label || '',
+      recipient: addr.fullName || addr.name || '',
+      phone: addr.phone || '',
+      state: addr.state || '',
       houseNumber: addr.street || '',
       street: '',
       landmark: addr.additionalDetails || '',
@@ -173,8 +229,95 @@ export const toOpsOrder = (order) => {
       : '',
     refundStatus: payment.refund?.status || 'none',
     deliveryPartnerId: o.dispatch?.deliveryPartnerId ? String(o.dispatch.deliveryPartnerId) : '',
+    train: o.train?.trainNo ? { trainNo: o.train.trainNo, coach: o.train.coach || '', seat: o.train.seat || '', station: o.train.stationName || o.train.stationCode || '' } : null,
   };
 };
+
+/**
+ * Adds what needs another collection: the rider (safe fields only, the phone for the store manager), the coupon's campaign
+ * name, and how many orders the customer has placed with this store. One query each, for a whole list.
+ */
+export async function enrichOpsOrders(user, ops, raw) {
+  if (!ops.length) return ops;
+  const isManager = normalizeRole(user.role) === 'STORE_MANAGER';
+  const riderIds = [...new Set(ops.map((o) => o.deliveryPartnerId).filter(Boolean))];
+  const codes = [...new Set(ops.map((o) => o.couponCode).filter(Boolean))];
+  const userIds = [...new Set(raw.map((o) => idStr(o.userId)).filter(Boolean))];
+  const storeId = toObjectId(requireStore(user));
+
+  // Orders placed before the coupon code was saved on the order: the customer's coupon usage was still recorded at the
+  // time (FoodOfferUsage.lastUsedAt), so a usage within a few minutes of the order identifies the coupon that was used.
+  const RECOVER_WINDOW_MS = 3 * 60000;
+  const toRecover = ops.filter((o) => o.discountAmount > 0 && !o.couponCode);
+  const usages = toRecover.length
+    ? await FoodOfferUsage.find({
+      userId: { $in: [...new Set(toRecover.map((o) => o.customerId).filter(Boolean))].map(toObjectId) },
+      lastUsedAt: {
+        $gte: new Date(Math.min(...toRecover.map((o) => +new Date(o.createdAt))) - RECOVER_WINDOW_MS),
+        $lte: new Date(Math.max(...toRecover.map((o) => +new Date(o.createdAt))) + RECOVER_WINDOW_MS),
+      },
+    }).lean()
+    : [];
+  const recoveredOffer = new Map();
+  toRecover.forEach((o) => {
+    const hit = usages.find((u) => String(u.userId) === o.customerId && Math.abs(+new Date(u.lastUsedAt) - +new Date(o.createdAt)) <= RECOVER_WINDOW_MS);
+    if (hit) recoveredOffer.set(o._id, String(hit.offerId));
+  });
+
+  const [riders, coupons, counts] = await Promise.all([
+    riderIds.length ? FoodDeliveryPartner.find({ _id: { $in: riderIds.map(toObjectId) } }).select('name phone vehicleType vehicleName vehicleNumber profilePhoto rating totalDeliveries').lean() : [],
+    codes.length || recoveredOffer.size
+      ? FoodCoupon.find({ $or: [{ code: { $in: codes } }, { _id: { $in: [...new Set(recoveredOffer.values())].map(toObjectId) } }] }).lean()
+      : [],
+    userIds.length ? FoodOrder.aggregate([
+      { $match: { storeId, userId: { $in: userIds.map(toObjectId) }, orderStatus: { $nin: CANCELLED } } },
+      { $group: { _id: '$userId', n: { $sum: 1 } } },
+    ]) : [],
+  ]);
+  const riderById = new Map(riders.map((r) => [String(r._id), r]));
+  const couponByCode = new Map(coupons.map((c) => [c.code, c]));
+  const couponById = new Map(coupons.map((c) => [String(c._id), c]));
+  const countByUser = new Map(counts.map((c) => [String(c._id), c.n]));
+
+  // What the offer was: "20% off up to Rs 100", "Rs 50 off" ... from the coupon as set up by the super admin
+  const offerText = (c) => {
+    const v = Number(c.value || c.discountValue) || 0;
+    const cap = Number(c.maxDiscount || c.maximumDiscount) || 0;
+    if (c.couponType === 'Percentage') return `${v}% off${cap ? `, up to Rs ${cap}` : ''}`;
+    if (c.couponType === 'Flat Amount') return `Rs ${v} off`;
+    return c.couponType || '';
+  };
+
+  return ops.map((o) => {
+    const r = riderById.get(o.deliveryPartnerId);
+    const recovered = !o.couponCode && recoveredOffer.has(o._id) ? couponById.get(recoveredOffer.get(o._id)) : null;
+    const c = o.couponCode ? couponByCode.get(o.couponCode) : recovered;
+    const code = o.couponCode || recovered?.code || '';
+    return {
+      ...o,
+      couponCode: code,
+      couponCampaignName: c?.title || '',
+      coupon: code ? {
+        code,
+        title: c?.title || '',
+        description: c?.description || '',
+        offer: c ? offerText(c) : '',
+        minimumOrderAmount: Number(c?.minimumOrderAmount) || 0,
+        discountAmount: o.discountAmount,
+        orderSubtotal: o.subtotal,
+        savedPercent: o.subtotal > 0 ? Math.round((o.discountAmount / o.subtotal) * 1000) / 10 : 0,
+        // true when the code was matched from the customer's coupon usage because the order itself did not store it
+        matchedFromUsage: !o.couponCode,
+      } : null,
+      customer: { ...o.customer, totalOrdersWithStore: countByUser.get(o.customerId) || 0, previousOrdersCount: Math.max(0, (countByUser.get(o.customerId) || 0) - 1) },
+      deliveryPartner: r ? {
+        _id: String(r._id), name: r.name, phone: isManager ? r.phone || '' : '', vehicleType: r.vehicleType || '',
+        vehicleName: r.vehicleName || '', vehicleNumber: r.vehicleNumber || '', photo: r.profilePhoto || '',
+        rating: r.rating || 0, totalDeliveries: r.totalDeliveries || 0,
+      } : null,
+    };
+  });
+}
 
 // ---------------------------------------------------------------------------------------------
 // Access control
@@ -210,6 +353,7 @@ const findStaffMember = async (userId, storeId, expectRole) => {
   const codes = await systemRoleCodes([member.userId]);
   const uiRole = resolveUiRole(codes.get(String(member.userId)), member.role);
   if (expectRole && uiRole !== expectRole) throw new ValidationError(`Selected person is not a ${expectRole.replace(/_/g, ' ')}`);
+  await requirePresent(storeId, member); // attendance is mandatory: only people who have clocked in can be given work
   return { member, uiRole };
 };
 
@@ -284,7 +428,7 @@ export async function listStoreOrders(user, query = {}) {
     .sort({ createdAt: view === 'incoming' ? 1 : -1 })
     .limit(limit)
     .lean();
-  return docs.map(toOpsOrder);
+  return enrichOpsOrders(user, docs.map(toOpsOrder), docs);
 }
 
 export async function getStoreOrder(user, orderId) {
@@ -294,7 +438,8 @@ export async function getStoreOrder(user, orderId) {
   const role = normalizeRole(user.role);
   if (role === 'KITCHEN_SUPERVISOR' && !isOrderSupervisor(order, user.userId)) throw new NotFoundError('Order not found');
   if (role === 'KITCHEN_STAFF' && staffSlotsOf(order, user.userId).length === 0) throw new NotFoundError('Order not found');
-  return toOpsOrder(order);
+  const [enriched] = await enrichOpsOrders(user, [toOpsOrder(order)], [order.toObject ? order.toObject() : order]);
+  return enriched;
 }
 
 // Kitchen team of the caller's store, with how many live orders each person holds.
@@ -319,6 +464,7 @@ export async function listTeam(user, { role, q } = {}) {
   });
 
   const codes = await systemRoleCodes(members.map((m) => m.userId));
+  const onDuty = await onDutyStaffIds(toObjectId(storeId), members.map((m) => m._id));
   const wanted = String(role || '').toLowerCase();
   const needle = String(q || '').trim().toLowerCase();
   return members
@@ -333,11 +479,15 @@ export async function listTeam(user, { role, q } = {}) {
       // The chef / baker / packer pickers show load against capacity
       currentWorkload: load.get(String(m.userId)) || 0,
       maxWorkload: MAX_WORKLOAD,
-      availability: (load.get(String(m.userId)) || 0) >= MAX_WORKLOAD ? 'busy' : 'available',
+      present: onDuty.has(String(m._id)),
+      attendance: onDuty.has(String(m._id)) ? 'present' : 'absent',
+      availability: !onDuty.has(String(m._id)) ? 'absent' : (load.get(String(m.userId)) || 0) >= MAX_WORKLOAD ? 'busy' : 'available',
       avatar: m.profileImage && !m.profileImage.startsWith('data:') ? m.profileImage : '',
     }))
     .filter((m) => m.role !== 'store_manager')
     .filter((m) => !wanted || wanted === 'all' || m.role === wanted)
+    // The pickers (a role is always asked for) list only people who are in; the unfiltered team still shows everyone, flagged
+    .filter((m) => !wanted || wanted === 'all' || m.present)
     .filter((m) => !needle || m.name.toLowerCase().includes(needle) || String(m.employeeId || '').toLowerCase().includes(needle));
 }
 
@@ -562,10 +712,13 @@ export async function moveToStage(user, storeId, order, stage) {
   await fresh.save();
   emitKitchenStage(fresh, stage);
 
-  const taskUpdate = stage === 'ready'
-    ? { status: 'completed', completedAt: new Date() }
-    : { status: 'in_progress', startedAt: new Date() };
-  await KitchenTask.updateMany({ orderId: fresh._id }, { $set: taskUpdate });
+  // The order being ready completes every task. Before that only the supervisor's task follows the order: each
+  // station's task moves with that station's own work (see syncStaffTasks in kitchenTasks.service.js).
+  if (stage === 'ready') {
+    await KitchenTask.updateMany({ orderId: fresh._id, status: { $ne: 'completed' } }, { $set: { status: 'completed', completedAt: new Date() } });
+  } else {
+    await KitchenTask.updateMany({ orderId: fresh._id, kind: 'supervisor', status: 'pending' }, { $set: { status: 'in_progress', startedAt: new Date() } });
+  }
   return fresh;
 }
 

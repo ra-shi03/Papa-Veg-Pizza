@@ -1120,8 +1120,8 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                 {showVerification && tripStatus !== 'COMPLETED' && (
                   <DeliveryVerificationModal 
                     order={activeOrder} 
-                    onComplete={async (otp, paymentOverride) => {
-                      const res = await completeDelivery(otp, paymentOverride);
+                    onComplete={async (otp, paymentOverride, handoverPhotoUrl) => {
+                      const res = await completeDelivery(otp, paymentOverride, handoverPhotoUrl);
                       setShowVerification(false);
                       return res;
                     }}

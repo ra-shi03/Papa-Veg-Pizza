@@ -8,9 +8,20 @@ export default function AssignStaffModal({ visible, onClose, order }) {
   const [bakingChefId, setBakingChefId] = useState(null);
   const [packagingStaffId, setPackagingStaffId] = useState(null);
 
-  const { data: pizzaChefs = [], isLoading: loadingPizza } = useActiveKitchenStaff("pizza_chef");
-  const { data: bakingChefs = [], isLoading: loadingBaking } = useActiveKitchenStaff("baking_chef");
-  const { data: packagingStaff = [], isLoading: loadingPackaging } = useActiveKitchenStaff("packaging_staff");
+  const { data: pizzaChefs = [], isLoading: loadingPizza, refetch: refetchPizza } = useActiveKitchenStaff("pizza_chef");
+  const { data: bakingChefs = [], isLoading: loadingBaking, refetch: refetchBaking } = useActiveKitchenStaff("baking_chef");
+  const { data: packagingStaff = [], isLoading: loadingPackaging, refetch: refetchPackaging } = useActiveKitchenStaff("packaging_staff");
+
+  // Only people who are clocked in are listed, and that changes during the day: reload every time the dialog opens
+  // (and while it stays open), so someone who just clocked in shows up without refreshing the page.
+  useEffect(() => {
+    if (!visible) return undefined;
+    const reload = () => { refetchPizza(); refetchBaking(); refetchPackaging(); };
+    reload();
+    const timer = setInterval(reload, 10000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
   const assignStaffMutation = useAssignStaff();
 

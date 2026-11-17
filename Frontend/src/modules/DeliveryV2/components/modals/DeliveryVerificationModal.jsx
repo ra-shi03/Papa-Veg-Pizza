@@ -2,9 +2,9 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShieldCheck, DollarSign, CheckCircle2, 
-  QrCode, Loader2, Info, X, RefreshCw, Package
+  QrCode, Loader2, Info, X, RefreshCw, Package, Camera
 } from 'lucide-react';
-import { deliveryAPI } from '@food/api';
+import { deliveryAPI, uploadAPI } from '@food/api';
 import { useDeliveryStore } from '@/modules/DeliveryV2/store/useDeliveryStore';
 import { toast } from 'sonner';
 import { ActionSlider } from '@/modules/DeliveryV2/components/ui/ActionSlider';
@@ -178,7 +178,89 @@ const OtpModal = ({ order, onVerified, onClose }) => {
   );
 };
 
-const PaymentModal = ({ order, otpString, onComplete, onClose }) => {
+const HandoverPhotoModal = ({ order, onDone, onClose }) => {
+  const [uploading, setUploading] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState(order?.deliveryVerification?.handoverPhotoUrl || '');
+  const cameraInputRef = useRef(null);
+
+  const handleSelect = async (file) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size should be less than 5MB');
+      return;
+    }
+    setUploading(true);
+    try {
+      const res = await uploadAPI.uploadMedia(file, { folder: 'appzeto/delivery/handover', client: 'delivery' });
+      const url = res?.data?.data?.url || res?.data?.data?.secure_url;
+      if (!res?.data?.success || !url) throw new Error('Upload failed');
+      setPhotoUrl(url);
+    } catch (err) {
+      toast.error('Failed to upload handover photo');
+      setPhotoUrl('');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-120 p-0 sm:p-4 flex items-end justify-center pointer-events-none">
+      <Backdrop onClose={onClose} />
+      <motion.div
+        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        className="w-full max-w-md sm:max-w-lg bg-white rounded-t-3xl sm:rounded-t-[2.5rem] shadow-[0_-20px_60px_rgba(0,0,0,0.3)] p-4 sm:p-6 pb-6 sm:pb-12 pointer-events-auto max-h-[84vh] overflow-y-auto"
+      >
+        <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-primary/10 text-primary">
+            <Camera className="w-6 h-6" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Handover Photo</h2>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Step 2 of verification · proof of delivery</p>
+          </div>
+        </div>
+
+        {photoUrl ? (
+          <img src={photoUrl} alt="Handover proof" className="w-full max-h-56 object-cover rounded-2xl border border-gray-100 mb-4" />
+        ) : (
+          <p className="text-sm font-semibold text-gray-500 mb-4">Take a photo of the order handed to the customer.</p>
+        )}
+
+        <div className="flex items-center gap-3 mb-5">
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => cameraInputRef.current?.click()}
+            className="flex-1 flex items-center justify-center gap-2 py-3 sm:py-4 rounded-2xl bg-gray-900 text-white font-bold text-[11px] sm:text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all disabled:opacity-60"
+          >
+            {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
+            <span>{uploading ? 'Uploading...' : photoUrl ? 'Retake Photo' : 'Take Photo'}</span>
+          </button>
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={(e) => handleSelect(e.target.files?.[0])}
+            className="hidden"
+          />
+        </div>
+
+        <ActionSlider
+          key="action-photo"
+          label={photoUrl ? 'Slide to Continue' : 'Upload photo to continue'}
+          successLabel="Photo saved ✓"
+          disabled={!photoUrl || uploading}
+          onConfirm={async () => onDone(photoUrl)}
+          color="bg-primary"
+        />
+      </motion.div>
+    </div>
+  );
+};
+
+const PaymentModal = ({ order, otpString, photoUrl, onComplete, onClose }) => {
   const [showQrModal, setShowQrModal] = useState(false);
   const [collectQrLink, setCollectQrLink] = useState(null);
   const [isGeneratingQr, setIsGeneratingQr] = useState(false);
@@ -328,7 +410,7 @@ const PaymentModal = ({ order, otpString, onComplete, onClose }) => {
             onConfirm={async () => {
                 try {
                     // Pass the payment method to completion if needed
-                    await onComplete(otpString, isCashPayment ? 'cash' : 'qr');
+                    await onComplete(otpString, isCashPayment ? 'cash' : 'qr', photoUrl);
                 } catch (e) {
                     // Slider handles reset
                     throw e;
@@ -397,25 +479,22 @@ export const DeliveryVerificationModal = ({ order, onComplete, onClose }) => {
 
   // Determine initial step: skip OTP if already verified
   const [step, setStep] = useState(() => {
-    if (alreadyVerified) {
-      return isCod ? 'payment' : 'complete';
-    }
-    return 'otp';
+    // OTP, then the handover photo, then payment / complete
+    return alreadyVerified ? 'photo' : 'otp';
   });
+  const [handoverPhotoUrl, setHandoverPhotoUrl] = useState(order?.deliveryVerification?.handoverPhotoUrl || '');
   const [verifiedOtp, setVerifiedOtp] = useState(alreadyVerified ? (order.deliveryVerification.dropOtp.code || '') : '');
 
   const handleOtpVerified = (otpValue) => {
     setVerifiedOtp(otpValue);
-    // After OTP is verified: COD → show payment panel, Online → show complete button
-    setStep(isCod ? 'payment' : 'complete');
+    setStep('photo');
   };
 
-  // If OTP was already verified on mount and it's a non-COD order, auto-complete
-  useEffect(() => {
-    if (step === 'complete' && !isCod) {
-      onComplete(verifiedOtp).catch(() => {}); // a refusal is already shown by the hook; the slider stays available
-    }
-  }, []); // only on mount
+  const handlePhotoDone = (url) => {
+    setHandoverPhotoUrl(url);
+    // After the photo: COD → show payment panel, Online → show complete button
+    setStep(isCod ? 'payment' : 'complete');
+  };
 
   if (!order) return null;
 
@@ -429,11 +508,20 @@ export const DeliveryVerificationModal = ({ order, onComplete, onClose }) => {
           onClose={onClose || (() => {})} 
         />
       )}
+      {step === 'photo' && (
+        <HandoverPhotoModal
+          key="photo-modal"
+          order={order}
+          onDone={handlePhotoDone}
+          onClose={onClose || (() => {})}
+        />
+      )}
       {step === 'payment' && (
         <PaymentModal 
           key="payment-modal" 
           order={order} 
           otpString={verifiedOtp} 
+          photoUrl={handoverPhotoUrl}
           onComplete={onComplete} 
           onClose={onClose || (() => {})} 
         />
@@ -461,7 +549,7 @@ export const DeliveryVerificationModal = ({ order, onComplete, onClose }) => {
               label="Slide to Complete Delivery" 
               successLabel="Delivered! ✓"
               onConfirm={async () => {
-                await onComplete(verifiedOtp);
+                await onComplete(verifiedOtp, null, handoverPhotoUrl);
               }}
               color="bg-primary"
             />

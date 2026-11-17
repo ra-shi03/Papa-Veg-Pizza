@@ -60,6 +60,9 @@ const pricingSchema = new mongoose.Schema(
         storeCommission: { type: Number, default: 0, min: 0 },
         discount: { type: Number, default: 0, min: 0 },
         handlingFee: { type: Number, default: 0, min: 0 },
+        // The coupon applied and the GST rate charged, as they were when the order was placed
+        couponCode: { type: String, default: '', trim: true },
+        gstRate: { type: Number, default: 0, min: 0 },
         // Cancellation policy as it was when the order was placed, so later fee changes do not touch it.
         cancellationFee: { type: Number, default: 0, min: 0 },
         cancellationFreeMinutes: { type: Number, default: 0, min: 0 },
@@ -133,6 +136,8 @@ const dispatchSchema = new mongoose.Schema(
             default: 'unassigned'
         },
         deliveryPartnerId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodDeliveryPartner', default: null },
+        // true when the store manager picked this rider: auto-dispatch must not take the order back (until the rider rejects it)
+        manual: { type: Boolean, default: false },
         assignedAt: { type: Date },
         acceptedAt: { type: Date },
         /** List of partners who were offered this order (to avoid repeats and track timeouts) */
@@ -284,7 +289,10 @@ const deliveryVerificationSchema = new mongoose.Schema(
             verified: { type: Boolean, default: false },
             // Tries spent on the customer's OTP (verify-drop-otp and complete). Five, then 429 until the store resets it.
             failedAttempts: { type: Number, default: 0, min: 0 }
-        }
+        },
+        /** Proof of delivery: photo the rider takes at the door (required to complete). */
+        handoverPhotoUrl: { type: String, default: '' },
+        handoverPhotoAt: { type: Date }
     },
     { _id: false }
 );

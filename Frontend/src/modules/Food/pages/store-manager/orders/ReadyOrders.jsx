@@ -167,14 +167,13 @@ export default function ReadyOrders() {
   }, [orders, currentTime]);
 
   const unassignedOrdersCount = orders.filter(
-    (o) => o.orderType === "delivery" && o.deliveryPartnerId === null
+    (o) => o.orderType === "delivery" && !o.deliveryPartnerId
   ).length;
 
   // Retrieve count of busy riders
   const assignedRidersCount = useMemo(() => {
     try {
-      const riders = JSON.parse(localStorage.getItem("pvp_riders")) || [];
-      return riders.filter((r) => r.availability === "busy" || r.currentDeliveries > 0).length;
+      return new Set(orders.filter((o) => o.deliveryPartnerId).map((o) => o.deliveryPartnerId)).size;
     } catch (e) {
       return 0;
     }
@@ -297,10 +296,7 @@ export default function ReadyOrders() {
           return <span className="text-[10px] text-zinc-400 font-bold uppercase italic">Customer Pickup</span>;
         }
 
-        const riders = JSON.parse(localStorage.getItem("pvp_riders")) || [];
-        const rider = record.deliveryPartnerId
-          ? riders.find((r) => r._id === record.deliveryPartnerId)
-          : null;
+        const rider = record.deliveryPartner || null;
 
         if (rider) {
           return (
@@ -439,10 +435,7 @@ export default function ReadyOrders() {
       borderStyle = "border-rose-455 dark:border-rose-950 bg-rose-50/10 dark:bg-rose-950/5 animate-pulse-subtle";
     }
 
-    const riders = JSON.parse(localStorage.getItem("pvp_riders")) || [];
-    const rider = orderObj.deliveryPartnerId
-      ? riders.find((r) => r._id === orderObj.deliveryPartnerId)
-      : null;
+    const rider = orderObj.deliveryPartner || null;
 
     return (
       <div

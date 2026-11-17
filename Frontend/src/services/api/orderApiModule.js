@@ -8,7 +8,7 @@ export const uploadAPI = {
   /**
    * Upload a single image file to the backend (Cloudinary-backed).
    * @param {File|Blob} file
-   * @param {{ folder?: string }} options
+   * @param {{ folder?: string, client?: 'delivery' }} options
    */
   uploadMedia: (file, options = {}) => {
     if (!file) {
@@ -21,7 +21,9 @@ export const uploadAPI = {
       formData.append("folder", options.folder);
     }
 
-    return userClient.post("/uploads/image", formData, {
+    // The rider app is signed in on the delivery client (its own token), not the customer one
+    const client = options.client === "delivery" ? deliveryClient : userClient;
+    return client.post("/uploads/image", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
