@@ -197,13 +197,20 @@ export function validateDispatchSettingsDto(body) {
 }
 
 export function validateOrderRatingsDto(body) {
+    // The customer app sends restaurantRating / restaurantComment; the order stores them as the store's rating
+    const input = { ...(body || {}) };
+    if (input.storeRating === undefined && input.restaurantRating !== undefined) input.storeRating = input.restaurantRating;
+    if (input.storeComment === undefined && input.restaurantComment !== undefined) input.storeComment = input.restaurantComment;
+    // ...and riderRating / riderComment are accepted for the delivery partner's
+    if (input.deliveryPartnerRating === undefined && input.riderRating !== undefined) input.deliveryPartnerRating = input.riderRating;
+    if (input.deliveryPartnerComment === undefined && input.riderComment !== undefined) input.deliveryPartnerComment = input.riderComment;
     const schema = z.object({
         storeRating: z.number().min(1).max(5),
         deliveryPartnerRating: z.number().min(1).max(5).optional(),
         storeComment: z.string().max(500).optional(),
         deliveryPartnerComment: z.string().max(500).optional()
     });
-    const result = schema.safeParse(body || {});
+    const result = schema.safeParse(input);
     if (!result.success) {
         throw new ValidationError(result.error.errors?.[0]?.message || 'Validation failed');
     }

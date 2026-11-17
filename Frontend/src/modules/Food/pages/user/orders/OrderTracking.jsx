@@ -39,6 +39,7 @@ import { useProfile } from "@food/context/ProfileContext"
 import { useLocation as useUserLocation } from "@food/hooks/useLocation"
 import DeliveryTrackingMap from "@food/components/user/DeliveryTrackingMap"
 import { orderAPI, restaurantAPI } from "@food/api"
+import { OrderTrackingSkeleton } from "@food/components/ui/loading-skeletons"
 import { useCompanyName } from "@food/hooks/useCompanyName"
 import { useUserNotifications } from "@food/hooks/useUserNotifications"
 import { RESTAURANT_PIN_SVG, CUSTOMER_PIN_SVG, RIDER_BIKE_SVG } from "@food/constants/mapIcons"
@@ -609,7 +610,7 @@ const transformOrderForTracking = (apiOrder, previousOrder = null, explicitResta
     cancellationReason: apiOrder?.cancellationReason || previousOrder?.cancellationReason || null,
     cancellationMessage: apiOrder?.cancellationMessage || previousOrder?.cancellationMessage || null,
     ratings: apiOrder?.ratings || previousOrder?.ratings || {},
-    restaurantRating: apiOrder?.ratings?.restaurant?.rating || apiOrder?.restaurantRating || previousOrder?.restaurantRating || null,
+    restaurantRating: (apiOrder?.ratings?.store ?? apiOrder?.ratings?.restaurant)?.rating || apiOrder?.restaurantRating || previousOrder?.restaurantRating || null,
     deliveryPartnerRating: apiOrder?.ratings?.deliveryPartner?.rating || apiOrder?.deliveryPartnerRating || previousOrder?.deliveryPartnerRating || null,
   }
 }
@@ -720,9 +721,14 @@ export default function OrderTracking() {
   const navigate = useNavigate()
   const location = useLocation()
   const { orderId } = useParams()
-  const [searchParams] = useSearchParams()
-  const confirmed = searchParams.get("confirmed") === "true"
-  const paidOnline = searchParams.get("paid") === "1"
+  const [searchParams, setSearchParams] = useSearchParams()
+  // The payment-success splash is a one-time event: remember it per order so a refresh (URL params stay) never replays it.
+  const splashKey = `pvp_order_splash_seen_${orderId}`
+  const [confirmed] = useState(() => {
+    if (searchParams.get("confirmed") !== "true") return false
+    try { return !localStorage.getItem(splashKey) } catch { return true }
+  })
+  const [paidOnline] = useState(() => searchParams.get("paid") === "1")
   const { getOrderById } = useOrders()
   const { profile, getDefaultAddress } = useProfile()
   const { location: userLiveLocation } = useUserLocation()
@@ -758,18 +764,27 @@ export default function OrderTracking() {
   const [submittingRating, setSubmittingRating] = useState(false)
 
   // Check if order is already rated
-  const hasRestaurantRating = Number.isFinite(Number(order?.ratings?.restaurant?.rating || order?.restaurantRating))
+  const hasRestaurantRating = Number((order?.ratings?.store ?? order?.ratings?.restaurant)?.rating || order?.restaurantRating) > 0
   const hasDeliveryPartner = !!(order?.deliveryPartnerId || order?.deliveryPartnerName)
-  const hasDeliveryRating = Number.isFinite(Number(order?.ratings?.deliveryPartner?.rating || order?.deliveryPartnerRating))
+  const hasDeliveryRating = Number(order?.ratings?.deliveryPartner?.rating || order?.deliveryPartnerRating) > 0
   const isOrderRated = hasRestaurantRating && (!hasDeliveryPartner || hasDeliveryRating)
 
   const handleOpenRating = () => {
-    setSelectedRestaurantRating(order?.ratings?.restaurant?.rating || order?.restaurantRating || null)
+    setSelectedRestaurantRating((order?.ratings?.store ?? order?.ratings?.restaurant)?.rating || order?.restaurantRating || null)
     setSelectedDeliveryRating(order?.ratings?.deliveryPartner?.rating || order?.deliveryPartnerRating || null)
-    setRestaurantFeedbackText(order?.ratings?.restaurant?.comment || "")
+    setRestaurantFeedbackText((order?.ratings?.store ?? order?.ratings?.restaurant)?.comment || "")
     setDeliveryFeedbackText(order?.ratings?.deliveryPartner?.comment || "")
     setShowRatingModal(true)
   }
+
+  // Once the order is delivered, ask for the store and delivery-partner ratings (once per order; the Rate button stays after)
+  useEffect(() => {
+    const delivered = order?.status === 'delivered' || order?.orderStatus === 'delivered'
+    if (!orderId || !delivered || isOrderRated || showRatingModal) return
+    const key = `pvp_rating_prompt_${orderId}`
+    try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1') } catch { /* storage unavailable: still ask once per visit */ }
+    handleOpenRating()
+  }, [order?.status, order?.orderStatus, isOrderRated])
 
   const handleSubmitRating = async () => {
     const deliveryPartnerCheck = !!(order?.deliveryPartnerId || order?.deliveryPartnerName)
@@ -794,7 +809,7 @@ export default function OrderTracking() {
           ...prev,
           ...updatedOrderData,
           ratings: updatedOrderData.ratings,
-          restaurantRating: updatedOrderData.ratings?.restaurant?.rating,
+          restaurantRating: (updatedOrderData.ratings?.store ?? updatedOrderData.ratings?.restaurant)?.rating,
           deliveryPartnerRating: updatedOrderData.ratings?.deliveryPartner?.rating
         }))
       }
@@ -1335,6 +1350,9 @@ export default function OrderTracking() {
 
   // Post-checkout splash only — real status comes from API / poll / socket.
   useEffect(() => {
+    if (!searchParams.get("confirmed")) return
+    try { localStorage.setItem(splashKey, "1") } catch { /* storage unavailable */ }
+    setSearchParams({}, { replace: true })
     if (!confirmed) return
     const timer1 = setTimeout(() => setShowConfirmation(false), 3800)
     return () => clearTimeout(timer1)
@@ -1604,14 +1622,7 @@ export default function OrderTracking() {
   if (loading) {
     // Straight after checkout there is no blank spinner: the success screen carries on while the order loads
     if (showConfirmation) return <PaymentSuccessScreen paid={paidOnline} />
-    return (
-      <AnimatedPage className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] p-4">
-        <div className="max-w-lg mx-auto text-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-gray-600 dark:text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading order details...</p>
-        </div>
-      </AnimatedPage>
-    )
+    return <OrderTrackingSkeleton />
   }
 
   // Error state (moved after hooks)
@@ -1954,6 +1965,21 @@ export default function OrderTracking() {
           )}
         </motion.div>
 
+        {/* Invoice: available once the order is delivered */}
+        {orderStatus === 'delivered' && (
+          <button
+            type="button"
+            onClick={() => navigate(`/user/orders/${orderId}/invoice`)}
+            className="w-full flex items-center justify-between bg-white dark:bg-[#1a1a1a] rounded-xl px-4 py-3 shadow-sm border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-[#222] transition-colors"
+          >
+            <span className="flex items-center gap-3 text-sm font-bold text-gray-900 dark:text-gray-100">
+              <Receipt className="w-5 h-5 text-[var(--primary)]" />
+              Download invoice
+            </span>
+            <ChevronRight className="w-4 h-4 text-gray-400" />
+          </button>
+        )}
+
         {/* Rating Logic: Show rating card after delivery */}
         {orderStatus === 'delivered' && !isOrderRated && (
           <motion.div
@@ -1996,19 +2022,13 @@ export default function OrderTracking() {
                 <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
                 Your Feedback
               </h3>
-              <button 
-                onClick={handleOpenRating}
-                className="text-[10px] font-bold text-[var(--primary)] dark:text-[var(--primary)] uppercase tracking-widest hover:opacity-80 transition-opacity"
-              >
-                Edit Rating
-              </button>
             </div>
             
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex flex-col">
                   <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Food & Store</span>
-                  {order?.ratings?.restaurant?.comment && (
+                  {(order?.ratings?.store ?? order?.ratings?.restaurant)?.comment && (
                     <span className="text-[10px] text-gray-500 dark:text-gray-400 italic mt-0.5 line-clamp-1">"{order.ratings.restaurant.comment}"</span>
                   )}
                 </div>
@@ -2017,7 +2037,7 @@ export default function OrderTracking() {
                     <Star
                       key={`res-rated-${star}`}
                       className={`w-3.5 h-3.5 ${
-                        star <= (order?.ratings?.restaurant?.rating || order?.restaurantRating)
+                        star <= ((order?.ratings?.store ?? order?.ratings?.restaurant)?.rating || order?.restaurantRating)
                           ? "text-yellow-400 fill-yellow-400"
                           : "text-gray-200 dark:text-gray-800"
                       }`}
