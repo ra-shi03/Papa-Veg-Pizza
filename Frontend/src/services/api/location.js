@@ -23,11 +23,9 @@ export const locationAPI = {
   },
 
   // Fetch nearby stores
-  getNearbyStores: async (lat, lng, q = '') => {
+  getNearbyStores: async (lat, lng, q = '', method = '') => {
     try {
-      const url = q
-        ? `/food/search/nearby-stores?lat=${lat}&lng=${lng}&q=${encodeURIComponent(q)}`
-        : `/food/search/nearby-stores?lat=${lat}&lng=${lng}`;
+      const url = `/food/search/nearby-stores?lat=${lat}&lng=${lng}${q ? `&q=${encodeURIComponent(q)}` : ''}${method ? `&method=${encodeURIComponent(method)}` : ''}`;
       const response = await axiosInstance.get(url);
       return response;
     } catch (error) {

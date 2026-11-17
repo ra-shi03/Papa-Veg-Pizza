@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, MapPin, Bike, ShoppingBag, Utensils, Train, ChevronRight, Car } from 'lucide-react';
 import { useLocationStore } from '@food/store/locationStore';
 import { locationAPI } from '@/services/api/location';
+import { readSavedCoords } from '@food/utils/savedLocation';
 import apiClient from '@/services/api/axios';
 import { orderAPI } from '@food/api';
 import { TRAIN_TERMS_TITLE, TRAIN_TERMS_SHORT } from '@food/constants/trainDelivery';
@@ -27,6 +28,8 @@ export default function DeliveryLocation() {
     }
   }, [location.state?.activeService, serviceFromQuery]);
   const [nearbyStores, setNearbyStores] = useState([]);
+  const [storesError, setStoresError] = useState('');
+  const [radiusKm, setRadiusKm] = useState(null);
   const [isLoadingStores, setIsLoadingStores] = useState(false);
   const [journey, setJourney] = useState(emptyJourney);
   const { info: trainInfo, failed: trainFailed } = useTrainStations(activeService === 'train');
@@ -121,19 +124,33 @@ export default function DeliveryLocation() {
     };
   }, []);
 
+  // every method except delivery and train picks a store
+  const isStoreMethod = Boolean(activeService) && activeService !== 'delivery' && activeService !== 'train';
+
   const fetchNearbyStores = async () => {
     setIsLoadingStores(true);
+    setStoresError('');
     try {
-      // Default to Indore coords if lat/lng are missing
-      const lat = locationState.lat || 22.7196;
-      const lng = locationState.lng || 75.8577;
-      
-      const res = await locationAPI.getNearbyStores(lat, lng);
+      // The customer's own saved position; no invented default city.
+      const saved = readSavedCoords();
+      const lat = Number.isFinite(locationState.lat) ? locationState.lat : saved?.lat;
+      const lng = Number.isFinite(locationState.lng) ? locationState.lng : saved?.lng;
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        setNearbyStores([]);
+        setStoresError('Set your location to see stores near you.');
+        return;
+      }
+      const res = await locationAPI.getNearbyStores(lat, lng, '', activeService);
       if (res?.data?.success) {
         setNearbyStores(res.data.data.stores || []);
+        setRadiusKm(res.data.data.radiusKm || null);
+      } else {
+        setNearbyStores([]);
+        setStoresError('Could not load nearby stores. Please try again.');
       }
     } catch (err) {
-      console.error(err);
+      setNearbyStores([]);
+      setStoresError('Could not load nearby stores. Please try again.');
     } finally {
       setIsLoadingStores(false);
     }
@@ -155,9 +172,7 @@ export default function DeliveryLocation() {
   }, []);
 
   useEffect(() => {
-    if (activeService === 'takeaway' || activeService === 'dinein' || activeService === 'incar') {
-      fetchNearbyStores();
-    }
+    if (isStoreMethod) fetchNearbyStores();
   }, [activeService]);
 
   return (
@@ -245,7 +260,7 @@ export default function DeliveryLocation() {
           </>
         )}
 
-        {(activeService === 'takeaway' || activeService === 'dinein' || activeService === 'incar') && (
+        {isStoreMethod && (
           <div className="flex flex-col gap-3">
              <h2 className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Nearby Stores</h2>
              {isLoadingStores ? (
@@ -278,7 +293,9 @@ export default function DeliveryLocation() {
                  </div>
                ))
              ) : (
-               <div className="text-center p-8 text-zinc-500 text-sm bg-zinc-50 rounded-2xl border border-zinc-100">No nearby stores found.</div>
+               <div className="text-center p-8 text-zinc-500 text-sm bg-zinc-50 rounded-2xl border border-zinc-100">
+                 {storesError || `No stores${radiusKm ? ` within ${radiusKm} km` : ''} of your location offer this.`}
+               </div>
              )}
           </div>
         )}

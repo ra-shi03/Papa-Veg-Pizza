@@ -36,9 +36,9 @@ describe('who may read and write the rules', () => {
         }
     });
 
-    test('the default: four methods, all on, for every store (no dine-in)', async () => {
+    test('the default: four methods on and dine-in off, for every store', async () => {
         const { methods } = ok(await fx.call('GET', ADMIN, fx.SA));
-        assert.deepEqual(methods.map((m) => [m.id, m.enabled, m.scope]), [['delivery', true, 'all'], ['takeaway', true, 'all'], ['incar', true, 'all'], ['train', true, 'all']]);
+        assert.deepEqual(methods.map((m) => [m.id, m.enabled, m.scope]), [['delivery', true, 'all'], ['takeaway', true, 'all'], ['incar', true, 'all'], ['train', true, 'all'], ['dinein', false, 'all']]);
     });
 });
 
@@ -48,8 +48,9 @@ describe('validation', () => {
         assert.equal(res.status, 400, JSON.stringify(rules));
         if (text) assert.match(res.body.message || res.body.error, text);
     };
-    test('unknown method (dine-in), unknown scope, limited scope without a list, invented or malformed ids, duplicates', async () => {
-        await bad([{ id: 'dine_in', enabled: true, scope: 'all' }], /Unknown order method/);
+    test('malformed method id, unknown scope, limited scope without a list, invented or malformed ids, duplicates', async () => {
+        await bad([{ id: 'Dine In!', enabled: true, scope: 'all' }], /Unknown order method/);
+        await bad([{ id: 'rooftop', scope: 'all' }], /give the method a name/);
         await bad([{ id: 'delivery', scope: 'everyone' }], /scope/);
         await bad([{ id: 'delivery', scope: 'franchises', franchiseIds: [] }], /at least one franchise/);
         await bad([{ id: 'delivery', scope: 'stores', storeIds: [] }], /at least one store/);
@@ -61,7 +62,7 @@ describe('validation', () => {
     });
     test('nothing was saved by the refused writes', async () => {
         const { methods } = ok(await fx.call('GET', ADMIN, fx.SA));
-        assert.ok(methods.every((m) => m.enabled && m.scope === 'all'));
+        assert.ok(methods.every((m) => m.scope === 'all') && methods.length === 5);
     });
 });
 
@@ -76,13 +77,13 @@ describe('where each method is offered', () => {
     });
 
     test('the customer app gets the rules applied to its own store', async () => {
-        assert.deepEqual(await forStore(A.storeId), { delivery: false, takeaway: false, incar: true, train: true });
-        assert.deepEqual(await forStore(B.storeId), { delivery: true, takeaway: false, incar: true, train: false });
+        assert.deepEqual(await forStore(A.storeId), { delivery: false, takeaway: false, incar: true, train: true, dinein: false });
+        assert.deepEqual(await forStore(B.storeId), { delivery: true, takeaway: false, incar: true, train: false, dinein: false });
     });
 
     test('with no store known, only methods open to every store are on; nothing about the rules leaks', async () => {
         const data = ok(await fx.call('GET', PUBLIC, null));
-        assert.deepEqual(Object.fromEntries(data.methods.map((m) => [m.id, m.enabled])), { delivery: false, takeaway: false, incar: true, train: false });
+        assert.deepEqual(Object.fromEntries(data.methods.map((m) => [m.id, m.enabled])), { delivery: false, takeaway: false, incar: true, train: false, dinein: false });
         const text = JSON.stringify(data);
         assert.ok(!text.includes(B.franchiseId) && !text.includes('franchiseIds') && !text.includes('scope'), 'no store or franchise ids, no scope');
         assert.deepEqual(Object.keys(data.methods[0]).sort(), ['enabled', 'icon', 'id', 'label']);
@@ -100,7 +101,7 @@ describe('where each method is offered', () => {
         const pub = ok(await fx.call('GET', '/v1/settings/home-page', null));
         assert.ok(!('orderMethods' in pub));
         await fx.call('PUT', '/v1/settings/home-page', fx.SA, { orderMethods: [{ id: 'delivery', label: 'x', enabled: false }] });
-        assert.deepEqual(await forStore(B.storeId), { delivery: true, takeaway: false, incar: true, train: false });
+        assert.deepEqual(await forStore(B.storeId), { delivery: true, takeaway: false, incar: true, train: false, dinein: false });
     });
 
     test('an order for a method not offered at the store is refused; one that is offered goes through', async () => {
@@ -168,5 +169,27 @@ describe('delivery on train follows the rules', () => {
         const res = await place(A.storeId, { orderMethod: 'train' });
         assert.equal(res.status, 400, 'a plain order that claims to be train is treated as delivery, which is limited to the other franchise');
         ok(await save([{ id: 'train', enabled: true, scope: 'all' }]));
+    });
+});
+
+describe('creating and deleting order methods', () => {
+    test('a created method gets an id from its name, works per store, and is removed by leaving it out', async () => {
+        const base = ok(await fx.call('GET', ADMIN, fx.SA)).methods;
+        const keep = base.filter((m) => !m.custom);
+        const saved = ok(await save([...keep, { label: 'Rooftop Dining', enabled: true, scope: 'stores', storeIds: [A.storeId] }, { label: 'Rooftop Dining', enabled: true, scope: 'all' }])).methods;
+        const made = saved.filter((m) => m.custom);
+        assert.deepEqual(made.map((m) => m.id), ['rooftop_dining', 'rooftop_dining_2']);
+        assert.equal((await forStore(A.storeId)).rooftop_dining, true);
+        assert.equal((await forStore(B.storeId)).rooftop_dining, false);
+        const kept = ok(await save([...keep, made[0]])).methods;
+        assert.deepEqual(kept.filter((m) => m.custom).map((m) => m.id), ['rooftop_dining']);
+        assert.deepEqual(ok(await save(keep)).methods.filter((m) => m.custom), [], 'deleted');
+        assert.equal(ok(await fx.call('GET', ADMIN, fx.SA)).methods.length, 5, 'built-in ones cannot be deleted');
+    });
+    test('dine-in can be switched on and an order for it is accepted at an allowed store', async () => {
+        ok(await save([{ id: 'dinein', enabled: true, scope: 'all' }]));
+        const res = await place(A.storeId, { orderMethod: 'dinein' });
+        assert.equal(res.status, 201, JSON.stringify(res.body));
+        assert.equal(res.body.data.order.orderMethod, 'dinein');
     });
 });

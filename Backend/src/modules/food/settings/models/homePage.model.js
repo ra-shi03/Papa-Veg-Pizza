@@ -35,6 +35,8 @@ const homePageSchema = new mongoose.Schema(
                 link: { type: String, default: '' }
             }
         ],
+        // Customers see stores within this many km of them (nearby stores, takeaway pickup); set by the super admin
+        nearbyStoreRadiusKm: { type: Number, default: 10, min: 1, max: 200 },
         orderMethods: [
             {
                 id: { type: String, required: true },

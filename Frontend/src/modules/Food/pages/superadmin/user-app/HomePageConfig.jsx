@@ -459,6 +459,8 @@ export default function HomePageConfig() {
   // Order methods: switched on or off, and where each is offered (all stores, chosen franchises, chosen stores).
   // Saved on the server through /settings/order-methods; the customer app reads them per store.
   const [orderMethods, setOrderMethods] = useState([]);
+  const [nearbyRadius, setNearbyRadius] = useState('10');
+  const [newMethodName, setNewMethodName] = useState('');
   const [methodsState, setMethodsState] = useState('loading'); // loading | ready | error
   const [isSavingMethods, setIsSavingMethods] = useState(false);
   const [methodsDirty, setMethodsDirty] = useState(false);
@@ -903,6 +905,7 @@ export default function HomePageConfig() {
         const res = await adminClient.get('/settings/order-methods');
         if (!cancelled) {
           setOrderMethods(res?.data?.data?.methods || []);
+          setNearbyRadius(String(res?.data?.data?.nearbyStoreRadiusKm ?? 10));
           setMethodsState('ready');
         }
       } catch {
@@ -933,11 +936,26 @@ export default function HomePageConfig() {
     setMethodsDirty(true);
   };
 
+  const addMethod = () => {
+    const label = newMethodName.trim();
+    if (!label) return;
+    if (orderMethods.some((m) => m.label.toLowerCase() === label.toLowerCase())) { toast.error('A method with this name already exists'); return; }
+    setOrderMethods((list) => [...list, { id: '', label, icon: 'storefront', enabled: true, scope: 'all', franchiseIds: [], storeIds: [], custom: true, isNew: true, key: `new-${Date.now()}` }]);
+    setNewMethodName('');
+    setMethodsDirty(true);
+  };
+
+  const removeMethod = (m) => {
+    setOrderMethods((list) => list.filter((x) => x !== m));
+    setMethodsDirty(true);
+  };
+
   const handleSaveOrderMethods = async () => {
     setIsSavingMethods(true);
     try {
-      const res = await adminClient.put('/settings/order-methods', { methods: orderMethods });
+      const res = await adminClient.put('/settings/order-methods', { methods: orderMethods.map(({ isNew, key, ...m }) => m), nearbyStoreRadiusKm: Number(nearbyRadius) });
       setOrderMethods(res?.data?.data?.methods || orderMethods);
+      setNearbyRadius(String(res?.data?.data?.nearbyStoreRadiusKm ?? nearbyRadius));
       setMethodsDirty(false);
       toast.success('Order methods saved');
     } catch (err) {
@@ -1672,9 +1690,13 @@ export default function HomePageConfig() {
             const options = pickFranchises ? franchiseOptions : storeOptions;
             const field = pickFranchises ? 'franchiseIds' : 'storeIds';
             return (
-              <div key={method.id} className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-900 shadow-sm space-y-3">
+              <div key={method.id || method.key} className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-900 shadow-sm space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{method.label}</span>
+                  <div className="flex items-center gap-3">
+                  {method.custom && (
+                    <button type="button" onClick={() => removeMethod(method)} className="text-xs text-red-600 hover:underline bg-transparent border-0 cursor-pointer">Delete</button>
+                  )}
                   <button
                     type="button"
                     onClick={() => updateMethod(method.id, { enabled: !method.enabled })}
@@ -1688,6 +1710,7 @@ export default function HomePageConfig() {
                       }`}
                     />
                   </button>
+                  </div>
                 </div>
                 <div className={method.enabled ? '' : 'opacity-50 pointer-events-none'}>
                   <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Offered at</label>
@@ -1727,6 +1750,34 @@ export default function HomePageConfig() {
               </div>
             );
           })}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={newMethodName}
+            onChange={(e) => setNewMethodName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addMethod(); } }}
+            maxLength={40}
+            placeholder="New order method name"
+            className="px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+          />
+          <button
+            type="button"
+            onClick={addMethod}
+            disabled={!newMethodName.trim() || orderMethods.length >= 12}
+            className="px-4 py-2 rounded-md border border-primary text-primary text-sm font-semibold disabled:opacity-50 cursor-pointer bg-transparent"
+          >
+            + Create order method
+          </button>
+        </div>
+        <div className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-900 shadow-sm max-w-md">
+          <label className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Nearby stores radius (km)</label>
+          <input
+            type="number" min="1" max="200" step="0.5"
+            value={nearbyRadius}
+            onChange={(e) => { setNearbyRadius(e.target.value); setMethodsDirty(true); }}
+            className="w-32 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+          />
+          <p className="mt-1 text-[11px] text-zinc-500">Customers see only stores within this distance of them (all franchises), 1 to 200 km.</p>
         </div>
         <div className="flex items-center gap-3">
           <button

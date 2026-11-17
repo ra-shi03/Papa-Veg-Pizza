@@ -1,4 +1,6 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
+import { locationAPI } from "@/services/api/location"
+import { readSavedCoords } from "@food/utils/savedLocation"
 import { useLocationStore } from "@food/store/locationStore"
 import { ChevronDown, MapPin, Navigation, Info } from "lucide-react"
 import { useScrollLock } from "@food/hooks/useScrollLock"
@@ -16,25 +18,62 @@ export default function TakeawayMapModal({
   const { confirmLocation } = useLocationStore()
   const [selectedStore, setSelectedStore] = useState(null)
 
+  const [stores, setStores] = useState([])
+  const [loadState, setLoadState] = useState("loading") // loading | ready | error | nolocation
+  const [radiusKm, setRadiusKm] = useState(null)
+
   // Lock background scroll when open
   useScrollLock(Boolean(show))
 
+  // Real stores within the radius the super admin set, nearest first (every franchise)
+  useEffect(() => {
+    if (!show) return
+    let cancelled = false
+    const me = readSavedCoords()
+    if (!me) { setStores([]); setLoadState("nolocation"); return }
+    setLoadState("loading")
+    locationAPI.getNearbyStores(me.lat, me.lng, "", "takeaway")
+      .then((res) => {
+        if (cancelled) return
+        const list = res?.data?.data?.stores
+        if (!Array.isArray(list)) { setLoadState("error"); return }
+        const farthest = Math.max(1, ...list.map((x) => x.distanceKm || 0))
+        const clamp = (v) => `${Math.min(86, Math.max(14, v))}%`
+        setStores(list.map((x, i) => ({
+          id: String(x._id),
+          name: x.storeName,
+          address: x.address,
+          dist: `${Number(x.distanceKm).toFixed(1)} km`,
+          nearest: i === 0,
+          lat: x.latitude,
+          lng: x.longitude,
+          // pin position on the sketch map: the store's real direction from the customer, scaled to the farthest store
+          coords: {
+            x: clamp(50 + ((x.longitude - me.lng) * Math.cos(me.lat * Math.PI / 180) * 111) / farthest * 36),
+            y: clamp(45 - ((x.latitude - me.lat) * 111) / farthest * 28),
+          },
+        })))
+        setRadiusKm(res.data.data.radiusKm || null)
+        setSelectedStore(null)
+        setLoadState("ready")
+      })
+      .catch(() => { if (!cancelled) setLoadState("error") })
+    return () => { cancelled = true }
+  }, [show])
+
   if (!show) return null
 
-  const STORES = [
-    { id: "hut-cp", name: "Pizza Veg Hut - Connaught Place", dist: "0.8 km", status: "Open Now", hours: "11 AM - 11 PM", coords: { x: "42%", y: "45%" }, nearest: true },
-    { id: "hut-kb", name: "Pizza Veg Hut - Karol Bagh", dist: "2.1 km", status: "Open Now", hours: "11 AM - 11 PM", coords: { x: "28%", y: "32%" } },
-    { id: "hut-sk", name: "Pizza Veg Hut - Saket Terminal", dist: "4.5 km", status: "Closed", hours: "Opens tomorrow", coords: { x: "65%", y: "70%" } }
-  ]
-
   // Default to nearest store if none selected
-  const activeStore = selectedStore || STORES[0]
+  const activeStore = selectedStore || stores[0] || null
 
   const handleConfirmStore = (store) => {
+    if (!store) return
     setTakeawayHut(store.name)
     confirmLocation({
       address: store.name,
-      serviceType: "takeaway"
+      serviceType: "takeaway",
+      lat: store.lat,
+      lng: store.lng
     })
     setActiveService("takeaway")
     localStorage.setItem("activeService", "takeaway")
@@ -99,8 +138,8 @@ export default function TakeawayMapModal({
         </div>
 
         {/* Store Pins on Map */}
-        {STORES.map((store) => {
-          const isStoreSelected = activeStore.id === store.id
+        {stores.map((store) => {
+          const isStoreSelected = activeStore?.id === store.id
           return (
             <button
               key={store.id}
@@ -120,7 +159,7 @@ export default function TakeawayMapModal({
                 )}
               </div>
               <div className={`text-[8.5px] font-extrabold px-1.5 py-0.5 rounded shadow mt-1 max-w-[100px] truncate ${isStoreSelected ? "bg-primary text-white" : "bg-[#FAF9F6] dark:bg-[#181818] text-slate-800 dark:text-slate-200"}`}>
-                {store.name.replace("Pizza Veg Hut - ", "")}
+                {store.name.replace("Papa Veg Pizza - ", "")}
               </div>
             </button>
           )
@@ -145,14 +184,20 @@ export default function TakeawayMapModal({
             Select Takeaway Store
           </h3>
           <p className={`text-[10px] ${textSecondary} leading-relaxed`}>
-            Showing outlets near: <span className="font-bold text-primary">{confirmedAddress || "Indore City Center"}</span>
+            Showing outlets near: <span className="font-bold text-primary">{confirmedAddress || "your location"}</span>
           </p>
         </div>
 
         {/* Stores list */}
         <div className="space-y-2.5 max-h-[220px] overflow-y-auto mb-5 pr-1">
-          {STORES.map((store) => {
-            const isStoreSelected = activeStore.id === store.id
+          {loadState === "loading" && <p className={`text-xs ${textSecondary}`}>Finding stores near you...</p>}
+          {loadState === "nolocation" && <p className={`text-xs ${textSecondary}`}>Set your location to see stores near you.</p>}
+          {loadState === "error" && <p className="text-xs text-primary">Could not load nearby stores. Please try again.</p>}
+          {loadState === "ready" && stores.length === 0 && (
+            <p className={`text-xs ${textSecondary}`}>No store{radiusKm ? ` within ${radiusKm} km` : ""} of your location offers takeaway.</p>
+          )}
+          {stores.map((store) => {
+            const isStoreSelected = activeStore?.id === store.id
             return (
               <div
                 key={store.id}
@@ -166,11 +211,7 @@ export default function TakeawayMapModal({
                       <span className="bg-primary/10 text-primary text-[8px] font-black px-1.5 py-0.2 rounded-full uppercase tracking-wider">Nearest</span>
                     )}
                   </div>
-                  <div className="flex gap-2 text-[9px] font-semibold opacity-85">
-                    <span className="text-emerald-500">{store.status}</span>
-                    <span className="opacity-40">•</span>
-                    <span className={textSecondary}>{store.hours}</span>
-                  </div>
+                  {store.address && <p className={`text-[9px] font-semibold opacity-85 ${textSecondary}`}>{store.address}</p>}
                 </div>
                 <div className="text-right flex flex-col items-end gap-1">
                   <span className={`text-[9px] px-2 py-0.5 rounded font-black tracking-wide ${isStoreSelected ? "bg-primary text-white" : "bg-primary/10 text-primary"}`}>
@@ -184,6 +225,7 @@ export default function TakeawayMapModal({
 
         {/* Selected Store Confirmation button */}
         <button
+          disabled={!activeStore}
           onClick={() => handleConfirmStore(activeStore)}
           className="w-full h-12 bg-primary hover:bg-red-700 text-white font-extrabold rounded-xl text-xs uppercase tracking-wider transition-all shadow-md active:scale-98 flex items-center justify-center cursor-pointer border-0 outline-none"
         >

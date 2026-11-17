@@ -4,37 +4,41 @@ import { FoodStore } from '../../store/models/store.model.js';
 import { FoodFranchise } from '../../franchise/models/franchise.model.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 
-// Order methods: how a customer can order (delivery, takeaway, in-car, delivery on train). The super admin switches each
-// one on or off and says where it is offered: every store, the stores of chosen franchises, or only chosen stores.
-// Dine-in does not exist (there is no such flow).
-export const ORDER_METHOD_IDS = ['delivery', 'takeaway', 'incar', 'train'];
+// Order methods: how a customer can order. Built in: delivery, takeaway, in-car, delivery on train, dine-in (dine-in
+// starts switched off). The super admin can also create more. Each is switched on or off and offered at every store,
+// the stores of chosen franchises, or only chosen stores. Built-in methods cannot be deleted, only switched off.
+export const BUILTIN_METHOD_IDS = ['delivery', 'takeaway', 'incar', 'train', 'dinein'];
+export const MAX_METHODS = 12;
+const ID_RE = /^[a-z][a-z0-9_]{1,29}$/;
 
 export const DEFAULT_ORDER_METHODS = [
     { id: 'delivery', label: 'Delivery', icon: 'moped', enabled: true, scope: 'all', franchiseIds: [], storeIds: [] },
     { id: 'takeaway', label: 'Takeaway', icon: 'store', enabled: true, scope: 'all', franchiseIds: [], storeIds: [] },
     { id: 'incar', label: 'In-Car', icon: 'directions_car', enabled: true, scope: 'all', franchiseIds: [], storeIds: [] },
     { id: 'train', label: 'Delivery on Train', icon: 'train', enabled: true, scope: 'all', franchiseIds: [], storeIds: [] },
+    { id: 'dinein', label: 'Dine-in', icon: 'restaurant', enabled: false, scope: 'all', franchiseIds: [], storeIds: [] },
 ];
 
 const strs = (list) => (list || []).map(String);
 
-/** The saved methods merged onto the four known ones, in a fixed order; unknown ids (dine-in) are dropped. */
+const cleanOne = (m, def, id) => ({
+    id,
+    label: String(m?.label || def?.label || id),
+    icon: m?.icon || def?.icon || 'storefront',
+    enabled: m ? m.enabled !== false : def.enabled,
+    scope: ['all', 'franchises', 'stores'].includes(m?.scope) ? m.scope : 'all',
+    franchiseIds: strs(m?.franchiseIds),
+    storeIds: strs(m?.storeIds),
+    custom: !def,
+});
+
+/** The saved methods: the built-in ones in a fixed order (defaults when never saved), then the created ones. */
 export function normalizeMethods(saved) {
-    const byId = new Map((Array.isArray(saved) ? saved : []).map((m) => [String(m?.id), m]));
-    return DEFAULT_ORDER_METHODS.map((def) => {
-        const m = byId.get(def.id);
-        if (!m) return { ...def };
-        const scope = ['all', 'franchises', 'stores'].includes(m.scope) ? m.scope : 'all';
-        return {
-            id: def.id,
-            label: String(m.label || def.label),
-            icon: m.icon || def.icon,
-            enabled: m.enabled !== false,
-            scope,
-            franchiseIds: strs(m.franchiseIds),
-            storeIds: strs(m.storeIds),
-        };
-    });
+    const list = Array.isArray(saved) ? saved : [];
+    const byId = new Map(list.map((m) => [String(m?.id), m]));
+    const builtin = DEFAULT_ORDER_METHODS.map((def) => (byId.has(def.id) ? cleanOne(byId.get(def.id), def, def.id) : { ...def, custom: false }));
+    const custom = list.filter((m) => ID_RE.test(String(m?.id)) && !BUILTIN_METHOD_IDS.includes(String(m.id))).map((m) => cleanOne(m, null, String(m.id)));
+    return [...builtin, ...custom];
 }
 
 export async function loadMethods() {
@@ -67,8 +71,9 @@ export async function publicMethodsFor(store) {
 
 /** Throws when the method is not offered at the store (orders for it are refused). */
 export async function assertMethodAllowed(methodId, store) {
-    const id = ORDER_METHOD_IDS.includes(methodId) ? methodId : 'delivery';
-    const method = (await loadMethods()).find((m) => m.id === id);
+    const all = await loadMethods();
+    const id = all.some((m) => m.id === methodId) ? methodId : 'delivery';
+    const method = all.find((m) => m.id === id);
     if (!methodAllowedAt(method, store)) {
         throw new ValidationError(`${method?.label || 'This order method'} is not available at this store.`);
     }
@@ -79,12 +84,19 @@ const isObjectId = (v) => mongoose.Types.ObjectId.isValid(String(v || '')) && St
 
 /** Validates a super admin save: known ids, known scope, real franchises and stores, and a list for a limited scope. */
 export async function validateMethodsInput(input) {
-    if (!Array.isArray(input) || input.length === 0 || input.length > ORDER_METHOD_IDS.length) throw new ValidationError('Send the order methods as a list');
+    if (!Array.isArray(input) || input.length === 0 || input.length > MAX_METHODS) throw new ValidationError('Send the order methods as a list');
     const seen = new Set();
     const clean = [];
+    const slug = (label) => String(label || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 28);
     for (const m of input) {
-        const id = String(m?.id || '');
-        if (!ORDER_METHOD_IDS.includes(id)) throw new ValidationError(`Unknown order method: ${id || '(empty)'}`);
+        let id = String(m?.id || '');
+        if (!id && String(m?.label || '').trim()) { // a newly created method: its id comes from its name
+            const base = slug(m.label) || 'method';
+            id = /^[a-z]/.test(base) ? base : `m_${base}`;
+            for (let n = 2; seen.has(id) || input.some((x) => x !== m && x?.id === id) || BUILTIN_METHOD_IDS.includes(id); n += 1) id = `${base}_${n}`.slice(0, 30);
+        }
+        if (!ID_RE.test(id)) throw new ValidationError(`Unknown order method: ${id || '(empty)'}`);
+        if (!BUILTIN_METHOD_IDS.includes(id) && !String(m?.label || '').trim()) throw new ValidationError(`${id}: give the method a name`);
         if (seen.has(id)) throw new ValidationError(`Order method sent twice: ${id}`);
         seen.add(id);
         const scope = String(m?.scope || 'all');
@@ -98,7 +110,7 @@ export async function validateMethodsInput(input) {
         const label = String(m?.label || '').trim().slice(0, 40);
         const def = DEFAULT_ORDER_METHODS.find((d) => d.id === id);
         clean.push({
-            id, label: label || def.label, icon: def.icon, enabled: m?.enabled !== false, scope,
+            id, label: label || def.label, icon: def?.icon || String(m?.icon || 'storefront').slice(0, 40), enabled: m?.enabled !== false, scope,
             franchiseIds: scope === 'franchises' ? franchiseIds : [],
             storeIds: scope === 'stores' ? storeIds : [],
         });
@@ -108,13 +120,37 @@ export async function validateMethodsInput(input) {
     const storeIds = [...new Set(clean.flatMap((m) => m.storeIds))];
     if (franchiseIds.length && (await FoodFranchise.countDocuments({ _id: { $in: franchiseIds } })) !== franchiseIds.length) throw new ValidationError('A chosen franchise does not exist');
     if (storeIds.length && (await FoodStore.countDocuments({ _id: { $in: storeIds } })) !== storeIds.length) throw new ValidationError('A chosen store does not exist');
-    // methods not sent keep their current rule
+    // built-in methods not sent keep their current rule; created methods not sent are deleted
     const current = await loadMethods();
-    return ORDER_METHOD_IDS.map((id) => clean.find((m) => m.id === id) || current.find((m) => m.id === id));
+    const builtin = BUILTIN_METHOD_IDS.map((id) => clean.find((m) => m.id === id) || current.find((m) => m.id === id));
+    return [...builtin, ...clean.filter((m) => !BUILTIN_METHOD_IDS.includes(m.id))];
 }
 
 export async function saveMethods(input) {
     const methods = await validateMethodsInput(input);
     await HomePage.findOneAndUpdate({}, { $set: { orderMethods: methods } }, { upsert: true, new: true, setDefaultsOnInsert: true });
     return normalizeMethods(methods);
+}
+
+export const DEFAULT_NEARBY_RADIUS_KM = 10;
+
+/** Radius (km) within which customers see stores. */
+export async function loadNearbyRadiusKm() {
+    const doc = await HomePage.findOne().select('nearbyStoreRadiusKm').lean();
+    const n = Number(doc?.nearbyStoreRadiusKm);
+    return Number.isFinite(n) && n >= 1 && n <= 200 ? n : DEFAULT_NEARBY_RADIUS_KM;
+}
+
+export function validateRadiusInput(input) {
+    const n = Number(input);
+    if (input === null || input === '' || typeof input === 'boolean' || !Number.isFinite(n) || n < 1 || n > 200) {
+        throw new ValidationError('Nearby store radius must be a number from 1 to 200 km');
+    }
+    return Math.round(n * 10) / 10;
+}
+
+export async function saveNearbyRadiusKm(input) {
+    const km = validateRadiusInput(input);
+    await HomePage.findOneAndUpdate({}, { $set: { nearbyStoreRadiusKm: km } }, { upsert: true, new: true, setDefaultsOnInsert: true });
+    return km;
 }

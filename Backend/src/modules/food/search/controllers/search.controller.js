@@ -97,74 +97,51 @@ export const checkServiceabilityController = async (req, res, next) => {
 };
 
 /**
- * Fetch nearby stores sorted by distance
+ * Stores near the customer: every approved, active store of EVERY franchise within the radius the super admin set
+ * (Order Methods page), nearest first. Display fields only. `method` (delivery|takeaway|incar|train) keeps only the
+ * stores where that order method is offered.
  */
 export const getNearbyStoresController = async (req, res, next) => {
     try {
-        const { lat, lng, q } = req.query;
-        if (!lat || !lng) {
-            return res.status(400).json({ success: false, error: 'Latitude and longitude are required' });
+        const { lat, lng, q, method } = req.query;
+        const userLat = lat === undefined || lat === '' ? NaN : Number(lat);
+        const userLng = lng === undefined || lng === '' ? NaN : Number(lng);
+        if (!Number.isFinite(userLat) || !Number.isFinite(userLng) || Math.abs(userLat) > 90 || Math.abs(userLng) > 180) {
+            return res.status(400).json({ success: false, message: 'Latitude and longitude are required', error: 'Latitude and longitude are required' });
         }
-
-        const userLat = parseFloat(lat);
-        const userLng = parseFloat(lng);
 
         const { FoodStore } = await import('../../store/models/store.model.js');
-        let activeStores = await FoodStore.find({
-            isActive: true,
-            $or: [
-                { approvalStatus: { $in: ['Approved', 'approved'] } },
-                { approvalStatus: { $exists: false } },
-                { approvalStatus: null }
-            ]
-        }).lean();
+        const { haversineKm } = await import('../../orders/services/order.helpers.js');
+        const { loadNearbyRadiusKm, loadMethods, methodAllowedAt } = await import('../../settings/services/orderMethods.service.js');
+        const radiusKm = await loadNearbyRadiusKm();
 
-        // If no approved stores found, fallback to all active stores
-        if (!activeStores || activeStores.length === 0) {
-            activeStores = await FoodStore.find({ isActive: true }).lean();
+        const stores = await FoodStore.find({ isActive: true, approvalStatus: { $in: ['Approved', 'approved'] } })
+            .select('storeName name address city state pincode phone latitude longitude franchiseId profileImage logo image')
+            .lean();
+
+        const rule = method ? (await loadMethods()).find((m) => m.id === String(method)) || null : null;
+        const re = q && String(q).trim() ? new RegExp(String(q).trim().slice(0, 80).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null;
+
+        const out = [];
+        for (const s of stores) {
+            const sLat = Number(s.latitude);
+            const sLng = Number(s.longitude);
+            if (s.latitude == null || s.longitude == null || !Number.isFinite(sLat) || !Number.isFinite(sLng)) continue; // no position, cannot be "near"
+            const distanceKm = Math.round(haversineKm(userLat, userLng, sLat, sLng) * 10) / 10;
+            if (distanceKm > radiusKm) continue;
+            if (rule && !methodAllowedAt(rule, s)) continue;
+            if (re && ![s.storeName, s.address, s.city, s.state, s.pincode].some((v) => re.test(String(v || '')))) continue;
+            out.push({
+                _id: s._id, id: s._id,
+                storeName: s.storeName || s.name || '',
+                address: s.address || '', city: s.city || '', state: s.state || '', pincode: s.pincode || '',
+                phone: s.phone || '', latitude: sLat, longitude: sLng, distanceKm,
+                image: s.profileImage || s.logo || s.image || '',
+            });
         }
+        out.sort((a, b) => a.distanceKm - b.distanceKm);
 
-        let storesWithDistance = activeStores.map(store => {
-            let distanceKm = null;
-            const sLat = Number(store.latitude ?? store.lat ?? store.location?.coordinates?.[1]);
-            const sLng = Number(store.longitude ?? store.lng ?? store.location?.coordinates?.[0]);
-
-            if (Number.isFinite(sLat) && Number.isFinite(sLng) && Number.isFinite(userLat) && Number.isFinite(userLng)) {
-                const dLat = (sLat - userLat) * Math.PI / 180;
-                const dLon = (sLng - userLng) * Math.PI / 180;
-                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                          Math.cos(userLat * Math.PI / 180) * Math.cos(sLat * Math.PI / 180) *
-                          Math.sin(dLon/2) * Math.sin(dLon/2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                distanceKm = Math.round(6371 * c * 10) / 10;
-            }
-            return {
-                ...store,
-                distanceKm
-            };
-        });
-
-        // Filter and sort by distance if distance is available
-        storesWithDistance.sort((a, b) => {
-            if (a.distanceKm === null && b.distanceKm === null) return 0;
-            if (a.distanceKm === null) return 1;
-            if (b.distanceKm === null) return -1;
-            return a.distanceKm - b.distanceKm;
-        });
-
-        // Optional search query filter
-        if (q && q.trim()) {
-            const searchRegex = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-            storesWithDistance = storesWithDistance.filter(s =>
-                searchRegex.test(s.storeName || '') ||
-                searchRegex.test(s.address || '') ||
-                searchRegex.test(s.city || '') ||
-                searchRegex.test(s.state || '') ||
-                searchRegex.test(s.pincode || '')
-            );
-        }
-
-        return sendResponse(res, 200, 'Nearby stores fetched successfully', { stores: storesWithDistance });
+        return sendResponse(res, 200, 'Nearby stores fetched successfully', { stores: out, radiusKm });
     } catch (error) {
         next(error);
     }

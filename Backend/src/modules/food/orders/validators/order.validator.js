@@ -116,7 +116,7 @@ export function validateCreateOrderDto(body) {
         // A train order: the store and the address come from the server (order-store.service.js resolveTrainStore)
         train: trainSchema.optional(),
         // delivery (default), takeaway, incar or train: checked against the super admin's order-method rules for the store
-        orderMethod: z.enum(['delivery', 'takeaway', 'incar', 'train']).optional(),
+        orderMethod: z.string().regex(/^[a-z][a-z0-9_]{1,29}$/).optional(),
         // 'razorpay_qr' means COD-style flow, but payment is collected via Razorpay QR at delivery.
         paymentMethod: z.enum(['cash', 'razorpay', 'razorpay_qr', 'card', 'wallet']),
         zoneId: z.string().nullable().optional(),

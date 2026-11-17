@@ -51,9 +51,6 @@ export function HomeModals({
         }}
         onSelect={(id) => {
           if (id === "delivery") {
-            if (!deliveryAddress) {
-              setDeliveryAddress("Joshi Colony, Bk Sindhi Colony, Indore, Indore");
-            }
             setShowMapModal(true);
           } else if (id === "takeaway") {
             setShowStoreModal(true);

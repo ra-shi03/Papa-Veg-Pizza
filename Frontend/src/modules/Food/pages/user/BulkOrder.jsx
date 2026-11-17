@@ -1,3 +1,4 @@
+import { readSavedCoords } from "@food/utils/savedLocation"
 import React, { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
@@ -386,33 +387,23 @@ export default function BulkOrder() {
     const fetchStores = async () => {
       setLoadingStores(true)
       try {
-        let lat = 22.7196
-        let lng = 75.8577
-
-        try {
-          const savedUserLoc = localStorage.getItem("userLocation")
-          if (savedUserLoc) {
-            const parsed = JSON.parse(savedUserLoc)
-            if (Number.isFinite(Number(parsed?.latitude)) && Number.isFinite(Number(parsed?.longitude))) {
-              lat = Number(parsed.latitude)
-              lng = Number(parsed.longitude)
-            }
-          }
-        } catch (_) {}
-
-        // If GPS is available and using default coords, attempt live GPS coordinates
-        if (navigator.geolocation && lat === 22.7196) {
+        // The customer's saved position, else live GPS; no invented default city.
+        let lat = null
+        let lng = null
+        const saved = readSavedCoords()
+        if (saved) { lat = saved.lat; lng = saved.lng }
+        if (lat === null && navigator.geolocation) {
           await new Promise((resolve) => {
             navigator.geolocation.getCurrentPosition(
-              (pos) => {
-                lat = pos.coords.latitude
-                lng = pos.coords.longitude
-                resolve()
-              },
+              (pos) => { lat = pos.coords.latitude; lng = pos.coords.longitude; resolve() },
               () => resolve(),
               { timeout: 3000 }
             )
           })
+        }
+        if (lat === null || lng === null) {
+          if (!isCancelled) setNearbyStores([])
+          return
         }
 
         const res = await locationAPI.getNearbyStores(lat, lng, debouncedSearch)
