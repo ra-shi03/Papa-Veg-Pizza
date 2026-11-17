@@ -52,3 +52,24 @@ export const validateConfig = () => {
         }
     }
 };
+
+/**
+ * Payment gateway secrets are encrypted with PAYMENT_SECRETS_KEY. In production, once a gateway is saved the server
+ * refuses to start without it: falling back to the JWT secret would make every saved secret unreadable (and online
+ * payment silently stop) the next time the JWT secrets are rotated. Runs after the database is connected.
+ * @param {() => Promise<number>} countSavedGateways
+ */
+export const validatePaymentSecrets = async (countSavedGateways) => {
+    if (process.env.PAYMENT_SECRETS_KEY) return true;
+    const saved = await countSavedGateways();
+    if (saved === 0) return true;
+    if (config.nodeEnv === 'production') {
+        logger.error(
+            `PAYMENT_SECRETS_KEY is not set, but ${saved} payment gateway(s) are saved. Set PAYMENT_SECRETS_KEY (a long random value, ` +
+            'never the JWT secret) and restart, then save each gateway\'s secret again in Settings > Payment Gateways. Refusing to start.'
+        );
+        process.exit(1);
+    }
+    logger.warn('PAYMENT_SECRETS_KEY is not set: payment gateway secrets are encrypted with the JWT secret (allowed outside production only).');
+    return false;
+};

@@ -1,9 +1,10 @@
 import http from 'http';
 import app from './src/app.js';
 import { config } from './src/config/env.js';
-import { validateConfig } from './src/config/validateEnv.js';
+import { validateConfig, validatePaymentSecrets } from './src/config/validateEnv.js';
 import { connectDB, disconnectDB } from './src/config/db.js';
 import { refreshGatewayCredentials } from './src/modules/food/settings/services/paymentGateway.service.js';
+import { FoodPaymentGateway } from './src/modules/food/settings/models/paymentGateway.model.js';
 import { connectRedis, closeRedis } from './src/config/redis.js';
 import { initSocket } from './src/config/socket.js';
 import { startOrderEventStream, stopOrderEventStream } from './src/modules/food/orders/services/order-events.service.js';
@@ -52,6 +53,9 @@ const startServer = async () => {
 
         // 1. Connect to Database (MongoDB)
         await connectDB();
+
+        // Saved gateway secrets need PAYMENT_SECRETS_KEY in production (exits if missing)
+        await validatePaymentSecrets(() => FoodPaymentGateway.countDocuments({}));
 
         // Use the payment gateway the super admin activated (falls back to .env until one is saved)
         await refreshGatewayCredentials().catch((e) => console.warn('Payment gateway credentials not loaded:', e.message));

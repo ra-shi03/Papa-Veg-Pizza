@@ -5,12 +5,24 @@ import { ValidationError, NotFoundError } from '../../../../core/auth/errors.js'
 import { config } from '../../../../config/env.js';
 import { setRazorpayCredentials, getRazorpayInstance, fetchRazorpayPayment } from '../../orders/helpers/razorpay.helper.js';
 
-// ---- secrets at rest: AES-256-GCM. The key comes from PAYMENT_SECRETS_KEY, else the JWT secret.
+// ---- secrets at rest: AES-256-GCM with a key from PAYMENT_SECRETS_KEY. Outside production the JWT secret stands in
+// when it is unset. Rotating the JWT secret must never make saved gateway secrets unreadable, so production requires
+// PAYMENT_SECRETS_KEY to save a gateway (and to start once one is saved: validatePaymentSecrets in config/validateEnv.js).
+const keyFrom = (base) => crypto.createHash('sha256').update(`payment-gateway:${base}`).digest();
+
 const encryptionKey = () => {
-    const base = process.env.PAYMENT_SECRETS_KEY || config.jwtAccessSecret || '';
-    if (!base) throw new Error('PAYMENT_SECRETS_KEY or JWT secret is required to store gateway secrets');
-    return crypto.createHash('sha256').update(`payment-gateway:${base}`).digest();
+    const own = process.env.PAYMENT_SECRETS_KEY || '';
+    if (own) return keyFrom(own);
+    if (config.nodeEnv === 'production') {
+        throw new ValidationError('PAYMENT_SECRETS_KEY must be set on the server before a payment gateway can be saved.');
+    }
+    if (!config.jwtAccessSecret) throw new Error('PAYMENT_SECRETS_KEY or JWT secret is required to store gateway secrets');
+    return keyFrom(config.jwtAccessSecret);
 };
+
+// Keys to try when reading: the current one, then the JWT-derived key used before PAYMENT_SECRETS_KEY existed (so a
+// gateway saved earlier keeps working until the super admin saves its secret again).
+const decryptionKeys = () => [process.env.PAYMENT_SECRETS_KEY, config.jwtAccessSecret].filter(Boolean).map(keyFrom);
 
 const encrypt = (plain) => {
     if (!plain) return '';
@@ -22,14 +34,17 @@ const encrypt = (plain) => {
 
 const decrypt = (packed) => {
     if (!packed) return '';
-    try {
-        const [iv, tag, data] = packed.split('.').map((p) => Buffer.from(p, 'base64'));
-        const decipher = crypto.createDecipheriv('aes-256-gcm', encryptionKey(), iv);
-        decipher.setAuthTag(tag);
-        return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
-    } catch {
-        return '';
+    const [iv, tag, data] = String(packed).split('.').map((p) => Buffer.from(p, 'base64'));
+    for (const key of decryptionKeys()) {
+        try {
+            const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+            decipher.setAuthTag(tag);
+            return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
+        } catch {
+            // wrong key: try the next one
+        }
     }
+    return '';
 };
 
 const mask = (value, keep = 4) => {

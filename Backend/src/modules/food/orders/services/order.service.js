@@ -21,6 +21,7 @@ import { config } from '../../../../config/env.js';
 import {
     createRazorpayOrder,
     verifyPaymentSignature,
+    fetchRazorpayPayment,
     getRazorpayKeyId,
     isRazorpayConfigured,
     initiateRazorpayRefund
@@ -470,24 +471,67 @@ export async function verifyPayment(userId, dto) {
   const identity = buildOrderIdentityFilter(dto.orderId);
   if (!identity) throw new ValidationError("Order id required");
 
-  const order = await FoodOrder.findOne({
+  let order = await FoodOrder.findOne({
     ...identity,
     userId: new mongoose.Types.ObjectId(userId),
   });
   if (!order) throw new NotFoundError("Order not found");
-  if (order.payment.status === "paid")
-    return { order: normalizeOrderForClient(order), payment: order.payment };
+
+  // The proof must be for THIS order's Razorpay order: a valid signature for another order (a cheaper one, say)
+  // proves nothing about this one.
+  const expectedRzOrderId = String(order.payment?.razorpay?.orderId || "");
+  const paidAlready = order.payment.status === "paid";
+  if (paidAlready) {
+    // Verifying the same payment again is a no-op; any other proof changes nothing
+    if (expectedRzOrderId && dto.razorpayOrderId === expectedRzOrderId && dto.razorpayPaymentId === order.payment.razorpay?.paymentId) {
+      return { order: normalizeOrderForClient(order), payment: order.payment };
+    }
+    throw new ValidationError("This order is already paid.");
+  }
+  if (String(order.orderStatus || "").startsWith("cancelled") || ["refunded", "failed"].includes(order.payment.status)) {
+    throw new ValidationError("This order can no longer be paid.");
+  }
+  if (String(order.payment?.method || "").toLowerCase() !== "razorpay" || !expectedRzOrderId) {
+    throw new ValidationError("This order is not waiting for an online payment.");
+  }
+  if (dto.razorpayOrderId !== expectedRzOrderId) throw new ValidationError("Payment verification failed");
 
   const valid = verifyPaymentSignature(
-    dto.razorpayOrderId,
+    expectedRzOrderId,
     dto.razorpayPaymentId,
     dto.razorpaySignature,
   );
   if (!valid) throw new ValidationError("Payment verification failed");
 
-  order.payment.status = "paid";
-  order.payment.razorpay.paymentId = dto.razorpayPaymentId;
-  order.payment.razorpay.signature = dto.razorpaySignature;
+  // Ask Razorpay what was really paid: same order, successful, and the full order total
+  let rzPayment;
+  try {
+    rzPayment = await fetchRazorpayPayment(dto.razorpayPaymentId);
+  } catch {
+    throw new ValidationError("Could not confirm the payment with the gateway. Please try again.");
+  }
+  const totalPaise = Math.round(Number(order.pricing?.total || 0) * 100);
+  if (
+    !rzPayment ||
+    String(rzPayment.order_id || "") !== expectedRzOrderId ||
+    !["captured", "authorized"].includes(String(rzPayment.status || "")) ||
+    Number(rzPayment.amount) !== totalPaise ||
+    String(rzPayment.currency || "INR").toUpperCase() !== "INR"
+  ) {
+    throw new ValidationError("Payment verification failed");
+  }
+
+  // Exactly once: a second verify (or the webhook) racing this one finds it already paid
+  const claimed = await FoodOrder.findOneAndUpdate(
+    { _id: order._id, "payment.status": { $nin: ["paid", "refunded"] } },
+    { $set: { "payment.status": "paid", "payment.razorpay.paymentId": dto.razorpayPaymentId, "payment.razorpay.signature": dto.razorpaySignature } },
+    { new: true },
+  );
+  if (!claimed) {
+    const fresh = await FoodOrder.findById(order._id);
+    return { order: normalizeOrderForClient(fresh), payment: fresh.payment };
+  }
+  order = claimed;
   pushStatusHistory(order, {
     byRole: "USER",
     byId: userId,

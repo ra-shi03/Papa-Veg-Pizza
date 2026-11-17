@@ -33,8 +33,16 @@ Run once per secret, on your own machine or the server. Each run prints a new 96
 node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 ```
 
-You need **three** values: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `OFFER_TOKEN_SECRET`.
-All three must be different. Never reuse old values or anything that looks typed by hand.
+You need **four** values: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `OFFER_TOKEN_SECRET`, `PAYMENT_SECRETS_KEY`.
+All four must be different. Never reuse old values or anything that looks typed by hand.
+
+> **Warning: payment gateway secrets.** The Razorpay secrets saved in Settings > Payment Gateways are encrypted with
+> `PAYMENT_SECRETS_KEY`. Without it they were encrypted with the JWT access secret, so **rotating the JWT secrets without
+> `PAYMENT_SECRETS_KEY` makes every saved gateway secret unreadable and online payment stops, with no error shown.**
+> Order of work: set `PAYMENT_SECRETS_KEY` and restart first, save each gateway's secret again (super admin), and only
+> then rotate the JWT secrets. In production the server refuses to start when a gateway is saved and the key is missing,
+> and refuses to save a gateway without it. Never rotate `PAYMENT_SECRETS_KEY` itself unless you re-enter every gateway
+> secret straight after.
 
 ## 2. Rotate, in this order
 
@@ -91,7 +99,8 @@ All three must be different. Never reuse old values or anything that looks typed
 | Variable | Value / note |
 |---|---|
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Unchanged. `CLOUDINARY_CLOUD_NAME` is now also used to accept kitchen-task proof images only from our own account. |
-| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` | Unchanged. Online amounts are now always computed by the server. |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` | Used only until a gateway is saved in Settings > Payment Gateways; after that the saved gateway's keys are used. Online amounts are always computed by the server. |
+| `PAYMENT_SECRETS_KEY` | **[required in production once a payment gateway is saved]** New random value from §1, different from every JWT secret. Encrypts the saved gateway secrets. See the warning in §1 before rotating any secret. |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_FROM` | Unchanged (admin forgot-password emails). |
 | `FIREBASE_SERVICE_ACCOUNT` or `FIREBASE_SERVICE_ACCOUNT_PATH`, `FIREBASE_*` / `VITE_FIREBASE_*` | Unchanged (push and realtime tracking). |
 | `REDIS_ENABLED`, `REDIS_URL`, `BULLMQ_ENABLED` | Unchanged. If `REDIS_ENABLED=true`, `REDIS_URL` is required. |

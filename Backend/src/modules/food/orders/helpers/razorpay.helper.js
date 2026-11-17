@@ -75,7 +75,21 @@ export function verifyPaymentSignature(orderId, paymentId, signature) {
     if (!secret) return false;
     const body = `${orderId}|${paymentId}`;
     const expected = crypto.createHmac('sha256', secret).update(body).digest('hex');
-    return expected === signature;
+    return safeEqual(expected, signature);
+}
+
+/** Constant-time string compare (a signature check must not leak how many characters matched). */
+export function safeEqual(a, b) {
+    const x = Buffer.from(String(a ?? ''), 'utf8');
+    const y = Buffer.from(String(b ?? ''), 'utf8');
+    return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
+
+// Tests replace the Razorpay payments API (they never reach the network). Not available in production.
+let paymentFetcherOverride = null;
+export function setPaymentFetcherForTests(fn) {
+    if (process.env.NODE_ENV === 'production') throw new Error('setPaymentFetcherForTests is not available in production');
+    paymentFetcherOverride = typeof fn === 'function' ? fn : null;
 }
 
 /**
@@ -83,6 +97,7 @@ export function verifyPaymentSignature(orderId, paymentId, signature) {
  * @param {string} paymentId
  */
 export async function fetchRazorpayPayment(paymentId) {
+    if (paymentFetcherOverride) return paymentFetcherOverride(String(paymentId || ''));
     const instance = getRazorpayInstance();
     if (!instance) throw new Error('Razorpay not configured');
     if (!paymentId) throw new Error('paymentId is required');
