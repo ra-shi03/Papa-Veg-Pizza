@@ -348,6 +348,14 @@ export function ProfileProvider({ children }) {
     return addresses.find((addr) => addr.isDefault) || addresses[0] || null
   }, [addresses])
 
+  const getAddressById = useCallback(
+    (id) => {
+      if (!id) return null
+      return addresses.find((addr) => String(getAddressId(addr)) === String(id)) || null
+    },
+    [addresses]
+  )
+
   // User profile functions - memoized with useCallback
   const updateUserProfile = useCallback((updatedProfile) => {
     setUserProfile((prev) => ({ ...prev, ...updatedProfile }))

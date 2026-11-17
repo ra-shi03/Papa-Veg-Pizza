@@ -126,8 +126,7 @@ describe('customer screens read real data (source checks)', () => {
         ['modules/Food/pages/user/search/UserSearchPage.jsx', ['pvp_products_v2'], []],
         ['modules/Food/components/user/MenuSearchOverlay.jsx', ['pvp_products_v2'], []],
         ['modules/Food/pages/user/profile/MyProfile.jsx', ['8770552411'], []],
-        ['modules/Food/pages/user/Gourmet.jsx', ['/food/hero-banners/gourmet/public'], []],
-        ['modules/Food/pages/user/Under250.jsx', ['/food/hero-banners/under-250/public'], []],
+        ['modules/Food/pages/user/Under250.jsx', ['/food/hero-banners/under-250/public'], ['/settings/hero-banners/under-250/public']],
         ['services/api/adminApiModule.js', ['/food/restaurant/categories/public'], ['"/food/categories/public"']],
         ['services/api/locationApiModule.js', ['/food/zones/detect', '/food/restaurant/dishes/public'], ['"/food/stores/resolve"', '"/food/products/public"']],
     ];
@@ -142,5 +141,15 @@ describe('customer screens read real data (source checks)', () => {
     test('the menu and the cart read the saved location through one reader', () => {
         assert.match(read('services/api/axios.js'), /readSavedCoords\(\)/);
         assert.match(read('modules/Food/pages/user/cart/cartHelpers.js'), /return readSavedCoords\(\)/);
+    });
+});
+
+describe('removed customer screens stay removed', () => {
+    test('their files are gone', async () => {
+        const { existsSync } = await import('node:fs');
+        for (const f of ['Gourmet', 'Collections', 'CollectionDetail', 'profile/Favorites', 'profile/Feedback', 'profile/AddPayment', 'profile/EditPayment']) {
+            assert.ok(!existsSync(`../Frontend/src/modules/Food/pages/user/${f}.jsx`), `${f}.jsx is back`);
+        }
+        assert.ok(existsSync('../Frontend/src/modules/Food/pages/user/profile/Payments.jsx'), 'Payment Options is live and must stay');
     });
 });

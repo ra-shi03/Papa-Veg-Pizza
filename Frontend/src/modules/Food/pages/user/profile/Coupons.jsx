@@ -207,19 +207,19 @@ export default function Coupons() {
   }
 
   return (
-    <AnimatedPage className="min-h-screen bg-[#F4F5F7] dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans select-none pb-24">
+    <AnimatedPage className="min-h-screen bg-[#F5F3EF] dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans select-none pb-24">
       {/* Top Header matching Image 1 */}
-      <header className="sticky top-0 z-40 bg-white dark:bg-zinc-900 border-b border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
+      <header className="sticky top-0 z-40 bg-[var(--primary,#E53935)] text-white shadow-md">
         <div className="max-w-xl mx-auto px-4 h-14 flex items-center">
           <button
             type="button"
             onClick={handleBack}
-            className="p-1.5 -ml-1.5 mr-3 text-zinc-800 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer border-0 bg-transparent flex items-center justify-center"
+            className="p-1.5 -ml-1.5 mr-3 text-white hover:bg-white/15 rounded-full transition-colors cursor-pointer border-0 bg-transparent flex items-center justify-center"
             aria-label="Go back"
           >
             <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
           </button>
-          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-zinc-900 dark:text-white m-0">
+          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white m-0">
             Coupons
           </h1>
         </div>
@@ -255,7 +255,7 @@ export default function Coupons() {
         {/* Empty State */}
         {!loading && coupons.length === 0 && (
           <div className="flex flex-col items-center justify-center text-center py-16 px-4 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs mt-2">
-            <div className="w-16 h-16 rounded-2xl bg-red-50 dark:bg-red-950/40 text-[#E53935] flex items-center justify-center mb-4 shadow-inner">
+            <div className="w-16 h-16 rounded-2xl bg-red-50 dark:bg-red-950/40 text-[var(--primary)] flex items-center justify-center mb-4 shadow-inner">
               <Ticket className="w-8 h-8 stroke-[1.8]" />
             </div>
             <h3 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-100">
@@ -273,7 +273,7 @@ export default function Coupons() {
                 }
                 navigate(target)
               }}
-              className="bg-[#E53935] hover:bg-[#D32F2F] active:scale-95 text-white text-xs sm:text-sm font-bold px-6 py-2.5 rounded-xl shadow-sm transition-all cursor-pointer border-0"
+              className="bg-[var(--primary)] hover:bg-[var(--primary-hover)] active:scale-95 text-white text-xs sm:text-sm font-bold px-6 py-2.5 rounded-xl shadow-sm transition-all cursor-pointer border-0"
             >
               Browse Menu
             </button>
@@ -326,19 +326,19 @@ export default function Coupons() {
                   className="relative bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/90 dark:border-zinc-800 shadow-2xs overflow-hidden transition-all duration-200 hover:shadow-md"
                 >
                   {/* Circular Ticket Cutouts on vertical divider line matching authentic coupon tickets */}
-                  <div className="absolute -top-3.5 right-[33%] sm:right-[34%] -translate-x-1/2 w-6 h-6 rounded-full bg-[#F4F5F7] dark:bg-zinc-950 border-b border-zinc-200/80 dark:border-zinc-800 z-10 pointer-events-none" />
-                  <div className="absolute -bottom-3.5 right-[33%] sm:right-[34%] -translate-x-1/2 w-6 h-6 rounded-full bg-[#F4F5F7] dark:bg-zinc-950 border-t border-zinc-200/80 dark:border-zinc-800 z-10 pointer-events-none" />
+                  <div className="absolute -top-3.5 right-[33%] sm:right-[34%] -translate-x-1/2 w-6 h-6 rounded-full bg-[#F5F3EF] dark:bg-zinc-950 border-b border-zinc-200/80 dark:border-zinc-800 z-10 pointer-events-none" />
+                  <div className="absolute -bottom-3.5 right-[33%] sm:right-[34%] -translate-x-1/2 w-6 h-6 rounded-full bg-[#F5F3EF] dark:bg-zinc-950 border-t border-zinc-200/80 dark:border-zinc-800 z-10 pointer-events-none" />
 
                   {/* Scalloped ticket punches on outer edges matching Image 1 */}
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 flex flex-col gap-1 z-10 pointer-events-none">
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#F4F5F7] dark:bg-zinc-950 border-r border-zinc-200/80 dark:border-zinc-800" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#F4F5F7] dark:bg-zinc-950 border-r border-zinc-200/80 dark:border-zinc-800" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#F4F5F7] dark:bg-zinc-950 border-r border-zinc-200/80 dark:border-zinc-800" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#F5F3EF] dark:bg-zinc-950 border-r border-zinc-200/80 dark:border-zinc-800" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#F5F3EF] dark:bg-zinc-950 border-r border-zinc-200/80 dark:border-zinc-800" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#F5F3EF] dark:bg-zinc-950 border-r border-zinc-200/80 dark:border-zinc-800" />
                   </div>
                   <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 flex flex-col gap-1 z-10 pointer-events-none">
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#F4F5F7] dark:bg-zinc-950 border-l border-zinc-200/80 dark:border-zinc-800" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#F4F5F7] dark:bg-zinc-950 border-l border-zinc-200/80 dark:border-zinc-800" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#F4F5F7] dark:bg-zinc-950 border-l border-zinc-200/80 dark:border-zinc-800" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#F5F3EF] dark:bg-zinc-950 border-l border-zinc-200/80 dark:border-zinc-800" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#F5F3EF] dark:bg-zinc-950 border-l border-zinc-200/80 dark:border-zinc-800" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#F5F3EF] dark:bg-zinc-950 border-l border-zinc-200/80 dark:border-zinc-800" />
                   </div>
 
                   {/* Ticket Card Body */}
@@ -349,7 +349,7 @@ export default function Coupons() {
                         {/* Top Row: Icon Badge + Dashed Code Pill */}
                         <div className="flex items-center gap-2.5">
                           {/* Badge Icon matching Image 1 */}
-                          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-sky-50 dark:bg-sky-950/50 border border-sky-100 dark:border-sky-900/60 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0">
+                          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-[var(--primary)]/10 border border-[var(--primary)]/20 flex items-center justify-center text-[var(--primary)] shrink-0">
                             {isPercentage ? (
                               <Percent className="w-4 h-4 stroke-[2.6]" />
                             ) : (
@@ -411,7 +411,7 @@ export default function Coupons() {
                         className={`w-full max-w-[105px] py-2 px-3 sm:px-4 rounded-lg font-bold text-xs sm:text-sm transition-all active:scale-95 shadow-xs cursor-pointer flex items-center justify-center gap-1 border-0 ${
                           isApplied
                             ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                            : "bg-[#E53935] hover:bg-[#D32F2F] text-white"
+                            : "bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white"
                         }`}
                       >
                         {isApplied ? (

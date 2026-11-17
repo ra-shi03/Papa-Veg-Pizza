@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "@/services/api/axios";
+import { isModuleAuthenticated } from "@food/utils/auth";
 
 export default function WelcomeScreen() {
   const navigate = useNavigate();
@@ -13,27 +14,27 @@ export default function WelcomeScreen() {
   const currentIndexRef = useRef(0);
   const hasRunRef = useRef(false);
 
-  // Navigate forward based on user visit and logout state
+  // Navigate forward based on authentication state
   const handleProceed = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
     sessionStorage.setItem("papa_veg_welcome_shown", "true");
 
     const hasLoggedOut = localStorage.getItem("customer_logged_out") === "true";
-    const hasVisited = localStorage.getItem("customer_has_visited") === "true";
     const isAuthenticated =
-      localStorage.getItem("user_authenticated") === "true" ||
-      Boolean(localStorage.getItem("user_accessToken") || localStorage.getItem("accessToken"));
+      !hasLoggedOut &&
+      (isModuleAuthenticated("user") ||
+        localStorage.getItem("user_authenticated") === "true" ||
+        Boolean(localStorage.getItem("user_accessToken") || localStorage.getItem("accessToken")));
 
-    // If customer explicitly logged out, or has never visited before:
-    // Flow: Welcome -> Login (phone) -> OTP -> Location -> Home
-    if (hasLoggedOut || (!hasVisited && !isAuthenticated)) {
+    // If customer is not logged in: Welcome -> Login
+    if (!isAuthenticated) {
       navigate("/food/user/auth/login", { replace: true });
       return;
     }
 
-    // Customer already visited and only backed out (did not logout):
-    // Flow: Welcome -> Location -> Home (skip number & OTP)
-    navigate("/user/location/setup", { replace: true });
+    // If customer is already logged in: proceed to home if location is set, otherwise setup location
+    const hasLocation = Boolean(localStorage.getItem("user_location"));
+    navigate(hasLocation ? "/food/user" : "/user/location/setup", { replace: true });
   };
 
   useEffect(() => {
