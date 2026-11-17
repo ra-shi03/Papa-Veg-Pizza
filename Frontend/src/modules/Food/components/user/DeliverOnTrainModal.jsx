@@ -5,7 +5,7 @@ import { useScrollLock } from "@food/hooks/useScrollLock"
 import { useLocationStore } from "@food/store/locationStore"
 import TrainJourneyFields from "@food/components/user/TrainJourneyFields"
 import { useTrainStations } from "@food/hooks/useTrainStations"
-import { emptyJourney, journeyProblem, saveTrainJourney } from "@food/utils/trainJourney"
+import { emptyJourney, journeyProblem, saveTrainJourney, TRAIN_LOAD_FAILED } from "@food/utils/trainJourney"
 
 export default function DeliverOnTrainModal({ show, onClose }) {
   const navigate = useNavigate()
@@ -22,7 +22,7 @@ export default function DeliverOnTrainModal({ show, onClose }) {
   const [journey, setJourney] = useState(emptyJourney)
   const [agreed, setAgreed] = useState(true)
   const { info: trainInfo, failed: trainFailed } = useTrainStations(Boolean(show))
-  const trainProblem = trainFailed ? "Train delivery is not available yet" : journeyProblem(journey, trainInfo)
+  const trainProblem = trainFailed ? TRAIN_LOAD_FAILED : journeyProblem(journey, trainInfo)
 
   // Modal / Drawer states
   const [showTermsModal, setShowTermsModal] = useState(false)

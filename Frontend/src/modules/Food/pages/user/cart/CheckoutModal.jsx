@@ -388,6 +388,8 @@ export default function CheckoutModal({
         },
         // What the customer chose on the Payment Options page: online goes through Razorpay, otherwise pay on delivery
         paymentMethod: payMethod.kind === "online" ? "razorpay" : "cash",
+        // How the customer chose to order; the server checks it against the super admin's order-method rules for the store
+        orderMethod: isTrain ? "train" : (["takeaway", "incar"].includes(activeService) ? activeService : "delivery"),
         note: instructions.trim(),
       }, { contact, selected: selectedAddress }))
       const created = response?.data?.data?.order

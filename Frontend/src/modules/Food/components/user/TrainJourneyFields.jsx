@@ -1,4 +1,4 @@
-import { OTHER_STATION, TRAIN_UNAVAILABLE } from "@food/utils/trainJourney"
+import { OTHER_STATION, TRAIN_UNAVAILABLE, TRAIN_LOAD_FAILED } from "@food/utils/trainJourney"
 
 /**
  * The fields of a train order: station (from the list), train number, coach, seat and an optional PNR. Both train screens
@@ -12,7 +12,7 @@ export default function TrainJourneyFields({ journey, onChange, info, failed, cl
   // "Another station" (typed by name) exists only while a default train store can serve it
   const selected = journey.other ? OTHER_STATION : journey.stationCode
 
-  if (unavailable) return <p className={error} role="alert">{TRAIN_UNAVAILABLE}</p>
+  if (unavailable) return <p className={error} role="alert">{failed ? TRAIN_LOAD_FAILED : TRAIN_UNAVAILABLE}</p>
 
   return (
     <div className="space-y-3">

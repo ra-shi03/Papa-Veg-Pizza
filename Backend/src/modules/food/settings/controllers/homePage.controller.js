@@ -57,7 +57,11 @@ export const getHomePageConfig = async (req, res, next) => {
                 await config.save();
             }
         }
-        return sendResponse(res, 200, 'Home page configuration retrieved', config);
+        // Order methods and where they apply are read through /food/orders/methods (per store) and written through
+        // /settings/order-methods: never exposed or accepted here
+        const publicConfig = config.toObject ? config.toObject() : { ...config };
+        delete publicConfig.orderMethods;
+        return sendResponse(res, 200, 'Home page configuration retrieved', publicConfig);
     } catch (error) {
         next(error);
     }
@@ -75,8 +79,9 @@ export const createOrUpdateHomePageConfig = async (req, res, next) => {
 
         let config = await HomePage.findOne();
         if (!config) {
+            const { orderMethods: _notHere, ...createBody } = req.body || {}; // order methods are saved only by /settings/order-methods
             config = await HomePage.create({
-                ...req.body,
+                ...createBody,
                 bottomNav: req.body.bottomNav || DEFAULT_BOTTOM_NAV
             });
         } else {
@@ -85,7 +90,6 @@ export const createOrUpdateHomePageConfig = async (req, res, next) => {
             if (req.body.promoText !== undefined) config.promoText = req.body.promoText;
             if (req.body.cravingHeading !== undefined) config.cravingHeading = req.body.cravingHeading;
             if (req.body.banners !== undefined) config.banners = req.body.banners;
-            if (req.body.orderMethods !== undefined) config.orderMethods = req.body.orderMethods;
             if (req.body.trainConfig !== undefined) config.trainConfig = req.body.trainConfig;
             if (req.body.adPopup !== undefined) config.adPopup = req.body.adPopup;
             if (req.body.menuFilters !== undefined) config.menuFilters = req.body.menuFilters;
@@ -111,8 +115,9 @@ export const updateHomePageConfig = async (req, res, next) => {
 
         let config = await HomePage.findOne();
         if (!config) {
+            const { orderMethods: _notHere, ...createBody } = req.body || {}; // order methods are saved only by /settings/order-methods
             config = await HomePage.create({
-                ...req.body,
+                ...createBody,
                 bottomNav: req.body.bottomNav || DEFAULT_BOTTOM_NAV
             });
         } else {
@@ -121,7 +126,6 @@ export const updateHomePageConfig = async (req, res, next) => {
             if (req.body.promoText !== undefined) config.promoText = req.body.promoText;
             if (req.body.cravingHeading !== undefined) config.cravingHeading = req.body.cravingHeading;
             if (req.body.banners !== undefined) config.banners = req.body.banners;
-            if (req.body.orderMethods !== undefined) config.orderMethods = req.body.orderMethods;
             if (req.body.trainConfig !== undefined) config.trainConfig = req.body.trainConfig;
             if (req.body.adPopup !== undefined) config.adPopup = req.body.adPopup;
             if (req.body.menuFilters !== undefined) config.menuFilters = req.body.menuFilters;

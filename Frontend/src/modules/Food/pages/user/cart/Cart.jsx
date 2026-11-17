@@ -9,7 +9,7 @@ import CartOffers, { CheesyRewardsCard } from "./CartOffers"
 import CouponAppliedPopup from "./CouponAppliedPopup"
 import { usePaymentGateways } from "./usePaymentGateways"
 import DeliveryTimeSheet from "./DeliveryTimeSheet"
-import { readTrainJourney, trainOrderProblem, trainStoreQuery } from "@food/utils/trainJourney"
+import { readTrainJourney, trainOrderProblem, trainStoreQuery, TRAIN_LOAD_FAILED } from "@food/utils/trainJourney"
 import { useTrainStations } from "@food/hooks/useTrainStations"
 import { getCartCoords, isSlotStillValid, loadSlot, saveSlot, slotDay, slotLabel, time12, offerDiscount, toOrderItems, readPaymentMethod } from "./cartHelpers"
 import { CartMealSuggestions, LimitedOffer } from "./upsell/CartUpsell"
@@ -572,7 +572,7 @@ export default function Cart() {
   // A train order is refused before it is placed when no station or default train store is set up
   const trainJourney = readTrainJourney()
   const { info: trainInfo, failed: trainFailed } = useTrainStations(!!trainJourney)
-  const trainProblem = trainJourney ? (trainFailed ? "Train delivery is not available yet" : trainOrderProblem(trainJourney, trainInfo)) : null
+  const trainProblem = trainJourney ? (trainFailed ? TRAIN_LOAD_FAILED : trainOrderProblem(trainJourney, trainInfo)) : null
 
   const proceed = () => {
     if (trainProblem) {

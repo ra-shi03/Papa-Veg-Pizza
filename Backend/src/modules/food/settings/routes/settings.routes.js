@@ -5,6 +5,7 @@ import { getDeliveryLoginScreenConfig, updateDeliveryLoginScreenConfig } from '.
 import { getHomePageConfig, createOrUpdateHomePageConfig, updateHomePageConfig, uploadHomePageBanner, updateHomePageBanner, deleteHomePageBanner } from '../controllers/homePage.controller.js';
 import { authMiddleware, requireSuperAdmin } from '../../../../core/auth/auth.middleware.js';
 import { upload } from '../../../../middleware/upload.js';
+import { getOrderMethodsAdmin, saveOrderMethodsAdmin } from '../controllers/orderMethods.controller.js';
 import { getPublicHeroBanner, getHeroBannerAdmin, saveHeroBanner } from '../controllers/heroBanner.controller.js';
 
 const router = express.Router();
@@ -18,6 +19,11 @@ router.put('/welcome', authMiddleware, requireSuperAdmin, updateWelcomeScreenCon
 // Delivery App Welcome Screen routes
 router.get('/delivery-welcome', getDeliveryWelcomeScreenConfig);
 router.put('/delivery-welcome', authMiddleware, requireSuperAdmin, updateDeliveryWelcomeScreenConfig);
+
+// Order methods: which methods exist and where each is offered. Only the super admin reads or writes the rules; the
+// customer app gets the result for its own store from GET /food/orders/methods.
+router.get('/order-methods', authMiddleware, requireSuperAdmin, getOrderMethodsAdmin);
+router.put('/order-methods', authMiddleware, requireSuperAdmin, saveOrderMethodsAdmin);
 
 // Hero banners on customer screens (Under 250): the super admin writes, customers read display fields only
 router.get('/hero-banners/:key/public', getPublicHeroBanner);

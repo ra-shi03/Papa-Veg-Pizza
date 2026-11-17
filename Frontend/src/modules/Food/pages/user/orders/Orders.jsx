@@ -44,30 +44,7 @@ export default function Orders() {
     return location.state?.tab || "order_history"
   })
   const [selectedFilter, setSelectedFilter] = useState("all")
-  const [filterOptions, setFilterOptions] = useState(() => {
-    try {
-      const stored = localStorage.getItem("pvp_order_methods")
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const dynamicChips = parsed
-            .filter((m) => m.enabled !== false)
-            .map((m) => ({
-              id: m.id === "dinein" ? "dine_in" : m.id,
-              label: m.label || m.name,
-            }))
-          if (dynamicChips.length > 0) {
-            return [
-              { id: "all", label: "All" },
-              { id: "favourite", label: "Favourite" },
-              ...dynamicChips,
-            ]
-          }
-        }
-      }
-    } catch (_) {}
-    return DEFAULT_FILTER_OPTIONS
-  })
+  const [filterOptions, setFilterOptions] = useState(DEFAULT_FILTER_OPTIONS)
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -126,38 +103,8 @@ export default function Orders() {
 
     fetchOrderMethods()
 
-    const handleMethodsChanged = (e) => {
-      let updated = e?.detail
-      if (!updated) {
-        try {
-          const stored = localStorage.getItem("pvp_order_methods")
-          if (stored) updated = JSON.parse(stored)
-        } catch (_) {}
-      }
-      if (Array.isArray(updated) && updated.length > 0) {
-        const dynamicChips = updated
-          .filter((m) => m.enabled !== false)
-          .map((m) => ({
-            id: m.id === "dinein" ? "dine_in" : m.id,
-            label: m.label || m.name,
-          }))
-        if (dynamicChips.length > 0) {
-          setFilterOptions([
-            { id: "all", label: "All" },
-            { id: "favourite", label: "Favourite" },
-            ...dynamicChips,
-          ])
-        }
-      }
-    }
-
-    window.addEventListener("pvp_order_methods_changed", handleMethodsChanged)
-    window.addEventListener("storage", handleMethodsChanged)
-
     return () => {
       isMounted = false
-      window.removeEventListener("pvp_order_methods_changed", handleMethodsChanged)
-      window.removeEventListener("storage", handleMethodsChanged)
     }
   }, [])
 

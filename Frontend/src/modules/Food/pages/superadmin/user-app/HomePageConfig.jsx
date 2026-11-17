@@ -456,14 +456,14 @@ export default function HomePageConfig() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isUploadingAdImage, setIsUploadingDealImage] = useState(false);
-  const defaultMethods = [
-    { id: "delivery", label: "Delivery", icon: "moped", enabled: false },
-    { id: "takeaway", label: "Takeaway", icon: "store", enabled: false },
-    { id: "incar", label: "In-Car", icon: "directions_car", enabled: false },
-    { id: "train", label: "Delivery on Train", icon: "train", enabled: false }
-  ];
-
-  const [orderMethods, setOrderMethods] = useState(defaultMethods);
+  // Order methods: switched on or off, and where each is offered (all stores, chosen franchises, chosen stores).
+  // Saved on the server through /settings/order-methods; the customer app reads them per store.
+  const [orderMethods, setOrderMethods] = useState([]);
+  const [methodsState, setMethodsState] = useState('loading'); // loading | ready | error
+  const [isSavingMethods, setIsSavingMethods] = useState(false);
+  const [methodsDirty, setMethodsDirty] = useState(false);
+  const [franchiseOptions, setFranchiseOptions] = useState([]);
+  const [storeOptions, setStoreOptions] = useState([]);
   
   const [trainConfig, setTrainConfig] = useState({
     bannerTitle: 'Pizza On Your Seat',
@@ -562,19 +562,6 @@ export default function HomePageConfig() {
   const fetchConfig = async () => {
     setIsLoading(true);
     try {
-      const storedMethods = localStorage.getItem("pvp_order_methods");
-      if (storedMethods) {
-        try {
-          const parsed = JSON.parse(storedMethods);
-          // Merge to ensure new options like Dine-In are added even if old localStorage exists
-          const merged = defaultMethods.map(def => {
-            const found = parsed.find(p => p.id === def.id);
-            return found ? found : def;
-          });
-          setOrderMethods(merged);
-        } catch(e) {}
-      }
-
       let response;
       try {
         response = await adminClient.get('/settings/home-page');
@@ -644,20 +631,6 @@ export default function HomePageConfig() {
               setMenuFilters(JSON.parse(storedFilters));
             } catch (_) {}
           }
-        }
-
-        if (Array.isArray(data.orderMethods) && data.orderMethods.length > 0) {
-           const merged = defaultMethods.map(def => {
-             const found = data.orderMethods.find(p => p.id === def.id);
-             return found ? found : def;
-           });
-           setOrderMethods(merged);
-           localStorage.setItem("pvp_order_methods", JSON.stringify(merged));
-        } else if (!storedMethods) {
-           setOrderMethods(defaultMethods);
-           localStorage.setItem("pvp_order_methods", JSON.stringify(defaultMethods));
-           // Sync defaults to backend if it was empty
-           adminClient.put('/settings/home-page', { orderMethods: defaultMethods }).catch(() => {});
         }
 
         if (data.deliveryCard) {
@@ -917,23 +890,60 @@ export default function HomePageConfig() {
     }
   };
 
-  const handleToggleOrderMethod = (id) => {
-    const updatedMethods = orderMethods.map(m => 
-      m.id === id ? { ...m, enabled: !m.enabled } : m
-    );
-    setOrderMethods(updatedMethods);
-    
-    // Save to localStorage and dispatch event for real-time user app update
+  // Order methods: load the rules (and the franchises and stores to choose from) from the server
+  useEffect(() => {
+    let cancelled = false;
+    const listOf = (res) => {
+      const d = res?.data?.data ?? res?.data;
+      const arr = Array.isArray(d) ? d : (d && typeof d === 'object' ? (Object.values(d).find(Array.isArray) || []) : []);
+      return arr.map((x) => ({ id: String(x._id || x.id), name: x.name || x.franchiseName || x.storeName || x.label || String(x._id || x.id) })).filter((x) => x.id);
+    };
+    (async () => {
+      try {
+        const res = await adminClient.get('/settings/order-methods');
+        if (!cancelled) {
+          setOrderMethods(res?.data?.data?.methods || []);
+          setMethodsState('ready');
+        }
+      } catch {
+        if (!cancelled) setMethodsState('error');
+      }
+      const [fr, st] = await Promise.allSettled([adminClient.get('/food/admin/franchises'), adminClient.get('/food/admin/stores')]);
+      if (cancelled) return;
+      if (fr.status === 'fulfilled') setFranchiseOptions(listOf(fr.value));
+      if (st.status === 'fulfilled') setStoreOptions(listOf(st.value));
+      else {
+        try { const r = await adminClient.get('/stores'); if (!cancelled) setStoreOptions(listOf(r)); } catch (_) {}
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const updateMethod = (id, patch) => {
+    setOrderMethods((list) => list.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+    setMethodsDirty(true);
+  };
+
+  const toggleInList = (id, field, value) => {
+    setOrderMethods((list) => list.map((m) => {
+      if (m.id !== id) return m;
+      const has = (m[field] || []).includes(value);
+      return { ...m, [field]: has ? m[field].filter((v) => v !== value) : [...(m[field] || []), value] };
+    }));
+    setMethodsDirty(true);
+  };
+
+  const handleSaveOrderMethods = async () => {
+    setIsSavingMethods(true);
     try {
-      localStorage.setItem('pvp_order_methods', JSON.stringify(updatedMethods));
-      window.dispatchEvent(new CustomEvent('pvp_order_methods_changed', { detail: updatedMethods }));
-      toast.success('Order method updated successfully!');
-      
-      // Optionally sync to backend if supported by your home-page settings schema
-      adminClient.put('/settings/home-page', { orderMethods: updatedMethods }).catch(e => console.warn('Failed to sync order methods to backend', e));
+      const res = await adminClient.put('/settings/order-methods', { methods: orderMethods });
+      setOrderMethods(res?.data?.data?.methods || orderMethods);
+      setMethodsDirty(false);
+      toast.success('Order methods saved');
     } catch (err) {
-      console.error(err);
-      toast.error('Failed to update order method');
+      toast.error(err?.response?.data?.message || err?.response?.data?.error || 'Could not save the order methods');
+    } finally {
+      setIsSavingMethods(false);
     }
   };
 
@@ -1650,27 +1660,84 @@ export default function HomePageConfig() {
             Order Methods
           </h2>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Enable or disable specific order methods in the user app. Disabled methods will be hidden.
+            Switch each order method on or off and choose where it is offered: all stores, the stores of chosen franchises, or chosen stores only. The customer app shows the methods that apply to the store serving the customer.
           </p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {orderMethods.map((method) => (
-            <div key={method.id} className="flex items-center justify-between p-4 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-900 shadow-sm">
-              <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{method.label}</span>
-              <button
-                onClick={() => handleToggleOrderMethod(method.id)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                  method.enabled ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-700'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    method.enabled ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-            </div>
-          ))}
+        {methodsState === 'loading' && <p className="text-xs text-zinc-500">Loading...</p>}
+        {methodsState === 'error' && <p className="text-xs text-red-600">Could not load the order methods.</p>}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {orderMethods.map((method) => {
+            const pickFranchises = method.scope === 'franchises';
+            const pickStores = method.scope === 'stores';
+            const options = pickFranchises ? franchiseOptions : storeOptions;
+            const field = pickFranchises ? 'franchiseIds' : 'storeIds';
+            return (
+              <div key={method.id} className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-900 shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{method.label}</span>
+                  <button
+                    type="button"
+                    onClick={() => updateMethod(method.id, { enabled: !method.enabled })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                      method.enabled ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-700'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        method.enabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+                <div className={method.enabled ? '' : 'opacity-50 pointer-events-none'}>
+                  <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Offered at</label>
+                  <select
+                    value={method.scope}
+                    onChange={(e) => updateMethod(method.id, { scope: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary dark:bg-zinc-800 dark:border-zinc-700"
+                  >
+                    <option value="all">All stores</option>
+                    <option value="franchises">Stores of selected franchises</option>
+                    <option value="stores">Selected stores only</option>
+                  </select>
+                  {(pickFranchises || pickStores) && (
+                    <div className="mt-2 max-h-40 overflow-y-auto border rounded-md divide-y dark:border-zinc-700 dark:divide-zinc-700">
+                      {options.length === 0 && <p className="p-2 text-xs text-zinc-500">No {pickFranchises ? 'franchises' : 'stores'} found.</p>}
+                      {options.map((o) => (
+                        <label key={o.id} className="flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={(method[field] || []).includes(o.id)}
+                            onChange={() => toggleInList(method.id, field, o.id)}
+                          />
+                          <span className="truncate">{o.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  {(pickFranchises || pickStores) && (method[field] || []).length === 0 && (
+                    <p className="mt-1 text-xs text-amber-600">Choose at least one {pickFranchises ? 'franchise' : 'store'}, or this method cannot be saved.</p>
+                  )}
+                  <p className="mt-2 text-[11px] text-zinc-500">
+                    {method.scope === 'all'
+                      ? 'Every customer sees it.'
+                      : 'Customers see it only when the store serving their location is one of these. Until their location is known it stays hidden.'}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleSaveOrderMethods}
+            disabled={isSavingMethods || !methodsDirty}
+            className="px-4 py-2 rounded-md bg-primary text-white text-sm font-semibold disabled:opacity-50 cursor-pointer border-0"
+          >
+            {isSavingMethods ? 'Saving...' : 'Save order methods'}
+          </button>
+          {methodsDirty && <span className="text-xs text-amber-600">Unsaved changes</span>}
         </div>
       </section>
 

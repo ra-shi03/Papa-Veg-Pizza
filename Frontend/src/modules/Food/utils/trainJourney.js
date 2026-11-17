@@ -2,6 +2,8 @@
 // an optional PNR. Nothing is looked up: the PNR is never checked against anything and only travels as a delivery note.
 
 export const TRAIN_UNAVAILABLE = "Train delivery is not available yet"
+// The station list could not be loaded (the server was not reached): not the same as "not available"
+export const TRAIN_LOAD_FAILED = "Could not load train stations. Please check your connection and try again."
 export const TRAIN_KEY = "pvp_train"
 export const OTHER_STATION = "__other__"
 

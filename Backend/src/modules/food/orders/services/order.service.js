@@ -10,6 +10,7 @@ import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model
 import { FoodZone } from '../../admin/models/zone.model.js';
 import { FoodFeeSettings } from '../../admin/models/feeSettings.model.js';
 import { ValidationError, ForbiddenError, NotFoundError } from '../../../../core/auth/errors.js';
+import { assertMethodAllowed } from '../../settings/services/orderMethods.service.js';
 import { buildPaginationOptions, buildPaginatedResult } from '../../../../utils/helpers.js';
 import { FoodCoupon } from '../../settings/models/foodCoupon.model.js';
 import { FoodOfferUsage } from '../../admin/models/offerUsage.model.js';
@@ -176,6 +177,8 @@ export async function createOrder(userId, dto) {
   const trainStore = dto.train ? await resolveTrainStore(dto.train.stationCode, { at: dto.scheduledAt }) : null;
   if (trainStore) dto = withTrainDelivery(dto, trainStore);
   const store = trainStore ? trainStore.store : await getOrderableStore(dto.storeId, { at: dto.scheduledAt });
+  // The super admin decides where each order method is offered; a method not offered at this store is refused here
+  const orderMethod = await assertMethodAllowed(trainStore ? 'train' : (dto.orderMethod === 'train' ? 'delivery' : dto.orderMethod), store);
 
   // Prices, fees, tax, discount and total are all computed here from the catalogue; the client's are ignored.
   const priced = await buildOrderPricing(userId, { ...dto, deliveryAddress: dto.address });
@@ -301,6 +304,7 @@ export async function createOrder(userId, dto) {
     ...(dto.train ? { train: dto.train } : {}),
     storeNote: dto.storeNote || "",
     sendCutlery: dto.sendCutlery !== false,
+    orderMethod,
     deliveryFleet: dto.deliveryFleet || "standard",
     scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
     riderEarning,

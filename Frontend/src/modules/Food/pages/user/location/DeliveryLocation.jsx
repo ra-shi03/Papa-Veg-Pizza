@@ -4,10 +4,11 @@ import { ArrowLeft, MapPin, Bike, ShoppingBag, Utensils, Train, ChevronRight, Ca
 import { useLocationStore } from '@food/store/locationStore';
 import { locationAPI } from '@/services/api/location';
 import apiClient from '@/services/api/axios';
+import { orderAPI } from '@food/api';
 import { TRAIN_TERMS_TITLE, TRAIN_TERMS_SHORT } from '@food/constants/trainDelivery';
 import TrainJourneyFields from '@food/components/user/TrainJourneyFields';
 import { useTrainStations } from '@food/hooks/useTrainStations';
-import { emptyJourney, journeyProblem, saveTrainJourney } from '@food/utils/trainJourney';
+import { emptyJourney, journeyProblem, saveTrainJourney, TRAIN_LOAD_FAILED } from '@food/utils/trainJourney';
 
 export default function DeliveryLocation() {
   const navigate = useNavigate();
@@ -29,7 +30,7 @@ export default function DeliveryLocation() {
   const [isLoadingStores, setIsLoadingStores] = useState(false);
   const [journey, setJourney] = useState(emptyJourney);
   const { info: trainInfo, failed: trainFailed } = useTrainStations(activeService === 'train');
-  const trainProblem = trainFailed ? 'Train delivery is not available yet' : journeyProblem(journey, trainInfo);
+  const trainProblem = trainFailed ? TRAIN_LOAD_FAILED : journeyProblem(journey, trainInfo);
   const [agreed, setAgreed] = useState(false);
 
   const iconMap = {
@@ -40,30 +41,10 @@ export default function DeliveryLocation() {
     incar: Car
   };
 
-  const defaultMethodsTemplate = [
-    { id: 'delivery', label: 'Delivery', enabled: true },
-    { id: 'takeaway', label: 'Takeaway', enabled: true },
-    { id: 'dinein', label: 'Dine-in', enabled: true },
-    { id: 'train', label: 'Deliver on train', enabled: true },
-    { id: 'incar', label: 'In-Car', enabled: false }
-  ];
-
-  const [orderMethods, setOrderMethods] = useState(() => {
-    try {
-      const stored = localStorage.getItem("pvp_order_methods");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        const merged = defaultMethodsTemplate.map(def => {
-          const found = parsed.find(p => p.id === def.id);
-          return found ? { ...def, enabled: found.enabled, label: found.label } : def;
-        });
-        return merged.filter(m => m.enabled);
-      }
-    } catch (e) {
-      console.error("Failed to parse order methods", e);
-    }
-    return defaultMethodsTemplate.filter(m => m.enabled);
-  });
+  // The order methods this customer may use, from the server: the super admin's switches and the stores / franchises
+  // each method is limited to, applied to the store that serves the customer's saved location.
+  const [orderMethods, setOrderMethods] = useState([]);
+  const [methodsState, setMethodsState] = useState('loading'); // loading | ready | error
 
   const [trainConfig, setTrainConfig] = useState(() => {
     const defaultTrainConfig = {
@@ -94,29 +75,6 @@ export default function DeliveryLocation() {
   });
 
   useEffect(() => {
-    const handleOrderMethodsChange = (e) => {
-      let parsed = [];
-      if (e.type === 'pvp_order_methods_changed') {
-        parsed = e.detail;
-      } else if (e.key === 'pvp_order_methods' && e.newValue) {
-        parsed = JSON.parse(e.newValue);
-      } else {
-        const stored = localStorage.getItem("pvp_order_methods");
-        if (stored) parsed = JSON.parse(stored);
-      }
-
-      if (parsed && parsed.length > 0) {
-        const merged = defaultMethodsTemplate.map(def => {
-          const found = parsed.find(p => p.id === def.id);
-          return found ? { ...def, enabled: found.enabled, label: found.label } : def;
-        });
-        setOrderMethods(merged.filter(m => m.enabled));
-      }
-    };
-
-    window.addEventListener('pvp_order_methods_changed', handleOrderMethodsChange);
-    window.addEventListener('storage', handleOrderMethodsChange);
-
     const handleHomeConfigChange = (e) => {
       let parsed = null;
       if (e.type === 'homePageConfigUpdated') {
@@ -135,21 +93,6 @@ export default function DeliveryLocation() {
             formTitle: parsed.trainConfig.formTitle || prev.formTitle,
             terms: parsed.trainConfig.terms && parsed.trainConfig.terms.length > 0 ? parsed.trainConfig.terms : prev.terms
           }));
-        }
-        if (Array.isArray(parsed.orderMethods)) {
-          const defaultMethods = [
-            { id: 'delivery', label: 'Delivery', enabled: true },
-            { id: 'takeaway', label: 'Takeaway', enabled: true },
-            { id: 'dinein', label: 'Dine-in', enabled: true },
-            { id: 'train', label: 'Deliver on train', enabled: true },
-            { id: 'incar', label: 'In-Car', enabled: false }
-          ];
-          const merged = defaultMethods.map(def => {
-            const found = parsed.orderMethods.find(p => p.id === def.id);
-            return found ? { ...def, enabled: found.enabled, label: found.label } : def;
-          });
-          setOrderMethods(merged.filter(m => m.enabled));
-          localStorage.setItem("pvp_order_methods", JSON.stringify(merged));
         }
       }
     };
@@ -173,8 +116,6 @@ export default function DeliveryLocation() {
     window.addEventListener('storage', handleHomeConfigChange);
 
     return () => {
-      window.removeEventListener('pvp_order_methods_changed', handleOrderMethodsChange);
-      window.removeEventListener('storage', handleOrderMethodsChange);
       window.removeEventListener('homePageConfigUpdated', handleHomeConfigChange);
       window.removeEventListener('storage', handleHomeConfigChange);
     };
@@ -199,6 +140,21 @@ export default function DeliveryLocation() {
   };
 
   useEffect(() => {
+    let cancelled = false;
+    orderAPI.getOrderMethods()
+      .then((methods) => {
+        if (cancelled) return;
+        const on = methods.filter((m) => m.enabled);
+        setOrderMethods(on);
+        setMethodsState('ready');
+        // a method that is not offered here cannot stay selected
+        setActiveService((current) => (on.some((m) => m.id === current) || on.length === 0 ? current : on[0].id));
+      })
+      .catch(() => { if (!cancelled) setMethodsState('error'); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
     if (activeService === 'takeaway' || activeService === 'dinein' || activeService === 'incar') {
       fetchNearbyStores();
     }
@@ -216,6 +172,12 @@ export default function DeliveryLocation() {
 
       <div className="p-4 flex flex-col gap-6">
         {/* Order Methods Grid */}
+        {methodsState === 'error' && (
+          <p className="text-[13px] font-semibold text-[#E53935]">Could not load the order methods. Please check your connection and try again.</p>
+        )}
+        {methodsState === 'ready' && orderMethods.length === 0 && (
+          <p className="text-[13px] font-semibold text-zinc-500">Ordering is not available at your location right now.</p>
+        )}
         <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-2 pt-2 -mt-2 -mx-4 px-4">
           {orderMethods.map((method) => {
             const IconComponent = iconMap[method.id] || Bike;

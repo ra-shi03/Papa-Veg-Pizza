@@ -2,6 +2,7 @@ import { FoodBusinessSettings } from '../models/businessSettings.model.js';
 import { isValidEmail, isValidPhone } from '../validators/businessSettings.validator.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { FoodStore } from '../../store/models/store.model.js';
+import { loadMethods as loadOrderMethods, methodAllowedAt } from '../../settings/services/orderMethods.service.js';
 
 // The one business settings record: the only source of the business name and contact details. Super admin writes it;
 // the apps read toPublicBusinessInfo through GET /food/admin/business-settings/public.
@@ -54,7 +55,14 @@ export async function getTrainStations() {
   const settings = await FoodBusinessSettings.findOne().sort({ createdAt: 1 }).select('trainDelivery').lean();
   const { stations = [], defaultStoreId = null } = settings?.trainDelivery || {};
   const ids = [...stations.map((s) => s.storeId), defaultStoreId].filter(Boolean);
-  const usable = new Set((await FoodStore.find({ _id: { $in: ids }, approvalStatus: 'Approved', isActive: { $ne: false } }).select('_id').lean()).map((s) => String(s._id)));
+  // A station counts only when its store is approved and active AND the super admin's "Delivery on Train" order
+  // method is on for that store (all stores, its franchise, or the store itself).
+  const trainMethod = (await loadOrderMethods()).find((m) => m.id === 'train');
+  const usable = new Set(
+    (await FoodStore.find({ _id: { $in: ids }, approvalStatus: 'Approved', isActive: { $ne: false } }).select('_id franchiseId').lean())
+      .filter((s) => methodAllowedAt(trainMethod, s))
+      .map((s) => String(s._id)),
+  );
   const defaultAvailable = !!defaultStoreId && usable.has(String(defaultStoreId));
   const listed = stations.filter((s) => usable.has(String(s.storeId))).map(({ name, code }) => ({ name, code }));
   const info = { available: listed.length > 0 || defaultAvailable, defaultAvailable, stations: listed };

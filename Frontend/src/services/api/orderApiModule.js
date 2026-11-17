@@ -2,6 +2,7 @@ import apiClient, { userClient, restaurantClient, deliveryClient, adminClient } 
 import { API_ENDPOINTS } from "./config.js";
 import * as authService from "./auth.js";
 import { createStubAPI, emptyDataStub, stub } from "./core.js";
+import { readSavedCoords } from "../../modules/Food/utils/savedLocation.js";
 
 
 export const uploadAPI = {
@@ -153,32 +154,15 @@ export const orderAPI = {
         description: payload.subject ? `${payload.subject}: ${payload.description}` : payload.description,
       }
     ),
+  /**
+   * The order methods this customer may use, from the server: the super admin's rules applied to the store that serves
+   * the customer's saved location. Throws when the server cannot be reached (nothing is invented).
+   */
   getOrderMethods: async () => {
-    try {
-      const res = await userClient.get("/food/orders/methods");
-      const data = res?.data?.data;
-      const list = Array.isArray(data?.methods) ? data.methods : (Array.isArray(data) ? data : []);
-      if (list.length > 0) return list;
-    } catch (_) {}
-    try {
-      const homeRes = await apiClient.get('/settings/home-page');
-      const list = homeRes?.data?.data?.orderMethods;
-      if (Array.isArray(list) && list.length > 0) return list;
-    } catch (_) {}
-    try {
-      const stored = localStorage.getItem("pvp_order_methods");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (_) {}
-    return [
-      { id: "delivery", label: "Delivery", enabled: true },
-      { id: "dine_in", label: "Dine-In", enabled: true },
-      { id: "takeaway", label: "Takeaway", enabled: true },
-      { id: "train", label: "Delivery on Train", enabled: true },
-      { id: "incar", label: "In-Car", enabled: true }
-    ];
+    const point = readSavedCoords();
+    const res = await userClient.get("/food/orders/methods", { params: point ? { lat: point.lat, lng: point.lng } : {} });
+    const list = res?.data?.data?.methods;
+    return Array.isArray(list) ? list : [];
   },
 };
 

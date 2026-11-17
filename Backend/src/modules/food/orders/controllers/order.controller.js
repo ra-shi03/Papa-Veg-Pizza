@@ -1,9 +1,9 @@
+import mongoose from 'mongoose';
 import { sendResponse } from '../../../../utils/response.js';
 import { scopedStoreIds } from '../../shared/franchiseScope.js';
 import * as orderService from '../services/order.service.js';
 import { getPublicFeeConfig } from '../services/order-pricing.service.js';
 import * as foodOrderPaymentService from '../services/foodOrderPayment.service.js';
-import { HomePage } from '../../settings/models/homePage.model.js';
 import {
     validateCalculateOrderDto,
     validateCreateOrderDto,
@@ -441,27 +441,29 @@ export async function getOrderHistoryPublicController(req, res, next) {
     }
 }
 
+/**
+ * GET /food/orders/methods?storeId= or ?lat=&lng= (public): the order methods this customer may use. The store is the
+ * one that serves them (given, or the nearest orderable one for the point); the super admin's rules for each method
+ * are applied to that store. With no store, only methods open to every store are listed.
+ */
 export async function getOrderMethodsController(req, res, next) {
     try {
-        let config = await HomePage.findOne().lean();
-        let methods = config?.orderMethods;
-        if (!methods || !Array.isArray(methods) || methods.length === 0) {
-            methods = [
-                { id: 'delivery', label: 'Delivery', icon: 'moped', enabled: true },
-                { id: 'takeaway', label: 'Takeaway', icon: 'store', enabled: true },
-                { id: 'train', label: 'Delivery on Train', icon: 'train', enabled: true },
-                { id: 'incar', label: 'In-Car', icon: 'directions_car', enabled: true }
-            ];
+        const { publicMethodsFor } = await import('../../settings/services/orderMethods.service.js');
+        let store = null;
+        try {
+            if (req.query.storeId && mongoose.Types.ObjectId.isValid(String(req.query.storeId))) {
+                const { FoodStore } = await import('../../store/models/store.model.js');
+                store = await FoodStore.findOne({ _id: String(req.query.storeId), approvalStatus: 'Approved', isActive: { $ne: false } }).select('_id franchiseId').lean();
+            } else if (req.query.lat !== undefined && req.query.lng !== undefined) {
+                const { resolveStoreForLocation } = await import('../services/order-store.service.js');
+                const found = await resolveStoreForLocation(parseFloat(req.query.lat), parseFloat(req.query.lng), { anyHours: true });
+                store = found?.store || null;
+            }
+        } catch {
+            store = null; // no store serves this point: only the methods open to every store
         }
-        return sendResponse(res, 200, 'Order methods retrieved successfully', {
-            // There is no dine-in flow: a stored dine-in entry is never offered
-            methods: methods.filter(m => m.id !== 'dine_in' && m.id !== 'dinein').map(m => ({
-                id: m.id,
-                label: m.label,
-                icon: m.icon || '',
-                enabled: m.enabled !== false
-            }))
-        });
+        res.set('Cache-Control', 'no-store');
+        return sendResponse(res, 200, 'Order methods retrieved successfully', { methods: await publicMethodsFor(store), storeId: store ? String(store._id) : null });
     } catch (err) {
         next(err);
     }

@@ -40,7 +40,11 @@ const homePageSchema = new mongoose.Schema(
                 id: { type: String, required: true },
                 label: { type: String, required: true },
                 icon: { type: String },
-                enabled: { type: Boolean, default: true }
+                enabled: { type: Boolean, default: true },
+                // Where it is offered: every store, the stores of the listed franchises, or only the listed stores
+                scope: { type: String, enum: ['all', 'franchises', 'stores'], default: 'all' },
+                franchiseIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'FoodFranchise' }],
+                storeIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'FoodStore' }]
             }
         ],
         trainConfig: {
