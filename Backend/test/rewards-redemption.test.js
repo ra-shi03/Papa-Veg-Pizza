@@ -164,3 +164,55 @@ describe('who handed it over is shown', () => {
         assert.ok(data.redemptions.find((r) => r.status === 'REDEEMED').storeName.includes('TEST STORE A'));
     });
 });
+
+describe('taking the free item in an online order', () => {
+    let pizza; let code;
+    const body = (extra = {}) => ({
+        items: [{ itemId: String(pizza._id), name: 'Margherita', price: 200, quantity: 1, size: 'Regular', kind: 'product' }],
+        storeId: A.storeId, address: { label: 'Home', name: 'Asha', phone: '9812345678', street: '1 Test Street', city: 'Indore', state: 'MP' },
+        customerName: 'Asha', customerPhone: '9812345678', paymentMethod: 'cash', ...extra,
+    });
+    before(async () => {
+        const { Product } = await import('../src/modules/food/admin/models/product.model.js');
+        pizza = await Product.create({ name: 'Margherita', categoryId: new mongoose.Types.ObjectId(), status: 'Active', sizes: [{ size: 'Regular', price: 200 }], basePrice: 200, price: 200 });
+        await RewardMembership.updateOne({ userId: A.customerId }, { $set: { pointsBalance: 1300 } });
+        code = ok(await redeem(), 201).redemption.code;
+    });
+
+    test('the quote shows the free item apart and changes no price', async () => {
+        const plain = ok(await fx.call('POST', '/v1/food/orders/calculate', A.customerToken, { storeId: A.storeId, items: body().items }));
+        const withReward = ok(await fx.call('POST', '/v1/food/orders/calculate', A.customerToken, { storeId: A.storeId, items: body().items, rewardCode: code }));
+        assert.equal(withReward.pricing.total, plain.pricing.total);
+        assert.equal(withReward.lines.length, 1, 'one line per cart line');
+        assert.equal(withReward.rewardLine.name, 'Margherita');
+    });
+
+    test('someone else\'s code, a made-up code and a code that is not a number are refused', async () => {
+        assert.equal((await fx.call('POST', '/v1/food/orders', B.customerToken, { ...body({ storeId: B.storeId }), rewardCode: code })).status, 400);
+        assert.equal((await fx.call('POST', '/v1/food/orders', A.customerToken, body({ rewardCode: '000000' }))).status, 400);
+        assert.equal((await fx.call('POST', '/v1/food/orders', A.customerToken, body({ rewardCode: 'abc' }))).status, 400);
+    });
+
+    test('the order carries the item at no charge and the code is used once', async () => {
+        const res = ok(await fx.call('POST', '/v1/food/orders', A.customerToken, body({ rewardCode: code })), 201).order;
+        const free = res.items.find((i) => /\(Reward\)/.test(i.name));
+        assert.ok(free && free.price === 0 && free.quantity === 1);
+        assert.equal(res.pricing.subtotal, 200, 'the reward adds nothing to the bill');
+        const row = await RewardRedemption.findOne({ code }).lean();
+        assert.equal(row.status, 'REDEEMED');
+        assert.equal(String(row.orderId), String(res._id));
+        assert.equal((await fx.call('POST', '/v1/food/orders', A.customerToken, body({ rewardCode: code }))).status, 400, 'not twice');
+        assert.equal((await fx.call('GET', `/v1/food/store/rewards/codes/${code}`, A.managerToken)).body.data.redemption.handledByName, 'Online order');
+        globalThis.__rewardOrder = res;
+    });
+
+    test('cancelling that order gives the customer the code back', async () => {
+        const o = globalThis.__rewardOrder;
+        ok(await fx.call('PATCH', `/v1/food/orders/${o._id}/cancel`, A.customerToken, { reason: 'Changed my mind' }));
+        await new Promise((r) => setTimeout(r, 400));
+        const row = await RewardRedemption.findOne({ code }).lean();
+        assert.equal(row.status, 'PENDING');
+        assert.equal(row.orderId, null);
+        assert.ok(new Date(row.expiresAt) > new Date());
+    });
+});

@@ -86,6 +86,7 @@ export function validateCalculateOrderDto(body) {
         couponCode: z.string().optional(),
         deliveryFleet: z.string().optional(),
         orderMethod: z.string().regex(/^[a-z][a-z0-9_]{1,29}$/).optional(),
+        rewardCode: z.string().regex(/^\d{6}$/).optional(),
         scheduledAt: z.string().datetime({ offset: true }).nullable().optional()
     });
     const result = schema.safeParse(body);
@@ -118,6 +119,8 @@ export function validateCreateOrderDto(body) {
         train: trainSchema.optional(),
         // delivery (default), takeaway, incar or train: checked against the super admin's order-method rules for the store
         orderMethod: z.string().regex(/^[a-z][a-z0-9_]{1,29}$/).optional(),
+        // a free-reward code the customer applied (Cheesy Rewards)
+        rewardCode: z.string().regex(/^\d{6}$/).optional(),
         // 'razorpay_qr' means COD-style flow, but payment is collected via Razorpay QR at delivery.
         paymentMethod: z.enum(['cash', 'razorpay', 'razorpay_qr', 'card', 'wallet']),
         zoneId: z.string().nullable().optional(),

@@ -1,3 +1,4 @@
+import { rewardForOrder, rewardOrderLine } from '../../user/services/rewardRedemption.service.js';
 import { isPickupMethod } from '../../settings/services/orderMethods.service.js';
 import mongoose from 'mongoose';
 import { FoodOrder } from '../models/order.model.js';
@@ -52,7 +53,9 @@ export async function getPublicFeeConfig() {
 
 // Quote for a quick price check. Nothing is spent here.
 export async function calculateOrderPricing(userId, dto) {
-  const { pricing, items } = await buildOrderPricing(userId, dto);
+  const { pricing, items: allItems, reward } = await buildOrderPricing(userId, dto);
+  // the free reward item is shown apart, so `lines` stays one per cart line
+  const items = reward ? allItems.slice(0, -1) : allItems;
   // One priced line per cart line, in the same order: the cart shows these prices on its rows
   const lines = (items || []).map((it) => ({
     itemId: String(it.itemId || ''),
@@ -62,14 +65,17 @@ export async function calculateOrderPricing(userId, dto) {
     price: Number(it.price) || 0,
     lineTotal: Math.round((Number(it.price) || 0) * (Number(it.quantity) || 0) * 100) / 100,
   }));
-  return { pricing, lines };
+  return { pricing, lines, ...(reward ? { rewardLine: { code: reward.code, name: reward.product.name, size: reward.product.size || '', crust: reward.product.crust || '' } } : {}) };
 }
 
 // Everything is rebuilt from the catalogue and the fee settings; prices and totals sent by the client are ignored.
 export async function buildOrderPricing(userId, dto) {
   const store = await getOrderableStore(dto.storeId, { at: dto.scheduledAt });
 
-  const { items, subtotal, offerClaims } = await priceCartItems(userId, dto.items, { storeId: store._id });
+  const { items: pricedItems, subtotal, offerClaims } = await priceCartItems(userId, dto.items, { storeId: store._id });
+  // A reward code the customer applied: the free item is added to the order at no charge (it changes no price)
+  const reward = dto.rewardCode ? await rewardForOrder(userId, dto.rewardCode) : null;
+  const items = reward ? [...pricedItems, rewardOrderLine(reward)] : pricedItems;
 
   const feeSettings = await loadFeeSettings();
 
@@ -194,6 +200,7 @@ export async function buildOrderPricing(userId, dto) {
 
   return {
     items,
+    reward,
     offerClaims,
     pricing: {
       subtotal,

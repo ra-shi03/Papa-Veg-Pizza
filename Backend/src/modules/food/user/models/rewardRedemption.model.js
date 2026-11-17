@@ -24,7 +24,9 @@ const rewardRedemptionSchema = new mongoose.Schema(
         storeId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodStore', default: null },
         handledBy: { type: mongoose.Schema.Types.ObjectId, default: null },
         handledByName: { type: String, default: '' },
-        cancelReason: { type: String, default: '' }
+        cancelReason: { type: String, default: '' },
+        // set when the reward was taken in an online order instead of at a store
+        orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodOrder', default: null, index: true }
     },
     { collection: 'rewardRedemptions', timestamps: true }
 );

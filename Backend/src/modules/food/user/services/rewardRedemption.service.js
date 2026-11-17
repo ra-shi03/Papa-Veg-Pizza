@@ -190,3 +190,57 @@ export async function cancelRedemption({ code, id, userId = null, reason = '' })
     await returnPoints(row, `Points returned: reward code ${row.code} cancelled`);
     return shape(row);
 }
+
+// ---- Taking the free item in an online order: the code is applied to the cart, the order carries the item at no charge.
+
+/** The customer's own unused code, for an order. Throws when it cannot be used. */
+export async function rewardForOrder(userId, code) {
+    if (!CODE_RE.test(String(code || ''))) throw new ValidationError('This reward code is not valid.');
+    await expireStale(userId);
+    const row = await RewardRedemption.findOne({ code: String(code), userId: oid(userId, 'User') }).lean();
+    if (!row || row.status !== 'PENDING' || new Date(row.expiresAt) <= new Date()) throw new ValidationError('This reward code is not valid or has already been used.');
+    return row;
+}
+
+/** The order line for the reward: the item at no charge. */
+export const rewardOrderLine = (row) => ({
+    itemId: `reward:${row._id}`,
+    name: `${row.product.name} (Reward)`,
+    price: 0,
+    quantity: 1,
+    isVeg: true,
+    image: row.product.image || '',
+    kind: 'product',
+    size: row.product.size || '',
+    crust: row.product.crust || '',
+    notes: 'Free reward item',
+});
+
+/** The order is placed: the code is used (once). Fails when someone else used it first. */
+export async function useCodeInOrder(row, order) {
+    const claimed = await RewardRedemption.findOneAndUpdate(
+        { _id: row._id, status: 'PENDING', expiresAt: { $gt: new Date() } },
+        { $set: { status: 'REDEEMED', redeemedAt: new Date(), orderId: order._id, storeId: order.storeId, handledByName: 'Online order' } },
+        { new: true }
+    ).lean();
+    if (!claimed) throw new ValidationError('This reward code is not valid or has already been used.');
+    return claimed;
+}
+
+/** The order could not be saved: the code is free again. */
+export async function releaseCodeFromOrder(row) {
+    await RewardRedemption.updateOne({ _id: row._id, status: 'REDEEMED', orderId: { $ne: null } }, { $set: { status: 'PENDING', redeemedAt: null, orderId: null, storeId: null, handledByName: '' } });
+}
+
+/** The order was cancelled: the customer gets the code back, with a fresh 24 hours. */
+export async function restoreCodeForCancelledOrder(orderId) {
+    const row = await RewardRedemption.findOneAndUpdate(
+        { orderId: oid(orderId, 'Order'), status: 'REDEEMED' },
+        { $set: { status: 'PENDING', redeemedAt: null, orderId: null, storeId: null, handledByName: '', expiresAt: new Date(Date.now() + CODE_VALID_MS) } },
+        { new: true }
+    ).lean();
+    if (row) logger.info(`[Rewards] code ${row.code} restored: order ${orderId} was cancelled`);
+}
+
+export const restoreCodeForCancelledOrderSafely = (orderId) =>
+    restoreCodeForCancelledOrder(orderId).catch((e) => logger.error(`[Rewards] restore failed for order ${orderId}: ${e.message}`));

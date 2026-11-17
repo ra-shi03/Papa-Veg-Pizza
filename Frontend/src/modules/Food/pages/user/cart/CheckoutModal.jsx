@@ -406,6 +406,8 @@ export default function CheckoutModal({
         paymentMethod: payMethod.kind === "wallet" ? "wallet" : payMethod.kind === "online" ? "razorpay" : "cash",
         // How the customer chose to order; the server checks it against the super admin's order-method rules for the store
         orderMethod: isTrain ? "train" : (pickupStore ? pickupStore.service : "delivery"),
+        // a free reward the customer applied in the cart
+        ...(localStorage.getItem("pvp_reward_code") ? { rewardCode: localStorage.getItem("pvp_reward_code") } : {}),
         note: [instructions.trim(), pickupStore?.service === "incar" && localStorage.getItem("carNumber") ? `Car number: ${localStorage.getItem("carNumber")}` : ""].filter(Boolean).join(" | "),
       }, { contact, selected: selectedAddress }))
       const created = response?.data?.data?.order
@@ -463,6 +465,7 @@ export default function CheckoutModal({
 
     // Clear cart in storage & context
     try {
+      localStorage.removeItem("pvp_reward_code") // the free reward went with this order
       localStorage.removeItem("userCart")
       localStorage.removeItem("cart")
     } catch (e) {}

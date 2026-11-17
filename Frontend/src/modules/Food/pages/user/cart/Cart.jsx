@@ -19,7 +19,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { toast } from "sonner"
 import { removeCartKey } from "./upsell/upsellApi"
 import apiClient from "@/services/api/axios"
-import { orderAPI } from "@food/api"
+import { orderAPI, userAPI } from "@food/api"
 
 const COUPON_KEY = "pvp_cart_coupon"
 
@@ -473,6 +473,30 @@ export default function Cart() {
   const estDiscount = appliedCoupon && !couponRejected ? offerDiscount(appliedCoupon, estSubtotal) : 0
 
   const [quote, setQuote] = useState(null) // { key, pricing } for the cart it was asked for
+
+  // Free reward codes the customer made in Rewards: one can be applied to this order (the item is added at no charge)
+  const [rewardCodes, setRewardCodes] = useState([])
+  const [rewardCode, setRewardCode] = useState(() => { try { return localStorage.getItem("pvp_reward_code") || "" } catch (_) { return "" } })
+  useEffect(() => {
+    if (!isLoggedIn) { setRewardCodes([]); return undefined }
+    let on = true
+    userAPI.getMyRedemptions().then((res) => {
+      if (!on) return
+      const pending = (res?.data?.data?.redemptions || []).filter((r) => r.status === "PENDING")
+      setRewardCodes(pending)
+      // an applied code that is no longer usable is dropped
+      setRewardCode((current) => {
+        const keep = pending.some((r) => r.code === current) ? current : ""
+        if (keep !== current) { try { localStorage.removeItem("pvp_reward_code") } catch (_) {} }
+        return keep
+      })
+    }).catch(() => {})
+    return () => { on = false }
+  }, [isLoggedIn])
+  const applyReward = (code) => {
+    setRewardCode(code)
+    try { code ? localStorage.setItem("pvp_reward_code", code) : localStorage.removeItem("pvp_reward_code") } catch (_) {}
+  }
   const [quoteError, setQuoteError] = useState("")
   const quoteKey = JSON.stringify([
     cartItems.map((i) => [i.itemId || i.id, i.quantity, i.size, i.crust, i.toppings, i.meals, i.extraCheese, i.offerToken]),
@@ -480,6 +504,7 @@ export default function Cart() {
     slotInfo?.storeId || "",
     scheduledAt || "",
     readPickupStore()?.service || "",
+    rewardCode || "",
   ])
   useEffect(() => {
     setCouponRejected("")
@@ -496,6 +521,7 @@ export default function Cart() {
         const res = await orderAPI.calculateOrder({
           storeId: slotInfo.storeId,
           ...(pickup ? { orderMethod: pickup.service } : {}),
+          ...(rewardCode ? { rewardCode } : {}),
           items: toOrderItems(cartItems),
           ...(point ? { deliveryAddress: { location: { type: "Point", coordinates: [point.lng, point.lat] } } } : {}),
           ...(appliedCoupon?.couponCode ? { couponCode: appliedCoupon.couponCode } : {}),
@@ -504,7 +530,7 @@ export default function Cart() {
         if (cancelled) return
         const pricing = res?.data?.data?.pricing || null
         const lines = Array.isArray(res?.data?.data?.lines) ? res.data.data.lines : null
-        setQuote(pricing ? { key: quoteKey, pricing, lines } : null)
+        setQuote(pricing ? { key: quoteKey, pricing, lines, rewardLine: res?.data?.data?.rewardLine || null } : null)
         setQuoteError("")
         // The server is the judge of the coupon (first-order-only, per-user limits, store scope...)
         if (pricing && appliedCoupon && !pricing.appliedCoupon && pricing.subtotal >= (appliedCoupon.minOrderValue || 0)) {
@@ -905,6 +931,33 @@ export default function Cart() {
               onViewAll={() => setShowCouponModal(true)}
               ui={ui}
             />
+          )}
+
+          {/* Free reward: a code the customer made in Rewards, taken in this order */}
+          {rewardCodes.length > 0 && (
+            <div className="mt-4 rounded-2xl p-4 text-left" style={{ backgroundColor: ui.card }}>
+              <SectionTitle ui={ui}>Free reward</SectionTitle>
+              {rewardCodes.map((r) => {
+                const on = rewardCode === r.code
+                const name = `${r.product?.name || "Reward"}${r.product?.size ? ` (${r.product.size})` : ""}`
+                return (
+                  <div key={r.id} className="mt-2 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="m-0 text-sm font-bold truncate" style={{ color: ui.text }}>{name}</p>
+                      <p className="m-0 text-xs" style={{ color: ui.muted }}>{on ? "Added to this order for free" : "Use your reward in this order"}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => applyReward(on ? "" : r.code)}
+                      className="shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold cursor-pointer"
+                      style={on ? { background: "transparent", borderColor: "#E53935", color: "#E53935" } : { background: "#E53935", borderColor: "#E53935", color: "#fff" }}
+                    >
+                      {on ? "Remove" : "Apply"}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
           )}
 
           {/* Cheesy Rewards section matching Image 5 */}

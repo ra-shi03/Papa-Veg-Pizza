@@ -33,6 +33,7 @@ import { fetchPolyline } from '../utils/googleMaps.js';
 import { getFirebaseDB } from '../../../../config/firebase.js';
 import * as foodTransactionService from './foodTransaction.service.js';
 import { reserveFunds, confirmReservation, releaseReservation, rupeesToPaise } from '../../user/services/walletLedger.service.js';
+import { useCodeInOrder, releaseCodeFromOrder, restoreCodeForCancelledOrderSafely } from '../../user/services/rewardRedemption.service.js';
 import { awardOrderPointsSafely, reverseOrderPointsSafely } from '../../user/services/rewards.service.js';
 import { refundCancelledOrderToWallet, recordGatewayRefund } from '../../../../core/payments/refund.service.js';
 import { calculateOrderPricing, buildOrderPricing, getCouponEligibility } from './order-pricing.service.js';
@@ -367,8 +368,11 @@ export async function createOrder(userId, dto) {
 
   // Each limited-time-offer token buys one order only; spent just before the save, given back if it fails.
   let spentOfferClaims = [];
+  let rewardUsed = false;
   try {
     spentOfferClaims = await spendOfferClaims(userId, priced.offerClaims, order._id);
+    // a reward code applied to this order is used now (once); given back below if the order is not saved
+    if (priced.reward) { await useCodeInOrder(priced.reward, order); rewardUsed = true; }
     await order.save();
     if (walletHold) {
       await confirmReservation({
@@ -380,6 +384,7 @@ export async function createOrder(userId, dto) {
     }
   } catch (err) {
     await releaseOfferClaims(spentOfferClaims);
+    if (rewardUsed) await releaseCodeFromOrder(priced.reward).catch(() => {});
     if (walletHold) {
       await releaseReservation({
         userId,
@@ -1050,6 +1055,7 @@ export async function cancelOrder(orderId, userId, reason, refundDestination = "
 
   await order.save();
   reverseOrderPointsSafely(order._id, "Points reversed: order cancelled");
+  restoreCodeForCancelledOrderSafely(order._id);
 
   enqueueOrderEvent("order_cancelled_by_user", {
     orderMongoId: order._id?.toString?.(),
@@ -1271,7 +1277,10 @@ export async function updateOrderStatusStore(
   await order.save();
 
   if (orderStatus === "delivered") awardOrderPointsSafely(order._id);
-  if (String(orderStatus).includes("cancel")) reverseOrderPointsSafely(order._id, "Points reversed: order cancelled");
+  if (String(orderStatus).includes("cancel")) {
+    reverseOrderPointsSafely(order._id, "Points reversed: order cancelled");
+    restoreCodeForCancelledOrderSafely(order._id);
+  }
 
   // Custom messages / titles for status updates
   let title = `Order ${order._id.toString()} updated`;

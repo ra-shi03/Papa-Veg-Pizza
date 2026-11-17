@@ -690,7 +690,7 @@ export default function PreviousRewardsView({ onBack, initialTab = 'rewards', re
               {isEnrolled && redemptions.some((x) => x.status === 'PENDING') && (
                 <div className="mb-4 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4">
                   <h3 className="text-[15px] font-bold text-zinc-900 dark:text-white m-0 mb-1">Your reward codes</h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 m-0 mb-3">Show a code at any Papa Veg Pizza store to get your free item. Codes work for 24 hours.</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 m-0 mb-3">Show a code at any Papa Veg Pizza store, or apply it in your cart when you order online, to get your free item. Codes work for 24 hours.</p>
                   {redemptions.filter((x) => x.status === 'PENDING').map((x) => (
                     <div key={x.id} className="flex items-center justify-between py-2.5 border-t border-zinc-100 dark:border-zinc-800">
                       <div className="min-w-0">
@@ -714,7 +714,7 @@ export default function PreviousRewardsView({ onBack, initialTab = 'rewards', re
                     <h3 className="text-lg font-bold mt-2 mb-0 text-zinc-900 dark:text-white">Show this code at the store</h3>
                     <p className="text-sm text-zinc-500 mt-1 mb-3">{claim.product?.name}{claim.product?.size ? ` (${claim.product.size})` : ''} is free with {claim.points} points.</p>
                     <p className="text-4xl font-bold tracking-[0.3em] text-zinc-900 dark:text-white m-0">{claim.code}</p>
-                    <p className="text-xs text-zinc-500 mt-3 mb-4">Valid for 24 hours. If you do not use it, your points come back.</p>
+                    <p className="text-xs text-zinc-500 mt-3 mb-4">Show it at a store, or apply it in your cart when you order online. Valid for 24 hours; if you do not use it, your points come back.</p>
                     <button type="button" onClick={() => setClaim(null)} className="w-full py-3 text-white font-bold text-sm rounded-xl border-0 cursor-pointer" style={{ backgroundColor: 'var(--accent-red, #EE3A43)' }}>Done</button>
                   </div>
                 </div>
