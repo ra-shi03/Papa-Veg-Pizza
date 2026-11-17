@@ -2318,7 +2318,7 @@ export default function OrderTracking() {
           {Number(order?.total) > 0 && (
             <div className="flex items-center justify-between px-4 py-3.5 bg-[var(--primary)]/5">
               <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-                {String(order?.paymentMethod || '').toLowerCase() === 'cash' ? (order?.isPickup ? 'Pay at the store' : 'Pay on delivery') : 'Paid online'}
+                {String(order?.paymentMethod || '').toLowerCase() === 'cash' ? (order?.isPickup ? 'Pay at the store' : 'Pay on delivery') : String(order?.paymentMethod || '').toLowerCase() === 'wallet' ? 'Paid from wallet' : 'Paid online'}
               </span>
               <span className="text-base font-extrabold text-gray-900 dark:text-gray-100">₹{Number(order.total)}</span>
             </div>

@@ -105,6 +105,12 @@ export const creditReferralReward = async (userId, amountInr, metadata = {}, ref
     return { wallet: await getUserWallet(id) };
 };
 
+/**
+ * With no payment gateway configured there is nothing to verify a top-up against, so a top-up could be claimed for any
+ * amount. That is allowed only on a developer machine that asks for it (WALLET_DEV_TOPUP=true), never in production.
+ */
+const devTopupAllowed = () => process.env.NODE_ENV !== 'production' && String(process.env.WALLET_DEV_TOPUP || '').toLowerCase() === 'true';
+
 export const createWalletTopupOrder = async (userId, amountInr) => {
     assertUserId(userId);
     const amount = Number(amountInr);
@@ -118,6 +124,7 @@ export const createWalletTopupOrder = async (userId, amountInr) => {
     const amountPaise = Math.round(amount * 100);
 
     if (!isRazorpayConfigured()) {
+        if (!devTopupAllowed()) throw new ValidationError('Adding money is not available right now.');
         // Dev fallback: return a compatible shape without writing to DB.
         const orderId = `order_dev_${Date.now()}`;
         return {
@@ -169,6 +176,7 @@ export const verifyWalletTopupPayment = async (userId, payload) => {
         amountPaise = Number(gatewayOrder?.amount_paid) || 0;
     } else {
         // Dev only: no gateway to verify against.
+        if (!devTopupAllowed()) throw new ValidationError('Adding money is not available right now.');
         amountPaise = rupeesToPaise(payload?.amount);
     }
     if (!Number.isInteger(amountPaise) || amountPaise <= 0) {

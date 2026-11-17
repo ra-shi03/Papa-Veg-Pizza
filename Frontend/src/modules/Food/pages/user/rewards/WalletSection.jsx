@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Loader2, Award, ArrowLeft, ChevronDown, ChevronRight, Wallet, RotateCcw } from "lucide-react";
 import { userAPI } from "@food/api";
 import { toast } from "sonner";
+import AddMoneyModal from "@food/components/user/AddMoneyModal";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -48,6 +49,7 @@ export default function WalletSection({ isEnrolled: propIsEnrolled, onEnroll, re
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
+  const [showAddMoney, setShowAddMoney] = useState(false);
   const [localEnrolled, setLocalEnrolled] = useState(() => {
     return localStorage.getItem("pvp_rewards_enrolled") === "true";
   });
@@ -169,33 +171,7 @@ export default function WalletSection({ isEnrolled: propIsEnrolled, onEnroll, re
     );
   }
 
-  // The wallet is only shown to users who have actually enrolled.
-  if (!isUserEnrolled) {
-    return (
-      <div className="max-w-md mx-auto pb-10">
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-150 dark:border-zinc-800 p-6 sm:p-8 text-center shadow-xs">
-          <div className="w-14 h-14 mx-auto rounded-full bg-red-50 dark:bg-red-950/40 flex items-center justify-center text-[var(--accent-red,#EE3A43)] mb-4">
-            <Award className="w-7 h-7" />
-          </div>
-          <h3 className="text-base sm:text-lg font-semibold text-zinc-900 dark:text-white">
-            Enroll to Activate Your Wallet
-          </h3>
-          <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-2 max-w-xs mx-auto leading-relaxed">
-            Your Refund Points and transaction statement will show here once you enroll.
-          </p>
-          <button
-            type="button"
-            onClick={handleEnrollClick}
-            className="w-full mt-6 py-3 bg-[#EE3A43] hover:bg-[#d92d36] text-white font-semibold text-sm rounded-xl transition-all shadow-md shadow-red-500/25 active:scale-[0.99] cursor-pointer border-0"
-            style={{ backgroundColor: "var(--accent-red, #EE3A43)", color: "#ffffff" }}
-          >
-            {cfg.buttonText || "Enroll Now"}
-          </button>
-        </div>
-        {faqList}
-      </div>
-    );
-  }
+  // The wallet holds the customer's money (refunds, top-ups): it is always shown, rewards enrolment is separate.
 
   const balance = Number(wallet?.balance || 0);
   const balanceText = balance.toLocaleString("en-IN");
@@ -244,6 +220,15 @@ export default function WalletSection({ isEnrolled: propIsEnrolled, onEnroll, re
         <span className="font-semibold text-base text-zinc-900 dark:text-white">{balanceText}</span>
         <ChevronRight className="w-4 h-4 text-zinc-400 shrink-0" />
       </button>
+
+      <button
+        type="button"
+        onClick={() => setShowAddMoney(true)}
+        className="mt-3 w-full py-3 rounded-xl border border-[var(--accent-red,#EE3A43)] bg-transparent text-[var(--accent-red,#EE3A43)] text-sm font-semibold cursor-pointer"
+      >
+        Add money
+      </button>
+      <AddMoneyModal open={showAddMoney} onOpenChange={setShowAddMoney} onSuccess={fetchWalletData} />
 
       {faqList}
 

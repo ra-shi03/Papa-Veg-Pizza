@@ -403,7 +403,7 @@ export default function CheckoutModal({
           total,
         },
         // What the customer chose on the Payment Options page: online goes through Razorpay, otherwise pay on delivery
-        paymentMethod: payMethod.kind === "online" ? "razorpay" : "cash",
+        paymentMethod: payMethod.kind === "wallet" ? "wallet" : payMethod.kind === "online" ? "razorpay" : "cash",
         // How the customer chose to order; the server checks it against the super admin's order-method rules for the store
         orderMethod: isTrain ? "train" : (pickupStore ? pickupStore.service : "delivery"),
         note: [instructions.trim(), pickupStore?.service === "incar" && localStorage.getItem("carNumber") ? `Car number: ${localStorage.getItem("carNumber")}` : ""].filter(Boolean).join(" | "),
@@ -834,7 +834,7 @@ export default function CheckoutModal({
                       disabled={placingOrder}
                       className="w-full h-12 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border-0 bg-primary hover:bg-primary-hover text-white active:scale-95 cursor-pointer shadow-md shadow-primary/10 disabled:opacity-60"
                     >
-                      {placingOrder ? "Processing..." : `Pay ₹${Number(total.toFixed(2))} securely`}
+                      {placingOrder ? "Processing..." : payMethod.kind === "wallet" ? `Pay ₹${Number(total.toFixed(2))} from wallet` : `Pay ₹${Number(total.toFixed(2))} securely`}
                     </button>
                   )}
                 </div>

@@ -1,10 +1,11 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
-import { ChevronLeft, Banknote, ShieldCheck, AlertTriangle, Check } from "lucide-react"
+import { ChevronLeft, Banknote, ShieldCheck, AlertTriangle, Check, Wallet } from "lucide-react"
 import { toast } from "sonner"
 import AnimatedPage from "@food/components/user/AnimatedPage"
 import { useAppConfig } from "@food/context/AppConfigContext"
-import { CASH_METHOD, onlineMethod, readPaymentMethod } from "../cart/cartHelpers"
+import { CASH_METHOD, WALLET_METHOD, onlineMethod, readPaymentMethod } from "../cart/cartHelpers"
+import { userAPI } from "@food/api"
 import { usePaymentGateways } from "../cart/usePaymentGateways"
 
 /**
@@ -24,6 +25,14 @@ export default function Payments() {
   })
 
   const gateways = usePaymentGateways()
+  const [walletBalance, setWalletBalance] = useState(null) // rupees, from the server; null while loading or unavailable
+  useEffect(() => {
+    let on = true
+    userAPI.getWalletMe().then((res) => { if (on) setWalletBalance(Number(res?.data?.data?.wallet?.balance) || 0) }).catch(() => {})
+    return () => { on = false }
+  }, [])
+  const walletDisabled = appConfig?.walletEnabled === false
+  const walletShort = Number.isFinite(total) && total > 0 && walletBalance !== null && walletBalance < total
   const selected = readPaymentMethod(appConfig, gateways).id
   const [, setTick] = useState(0) // re-read the saved choice after a pick
 
@@ -112,6 +121,26 @@ export default function Payments() {
               <span className="mt-0.5 block text-xs" style={{ color: ui.muted }}>Pay the delivery partner in cash, or scan a UPI QR when your order arrives.</span>
             </span>
             <Radio on={selected === "cash"} disabled={cashDisabled} />
+          </button>
+        </Section>
+
+        <Section title="Pay from Wallet">
+          <button
+            type="button"
+            onClick={() => (walletShort ? toast.error("Your wallet balance is not enough for this order.") : choose("wallet", WALLET_METHOD.title, walletDisabled))}
+            className="flex w-full items-center gap-3 border-0 bg-transparent px-4 py-4 text-left cursor-pointer"
+            style={{ opacity: walletDisabled || walletShort ? 0.55 : 1 }}
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border" style={{ borderColor: ui.line, color: ui.text }}>
+              <Wallet size={20} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold" style={{ color: ui.text }}>Wallet</span>
+              <span className="mt-0.5 block text-xs" style={{ color: ui.muted }}>
+                {walletBalance === null ? "Pay from your refund and top-up balance." : `Balance: ₹${walletBalance.toLocaleString("en-IN")}${walletShort ? " (not enough for this order)" : ""}`}
+              </span>
+            </span>
+            <Radio on={selected === "wallet"} disabled={walletDisabled || walletShort} />
           </button>
         </Section>
 

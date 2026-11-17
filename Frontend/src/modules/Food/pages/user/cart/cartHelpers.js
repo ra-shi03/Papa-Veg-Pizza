@@ -127,6 +127,9 @@ export const toOrderItems = (cartItems) => cartItems.map((item) => ({
 
 export const CASH_METHOD = { id: "cash", kind: "cash", title: "Cash / UPI on Delivery", short: "Cash / UPI on\nDelivery" }
 
+// Pay from the customer's wallet balance (refunds, top-ups). The server takes the money and refuses if it is short.
+export const WALLET_METHOD = { id: "wallet", kind: "wallet", title: "Wallet", short: "Wallet\n(Balance)" }
+
 // An online method comes from a gateway the super admin switched on (see usePaymentGateways).
 export const onlineMethod = (gateway) => {
   const test = gateway.environment === "Sandbox"
@@ -151,6 +154,7 @@ export function readPaymentMethod(appConfig, gateways = []) {
   try { saved = localStorage.getItem("preferred_payment_method") || "" } catch (_) {}
 
   if (saved === "cash" && cashOn) return CASH_METHOD
+  if (saved === "wallet" && appConfig?.walletEnabled !== false) return WALLET_METHOD
   if (saved.startsWith("online:") || saved === "razorpay_test") {
     const chosen = online.find((g) => `online:${g.id}` === saved) || fallbackOnline
     if (chosen) return onlineMethod(chosen)

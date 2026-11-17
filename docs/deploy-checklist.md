@@ -488,3 +488,5 @@ finance, marketing and rewards. They exist in the menus, but their backend is de
 ### Last check
 - [ ] Nothing in the admin panels shows "mock", "demo" or "Please switch your role using the demo toggle": if it does, that screen is not ready for the client.
 - [ ] `pm2 logs` quiet for 10 minutes while the above is clicked through.
+
+- Wallet top-up needs a configured payment gateway. Without one it is refused. `WALLET_DEV_TOPUP=true` allows a fake top-up on a developer machine only; it is ignored when `NODE_ENV=production`.
