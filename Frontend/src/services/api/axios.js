@@ -6,6 +6,7 @@
 
 import axios from "axios";
 import { handleMockRequest } from "./mockService.js";
+import { readSavedCoords } from "../../modules/Food/utils/savedLocation.js";
 
 // Prefer explicit env. If not set, default to /api/v1 so the Vite proxy can forward to backend.
 const baseURL =
@@ -317,9 +318,10 @@ const MENU_URL = /\/food\/(admin\/)?(menu|products)\/public/;
 function withMenuLocation(config) {
   try {
     if (!MENU_URL.test(String(config.url || "")) || config.params?.storeId || config.params?.lat != null) return config;
-    const loc = JSON.parse(localStorage.getItem("userLocation") || "null");
-    if (Number.isFinite(loc?.latitude) && Number.isFinite(loc?.longitude)) {
-      config.params = { ...(config.params || {}), lat: loc.latitude, lng: loc.longitude };
+    // The same saved point the cart and checkout read, so a customer with a saved address never sees catalogue prices
+    const loc = readSavedCoords();
+    if (loc) {
+      config.params = { ...(config.params || {}), lat: loc.lat, lng: loc.lng };
     }
   } catch (_) {}
   return config;

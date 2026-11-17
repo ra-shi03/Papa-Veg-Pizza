@@ -181,6 +181,64 @@ export async function getPublicProducts(req, res, next) {
     }
 }
 
+// Display fields only: what the customer's product page shows. No store/franchise lists, no audit fields.
+const toPublicAddon = (a) => (a && typeof a === 'object' && a.name
+    ? { _id: String(a._id), name: a.name, type: a.type || '', image: a.image || '', prices: (a.prices || []).map((p) => ({ size: p.size, price: Number(p.price) || 0 })) }
+    : null);
+
+export function toPublicProduct(p) {
+    const category = p.categoryId && typeof p.categoryId === 'object' ? p.categoryId : null;
+    return {
+        _id: String(p._id),
+        id: String(p._id),
+        name: p.name,
+        shortDescription: p.shortDescription || '',
+        description: p.description || '',
+        image: p.image || '',
+        badge: p.badge || '',
+        price: Number(p.price) || 0,
+        originalPrice: Number(p.originalPrice) || 0,
+        discount: Number(p.discount) || 0,
+        discountType: p.discountType || 'percentage',
+        saveAmount: Number(p.saveAmount) || 0,
+        vegType: p.vegType || 'veg',
+        availability: p.availability || 'In Stock',
+        inStock: p.inStock !== false,
+        category: category ? { _id: String(category._id), label: category.label || category.name || '' } : null,
+        sizes: (p.sizes || []).map((s) => ({
+            size: s.size, price: Number(s.price) || 0, originalPrice: Number(s.originalPrice) || 0, description: s.description || '',
+        })),
+        defaultCrust: p.defaultCrust || '',
+        showCrust: p.showCrust !== false,
+        toppings: (p.toppings || []).map(toPublicAddon).filter(Boolean),
+        crusts: (p.crusts || []).map(toPublicAddon).filter(Boolean),
+    };
+}
+
+/**
+ * GET /v1/food/products/public/:id : one active product for the customer's product page (home banners link here).
+ * Priced for the customer's store exactly like the menu (?storeId= or ?lat=&lng=), so the page, the cart and the
+ * order agree. Draft, archived or unknown ids, and products the store hides, are 404.
+ */
+export async function getPublicProductById(req, res, next) {
+    try {
+        const { id } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(String(id))) {
+            return res.status(404).json({ success: false, message: 'Product not found' });
+        }
+        const product = await Product.findOne({ _id: id, status: { $regex: /^active$/i } })
+            .populate('categoryId', 'label name')
+            .populate({ path: 'toppings', match: { status: { $ne: 'Inactive' } }, select: 'name type image prices' })
+            .populate({ path: 'crusts', match: { status: { $ne: 'Inactive' } }, select: 'name type image prices' });
+        if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+        const [priced] = await priceMenuForStore([product], req.query);
+        if (!priced) return res.status(404).json({ success: false, message: 'Product not found' });
+        return res.status(200).json({ success: true, message: 'Product', data: toPublicProduct(priced) });
+    } catch (error) {
+        next(error);
+    }
+}
+
 export async function getPublicMenu(req, res, next) {
     try {
         const categories = await CategoryProduct.find({ status: { $ne: 'Inactive' } }).sort({ sort: 1, createdAt: 1 });

@@ -162,7 +162,7 @@ const buildMessagePayload = (payload = {}, token) => {
     };
 
     const image =
-        sanitizeString(payload.icon || payload.notification?.image || payload.notification?.icon || data.image || data.imageUrl);
+        sanitizeString(payload.image || payload.icon || payload.notification?.image || payload.notification?.icon || data.image || data.imageUrl);
 
     // If payload.dataOnly is true, we omit the 'notification' block.
     // This prevents FCM from auto-displaying while allowing app code to show a 'Local Notification'.
@@ -207,6 +207,26 @@ const buildMessagePayload = (payload = {}, token) => {
 
     return message;
 };
+
+// The business logo (Settings > Business information) is the picture on every push that does not bring its own.
+// Read at most once a minute; no logo (or one that is not an absolute URL) means no picture.
+const BRAND_LOGO_TTL_MS = 60 * 1000;
+let brandLogoCache = { at: 0, url: '' };
+export const brandLogoUrl = async () => {
+    if (Date.now() - brandLogoCache.at < BRAND_LOGO_TTL_MS) return brandLogoCache.url;
+    let url = '';
+    try {
+        const { FoodBusinessSettings } = await import('../../modules/food/admin/models/businessSettings.model.js');
+        const doc = await FoodBusinessSettings.findOne().select('logo').lean();
+        const candidate = String(doc?.logo?.url || '').trim();
+        url = /^https?:\/\//i.test(candidate) ? candidate : '';
+    } catch {
+        url = '';
+    }
+    brandLogoCache = { at: Date.now(), url };
+    return url;
+};
+export const resetBrandLogoCache = () => { brandLogoCache = { at: 0, url: '' }; };
 
 const parseFirebaseError = async (response) => {
     try {
@@ -395,6 +415,10 @@ export const sendNotificationToOwner = async ({ ownerType, ownerId, payload, pla
     const tokens = await listOwnerTokens({ ownerType, ownerId, platform });
     if (!tokens.length) {
         return { successCount: 0, failureCount: 0, results: [] };
+    }
+    if (!enrichedPayload.image && !enrichedPayload.icon) {
+        const logo = await brandLogoUrl();
+        if (logo) enrichedPayload.image = logo;
     }
     try {
         console.log(`[FCM] Sending to ${ownerType}:${ownerId}. Title: "${enrichedPayload.title || 'Data Only'}"`);

@@ -51,8 +51,17 @@ export async function getPublicFeeConfig() {
 
 // Quote for a quick price check. Nothing is spent here.
 export async function calculateOrderPricing(userId, dto) {
-  const { pricing } = await buildOrderPricing(userId, dto);
-  return { pricing };
+  const { pricing, items } = await buildOrderPricing(userId, dto);
+  // One priced line per cart line, in the same order: the cart shows these prices on its rows
+  const lines = (items || []).map((it) => ({
+    itemId: String(it.itemId || ''),
+    name: it.name || '',
+    size: it.size || '',
+    quantity: Number(it.quantity) || 0,
+    price: Number(it.price) || 0,
+    lineTotal: Math.round((Number(it.price) || 0) * (Number(it.quantity) || 0) * 100) / 100,
+  }));
+  return { pricing, lines };
 }
 
 // Everything is rebuilt from the catalogue and the fee settings; prices and totals sent by the client are ignored.

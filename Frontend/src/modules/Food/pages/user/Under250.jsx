@@ -230,27 +230,11 @@ export default function Under250() {
     return filtered
   }, [under250Restaurants, selectedSort, under30MinsFilter, activeCategory, categories])
 
-  // Fetch under-50 banner from public API
+  // Under-250 banner: there is no super admin content or public route for it yet, so no banner is shown
+  // (the section hides itself when there are no images) instead of calling a path that does not exist.
   useEffect(() => {
-    let cancelled = false
-    setLoadingBanner(true)
-    api.get('/food/hero-banners/under-250/public', { params: { zoneId } })
-      .then((res) => {
-        if (cancelled) return
-        const data = res?.data?.data
-        const list = Array.isArray(data?.banners) ? data.banners : (Array.isArray(data) ? data : [])
-        const images = list
-          .map((banner) => (typeof banner?.imageUrl === "string" ? banner.imageUrl.trim() : ""))
-          .filter(Boolean)
-        setBannerImages(images)
-      })
-      .catch(() => {
-        if (!cancelled) setBannerImages([])
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingBanner(false)
-      })
-    return () => { cancelled = true }
+    setBannerImages([])
+    setLoadingBanner(false)
   }, [zoneId])
 
   // Fetch landing settings to get dynamic price limit

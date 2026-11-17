@@ -22,119 +22,28 @@ import { orderAPI } from "@food/api"
 
 const COUPON_KEY = "pvp_cart_coupon"
 
-const ALL_PRODUCTS = {
-  "margherita-supreme": {
-    id: "margherita-supreme",
-    name: "Margherita Supreme",
-    price: 299,
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuBluz4eCNAilJO6yR3_OFzJkONQMKo9XRScol5o2w_wqSUPMQDImok1wr4UrTbZd0tDM7eicy98AOUq9ORUm23pi_z6uJuyeKQ3_tMtGkycxVZqFNywk1nb7d0RmEboytoVC-L__LD3BvG4JNTz3ZyFOnr8AyX-1ztogKmbBa3797PAAs2KoxmP2fFsZ_kMnaS2D-lsv6J0g5sQojmKXNF9d470loeENjh89lAF_TJu4TG-lB2oxnC2s56TPYL6h1CjXGleROU_bDPc",
-    description: "Buffalo mozzarella, San Marzano tomatoes, fresh basil."
-  },
-  "farmhouse-delight": {
-    id: "farmhouse-delight",
-    name: "Farmhouse Delight",
-    price: 349,
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuA6Rib9mlrsig1haXvSfhY1zS2NGAIwUFig_-dDDTjQXBRJ_hdwzvKhvSs4X_KczL-USNdycC0vnIVox-Oyrmt5zbOdPneq43yDpJwEWYB3CSCU5gL7rFmEitcAS-QChuUXgeCi6WJcn32uqxZfLupJCZNO4YVg04lB8Y1JIsHt8L0bgON_2RuBMVL02rBMhN5haheBGgLGmqbDG4wUP7bqztn0gWQKQQedaHRRZ14BMbnbI7P9oZaCYPYkXEol9_8DJ3BLamRCaUpO",
-    description: "Mushrooms, onions, peppers, and sweet corn."
-  },
-  "fiery-schezwan": {
-    id: "fiery-schezwan",
-    name: "Fiery Schezwan Veggie",
-    price: 299,
-    image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=80",
-    description: "Fiery schezwan sauce, dynamic mozzarella, onions, sweet bell peppers, and fresh greens."
-  },
-  "smokey-bbq": {
-    id: "smokey-bbq",
-    name: "Smokey BBQ Veggie",
-    price: 299,
-    image: "https://images.unsplash.com/photo-1571407970349-bc81e7e96d47?w=500&auto=format&fit=crop&q=80",
-    description: "Rich smokey BBQ base, melted mozzarella, loaded red onions, golden sweet corn, and BBQ drizzle."
-  },
-  "paneer-makhni": {
-    id: "paneer-makhni",
-    name: "Paneer Makhni Masala",
-    price: 299,
-    image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=500&auto=format&fit=crop&q=80",
-    description: "Indian style Makhni sauce, premium marinated paneer cubes, capsicum, red onions, and tomatoes."
-  },
-  "overloaded-veggies": {
-    id: "overloaded-veggies",
-    name: "Overloaded Veggies",
-    price: 299,
-    image: "https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?w=500&auto=format&fit=crop&q=80",
-    description: "Black olives, mushrooms, sweet corn, red onions, tri-color bell peppers, and jalapeños."
-  },
-  "crispy-veg-burger": {
-    id: "crispy-veg-burger",
-    name: "Crispy Veg Burger",
-    price: 149,
-    image: "https://images.unsplash.com/photo-1550547660-d9450f859349?w=500&auto=format&fit=crop&q=80",
-    description: "Crispy mixed vegetable patty, fresh lettuce, tomatoes, and creamy classic mayonnaise."
-  },
-  "spicy-paneer-burger": {
-    id: "spicy-paneer-burger",
-    name: "Spicy Paneer Burger",
-    price: 189,
-    image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&auto=format&fit=crop&q=80",
-    description: "Spicy marinated paneer patty, layered with spicy dressing, melted cheese, and sliced onions."
-  },
-  "garlic-bread-stix": {
-    id: "garlic-bread-stix",
-    name: "Garlic Bread Stix",
-    price: 119,
-    image: "https://images.unsplash.com/photo-1619535860434-ba1d8fa12536?w=500&auto=format&fit=crop&q=80",
-    description: "Freshly baked garlic bread sticks served warm with creamy dynamic dipping sauce."
-  },
-  "cheese-garlic-bread": {
-    id: "cheese-garlic-bread",
-    name: "Cheese Garlic Bread",
-    price: 149,
-    image: "https://images.unsplash.com/photo-1574085733277-851d9d856a3a?w=500&auto=format&fit=crop&q=80",
-    description: "Toasted thick bread slices loaded with garlic butter, fresh parsley, and gooey melted mozzarella."
-  },
-  "creamy-mushroom-penne": {
-    id: "creamy-mushroom-penne",
-    name: "Creamy Mushroom Penne",
-    price: 249,
-    image: "https://images.unsplash.com/photo-1645112411341-6c4fd023714a?w=500&auto=format&fit=crop&q=80",
-    description: "Penne tossed in a rich, creamy white parmesan sauce loaded with fresh button mushrooms and garlic herbs."
-  },
-  "spiced-arrabbiata": {
-    id: "spiced-arrabbiata",
-    name: "Spiced Arrabbiata Pasta",
-    price: 229,
-    image: "https://images.unsplash.com/photo-1608897013039-887f21d8c804?w=500&auto=format&fit=crop&q=80",
-    description: "Penne pasta in a fiery, spiced San Marzano tomato sauce infused with fresh garlic, chili flakes, and basil leaves."
-  },
-  "warm-brownie": {
-    id: "warm-brownie",
-    name: "Warm Chocolate Brownie",
-    price: 129,
-    image: "https://images.unsplash.com/photo-1564355808539-22fda35bed7e?w=500&auto=format&fit=crop&q=80",
-    description: "Rich, dense chocolate brownie served warm with a shiny, gooey dark chocolate glaze on top."
-  },
-  "choco-volcano": {
-    id: "choco-volcano",
-    name: "Choco Volcano Cake",
-    price: 139,
-    image: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=500&auto=format&fit=crop&q=80",
-    description: "Freshly baked soft chocolate sponge cake with a molten, oozing chocolate lava core inside."
-  },
-  "water-bottle": {
-    id: "water-bottle",
-    name: "Purified Water Bottle",
-    price: 40,
-    image: "/food/bisleri_water_bottle.png",
-    description: "Ice-cold premium mineral packaged drinking water for refreshment."
-  },
-  "pepsi-cola": {
-    id: "pepsi-cola",
-    name: "Pepsi Cola (500ml)",
-    price: 60,
-    image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=500&auto=format&fit=crop&q=80",
-    description: "500ml bottle of cold, sparkling carbonated Pepsi cola beverage."
+// Cart lines saved without their full spec (plain adds from the home screen and search) are read from the public
+// menu, once per cart visit, priced for the customer's saved location exactly like the menu. The server quote then
+// prices every row (see `lines` below); nothing here comes from sample data or a cached product list.
+let publicMenuRequest = null
+const loadPublicMenu = () => {
+  if (!publicMenuRequest) {
+    publicMenuRequest = apiClient
+      .get("/food/products/public")
+      .then((res) => (Array.isArray(res?.data?.data) ? res.data.data : []))
+      .catch(() => {
+        publicMenuRequest = null
+        return []
+      })
   }
+  return publicMenuRequest
+}
+const priceForSize = (product, size) => {
+  if (size) {
+    const match = (product.sizes || []).find((s) => String(s.size).toLowerCase() === String(size).toLowerCase())
+    if (match) return Number(match.price) || 0
+  }
+  return Number(product.price) || Number(product.sizes?.[0]?.price) || 0
 }
 
 function SectionTitle({ ui, children }) {
@@ -395,15 +304,15 @@ export default function Cart() {
 
   // Resolve Cart items from userCart localStorage on mount
   useEffect(() => {
-    const resolveAndSyncCart = () => {
+    let runId = 0
+    publicMenuRequest = null // fresh menu prices on every visit to the cart
+    const resolveAndSyncCart = async () => {
+      const run = ++runId
       const stored = JSON.parse(localStorage.getItem("userCart") || "{}")
       const customItemsMap = JSON.parse(localStorage.getItem("pvp_customized_items") || "{}")
-      let dynamicProds = []
-      try {
-        dynamicProds = JSON.parse(localStorage.getItem("pvp_products_v2") || "[]")
-      } catch (_) {}
 
       const list = []
+      const plain = [] // keys saved without a spec: resolved from the public menu below
 
       Object.entries(stored).forEach(([key, qty]) => {
         const itemQuantity = typeof qty === 'object' && qty !== null ? Number(qty.quantity || 1) : Number(qty)
@@ -436,55 +345,36 @@ export default function Cart() {
           return
         }
 
-        let baseId = key
-        let size = ""
+        plain.push({ key, quantity: itemQuantity })
+      })
 
-        const matchedBaseId = Object.keys(ALL_PRODUCTS).find(id => key.startsWith(id))
-        if (matchedBaseId) {
-          baseId = matchedBaseId
-          if (key.length > matchedBaseId.length) {
-            size = key.slice(matchedBaseId.length + 1)
-          }
-        }
-
-        const prod = ALL_PRODUCTS[baseId]
-        if (prod) {
+      if (plain.length > 0) {
+        const menu = await loadPublicMenu()
+        if (run !== runId) return
+        plain.forEach(({ key, quantity }) => {
+          const product = menu.find((p) => {
+            const id = String(p._id || p.id || "")
+            return id && (key === id || key.startsWith(`${id}-`))
+          })
+          if (!product) return // no longer on the menu: the server would refuse it, so it is not shown
+          const id = String(product._id || product.id)
+          const size = key.length > id.length ? key.slice(id.length + 1) : ""
+          const name = product.name || product.title || ""
           list.push({
             key,
             id: key,
-            itemId: baseId,
-            name: size ? `${prod.name} (${size})` : prod.name,
-            price: prod.price,
-            image: prod.image,
-            description: prod.description,
+            itemId: id,
+            name: size ? `${name} (${size})` : name,
+            price: priceForSize(product, size),
+            image: product.image || "",
+            description: product.description || "",
             size,
-            quantity: itemQuantity,
+            quantity,
             restaurant: "Papa Veg Pizza",
             restaurantId: "papa-veg-pizza-1"
           })
-          return
-        }
-
-        // 2. Check dynamic products from superadmin / API
-        if (Array.isArray(dynamicProds) && dynamicProds.length > 0) {
-          const foundDyn = dynamicProds.find(p => String(p._id || p.id) === String(baseId) || key.startsWith(String(p._id || p.id)))
-          if (foundDyn) {
-            list.push({
-              key,
-              id: key,
-              itemId: foundDyn._id || foundDyn.id,
-              name: size ? `${foundDyn.name || foundDyn.title} (${size})` : (foundDyn.name || foundDyn.title),
-              price: Number(foundDyn.price) || 0,
-              image: foundDyn.image || foundDyn.imageUrl || (Array.isArray(foundDyn.images) ? foundDyn.images[0] : ""),
-              description: foundDyn.description || "",
-              size,
-              quantity: itemQuantity,
-              restaurant: "Papa Veg Pizza",
-              restaurantId: "papa-veg-pizza-1"
-            })
-          }
-        }
-      })
+        })
+      }
 
       // A limited time offer is dropped from the cart once its countdown ends
       const expired = list.find((i) => i.isLimitedOffer && i.offerExpiresAt && i.offerExpiresAt <= Date.now())
@@ -493,6 +383,7 @@ export default function Cart() {
         return
       }
 
+      if (run !== runId) return
       setCartItems(list)
       setCartLoaded(true)
       replaceCart(list)
@@ -601,7 +492,8 @@ export default function Cart() {
         })
         if (cancelled) return
         const pricing = res?.data?.data?.pricing || null
-        setQuote(pricing ? { key: quoteKey, pricing } : null)
+        const lines = Array.isArray(res?.data?.data?.lines) ? res.data.data.lines : null
+        setQuote(pricing ? { key: quoteKey, pricing, lines } : null)
         setQuoteError("")
         // The server is the judge of the coupon (first-order-only, per-user limits, store scope...)
         if (pricing && appliedCoupon && !pricing.appliedCoupon && pricing.subtotal >= (appliedCoupon.minOrderValue || 0)) {
@@ -622,6 +514,11 @@ export default function Cart() {
     if (quoteError) toast.error(quoteError)
   }, [quoteError])
   const q = quote && quote.key === quoteKey ? quote.pricing : null
+  // Each row shows the price the server quoted for that line (same order as the cart); the local price only until then
+  const quotedLines = quote && quote.key === quoteKey ? quote.lines : null
+  const shownItems = quotedLines && quotedLines.length === cartItems.length
+    ? cartItems.map((item, i) => (Number.isFinite(Number(quotedLines[i]?.price)) ? { ...item, price: Number(quotedLines[i].price) } : item))
+    : cartItems
 
   // Fees are set by the super admin; until the quote arrives the browser estimates them (delivery by distance included)
   const freeDeliveryAt = [fees.freeDeliveryUpTo, fees.freeDeliveryThreshold].filter((v) => v > 0).sort((a, b) => a - b)[0] || 0
@@ -952,7 +849,7 @@ export default function Cart() {
           {/* Items */}
           <div className="rounded-2xl overflow-hidden text-left" style={{ backgroundColor: ui.card }}>
             <AnimatePresence initial={false}>
-              {cartItems.map((item, index) => (
+              {shownItems.map((item, index) => (
                 <CartItemRow
                   key={item.key}
                   item={item}

@@ -2,7 +2,7 @@
 
 
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useParams, Link, useNavigate } from "react-router-dom"
 import useAppBackNavigation from "@food/hooks/useAppBackNavigation"
 import { useLocationGuard } from "@food/hooks/useLocationGuard"
@@ -11,85 +11,33 @@ import { ArrowLeft, Star, Clock, MapPin, ShoppingBag, Plus, Minus, Calendar, Thu
 import AnimatedPage from "@food/components/user/AnimatedPage"
 import Footer from "@food/components/user/Footer"
 import ScrollReveal from "@food/components/user/ScrollReveal"
-import { useCart } from "@food/context/CartContext"
-import { useOrders } from "@food/context/OrdersContext"
+import apiClient from "@/services/api/axios"
+import { addLineToCart, lineKeyFor, setLineQty } from "@food/utils/userCart"
 import { Button } from "@food/components/ui/button"
 import { Badge } from "@food/components/ui/badge"
 import { Textarea } from "@food/components/ui/textarea"
 import { Label } from "@food/components/ui/label"
 
-// Sample product data - in a real app, this would come from an API
-const productsData = {
-  // Featured Dishes
-  1: { id: 1, name: "Margherita Pizza", restaurant: "Pizza Corner", restaurantSlug: "pizza-corner", price: 12.99, image: "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=600&h=400&fit=crop&q=80", rating: 4.8, description: "Classic Italian pizza with fresh tomato sauce, mozzarella cheese, and basil leaves. Made with our signature wood-fired crust.", category: "Pizza", ingredients: ["Tomato sauce", "Mozzarella cheese", "Fresh basil", "Olive oil"], preparationTime: "15-20 min", calories: 280 },
-  2: { id: 2, name: "Classic Burger", restaurant: "Burger Paradise", restaurantSlug: "burger-paradise", price: 9.99, image: "https://images.unsplash.com/photo-1550547660-d9450f859349?w=600&h=400&fit=crop&q=80", rating: 4.7, description: "Juicy beef patty with fresh lettuce, tomato, onion, and our special sauce. Served on a toasted bun.", category: "Burgers", ingredients: ["Beef patty", "Lettuce", "Tomato", "Onion", "Special sauce", "Bun"], preparationTime: "10-15 min", calories: 520 },
-  3: { id: 3, name: "Salmon Sushi Roll", restaurant: "Sushi Master", restaurantSlug: "sushi-master", price: 15.99, image: "https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=600&h=400&fit=crop&q=80", rating: 4.9, description: "Fresh salmon with creamy avocado, wrapped in nori and sushi rice. Served with soy sauce and wasabi.", category: "Sushi", ingredients: ["Fresh salmon", "Avocado", "Nori", "Sushi rice", "Soy sauce", "Wasabi"], preparationTime: "20-25 min", calories: 320 },
-  4: { id: 4, name: "Chicken Tacos", restaurant: "Taco Fiesta", restaurantSlug: "taco-fiesta", price: 8.99, image: "https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=600&h=400&fit=crop&q=80", rating: 4.6, description: "Soft shell tacos with grilled chicken, fresh vegetables, and our signature salsa. Served with lime wedges.", category: "Tacos", ingredients: ["Grilled chicken", "Lettuce", "Tomato", "Onion", "Cheese", "Salsa", "Lime"], preparationTime: "12-15 min", calories: 380 },
-  5: { id: 5, name: "Chicken Biryani", restaurant: "Spice Garden", restaurantSlug: "spice-garden", price: 14.99, image: "https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=600&h=400&fit=crop&q=80", rating: 4.8, description: "Fragrant basmati rice cooked with tender chicken pieces, aromatic spices, and herbs. Served with raita and pickle.", category: "Indian", ingredients: ["Basmati rice", "Chicken", "Onions", "Spices", "Yogurt", "Herbs"], preparationTime: "30-35 min", calories: 650 },
-  6: { id: 6, name: "Pad Thai", restaurant: "Thai Express", restaurantSlug: "thai-express", price: 13.99, image: "https://images.unsplash.com/photo-1559314809-0d155b1c5b8e?w=600&h=400&fit=crop&q=80", rating: 4.7, description: "Stir-fried rice noodles with shrimp, tofu, bean sprouts, and peanuts in a tangy tamarind sauce.", category: "Thai", ingredients: ["Rice noodles", "Shrimp", "Tofu", "Bean sprouts", "Peanuts", "Tamarind sauce"], preparationTime: "18-22 min", calories: 420 },
-  7: { id: 7, name: "Grilled Salmon", restaurant: "Ocean Breeze", restaurantSlug: "ocean-breeze", price: 18.99, image: "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=600&h=400&fit=crop&q=80", rating: 4.9, description: "Fresh Atlantic salmon grilled to perfection with lemon butter sauce. Served with seasonal vegetables and rice.", category: "Seafood", ingredients: ["Atlantic salmon", "Lemon", "Butter", "Herbs", "Seasonal vegetables", "Rice"], preparationTime: "25-30 min", calories: 480 },
-  8: { id: 8, name: "BBQ Ribs", restaurant: "Smokehouse", restaurantSlug: "smokehouse", price: 16.99, image: "https://images.unsplash.com/photo-1544025162-d76694265947?w=600&h=400&fit=crop&q=80", rating: 4.8, description: "Slow-cooked pork ribs smothered in our signature BBQ sauce. Served with coleslaw and cornbread.", category: "BBQ", ingredients: ["Pork ribs", "BBQ sauce", "Coleslaw", "Cornbread"], preparationTime: "35-40 min", calories: 720 },
-  // Quick Bites
-  9: { id: 9, name: "Chicken Wings", restaurant: "Burger Paradise", restaurantSlug: "burger-paradise", price: 8.99, image: "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=600&h=400&fit=crop&q=80", rating: 4.8, description: "Crispy fried chicken wings tossed in your choice of sauce. Served with celery sticks and blue cheese dip.", category: "Appetizers", ingredients: ["Chicken wings", "Hot sauce", "Butter", "Celery", "Blue cheese"], preparationTime: "15-18 min", calories: 450 },
-  10: { id: 10, name: "French Fries", restaurant: "Burger Paradise", restaurantSlug: "burger-paradise", price: 4.99, image: "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=600&h=400&fit=crop&q=80", rating: 4.7, description: "Golden crispy fries made from premium potatoes. Served hot with ketchup.", category: "Sides", ingredients: ["Potatoes", "Salt", "Oil"], preparationTime: "8-10 min", calories: 320 },
-  11: { id: 11, name: "Onion Rings", restaurant: "Burger Paradise", restaurantSlug: "burger-paradise", price: 5.99, image: "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=600&h=400&fit=crop&q=80", rating: 4.6, description: "Crispy battered onion rings, perfectly golden and crunchy. Served with dipping sauce.", category: "Sides", ingredients: ["Onions", "Batter", "Oil"], preparationTime: "10-12 min", calories: 280 },
-  12: { id: 12, name: "Mozzarella Sticks", restaurant: "Pizza Corner", restaurantSlug: "pizza-corner", price: 6.99, image: "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=600&h=400&fit=crop&q=80", rating: 4.9, description: "Golden fried mozzarella sticks with a crispy exterior and gooey center. Served with marinara sauce.", category: "Appetizers", ingredients: ["Mozzarella cheese", "Breadcrumbs", "Marinara sauce"], preparationTime: "8-10 min", calories: 350 },
-  13: { id: 13, name: "Nachos", restaurant: "Taco Fiesta", restaurantSlug: "taco-fiesta", price: 7.99, image: "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=600&h=400&fit=crop&q=80", rating: 4.8, description: "Crispy tortilla chips loaded with melted cheese, jalape�os, and your choice of toppings.", category: "Appetizers", ingredients: ["Tortilla chips", "Cheese", "Jalape�os", "Sour cream", "Salsa"], preparationTime: "10-12 min", calories: 420 },
-  14: { id: 14, name: "Garlic Bread", restaurant: "Pizza Corner", restaurantSlug: "pizza-corner", price: 4.49, image: "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=600&h=400&fit=crop&q=80", rating: 4.7, description: "Fresh baked bread brushed with garlic butter and herbs. Perfect as a side or appetizer.", category: "Sides", ingredients: ["Bread", "Garlic", "Butter", "Herbs"], preparationTime: "5-8 min", calories: 220 },
-  // Trending Now
-  15: { id: 15, name: "Spicy Ramen", restaurant: "Noodle House", restaurantSlug: "noodle-house", price: 11.99, image: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=600&h=400&fit=crop&q=80", rating: 4.9, description: "Rich and spicy ramen broth with tender noodles, soft-boiled egg, and fresh vegetables.", category: "Noodles", ingredients: ["Ramen noodles", "Broth", "Egg", "Vegetables", "Spices"], preparationTime: "20-25 min", calories: 480 },
-  16: { id: 16, name: "BBQ Chicken Pizza", restaurant: "Pizza Corner", restaurantSlug: "pizza-corner", price: 13.99, image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&h=400&fit=crop&q=80", rating: 4.8, description: "Wood-fired pizza with BBQ sauce, grilled chicken, red onions, and mozzarella cheese.", category: "Pizza", ingredients: ["BBQ sauce", "Grilled chicken", "Red onions", "Mozzarella cheese"], preparationTime: "15-20 min", calories: 380 },
-  17: { id: 17, name: "Sushi Platter", restaurant: "Sushi Master", restaurantSlug: "sushi-master", price: 19.99, image: "https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=600&h=400&fit=crop&q=80", rating: 4.9, description: "Assorted sushi platter with salmon, tuna, and California rolls. Served with soy sauce, wasabi, and pickled ginger.", category: "Sushi", ingredients: ["Salmon", "Tuna", "Avocado", "Rice", "Nori", "Soy sauce"], preparationTime: "25-30 min", calories: 450 },
-  18: { id: 18, name: "Loaded Burger", restaurant: "Burger Paradise", restaurantSlug: "burger-paradise", price: 10.99, image: "https://images.unsplash.com/photo-1550547660-d9450f859349?w=600&h=400&fit=crop&q=80", rating: 4.7, description: "Double beef patty with bacon, cheese, lettuce, tomato, onion, and special sauce. Served with fries.", category: "Burgers", ingredients: ["Double beef patty", "Bacon", "Cheese", "Lettuce", "Tomato", "Onion", "Special sauce"], preparationTime: "12-15 min", calories: 680 },
-}
-
-// Restaurant data
-const restaurantsData = {
-  "pizza-corner": { name: "Pizza Corner", cuisine: "Italian", rating: 4.7, deliveryTime: "15-20 min", distance: "0.5 km", priceRange: "$$", address: "321 Elm Street, New York, NY 10004", phone: "+1 (555) 456-7890" },
-  "burger-paradise": { name: "Burger Paradise", cuisine: "American", rating: 4.6, deliveryTime: "20-25 min", distance: "0.8 km", priceRange: "$", address: "456 Oak Avenue, New York, NY 10002", phone: "+1 (555) 234-5678" },
-  "sushi-master": { name: "Sushi Master", cuisine: "Japanese", rating: 4.9, deliveryTime: "30-35 min", distance: "2.1 km", priceRange: "$$$", address: "789 Cherry Lane, New York, NY 10003", phone: "+1 (555) 345-6789" },
-  "taco-fiesta": { name: "Taco Fiesta", cuisine: "Mexican", rating: 4.5, deliveryTime: "20-25 min", distance: "1.5 km", priceRange: "$", address: "654 Pine Street, New York, NY 10005", phone: "+1 (555) 567-8901" },
-  "spice-garden": { name: "Spice Garden", cuisine: "Indian", rating: 4.8, deliveryTime: "25-30 min", distance: "1.8 km", priceRange: "$$", address: "123 Spice Road, New York, NY 10001", phone: "+1 (555) 123-4567" },
-  "thai-express": { name: "Thai Express", cuisine: "Thai", rating: 4.7, deliveryTime: "22-28 min", distance: "1.3 km", priceRange: "$$", address: "456 Thai Street, New York, NY 10002", phone: "+1 (555) 234-5678" },
-  "ocean-breeze": { name: "Ocean Breeze", cuisine: "Seafood", rating: 4.9, deliveryTime: "30-35 min", distance: "2.5 km", priceRange: "$$$", address: "789 Ocean Drive, New York, NY 10003", phone: "+1 (555) 345-6789" },
-  "smokehouse": { name: "Smokehouse", cuisine: "BBQ", rating: 4.8, deliveryTime: "35-40 min", distance: "2.2 km", priceRange: "$$", address: "321 BBQ Lane, New York, NY 10004", phone: "+1 (555) 456-7890" },
-  "noodle-house": { name: "Noodle House", cuisine: "Asian", rating: 4.8, deliveryTime: "20-25 min", distance: "1.1 km", priceRange: "$$", address: "654 Noodle Street, New York, NY 10005", phone: "+1 (555) 567-8901" },
-}
-
-// Generate sample reviews
-const generateReviews = (productName, totalReviews = 20) => {
-  const reviews = []
-  const names = ["Alex Johnson", "Sarah Chen", "Michael Brown", "Emily Davis", "David Wilson", "Jessica Martinez", "Chris Anderson", "Amanda Taylor", "Ryan Garcia", "Lisa Thompson"]
-  const comments = [
-    "Absolutely amazing! The flavors were incredible and the quality was top-notch. Highly recommend!",
-    "Great experience overall. Food arrived hot and fresh. Will definitely order again!",
-    "One of the best dishes I've tried. The quality is outstanding and prices are reasonable.",
-    "Delicious food and fast delivery. The packaging was excellent too. Very satisfied!",
-    "Excellent service and amazing food quality. This has become my go-to dish.",
-    "The food exceeded my expectations! Everything was perfectly cooked and seasoned.",
-    "Fast delivery and great tasting food. The portion sizes are generous too.",
-    "Love this dish! The food is always fresh and the flavors are authentic.",
-    "Outstanding quality and service. The food arrived on time and was still hot.",
-    "Highly recommend! The food is delicious and the customer service is excellent."
-  ]
-
-  for (let i = 0; i < Math.min(15, totalReviews); i++) {
-    const rating = 3.5 + Math.random() * 1.5
-    const roundedRating = Math.round(rating * 10) / 10
-    reviews.push({
-      id: i + 1,
-      userName: names[i % names.length],
-      userAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(names[i % names.length])}&background=ffc107&color=fff&size=128`,
-      rating: roundedRating,
-      comment: comments[i % comments.length],
-      date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
-      helpful: Math.floor(Math.random() * 50),
-      verified: Math.random() > 0.3,
-      orderType: ["Delivery", "Dine-in", "Takeout"][Math.floor(Math.random() * 3)]
-    })
+// The product comes from the server (GET /food/products/public/:id, priced for the customer's saved location like
+// the menu). There is no product review, restaurant or per-product order data on the server, so those sections stay
+// empty instead of showing invented content.
+const toPageProduct = (p) => {
+  if (!p) return null
+  const firstSize = (p.sizes || [])[0] || null
+  return {
+    id: String(p._id || p.id),
+    name: p.name || "",
+    price: Number(firstSize?.price ?? p.price) || 0,
+    size: firstSize?.size || "",
+    image: p.image || "",
+    description: p.description || p.shortDescription || "",
+    category: p.category?.label || "",
+    ingredients: (p.toppings || []).map((t) => t.name).filter(Boolean),
+    preparationTime: "",
+    calories: null,
+    rating: 0,
+    isVeg: p.vegType !== "non-veg",
   }
-
-  return reviews.sort((a, b) => b.rating - a.rating)
 }
 
 export default function ProductDetail() {
@@ -97,26 +45,53 @@ export default function ProductDetail() {
   const navigate = useNavigate()
   const goBack = useAppBackNavigation()
   const checkLocation = useLocationGuard()
-  const product = productsData[parseInt(id)]
-  const { addToCart, isInCart, getCartItem, updateQuantity } = useCart()
-  const { getAllOrders } = useOrders()
+  const [product, setProduct] = useState(null)
+  const [productLoading, setProductLoading] = useState(true)
+  useEffect(() => {
+    let cancelled = false
+    setProductLoading(true)
+    apiClient.get(`/food/products/public/${encodeURIComponent(String(id || ""))}`)
+      .then((res) => { if (!cancelled) setProduct(toPageProduct(res?.data?.data)) })
+      .catch(() => { if (!cancelled) setProduct(null) })
+      .finally(() => { if (!cancelled) setProductLoading(false) })
+    return () => { cancelled = true }
+  }, [id])
+
+  // The cart is the same one the menu and the cart page use (userCart + pvp_customized_items)
+  const cartLine = product ? { itemId: product.id, name: product.name, price: product.price, size: product.size, image: product.image, isVeg: product.isVeg } : null
+  const lineKey = cartLine ? lineKeyFor(cartLine) : null
+  const [cartQty, setCartQty] = useState(0)
+  useEffect(() => {
+    const read = () => {
+      try {
+        const v = JSON.parse(localStorage.getItem("userCart") || "{}")[lineKey]
+        setCartQty(typeof v === "object" && v !== null ? Number(v.quantity || 0) : Number(v || 0))
+      } catch (_) {
+        setCartQty(0)
+      }
+    }
+    read()
+    window.addEventListener("cartUpdated", read)
+    return () => window.removeEventListener("cartUpdated", read)
+  }, [lineKey])
+  const isInCart = () => cartQty > 0
+  const getCartItem = () => (cartQty > 0 ? { quantity: cartQty } : null)
+  const updateQuantity = (_id, qty) => { if (lineKey) setLineQty(lineKey, qty) }
   const [quantity, setQuantity] = useState(1)
   const [showReviewForm, setShowReviewForm] = useState(false)
   const [reviewForm, setReviewForm] = useState({
     rating: 5,
     comment: "",
   })
-  const [reviews, setReviews] = useState(() =>
-    product ? generateReviews(product.name) : []
-  )
+  const [reviews, setReviews] = useState([])
   const [helpfulVotes, setHelpfulVotes] = useState(new Set())
   const [replyStates, setReplyStates] = useState({})
   const [replies, setReplies] = useState({})
 
-  const restaurant = product ? restaurantsData[product.restaurantSlug] : null
+  const restaurant = null
   const inCart = product ? isInCart(product.id) : false
   const cartItem = product ? getCartItem(product.id) : null
-  const orders = getAllOrders()
+  const orders = []
 
   // Get order history for this product
   const orderHistory = useMemo(() => {
@@ -136,13 +111,7 @@ export default function ProductDetail() {
   const handleAddToCart = () => {
     checkLocation(() => {
       if (product) {
-        for (let i = 0; i < quantity; i++) {
-          const result = addToCart(product)
-          if (result?.ok === false) {
-            alert(result.error || "Cannot add item from different store. Please clear your cart first.")
-            break
-          }
-        }
+        addLineToCart(cartLine, quantity)
       }
     })
   }
@@ -258,6 +227,10 @@ export default function ProductDetail() {
           }`}
       />
     ))
+  }
+
+  if (productLoading) {
+    return <AnimatedPage className="min-h-screen bg-gradient-to-b from-yellow-50/30 via-white to-orange-50/20 dark:from-[#0a0a0a] dark:via-[#0a0a0a] dark:to-[#0a0a0a]" />
   }
 
   if (!product) {
@@ -473,11 +446,11 @@ export default function ProductDetail() {
                 </div>
                 <div>
                   <p className="text-muted-foreground mb-1 md:mb-2">Preparation Time</p>
-                  <p className="font-semibold">{product.preparationTime}</p>
+                  <p className="font-semibold">{product.preparationTime || "-"}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground mb-1 md:mb-2">Calories</p>
-                  <p className="font-semibold">{product.calories} kcal</p>
+                  <p className="font-semibold">{product.calories ? `${product.calories} kcal` : "-"}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground mb-1 md:mb-2">Ingredients</p>

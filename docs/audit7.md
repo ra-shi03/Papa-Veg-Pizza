@@ -427,6 +427,13 @@ Severity: High / Medium / Low. Size: S (hours), M (a day), L (several days). Dem
 | Cart rows from `ALL_PRODUCTS` / `pvp_products_v2`; menu location key | Medium | S | Maybe |
 | Fallback phone in MyProfile | Low | S | Maybe |
 | Refund request screen | PHASE2 | M | No |
+| `U/profile/Favorites.jsx`: non-v1 mock, hide or build (`ProfileContext`, localStorage `userFavorites`) | Low | S hide / M build | Maybe |
+| `U/Collections.jsx`: non-v1 mock, hide or build (`ProfileContext`, localStorage) | Low | S hide / M build | Maybe |
+| `U/CollectionDetail.jsx`: non-v1 mock, hide or build (`ProfileContext`, localStorage) | Low | S hide / M build | Maybe |
+| `U/profile/Payments.jsx` (saved payment methods): non-v1 mock, hide or build (localStorage `userPaymentMethods`) | Low | S hide / M build | Maybe |
+| `U/profile/AddPayment.jsx`: non-v1 mock, hide or build (localStorage) | Low | S hide / M build | Maybe |
+| `U/profile/EditPayment.jsx`: non-v1 mock, hide or build (localStorage) | Low | S hide / M build | Maybe |
+| `U/profile/Feedback.jsx`: non-v1 mock, hide or build ("Simulate API request", hardcoded licence number) | Low | S hide / M build | Maybe |
 
 ### Store manager
 

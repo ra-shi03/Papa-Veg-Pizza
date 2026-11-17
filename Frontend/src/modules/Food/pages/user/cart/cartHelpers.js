@@ -1,22 +1,9 @@
 // Shared by the cart and checkout: delivery location, delivery time slots, coupons and the order item payload.
+import { readSavedCoords } from "../../../utils/savedLocation"
 
-const readJson = (key) => {
-  try {
-    return JSON.parse(localStorage.getItem(key) || "null")
-  } catch (_) {
-    return null
-  }
-}
-
-/** The confirmed delivery point, from whichever key the location screens wrote. */
+/** The confirmed delivery point: the same reader the menu uses (utils/savedLocation.js), so both price for one store. */
 export function getCartCoords() {
-  const picked = readJson("deliveryLocation")?.selectedAddress
-  if (Number.isFinite(picked?.lat) && Number.isFinite(picked?.lng)) return { lat: picked.lat, lng: picked.lng }
-  const setup = readJson("user_location")
-  if (Number.isFinite(setup?.lat) && Number.isFinite(setup?.lng)) return { lat: setup.lat, lng: setup.lng }
-  const legacy = readJson("userLocation")
-  if (Number.isFinite(legacy?.latitude) && Number.isFinite(legacy?.longitude)) return { lat: legacy.latitude, lng: legacy.longitude }
-  return null
+  return readSavedCoords()
 }
 
 // ---- delivery time

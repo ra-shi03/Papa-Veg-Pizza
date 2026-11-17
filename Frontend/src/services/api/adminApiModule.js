@@ -415,11 +415,29 @@ export const adminAPI = {
   /** Public env variables (safe subset). Used for runtime keys like Google Maps. */
   // getPublicEnvVariables removed: rely on import.meta.env instead.
 
-  /** Public categories (user app) - zone-aware */
+  /**
+   * Public categories (user app). Read from GET /food/categories/public (the super admin's menu categories) and
+   * returned in the shape the category screens read: data.data.categories = [{ id, name, slug, image, type }].
+   * Inactive categories are left out.
+   */
   getPublicCategories: (params = {}, config = {}) =>
-    userClient.get("/food/restaurant/categories/public", {
-      params: params ?? {},
-      ...config,
+    userClient.get("/food/categories/public", { ...config }).then((res) => {
+      const list = Array.isArray(res?.data?.data) ? res.data.data : (res?.data?.categories || [])
+      const categories = list
+        .filter((c) => c && String(c.status || "Active") !== "Inactive")
+        .map((c) => {
+          const name = c.label || c.name || ""
+          return {
+            id: String(c._id || c.id || ""),
+            _id: String(c._id || c.id || ""),
+            name,
+            slug: String(name).toLowerCase().trim().replace(/\s+/g, "-"),
+            image: c.icon || c.image || "",
+            borderColor: c.borderColor || "",
+            type: c.type || "",
+          }
+        })
+      return { ...res, data: { success: true, data: { categories }, categories } }
     }),
 
   /** Offers & Coupons (admin) */

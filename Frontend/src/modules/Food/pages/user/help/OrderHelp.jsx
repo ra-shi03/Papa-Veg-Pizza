@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import { useParams, Link, useNavigate } from "react-router-dom"
 import {
   ArrowLeft,
@@ -21,7 +22,24 @@ import ScrollReveal from "@food/components/user/ScrollReveal"
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@food/components/ui/card"
 import { Button } from "@food/components/ui/button"
 import { Badge } from "@food/components/ui/badge"
-import { useOrders } from "@food/context/OrdersContext"
+import { orderAPI } from "@food/api"
+import { loadBusinessSettings } from "@food/utils/businessSettings"
+
+// The order as this screen reads it, from the customer's own order on the server
+const STATUS_FOR_SCREEN = { created: "confirmed", confirmed: "confirmed", preparing: "preparing", ready_for_pickup: "preparing", reached_pickup: "preparing", picked_up: "outForDelivery", reached_drop: "outForDelivery", delivered: "delivered" }
+const toHelpOrder = (o) => {
+  if (!o) return null
+  const raw = String(o.orderStatus || o.status || "")
+  const a = o.deliveryAddress || o.address || null
+  return {
+    id: o.order_id || o.orderId || o._id || o.id,
+    status: STATUS_FOR_SCREEN[raw] || (raw.startsWith("cancelled") ? "cancelled" : raw),
+    createdAt: o.createdAt,
+    total: Number(o.pricing?.total ?? o.total ?? 0),
+    items: o.items || [],
+    address: a ? { street: a.street || "", additionalDetails: a.additionalDetails || "", city: a.city || "", state: a.state || "", zipCode: a.zipCode || "" } : null,
+  }
+}
 
 const commonIssues = [
   {
@@ -125,8 +143,23 @@ const commonIssues = [
 export default function OrderHelp() {
   const { orderId } = useParams()
   const navigate = useNavigate()
-  const { getOrderById } = useOrders()
-  const order = getOrderById(orderId)
+  const [order, setOrder] = useState(null)
+  const [loading, setLoading] = useState(true)
+  // Support contact from the business settings (super admin); a card is hidden when its value is empty
+  const [support, setSupport] = useState({ phone: "", email: "" })
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    orderAPI.getOrderDetails(orderId)
+      .then((res) => { if (!cancelled) setOrder(toHelpOrder(res?.data?.data?.order || res?.data?.order || null)) })
+      .catch(() => { if (!cancelled) setOrder(null) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    loadBusinessSettings()
+      .then((s) => { if (!cancelled) setSupport({ phone: String(s?.supportPhone || "").trim(), email: String(s?.supportEmail || "").trim() }) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [orderId])
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A"
@@ -188,6 +221,10 @@ export default function OrderHelp() {
       default:
         break
     }
+  }
+
+  if (loading) {
+    return <AnimatedPage className="min-h-screen bg-gradient-to-b from-yellow-50/30 via-white to-orange-50/20 p-4"><div className="max-w-4xl mx-auto" /></AnimatedPage>
   }
 
   if (!order) {
@@ -260,7 +297,7 @@ export default function OrderHelp() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
-                  <p className="font-semibold text-[#7e3866] text-xl">${order.total.toFixed(2)}</p>
+                  <p className="font-semibold text-[#7e3866] text-xl">₹{order.total.toFixed(2)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Items</p>
@@ -407,6 +444,7 @@ export default function OrderHelp() {
             </CardHeader>
             <CardContent className="space-y-4 md:space-y-5 lg:space-y-6 p-4 md:p-5 lg:p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5 lg:gap-6">
+                {support.phone && (
                 <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
                   <div className="p-2 bg-orange-100 rounded-lg">
                     <Phone className="h-5 w-5 text-[#7e3866]" />
@@ -417,13 +455,15 @@ export default function OrderHelp() {
                       Mention order {order.id}
                     </p>
                     <a
-                      href="tel:+1-800-123-4567"
+                      href={`tel:${support.phone.replace(/\s+/g, "")}`}
                       className="text-sm text-primary hover:underline font-medium"
                     >
-                      +1 (800) 123-4567
+                      {support.phone}
                     </a>
                   </div>
                 </div>
+                )}
+                {support.email && (
                 <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
                   <div className="p-2 bg-orange-100 rounded-lg">
                     <Mail className="h-5 w-5 text-[#7e3866]" />
@@ -434,13 +474,14 @@ export default function OrderHelp() {
                       Include order {order.id} in subject
                     </p>
                     <a
-                      href={`mailto:support@papavegpizza.com?subject=Help with Order ${order.id}`}
+                      href={`mailto:${support.email}?subject=${encodeURIComponent(`Help with Order ${order.id}`)}`}
                       className="text-sm text-primary hover:underline font-medium"
                     >
-                      support@papavegpizza.com
+                      {support.email}
                     </a>
                   </div>
                 </div>
+                )}
               </div>
               <div className="pt-4 border-t">
                 <Button

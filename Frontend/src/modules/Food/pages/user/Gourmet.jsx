@@ -40,28 +40,12 @@ export default function Gourmet() {
     return `${backendOrigin.replace(/\/$/, "")}${trimmed.startsWith("/") ? trimmed : `/${trimmed}`}`
   }
 
-  // Fetch Gourmet restaurants from public API
+  // Gourmet stores: the super admin has no Gourmet list yet and the server has no route for one, so the section is
+  // empty (its own empty state) instead of calling a path that does not exist.
   useEffect(() => {
-    const fetchGourmetRestaurants = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        const response = await api.get('/food/hero-banners/gourmet/public')
-        const data = response?.data?.data
-        const list = data?.restaurants ?? (Array.isArray(data) ? data : [])
-        setGourmetRestaurants(list)
-      } catch (err) {
-        debugError('Error fetching Gourmet restaurants:', err)
-        const errorMessage = err?.response?.data?.message || err?.message || 'Failed to load Gourmet stores'
-        setError(errorMessage)
-        toast.error(errorMessage)
-        setGourmetRestaurants([])
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchGourmetRestaurants()
+    setError(null)
+    setGourmetRestaurants([])
+    setLoading(false)
   }, [])
 
   const toggleFavorite = (id) => {

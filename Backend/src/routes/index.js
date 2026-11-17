@@ -175,6 +175,8 @@ router.get('/v1/food/admin/menu/public', productController.getPublicMenu);
 // Public products routes (the full admin lists, with Draft / Archived items, are in the admin router below)
 router.get('/v1/food/admin/products/public', productController.getPublicProducts);
 router.get('/v1/food/products/public', productController.getPublicProducts);
+// One product for the customer's product page (display fields only, store-priced like the menu)
+router.get('/v1/food/products/public/:id', productController.getPublicProductById);
 
 // Public combos (Meal for 1 / 2 / 4) route
 router.get(['/v1/food/combos/public', '/v1/food/admin/combos/public'], comboController.getPublicCombos);

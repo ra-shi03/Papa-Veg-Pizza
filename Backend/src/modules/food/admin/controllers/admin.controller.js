@@ -644,14 +644,16 @@ export async function getAllOffers(req, res, next) {
     }
 }
 
-export async function createAdminOffer(req, res, next) {
-    try {
-        const body = validateCreateOfferDto(req.body || {});
-        const created = await adminService.createAdminOffer(body);
-        res.status(201).json({ success: true, message: 'Offer created successfully', data: { offer: created } });
-    } catch (error) {
-        next(error);
-    }
+/**
+ * POST /food/admin/offers : retired. Checkout, the cart and the public coupon list read only Marketing > Coupons
+ * (FoodCoupon), so an offer saved here would never apply. The old records stay readable and deletable.
+ */
+export async function createAdminOffer(req, res) {
+    return res.status(410).json({
+        success: false,
+        message: 'Offers are no longer created here. Create the coupon in Marketing > Coupons; that is the list checkout uses.',
+        data: null,
+    });
 }
 
 export async function updateAdminOfferCartVisibility(req, res, next) {
@@ -1502,7 +1504,6 @@ export async function processRefund(req, res, next) {
                 {
                     title: 'Refund Processed! 💸',
                     body: `Your refund of ₹${refundAmount || order.totalAmount || order.total || 0} for Order #${order.orderId} has been processed successfully.`,
-                    image: 'https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png',
                     data: {
                         type: 'refund_processed',
                         orderId: String(order.orderId),

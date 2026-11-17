@@ -16,17 +16,7 @@ export default function UserSearchPage() {
 
   // Load products, categories, and addons
   useEffect(() => {
-    // 1. Instant fallback from localStorage
-    try {
-      const storedProds = localStorage.getItem('pvp_products_v2');
-      if (storedProds) {
-        const parsed = JSON.parse(storedProds);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setProducts(parsed.filter(p => p.status === 'Active' || !p.status));
-        }
-      }
-    } catch (_) {}
-
+    // 1. Categories and add-ons can paint from their last copy; products always come from the server (store prices)
     try {
       const storedCats = localStorage.getItem('pvp_categories');
       if (storedCats) {
@@ -55,7 +45,6 @@ export default function UserSearchPage() {
         if (Array.isArray(prodList) && prodList.length > 0) {
           const activeProds = prodList.filter(p => p.status === 'Active' || !p.status);
           setProducts(activeProds);
-          localStorage.setItem('pvp_products_v2', JSON.stringify(activeProds));
         }
       } catch (_) {}
 

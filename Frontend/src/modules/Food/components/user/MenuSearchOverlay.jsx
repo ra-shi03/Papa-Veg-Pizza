@@ -428,15 +428,7 @@ const getImageForAddon = (name, type, existingImage) => {
     const fetchDirectProducts = async () => {
       if (internalProducts.length > 0) return;
       try {
-        const cached = localStorage.getItem('pvp_products_v2');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setInternalProducts(parsed);
-            return;
-          }
-        }
-
+        // Always from the server (store-priced for the saved location), never a cached product list
         const [pRes, mRes] = await Promise.all([
           apiClient.get('/food/admin/products/public').catch(() => null),
           apiClient.get('/food/admin/menu/public').catch(() => null)

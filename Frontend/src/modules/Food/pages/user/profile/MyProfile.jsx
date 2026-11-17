@@ -82,7 +82,7 @@ export default function MyProfile() {
       const cleaned = String(tempPhone).replace(/\D/g, "")
       return cleaned.slice(-10)
     }
-    return "8770552411" // fallback
+    return "" // unknown until the profile loads; never a sample number
   })
   
   const [gender, setGender] = useState("Unspecified")

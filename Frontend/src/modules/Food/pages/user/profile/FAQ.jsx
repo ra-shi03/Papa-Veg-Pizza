@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { ChevronDown } from "lucide-react"
 import Header from "@food/components/user/Header"
+import { faqAPI } from "@/services/api/faqApi"
 
 export default function FAQ() {
   const navigate = useNavigate()
@@ -14,38 +15,24 @@ export default function FAQ() {
     setIsDarkMode(isDark)
   }, [])
 
-  const FAQ_DATA = [
-    {
-      id: 1,
-      question: "Are all pizzas on the menu 100% vegetarian?",
-      answer: "Yes, Papa Veg Pizza is a 100% vegetarian brand. We do not use meat, fish, or poultry products. All our cheeses are made with microbial rennet (non-animal source) and are 100% vegetarian friendly."
-    },
-    {
-      id: 2,
-      question: "How do I track my active order?",
-      answer: "You can track your order in real-time by navigating to 'Track Order' from the Account page. This displays live status updates from order acceptance, preparation, baking, and delivery dispatcher coordinates."
-    },
-    {
-      id: 3,
-      question: "What is In-Car Dining and how does it work?",
-      answer: "In-Car Dining allows you to enjoy hot pizza in the comfort of your parked car. Simply select the 'In-Car' option on the home screen, input your vehicle registration/car number, and confirm your order. Once parked at our designated spot, our server will deliver the order directly to your window."
-    },
-    {
-      id: 4,
-      question: "Can I customize the crust and cheese options?",
-      answer: "Absolutely! You can choose from various crust sizes (Oval Flatz, Personal, Medium, Stuffed Crust) and customize toppings (paneer, olives, jalapenos, etc.) by clicking the 'Customise' button on any pizza in the Menu list."
-    },
-    {
-      id: 5,
-      question: "How do I cancel my order or request a refund?",
-      answer: "Orders can be modified or cancelled within 5 minutes of placement by clicking the support button or calling the branch directly. Once order preparation begins, cancellation is not possible. Approved refunds are credited directly to your Papa Veg Money wallet instantly."
-    },
-    {
-      id: 6,
-      question: "Do you have any gluten-free or vegan crust options?",
-      answer: "Currently, our pizzas contain wheat-based dough. We are actively working on developing certified gluten-free crusts and dairy-free vegan cheese options, which will be launched very soon!"
-    }
-  ]
+  // FAQs the super admin manages (Settings > FAQ), active ones only, in their saved order
+  const [faqs, setFaqs] = useState([])
+  const [faqState, setFaqState] = useState("loading") // loading | ready | error
+
+  useEffect(() => {
+    let cancelled = false
+    faqAPI.getPublicFaqs()
+      .then((res) => {
+        if (cancelled) return
+        const list = Array.isArray(res?.data?.data) ? res.data.data : []
+        setFaqs(list
+          .filter((f) => f && f.isActive !== false && (f.title || f.question))
+          .map((f) => ({ id: String(f._id || f.id), question: f.title || f.question, answer: f.content || f.answer || "" })))
+        setFaqState("ready")
+      })
+      .catch(() => { if (!cancelled) setFaqState("error") })
+    return () => { cancelled = true }
+  }, [])
 
   const toggleAccordion = (id) => {
     setActiveId(activeId === id ? null : id)
@@ -98,7 +85,16 @@ export default function FAQ() {
 
         {/* Collapsible Accordions */}
         <div className="space-y-3">
-          {FAQ_DATA.map((faq) => {
+          {faqState === "loading" && (
+            <p className="text-sm opacity-70 text-left text-slate-600 dark:text-[#e4beb9]">Loading FAQs...</p>
+          )}
+          {faqState === "error" && (
+            <p className="text-sm opacity-70 text-left text-slate-600 dark:text-[#e4beb9]">FAQs could not be loaded. Please try again later.</p>
+          )}
+          {faqState === "ready" && faqs.length === 0 && (
+            <p className="text-sm opacity-70 text-left text-slate-600 dark:text-[#e4beb9]">No FAQs have been added yet.</p>
+          )}
+          {faqs.map((faq) => {
             const isOpen = activeId === faq.id
             return (
               <div
