@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import { HomePage } from '../models/homePage.model.js';
 import { FoodStore } from '../../store/models/store.model.js';
 import { FoodFranchise } from '../../franchise/models/franchise.model.js';
-import { ValidationError } from '../../../../core/auth/errors.js';
+import { ValidationError, NotFoundError } from '../../../../core/auth/errors.js';
 
 // Order methods: how a customer can order. Built in: delivery, takeaway, in-car, delivery on train, dine-in (dine-in
 // starts switched off). The super admin can also create more. Each is switched on or off and offered at every store,
@@ -33,17 +33,18 @@ const cleanOne = (m, def, id) => ({
 });
 
 /** The saved methods: the built-in ones in a fixed order (defaults when never saved), then the created ones. */
-export function normalizeMethods(saved) {
+export function normalizeMethods(saved, removed = []) {
     const list = Array.isArray(saved) ? saved : [];
     const byId = new Map(list.map((m) => [String(m?.id), m]));
-    const builtin = DEFAULT_ORDER_METHODS.map((def) => (byId.has(def.id) ? cleanOne(byId.get(def.id), def, def.id) : { ...def, custom: false }));
+    const gone = new Set(strs(removed));
+    const builtin = DEFAULT_ORDER_METHODS.filter((d) => !gone.has(d.id)).map((def) => (byId.has(def.id) ? cleanOne(byId.get(def.id), def, def.id) : { ...def, custom: false }));
     const custom = list.filter((m) => ID_RE.test(String(m?.id)) && !BUILTIN_METHOD_IDS.includes(String(m.id))).map((m) => cleanOne(m, null, String(m.id)));
     return [...builtin, ...custom];
 }
 
 export async function loadMethods() {
-    const doc = await HomePage.findOne().select('orderMethods').lean();
-    return normalizeMethods(doc?.orderMethods);
+    const doc = await HomePage.findOne().select('orderMethods removedMethodIds').lean();
+    return normalizeMethods(doc?.orderMethods, doc?.removedMethodIds);
 }
 
 /** Is this method offered at this store? `store` needs _id and franchiseId. */
@@ -88,11 +89,16 @@ export async function validateMethodsInput(input) {
     const seen = new Set();
     const clean = [];
     const slug = (label) => String(label || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 28);
-    for (const m of input) {
+    const removedNow = new Set(strs((await HomePage.findOne().select('removedMethodIds').lean())?.removedMethodIds));
+    for (let m of input) {
         let id = String(m?.id || '');
         if (!id && String(m?.label || '').trim()) { // a newly created method: its id comes from its name
             const flat = (v) => String(v).toLowerCase().replace(/[^a-z0-9]/g, '');
-            if (DEFAULT_ORDER_METHODS.some((d) => flat(d.id) === flat(m.label) || flat(d.label) === flat(m.label))) throw new ValidationError(`${String(m.label).trim()} already exists, switch it on instead`);
+            const same = DEFAULT_ORDER_METHODS.find((d) => flat(d.id) === flat(m.label) || flat(d.label) === flat(m.label));
+            if (same && !removedNow.has(same.id)) throw new ValidationError(`${String(m.label).trim()} already exists, switch it on instead`);
+            if (same) { id = same.id; m = { ...m, id: same.id, label: same.label }; } // a deleted built-in method comes back
+        }
+        if (!id && String(m?.label || '').trim()) {
             const base = slug(m.label) || 'method';
             id = /^[a-z]/.test(base) ? base : `m_${base}`;
             for (let n = 2; seen.has(id) || input.some((x) => x !== m && x?.id === id) || BUILTIN_METHOD_IDS.includes(id); n += 1) id = `${base}_${n}`.slice(0, 30);
@@ -124,14 +130,27 @@ export async function validateMethodsInput(input) {
     if (storeIds.length && (await FoodStore.countDocuments({ _id: { $in: storeIds } })) !== storeIds.length) throw new ValidationError('A chosen store does not exist');
     // built-in methods not sent keep their current rule; created methods not sent are deleted
     const current = await loadMethods();
-    const builtin = BUILTIN_METHOD_IDS.map((id) => clean.find((m) => m.id === id) || current.find((m) => m.id === id));
+    const builtin = BUILTIN_METHOD_IDS.map((id) => clean.find((m) => m.id === id) || current.find((m) => m.id === id)).filter(Boolean);
     return [...builtin, ...clean.filter((m) => !BUILTIN_METHOD_IDS.includes(m.id))];
 }
 
 export async function saveMethods(input) {
     const methods = await validateMethodsInput(input);
-    await HomePage.findOneAndUpdate({}, { $set: { orderMethods: methods } }, { upsert: true, new: true, setDefaultsOnInsert: true });
-    return normalizeMethods(methods);
+    const sent = new Set(methods.map((m) => m.id));
+    // a built-in method that is sent again is no longer deleted
+    await HomePage.findOneAndUpdate({}, { $set: { orderMethods: methods }, $pull: { removedMethodIds: { $in: [...sent] } } }, { upsert: true, new: true, setDefaultsOnInsert: true });
+    return loadMethods();
+}
+
+/** Deletes a method: a created one is dropped; a built-in one is hidden everywhere until it is created again. */
+export async function deleteMethod(id) {
+    const all = await loadMethods();
+    const m = all.find((x) => x.id === String(id));
+    if (!m) throw new NotFoundError('Order method not found');
+    const update = { $pull: { orderMethods: { id: m.id } } };
+    if (!m.custom) update.$addToSet = { removedMethodIds: m.id };
+    await HomePage.findOneAndUpdate({}, update, { upsert: true, new: true, setDefaultsOnInsert: true });
+    return loadMethods();
 }
 
 export const DEFAULT_NEARBY_RADIUS_KM = 10;

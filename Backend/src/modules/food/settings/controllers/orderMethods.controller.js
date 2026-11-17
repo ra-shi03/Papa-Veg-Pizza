@@ -1,5 +1,5 @@
 import { sendResponse } from '../../../../utils/response.js';
-import { loadMethods, saveMethods, loadNearbyRadiusKm, saveNearbyRadiusKm, validateRadiusInput } from '../services/orderMethods.service.js';
+import { deleteMethod, loadMethods, saveMethods, loadNearbyRadiusKm, saveNearbyRadiusKm, validateRadiusInput } from '../services/orderMethods.service.js';
 import { clearBusinessInfoCache } from '../../admin/services/businessSettings.service.js';
 
 /** GET /settings/order-methods (super admin): every method with its rules, for the form. */
@@ -21,6 +21,17 @@ export const saveOrderMethodsAdmin = async (req, res, next) => {
         if (hasRadius) await saveNearbyRadiusKm(body.nearbyStoreRadiusKm);
         clearBusinessInfoCache(); // the train station list follows the train method's rules
         return sendResponse(res, 200, 'Order methods saved', { methods, nearbyStoreRadiusKm: await loadNearbyRadiusKm() });
+    } catch (err) {
+        next(err);
+    }
+};
+
+/** DELETE /settings/order-methods/:id (super admin). */
+export const deleteOrderMethodAdmin = async (req, res, next) => {
+    try {
+        const methods = await deleteMethod(req.params.id);
+        clearBusinessInfoCache();
+        return sendResponse(res, 200, 'Order method deleted', { methods });
     } catch (err) {
         next(err);
     }

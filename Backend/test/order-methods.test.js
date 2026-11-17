@@ -202,3 +202,28 @@ describe('duplicate names', () => {
         }
     });
 });
+
+describe('deleting order methods', () => {
+    const del = (id, token = fx.SA) => fx.call('DELETE', `${ADMIN}/${id}`, token);
+    test('only the super admin; unknown id is 404', async () => {
+        assert.equal((await del('incar', A.adminToken)).status, 403);
+        assert.equal((await del('incar', null)).status, 401);
+        assert.equal((await del('nope')).status, 404);
+    });
+    test('a deleted built-in method disappears everywhere and orders for it are refused; creating it again brings it back', async () => {
+        ok(await save([{ id: 'incar', enabled: true, scope: 'all' }]));
+        const left = ok(await del('incar')).methods;
+        assert.ok(!left.some((m) => m.id === 'incar'));
+        assert.ok(!ok(await fx.call('GET', ADMIN, fx.SA)).methods.some((m) => m.id === 'incar'));
+        assert.ok(!(await fx.call('GET', `${PUBLIC}?storeId=${A.storeId}`, null)).body.data.methods.some((m) => m.id === 'incar'));
+        assert.equal((await place(A.storeId, { orderMethod: 'incar' })).status, 400);
+        const back = ok(await save([...left, { label: 'In-Car', enabled: true, scope: 'all' }])).methods;
+        assert.ok(back.some((m) => m.id === 'incar' && !m.custom));
+    });
+    test('a deleted created method is gone', async () => {
+        const keep = ok(await fx.call('GET', ADMIN, fx.SA)).methods;
+        const made = ok(await save([...keep, { label: 'Patio', enabled: true, scope: 'all' }])).methods.find((m) => m.id === 'patio');
+        assert.ok(made?.custom);
+        assert.ok(!ok(await del('patio')).methods.some((m) => m.id === 'patio'));
+    });
+});

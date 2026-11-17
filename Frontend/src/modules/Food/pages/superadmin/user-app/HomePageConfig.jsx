@@ -946,9 +946,16 @@ export default function HomePageConfig() {
     setMethodsDirty(true);
   };
 
-  const removeMethod = (m) => {
-    setOrderMethods((list) => list.filter((x) => x !== m));
-    setMethodsDirty(true);
+  const removeMethod = async (m) => {
+    if (m.isNew) { setOrderMethods((list) => list.filter((x) => x !== m)); return; } // never saved: nothing on the server
+    if (!window.confirm(`Delete the "${m.label}" order method? Customers will no longer see it${m.custom ? '' : ' until you create it again'}.`)) return;
+    try {
+      await adminClient.delete(`/settings/order-methods/${m.id}`);
+      setOrderMethods((list) => list.filter((x) => x.id !== m.id)); // other unsaved edits stay
+      toast.success('Order method deleted');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.response?.data?.error || 'Could not delete the order method');
+    }
   };
 
   const handleSaveOrderMethods = async () => {
@@ -1695,9 +1702,7 @@ export default function HomePageConfig() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{method.label}</span>
                   <div className="flex items-center gap-3">
-                  {method.custom && (
-                    <button type="button" onClick={() => removeMethod(method)} className="text-xs text-red-600 hover:underline bg-transparent border-0 cursor-pointer">Delete</button>
-                  )}
+                  <button type="button" onClick={() => removeMethod(method)} className="text-xs text-red-600 hover:underline bg-transparent border-0 cursor-pointer">Delete</button>
                   <button
                     type="button"
                     onClick={() => updateMethod(method.id, { enabled: !method.enabled })}

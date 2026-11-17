@@ -5,7 +5,7 @@ import { getDeliveryLoginScreenConfig, updateDeliveryLoginScreenConfig } from '.
 import { getHomePageConfig, createOrUpdateHomePageConfig, updateHomePageConfig, uploadHomePageBanner, updateHomePageBanner, deleteHomePageBanner } from '../controllers/homePage.controller.js';
 import { authMiddleware, requireSuperAdmin } from '../../../../core/auth/auth.middleware.js';
 import { upload } from '../../../../middleware/upload.js';
-import { getOrderMethodsAdmin, saveOrderMethodsAdmin } from '../controllers/orderMethods.controller.js';
+import { getOrderMethodsAdmin, saveOrderMethodsAdmin, deleteOrderMethodAdmin } from '../controllers/orderMethods.controller.js';
 import { getPublicHeroBanner, getHeroBannerAdmin, saveHeroBanner } from '../controllers/heroBanner.controller.js';
 
 const router = express.Router();
@@ -24,6 +24,7 @@ router.put('/delivery-welcome', authMiddleware, requireSuperAdmin, updateDeliver
 // customer app gets the result for its own store from GET /food/orders/methods.
 router.get('/order-methods', authMiddleware, requireSuperAdmin, getOrderMethodsAdmin);
 router.put('/order-methods', authMiddleware, requireSuperAdmin, saveOrderMethodsAdmin);
+router.delete('/order-methods/:id', authMiddleware, requireSuperAdmin, deleteOrderMethodAdmin);
 
 // Hero banners on customer screens (Under 250): the super admin writes, customers read display fields only
 router.get('/hero-banners/:key/public', getPublicHeroBanner);

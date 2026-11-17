@@ -37,6 +37,8 @@ const homePageSchema = new mongoose.Schema(
         ],
         // Customers see stores within this many km of them (nearby stores, takeaway pickup); set by the super admin
         nearbyStoreRadiusKm: { type: Number, default: 10, min: 1, max: 200 },
+        // built-in order methods the super admin deleted (hidden until created again)
+        removedMethodIds: [{ type: String }],
         orderMethods: [
             {
                 id: { type: String, required: true },
