@@ -98,3 +98,23 @@ describe('store panel rows', () => {
         assert.equal((await fx.call('GET', '/v1/food/stores/slots?storeId=not-an-id', null)).status, 400);
     });
 });
+
+describe('store panel: method label and type filter', () => {
+    test('rows carry the method name, and the type and method filters narrow the list', async () => {
+        const pick = ok(await place({ orderMethod: 'incar' }), 201).order;
+        const del = ok(await place(), 201).order;
+        const get = async (qs) => {
+            const list = ok(await fx.call('GET', `/v1/food/store/orders?view=incoming${qs}`, A.managerToken));
+            return Array.isArray(list) ? list : list.orders || [];
+        };
+        const all = await get('');
+        assert.equal(all.find((r) => r._id === String(pick._id)).orderMethodLabel, 'In-Car');
+        assert.equal(all.find((r) => r._id === String(del._id)).orderMethodLabel, 'Delivery');
+        const onlyPickup = await get('&orderType=pickup');
+        assert.ok(onlyPickup.length && onlyPickup.every((r) => r.orderType === 'pickup'));
+        const onlyDelivery = await get('&orderType=delivery');
+        assert.ok(onlyDelivery.length && onlyDelivery.every((r) => r.orderType === 'delivery'));
+        const incar = await get('&orderMethod=incar');
+        assert.ok(incar.length && incar.every((r) => r.orderMethod === 'incar'));
+    });
+});

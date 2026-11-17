@@ -445,7 +445,7 @@ export default function ActiveOrders() {
           <div className="flex items-center gap-1">
             {priorityBadge}
             <Tag color={orderObj.orderType === "delivery" ? "purple" : "cyan"} className="font-bold border-0 px-2 py-0.5 rounded-full text-[9px] capitalize m-0">
-              {orderObj.orderType}
+              {orderObj.orderMethodLabel || orderObj.orderType}
             </Tag>
           </div>
         </div>

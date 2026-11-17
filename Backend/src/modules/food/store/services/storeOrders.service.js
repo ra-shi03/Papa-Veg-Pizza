@@ -1,3 +1,4 @@
+import { loadMethods } from '../../settings/services/orderMethods.service.js';
 import mongoose from 'mongoose';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { KitchenTask } from '../models/kitchenTask.model.js';
@@ -242,6 +243,13 @@ export const toOpsOrder = (order) => {
  */
 export async function enrichOpsOrders(user, ops, raw) {
   if (!ops.length) return ops;
+  // The method's name as the super admin set it (Takeaway, In-Car, Delivery on Train, a created one...). A method deleted since
+  // keeps a readable name made from its id.
+  const methods = await loadMethods();
+  for (const o of ops) {
+    const id = o.orderMethod || 'delivery';
+    o.orderMethodLabel = methods.find((m) => m.id === id)?.label || id.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  }
   const isManager = normalizeRole(user.role) === 'STORE_MANAGER';
   const riderIds = [...new Set(ops.map((o) => o.deliveryPartnerId).filter(Boolean))];
   const codes = [...new Set(ops.map((o) => o.couponCode).filter(Boolean))];
@@ -400,6 +408,11 @@ export async function listStoreOrders(user, query = {}) {
       $or: STAFF_SLOTS.map((slot) => ({ [`kitchen.staff.${slot}.userId`]: me })),
     }];
   }
+
+  // order type: collected at the store or delivered; method: the exact order method
+  if (query.orderType === 'pickup') filter.isPickup = true;
+  else if (query.orderType === 'delivery') filter.isPickup = { $ne: true };
+  if (query.orderMethod && /^[a-z][a-z0-9_]{1,29}$/.test(String(query.orderMethod))) filter.orderMethod = String(query.orderMethod);
 
   if (query.priority && query.priority !== 'All') filter['kitchen.priority'] = String(query.priority).toLowerCase();
   if (query.paymentMethod && query.paymentMethod !== 'All') {

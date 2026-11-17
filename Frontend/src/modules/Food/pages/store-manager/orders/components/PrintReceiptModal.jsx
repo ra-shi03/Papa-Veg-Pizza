@@ -154,7 +154,7 @@ export default function PrintReceiptModal({ visible, onClose, order }) {
             </div>
             <div className="flex justify-between">
               <span>Order Type:</span>
-              <span className="font-bold uppercase">{order.orderType}</span>
+              <span className="font-bold uppercase">{order.orderMethodLabel || order.orderType}</span>
             </div>
             <div className="flex justify-between">
               <span>Payment Status:</span>

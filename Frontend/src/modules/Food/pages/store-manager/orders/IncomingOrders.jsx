@@ -219,9 +219,9 @@ export default function IncomingOrders() {
       dataIndex: "orderType",
       key: "orderType",
       width: 90,
-      render: (type) => (
+      render: (type, record) => (
         <Tag color={type === "delivery" ? "purple" : "blue"} className="font-bold border-0 px-2 py-0.5 rounded-full capitalize">
-          {type}
+          {record?.orderMethodLabel || type}
         </Tag>
       )
     },
@@ -604,7 +604,7 @@ export default function IncomingOrders() {
 
                   <div className="flex gap-1.5">
                     <Tag color={order.orderType === "delivery" ? "purple" : "blue"} className="font-bold border-0 px-2 rounded-full text-[9px] capitalize">
-                      {order.orderType}
+                      {order.orderMethodLabel || order.orderType}
                     </Tag>
                     <Tag color={order.paymentStatus === "paid" ? "green" : "red"} className="font-bold border-0 px-2 rounded-full text-[9px]">
                       {order.paymentStatus === "paid" ? "Paid" : "Pending"}

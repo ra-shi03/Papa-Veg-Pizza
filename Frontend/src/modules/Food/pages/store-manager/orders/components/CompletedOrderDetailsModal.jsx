@@ -87,7 +87,7 @@ export default function CompletedOrderDetailsModal({
               </div>
               <div>
                 <span className="text-zinc-400 block mb-0.5">Order Type</span>
-                <Tag color={order.orderType === "delivery" ? "purple" : "cyan"} className="font-extrabold border-0 px-2.5 py-0.5 rounded-full capitalize">{order.orderType}</Tag>
+                <Tag color={order.orderType === "delivery" ? "purple" : "cyan"} className="font-extrabold border-0 px-2.5 py-0.5 rounded-full capitalize">{order.orderMethodLabel || order.orderType}</Tag>
               </div>
               <div>
                 <span className="text-zinc-400 block mb-0.5">Completed Time</span>

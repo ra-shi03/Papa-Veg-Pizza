@@ -140,7 +140,7 @@ export default function PrintReceiptPreviewModal({ visible, onClose, order }) {
             </div>
             <div className="flex justify-between">
               <span>Order Type:</span>
-              <span className="font-bold uppercase">{order.orderType}</span>
+              <span className="font-bold uppercase">{order.orderMethodLabel || order.orderType}</span>
             </div>
             <div className="flex justify-between">
               <span>Payment Method:</span>
@@ -194,7 +194,7 @@ export default function PrintReceiptPreviewModal({ visible, onClose, order }) {
             </div>
             <div className="flex justify-between">
               <span>Delivery Charge:</span>
-              <span>{formatCurrency(order.orderType === "delivery" ? 40.00 : 0.00)}</span>
+              <span>{formatCurrency(order.deliveryCharges || 0)}</span>
             </div>
             <div className="divider"></div>
             <div className="flex justify-between font-bold text-xs">

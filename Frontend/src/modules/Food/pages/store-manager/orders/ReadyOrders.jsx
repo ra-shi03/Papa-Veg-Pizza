@@ -243,9 +243,9 @@ export default function ReadyOrders() {
       title: <span className="text-xs font-black text-slate-700 dark:text-zinc-300">Type</span>,
       dataIndex: "orderType",
       key: "orderType",
-      render: (type) => (
+      render: (type, record) => (
         <Tag color={type === "delivery" ? "purple" : "cyan"} className="font-extrabold border-0 px-2 py-0.5 rounded-full text-[10px] capitalize">
-          {type}
+          {record?.orderMethodLabel || type}
         </Tag>
       )
     },
@@ -463,7 +463,7 @@ export default function ReadyOrders() {
           <div className="flex items-center gap-1">
             {priorityBadge}
             <Tag color={orderObj.orderType === "delivery" ? "purple" : "cyan"} className="font-bold border-0 px-2 py-0.5 rounded-full text-[9px] capitalize m-0">
-              {orderObj.orderType}
+              {orderObj.orderMethodLabel || orderObj.orderType}
             </Tag>
           </div>
         </div>

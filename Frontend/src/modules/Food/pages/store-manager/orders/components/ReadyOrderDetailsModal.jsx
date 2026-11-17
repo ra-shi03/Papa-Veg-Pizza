@@ -276,7 +276,7 @@ export default function ReadyOrderDetailsModal({
             <div>
               <span className="text-zinc-400 font-semibold block text-[10px] uppercase">Service Mode</span>
               <Tag color={isDelivery ? "purple" : "cyan"} className="font-bold border-0 px-2 py-0.5 rounded-full mt-1 capitalize text-[10px]">
-                {order.orderType}
+                {order.orderMethodLabel || order.orderType}
               </Tag>
             </div>
             {isDelivery && (
@@ -371,7 +371,7 @@ export default function ReadyOrderDetailsModal({
             </div>
             <div className="flex justify-between text-zinc-455 dark:text-zinc-400 font-semibold">
               <span>Delivery Charge</span>
-              <span>{formatCurrency(order.orderType === "delivery" ? 40.00 : 0.00)}</span>
+              <span>{formatCurrency(order.deliveryCharges || 0)}</span>
             </div>
             <Divider className="my-1.5 border-zinc-100 dark:border-zinc-800" />
             <div className="flex justify-between text-sm font-black text-slate-900 dark:text-white">

@@ -110,7 +110,7 @@ export default function ActiveOrderDetailsModal({
             </div>
             <div>
               <p className="text-zinc-400 font-semibold mb-0.5">Order Type</p>
-              <Tag color="purple" className="font-bold border-0 px-2 py-0.5 rounded-full mt-0.5 capitalize">{order.orderType}</Tag>
+              <Tag color="purple" className="font-bold border-0 px-2 py-0.5 rounded-full mt-0.5 capitalize">{order.orderMethodLabel || order.orderType}</Tag>
             </div>
             <div>
               <p className="text-zinc-400 font-semibold mb-0.5">Priority</p>

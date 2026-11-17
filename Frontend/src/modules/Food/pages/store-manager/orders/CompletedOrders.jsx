@@ -224,9 +224,9 @@ export default function CompletedOrders() {
       title: <span className="text-xs font-black text-slate-700 dark:text-zinc-300">Type</span>,
       dataIndex: "orderType",
       key: "orderType",
-      render: (type) => (
+      render: (type, record) => (
         <Tag color={type === "delivery" ? "purple" : "cyan"} className="font-extrabold border-0 px-2.5 py-0.5 rounded-full text-[10px] capitalize">
-          {type}
+          {record?.orderMethodLabel || type}
         </Tag>
       )
     },
@@ -383,7 +383,7 @@ export default function CompletedOrders() {
               {orderObj.orderNumber}
             </span>
             <Tag color={orderObj.orderType === "delivery" ? "purple" : "cyan"} className="font-bold border-0 px-2 py-0.2 rounded-full text-[9px] capitalize m-0">
-              {orderObj.orderType}
+              {orderObj.orderMethodLabel || orderObj.orderType}
             </Tag>
           </div>
           <Tag color={orderObj.refundStatus === "refunded" ? "error" : orderObj.status === "completed" ? "success" : "processing"} className="font-extrabold border-0 px-2.5 py-0.2 rounded-full text-[9px] capitalize m-0">
