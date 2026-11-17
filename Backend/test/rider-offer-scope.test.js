@@ -229,3 +229,20 @@ describe('accepting', () => {
         assert.ok(!JSON.stringify(current.body).includes(CUSTOMER.email));
     });
 });
+
+describe('scheduled orders are offered only when their slot is near', () => {
+    const scheduled = async (minutesAhead) => {
+        const o = await makeOrder();
+        await fx.models.FoodOrder.updateOne({ _id: o.id }, { $set: { scheduledAt: new Date(Date.now() + minutesAhead * 60000) } });
+        return o;
+    };
+    test('a slot hours away is not in the rider feed; a slot within the lead time is', async () => {
+        const farAway = await scheduled(5 * 60);
+        const soon = await scheduled(30);
+        const feed = await seen('shared');
+        assert.ok(!feed.includes(farAway.id), 'held until its slot is near');
+        assert.ok(feed.includes(soon.id));
+        const unscheduled = await makeOrder();
+        assert.ok((await seen('shared')).includes(unscheduled.id), 'ordinary orders are unaffected');
+    });
+});

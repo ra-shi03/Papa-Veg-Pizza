@@ -43,9 +43,10 @@ const sendSmsViaIndiaHub = async (phone, otp) => {
         const digits = String(phone || '').replace(/\D/g, '');
         const msisdn = digits.startsWith('91') ? digits : `91${digits}`;
 
-        // EXACT DLT TEMPLATE provided by user:
-        // "Welcome to the ##var## powered by SMSINDIAHUB. Your OTP for registration is ##var##"
-        const message = `Welcome to the Foodelo powered by SMSINDIAHUB. Your OTP for registration is ${otp}`;
+        // DLT TEMPLATE: "Welcome to the ##var## powered by SMSINDIAHUB. Your OTP for registration is ##var##"
+        // The first variable is the brand name. The template registered with the SMS provider (DLT) must accept it:
+        // a brand the template does not allow can make the operator reject the SMS.
+        const message = `Welcome to the Papa Veg Pizza powered by SMSINDIAHUB. Your OTP for registration is ${otp}`;
 
         // SMS India Hub HTTP GET API — query param names are case-sensitive per SOP
         const url = new URL('http://cloud.smsindiahub.in/vendorsms/pushsms.aspx');

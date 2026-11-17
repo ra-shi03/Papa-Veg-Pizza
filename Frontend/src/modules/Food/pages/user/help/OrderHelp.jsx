@@ -1,21 +1,17 @@
-import { useEffect, useState } from "react"
-import { useParams, Link, useNavigate } from "react-router-dom"
+import { useEffect, useRef, useState } from "react"
+import { useParams, Link } from "react-router-dom"
+import { toast } from "sonner"
 import {
   ArrowLeft,
   Package,
   AlertCircle,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Truck,
   MessageCircle,
   Phone,
   Mail,
-  FileText,
-  RefreshCw,
-  CreditCard,
   MapPin,
-  HelpCircle
+  HelpCircle,
+  Send,
+  CheckCircle,
 } from "lucide-react"
 import AnimatedPage from "@food/components/user/AnimatedPage"
 import ScrollReveal from "@food/components/user/ScrollReveal"
@@ -23,15 +19,18 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@food
 import { Button } from "@food/components/ui/button"
 import { Badge } from "@food/components/ui/badge"
 import { orderAPI } from "@food/api"
-import { loadBusinessSettings } from "@food/utils/businessSettings"
+import { supportAPI } from "@/services/api/supportApiModule"
+import { loadBusinessSettings, whatsappLink } from "@food/utils/businessSettings"
 
 // The order as this screen reads it, from the customer's own order on the server
 const STATUS_FOR_SCREEN = { created: "confirmed", confirmed: "confirmed", preparing: "preparing", ready_for_pickup: "preparing", reached_pickup: "preparing", picked_up: "outForDelivery", reached_drop: "outForDelivery", delivered: "delivered" }
+const STATUS_LABEL = { confirmed: "Confirmed", preparing: "Preparing", outForDelivery: "Out for Delivery", delivered: "Delivered", cancelled: "Cancelled" }
 const toHelpOrder = (o) => {
   if (!o) return null
   const raw = String(o.orderStatus || o.status || "")
   const a = o.deliveryAddress || o.address || null
   return {
+    mongoId: String(o._id || o.id || ""),
     id: o.order_id || o.orderId || o._id || o.id,
     status: STATUS_FOR_SCREEN[raw] || (raw.startsWith("cancelled") ? "cancelled" : raw),
     createdAt: o.createdAt,
@@ -41,112 +40,29 @@ const toHelpOrder = (o) => {
   }
 }
 
-const commonIssues = [
-  {
-    id: "late-delivery",
-    title: "Order is Late",
-    icon: Clock,
-    description: "Your order hasn't arrived within the estimated time",
-    solutions: [
-      "Check the order tracking page for real-time updates",
-      "Contact the delivery driver if contact information is available",
-      "Wait an additional 15-20 minutes as delays can occur",
-      "Contact support if the order is more than 30 minutes late"
-    ],
-    actions: [
-      { label: "Track Order", path: "track" },
-      { label: "Contact Support", path: "support" }
-    ]
-  },
-  {
-    id: "missing-items",
-    title: "Missing Items",
-    icon: Package,
-    description: "Some items from your order are missing",
-    solutions: [
-      "Check your order receipt to verify what was ordered",
-      "Check if items were delivered separately",
-      "Contact support immediately with your order number",
-      "Take photos if possible to help with the investigation"
-    ],
-    actions: [
-      { label: "View Invoice", path: "invoice" },
-      { label: "Report Issue", path: "support" }
-    ]
-  },
-  {
-    id: "wrong-order",
-    title: "Wrong Order Received",
-    icon: XCircle,
-    description: "You received items different from what you ordered",
-    solutions: [
-      "Keep the incorrect order - you won't be charged for it",
-      "Contact support immediately with your order number",
-      "We'll arrange a replacement or full refund",
-      "You may be eligible for a discount on your next order"
-    ],
-    actions: [
-      { label: "View Order Details", path: "track" },
-      { label: "Report Issue", path: "support" }
-    ]
-  },
-  {
-    id: "quality-issue",
-    title: "Quality Issue",
-    icon: AlertCircle,
-    description: "Food quality doesn't meet expectations",
-    solutions: [
-      "Contact support within 24 hours of delivery",
-      "Describe the issue in detail",
-      "Take photos if possible",
-      "We'll process a full refund or replacement"
-    ],
-    actions: [
-      { label: "Report Issue", path: "support" },
-      { label: "Request Refund", path: "refund" }
-    ]
-  },
-  {
-    id: "payment-issue",
-    title: "Payment Problem",
-    icon: CreditCard,
-    description: "Issues with payment or billing",
-    solutions: [
-      "Check your payment method in your profile",
-      "Verify the charge on your bank statement",
-      "Contact support if you were charged incorrectly",
-      "We'll investigate and process a refund if needed"
-    ],
-    actions: [
-      { label: "View Invoice", path: "invoice" },
-      { label: "Contact Support", path: "support" }
-    ]
-  },
-  {
-    id: "cancel-order",
-    title: "Cancel Order",
-    icon: RefreshCw,
-    description: "Need to cancel your order",
-    solutions: [
-      "Orders can be cancelled within 5 minutes of placement",
-      "After 5 minutes, contact support for cancellation",
-      "If the order is already being prepared, cancellation may not be possible",
-      "Refunds are processed automatically for cancelled orders"
-    ],
-    actions: [
-      { label: "Contact Support", path: "support" },
-      { label: "View Order", path: "track" }
-    ]
-  }
-]
+// What a pizza app asks when something is wrong with an order
+const ISSUE_TYPES = ["Missing item", "Wrong item", "Food quality or cold", "Damaged packaging", "Late delivery", "Other"]
+
+const formatDate = (dateString) => {
+  if (!dateString) return "N/A"
+  return new Date(dateString).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+}
+const formatTime = (value) => (value ? new Date(value).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "")
 
 export default function OrderHelp() {
   const { orderId } = useParams()
-  const navigate = useNavigate()
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
   // Support contact from the business settings (super admin); a card is hidden when its value is empty
-  const [support, setSupport] = useState({ phone: "", email: "" })
+  const [support, setSupport] = useState({ phone: "", email: "", whatsapp: "", hours: "" })
+  const [ticket, setTicket] = useState(null) // the report for this order that is open (or the latest one)
+  const [ticketsLoaded, setTicketsLoaded] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ issueType: ISSUE_TYPES[0], description: "" })
+  const [submitting, setSubmitting] = useState(false)
+  const [text, setText] = useState("")
+  const [sending, setSending] = useState(false)
+  const endRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
@@ -156,70 +72,96 @@ export default function OrderHelp() {
       .catch(() => { if (!cancelled) setOrder(null) })
       .finally(() => { if (!cancelled) setLoading(false) })
     loadBusinessSettings()
-      .then((s) => { if (!cancelled) setSupport({ phone: String(s?.supportPhone || "").trim(), email: String(s?.supportEmail || "").trim() }) })
+      .then((s) => {
+        if (cancelled) return
+        setSupport({
+          phone: String(s?.supportPhone || "").trim(),
+          email: String(s?.supportEmail || "").trim(),
+          whatsapp: String(s?.whatsappNumber || "").trim(),
+          hours: String(s?.supportHours || "").trim(),
+        })
+      })
       .catch(() => {})
     return () => { cancelled = true }
   }, [orderId])
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "N/A"
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+  // The report(s) for this order: the open one, else the latest
+  useEffect(() => {
+    if (!order?.mongoId) return undefined
+    let cancelled = false
+    supportAPI.getMyTickets({ orderId: order.mongoId, limit: 5 })
+      .then((res) => {
+        if (cancelled) return
+        const list = res?.data?.data?.tickets || []
+        setTicket(list.find((t) => t.status !== "resolved") || list[0] || null)
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setTicketsLoaded(true) })
+    return () => { cancelled = true }
+  }, [order?.mongoId])
+
+  // Live: the store's answer arrives over the socket (the customer app's own connection)
+  useEffect(() => {
+    const onMessage = (e) => {
+      const d = e?.detail
+      if (!d || !order?.mongoId || String(d.orderId) !== order.mongoId) return
+      setTicket((t) => {
+        if (!t || String(t._id) !== String(d.ticketId)) return t
+        const exists = (t.responses || []).some((r) => r.byRole === d.message.byRole && r.message === d.message.message && String(r.at) === String(d.message.at))
+        return exists ? { ...t, status: d.status || t.status } : { ...t, status: d.status || t.status, responses: [...(t.responses || []), d.message] }
+      })
+    }
+    window.addEventListener("supportMessage", onMessage)
+    return () => window.removeEventListener("supportMessage", onMessage)
+  }, [order?.mongoId])
+
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }) }, [ticket?.responses?.length])
+
+  const refreshTicket = async () => {
+    const res = await supportAPI.getMyTickets({ orderId: order.mongoId, limit: 5 })
+    const list = res?.data?.data?.tickets || []
+    setTicket(list.find((t) => t.status !== "resolved") || list[0] || null)
   }
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "confirmed":
-        return "bg-[#7e3866]"
-      case "preparing":
-        return "bg-[#7e3866]"
-      case "outForDelivery":
-        return "bg-[#7e3866]"
-      case "delivered":
-        return "bg-[#7e3866]"
-      default:
-        return "bg-gray-500"
+  const submitReport = async (e) => {
+    e.preventDefault()
+    const description = form.description.trim()
+    if (description.length < 5) {
+      toast.error("Please tell us a little more about the problem.")
+      return
+    }
+    setSubmitting(true)
+    try {
+      await supportAPI.createTicket({ type: "order", orderId: order.mongoId, issueType: form.issueType, description })
+      setForm({ issueType: ISSUE_TYPES[0], description: "" })
+      setShowForm(false)
+      await refreshTicket()
+      toast.success("Reported. The store will reply here.")
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Could not send your report. Please try again.")
+      // already have an open report: open it
+      if (err?.response?.status === 409) await refreshTicket().catch(() => {})
+    } finally {
+      setSubmitting(false)
     }
   }
 
-  const getStatusLabel = (status) => {
-    switch (status) {
-      case "confirmed":
-        return "Confirmed"
-      case "preparing":
-        return "Preparing"
-      case "outForDelivery":
-        return "Out for Delivery"
-      case "delivered":
-        return "Delivered"
-      default:
-        return status
-    }
-  }
-
-  const handleAction = (action) => {
-    switch (action) {
-      case "track":
-        navigate(`/user/orders/${orderId}`)
-        break
-      case "invoice":
-        navigate(`/user/orders/${orderId}/invoice`)
-        break
-      case "support":
-        // Scroll to support section or open contact modal
-        document.getElementById("contact-support")?.scrollIntoView({ behavior: "smooth" })
-        break
-      case "refund":
-        alert("Refund request would be processed here. Contact support for assistance.")
-        break
-      default:
-        break
+  const sendMessage = async (e) => {
+    e.preventDefault()
+    const message = text.trim()
+    if (!message || !ticket) return
+    setSending(true)
+    try {
+      const res = await supportAPI.sendTicketMessage(ticket._id, message)
+      const sent = res?.data?.data?.message
+      setText("")
+      if (sent) {
+        setTicket((t) => ((t.responses || []).some((r) => r.byRole === sent.byRole && r.message === sent.message && String(r.at) === String(sent.at)) ? t : { ...t, responses: [...(t.responses || []), sent] }))
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Could not send your message.")
+    } finally {
+      setSending(false)
     }
   }
 
@@ -235,16 +177,10 @@ export default function OrderHelp() {
             <CardContent className="py-12 text-center">
               <AlertCircle className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
               <h2 className="text-2xl font-bold mb-2">Order Not Found</h2>
-              <p className="text-muted-foreground mb-6">
-                We couldn't find an order with ID: {orderId}
-              </p>
+              <p className="text-muted-foreground mb-6">We couldn't find an order with ID: {orderId}</p>
               <div className="flex gap-4 justify-center">
-                <Link to="/user/orders">
-                  <Button variant="outline">View All Orders</Button>
-                </Link>
-                <Link to="/user/help">
-                  <Button>Go to Help Center</Button>
-                </Link>
+                <Link to="/user/orders"><Button variant="outline">View All Orders</Button></Link>
+                <Link to="/user/help"><Button>Go to Help Center</Button></Link>
               </div>
             </CardContent>
           </Card>
@@ -252,6 +188,14 @@ export default function OrderHelp() {
       </AnimatedPage>
     )
   }
+
+  const resolved = ticket?.status === "resolved"
+  const showReportForm = ticketsLoaded && (!ticket || resolved) && (showForm || !ticket)
+  const conversation = ticket
+    ? [{ message: ticket.description, byRole: "Customer", at: ticket.createdAt }, ...(ticket.responses || [])].filter((m) => m.message)
+    : []
+  const wa = whatsappLink(support.whatsapp, `Hi, I need help with order ${order.id}`)
+  const hasContact = support.phone || support.email || wa
 
   return (
     <AnimatedPage className="min-h-screen bg-gradient-to-b from-yellow-50/30 via-white to-orange-50/20 dark:from-[#0a0a0a] dark:via-[#0a0a0a] dark:to-[#0a0a0a] p-4 md:p-6 lg:p-8">
@@ -277,12 +221,10 @@ export default function OrderHelp() {
             <CardHeader className="p-4 md:p-5 lg:p-6">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-lg md:text-xl lg:text-2xl">
-                  <Package className="h-4 w-4 md:h-5 md:w-5 text-[#7e3866]" />
+                  <Package className="h-4 w-4 md:h-5 md:w-5 text-[var(--primary)]" />
                   Order Summary
                 </CardTitle>
-                <Badge className={`${getStatusColor(order.status)} text-white text-xs md:text-sm`}>
-                  {getStatusLabel(order.status)}
-                </Badge>
+                <Badge className="bg-[var(--primary)] text-white text-xs md:text-sm">{STATUS_LABEL[order.status] || order.status}</Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-4 md:space-y-5 p-4 md:p-5 lg:p-6">
@@ -297,7 +239,7 @@ export default function OrderHelp() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
-                  <p className="font-semibold text-[#7e3866] text-xl">₹{order.total.toFixed(2)}</p>
+                  <p className="font-semibold text-[var(--primary)] text-xl">₹{order.total.toFixed(2)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Items</p>
@@ -324,180 +266,155 @@ export default function OrderHelp() {
           </Card>
         </ScrollReveal>
 
-        {/* Common Issues */}
-        <ScrollReveal delay={0.2}>
-          <div className="space-y-4 md:space-y-5 lg:space-y-6">
-            <h2 className="text-xl md:text-2xl lg:text-3xl font-bold">What can we help you with?</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5 lg:gap-6">
-              {commonIssues.map((issue, index) => {
-                const Icon = issue.icon
-                return (
-                  <Card
-                    key={issue.id}
-                  >
-                    <CardHeader className="p-4 md:p-5 lg:p-6">
-                      <div className="flex items-start gap-3 md:gap-4">
-                        <div className="p-2 md:p-3 bg-yellow-100 rounded-lg">
-                          <Icon className="h-4 w-4 md:h-5 md:w-5 text-[#7e3866]" />
-                        </div>
-                        <div className="flex-1">
-                          <CardTitle className="text-base md:text-lg lg:text-xl">{issue.title}</CardTitle>
-                          <CardDescription className="mt-1 text-sm md:text-base">{issue.description}</CardDescription>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3 md:space-y-4 p-4 md:p-5 lg:p-6">
-                      <div className="space-y-2">
-                        <p className="text-sm font-semibold">What to do:</p>
-                        <ul className="space-y-1 text-sm text-muted-foreground">
-                          {issue.solutions.map((solution, idx) => (
-                            <li key={idx} className="flex items-start gap-2">
-                              <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                              <span>{solution}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div className="flex gap-2 pt-2 border-t">
-                        {issue.actions.map((action, idx) => (
-                          <Button
-                            key={idx}
-                            variant={idx === 0 ? "default" : "outline"}
-                            size="sm"
-                            className={idx === 0 ? "bg-[#7e3866] hover:opacity-90" : ""}
-                            onClick={() => handleAction(action.path)}
-                          >
-                            {action.label}
-                          </Button>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          </div>
-        </ScrollReveal>
-
-        {/* Quick Actions */}
-        <ScrollReveal delay={0.3}>
-          <Card className="bg-gradient-to-br from-yellow-50 to-orange-50 border-yellow-200 shadow-lg">
-            <CardHeader className="p-4 md:p-5 lg:p-6">
-              <CardTitle className="flex items-center gap-2 text-lg md:text-xl lg:text-2xl">
-                <HelpCircle className="h-4 w-4 md:h-5 md:w-5 text-[#7e3866]" />
-                Quick Actions
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 md:p-5 lg:p-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 lg:gap-6">
-                <Link to={`/user/orders/${orderId}`}>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start gap-2 h-auto py-3"
-                  >
-                    <Truck className="h-4 w-4" />
-                    <div className="text-left">
-                      <div className="font-semibold">Track Order</div>
-                      <div className="text-xs text-muted-foreground">View real-time status</div>
-                    </div>
-                  </Button>
-                </Link>
-                <Link to={`/user/orders/${orderId}/invoice`}>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start gap-2 h-auto py-3"
-                  >
-                    <FileText className="h-4 w-4" />
-                    <div className="text-left">
-                      <div className="font-semibold">View Invoice</div>
-                      <div className="text-xs text-muted-foreground">Download receipt</div>
-                    </div>
-                  </Button>
-                </Link>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start gap-2 h-auto py-3"
-                  onClick={() => document.getElementById("contact-support")?.scrollIntoView({ behavior: "smooth" })}
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  <div className="text-left">
-                    <div className="font-semibold">Contact Support</div>
-                    <div className="text-xs text-muted-foreground">Get help now</div>
-                  </div>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </ScrollReveal>
-
-        {/* Contact Support Section */}
-        <ScrollReveal delay={0.4}>
-          <Card id="contact-support" className="shadow-lg">
-            <CardHeader className="p-4 md:p-5 lg:p-6">
-              <CardTitle className="text-xl md:text-2xl lg:text-3xl flex items-center gap-2">
-                <MessageCircle className="h-5 w-5 md:h-6 md:w-6 text-[#7e3866]" />
-                Contact Support for This Order
-              </CardTitle>
-              <CardDescription className="text-sm md:text-base">
-                Our support team is ready to help you with order {order.id}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 md:space-y-5 lg:space-y-6 p-4 md:p-5 lg:p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5 lg:gap-6">
-                {support.phone && (
-                <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <Phone className="h-5 w-5 text-[#7e3866]" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Phone Support</h3>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Mention order {order.id}
-                    </p>
-                    <a
-                      href={`tel:${support.phone.replace(/\s+/g, "")}`}
-                      className="text-sm text-primary hover:underline font-medium"
-                    >
-                      {support.phone}
-                    </a>
-                  </div>
+        {/* Chat with the store about this order (live over the socket) */}
+        {ticket && (
+          <ScrollReveal delay={0.2}>
+            <Card id="order-chat" className="shadow-lg">
+              <CardHeader className="p-4 md:p-5 lg:p-6">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-lg md:text-xl flex items-center gap-2">
+                    <MessageCircle className="h-5 w-5 text-[var(--primary)]" />
+                    Chat with the store
+                  </CardTitle>
+                  <Badge className={resolved ? "bg-green-600 text-white" : "bg-[var(--primary)] text-white"}>
+                    {resolved ? "Resolved" : ticket.status === "in-progress" ? "In progress" : "Open"}
+                  </Badge>
                 </div>
+                <CardDescription>{ticket.issueType}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 p-4 md:p-5 lg:p-6 pt-0">
+                <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+                  {conversation.map((m, i) => {
+                    const mine = m.byRole === "Customer"
+                    return (
+                      <div key={`${m.at}-${i}`} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${mine ? "bg-[var(--primary)] text-white" : "bg-muted text-foreground"}`}>
+                          <p className="whitespace-pre-wrap break-words">{m.message}</p>
+                          <p className={`mt-1 text-[10px] ${mine ? "text-white/70" : "text-muted-foreground"}`}>{mine ? "You" : "Store"} · {formatTime(m.at)}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <div ref={endRef} />
+                </div>
+
+                {resolved && ticket.resolution && (
+                  <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 p-3 text-sm space-y-1">
+                    <p className="font-semibold flex items-center gap-1.5 text-green-700 dark:text-green-400"><CheckCircle className="h-4 w-4" /> Resolved</p>
+                    {ticket.resolution.actionTaken && <p>{ticket.resolution.actionTaken}</p>}
+                    {ticket.resolution.refundAmount > 0 && <p>Refund promised: ₹{ticket.resolution.refundAmount}. It is paid back by the team and shown in your wallet or source account.</p>}
+                    {ticket.resolution.couponIssued && <p>Coupon for you: <span className="font-semibold">{ticket.resolution.couponIssued}</span></p>}
+                    {ticket.resolution.replacementOrderId && <p>Replacement order: {ticket.resolution.replacementOrderId}</p>}
+                  </div>
+                )}
+
+                {!resolved ? (
+                  <form onSubmit={sendMessage} className="flex items-center gap-2">
+                    <input
+                      value={text}
+                      onChange={(e) => setText(e.target.value)}
+                      maxLength={1000}
+                      placeholder="Write a message"
+                      className="flex-1 h-11 rounded-full border border-input bg-background px-4 text-sm outline-none focus:border-[var(--primary)]"
+                    />
+                    <Button type="submit" disabled={sending || !text.trim()} className="h-11 w-11 rounded-full p-0 bg-[var(--primary)] hover:bg-[var(--primary-hover)]">
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </form>
+                ) : (
+                  <Button variant="outline" className="w-full" onClick={() => setShowForm(true)}>Report another problem</Button>
+                )}
+              </CardContent>
+            </Card>
+          </ScrollReveal>
+        )}
+
+        {/* Report a problem */}
+        {showReportForm && (
+          <ScrollReveal delay={0.2}>
+            <Card id="report-problem" className="shadow-lg">
+              <CardHeader className="p-4 md:p-5 lg:p-6">
+                <CardTitle className="text-lg md:text-xl flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-[var(--primary)]" />
+                  Report a problem
+                </CardTitle>
+                <CardDescription>
+                  Tell the store what went wrong. You can report a delivered order for 24 hours after delivery. The store replies here, and any refund or coupon is shown on this screen.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 md:p-5 lg:p-6 pt-0">
+                <form onSubmit={submitReport} className="space-y-4">
+                  <div className="flex flex-wrap gap-2">
+                    {ISSUE_TYPES.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, issueType: t }))}
+                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${form.issueType === t ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-input bg-background text-foreground"}`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    value={form.description}
+                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                    maxLength={1000}
+                    rows={4}
+                    placeholder="What happened? Which item?"
+                    className="w-full rounded-xl border border-input bg-background p-3 text-sm outline-none focus:border-[var(--primary)]"
+                  />
+                  <div className="flex gap-3">
+                    {ticket && <Button type="button" variant="outline" className="flex-1" onClick={() => setShowForm(false)}>Cancel</Button>}
+                    <Button type="submit" disabled={submitting} className="flex-1 bg-[var(--primary)] hover:bg-[var(--primary-hover)]">
+                      {submitting ? "Sending..." : "Report a problem"}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </ScrollReveal>
+        )}
+
+        {/* Contact support (business settings; each line is hidden when empty) */}
+        {hasContact && (
+          <ScrollReveal delay={0.3}>
+            <Card id="contact-support" className="shadow-lg">
+              <CardHeader className="p-4 md:p-5 lg:p-6">
+                <CardTitle className="text-lg md:text-xl flex items-center gap-2">
+                  <Phone className="h-5 w-5 text-[var(--primary)]" />
+                  Talk to support
+                </CardTitle>
+                <CardDescription>
+                  Mention order {order.id}.{support.hours ? ` ${support.hours}` : ""}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 md:p-5 lg:p-6 pt-0">
+                {support.phone && (
+                  <a href={`tel:${support.phone.replace(/\s+/g, "")}`} className="flex items-center gap-3 rounded-lg bg-muted/50 p-3 hover:bg-muted">
+                    <Phone className="h-5 w-5 text-[var(--primary)]" />
+                    <span className="text-sm font-medium">{support.phone}</span>
+                  </a>
                 )}
                 {support.email && (
-                <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <Mail className="h-5 w-5 text-[#7e3866]" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Email Support</h3>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Include order {order.id} in subject
-                    </p>
-                    <a
-                      href={`mailto:${support.email}?subject=${encodeURIComponent(`Help with Order ${order.id}`)}`}
-                      className="text-sm text-primary hover:underline font-medium"
-                    >
-                      {support.email}
-                    </a>
-                  </div>
-                </div>
+                  <a href={`mailto:${support.email}?subject=${encodeURIComponent(`Help with Order ${order.id}`)}`} className="flex items-center gap-3 rounded-lg bg-muted/50 p-3 hover:bg-muted">
+                    <Mail className="h-5 w-5 text-[var(--primary)]" />
+                    <span className="text-sm font-medium break-all">{support.email}</span>
+                  </a>
                 )}
-              </div>
-              <div className="pt-4 border-t">
-                <Button
-                  className="w-full bg-[#7e3866] hover:opacity-90"
-                  onClick={() => alert("Live chat would open here with order context")}
-                >
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  Start Live Chat
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </ScrollReveal>
+                {wa && (
+                  <a href={wa} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 rounded-lg bg-muted/50 p-3 hover:bg-muted">
+                    <MessageCircle className="h-5 w-5 text-[var(--primary)]" />
+                    <span className="text-sm font-medium">WhatsApp</span>
+                  </a>
+                )}
+              </CardContent>
+            </Card>
+          </ScrollReveal>
+        )}
 
         {/* Back to Orders */}
-        <ScrollReveal delay={0.5}>
+        <ScrollReveal delay={0.4}>
           <div className="flex gap-4">
             <Link to="/user/orders" className="flex-1">
               <Button variant="outline" className="w-full">

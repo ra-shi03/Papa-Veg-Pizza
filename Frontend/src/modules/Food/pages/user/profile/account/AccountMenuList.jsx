@@ -78,11 +78,6 @@ export default function AccountMenuList({ isDarkMode, onToggleTheme }) {
       isThemeToggle: true,
     },
     {
-      title: "Give Feedback",
-      icon: "rate_review",
-      route: "/user/account/feedback",
-    },
-    {
       title: "Rate Us",
       icon: "star",
       route: "/rate-us",

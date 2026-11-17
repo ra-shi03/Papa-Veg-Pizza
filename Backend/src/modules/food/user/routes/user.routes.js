@@ -42,6 +42,7 @@ import {
 } from '../controllers/userSafetyEmergency.controller.js';
 import {
     createSupportTicketController,
+    addCustomerMessageController,
     listMySupportTicketsController
 } from '../controllers/supportTicket.controller.js';
 import { deleteUserAccountController } from '../controllers/deleteAccount.controller.js';
@@ -90,6 +91,7 @@ router.get('/safety-emergency-reports', listMySafetyEmergencyReportsController);
 // Support tickets (Bearer USER)
 router.post('/support/ticket', createSupportTicketController);
 router.get('/support/my-tickets', listMySupportTicketsController);
+router.post('/support/ticket/:ticketId/messages', addCustomerMessageController);
 
 router.get('/addresses', listAddressesController);
 router.post('/addresses', addAddressController);

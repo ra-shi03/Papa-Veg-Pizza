@@ -5,6 +5,7 @@ import { getDeliveryLoginScreenConfig, updateDeliveryLoginScreenConfig } from '.
 import { getHomePageConfig, createOrUpdateHomePageConfig, updateHomePageConfig, uploadHomePageBanner, updateHomePageBanner, deleteHomePageBanner } from '../controllers/homePage.controller.js';
 import { authMiddleware, requireSuperAdmin } from '../../../../core/auth/auth.middleware.js';
 import { upload } from '../../../../middleware/upload.js';
+import { getPublicHeroBanner, getHeroBannerAdmin, saveHeroBanner } from '../controllers/heroBanner.controller.js';
 
 const router = express.Router();
 
@@ -17,6 +18,11 @@ router.put('/welcome', authMiddleware, requireSuperAdmin, updateWelcomeScreenCon
 // Delivery App Welcome Screen routes
 router.get('/delivery-welcome', getDeliveryWelcomeScreenConfig);
 router.put('/delivery-welcome', authMiddleware, requireSuperAdmin, updateDeliveryWelcomeScreenConfig);
+
+// Hero banners on customer screens (Under 250): the super admin writes, customers read display fields only
+router.get('/hero-banners/:key/public', getPublicHeroBanner);
+router.get('/hero-banners/:key', authMiddleware, requireSuperAdmin, getHeroBannerAdmin);
+router.put('/hero-banners/:key', authMiddleware, requireSuperAdmin, saveHeroBanner);
 
 // Delivery App Login Screen routes
 router.get('/delivery-login', getDeliveryLoginScreenConfig);

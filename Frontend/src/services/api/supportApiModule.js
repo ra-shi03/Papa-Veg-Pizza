@@ -9,6 +9,9 @@ export const supportAPI = {
     userClient.post("/food/user/support/ticket", body ?? {}),
   getMyTickets: (params = {}) =>
     userClient.get("/food/user/support/my-tickets", { params }),
+  /** The customer writes in the chat of their own report. */
+  sendTicketMessage: (ticketId, message) =>
+    userClient.post(`/food/user/support/ticket/${String(ticketId)}/messages`, { message }),
   getSupportTicketsAdmin: (params = {}) =>
     adminClient.get("/food/admin/support-tickets", { params }),
   updateSupportTicketAdmin: (id, body = {}) =>

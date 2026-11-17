@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { FoodSupportTicket } from '../models/supportTicket.model.js';
 import { sendResponse, sendError } from '../../../../utils/response.js';
+import { emitSupportMessage, MAX_CUSTOMER_MESSAGES, REPORT_WINDOW_MS, MAX_TICKETS_PER_ORDER } from '../services/supportChat.js';
 
 export async function createSupportTicketController(req, res, next) {
     try {
@@ -28,8 +29,22 @@ export async function createSupportTicketController(req, res, next) {
             // Also try to link storeId automatically if possible
             // A customer complains only about their own order
             const { FoodOrder } = await import('../../../food/orders/models/order.model.js');
-            const order = await FoodOrder.findOne({ _id: orderMongoId, userId: doc.userId }).select('storeId').lean();
+            const order = await FoodOrder.findOne({ _id: orderMongoId, userId: doc.userId }).select('storeId orderStatus updatedAt deliveryState').lean();
             if (!order) return sendError(res, 404, 'Order not found');
+            // How a pizza app handles "something is wrong with my order":
+            //  - a cancelled order has nothing to report (a prepaid cancellation is refunded automatically);
+            //  - a delivered order can be reported for 24 hours after delivery;
+            //  - an order still on its way can be reported too (late, wrong address, ...);
+            //  - one open report per order, and at most three in all, so the store is not flooded.
+            if (String(order.orderStatus).startsWith('cancelled')) return sendError(res, 400, 'This order was cancelled, so there is nothing to report.');
+            if (order.orderStatus === 'delivered') {
+                const deliveredAt = new Date(order.deliveryState?.deliveredAt || order.updatedAt || Date.now()).getTime();
+                if (Date.now() - deliveredAt > REPORT_WINDOW_MS) return sendError(res, 400, 'Problems can be reported within 24 hours of delivery. Please contact support.');
+            }
+            const earlier = await FoodSupportTicket.find({ userId: doc.userId, orderId: orderMongoId, type: 'order' }).select('status').lean();
+            const open = earlier.find((t) => t.status !== 'resolved');
+            if (open) return res.status(409).json({ success: false, message: 'You already have an open report for this order. Continue it in the chat.', data: { ticketId: String(open._id) } });
+            if (earlier.length >= MAX_TICKETS_PER_ORDER) return sendError(res, 400, 'This order has reached the limit of reports. Please contact support.');
             if (order.storeId) {
                 doc.storeId = order.storeId;
             }
@@ -41,6 +56,10 @@ export async function createSupportTicketController(req, res, next) {
             doc.storeId = new mongoose.Types.ObjectId(body.storeId);
         }
         const created = await FoodSupportTicket.create(doc);
+        if (type === 'order' && description) {
+            // The first message of the chat is the problem as the customer described it
+            emitSupportMessage(created, { message: description, byRole: 'Customer', at: created.createdAt });
+        }
         return sendResponse(res, 201, 'Ticket created', { ticket: created.toObject() });
     } catch (e) {
         next(e);
@@ -78,13 +97,15 @@ export async function listMySupportTicketsController(req, res, next) {
         const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 20, 1), 50);
         const page = Math.max(parseInt(req.query?.page, 10) || 1, 1);
         const skip = (page - 1) * limit;
+        const filter = { userId: new mongoose.Types.ObjectId(userId) };
+        if (req.query?.orderId && mongoose.Types.ObjectId.isValid(String(req.query.orderId))) filter.orderId = new mongoose.Types.ObjectId(String(req.query.orderId));
         const [tickets, total] = await Promise.all([
-            FoodSupportTicket.find({ userId: new mongoose.Types.ObjectId(userId) })
+            FoodSupportTicket.find(filter)
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit)
                 .lean(),
-            FoodSupportTicket.countDocuments({ userId: new mongoose.Types.ObjectId(userId) })
+            FoodSupportTicket.countDocuments(filter)
         ]);
         const { FoodOrder } = await import('../../../food/orders/models/order.model.js');
         const { FoodStore } = await import('../../store/models/store.model.js');
@@ -100,6 +121,29 @@ export async function listMySupportTicketsController(req, res, next) {
             page,
             limit
         });
+    } catch (e) {
+        next(e);
+    }
+}
+
+/** POST /food/user/support/ticket/:ticketId/messages { message } : the customer writes in the chat of their own report. */
+export async function addCustomerMessageController(req, res, next) {
+    try {
+        const { ticketId } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(ticketId)) return sendError(res, 404, 'Report not found');
+        const message = String(req.body?.message || '').trim().slice(0, 1000);
+        if (!message) return sendError(res, 400, 'Write a message first');
+        // Only the owner's own ticket: anyone else's is 404
+        const ticket = await FoodSupportTicket.findOne({ _id: ticketId, userId: new mongoose.Types.ObjectId(req.user.userId) });
+        if (!ticket) return sendError(res, 404, 'Report not found');
+        if (ticket.status === 'resolved') return sendError(res, 409, 'This report is resolved. Report a new problem if you still need help.');
+        const fromCustomer = (ticket.responses || []).filter((r) => r.byRole === 'Customer').length;
+        if (fromCustomer >= MAX_CUSTOMER_MESSAGES) return sendError(res, 429, 'Message limit reached for this report.');
+        const entry = { message, byName: 'Customer', byRole: 'Customer', at: new Date() };
+        ticket.responses.push(entry);
+        await ticket.save();
+        emitSupportMessage(ticket, entry);
+        return sendResponse(res, 201, 'Message sent', { message: { message: entry.message, byRole: entry.byRole, at: entry.at } });
     } catch (e) {
         next(e);
     }

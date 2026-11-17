@@ -156,6 +156,7 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
         { name: "Search Overlay", icon: Search },
         { name: "Combo Page", icon: Sparkles },
         { name: "Cart & Upsell", icon: ShoppingCart },
+        { name: "Hero Banners", icon: Sparkles },
         { name: "Nutrition Info", icon: Apple }
       ]
     },
@@ -413,6 +414,8 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
                                 navigate("/food/superadmin/user-app/combo-page")
                               } else if (item.name === "Cart & Upsell") {
                                 navigate("/food/superadmin/user-app/cart-config")
+                              } else if (item.name === "Hero Banners") {
+                                navigate("/food/superadmin/user-app/hero-banners")
                               } else if (item.name === "Nutrition Info") {
                                 navigate("/food/superadmin/user-app/nutrition")
                               } else if (item.name === "Delivery Welcome Page") {

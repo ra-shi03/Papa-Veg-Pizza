@@ -64,6 +64,7 @@
     "GET /api/v1/settings/delivery-login",
     "GET /api/v1/settings/delivery-welcome",
     "GET /api/v1/settings/faqs/public",
+    "GET /api/v1/settings/hero-banners/:key/public",
     "GET /api/v1/settings/home-page",
     "GET /api/v1/settings/nutrition/public",
     "GET /api/v1/settings/payment-gateways/public",
@@ -154,6 +155,7 @@
     "GET /api/v1/food/admin/business-settings/public": "Business name, logo and contact details every app shows before sign-in. Display fields only (toPublicBusinessInfo): no ids, no audit fields, no storage references, no train mapping. Cached for 60 seconds.",
     "GET /api/v1/food/train/stations": "The station picker for train delivery before sign-in. { name, code } of stations whose store is approved and active, plus two booleans: no store ids, no audit fields. Cached for 60 seconds.",
     "GET /api/v1/food/products/public/:id": "The customer's product page (home banners link here) before sign-in. One Active product, display fields only (toPublicProduct): name, texts, image, prices and sizes, category label, active toppings and crusts. No store or franchise lists, no audit fields. Draft, archived, unknown and store-hidden products are 404. Priced for ?storeId or ?lat/lng exactly like the public menu.",
-    "GET /api/v1/settings/payment-gateways/public": "Which online payment methods the checkout may offer, before sign-in. Provider name, display name, environment and default flag only (toPublicView): no key id, no secrets, no merchant id."
+    "GET /api/v1/settings/payment-gateways/public": "Which online payment methods the checkout may offer, before sign-in. Provider name, display name, environment and default flag only (toPublicView): no key id, no secrets, no merchant id.",
+    "GET /api/v1/settings/hero-banners/:key/public": "The banner at the top of the customer's Under 250 page, before sign-in. { imageUrl, title, link } of the one active banner, or null: nothing else. The key is whitelisted (only under-250 exists). Written by the super admin only (PUT needs the super admin), validated (https image, app path or https link). Cached for 60 seconds, cleared on save."
   }
 }

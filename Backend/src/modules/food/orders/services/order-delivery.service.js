@@ -21,6 +21,7 @@ import {
 import { fetchPolyline } from '../utils/googleMaps.js';
 import * as foodTransactionService from './foodTransaction.service.js';
 import * as dispatchService from './order-dispatch.service.js';
+import { dispatchDueFilter } from './order-schedule.service.js';
 import { awardOrderPointsSafely } from '../../user/services/rewards.service.js';
 import {
   buildDeliveryOfferPayload,
@@ -393,7 +394,9 @@ export async function listOrdersAvailableDelivery(deliveryPartnerId, query) {
 
   // Offers: the rule auto-dispatch uses, or an order already offered to this rider (they may have moved since)
   const partnerId = new mongoose.Types.ObjectId(deliveryPartnerId);
-  const openOrders = { 'dispatch.status': 'unassigned', orderStatus: { $in: OFFER_STATUSES } };
+  // a scheduled order is not offered until its slot is near (the same rule as auto-dispatch)
+  // ($and, because the offer filter below has its own $or)
+  const openOrders = { 'dispatch.status': 'unassigned', orderStatus: { $in: OFFER_STATUSES }, $and: [dispatchDueFilter()] };
   const servedStores = partnerCapacity.hasCapacity
     ? await dispatchService.storesServedByRider(partnerId, await FoodOrder.distinct('storeId', openOrders))
     : [];

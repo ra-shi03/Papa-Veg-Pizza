@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import IrctcOrderHistoryModal from "@food/components/user/IrctcOrderHistoryModal"
+import { TRAIN_TERMS_TITLE, TRAIN_TERMS_SHORT, TRAIN_TERMS_FULL } from "@food/constants/trainDelivery"
 import { useScrollLock } from "@food/hooks/useScrollLock"
 import { useLocationStore } from "@food/store/locationStore"
 import TrainJourneyFields from "@food/components/user/TrainJourneyFields"
@@ -25,7 +25,6 @@ export default function DeliverOnTrainModal({ show, onClose }) {
   const trainProblem = trainFailed ? "Train delivery is not available yet" : journeyProblem(journey, trainInfo)
 
   // Modal / Drawer states
-  const [showHistoryModal, setShowHistoryModal] = useState(false)
   const [showTermsModal, setShowTermsModal] = useState(false)
   const [toast, setToast] = useState({ visible: false, message: "" })
 
@@ -210,7 +209,7 @@ export default function DeliverOnTrainModal({ show, onClose }) {
               className="w-4 h-4 rounded accent-[#E53935] cursor-pointer"
             />
             <span className={`text-xs opacity-75 font-semibold leading-snug ${isDarkMode ? "text-white" : "text-zinc-800"}`}>
-              I agree to the IRCTC Ordering Terms & Conditions
+              I agree to the Train Delivery Terms
             </span>
           </label>
 
@@ -224,39 +223,19 @@ export default function DeliverOnTrainModal({ show, onClose }) {
           </button>
         </section>
 
-        {/* IRCTC Order History Card */}
-        <section 
-          onClick={() => setShowHistoryModal(true)}
-          className="glass-card rounded-2xl p-4 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform"
-        >
-          <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-2xl text-[#E53935] font-semibold">train</span>
-            <span className={`text-xs font-semibold uppercase tracking-wider ${isDarkMode ? "text-white" : "text-[#1c1b1b]"}`}>
-              IRCTC ORDER HISTORY
-            </span>
-          </div>
-          <span className="material-symbols-outlined opacity-60">chevron_right</span>
-        </section>
-
-        {/* IRCTC Terms and Conditions Card */}
+        {/* Train delivery terms */}
         <section className="glass-card rounded-2xl p-5 space-y-4">
           <h3 className={`font-semibold text-xs uppercase tracking-wider ${isDarkMode ? "text-white" : "text-[#1c1b1b]"}`}>
-            IRCTC T&C
+            {TRAIN_TERMS_TITLE}
           </h3>
-          
+
           <ul className="space-y-3 pl-0 text-xs opacity-85 leading-relaxed">
-            <li className="flex items-start gap-2.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#E53935] mt-1.5 shrink-0" />
-              <span>Ordering is only allowed for stations which are catered by Papa Veg Pizza and are ahead by 2 hours or more.</span>
-            </li>
-            <li className="flex items-start gap-2.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#E53935] mt-1.5 shrink-0" />
-              <span>Delivery is available only between 12:00 and 23:00 hours. The order would get cancelled if train reaches selected station outside of these operational hours.</span>
-            </li>
-            <li className="flex items-start gap-2.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#E53935] mt-1.5 shrink-0" />
-              <span>Cancellation is only permitted within 2 hours of actual arrival at station.</span>
-            </li>
+            {TRAIN_TERMS_SHORT.map((term) => (
+              <li key={term} className="flex items-start gap-2.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#E53935] mt-1.5 shrink-0" />
+                <span>{term}</span>
+              </li>
+            ))}
           </ul>
 
           <button
@@ -268,20 +247,13 @@ export default function DeliverOnTrainModal({ show, onClose }) {
         </section>
       </main>
 
-      {/* IRCTC ORDER HISTORY MODAL */}
-      <IrctcOrderHistoryModal
-        isOpen={showHistoryModal}
-        onClose={() => setShowHistoryModal(false)}
-        isDarkMode={isDarkMode}
-      />
-
-      {/* IRCTC TERMS & CONDITIONS MORE INFO MODAL */}
+      {/* Train delivery terms, in full */}
       {showTermsModal && (
         <div className="fixed inset-0 z-55 flex items-center justify-center p-5 bg-black/70 backdrop-blur-sm animate-fadeIn">
           <div className={`w-full max-w-sm rounded-3xl p-6 space-y-4 text-left ${isDarkMode ? "bg-[#181818] border border-white/10" : "bg-white border border-black/10 shadow-2xl"}`}>
             <div className="flex justify-between items-center border-b border-white/10 pb-2">
               <h3 className={`font-headline-lg-mobile text-base font-semibold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
-                IRCTC Guidelines & FAQ
+                {TRAIN_TERMS_TITLE}
               </h3>
               <button 
                 onClick={() => setShowTermsModal(false)}
@@ -292,25 +264,12 @@ export default function DeliverOnTrainModal({ show, onClose }) {
             </div>
             
             <div className="space-y-4 max-h-80 overflow-y-auto pr-1 text-xs opacity-90 leading-relaxed">
-              <div className="space-y-1">
-                <h4 className="font-semibold text-[#E53935]">How does train delivery work?</h4>
-                <p className="opacity-75">We partner with authorized ecatering services to deliver fresh Papa Veg Pizza directly to your train coach and seat. You just need a valid PNR number of a running train.</p>
-              </div>
-
-              <div className="space-y-1">
-                <h4 className="font-semibold text-[#E53935]">Can I pay with Cash on Delivery?</h4>
-                <p className="opacity-75">To ensure seamless deliveries on active trains, only online pre-payment is supported. This prevents delay when trains halt for limited durations.</p>
-              </div>
-
-              <div className="space-y-1">
-                <h4 className="font-semibold text-[#E53935]">What if my train gets delayed?</h4>
-                <p className="opacity-75">We track your train real-time. If the train reaches the designated catered station outside the operational delivery hours (12:00 PM - 11:00 PM), the order is automatically cancelled and a full refund is processed within 3 business days.</p>
-              </div>
-
-              <div className="space-y-1">
-                <h4 className="font-semibold text-[#E53935]">Is a PNR number mandatory?</h4>
-                <p className="opacity-75">No. Tell us your station, train number, coach and seat so the delivery partner can find you. A PNR is optional and is only passed on as a note; we do not check it with IRCTC.</p>
-              </div>
+              {TRAIN_TERMS_FULL.map((item) => (
+                <div key={item.title} className="space-y-1">
+                  <h4 className="font-semibold text-[#E53935]">{item.title}</h4>
+                  <p className="opacity-75">{item.text}</p>
+                </div>
+              ))}
             </div>
 
             <button 

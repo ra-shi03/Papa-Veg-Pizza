@@ -1,5 +1,20 @@
 # Audit 7: complete vs remaining
 
+> **Update, after the customer-app finish.** Decisions from the project owner, applied in the commit
+> "feat(customer): finish customer app (order chat, banner, cleanup, cross-role fixes)". The sections below describe the
+> state at `f9536b5`; this box records what changed since.
+>
+> | Item | Result |
+> |---|---|
+> | Screens removed (files deleted, routes and menu links gone) | `Favorites`, `Collections`, `CollectionDetail`, `Feedback`, `AddPayment`, `EditPayment`, and the whole **Gourmet** page. **`Payments.jsx` was kept**: since `6b851bb` it is the live Payment Options page (cash or online) that Cart and Checkout open; its menu entry now reads "Payment Options". The saved-methods state in `ProfileContext` and the `userFavorites`, `userDishFavorites`, `userPaymentMethods` localStorage keys are gone. The heart on Home product cards and the bookmark on the Category page are session-only (not saved) |
+> | Product reviews | None exist on the server and the review form in `ProductDetail` was local page state only: removed, along with fake rating, restaurant and order-history sections and a USD to rupee x83 price bug |
+> | Order help | Live chat on the complaint thread over the socket (`support_message`), "Report a problem" with pizza-app rules (24 h after delivery, one open report per order, three in all), support phone, email and WhatsApp from business settings. The store manager's Complaints screen got a reply box |
+> | Under 250 banner | Super admin form (User App > Hero Banners), validated, public read route reviewed in `reviewed-routes.json`; the page shows the banner or none |
+> | Kitchen rejects an item | The bill drops (food, coupon share, GST again); cash orders collect the lower total; a paid order gets a pending refund for the difference |
+> | Scheduled orders | No rider search until 45 minutes before the slot (30 prep + 15 rider); a one-minute sweep starts it, so it works without Redis |
+> | OTP SMS | Now "Welcome to the Papa Veg Pizza powered by SMSINDIAHUB. Your OTP ...". The registered DLT template must allow this brand name or the operator can reject the SMS |
+> | Other | Home paints a skeleton until the server answers (no `pvp_home_config` / `pvp_categories` first paint); Terms shows server text or an error/empty state; Truecaller button removed; train screens say what the code does (no IRCTC); cart rows show a placeholder until the server prices them; public categories list active ones only; Razorpay webhook compare is constant-time |
+
 Audited on 2026-11-16: `main` at `f9536b5` plus the uncommitted working tree (40 modified files, 1 new). No code was changed.
 Tests and builds ran on a clean `git archive` export of `f9536b5` in a plain scratch folder, and again on a copy of the
 working tree (section 6).
@@ -427,13 +442,6 @@ Severity: High / Medium / Low. Size: S (hours), M (a day), L (several days). Dem
 | Cart rows from `ALL_PRODUCTS` / `pvp_products_v2`; menu location key | Medium | S | Maybe |
 | Fallback phone in MyProfile | Low | S | Maybe |
 | Refund request screen | PHASE2 | M | No |
-| `U/profile/Favorites.jsx`: non-v1 mock, hide or build (`ProfileContext`, localStorage `userFavorites`) | Low | S hide / M build | Maybe |
-| `U/Collections.jsx`: non-v1 mock, hide or build (`ProfileContext`, localStorage) | Low | S hide / M build | Maybe |
-| `U/CollectionDetail.jsx`: non-v1 mock, hide or build (`ProfileContext`, localStorage) | Low | S hide / M build | Maybe |
-| `U/profile/Payments.jsx` (saved payment methods): non-v1 mock, hide or build (localStorage `userPaymentMethods`) | Low | S hide / M build | Maybe |
-| `U/profile/AddPayment.jsx`: non-v1 mock, hide or build (localStorage) | Low | S hide / M build | Maybe |
-| `U/profile/EditPayment.jsx`: non-v1 mock, hide or build (localStorage) | Low | S hide / M build | Maybe |
-| `U/profile/Feedback.jsx`: non-v1 mock, hide or build ("Simulate API request", hardcoded licence number) | Low | S hide / M build | Maybe |
 
 ### Store manager
 

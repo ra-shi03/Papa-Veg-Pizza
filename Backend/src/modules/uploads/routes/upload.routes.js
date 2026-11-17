@@ -21,7 +21,7 @@ const SUFFIX = { image: '', pdf: '/files', video: '/videos' };
 // role that uses them; the first entry is the default. Everything else goes to a folder for the caller's
 // own role and scope, so nobody can write into another area (e.g. store-approval documents).
 const SUPER_ADMIN_FOLDERS = {
-    image: ['uploads', 'welcome/images', 'search/new-launches', 'search/tabs', 'combo-page', 'bulk-orders'],
+    image: ['uploads', 'welcome/images', 'search/new-launches', 'search/tabs', 'combo-page', 'hero-banners', 'bulk-orders'],
     pdf: ['uploads', 'bulk-orders'],
     video: ['uploads/videos', 'welcome/videos']
 };

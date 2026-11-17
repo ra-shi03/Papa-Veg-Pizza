@@ -4,7 +4,7 @@ import { ArrowLeft, MapPin, Bike, ShoppingBag, Utensils, Train, ChevronRight, Ca
 import { useLocationStore } from '@food/store/locationStore';
 import { locationAPI } from '@/services/api/location';
 import apiClient from '@/services/api/axios';
-import IrctcOrderHistoryModal from '@food/components/user/IrctcOrderHistoryModal';
+import { TRAIN_TERMS_TITLE, TRAIN_TERMS_SHORT } from '@food/constants/trainDelivery';
 import TrainJourneyFields from '@food/components/user/TrainJourneyFields';
 import { useTrainStations } from '@food/hooks/useTrainStations';
 import { emptyJourney, journeyProblem, saveTrainJourney } from '@food/utils/trainJourney';
@@ -31,7 +31,6 @@ export default function DeliveryLocation() {
   const { info: trainInfo, failed: trainFailed } = useTrainStations(activeService === 'train');
   const trainProblem = trainFailed ? 'Train delivery is not available yet' : journeyProblem(journey, trainInfo);
   const [agreed, setAgreed] = useState(false);
-  const [showIrctcHistoryModal, setShowIrctcHistoryModal] = useState(false);
 
   const iconMap = {
     delivery: Bike,
@@ -365,7 +364,7 @@ export default function DeliveryLocation() {
                   className="mt-0.5 w-4 h-4 rounded text-[#E53935] border-zinc-300 focus:ring-[#E53935]" 
                 />
                 <span className="text-[12px] font-medium text-zinc-600 leading-snug">
-                  I agree to the IRCTC Ordering Terms & Conditions
+                  I agree to the Train Delivery Terms
                 </span>
               </label>
 
@@ -385,25 +384,11 @@ export default function DeliveryLocation() {
               </button>
             </div>
 
-            {/* Order History */}
-            <div 
-              onClick={() => setShowIrctcHistoryModal(true)}
-              className="bg-white rounded-2xl p-4 border border-zinc-200 shadow-sm flex items-center justify-between cursor-pointer active:bg-zinc-50 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center">
-                  <Train className="w-5 h-5 text-zinc-700" />
-                </div>
-                <span className="font-bold text-zinc-900 text-[13px] tracking-wide">IRCTC ORDER HISTORY</span>
-              </div>
-              <ChevronRight className="w-5 h-5 text-zinc-400" />
-            </div>
-
             {/* T&C */}
             <div className="bg-zinc-50 rounded-2xl p-5 border border-zinc-100">
-              <h4 className="font-extrabold text-zinc-900 text-[13px] mb-3 uppercase tracking-wide">IRCTC T&C</h4>
+              <h4 className="font-extrabold text-zinc-900 text-[13px] mb-3 uppercase tracking-wide">{TRAIN_TERMS_TITLE}</h4>
               <ul className="space-y-3">
-                {trainConfig.terms.map((term, index) => (
+                {TRAIN_TERMS_SHORT.map((term, index) => (
                   <li key={index} className="flex items-start gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 mt-1.5 shrink-0" />
                     <span className="text-[11.5px] font-medium text-zinc-600 leading-relaxed">
@@ -423,11 +408,6 @@ export default function DeliveryLocation() {
         )}
       </div>
 
-      {/* IRCTC Order History Bottom Sheet Modal */}
-      <IrctcOrderHistoryModal
-        isOpen={showIrctcHistoryModal}
-        onClose={() => setShowIrctcHistoryModal(false)}
-      />
     </div>
   );
 }

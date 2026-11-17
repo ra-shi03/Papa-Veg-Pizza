@@ -10,6 +10,7 @@ import { riderScope } from '../../store/services/storeDelivery.service.js';
 import { config } from '../../../../config/env.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 import { addOrderJob } from '../../../../queues/producers/order.producer.js';
+import { dispatchDueFilter } from './order-schedule.service.js';
 import {
   buildDeliveryOfferPayload,
   buildOrderIdentityFilter,
@@ -202,18 +203,24 @@ export async function tryAutoAssign(orderId, options = {}) {
     'picked_up',
   ]);
 
+  // A scheduled order is not offered to riders until its slot is near (see dispatchDueFilter); the sweep picks it up then
   const order = await FoodOrder.findOneAndUpdate(
     {
       _id: new mongoose.Types.ObjectId(orderId),
       orderStatus: { $in: Array.from(dispatchableStatuses) },
-      $or: [
-        { 'dispatch.status': 'unassigned' },
+      $and: [
+        dispatchDueFilter(),
         {
-          'dispatch.status': 'assigned',
-          'dispatch.manual': { $ne: true }, // a rider the store picked is never taken back by auto-dispatch
-          'dispatch.acceptedAt': { $exists: false },
-          'dispatch.assignedAt': { $lt: new Date(Date.now() - lockTimeout) }
-        }
+          $or: [
+            { 'dispatch.status': 'unassigned' },
+            {
+              'dispatch.status': 'assigned',
+              'dispatch.manual': { $ne: true }, // a rider the store picked is never taken back by auto-dispatch
+              'dispatch.acceptedAt': { $exists: false },
+              'dispatch.assignedAt': { $lt: new Date(Date.now() - lockTimeout) }
+            }
+          ],
+        },
       ],
       'dispatch.dispatchingAt': { $exists: false }
     },
@@ -374,6 +381,29 @@ export async function tryAutoAssign(orderId, options = {}) {
   }
 }
 
+
+/**
+ * Scheduled orders wait for their slot (tryAutoAssign skips them until it is near). This finds the ones that have just
+ * come due and starts the rider search, once. Runs from a timer in server.js, so it works without Redis.
+ */
+export async function dispatchDueScheduledOrders(now = new Date()) {
+  const due = await FoodOrder.find({
+    scheduledAt: { $ne: null },
+    orderStatus: { $in: ['confirmed', 'preparing', 'ready_for_pickup', 'ready'] },
+    'dispatch.status': 'unassigned',
+    'dispatch.offeredTo.0': { $exists: false },
+    'dispatch.dispatchingAt': { $exists: false },
+    ...dispatchDueFilter(now),
+  }).select('_id').limit(50).lean();
+  for (const o of due) {
+    try {
+      await tryAutoAssign(o._id);
+    } catch (err) {
+      logger.error(`Scheduled dispatch failed for ${o._id}: ${err.message}`);
+    }
+  }
+  return due.length;
+}
 
 export async function processDispatchTimeout(orderId, partnerId) {
   const order = await FoodOrder.findById(orderId);

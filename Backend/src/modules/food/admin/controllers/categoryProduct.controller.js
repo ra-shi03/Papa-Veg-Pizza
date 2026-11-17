@@ -9,6 +9,10 @@ export const getCategoryProducts = async (req, res) => {
     if (search) {
       query.label = { $regex: escapeRegex(search), $options: 'i' };
     }
+    // The public list (customer app) never includes Inactive categories; the admin list sees all
+    if (String(req.originalUrl || '').split('?')[0].endsWith('/public')) {
+      query.status = { $ne: 'Inactive' };
+    }
 
     let sortObj = { sort: 1, createdAt: 1 };
     if (sort === 'name_asc') sortObj = { label: 1 };

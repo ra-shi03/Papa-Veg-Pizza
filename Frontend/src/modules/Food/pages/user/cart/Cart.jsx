@@ -516,9 +516,12 @@ export default function Cart() {
   const q = quote && quote.key === quoteKey ? quote.pricing : null
   // Each row shows the price the server quoted for that line (same order as the cart); the local price only until then
   const quotedLines = quote && quote.key === quoteKey ? quote.lines : null
+  // A signed-in customer's row shows a placeholder until the server has priced it (never the price saved when it was
+  // added); a signed-out customer has no quote, so rows show the public menu's price.
+  const quoteExpected = isLoggedIn && !!slotInfo?.storeId
   const shownItems = quotedLines && quotedLines.length === cartItems.length
     ? cartItems.map((item, i) => (Number.isFinite(Number(quotedLines[i]?.price)) ? { ...item, price: Number(quotedLines[i].price) } : item))
-    : cartItems
+    : cartItems.map((item) => (quoteExpected && !quoteError ? { ...item, priceLoading: true } : item))
 
   // Fees are set by the super admin; until the quote arrives the browser estimates them (delivery by distance included)
   const freeDeliveryAt = [fees.freeDeliveryUpTo, fees.freeDeliveryThreshold].filter((v) => v > 0).sort((a, b) => a - b)[0] || 0

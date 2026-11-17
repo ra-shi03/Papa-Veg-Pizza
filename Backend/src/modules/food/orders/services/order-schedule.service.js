@@ -9,9 +9,18 @@ export const SCHEDULE = {
   leadMinutes: 45, // the earliest slot shown is at least this far ahead
   graceMinutes: 20, // what placement accepts, so a slot picked a few minutes ago still goes through
   prepMinutes: 30,
+  riderLeadMinutes: 15, // a rider is looked for this long before the kitchen needs to be done
 };
 
 const MINUTE = 60 * 1000;
+
+/** Riders are looked for from this long before a scheduled slot (prep time plus the rider's trip to the store). */
+export const DISPATCH_LEAD_MS = (SCHEDULE.prepMinutes + SCHEDULE.riderLeadMinutes) * MINUTE;
+
+/** Mongo filter: orders that are not scheduled, or whose slot is close enough for a rider to be looked for now. */
+export const dispatchDueFilter = (now = new Date()) => ({
+  $or: [{ scheduledAt: null }, { scheduledAt: { $exists: false } }, { scheduledAt: { $lte: new Date(now.getTime() + DISPATCH_LEAD_MS) } }],
+});
 
 export function isDeliverableAt(hoursDoc, at) {
   const t = at.getTime();

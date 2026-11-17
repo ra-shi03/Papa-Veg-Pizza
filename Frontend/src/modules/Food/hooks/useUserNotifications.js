@@ -135,6 +135,12 @@ export const useUserNotifications = () => {
       window.dispatchEvent(event);
     });
 
+    // A message in the customer's order chat (the store answered, or another device of theirs wrote). The open chat
+    // screen listens for this event.
+    socketRef.current.on('support_message', (payload) => {
+      window.dispatchEvent(new CustomEvent('supportMessage', { detail: payload }));
+    });
+
     /** Customer receives handover OTP when partner confirms "reached drop" (never shown to partner). */
     socketRef.current.on('delivery_drop_otp', (payload) => {
       debugLog('🔐 Delivery handover OTP:', payload?.orderId);

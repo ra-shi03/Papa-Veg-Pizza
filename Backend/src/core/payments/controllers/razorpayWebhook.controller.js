@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import { FoodOrder } from '../../../modules/food/orders/models/order.model.js';
 import * as foodTransactionService from '../../../modules/food/orders/services/foodTransaction.service.js';
 import { config } from '../../../config/env.js';
-import { getRazorpayWebhookSecret } from '../../../modules/food/orders/helpers/razorpay.helper.js';
+import { getRazorpayWebhookSecret, safeEqual } from '../../../modules/food/orders/helpers/razorpay.helper.js';
 import { logger } from '../../../utils/logger.js';
 
 /**
@@ -25,7 +25,8 @@ export const handleRazorpayWebhook = async (req, res) => {
         .update(req.rawBody)
         .digest('hex');
 
-    if (expected !== signature) {
+    // constant-time: how many leading characters matched must not be observable
+    if (!safeEqual(expected, signature)) {
         logger.warn('Razorpay Webhook: Signature verification failed.');
         return res.status(400).send('Invalid signature');
     }

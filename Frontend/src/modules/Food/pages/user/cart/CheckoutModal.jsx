@@ -48,7 +48,7 @@ export default function CheckoutModal({
 }) {
   const navigate = useNavigate()
   const { replaceCart, clearCart } = useCart()
-  const { addAddress, addresses, paymentMethods } = useProfile()
+  const { addAddress, addresses } = useProfile()
   const { config: appConfig } = useAppConfig()
   const isPaymentOptionDisabled = appConfig?.paymentOptionEnabled === false
   // Chosen on the Payment Options page
@@ -372,7 +372,7 @@ export default function CheckoutModal({
         address: {
           ...orderDetails.address,
           street: isTrain && savedDeliveryAddress ? savedDeliveryAddress : orderDetails.address.street,
-          additionalDetails: isTrain && trainPnr ? `IRCTC Train PNR: ${trainPnr}` : orderDetails.address.additionalDetails,
+          additionalDetails: isTrain && trainPnr ? `Train PNR: ${trainPnr}` : orderDetails.address.additionalDetails,
         },
         // The server turns these into the address and the rider's delivery notes
         ...(trainJourney ? { train: trainOrderFields(trainJourney) } : {}),

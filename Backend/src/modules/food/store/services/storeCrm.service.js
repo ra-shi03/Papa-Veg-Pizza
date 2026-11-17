@@ -11,6 +11,7 @@ import { notifyOwnersSafely } from '../../orders/services/order.helpers.js';
 import { config } from '../../../../config/env.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 import { storeArea, nearbyAddressFilter } from './nearby.js';
+import { emitSupportMessage } from '../../user/services/supportChat.js';
 
 // Store manager panel: Customers & Orders, Complaints, Reviews.
 //
@@ -444,9 +445,11 @@ export async function respondToComplaint(user, id, body = {}) {
   if (t.status === 'resolved') throw new ValidationError('This complaint is already resolved');
   const message = str(body.message, 1000);
   if (!message) throw new ValidationError('A message is required');
-  t.responses.push({ message, byName: await managerName(ctx), byRole: 'Store Manager', at: new Date() });
+  const entry = { message, byName: await managerName(ctx), byRole: 'Store Manager', at: new Date() };
+  t.responses.push(entry);
   if (t.status === 'open') t.status = 'in-progress';
   await t.save();
+  emitSupportMessage(t, entry); // the customer's open chat gets it at once
   await tellCustomer(t, 'Update on your complaint', message);
   const [complaint] = await decorate(ctx, [t.toObject()]);
   return complaint;

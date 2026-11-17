@@ -361,7 +361,7 @@ export default function ProfileDetails() {
   const initial = (account?.name || nameDraft || "").trim().charAt(0).toUpperCase()
 
   const authenticatedMenuItems = [
-    ...(appConfig?.paymentOptionEnabled !== false ? [{ key: "cards", label: "My Saved Cards", icon: "credit_card", onClick: () => go("/user/account/profile-details/payments") }] : []),
+    ...(appConfig?.paymentOptionEnabled !== false ? [{ key: "cards", label: "Payment Options", icon: "credit_card", onClick: () => go("/user/account/profile-details/payments") }] : []),
     ...(appConfig?.walletEnabled !== false ? [{ key: "wallet", label: "Papa Veg Wallet", icon: "account_balance_wallet", badge: `${points} Points`, onClick: () => go("/user/wallet") }] : []),
     { key: "addresses", label: "My Addresses", icon: "location_on", onClick: () => go("/user/location/setup", { mode: "my_addresses", from: "/user/account/profile-details" }) },
     { key: "orders", label: "My Orders", icon: "receipt_long", onClick: () => go("/user/order-history") },
@@ -372,7 +372,7 @@ export default function ProfileDetails() {
   ]
 
   const unauthenticatedMenuItems = [
-    ...(appConfig?.paymentOptionEnabled !== false ? [{ key: "cards", label: "My Saved Cards", icon: "credit_card", onClick: () => go("/user/auth/login", { from: "/user/account/profile-details" }) }] : []),
+    ...(appConfig?.paymentOptionEnabled !== false ? [{ key: "cards", label: "Payment Options", icon: "credit_card", onClick: () => go("/user/auth/login", { from: "/user/account/profile-details" }) }] : []),
     ...(appConfig?.walletEnabled !== false ? [{ key: "wallet", label: "Papa Veg Wallet", icon: "account_balance_wallet", onClick: () => go("/user/auth/login", { from: "/user/account/profile-details" }) }] : []),
     { key: "addresses", label: "My Addresses", icon: "location_on", onClick: () => go("/user/auth/login", { from: "/user/account/profile-details" }) },
     { key: "orders", label: "My Orders", icon: "receipt_long", onClick: () => go("/user/auth/login", { from: "/user/account/profile-details" }) },

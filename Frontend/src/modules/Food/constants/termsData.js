@@ -118,11 +118,11 @@ export const DEFAULT_TERMS_SECTIONS = [
     ]
   },
   {
-    title: "IRCTC",
+    title: "Train delivery",
     items: [
-      "Deliveries on trains are coordinated based on real-time train tracking and PNR status.",
-      "Orders must be booked at least 45 minutes prior to the scheduled arrival at the delivery station.",
-      "If the train is cancelled or diverted, full automated refund will be processed to the original payment mode."
+      "Train orders are delivered at the station you choose, by the store that serves it.",
+      "Enter your train number, coach and seat. A PNR is optional and is never checked.",
+      "Payment is in cash or online, as offered at checkout. A train order can be cancelled before the store accepts it."
     ]
   },
   {

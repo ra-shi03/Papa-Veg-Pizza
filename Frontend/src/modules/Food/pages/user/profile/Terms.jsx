@@ -5,14 +5,16 @@ import AnimatedPage from "@food/components/user/AnimatedPage";
 import api from "@food/api";
 import useAppBackNavigation from "@food/hooks/useAppBackNavigation";
 import { API_ENDPOINTS } from "@food/api/config";
-import { DEFAULT_TERMS_SECTIONS, parseTermsSections } from "@food/constants/termsData";
+import { parseTermsSections } from "@food/constants/termsData";
 
 export default function Terms() {
   const navigate = useNavigate();
   const goBack = useAppBackNavigation();
   const [loading, setLoading] = useState(true);
   const [pageTitle, setPageTitle] = useState("Disclaimer");
-  const [sections, setSections] = useState(DEFAULT_TERMS_SECTIONS);
+  const [sections, setSections] = useState([]);
+  // "error": the server could not be reached; "empty": it answered but no terms have been published
+  const [problem, setProblem] = useState("");
   const [openSections, setOpenSections] = useState({ 0: true });
 
   useEffect(() => {
@@ -22,22 +24,16 @@ export default function Terms() {
   const fetchTermsData = async () => {
     try {
       setLoading(true);
+      setProblem("");
       const response = await api.get(API_ENDPOINTS.ADMIN.TERMS_PUBLIC);
-      if (response?.data?.success && response?.data?.data) {
-        const data = response.data.data;
-        if (data.title) {
-          setPageTitle(data.title);
-        }
-        if (data.content) {
-          const parsed = parseTermsSections(data.content);
-          if (parsed && parsed.length > 0) {
-            setSections(parsed);
-          }
-        }
-      }
+      const data = response?.data?.success ? response?.data?.data : null;
+      if (data?.title) setPageTitle(data.title);
+      const parsed = data?.content ? parseTermsSections(data.content) : [];
+      if (parsed && parsed.length > 0) setSections(parsed);
+      else setProblem("empty");
     } catch (error) {
-      console.warn("Could not fetch remote terms, falling back to defaults:", error);
-      setSections(DEFAULT_TERMS_SECTIONS);
+      console.warn("Could not fetch the terms:", error);
+      setProblem("error");
     } finally {
       setLoading(false);
     }
@@ -90,6 +86,13 @@ export default function Terms() {
         <h2 className="text-2xl font-bold text-center text-zinc-900 dark:text-white mb-6 tracking-tight">
           {pageTitle}
         </h2>
+
+        {problem === "error" && (
+          <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">The terms could not be loaded. Please check your connection and try again.</p>
+        )}
+        {problem === "empty" && (
+          <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">The terms have not been published yet.</p>
+        )}
 
         {/* Accordions List */}
         <div className="space-y-2.5">

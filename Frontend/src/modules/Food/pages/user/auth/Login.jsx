@@ -5,7 +5,6 @@ import { clearModuleAuth } from "@food/utils/auth";
 import { requestUserOtp } from "@/services/api/auth";
 import axiosInstance from "@/services/api/axios";
 import OTP from "./OTP";
-import { truecallerMock } from "@/services/truecallerMock";
 import logoNew from "@/assets/logo1.png";
 
 export default function Login() {
@@ -13,7 +12,6 @@ export default function Login() {
   const location = useLocation();
   const [phoneNumber, setPhoneNumber] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isTruecallerLoading, setIsTruecallerLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [step, setStep] = useState("phone");
   const [config, setConfig] = useState(null);
@@ -41,41 +39,6 @@ export default function Login() {
       })
       .catch(err => console.error("Failed to load welcome screen config", err));
   }, []);
-
-  const handleTruecallerLogin = async () => {
-    if (!truecallerMock.isInstalled()) return;
-    
-    setIsTruecallerLoading(true);
-    try {
-      const response = await truecallerMock.requestVerification();
-      if (response.successful) {
-        // Send payload to backend verify endpoint
-        const apiResponse = await axiosInstance.post('/food/auth/user/verify-truecaller', {
-          payload: response.payload
-        });
-        
-        if (apiResponse.data?.success) {
-          const { tokens, user, isNewUser } = apiResponse.data.data;
-          
-          localStorage.setItem("user_accessToken", tokens.accessToken);
-          localStorage.setItem("user_refreshToken", tokens.refreshToken);
-          localStorage.setItem("user_authenticated", "true");
-          localStorage.setItem("user_profile", JSON.stringify(user));
-          localStorage.removeItem("customer_logged_out");
-          localStorage.setItem("customer_has_visited", "true");
-          
-          window.dispatchEvent(new CustomEvent("authStatusChanged", { detail: { module: "user", status: "login" } }));
-          
-          navigate("/user/location/setup", { replace: true });
-        }
-      }
-    } catch (err) {
-      console.error("Truecaller verification failed", err);
-      // Fallback silently by just ending loading state
-    } finally {
-      setIsTruecallerLoading(false);
-    }
-  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -150,31 +113,6 @@ export default function Login() {
                 {config?.loginDescription || "Log in or sign up to explore exclusive deals and order your favorite pizzas instantly."}
               </p>
             </motion.div>
-
-            {truecallerMock.isInstalled() && config?.enableTruecaller !== false && (
-              <motion.div variants={itemVariants} className="mb-6 w-full">
-                <button
-                  type="button"
-                  onClick={handleTruecallerLogin}
-                  disabled={isTruecallerLoading}
-                  className="w-full h-14 bg-[var(--accent-red)] text-white font-bold rounded-xl text-[16px] tracking-wide cursor-pointer transition-all border-0 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-md"
-                >
-                  {isTruecallerLoading ? (
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  ) : (
-                    "Continue with Truecaller"
-                  )}
-                </button>
-              </motion.div>
-            )}
-
-            {truecallerMock.isInstalled() && config?.enableTruecaller !== false && (
-              <motion.div variants={itemVariants} className="flex items-center w-full mb-6">
-                <div className="flex-1 border-t border-gray-200"></div>
-                <span className="px-4 text-sm text-gray-400 font-medium">or</span>
-                <div className="flex-1 border-t border-gray-200"></div>
-              </motion.div>
-            )}
 
             <motion.form variants={itemVariants} onSubmit={handleLogin} className="space-y-6 relative w-full">
               <div className={`flex items-center border-2 rounded-xl px-4 py-1.5 transition-all duration-300 ${isFocused ? 'border-gray-800 bg-white' : 'border-gray-200 bg-gray-50'}`}>

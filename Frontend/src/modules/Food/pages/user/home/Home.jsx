@@ -25,6 +25,7 @@ import apiClient from "@/services/api/axios"
 import { userAPI } from "@food/api"
 import { applySystemTheme } from "@/shared/utils/themeSync"
 import { useAppConfig } from "@food/context/AppConfigContext"
+import { HomePageSkeleton } from "@food/components/ui/loading-skeletons"
 
 const DEFAULT_REWARD_TERMS = [
   "The Papa Veg Pizza Cheesy Rewards Loyalty Program (Loyalty Program) is being conducted by Papa Veg Pizza.",
@@ -135,80 +136,26 @@ export default function Home() {
   const [showTrainModal, setShowTrainModal] = useState(false)
 
   // Dynamic Bottom Nav State (Domino's 5-button bar configured by superadmin)
-  const [bottomNavItems, setBottomNavItems] = useState(() => {
-    try {
-      const stored = localStorage.getItem("pvp_home_config")
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed?.bottomNav) && parsed.bottomNav.length > 0) {
-          return parsed.bottomNav
-        }
-      }
-    } catch (_) {}
-    return null
-  })
+  const [bottomNavItems, setBottomNavItems] = useState(null)
+  // The page shows a skeleton until the server's home settings have arrived (no stored copy is painted first)
+  const [homeReady, setHomeReady] = useState(false)
 
   // Dynamic Home Page Config (delivery time set by superadmin)
-  const [deliveryTime, setDeliveryTime] = useState(() => {
-    try {
-      const stored = localStorage.getItem("pvp_home_config")
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (parsed?.deliveryTimeMinutes) return parsed.deliveryTimeMinutes
-      }
-    } catch (_) { }
-    return 30
-  })
-  const [deliveryLabel, setDeliveryLabel] = useState(() => {
-    try {
-      const stored = localStorage.getItem("pvp_home_config")
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (parsed?.deliveryTimeLabel) return parsed.deliveryTimeLabel
-      }
-    } catch (_) { }
-    return "mins"
-  })
+  const [deliveryTime, setDeliveryTime] = useState(30)
+  const [deliveryLabel, setDeliveryLabel] = useState("mins")
 
-  const [promoText, setPromoText] = useState(() => {
-    try {
-      const stored = localStorage.getItem("pvp_home_config")
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (parsed?.promoText) return parsed.promoText
-      }
-    } catch (_) { }
-    return "LOWEST PRICES ONLY ON APP | FREE DELIVERY ABOVE ₹99"
-  })
+  const [promoText, setPromoText] = useState("LOWEST PRICES ONLY ON APP | FREE DELIVERY ABOVE ₹99")
 
-  const [cravingHeading, setCravingHeading] = useState(() => {
-    try {
-      const stored = localStorage.getItem("pvp_home_config")
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (parsed?.cravingHeading) return parsed.cravingHeading
-      }
-    } catch (_) { }
-    return "What are you craving for?"
-  })
+  const [cravingHeading, setCravingHeading] = useState("What are you craving for?")
 
-  const [deliveryCardData, setDeliveryCardData] = useState(() => {
-    try {
-      const stored = localStorage.getItem("pvp_home_config")
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (parsed?.deliveryCard) return parsed.deliveryCard
-      }
-    } catch (_) { }
-    return {
-      enabled: true,
-      title: 'Lowest Prices on Papa Veg Pizza App & Free Delivery',
-      subtitle: 'Add items worth ₹99 to get FREE delivery!',
-      iconType: 'animation',
-      iconUrl: '',
-      animationType: 'scooter',
-      link: '/user/menu'
-    }
+  const [deliveryCardData, setDeliveryCardData] = useState({
+    enabled: true,
+    title: 'Lowest Prices on Papa Veg Pizza App & Free Delivery',
+    subtitle: 'Add items worth ₹99 to get FREE delivery!',
+    iconType: 'animation',
+    iconUrl: '',
+    animationType: 'scooter',
+    link: '/user/menu'
   })
 
   // Helper to strictly sort categories according to superadmin configuration
@@ -227,35 +174,10 @@ export default function Home() {
   };
 
   // Dynamic Banners State (Zero hardcoded banners)
-  const [banners, setBanners] = useState(() => {
-    try {
-      const homeConfig = localStorage.getItem("pvp_home_config");
-      if (homeConfig) {
-        const parsed = JSON.parse(homeConfig);
-        if (Array.isArray(parsed.banners)) {
-          return parsed.banners.filter(
-            (b) => b._id !== "ban-01" && b._id !== "ban-02" && b.title !== "Paneer Volcano"
-          );
-        }
-      }
-    } catch (_) {}
-    return [];
-  });
+  const [banners, setBanners] = useState([]);
 
   // Dynamic Offers State
-  const [offers, setOffers] = useState(() => {
-    try {
-      const homeConfig = localStorage.getItem("pvp_home_config")
-      if (homeConfig) {
-        const parsed = JSON.parse(homeConfig)
-        if (parsed.offers && Array.isArray(parsed.offers) && parsed.offers.length > 0) {
-          return parsed.offers
-        }
-      }
-    } catch (e) { }
-
-    return []
-  })
+  const [offers, setOffers] = useState([])
 
   // Superadmin Dynamic Coupons State
   // Only what the server publishes from Marketing > Coupons; no cached or built-in coupons.
@@ -275,32 +197,7 @@ export default function Home() {
   const [logoUrl, setLogoUrl] = useState(() => localStorage.getItem("sa_logo") || logoNew)
 
   // Dynamic Categories State
-  const [categories, setCategories] = useState(() => {
-    try {
-      const stored = localStorage.getItem("pvp_categories");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const activeCats = parsed.filter(c => c.status !== "Inactive" && (c.type === "Category" || !c.type));
-          const sorted = sortCategoriesBySuperadmin(activeCats);
-          return sorted.map(c => {
-            const labelRaw = c.label || c.name || "";
-            const slug = c.slug || labelRaw.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
-            return {
-              id: c.slug || slug,
-              _id: c._id || c.id,
-              slug: slug,
-              label: labelRaw,
-              icon: c.icon || c.image || 'local_pizza',
-              borderColor: c.borderColor || '',
-              sort: Number(c.sort !== undefined && c.sort !== null ? c.sort : (c.order !== undefined && c.order !== null ? c.order : 999))
-            };
-          });
-        }
-      }
-    } catch (_) {}
-    return [];
-  });
+  const [categories, setCategories] = useState([])
   
 
   // Dynamic Products State (100% Real Dynamic Data from Backend / Database)
@@ -435,7 +332,6 @@ export default function Home() {
           const validBanners = Array.isArray(data.banners)
             ? data.banners.filter((b) => b._id !== "ban-01" && b._id !== "ban-02" && b.title !== "Paneer Volcano")
             : [];
-          localStorage.setItem("pvp_home_config", JSON.stringify({ ...data, banners: validBanners }));
           setBanners(validBanners);
           if (Array.isArray(data.offers)) {
             setOffers(data.offers.length > 0 ? data.offers : [])
@@ -452,6 +348,8 @@ export default function Home() {
         }
       } catch (err) {
         console.warn("Failed to load home page dynamic config:", err)
+      } finally {
+        setHomeReady(true)
       }
     }
 
@@ -491,19 +389,6 @@ export default function Home() {
           }
         } catch (_) {
           productsFailed = true;
-        }
-
-        // 3. Fallback to localStorage if needed
-        if (fetchedCats.length === 0) {
-          try {
-            const stored = localStorage.getItem("pvp_categories");
-            if (stored) {
-              const parsed = JSON.parse(stored);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                fetchedCats = parsed;
-              }
-            }
-          } catch (_) {}
         }
 
         if (fetchedCats.length > 0) {
@@ -855,57 +740,10 @@ export default function Home() {
       }
     }
 
-    const handleOffersSync = () => {
-      try {
-        const homeConfig = localStorage.getItem("pvp_home_config")
-        if (homeConfig) {
-          const parsed = JSON.parse(homeConfig)
-          if (parsed.offers && Array.isArray(parsed.offers) && parsed.offers.length > 0) {
-            setOffers(parsed.offers)
-            return
-          }
-        }
-      } catch (e) { }
-
-    }
-
     // handleOrderMethodsSync removed
 
     const handleBrandingSync = () => {
       setLogoUrl(localStorage.getItem("sa_logo") || logoNew)
-    }
-
-    const handleCategoriesSync = () => {
-      try {
-        const stored = localStorage.getItem("pvp_categories")
-        if (stored) {
-          const parsed = JSON.parse(stored)
-          if (parsed.length > 0) {
-            const activeCats = parsed.filter(c => c.status !== "Inactive" && (c.type === "Category" || !c.type));
-            const sortedCats = sortCategoriesBySuperadmin(activeCats);
-            const uniqueCatsMap = new Map();
-            sortedCats.forEach(c => {
-              const labelRaw = c.label || c.name;
-              if (!labelRaw) return;
-              const label = labelRaw.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-              
-              if (!uniqueCatsMap.has(label)) {
-                const slug = c.slug || labelRaw.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
-                uniqueCatsMap.set(label, {
-                  id: c.slug || slug,
-                  _id: c._id || c.id,
-                  slug: slug,
-                  label: label,
-                  icon: c.icon || c.image || 'local_pizza',
-                  borderColor: c.borderColor || '',
-                  sort: Number(c.sort !== undefined && c.sort !== null ? c.sort : (c.order !== undefined && c.order !== null ? c.order : 999))
-                });
-              }
-            });
-            setCategories(Array.from(uniqueCatsMap.values()));
-          }
-        }
-      } catch (e) { }
     }
 
     const handleHomeConfigSync = (e) => {
@@ -917,19 +755,13 @@ export default function Home() {
 
     window.addEventListener("franchise_banners_changed", handleBannersSync)
     window.addEventListener("pvp_banners_changed", handleBannersSync)
-    window.addEventListener("franchise_coupons_changed", handleOffersSync)
-    window.addEventListener("pvp_coupons_changed", handleOffersSync)
     window.addEventListener("systemThemeChanged", handleBrandingSync)
-    window.addEventListener("pvp_categories_changed", handleCategoriesSync)
     window.addEventListener("homePageConfigUpdated", handleHomeConfigSync)
 
     return () => {
       window.removeEventListener("franchise_banners_changed", handleBannersSync)
       window.removeEventListener("pvp_banners_changed", handleBannersSync)
-      window.removeEventListener("franchise_coupons_changed", handleOffersSync)
-      window.removeEventListener("pvp_coupons_changed", handleOffersSync)
       window.removeEventListener("systemThemeChanged", handleBrandingSync)
-      window.removeEventListener("pvp_categories_changed", handleCategoriesSync)
       window.removeEventListener("homePageConfigUpdated", handleHomeConfigSync)
     }
   }, [])
@@ -1096,6 +928,8 @@ export default function Home() {
     }
     return sum + (Number(qty) || 0);
   }, 0)
+
+  if (!homeReady) return <HomePageSkeleton />
 
   return (
     <div className={`min-h-screen flex justify-center transition-colors duration-300 ${isDarkMode ? "bg-[#0a0a0a]" : "bg-gray-100"}`}>

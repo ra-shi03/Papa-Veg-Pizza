@@ -89,6 +89,7 @@ export default function Under250() {
   const [categories, setCategories] = useState([])
   const [bannerImages, setBannerImages] = useState([])
   const [loadingBanner, setLoadingBanner] = useState(true)
+  const [bannerInfo, setBannerInfo] = useState({ title: '', link: '' })
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0)
   const [under250Restaurants, setUnder250Restaurants] = useState([])
   const [loadingRestaurants, setLoadingRestaurants] = useState(true)
@@ -230,12 +231,21 @@ export default function Under250() {
     return filtered
   }, [under250Restaurants, selectedSort, under30MinsFilter, activeCategory, categories])
 
-  // Under-250 banner: there is no super admin content or public route for it yet, so no banner is shown
-  // (the section hides itself when there are no images) instead of calling a path that does not exist.
+  // Under-250 banner: set by the super admin (Settings > Hero banners). No banner saved means no image is shown.
   useEffect(() => {
-    setBannerImages([])
-    setLoadingBanner(false)
-  }, [zoneId])
+    let cancelled = false
+    setLoadingBanner(true)
+    api.get('/settings/hero-banners/under-250/public')
+      .then((res) => {
+        if (cancelled) return
+        const banner = res?.data?.data
+        setBannerImages(banner?.imageUrl ? [banner.imageUrl] : [])
+        setBannerInfo({ title: banner?.title || '', link: banner?.link || '' })
+      })
+      .catch(() => { if (!cancelled) { setBannerImages([]); setBannerInfo({ title: '', link: '' }) } })
+      .finally(() => { if (!cancelled) setLoadingBanner(false) })
+    return () => { cancelled = true }
+  }, [])
 
   // Fetch landing settings to get dynamic price limit
   useEffect(() => {
@@ -893,10 +903,19 @@ export default function Under250() {
               style={{ transform: `translateX(-${currentBannerIndex * 100}%)` }}
             >
               {bannerImages.map((bannerImage, index) => (
-                <div key={`${bannerImage}-${index}`} className="relative h-full w-full shrink-0">
+                <div
+                  key={`${bannerImage}-${index}`}
+                  className={`relative h-full w-full shrink-0 ${bannerInfo.link ? 'cursor-pointer' : ''}`}
+                  onClick={() => {
+                    const link = bannerInfo.link
+                    if (!link) return
+                    if (/^https:/i.test(link)) window.open(link, '_blank', 'noopener,noreferrer')
+                    else navigate(link)
+                  }}
+                >
                   <OptimizedImage
                     src={bannerImage}
-                    alt={`Under 250 Banner ${index + 1}`}
+                    alt={bannerInfo.title || `Under 250 Banner ${index + 1}`}
                     className="w-full h-full"
                     objectFit="cover"
                     priority={index === 0}

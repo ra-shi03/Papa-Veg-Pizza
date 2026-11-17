@@ -15,6 +15,7 @@ import {
 import { notifyUsers } from './kitchenTasks.service.js';
 import { ensureItems, syncOrderStage, visibleKitchenOrders, priorityLabel, isDelayed, IN_KITCHEN } from './kitchenItems.service.js';
 import { notifyOwnersSafely } from '../../orders/services/order.helpers.js';
+import { applyItemRejection } from './itemRejectionPricing.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 
 // Kitchen Queue, Delayed Orders, Packaging Station and the two My Tasks modals (ingredient request,
@@ -151,7 +152,10 @@ export async function assignChef(user, orderId, { chefId } = {}) {
   return queueView(orderId, storeId);
 }
 
-/** Rejects individual pizzas of an order (out of stock, can't be made). Prices are untouched; refunds are a finance matter. */
+/**
+ * Rejects individual pizzas of an order (out of stock, can't be made). They come off the bill: cash orders collect the
+ * lower total; a paid order gets a pending refund request for the difference (processed with the other refunds).
+ */
 export async function rejectItems(user, { orderId, itemIds, reason, notifyCustomer } = {}) {
   const { order, storeId } = await findVisibleOrder(user, orderId);
   mustLead(user, order);
@@ -168,19 +172,22 @@ export async function rejectItems(user, { orderId, itemIds, reason, notifyCustom
   const remaining = all.filter((r) => !r.rejected && !chosen.includes(r));
   if (!remaining.length) throw new ValidationError('Cannot reject every item. Reject the whole order instead.');
 
+  const newlyRejected = chosen.filter((r) => !r.rejected);
   await KitchenItem.updateMany({ _id: { $in: chosen.map((r) => r._id) } }, { $set: { rejected: true, rejectReason: why } });
   logStep(order, user, `Items rejected: ${chosen.map((r) => r.name).join(', ')}. Reason: ${why}`);
+  const adjustment = await applyItemRejection(order, newlyRejected.map((r) => order.items[r.index]).filter(Boolean), { reason: why, byUserId: user.userId });
+  if (adjustment) logStep(order, user, `Bill reduced by Rs ${adjustment.reduction}${adjustment.refund ? ' (refund requested)' : ''}`);
   await order.save();
   await syncOrderStage(user, storeId, order._id);
 
   if (notifyCustomer) {
     await notifyOwnersSafely([{ ownerType: 'USER', ownerId: order.userId }], {
       title: 'Update on your order',
-      body: `Sorry, we could not prepare ${chosen.map((r) => r.name).join(', ')} in order #${order.order_id || order._id}. ${why}`,
+      body: `Sorry, we could not prepare ${chosen.map((r) => r.name).join(', ')} in order #${order.order_id || order._id}. ${why}${adjustment?.reduction ? ` Your bill is Rs ${adjustment.reduction} lower.` : ''}`,
       data: { type: 'order_item_rejected', orderId: String(order._id) },
     });
   }
-  return { orderId: String(order._id), rejected: chosen.map((r) => String(r._id)) };
+  return { orderId: String(order._id), rejected: chosen.map((r) => String(r._id)), billReducedBy: adjustment?.reduction || 0, refundRequested: !!adjustment?.refund, total: order.pricing?.total };
 }
 
 // ---------------------------------------------------------------------------------------------

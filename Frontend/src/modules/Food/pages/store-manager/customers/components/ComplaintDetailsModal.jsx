@@ -6,6 +6,7 @@ import CustomerInfoSection from "./CustomerInfoSection";
 import OrderInfoSection from "./OrderInfoSection";
 import ResolutionTimeline from "./ResolutionTimeline";
 import ComplaintImagesGallery from "./ComplaintImagesGallery";
+import ComplaintConversation from "./ComplaintConversation";
 import ResolutionNotesSection from "./ResolutionNotesSection";
 import ComplaintStatusBadge from "./ComplaintStatusBadge";
 import ComplaintPriorityBadge from "./ComplaintPriorityBadge";
@@ -129,6 +130,9 @@ export default function ComplaintDetailsModal({
                     </p>
                   </div>
                 </div>
+
+                {/* Conversation with the customer (their order-help chat) */}
+                <ComplaintConversation complaint={complaint} />
 
                 {/* Evidence Image Gallery */}
                 <ComplaintImagesGallery images={complaint.images} />

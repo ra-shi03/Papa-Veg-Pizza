@@ -36,7 +36,27 @@ export function useComplaintDetails(complaintId) {
         throw err; // the real answer from the server is shown; there is no sample data
       }
     },
-    enabled: !!complaintId
+    enabled: !!complaintId,
+    // an open conversation: pick up the customer's new messages
+    refetchInterval: 8000
+  });
+}
+
+// The manager answers the customer without closing the complaint
+export function useRespondToComplaint() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ complaintId, message }) => {
+      const response = await apiClient.post(`/food/store/complaints/${complaintId}/respond`, { message });
+      return response.data?.data || response.data;
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["complaintDetails", variables.complaintId] });
+      queryClient.invalidateQueries({ queryKey: ["complaints"] });
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || err?.message || "Could not send the reply");
+    }
   });
 }
 

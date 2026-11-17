@@ -37,13 +37,8 @@ const ComboBuilder = lazy(() => import("@food/pages/user/ComboBuilder"))
 const PromisePage = lazy(() => import("@food/pages/user/PromisePage"))
 const BulkOrder = lazy(() => import("@food/pages/user/BulkOrder"))
 
-// Gourmet
-const Gourmet = lazy(() => import("@food/pages/user/Gourmet"))
 
 
-// Collections
-const Collections = lazy(() => import("@food/pages/user/Collections"))
-const CollectionDetail = lazy(() => import("@food/pages/user/CollectionDetail"))
 
 
 
@@ -54,9 +49,6 @@ const EditProfile = lazy(() => import("@food/pages/user/profile/EditProfile"))
 const MyProfile = lazy(() => import("@food/pages/user/profile/MyProfile"))
 const ProfileDetails = lazy(() => import("@food/pages/user/profile/ProfileDetails"))
 const Payments = lazy(() => import("@food/pages/user/profile/Payments"))
-const AddPayment = lazy(() => import("@food/pages/user/profile/AddPayment"))
-const EditPayment = lazy(() => import("@food/pages/user/profile/EditPayment"))
-const Favorites = lazy(() => import("@food/pages/user/profile/Favorites"))
 const Support = lazy(() => import("@food/pages/user/profile/Support"))
 const Coupons = lazy(() => import("@food/pages/user/profile/Coupons"))
 const AllCoupons = lazy(() => import("@food/pages/user/profile/AllCoupons"))
@@ -65,7 +57,6 @@ const Terms = lazy(() => import("@food/pages/user/profile/Terms"))
 const Privacy = lazy(() => import("@food/pages/user/profile/Privacy"))
 const FAQ = lazy(() => import("@food/pages/user/profile/FAQ"))
 const Nutrition = lazy(() => import("@food/pages/user/profile/Nutrition"))
-const Feedback = lazy(() => import("@food/pages/user/profile/Feedback"))
 const Refund = lazy(() => import("@food/pages/user/profile/Refund"))
 const Shipping = lazy(() => import("@food/pages/user/profile/Shipping"))
 const Cancellation = lazy(() => import("@food/pages/user/profile/Cancellation"))
@@ -158,13 +149,8 @@ export default function UserRouter() {
           <Route path="bulk-order" element={<BulkOrder />} />
           <Route path="bulk-orders" element={<BulkOrder />} />
 
-          {/* Gourmet */}
-          <Route path="gourmet" element={<Gourmet />} />
 
 
-          {/* Collections */}
-          <Route path="collections" element={<Collections />} />
-          <Route path="collections/:id" element={<CollectionDetail />} />
 
 
 
@@ -244,30 +230,6 @@ export default function UserRouter() {
             }
           />
           <Route
-            path="account/profile-details/payments/new"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <AddPayment />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="account/profile-details/payments/:id/edit"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <EditPayment />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="profile/favorites"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <Favorites />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="account/coupons/support"
             element={
               <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
@@ -326,7 +288,6 @@ export default function UserRouter() {
           <Route path="account/privacy" element={<Privacy />} />
           <Route path="account/faqs" element={<FAQ />} />
           <Route path="account/nutrition" element={<Nutrition />} />
-          <Route path="account/feedback" element={<Feedback />} />
           <Route path="profile/refund" element={<Refund />} />
           <Route path="profile/shipping" element={<Shipping />} />
           <Route path="profile/cancellation" element={<Cancellation />} />

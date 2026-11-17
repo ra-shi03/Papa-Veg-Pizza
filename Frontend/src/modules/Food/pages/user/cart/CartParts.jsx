@@ -151,7 +151,12 @@ export function CartItemRow({ item, index, ui, onQty, onRemove }) {
             </button>
           </div>
           <p className="text-[13px] font-bold text-right shrink-0" style={{ color: ui.text }}>
-            <AnimatedNumber value={item.price * item.quantity} />
+            {item.priceLoading ? (
+              // the server is pricing this line: a placeholder instead of the price saved when it was added
+              <span aria-label="Loading price" className="inline-block h-3.5 w-12 animate-pulse rounded-full align-middle" style={{ backgroundColor: ui.line }} />
+            ) : (
+              <AnimatedNumber value={item.price * item.quantity} />
+            )}
           </p>
         </div>
       </motion.div>

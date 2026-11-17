@@ -10,6 +10,7 @@ import { initSocket } from './src/config/socket.js';
 import { startOrderEventStream, stopOrderEventStream } from './src/modules/food/orders/services/order-events.service.js';
 import { initializeQueues, closeBullMQConnection } from './src/queues/index.js';
 import { expireExpiredOffers } from './src/modules/food/admin/services/admin.service.js';
+import { dispatchDueScheduledOrders } from './src/modules/food/orders/services/order-dispatch.service.js';
 
 import { logger } from './src/utils/logger.js';
 import { initializeFirebaseRealtime } from './src/config/firebase.js';
@@ -18,6 +19,7 @@ import { cleanupLegacySuperAdmin } from './src/core/admin/admin.seed.js';
 const SHUTDOWN_TIMEOUT_MS = 10000;
 let server = null;
 let expireOffersInterval = null;
+let scheduledDispatchInterval = null;
 
 const gracefulShutdown = async (signal) => {
     logger.info(`${signal} received, starting graceful shutdown`);
@@ -31,6 +33,7 @@ const gracefulShutdown = async (signal) => {
             await closeRedis();
             await closeBullMQConnection();
             if (expireOffersInterval) clearInterval(expireOffersInterval);
+            if (scheduledDispatchInterval) clearInterval(scheduledDispatchInterval);
             await stopOrderEventStream();
 
             logger.info('Graceful shutdown complete');
@@ -128,6 +131,16 @@ const startServer = async () => {
         runExpire();
         // Run every 3 minutes (180,000 ms) instead of 5 to prevent MongoDB NAT idle timeouts
         expireOffersInterval = setInterval(runExpire, 3 * 60 * 1000);
+
+        // Scheduled orders: start looking for a rider when the slot is near (once a minute)
+        const runScheduledDispatch = async () => {
+            try {
+                await dispatchDueScheduledOrders();
+            } catch (err) {
+                logger.error(`Scheduled dispatch error: ${err.message}`);
+            }
+        };
+        scheduledDispatchInterval = setInterval(runScheduledDispatch, 60 * 1000);
 
         process.on('SIGINT', () => gracefulShutdown('SIGINT'));
         process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

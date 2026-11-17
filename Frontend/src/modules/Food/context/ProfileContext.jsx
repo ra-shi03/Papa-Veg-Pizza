@@ -62,22 +62,6 @@ export function ProfileProvider({ children }) {
 
   const [addresses, setAddresses] = useState([])
 
-  const [paymentMethods, setPaymentMethods] = useState(() => {
-    const saved = localStorage.getItem("userPaymentMethods")
-    return saved ? JSON.parse(saved) : []
-  })
-
-  const [favorites, setFavorites] = useState(() => {
-    const saved = localStorage.getItem("userFavorites")
-    return saved ? JSON.parse(saved) : []
-  })
-
-  // Dish favorites state - stored in localStorage for persistence
-  const [dishFavorites, setDishFavorites] = useState(() => {
-    const saved = localStorage.getItem("userDishFavorites")
-    return saved ? JSON.parse(saved) : []
-  })
-
   // VegMode state - stored in localStorage for persistence
   const [vegMode, setVegMode] = useState(() => {
     const saved = localStorage.getItem("userVegMode")
@@ -95,7 +79,7 @@ export function ProfileProvider({ children }) {
     return localStorage.getItem("user_authenticated") === "true" || !!localStorage.getItem("user_accessToken")
   }, [userProfile])
 
-  // Save to localStorage whenever userProfile, addresses or paymentMethods change
+  // Save to localStorage whenever userProfile or addresses change
   useEffect(() => {
     if (userProfile || isAuthenticated) {
       localStorage.setItem("userProfile", JSON.stringify(userProfile))
@@ -107,24 +91,6 @@ export function ProfileProvider({ children }) {
       localStorage.setItem("userAddresses", JSON.stringify(addresses))
     }
   }, [addresses, isAuthenticated])
-
-  useEffect(() => {
-    if (paymentMethods.length > 0 || isAuthenticated) {
-      localStorage.setItem("userPaymentMethods", JSON.stringify(paymentMethods))
-    }
-  }, [paymentMethods, isAuthenticated])
-
-  useEffect(() => {
-    if (favorites.length > 0 || isAuthenticated) {
-      localStorage.setItem("userFavorites", JSON.stringify(favorites))
-    }
-  }, [favorites, isAuthenticated])
-
-  useEffect(() => {
-    if (dishFavorites.length > 0 || isAuthenticated) {
-      localStorage.setItem("userDishFavorites", JSON.stringify(dishFavorites))
-    }
-  }, [dishFavorites, isAuthenticated])
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -143,9 +109,6 @@ export function ProfileProvider({ children }) {
       if (!isAuthenticated) {
         setUserProfile(null)
         setAddresses([])
-        setPaymentMethods([])
-        setFavorites([])
-        setDishFavorites([])
         setVegMode(false)
         setVegModeOption("all")
         USER_SESSION_PREFERENCE_KEYS.forEach((key) => {
@@ -385,105 +348,6 @@ export function ProfileProvider({ children }) {
     return addresses.find((addr) => addr.isDefault) || addresses[0] || null
   }, [addresses])
 
-  // Payment method functions - memoized with useCallback
-  const addPaymentMethod = useCallback((payment) => {
-    setPaymentMethods((prev) => {
-      const newPayment = {
-        ...payment,
-        id: Date.now().toString(),
-        isDefault: prev.length === 0 ? true : false,
-      }
-      return [...prev, newPayment]
-    })
-  }, [])
-
-  const updatePaymentMethod = useCallback((id, updatedPayment) => {
-    setPaymentMethods((prev) =>
-      prev.map((pm) => (pm.id === id ? { ...pm, ...updatedPayment } : pm))
-    )
-  }, [])
-
-  const deletePaymentMethod = useCallback((id) => {
-    setPaymentMethods((prev) => {
-      const paymentToDelete = prev.find((pm) => pm.id === id)
-      const newPayments = prev.filter((pm) => pm.id !== id)
-      
-      // If deleting default, set first remaining as default
-      if (paymentToDelete?.isDefault && newPayments.length > 0) {
-        newPayments[0].isDefault = true
-      }
-      
-      return newPayments
-    })
-  }, [])
-
-  const setDefaultPaymentMethod = useCallback((id) => {
-    setPaymentMethods((prev) =>
-      prev.map((pm) => ({
-        ...pm,
-        isDefault: pm.id === id,
-      }))
-    )
-  }, [])
-
-  const getDefaultPaymentMethod = useCallback(() => {
-    return paymentMethods.find((pm) => pm.isDefault) || paymentMethods[0] || null
-  }, [paymentMethods])
-
-  const getAddressById = useCallback((id) => {
-    return addresses.find((addr) => String(getAddressId(addr)) === String(id))
-  }, [addresses])
-
-  const getPaymentMethodById = useCallback((id) => {
-    return paymentMethods.find((pm) => pm.id === id)
-  }, [paymentMethods])
-
-  // Favorites functions - memoized with useCallback
-  const addFavorite = useCallback((store) => {
-    setFavorites((prev) => {
-      if (!prev.find(fav => fav.slug === store.slug)) {
-        return [...prev, store]
-      }
-      return prev
-    })
-  }, [])
-
-  const removeFavorite = useCallback((slug) => {
-    setFavorites((prev) => prev.filter(fav => fav.slug !== slug))
-  }, [])
-
-  const isFavorite = useCallback((slug) => {
-    return favorites.some(fav => fav.slug === slug)
-  }, [favorites])
-
-  const getFavorites = useCallback(() => {
-    return favorites
-  }, [favorites])
-
-  // Dish favorites functions - memoized with useCallback
-  const addDishFavorite = useCallback((dish) => {
-    setDishFavorites((prev) => {
-      if (!prev.find(fav => fav.id === dish.id && fav.storeId === dish.storeId)) {
-        return [...prev, dish]
-      }
-      return prev
-    })
-  }, [])
-
-  const removeDishFavorite = useCallback((dishId, storeId) => {
-    setDishFavorites((prev) => 
-      prev.filter(fav => !(fav.id === dishId && fav.storeId === storeId))
-    )
-  }, [])
-
-  const isDishFavorite = useCallback((dishId, storeId) => {
-    return dishFavorites.some(fav => fav.id === dishId && fav.storeId === storeId)
-  }, [dishFavorites])
-
-  const getDishFavorites = useCallback(() => {
-    return dishFavorites
-  }, [dishFavorites])
-
   // User profile functions - memoized with useCallback
   const updateUserProfile = useCallback((updatedProfile) => {
     setUserProfile((prev) => ({ ...prev, ...updatedProfile }))
@@ -496,8 +360,6 @@ export function ProfileProvider({ children }) {
       loading,
       updateUserProfile,
       addresses,
-      paymentMethods,
-      favorites,
       vegMode,
       setVegMode,
       vegModeOption,
@@ -508,21 +370,6 @@ export function ProfileProvider({ children }) {
       setDefaultAddress,
       getDefaultAddress,
       getAddressById,
-      addPaymentMethod,
-      updatePaymentMethod,
-      deletePaymentMethod,
-      setDefaultPaymentMethod,
-      getDefaultPaymentMethod,
-      getPaymentMethodById,
-      addFavorite,
-      removeFavorite,
-      isFavorite,
-      getFavorites,
-      dishFavorites,
-      addDishFavorite,
-      removeDishFavorite,
-      isDishFavorite,
-      getDishFavorites,
       isAuthenticated,
     }),
     [
@@ -530,9 +377,6 @@ export function ProfileProvider({ children }) {
       loading,
       updateUserProfile,
       addresses,
-      paymentMethods,
-      favorites,
-      dishFavorites,
       vegMode,
       setVegMode,
       vegModeOption,
@@ -543,20 +387,6 @@ export function ProfileProvider({ children }) {
       setDefaultAddress,
       getDefaultAddress,
       getAddressById,
-      addPaymentMethod,
-      updatePaymentMethod,
-      deletePaymentMethod,
-      setDefaultPaymentMethod,
-      getDefaultPaymentMethod,
-      getPaymentMethodById,
-      addFavorite,
-      removeFavorite,
-      isFavorite,
-      getFavorites,
-      addDishFavorite,
-      removeDishFavorite,
-      isDishFavorite,
-      getDishFavorites,
       isAuthenticated,
     ]
   )
@@ -575,29 +405,12 @@ export function useProfile() {
       loading: false,
       updateUserProfile: () => debugWarn("ProfileProvider not available"),
       addresses: [],
-      paymentMethods: [],
-      favorites: [],
       addAddress: () => debugWarn("ProfileProvider not available"),
       updateAddress: () => debugWarn("ProfileProvider not available"),
       deleteAddress: () => debugWarn("ProfileProvider not available"),
       setDefaultAddress: () => debugWarn("ProfileProvider not available"),
       getDefaultAddress: () => null,
       getAddressById: () => null,
-      addPaymentMethod: () => debugWarn("ProfileProvider not available"),
-      updatePaymentMethod: () => debugWarn("ProfileProvider not available"),
-      deletePaymentMethod: () => debugWarn("ProfileProvider not available"),
-      setDefaultPaymentMethod: () => debugWarn("ProfileProvider not available"),
-      getDefaultPaymentMethod: () => null,
-      getPaymentMethodById: () => null,
-      addFavorite: () => debugWarn("ProfileProvider not available"),
-      removeFavorite: () => debugWarn("ProfileProvider not available"),
-      isFavorite: () => false,
-      getFavorites: () => [],
-      dishFavorites: [],
-      addDishFavorite: () => debugWarn("ProfileProvider not available"),
-      removeDishFavorite: () => debugWarn("ProfileProvider not available"),
-      isDishFavorite: () => false,
-      getDishFavorites: () => [],
       vegMode: false,
       setVegMode: () => debugWarn("ProfileProvider not available"),
       vegModeOption: "all",

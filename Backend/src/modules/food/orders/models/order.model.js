@@ -67,6 +67,9 @@ const pricingSchema = new mongoose.Schema(
         cancellationFee: { type: Number, default: 0, min: 0 },
         cancellationFreeMinutes: { type: Number, default: 0, min: 0 },
         cancellationFeeCharged: { type: Number, default: 0, min: 0 },
+        // Items the kitchen could not prepare come off the bill: the total the customer first saw, and the food value removed
+        originalTotal: { type: Number, default: 0, min: 0 },
+        rejectedItemsAmount: { type: Number, default: 0, min: 0 },
         total: { type: Number, required: true, min: 0 },
         currency: { type: String, default: 'INR' }
     },

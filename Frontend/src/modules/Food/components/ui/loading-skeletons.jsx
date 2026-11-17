@@ -354,6 +354,35 @@ function AppShellSkeleton({ className }) {
   )
 }
 
+/** The customer home page while the server's home settings load: top bar, banner, category chips, product tiles. */
+function HomePageSkeleton({ className }) {
+  return (
+    <LoadingSkeletonRegion label="Loading home" className={cn("flex min-h-screen justify-center bg-gray-100 dark:bg-[#0a0a0a]", className)}>
+      <div className="w-full max-w-md space-y-4 bg-white p-4 pb-32 dark:bg-[#111]">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-32 rounded-full" />
+            <Skeleton className="h-3 w-48 rounded-full" />
+          </div>
+          <Skeleton className="h-10 w-10 rounded-full" />
+        </div>
+        <Skeleton className="h-10 w-full rounded-full" />
+        <Skeleton className="h-40 w-full rounded-3xl" />
+        <CategoryChipRowSkeleton count={5} />
+        <div className="grid grid-cols-2 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={`tile-${i}`} className="space-y-2 rounded-2xl border border-gray-100 p-2 dark:border-white/10">
+              <Skeleton className="h-28 w-full rounded-xl" />
+              <Skeleton className="h-4 w-3/4 rounded-full" />
+              <Skeleton className="h-3 w-1/2 rounded-full" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </LoadingSkeletonRegion>
+  )
+}
+
 /** Order tracking page while the order loads: header, status banner, map, rider and bill cards. */
 function OrderTrackingSkeleton({ className }) {
   return (
@@ -409,6 +438,7 @@ export {
   HeroBannerSkeleton,
   LoadingSkeletonRegion,
   OrdersDashboardSkeleton,
+  HomePageSkeleton,
   OrderTrackingSkeleton,
   StoreCardSkeleton,
   StoreDetailSkeleton,
