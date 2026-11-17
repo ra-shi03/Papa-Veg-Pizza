@@ -63,14 +63,37 @@ export function methodAllowedAt(method, store) {
  * known yet, only methods open to every store are offered: a method limited to some stores or franchises appears
  * once the customer's location resolves to one of them.
  */
-export async function publicMethodsFor(store) {
+export async function publicMethodsFor(store, nearbyStores = null) {
     const methods = await loadMethods();
     return methods.map((m) => ({
         id: m.id,
         label: m.label,
         icon: m.icon || '',
-        enabled: store ? methodAllowedAt(m, store) : (m.enabled && m.scope === 'all'),
+        // A method collected at a store is on when any store within the customer's radius offers it; delivery and train
+        // follow the one store that serves the customer
+        enabled: nearbyStores && isPickupMethod(m.id)
+            ? nearbyStores.some((s) => methodAllowedAt(m, s))
+            : store ? methodAllowedAt(m, store) : (m.enabled && m.scope === 'all'),
     }));
+}
+
+/**
+ * Approved, active stores with a position within the radius the super admin set, of every franchise, nearest first.
+ * Each has the store fields given plus distanceKm.
+ */
+export async function nearbyStoresWithin(lat, lng, select = '_id franchiseId') {
+    const radiusKm = await loadNearbyRadiusKm();
+    const stores = await FoodStore.find({ isActive: true, approvalStatus: { $in: ['Approved', 'approved'] }, latitude: { $ne: null }, longitude: { $ne: null } }).select(`${select} latitude longitude`).lean();
+    const { haversineKm } = await import('../../orders/services/order.helpers.js');
+    const out = [];
+    for (const s of stores) {
+        const sLat = Number(s.latitude); const sLng = Number(s.longitude);
+        if (!Number.isFinite(sLat) || !Number.isFinite(sLng)) continue;
+        const distanceKm = Math.round(haversineKm(lat, lng, sLat, sLng) * 10) / 10;
+        if (distanceKm <= radiusKm) out.push({ ...s, distanceKm });
+    }
+    out.sort((a, b) => a.distanceKm - b.distanceKm);
+    return { stores: out, radiusKm };
 }
 
 /** Throws when the method is not offered at the store (orders for it are refused). */

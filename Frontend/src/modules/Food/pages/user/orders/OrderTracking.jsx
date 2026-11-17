@@ -349,12 +349,19 @@ const DeliveryMap = memo(({ orderId, order, isVisible, fallbackCustomerCoords = 
   );
   const heightClass = waiting ? 'h-[230px] sm:h-[450px] rounded-b-3xl overflow-hidden' : 'h-[300px] sm:h-[450px] overflow-visible';
 
-  if (!isVisible || !orderId || !order || !effectiveRestaurantCoords || !effectiveCustomerCoords) {
+  // An order collected at the store has no rider to follow: no map, just where to collect it
+  if (!isVisible || !orderId || !order || order.isPickup || !effectiveRestaurantCoords || !effectiveCustomerCoords) {
     return (
       <div
         className={`relative ${heightClass} bg-gradient-to-b from-[#F6EDEB] to-[#EEE6E3] dark:from-[#0a0a0a] dark:to-[#1a1a1a]`}
       >
-        {waitingChip}
+        {order?.isPickup && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 px-6 text-center">
+            <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Collect at</span>
+            <span className="text-base font-extrabold text-gray-900 dark:text-gray-100">{order?.restaurant || 'the store'}</span>
+          </div>
+        )}
+        {!order?.isPickup && waitingChip}
       </div>
     );
   }
@@ -573,6 +580,9 @@ const transformOrderForTracking = (apiOrder, previousOrder = null, explicitResta
     discount: apiOrder?.pricing?.discount || apiOrder?.discount || 0,
     subtotal: apiOrder?.pricing?.subtotal || apiOrder?.subtotal || 0,
     paymentMethod: apiOrder?.paymentMethod || apiOrder?.payment?.method || previousOrder?.paymentMethod || null,
+    // collected at the store (takeaway, in-car, dine-in, ...): no rider, no delivery steps
+    isPickup: apiOrder?.isPickup === true || previousOrder?.isPickup === true,
+    orderMethod: apiOrder?.orderMethod || previousOrder?.orderMethod || 'delivery',
     payment: apiOrder?.payment || previousOrder?.payment || null,
     // Preserve delivery OTP code received via socket event.
     // API responses intentionally strip the secret code for security,
@@ -666,7 +676,15 @@ function normalizeLookupId(value) {
   return raw
 }
 
-const PROGRESS_STEPS = [
+const PICKUP_PROGRESS_STEPS = [
+  { label: 'Placed', states: ['placed', 'pending', 'created'] },
+  { label: 'Accepted', states: ['confirmed'] },
+  { label: 'Preparing', states: ['preparing'] },
+  { label: 'Ready', states: ['ready', 'at_pickup', 'on_way', 'at_drop'] },
+  { label: 'Collected', states: ['delivered'] },
+]
+
+const DELIVERY_PROGRESS_STEPS = [
   { label: 'Placed', states: ['placed', 'pending', 'created'] },
   { label: 'Accepted', states: ['confirmed'] },
   { label: 'Preparing', states: ['preparing', 'ready', 'at_pickup'] },
@@ -675,7 +693,8 @@ const PROGRESS_STEPS = [
 ]
 
 /** A five-step tracker: the line fills up to the current step, done steps are ticks, the current one pulses. */
-function OrderProgress({ status }) {
+function OrderProgress({ status, pickup = false }) {
+  const PROGRESS_STEPS = pickup ? PICKUP_PROGRESS_STEPS : DELIVERY_PROGRESS_STEPS
   const found = PROGRESS_STEPS.findIndex((step) => step.states.includes(status))
   const current = found === -1 ? 0 : found
   const last = PROGRESS_STEPS.length - 1
@@ -1704,6 +1723,13 @@ export default function OrderTracking() {
     }
   }
 
+  // Collected at the store: no rider, so the wording is about collecting
+  if (order?.isPickup) {
+    statusConfig.preparing.subtitle = "Cooking your meal"
+    statusConfig.ready = { title: "Ready to collect", subtitle: "Your order is ready at the store", color: "bg-gradient-to-br from-[#E53935] to-[#B71C1C]", iconType: 'food' }
+    statusConfig.delivered = { ...statusConfig.delivered, title: "Order collected" }
+  }
+
   const KITCHEN_STAGE_COPY = {
     pending: 'In the kitchen queue',
     preparing: 'Chefs are preparing your pizza',
@@ -1961,7 +1987,7 @@ export default function OrderTracking() {
             </div>
           )}
           {orderStatus !== 'cancelled' && !(isScheduledOrder && ['placed', 'confirmed'].includes(orderStatus)) && (
-            <OrderProgress status={orderStatus} />
+            <OrderProgress status={orderStatus} pickup={order?.isPickup === true} />
           )}
         </motion.div>
 
@@ -2118,7 +2144,7 @@ export default function OrderTracking() {
         )}
 
         {/* Delivery Partner Safety */}
-        {orderStatus !== 'delivered' && orderStatus !== 'cancelled' && (
+        {orderStatus !== 'delivered' && orderStatus !== 'cancelled' && !order?.isPickup && (
           <motion.button
             className="w-full bg-white dark:bg-[#1a1a1a] rounded-2xl p-4 shadow-sm flex items-center gap-3 border border-black/5 dark:border-white/5"
             initial={{ opacity: 0, y: 20 }}
@@ -2147,7 +2173,7 @@ export default function OrderTracking() {
             transition={{ delay: 0.65 }}
           >
             <span className="h-px flex-1 bg-black/10 dark:bg-white/10" />
-            <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">Delivery details</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">{order?.isPickup ? "Collection details" : "Delivery details"}</span>
             <span className="h-px flex-1 bg-black/10 dark:bg-white/10" />
           </motion.div>
         )}
@@ -2185,7 +2211,7 @@ export default function OrderTracking() {
                 className="w-6 h-6 [&_svg]:w-full [&_svg]:h-full [&_svg]:block"
               />
             }
-            title="Delivery at Location"
+            title={order?.isPickup ? "Collect at the store" : "Delivery at Location"}
             subtitle={(() => {
               // Priority 1: Use order address formattedAddress (live location address)
               if (order?.address?.formattedAddress && order.address.formattedAddress !== "Select location") {
@@ -2230,7 +2256,7 @@ export default function OrderTracking() {
           {!isAdminAccepted && orderStatus !== 'cancelled' && orderStatus !== 'delivered' && (
             <SectionItem
               icon={MessageSquare}
-              title={order?.note ? "Edit delivery instructions" : "Add delivery instructions"}
+              title={order?.isPickup ? (order?.note ? "Edit note for the store" : "Add a note for the store") : (order?.note ? "Edit delivery instructions" : "Add delivery instructions")}
               subtitle={order?.note ? order.note.substring(0, 35) + (order.note.length > 35 ? "..." : "") : ""}
               onClick={() => {
                 setDeliveryInstructions(order?.note || "");
@@ -2292,7 +2318,7 @@ export default function OrderTracking() {
           {Number(order?.total) > 0 && (
             <div className="flex items-center justify-between px-4 py-3.5 bg-[var(--primary)]/5">
               <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-                {String(order?.paymentMethod || '').toLowerCase() === 'cash' ? 'Pay on delivery' : 'Paid online'}
+                {String(order?.paymentMethod || '').toLowerCase() === 'cash' ? (order?.isPickup ? 'Pay at the store' : 'Pay on delivery') : 'Paid online'}
               </span>
               <span className="text-base font-extrabold text-gray-900 dark:text-gray-100">₹{Number(order.total)}</span>
             </div>

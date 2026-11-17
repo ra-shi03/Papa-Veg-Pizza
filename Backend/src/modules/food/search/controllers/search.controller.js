@@ -110,32 +110,21 @@ export const getNearbyStoresController = async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'Latitude and longitude are required', error: 'Latitude and longitude are required' });
         }
 
-        const { FoodStore } = await import('../../store/models/store.model.js');
-        const { haversineKm } = await import('../../orders/services/order.helpers.js');
-        const { loadNearbyRadiusKm, loadMethods, methodAllowedAt } = await import('../../settings/services/orderMethods.service.js');
-        const radiusKm = await loadNearbyRadiusKm();
-
-        const stores = await FoodStore.find({ isActive: true, approvalStatus: { $in: ['Approved', 'approved'] } })
-            .select('storeName name address city state pincode phone latitude longitude franchiseId profileImage logo image')
-            .lean();
+        const { nearbyStoresWithin, loadMethods, methodAllowedAt } = await import('../../settings/services/orderMethods.service.js');
+        const { stores, radiusKm } = await nearbyStoresWithin(userLat, userLng, 'storeName name address city state pincode phone franchiseId profileImage logo image');
 
         const rule = method ? (await loadMethods()).find((m) => m.id === String(method)) || null : null;
         const re = q && String(q).trim() ? new RegExp(String(q).trim().slice(0, 80).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null;
 
         const out = [];
         for (const s of stores) {
-            const sLat = Number(s.latitude);
-            const sLng = Number(s.longitude);
-            if (s.latitude == null || s.longitude == null || !Number.isFinite(sLat) || !Number.isFinite(sLng)) continue; // no position, cannot be "near"
-            const distanceKm = Math.round(haversineKm(userLat, userLng, sLat, sLng) * 10) / 10;
-            if (distanceKm > radiusKm) continue;
             if (rule && !methodAllowedAt(rule, s)) continue;
             if (re && ![s.storeName, s.address, s.city, s.state, s.pincode].some((v) => re.test(String(v || '')))) continue;
             out.push({
                 _id: s._id, id: s._id,
                 storeName: s.storeName || s.name || '',
                 address: s.address || '', city: s.city || '', state: s.state || '', pincode: s.pincode || '',
-                phone: s.phone || '', latitude: sLat, longitude: sLng, distanceKm,
+                phone: s.phone || '', latitude: Number(s.latitude), longitude: Number(s.longitude), distanceKm: s.distanceKm,
                 image: s.profileImage || s.logo || s.image || '',
             });
         }

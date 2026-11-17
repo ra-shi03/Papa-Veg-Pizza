@@ -406,7 +406,12 @@ export default function Cart() {
     if (activeService === "takeaway") {
       setOrderTypeInfo(localStorage.getItem("takeawayHut") || "Nearest outlet")
     } else if (activeService === "incar") {
-      setOrderTypeInfo(localStorage.getItem("carNumber") || "Vehicle dining")
+      setOrderTypeInfo([readPickupStore()?.name, localStorage.getItem("carNumber")].filter(Boolean).join(" · ") || "Vehicle dining")
+    } else if (activeService === "train") {
+      setOrderTypeInfo(localStorage.getItem("deliveryAddress") || "Your train seat")
+    } else if (activeService !== "delivery") {
+      // dine-in and any method the super admin created: the store the customer chose
+      setOrderTypeInfo(readPickupStore()?.name || "Nearest outlet")
     }
   }, [])
 
@@ -550,7 +555,7 @@ export default function Cart() {
   const billTaxes = Number((cgst + sgst).toFixed(2))
   const billTaxesAndCharges = Number((billTaxes + billPlatformFee + billPackagingFee + billHandlingFee).toFixed(2))
   const total = q ? Number(q.total) : (subtotal > 0 ? Number((subtotal - discount + handlingCharge + cgst + sgst).toFixed(2)) : 0)
-  const deliverySaved = freeDelivery && fees.deliveryFee > 0 ? fees.deliveryFee : 0
+  const deliverySaved = freeDelivery && fees.deliveryFee > 0 && !readPickupStore() ? fees.deliveryFee : 0 // collecting at a store has no delivery fee to save
   const savings = Number((discount + deliverySaved).toFixed(2))
   const beforeSavings = Number((total + savings).toFixed(2))
   const itemCount = cartItems.reduce((n, i) => n + i.quantity, 0)
@@ -787,7 +792,7 @@ export default function Cart() {
                 className="w-[38%] px-3.5 py-2.5 bg-transparent border-0 cursor-pointer text-left flex flex-col justify-center active:opacity-75 transition-opacity"
               >
                 <div className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#E53935]">
-                  <span>{scheduledAt ? "SCHEDULED" : isDelivery ? "DELIVERY" : serviceKind === "takeaway" ? "TAKEAWAY" : "IN-CAR"}</span>
+                  <span>{scheduledAt ? "SCHEDULED" : isDelivery ? "DELIVERY" : serviceKind === "takeaway" ? "TAKEAWAY" : serviceKind === "incar" ? "IN-CAR" : serviceKind === "dinein" ? "DINE-IN" : serviceKind === "train" ? "ON TRAIN" : String(serviceKind).replace(/[_-]+/g, " ").toUpperCase()}</span>
                   <ChevronDown size={13} className="text-[#E53935] shrink-0" />
                 </div>
                 <div className="text-[13px] font-extrabold truncate mt-0.5" style={{ color: ui.text }}>
@@ -917,7 +922,7 @@ export default function Cart() {
               <div className="space-y-2 text-sm" style={{ color: ui.muted }}>
                 <BillRow label={`Item total (${itemCount})`} value={`₹${subtotal}`} />
                 {discount > 0 && <BillRow label={`Coupon (${appliedCoupon.couponCode})`} value={`-₹${discount}`} positive />}
-                {isDelivery && fees.deliveryFee > 0 && (
+                {!readPickupStore() && fees.deliveryFee > 0 && (
                   <BillRow label="Delivery fee" value={freeDelivery ? <><span className="line-through mr-1.5" style={{ color: ui.muted }}>₹{fees.deliveryFee}</span><span className="text-emerald-600 font-semibold">FREE</span></> : `₹${billDeliveryFee}`} />
                 )}
                 {subtotal > 0 && billTaxesAndCharges > 0 && (

@@ -113,7 +113,7 @@ export default function CheckoutModal({
     const pickup = readPickupStore()
     if (pickup) {
       const text = `Collect at ${pickup.name || "the store"}`
-      setSelectedAddress({ kind: "service", id: "", label: "Pickup", street: text, area: "", city: "", state: "", zipCode: "", additionalDetails: "", point: null, display: text })
+      setSelectedAddress({ kind: "service", id: "", label: "Other", street: text, area: "", city: "", state: "", zipCode: "", additionalDetails: "", point: null, display: text })
       setHouseNumber(text)
       if (!skippedAddressStep.current) {
         skippedAddressStep.current = true
@@ -715,18 +715,20 @@ export default function CheckoutModal({
                     <MapPin className="w-5 h-5 text-zinc-450 dark:text-zinc-550 shrink-0 mt-0.5" />
                     <div className="flex-1 text-left min-w-0">
                       <p className="text-xs font-semibold leading-relaxed text-zinc-500 dark:text-zinc-400">
-                        Delivering to: <span className="text-zinc-800 dark:text-zinc-200 font-bold">{currentAddress}</span>
+                        {readPickupStore() ? "Collect from: " : "Delivering to: "}<span className="text-zinc-800 dark:text-zinc-200 font-bold">{readPickupStore() ? (readPickupStore().name || "the store") : currentAddress}</span>
                       </p>
-                      <p className="text-xs font-bold leading-normal mt-0.5">{houseNumber}</p>
+                      {!readPickupStore() && <p className="text-xs font-bold leading-normal mt-0.5">{houseNumber}</p>}
                       {landmark && <p className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 leading-normal">{landmark}</p>}
                       {instructions && <p className="text-[11px] italic text-zinc-500 dark:text-zinc-400 leading-normal mt-0.5">Note: {instructions}</p>}
                     </div>
+                    {!readPickupStore() && (
                     <button 
                       onClick={() => setModalView("address")}
                       className="text-xs font-black text-primary hover:text-primary-hover bg-transparent border-0 outline-none cursor-pointer"
                     >
                       Edit
                     </button>
+                    )}
                   </div>
 
                   {/* Row 4: Payment (UPI / Credit Card) */}

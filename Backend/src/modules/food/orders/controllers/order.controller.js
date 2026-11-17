@@ -450,6 +450,7 @@ export async function getOrderMethodsController(req, res, next) {
     try {
         const { publicMethodsFor } = await import('../../settings/services/orderMethods.service.js');
         let store = null;
+        let nearby = null;
         try {
             if (req.query.storeId && mongoose.Types.ObjectId.isValid(String(req.query.storeId))) {
                 const { FoodStore } = await import('../../store/models/store.model.js');
@@ -459,11 +460,16 @@ export async function getOrderMethodsController(req, res, next) {
                 const found = await resolveStoreForLocation(parseFloat(req.query.lat), parseFloat(req.query.lng), { anyHours: true });
                 store = found?.store || null;
             }
+            if (!req.query.storeId && req.query.lat !== undefined && req.query.lng !== undefined) {
+                const { nearbyStoresWithin } = await import('../../settings/services/orderMethods.service.js');
+                const lat = parseFloat(req.query.lat); const lng = parseFloat(req.query.lng);
+                if (Number.isFinite(lat) && Number.isFinite(lng)) nearby = (await nearbyStoresWithin(lat, lng)).stores;
+            }
         } catch {
             store = null; // no store serves this point: only the methods open to every store
         }
         res.set('Cache-Control', 'no-store');
-        return sendResponse(res, 200, 'Order methods retrieved successfully', { methods: await publicMethodsFor(store), storeId: store ? String(store._id) : null });
+        return sendResponse(res, 200, 'Order methods retrieved successfully', { methods: await publicMethodsFor(store, nearby), storeId: store ? String(store._id) : null });
     } catch (err) {
         next(err);
     }

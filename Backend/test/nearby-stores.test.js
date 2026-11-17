@@ -68,3 +68,19 @@ describe('nearby stores', () => {
         assert.deepEqual((await near('lat=22.7196&lng=75.8577&q=zzzz-nothing')).stores, []);
     });
 });
+
+describe('order methods follow the stores around the customer', () => {
+    const PUBLIC = '/v1/food/orders/methods';
+    const on = async (qs) => Object.fromEntries(ok(await fx.call('GET', `${PUBLIC}?${qs}`, null)).methods.map((m) => [m.id, m.enabled]));
+    test('a method collected at a store shows when any store in the radius offers it, even if the nearest store does not', async () => {
+        ok(await fx.call('PUT', ADMIN, fx.SA, { methods: [{ id: 'takeaway', enabled: true, scope: 'stores', storeIds: [B.storeId] }, { id: 'delivery', enabled: true, scope: 'all' }], nearbyStoreRadiusKm: 10 }));
+        const m = await on('lat=22.7196&lng=75.8577'); // the nearest store is A; B (another franchise, 3 km) offers takeaway
+        assert.equal(m.takeaway, true);
+        assert.equal(m.delivery, true);
+    });
+    test('and hides it when no such store is within the radius', async () => {
+        ok(await fx.call('PUT', ADMIN, fx.SA, { methods: [{ id: 'takeaway', enabled: true, scope: 'stores', storeIds: [B.storeId] }], nearbyStoreRadiusKm: 2 }));
+        assert.equal((await on('lat=22.7196&lng=75.8577')).takeaway, false);
+        ok(await fx.call('PUT', ADMIN, fx.SA, { methods: [{ id: 'takeaway', enabled: true, scope: 'all' }], nearbyStoreRadiusKm: 10 }));
+    });
+});

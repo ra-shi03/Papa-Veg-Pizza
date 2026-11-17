@@ -15,7 +15,7 @@ export default function DeliveryLocation() {
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = useLocationStore((state) => state);
-  const currentAddress = locationState.address || "Regal Circle, South Tukoganj";
+  const currentAddress = locationState.address || (() => { try { return localStorage.getItem("deliveryAddress") || ""; } catch (_) { return ""; } })() || "Location not set";
 
   const searchParams = new URLSearchParams(location.search);
   const serviceFromQuery = searchParams.get('tab') || searchParams.get('service') || searchParams.get('activeService');
@@ -29,6 +29,8 @@ export default function DeliveryLocation() {
   }, [location.state?.activeService, serviceFromQuery]);
   const [nearbyStores, setNearbyStores] = useState([]);
   const [storesError, setStoresError] = useState('');
+  const [carNumber, setCarNumber] = useState(() => { try { return localStorage.getItem('carNumber') || ''; } catch (_) { return ''; } });
+  const [carError, setCarError] = useState('');
   const [radiusKm, setRadiusKm] = useState(null);
   const [isLoadingStores, setIsLoadingStores] = useState(false);
   const [journey, setJourney] = useState(emptyJourney);
@@ -262,6 +264,19 @@ export default function DeliveryLocation() {
 
         {isStoreMethod && (
           <div className="flex flex-col gap-3">
+             {activeService === 'incar' && (
+               <div className="flex flex-col gap-1.5">
+                 <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Car number</label>
+                 <input
+                   type="text"
+                   value={carNumber}
+                   onChange={(e) => { setCarNumber(e.target.value); setCarError(''); }}
+                   placeholder="e.g. DL 3C AB 1234"
+                   className="w-full h-11 rounded-xl border border-zinc-200 px-4 text-sm font-semibold text-zinc-800 outline-none focus:border-[#E53935]"
+                 />
+                 {carError && <p className="text-[12px] font-semibold text-[#E53935] ml-1">{carError}</p>}
+               </div>
+             )}
              <h2 className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Nearby Stores</h2>
              {isLoadingStores ? (
                <div className="text-center p-8 text-zinc-500 text-sm animate-pulse font-medium bg-zinc-50 rounded-2xl border border-zinc-100">Finding nearest stores...</div>
@@ -278,8 +293,12 @@ export default function DeliveryLocation() {
                    </div>
                    <button 
                      onClick={() => {
+                        if (activeService === 'incar' && !carNumber.trim()) {
+                          setCarError('Enter your car number first so the store can find you.');
+                          return;
+                        }
                         useLocationStore.getState().confirmLocation({
-                           address: store.storeName,
+                           address: activeService === 'incar' ? carNumber.trim() : store.storeName,
                            serviceType: activeService,
                            storeId: String(store._id),
                            storeName: store.storeName

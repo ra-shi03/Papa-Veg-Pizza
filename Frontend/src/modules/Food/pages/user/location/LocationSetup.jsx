@@ -793,7 +793,7 @@ export default function LocationSetup() {
               </button>
             </div>
             <p className="text-[13px] text-zinc-500 mt-1 pl-[30px] leading-tight line-clamp-1 m-0">
-              {detailedAddress || "Regal Circle, South Tukoganj"}
+              {detailedAddress || "Choose your location"}
             </p>
           </div>
 
