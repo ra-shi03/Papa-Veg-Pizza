@@ -461,6 +461,8 @@ export default function HomePageConfig() {
   const [orderMethods, setOrderMethods] = useState([]);
   const [nearbyRadius, setNearbyRadius] = useState('10');
   const [newMethodName, setNewMethodName] = useState('');
+  const [methodToDelete, setMethodToDelete] = useState(null);
+  const [isDeletingMethod, setIsDeletingMethod] = useState(false);
   const [methodsState, setMethodsState] = useState('loading'); // loading | ready | error
   const [isSavingMethods, setIsSavingMethods] = useState(false);
   const [methodsDirty, setMethodsDirty] = useState(false);
@@ -946,15 +948,24 @@ export default function HomePageConfig() {
     setMethodsDirty(true);
   };
 
-  const removeMethod = async (m) => {
+  const removeMethod = (m) => {
     if (m.isNew) { setOrderMethods((list) => list.filter((x) => x !== m)); return; } // never saved: nothing on the server
-    if (!window.confirm(`Delete the "${m.label}" order method? Customers will no longer see it${m.custom ? '' : ' until you create it again'}.`)) return;
+    setMethodToDelete(m);
+  };
+
+  const confirmDeleteMethod = async () => {
+    const m = methodToDelete;
+    if (!m) return;
+    setIsDeletingMethod(true);
     try {
       await adminClient.delete(`/settings/order-methods/${m.id}`);
       setOrderMethods((list) => list.filter((x) => x.id !== m.id)); // other unsaved edits stay
       toast.success('Order method deleted');
+      setMethodToDelete(null);
     } catch (err) {
       toast.error(err?.response?.data?.message || err?.response?.data?.error || 'Could not delete the order method');
+    } finally {
+      setIsDeletingMethod(false);
     }
   };
 
@@ -1757,6 +1768,20 @@ export default function HomePageConfig() {
             );
           })}
         </div>
+        {methodToDelete && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4" onClick={() => !isDeletingMethod && setMethodToDelete(null)}>
+            <div className="w-full max-w-sm rounded-xl bg-white dark:bg-zinc-900 p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Delete "{methodToDelete.label}"?</h3>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                Customers will no longer see this order method{methodToDelete.custom ? '.' : ' until you create it again.'}
+              </p>
+              <div className="mt-4 flex justify-end gap-2">
+                <button type="button" disabled={isDeletingMethod} onClick={() => setMethodToDelete(null)} className="px-4 py-2 rounded-md border text-sm font-semibold cursor-pointer bg-transparent dark:border-zinc-700">Cancel</button>
+                <button type="button" disabled={isDeletingMethod} onClick={confirmDeleteMethod} className="px-4 py-2 rounded-md bg-red-600 text-white text-sm font-semibold cursor-pointer border-0 disabled:opacity-50">{isDeletingMethod ? 'Deleting...' : 'Delete'}</button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <input
             value={newMethodName}
