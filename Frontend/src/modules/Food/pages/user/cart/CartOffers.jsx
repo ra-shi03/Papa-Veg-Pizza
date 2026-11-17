@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { motion, useReducedMotion } from "framer-motion"
 import { Tag, Sparkles, ChevronRight, Lock, Check, Info } from "lucide-react"
+import { userAPI } from "@food/api"
 import { offerDiscount, offerLocked, offerLockText } from "./cartHelpers"
 
 /** Offers sorted for the cart: usable ones first (biggest saving first), then closest to unlock. */
@@ -331,21 +332,23 @@ export default function CartOffers({
  *   and red outline "Add Items" button on right.
  */
 export function CheesyRewardsCard({ subtotal = 0, ui, onAddItems, isDarkMode }) {
-  // Papa Veg Pizza standard threshold to earn 100 Cheesy Reward points is ₹350
-  const rewardThreshold = 350
-  const pointsEarned = 100
+  // The points, the minimum order and the points per order are the super admin's rewards settings, read from the server
+  const [summary, setSummary] = useState(null)
+  useEffect(() => {
+    let on = true
+    userAPI.getRewards().then((res) => { if (on) setSummary(res?.data?.data?.rewards || null) }).catch(() => {})
+    return () => { on = false }
+  }, [])
+
+  // Nothing to show until the server answers, and nothing when the programme is switched off
+  if (!summary || summary.isProgramEnabled === false) return null
+
+  const rewardThreshold = Number(summary.minOrderAmount) || 0
+  const pointsEarned = Number(summary.pointsPerOrder) || 0
+  const points = Number(summary.points) || 0
+  const enrolled = Boolean(summary.isEnrolled)
   const shortfall = Math.max(0, Math.ceil(rewardThreshold - subtotal))
   const isUnlocked = shortfall === 0
-
-  // Points balance (reads from user session or defaults to 0)
-  const [points] = useState(() => {
-    try {
-      const stored = localStorage.getItem("user_rewards_points") || localStorage.getItem("pvp_cheesy_points")
-      return stored ? Number(stored) : 0
-    } catch (_) {
-      return 0
-    }
-  })
 
   return (
     <div
@@ -387,7 +390,9 @@ export function CheesyRewardsCard({ subtotal = 0, ui, onAddItems, isDarkMode }) 
         style={{ borderTop: `1px dashed ${ui.line}` }}
       >
         <p className="text-xs leading-relaxed flex-1 min-w-0" style={{ color: ui.text }}>
-          {isUnlocked ? (
+          {!enrolled ? (
+            <span>Join Cheesy Rewards to earn points on your orders.</span>
+          ) : isUnlocked ? (
             <span className="text-[#16a34a] font-bold">
               🎉 You will earn {pointsEarned} Cheesy Reward points on this order!
             </span>
@@ -399,7 +404,7 @@ export function CheesyRewardsCard({ subtotal = 0, ui, onAddItems, isDarkMode }) 
           )}
         </p>
 
-        {!isUnlocked && (
+        {enrolled && !isUnlocked && (
           <button
             type="button"
             onClick={onAddItems}
