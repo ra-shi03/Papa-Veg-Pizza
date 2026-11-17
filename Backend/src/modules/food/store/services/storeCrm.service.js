@@ -1,3 +1,4 @@
+import { getRewardsSummary } from '../../user/services/rewards.service.js';
 import mongoose from 'mongoose';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { FoodSupportTicket } from '../../user/models/supportTicket.model.js';
@@ -274,6 +275,13 @@ export async function listCustomers(user, q = {}) {
 }
 
 export async function customerProfile(user, customerId, q = {}) {
+  const result = await customerProfileBase(user, customerId, q);
+  // the points the customer really has in the rewards programme
+  result.customerProfile.loyaltyPoints = (await getRewardsSummary(customerId).catch(() => ({ points: 0 }))).points || 0;
+  return result;
+}
+
+async function customerProfileBase(user, customerId, q = {}) {
   const ctx = await customerContext(user, q);
   if (!isId(customerId)) throw new NotFoundError('Customer not found');
   const orders = await FoodOrder.find(ordersIn(ctx, { userId: toId(customerId) })).sort({ createdAt: -1 }).limit(50).lean();

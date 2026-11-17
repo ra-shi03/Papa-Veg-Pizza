@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Lock, ArrowUpDown, Check, ChevronDown, HelpCircle, FileText, X, Sparkles, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Lock, ArrowUpDown, Check, ChevronDown, HelpCircle, FileText, X, Sparkles, AlertCircle, Gift } from 'lucide-react';
 import { toast } from 'sonner';
 import apiClient from '@/services/api/axios';
 import { userAPI } from '@food/api';
@@ -142,6 +142,46 @@ export default function PreviousRewardsView({ onBack, initialTab = 'rewards', re
     return localStorage.getItem('pvp_rewards_enrolled') === 'true';
   });
   const [userPoints, setUserPoints] = useState(0);
+  const [redemptions, setRedemptions] = useState([]); // the customer's reward codes
+  const [claim, setClaim] = useState(null); // the code just made, shown in a popup
+  const [redeemingId, setRedeemingId] = useState('');
+
+  // A reward item is identified the way the server identifies it (the super admin's reward list)
+  const rewardKey = (prod) => String(prod.productId || `${prod.name}|${prod.size || ''}|${prod.crust || ''}`);
+  const rewardPoints = (prod) => Number(prod.requiredPoints) || Number(rewardsConfig?.defaultPointsRequired) || 600;
+
+  const loadRedemptions = async () => {
+    try {
+      const res = await userAPI.getMyRedemptions();
+      setRedemptions(Array.isArray(res?.data?.data?.redemptions) ? res.data.data.redemptions : []);
+    } catch (_) {
+      setRedemptions([]);
+    }
+  };
+
+  const redeemItem = async (prod) => {
+    if (redeemingId) return;
+    setRedeemingId(rewardKey(prod));
+    try {
+      const res = await userAPI.redeemReward(rewardKey(prod));
+      setClaim(res?.data?.data?.redemption || null);
+      await Promise.all([fetchRewardsData(), loadRedemptions()]);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.response?.data?.error || 'Could not redeem this reward. Please try again.');
+    } finally {
+      setRedeemingId('');
+    }
+  };
+
+  const cancelCode = async (id) => {
+    try {
+      await userAPI.cancelRedemption(id);
+      toast.success('Code cancelled. Your points are back.');
+      await Promise.all([fetchRewardsData(), loadRedemptions()]);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.response?.data?.error || 'Could not cancel this code.');
+    }
+  };
 
   const handleNavigateMenu = () => {
     if (onBack) onBack();
@@ -163,7 +203,7 @@ export default function PreviousRewardsView({ onBack, initialTab = 'rewards', re
 
   // Fetch dynamic rewards configuration from backend API
   useEffect(() => {
-    fetchRewardsData();
+    fetchRewardsData().then(loadRedemptions);
   }, []);
 
   // Handle outside click for sort dropdown
@@ -190,11 +230,8 @@ export default function PreviousRewardsView({ onBack, initialTab = 'rewards', re
       if (res?.data?.data) {
         const cfg = res.data.data;
         setRewardsConfig(cfg);
-        if (Array.isArray(cfg.rewardProducts) && cfg.rewardProducts.length > 0) {
-          setProducts(cfg.rewardProducts.slice(0, 10));
-        } else {
-          setProducts(FALLBACK_REWARD_PRODUCTS);
-        }
+        // only the items the super admin set up can be redeemed, so that is all the page lists
+        setProducts(Array.isArray(cfg.rewardProducts) ? cfg.rewardProducts.slice(0, 10) : []);
       } else {
         setProducts(FALLBACK_REWARD_PRODUCTS);
       }
@@ -650,6 +687,39 @@ export default function PreviousRewardsView({ onBack, initialTab = 'rewards', re
                 </div>
               )}
 
+              {isEnrolled && redemptions.some((x) => x.status === 'PENDING') && (
+                <div className="mb-4 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4">
+                  <h3 className="text-[15px] font-bold text-zinc-900 dark:text-white m-0 mb-1">Your reward codes</h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 m-0 mb-3">Show a code at any Papa Veg Pizza store to get your free item. Codes work for 24 hours.</p>
+                  {redemptions.filter((x) => x.status === 'PENDING').map((x) => (
+                    <div key={x.id} className="flex items-center justify-between py-2.5 border-t border-zinc-100 dark:border-zinc-800">
+                      <div className="min-w-0">
+                        <p className="m-0 text-sm font-semibold text-zinc-900 dark:text-white truncate">{x.product?.name}</p>
+                        <p className="m-0 text-[11px] text-zinc-500">Valid until {new Date(x.expiresAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-lg font-bold tracking-widest text-zinc-900 dark:text-white">{x.code}</span>
+                        <button type="button" onClick={() => cancelCode(x.id)} className="text-[11px] text-[var(--accent-red,#EE3A43)] bg-transparent border-0 cursor-pointer underline">Cancel</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {claim && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-5">
+                  <div className="fixed inset-0 bg-black/60" onClick={() => setClaim(null)} />
+                  <div className="relative z-10 w-full max-w-sm bg-white dark:bg-zinc-900 rounded-2xl p-6 text-center shadow-2xl">
+                    <Gift className="w-9 h-9 mx-auto text-[var(--accent-red,#EE3A43)]" />
+                    <h3 className="text-lg font-bold mt-2 mb-0 text-zinc-900 dark:text-white">Show this code at the store</h3>
+                    <p className="text-sm text-zinc-500 mt-1 mb-3">{claim.product?.name}{claim.product?.size ? ` (${claim.product.size})` : ''} is free with {claim.points} points.</p>
+                    <p className="text-4xl font-bold tracking-[0.3em] text-zinc-900 dark:text-white m-0">{claim.code}</p>
+                    <p className="text-xs text-zinc-500 mt-3 mb-4">Valid for 24 hours. If you do not use it, your points come back.</p>
+                    <button type="button" onClick={() => setClaim(null)} className="w-full py-3 text-white font-bold text-sm rounded-xl border-0 cursor-pointer" style={{ backgroundColor: 'var(--accent-red, #EE3A43)' }}>Done</button>
+                  </div>
+                </div>
+              )}
+
               {/* ── Products List (Fetched from API) ── */}
               <div className="divide-y divide-zinc-100 dark:divide-zinc-800/80">
                 {filteredProducts.map(prod => (
@@ -706,6 +776,17 @@ export default function PreviousRewardsView({ onBack, initialTab = 'rewards', re
                           )}
                         </div>
 
+                        {isEnrolled && userPoints >= rewardPoints(prod) ? (
+                          <button
+                            type="button"
+                            disabled={!!redeemingId}
+                            onClick={() => redeemItem(prod)}
+                            className="px-3.5 py-1 text-white text-xs font-bold rounded-lg border-0 cursor-pointer disabled:opacity-60"
+                            style={{ backgroundColor: 'var(--accent-red, #EE3A43)' }}
+                          >
+                            {redeemingId === rewardKey(prod) ? 'Please wait...' : 'Redeem'}
+                          </button>
+                        ) : (
                         <button
                           type="button"
                           disabled
@@ -714,6 +795,7 @@ export default function PreviousRewardsView({ onBack, initialTab = 'rewards', re
                           <Lock className="w-3 h-3" />
                           Locked
                         </button>
+                        )}
                       </div>
                     </div>
                   </div>

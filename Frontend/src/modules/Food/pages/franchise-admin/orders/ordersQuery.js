@@ -35,7 +35,41 @@ const READ_ONLY = "Orders are updated by the store. A franchise admin can view t
 
 // Orders come from the backend (read-only for the franchise admin); refunds / issues below are still local.
 let dbOrders = [];
-let dbRefundRequests = [...mockRefundRequests];
+// Wallet refunds the store managers of this franchise asked for (GET /food/franchise/refunds). Approving credits the
+// customer's wallet at once; there is no later "process" step.
+let dbRefundRequests = [];
+const REFUND_UI_STATUS = { pending: "Pending", processing: "Pending", processed: "Processed", rejected: "Rejected", failed: "Failed" };
+const mapRefundRequest = (r) => ({
+  requestId: r.id,
+  orderNumber: r.orderNumber,
+  customer: { name: r.customerName || "Customer", phone: "" },
+  store: { storeId: r.storeId || "", storeName: r.storeName || "", name: r.storeName || "" },
+  refundAmount: Number(r.amount) || 0,
+  refundStatus: REFUND_UI_STATUS[r.status] || r.status,
+  requestedAt: r.createdAt,
+  processedAt: r.processedAt || null,
+  reason: r.reason || "",
+  description: r.reason || "",
+  attachments: [],
+  approvedBy: r.status === "processed" ? "Franchise Admin" : "",
+  paymentTransactionId: "",
+  paymentInfo: { processedAmount: r.status === "processed" ? Number(r.amount) || 0 : 0, processingDate: r.processedAt || null },
+  timeline: [
+    { status: "Requested", updatedBy: "Store Manager", timestamp: r.createdAt, remarks: r.reason || "" },
+    ...(r.status === "processed" ? [{ status: "Approved", updatedBy: "Franchise Admin", timestamp: r.processedAt, remarks: "Credited to the customer's wallet." }] : []),
+    ...(r.status === "rejected" ? [{ status: "Rejected", updatedBy: "Franchise Admin", timestamp: r.processedAt, remarks: r.rejectionReason || "" }] : []),
+  ],
+});
+export const syncRefundRequests = async () => {
+  try {
+    const res = await adminClient.get("/food/franchise/refunds", { params: { status: "All" }, _isFallback: true });
+    const list = res?.data?.data?.refunds;
+    dbRefundRequests = Array.isArray(list) ? list.map(mapRefundRequest) : [];
+    notifyListeners();
+  } catch (err) {
+    toast.error(err?.response?.data?.message || "Could not load the refund requests");
+  }
+};
 let dbRefundTransactions = [...mockRefundTransactions];
 let dbOrderIssues = [...mockOrderIssues];
 let dbIssueStaff = [...mockIssueStaff];
@@ -1047,6 +1081,10 @@ export function useRefundRequests(filters = {}) {
   ]);
 
   useEffect(() => {
+    syncRefundRequests();
+  }, []);
+
+  useEffect(() => {
     fetchRefundRequests();
     return subscribe(fetchRefundRequests);
   }, [fetchRefundRequests]);
@@ -1120,7 +1158,7 @@ export function useRefundAnalytics() {
       const processedRequests = dbRefundRequests.filter(
         (r) => r.refundStatus === "Processed" && r.processedAt && r.requestedAt
       );
-      let avgResolutionDays = 3.2; // default fallback if no processed items yet
+      let avgResolutionDays = 0; // no processed refunds yet
       if (processedRequests.length > 0) {
         const totalMs = processedRequests.reduce((sum, r) => {
           const start = new Date(r.requestedAt);
@@ -1241,56 +1279,24 @@ export function useRefundChartData() {
 export function useApproveRefund() {
   const [isLoading, setIsLoading] = useState(false);
 
-  const mutateAsync = async ({ requestId, approvedAmount, remarks, notifyCustomer }) => {
+  // Approving credits the customer's wallet with the amount the store manager asked for
+  const mutateAsync = async ({ requestId }) => {
     setIsLoading(true);
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const index = dbRefundRequests.findIndex((r) => r.requestId === requestId);
-        if (index === -1) {
-          setIsLoading(false);
-          reject(new Error("Refund request not found"));
-          return;
-        }
-
-        const oldRequest = dbRefundRequests[index];
-        const newTimeline = [
-          ...oldRequest.timeline,
-          {
-            status: "Approved",
-            updatedBy: "Franchise Admin",
-            timestamp: new Date().toISOString(),
-            remarks: remarks || `Approved refund of ₹${approvedAmount}.`,
-          },
-        ];
-
-        dbRefundRequests[index] = {
-          ...oldRequest,
-          refundStatus: "Approved",
-          approvedBy: "Franchise Admin",
-          refundAmount: Number(approvedAmount), // update with approved amount if changed
-          timeline: newTimeline,
-          paymentInfo: {
-            ...oldRequest.paymentInfo,
-            processedAmount: Number(approvedAmount),
-          },
-        };
-
-        setIsLoading(false);
-        notifyListeners();
-        toast.success("Refund approved successfully.");
-        resolve({ success: true, request: dbRefundRequests[index] });
-      }, 500);
-    });
+    try {
+      await adminClient.post(`/food/franchise/refunds/${requestId}/approve`, {});
+      await syncRefundRequests();
+      toast.success("Refund approved. The customer's wallet has been credited.");
+      return { success: true };
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.response?.data?.error || "Could not approve the refund");
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const mutate = (variables, options = {}) => {
-    mutateAsync(variables)
-      .then((data) => {
-        if (options.onSuccess) options.onSuccess(data);
-      })
-      .catch((err) => {
-        if (options.onError) options.onError(err);
-      });
+    mutateAsync(variables).then((data) => options.onSuccess?.(data)).catch((err) => options.onError?.(err));
   };
 
   return { mutate, mutateAsync, isLoading };
@@ -1300,57 +1306,29 @@ export function useApproveRefund() {
 export function useRejectRefund() {
   const [isLoading, setIsLoading] = useState(false);
 
-  const mutateAsync = async ({ requestId, rejectionReason, remarks, notifyCustomer }) => {
+  const mutateAsync = async ({ requestId, rejectionReason, remarks }) => {
     setIsLoading(true);
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const index = dbRefundRequests.findIndex((r) => r.requestId === requestId);
-        if (index === -1) {
-          setIsLoading(false);
-          reject(new Error("Refund request not found"));
-          return;
-        }
-
-        const oldRequest = dbRefundRequests[index];
-        const newTimeline = [
-          ...oldRequest.timeline,
-          {
-            status: "Rejected",
-            updatedBy: "Franchise Admin",
-            timestamp: new Date().toISOString(),
-            remarks: remarks || `Rejected. Reason: ${rejectionReason}`,
-          },
-        ];
-
-        dbRefundRequests[index] = {
-          ...oldRequest,
-          refundStatus: "Rejected",
-          timeline: newTimeline,
-          remarks: `Rejected: ${rejectionReason}. Remarks: ${remarks || ""}`,
-        };
-
-        setIsLoading(false);
-        notifyListeners();
-        toast.error("Refund request rejected.");
-        resolve({ success: true, request: dbRefundRequests[index] });
-      }, 500);
-    });
+    try {
+      await adminClient.post(`/food/franchise/refunds/${requestId}/reject`, { reason: [rejectionReason, remarks].filter(Boolean).join(" - ") });
+      await syncRefundRequests();
+      toast.success("Refund request rejected.");
+      return { success: true };
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.response?.data?.error || "Could not reject the refund");
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const mutate = (variables, options = {}) => {
-    mutateAsync(variables)
-      .then((data) => {
-        if (options.onSuccess) options.onSuccess(data);
-      })
-      .catch((err) => {
-        if (options.onError) options.onError(err);
-      });
+    mutateAsync(variables).then((data) => options.onSuccess?.(data)).catch((err) => options.onError?.(err));
   };
 
   return { mutate, mutateAsync, isLoading };
 }
 
-// Mutation: Process Refund Request
+// Mutation: Process Refund (Approved -> Processed)
 export function useProcessRefund() {
   const [isLoading, setIsLoading] = useState(false);
 

@@ -15,7 +15,7 @@ export default function ProcessRefundModal({
   // Custom states if form object isn't needed or for cleaner controlled inputs
   const [refundAmount, setRefundAmount] = useState(0);
   const [refundType, setRefundType] = useState("full");
-  const [refundMethod, setRefundMethod] = useState("original_source");
+  const [refundMethod, setRefundMethod] = useState("wallet");
   const [refundReason, setRefundReason] = useState("Customer Request");
   const [notes, setNotes] = useState("");
 
@@ -23,7 +23,7 @@ export default function ProcessRefundModal({
     if (order) {
       setRefundAmount(order.grandTotal);
       setRefundType("full");
-      setRefundMethod("original_source");
+      setRefundMethod("wallet");
       setRefundReason("Customer Request");
       setNotes("");
     }
@@ -113,15 +113,12 @@ export default function ProcessRefundModal({
           />
         </div>
 
-        {/* Refund Method */}
+        {/* Refund Method: a store refund is always a credit to the customer's wallet, after the franchise admin approves it */}
         <div className="space-y-1.5">
           <label className="text-xs font-black text-slate-700 dark:text-zinc-300 block">Refund Method</label>
-          <Radio.Group value={refundMethod} onChange={(e) => setRefundMethod(e.target.value)} className="font-semibold text-xs flex flex-wrap gap-2">
-            <Radio value="original_source">Original Source</Radio>
-            <Radio value="wallet">Wallet</Radio>
-            <Radio value="manual">Manual Transfer</Radio>
-            <Radio value="cash">Cash</Radio>
-          </Radio.Group>
+          <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 m-0">
+            Credited to the customer's wallet once your franchise admin approves it. Nothing is paid until then.
+          </p>
         </div>
 
         {/* Refund Reason */}

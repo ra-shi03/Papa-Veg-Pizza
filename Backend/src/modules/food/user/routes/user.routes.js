@@ -27,6 +27,9 @@ import {
     getMyRewardsController,
     listMyRewardTransactionsController,
     enrollRewardsController,
+    redeemRewardController,
+    listMyRedemptionsController,
+    cancelMyRedemptionController,
     quitRewardsController,
     requestRefundController,
     listMyRefundsController,
@@ -73,6 +76,9 @@ router.post('/wallet/payments/:id/release', releaseWalletPaymentController);
 router.get('/rewards/me', getMyRewardsController);
 router.get('/rewards/transactions', listMyRewardTransactionsController);
 router.post('/rewards/enroll', enrollRewardsController);
+router.post('/rewards/redeem', redeemRewardController);
+router.get('/rewards/redemptions', listMyRedemptionsController);
+router.post('/rewards/redemptions/:id/cancel', cancelMyRedemptionController);
 router.post('/rewards/quit', quitRewardsController);
 
 // Refund requests (approval + crediting happen only in the admin workflow)

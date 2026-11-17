@@ -10,7 +10,7 @@ import { toast } from "sonner";
 // Queries and Mutations
 import { 
   useRefundRequests, useStores, useRefundAnalytics, 
-  simulateNewRefundRequest, useApproveRefund, useRejectRefund, useProcessRefund 
+  useApproveRefund, useRejectRefund, useProcessRefund 
 } from "./ordersQuery";
 
 // Overlays
@@ -294,26 +294,6 @@ export default function RefundRequests() {
         </div>
 
       </section>
-
-      {/* WebSocket Simulator Banner */}
-      <div className="p-3 bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-450 animate-ping shrink-0" />
-          <div>
-            <p className="font-extrabold text-[10.5px]">Real-time WebSocket Simulator Node</p>
-            <p className="text-[9.5px] text-zinc-400">Add random incoming customer refund requests instantly to test reactive updates.</p>
-          </div>
-        </div>
-        <button
-          onClick={() => {
-            simulateNewRefundRequest();
-          }}
-          className="px-3.5 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-bold rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 shrink-0 self-start sm:self-center"
-        >
-          <Zap size={13} className="text-yellow-350 fill-current" />
-          <span>Simulate Refund Request</span>
-        </button>
-      </div>
 
       {/* Sticky Filters & Search Section */}
       <section className="bg-white dark:bg-zinc-950 p-4 border border-zinc-150 dark:border-zinc-850 rounded-2xl shadow-xs space-y-4">

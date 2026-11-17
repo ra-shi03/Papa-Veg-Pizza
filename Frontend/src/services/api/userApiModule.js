@@ -185,6 +185,15 @@ export const userAPI = {
   /** GET /food/user/rewards/me (Bearer USER) — enrolment + points balance/progress (not cached) */
   getRewards: () =>
     userClient.get("/food/user/rewards/me"),
+  /** POST /food/user/rewards/redeem (Bearer USER). Body: { productId } - takes the points and returns a 6-digit code to show at a store */
+  redeemReward: (productId) =>
+    userClient.post("/food/user/rewards/redeem", { productId }),
+  /** GET /food/user/rewards/redemptions (Bearer USER) - the customer's reward codes */
+  getMyRedemptions: () =>
+    userClient.get("/food/user/rewards/redemptions"),
+  /** POST /food/user/rewards/redemptions/:id/cancel (Bearer USER) - an unused code; the points come back */
+  cancelRedemption: (id) =>
+    userClient.post(`/food/user/rewards/redemptions/${id}/cancel`, {}),
   /** GET /food/user/rewards/transactions (Bearer USER). Params: { page, limit } */
   getRewardTransactions: (params) =>
     userClient.get("/food/user/rewards/transactions", { params }),

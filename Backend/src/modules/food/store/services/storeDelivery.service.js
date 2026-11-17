@@ -6,6 +6,7 @@ import { FoodZone } from '../../admin/models/zone.model.js';
 import * as foodTransactionService from '../../orders/services/foodTransaction.service.js';
 import { FoodTransaction } from '../../orders/models/foodTransaction.model.js';
 import { awardOrderPointsSafely } from '../../user/services/rewards.service.js';
+import { getOrderWalletRefundedPaise } from '../../user/services/walletLedger.service.js';
 import { Refund } from '../../../../core/payments/models/refund.model.js';
 import { buildOrderIdentityFilter, buildDeliveryOfferPayload, pushStatusHistory, enqueueOrderEvent, notifyOwnerSafely } from '../../orders/services/order.helpers.js';
 import { getIO, rooms } from '../../../../config/socket.js';
@@ -496,6 +497,13 @@ async function recordRefundRequest(ctx, order, { amount, reason }) {
   const value = amount ?? total;
   if (!(value > 0)) throw new ValidationError('There is nothing to refund on this order.');
   if (value > total) throw new ValidationError(`Refund cannot exceed the order total of ₹${total}.`);
+  // what is already paid back to the wallet, or waiting for approval, counts against the total
+  const [walletPaise, waiting] = await Promise.all([
+    getOrderWalletRefundedPaise(order._id),
+    Refund.aggregate([{ $match: { orderId: order._id, refundTo: 'wallet', status: { $in: ['pending', 'processing'] } } }, { $group: { _id: null, sum: { $sum: '$amount' } } }]),
+  ]);
+  const left = Math.round((total - walletPaise / 100 - (waiting[0]?.sum || 0)) * 100) / 100;
+  if (value > left) throw new ValidationError(left > 0 ? `Only ₹${left} of this order can still be refunded.` : 'This order has already been refunded or has a refund waiting for approval.');
   if (await Refund.exists({ orderId: order._id, status: { $in: ['pending', 'processing'] } })) {
     throw new ValidationError('A refund request for this order is already in progress.');
   }

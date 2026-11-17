@@ -29,6 +29,8 @@ import franchiseStoreManagerRoutes from '../modules/food/franchise/routes/storeM
 import franchiseStoreApprovalRoutes from '../modules/food/franchise/routes/storeApproval.routes.js';
 import franchiseStaffApprovalRoutes from '../modules/food/franchise/routes/staffApproval.routes.js';
 import kitchenStaffRoutes from '../modules/food/store/routes/kitchenStaff.routes.js';
+import storeRewardsRoutes from '../modules/food/store/routes/storeRewards.routes.js';
+import franchiseRefundsRoutes from '../modules/food/franchise/routes/franchiseRefunds.routes.js';
 import storeOrderRoutes from '../modules/food/store/routes/storeOrders.routes.js';
 import kitchenTaskRoutes from '../modules/food/store/routes/kitchenTasks.routes.js';
 import kitchenOpsRoutes from '../modules/food/store/routes/kitchenOps.routes.js';
@@ -81,6 +83,8 @@ router.use('/v1/food/store/orders', storeOrderRoutes);
 router.use('/v1/food/store/kitchen', kitchenOpsRoutes);
 router.use('/v1/food/store/inventory', inventoryRoutes);
 router.use('/v1/food/store/customers', storeCustomersRoutes);
+router.use('/v1/food/store/rewards', storeRewardsRoutes);
+router.use('/v1/food/franchise/refunds', franchiseRefundsRoutes);
 router.use('/v1/food/store/complaints', storeComplaintsRoutes);
 router.use('/v1/food/store/reviews', storeReviewsRoutes);
 router.use('/v1/complaints', dashboardComplaintsRouter);

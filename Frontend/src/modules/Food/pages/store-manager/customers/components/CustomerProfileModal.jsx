@@ -1,14 +1,76 @@
 import React, { useState } from "react";
 import { X, Calendar, Award, Phone, Mail, ShoppingBag, CreditCard, RefreshCcw, HeartHandshake, AlertCircle } from "lucide-react";
 import { useCustomerProfile } from "../hooks/useCustomerOrders";
+import { useCustomerWalletRewards } from "../hooks/useRewardCodes";
 import RecentOrdersTable from "./RecentOrdersTable";
 import ComplaintsHistoryTable from "./ComplaintsHistoryTable";
 import ReviewsHistoryTable from "./ReviewsHistoryTable";
 import { Skeleton } from "@food/components/ui/skeleton";
 
+const fmtDate = (d) => (d ? new Date(d).toLocaleDateString("en-IN", { dateStyle: "medium" }) : "-");
+const rupees = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
+
+/** The customer's wallet balance and history, reward points and reward codes, and wallet refunds asked for at this store. */
+function WalletRewardsPanel({ query }) {
+  if (query.isLoading) return <p className="text-xs text-zinc-400 py-6 text-center">Loading...</p>;
+  if (query.isError || !query.data) return <p className="text-xs text-red-500 py-6 text-center">Could not load the wallet and rewards.</p>;
+  const { wallet, walletTransactions = [], rewards = {}, rewardTransactions = [], redemptions = [], walletRefunds = [] } = query.data;
+  const Box = ({ label, value, sub }) => (
+    <div className="rounded-xl border border-zinc-150 dark:border-zinc-800 p-3">
+      <p className="text-[10px] font-bold uppercase text-zinc-400">{label}</p>
+      <p className="text-lg font-black text-zinc-900 dark:text-white">{value}</p>
+      {sub && <p className="text-[10px] text-zinc-500">{sub}</p>}
+    </div>
+  );
+  const Row = ({ left, sub, right, cls = "" }) => (
+    <div className="flex items-start justify-between py-2 border-b border-zinc-100 dark:border-zinc-800 text-xs">
+      <div><p className="font-bold m-0">{left}</p>{sub && <p className="text-[10px] text-zinc-400 m-0">{sub}</p>}</div>
+      <span className={`font-black ${cls}`}>{right}</span>
+    </div>
+  );
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-3 gap-3">
+        <Box label="Wallet balance" value={rupees(wallet?.balance)} />
+        <Box label="Reward points" value={rewards.points ?? 0} sub={rewards.rewardsUnlocked ? "Reward unlocked" : `${rewards.pointsToNextReward ?? 0} to next reward`} />
+        <Box label="Rewards unlocked" value={rewards.availableRedemptions ?? 0} />
+      </div>
+      <div>
+        <h4 className="text-xs font-black uppercase text-zinc-500 mb-1">Wallet history</h4>
+        {walletTransactions.length === 0 && <p className="text-xs text-zinc-400">No wallet activity.</p>}
+        {walletTransactions.map((t) => (
+          <Row key={t.id} left={t.description || t.reason} sub={`${fmtDate(t.createdAt)}${t.orderRef ? ` · #${t.orderRef}` : ""}`} right={`${t.type === "CREDIT" ? "+" : "-"} ${rupees(t.amount)}`} cls={t.type === "CREDIT" ? "text-green-600" : "text-red-600"} />
+        ))}
+      </div>
+      <div>
+        <h4 className="text-xs font-black uppercase text-zinc-500 mb-1">Wallet refunds asked for at this store</h4>
+        {walletRefunds.length === 0 && <p className="text-xs text-zinc-400">None.</p>}
+        {walletRefunds.map((r) => (
+          <Row key={r.id} left={`#${r.orderNumber} · ${rupees(r.amount)}`} sub={`${r.reason || ""}${r.rejectionReason ? ` · Rejected: ${r.rejectionReason}` : ""}`} right={r.status === "pending" ? "Waiting for franchise admin" : r.status === "processed" ? "Credited" : r.status} cls="text-zinc-600" />
+        ))}
+      </div>
+      <div>
+        <h4 className="text-xs font-black uppercase text-zinc-500 mb-1">Reward codes</h4>
+        {redemptions.length === 0 && <p className="text-xs text-zinc-400">None.</p>}
+        {redemptions.map((r) => (
+          <Row key={r.id} left={r.product?.name} sub={`${fmtDate(r.createdAt)} · ${r.points} points${r.status === "PENDING" ? ` · code ${r.code}` : ""}`} right={r.status} cls="text-zinc-600" />
+        ))}
+      </div>
+      <div>
+        <h4 className="text-xs font-black uppercase text-zinc-500 mb-1">Points history</h4>
+        {rewardTransactions.length === 0 && <p className="text-xs text-zinc-400">No points activity.</p>}
+        {rewardTransactions.map((t) => (
+          <Row key={t.id} left={t.description || t.type} sub={fmtDate(t.createdAt)} right={`${t.direction === "CREDIT" ? "+" : "-"} ${t.points}`} cls={t.direction === "CREDIT" ? "text-green-600" : "text-red-600"} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function CustomerProfileModal({ visible, onClose, customerId, onViewOrder }) {
   const { data, isLoading, isError, refetch } = useCustomerProfile(customerId);
   const [activeTab, setActiveTab] = useState("orders");
+  const walletQuery = useCustomerWalletRewards(customerId, !!visible && activeTab === "wallet");
 
   if (!visible) return null;
 
@@ -206,6 +268,16 @@ export default function CustomerProfileModal({ visible, onClose, customerId, onV
                   >
                     Reviews History ({reviews.length})
                   </button>
+                  <button
+                    onClick={() => setActiveTab("wallet")}
+                    className={`px-4 py-2 text-xs font-bold transition-all border-b-2 -mb-[2px] cursor-pointer ${
+                      activeTab === "wallet"
+                        ? "border-[var(--primary)] text-[var(--primary)] font-black"
+                        : "border-transparent text-zinc-400 hover:text-zinc-600"
+                    }`}
+                  >
+                    Wallet &amp; Rewards
+                  </button>
                 </div>
 
                 <div className="pt-1">
@@ -218,6 +290,7 @@ export default function CustomerProfileModal({ visible, onClose, customerId, onV
                   {activeTab === "reviews" && (
                     <ReviewsHistoryTable reviews={reviews} />
                   )}
+                  {activeTab === "wallet" && <WalletRewardsPanel query={walletQuery} />}
                 </div>
               </div>
             </>

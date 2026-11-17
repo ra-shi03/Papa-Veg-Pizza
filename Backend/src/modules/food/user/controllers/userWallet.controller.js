@@ -11,6 +11,7 @@ import {
     rupeesToPaise
 } from '../services/walletLedger.service.js';
 import { getRewardsSummary, listRewardTransactions, enrollMember, quitMember } from '../services/rewards.service.js';
+import { createRedemption, listMyRedemptions, cancelRedemption } from '../services/rewardRedemption.service.js';
 import { requestRefund, getRefundForUser, listRefundsForUser } from '../../../../core/payments/refund.service.js';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { payOrderWithWallet } from '../../orders/services/order.service.js';
@@ -220,6 +221,33 @@ export const getMyRefundController = async (req, res, next) => {
     try {
         const refund = await getRefundForUser(req.user?.userId, req.params.id);
         return sendResponse(res, 200, 'Refund fetched successfully', { refund });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ---- Reward redemption: the customer claims a free item with points and gets a code to show at a store
+export const redeemRewardController = async (req, res, next) => {
+    try {
+        const redemption = await createRedemption(req.user?.userId, req.body?.productId);
+        return sendResponse(res, 201, 'Reward code created', { redemption });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const listMyRedemptionsController = async (req, res, next) => {
+    try {
+        return sendResponse(res, 200, 'Reward codes', { redemptions: await listMyRedemptions(req.user?.userId) });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const cancelMyRedemptionController = async (req, res, next) => {
+    try {
+        const redemption = await cancelRedemption({ id: req.params.id, userId: req.user?.userId, reason: 'Cancelled by the customer' });
+        return sendResponse(res, 200, 'Reward code cancelled', { redemption });
     } catch (error) {
         next(error);
     }

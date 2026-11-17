@@ -160,8 +160,8 @@ export function useInitiateRefund() {
       return { success: true, refund: newRefund };
     },
     onSuccess: (data) => {
-      toast.success("Refund initiated successfully", {
-        description: `Reference: ${data.refund.referenceNumber}`,
+      toast.success("Refund request sent to your franchise admin", {
+        description: `Reference: ${data.refund.referenceNumber}. The customer's wallet is credited once it is approved.`,
       });
       queryClient.invalidateQueries({ queryKey: ["cancelledOrders"] });
     },

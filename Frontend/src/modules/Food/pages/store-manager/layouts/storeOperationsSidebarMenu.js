@@ -237,6 +237,13 @@ export const storeOperationsSidebarMenu = [
       },
       {
         type: "link",
+        label: "Reward Codes",
+        path: "/store-operations/customers/rewards",
+        icon: "Gift",
+        allowedRoles: ["store_manager"]
+      },
+      {
+        type: "link",
         label: "Reviews",
         path: "/store-operations/customers/reviews",
         icon: "Star",

@@ -141,6 +141,7 @@ export default function ApproveRefundModal({ isOpen, onClose, request }) {
                   min="0"
                   max={requestedAmount}
                   value={approvedAmount}
+                  readOnly
                   onChange={(e) => setApprovedAmount(e.target.value)}
                   className="w-full pl-8 pr-4 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl font-bold text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] transition-all"
                   placeholder="0.00"
