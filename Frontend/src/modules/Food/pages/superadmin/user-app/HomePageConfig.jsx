@@ -963,7 +963,13 @@ export default function HomePageConfig() {
       toast.success('Order method deleted');
       setMethodToDelete(null);
     } catch (err) {
-      toast.error(err?.response?.data?.message || err?.response?.data?.error || 'Could not delete the order method');
+      if (err?.response?.status === 404) { // already deleted elsewhere: the card was stale
+        setOrderMethods((list) => list.filter((x) => x.id !== m.id));
+        setMethodToDelete(null);
+        toast.info('This order method was already deleted');
+      } else {
+        toast.error(err?.response?.data?.message || err?.response?.data?.error || 'Could not delete the order method');
+      }
     } finally {
       setIsDeletingMethod(false);
     }
