@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowLeft } from 'lucide-react';
+import { useMethodOffered } from '@food/hooks/useOrderMethods';
 
 export function HomeHeader({ 
   deliveryAddress, 
@@ -14,6 +15,7 @@ export function HomeHeader({
   onOpenSidebar
 }) {
   const navigate = useNavigate();
+  const trainOffered = useMethodOffered('train');
 
   const [currentCatIndex, setCurrentCatIndex] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
@@ -319,7 +321,7 @@ export function HomeHeader({
 
             {/* Deliver on Train Button */}
             <AnimatePresence>
-              {!isScrolled && (
+              {!isScrolled && trainOffered && (
                 <motion.button
                   initial={{ width: 0, opacity: 0, paddingLeft: 0, paddingRight: 0, marginLeft: -8 }}
                   animate={{ width: 'auto', opacity: 1, paddingLeft: 12, paddingRight: 12, marginLeft: 0 }}

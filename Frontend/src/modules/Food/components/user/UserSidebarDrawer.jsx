@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Phone, MessageCircle } from 'lucide-react';
 import { useAppConfig } from "@food/context/AppConfigContext";
+import { useMethodOffered } from "@food/hooks/useOrderMethods";
 import { useBusinessInfo } from "@food/hooks/useBusinessInfo";
 import { getCompanyName, whatsappLink } from "@food/utils/businessSettings";
 
@@ -15,6 +16,7 @@ export default function UserSidebarDrawer({
 }) {
   const navigate = useNavigate();
   const { config: appConfig } = useAppConfig();
+  const trainOffered = useMethodOffered('train');
 
   // User State
   const [user, setUser] = useState(() => {
@@ -210,7 +212,8 @@ export default function UserSidebarDrawer({
                   </button>
                 )}
 
-                {/* Deliver On Train */}
+                {/* Deliver On Train: only where the super admin offers it for this customer's store */}
+                {trainOffered && (
                 <button
                   type="button"
                   onClick={() => {
@@ -225,6 +228,7 @@ export default function UserSidebarDrawer({
                     Deliver On Train
                   </span>
                 </button>
+                )}
               </div>
 
               {/* Group 2: Papa Veg Rewards, Track Order, Order History, Papa Veg Wallet */}

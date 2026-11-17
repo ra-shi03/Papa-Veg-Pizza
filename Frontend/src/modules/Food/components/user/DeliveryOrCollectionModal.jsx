@@ -1,6 +1,7 @@
 import React from "react"
 import { useLocationStore } from "@food/store/locationStore"
 import { useScrollLock } from "@food/hooks/useScrollLock"
+import { useOrderMethods } from "@food/hooks/useOrderMethods"
 
 export default function DeliveryOrCollectionModal({
   show,
@@ -9,6 +10,7 @@ export default function DeliveryOrCollectionModal({
   isDarkMode
 }) {
   const { isModalOpen, modalMessage } = useLocationStore()
+  const offered = useOrderMethods()
 
   // Lock background scroll when open
   useScrollLock(Boolean(show))
@@ -99,7 +101,7 @@ export default function DeliveryOrCollectionModal({
 
         {/* Service Options List */}
         <div className="space-y-3">
-          {options.map((opt) => (
+          {options.filter((opt) => !offered || offered.some((m) => m.id === opt.id && m.enabled)).map((opt) => (
             <div 
               key={opt.id}
               onClick={() => {
