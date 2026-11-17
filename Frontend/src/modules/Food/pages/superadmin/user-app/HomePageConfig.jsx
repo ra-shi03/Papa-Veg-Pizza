@@ -939,7 +939,8 @@ export default function HomePageConfig() {
   const addMethod = () => {
     const label = newMethodName.trim();
     if (!label) return;
-    if (orderMethods.some((m) => m.label.toLowerCase() === label.toLowerCase())) { toast.error('A method with this name already exists'); return; }
+    const flat = (v) => String(v).toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (orderMethods.some((m) => flat(m.label) === flat(label) || flat(m.id) === flat(label))) { toast.error('A method with this name already exists'); return; }
     setOrderMethods((list) => [...list, { id: '', label, icon: 'storefront', enabled: true, scope: 'all', franchiseIds: [], storeIds: [], custom: true, isNew: true, key: `new-${Date.now()}` }]);
     setNewMethodName('');
     setMethodsDirty(true);

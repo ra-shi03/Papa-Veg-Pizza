@@ -91,6 +91,8 @@ export async function validateMethodsInput(input) {
     for (const m of input) {
         let id = String(m?.id || '');
         if (!id && String(m?.label || '').trim()) { // a newly created method: its id comes from its name
+            const flat = (v) => String(v).toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (DEFAULT_ORDER_METHODS.some((d) => flat(d.id) === flat(m.label) || flat(d.label) === flat(m.label))) throw new ValidationError(`${String(m.label).trim()} already exists, switch it on instead`);
             const base = slug(m.label) || 'method';
             id = /^[a-z]/.test(base) ? base : `m_${base}`;
             for (let n = 2; seen.has(id) || input.some((x) => x !== m && x?.id === id) || BUILTIN_METHOD_IDS.includes(id); n += 1) id = `${base}_${n}`.slice(0, 30);

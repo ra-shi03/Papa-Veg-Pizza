@@ -193,3 +193,12 @@ describe('creating and deleting order methods', () => {
         assert.equal(res.body.data.order.orderMethod, 'dinein');
     });
 });
+
+describe('duplicate names', () => {
+    test('a created method cannot repeat a built-in one, however it is spelled', async () => {
+        const keep = ok(await fx.call('GET', ADMIN, fx.SA)).methods.filter((m) => !m.custom);
+        for (const label of ['Dine-in', 'dine in', 'DELIVERY', 'In Car']) {
+            assert.equal((await save([...keep, { label, enabled: true, scope: 'all' }])).status, 400, label);
+        }
+    });
+});
