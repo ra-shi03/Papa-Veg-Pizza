@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useMemo, useRef, useState } from "react"
+import { useJsApiLoader } from "@react-google-maps/api"
 import { CheckCircle2, Loader2, MapPin, Store, Truck, ShoppingBag, Phone, ListChecks } from "lucide-react"
 import { toast } from "sonner"
 import apiClient, { userClient } from "@/services/api/axios"
 import { locationAPI } from "@/services/api/location"
 import { readSavedCoords } from "@food/utils/savedLocation"
+import { ADMIN_GOOGLE_MAPS_LOADER } from "@food/utils/adminGoogleMaps"
 
 const field =
   "w-full h-12 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 text-sm text-zinc-900 dark:text-white outline-none focus:border-[#E53935] focus:ring-2 focus:ring-[#E53935]/15 transition-colors placeholder:text-zinc-400"
@@ -59,6 +61,36 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
   })
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
   const [errors, setErrors] = useState({})
+
+  // City and state suggestions from Google Places (the project map key). Picking a city also fills its state.
+  const { isLoaded: mapsReady } = useJsApiLoader(ADMIN_GOOGLE_MAPS_LOADER)
+  const cityRef = useRef(null)
+  const stateRef = useRef(null)
+  const delivery = isParty && f.fulfilment === "delivery"
+  useEffect(() => {
+    if (!mapsReady || !delivery || !window.google?.maps?.places) return undefined
+    const made = []
+    if (cityRef.current) {
+      const ac = new window.google.maps.places.Autocomplete(cityRef.current, { types: ["(cities)"], componentRestrictions: { country: "in" }, fields: ["address_components", "name"] })
+      ac.addListener("place_changed", () => {
+        const place = ac.getPlace()
+        if (!place?.name) return
+        const state = place.address_components?.find((c) => c.types.includes("administrative_area_level_1"))?.long_name || ""
+        setF((p) => ({ ...p, city: place.name, ...(state ? { state } : {}) }))
+        setErrors((p) => ({ ...p, city: "" }))
+      })
+      made.push(ac)
+    }
+    if (stateRef.current) {
+      const ac = new window.google.maps.places.Autocomplete(stateRef.current, { types: ["administrative_area_level_1"], componentRestrictions: { country: "in" }, fields: ["name"] })
+      ac.addListener("place_changed", () => {
+        const place = ac.getPlace()
+        if (place?.name) setF((p) => ({ ...p, state: place.name }))
+      })
+      made.push(ac)
+    }
+    return () => made.forEach((ac) => window.google.maps.event.clearInstanceListeners(ac))
+  }, [mapsReady, delivery])
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(null)
 
@@ -257,12 +289,12 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
               <input className={field} placeholder="Landmark (optional)" value={f.landmark} onChange={(e) => set("landmark", e.target.value)} />
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <input className={field} placeholder="City" value={f.city} onChange={(e) => set("city", e.target.value)} />
+                  <input ref={cityRef} autoComplete="off" className={field} placeholder="City" value={f.city} onChange={(e) => set("city", e.target.value)} />
                   <Err k="city" />
                 </div>
                 <input className={field} placeholder="Pincode" inputMode="numeric" maxLength={6} value={f.pincode} onChange={(e) => set("pincode", e.target.value.replace(/\D/g, ""))} />
               </div>
-              <input className={field} placeholder="State" value={f.state} onChange={(e) => set("state", e.target.value)} />
+              <input ref={stateRef} autoComplete="off" className={field} placeholder="State" value={f.state} onChange={(e) => set("state", e.target.value)} />
             </div>
           )}
 
