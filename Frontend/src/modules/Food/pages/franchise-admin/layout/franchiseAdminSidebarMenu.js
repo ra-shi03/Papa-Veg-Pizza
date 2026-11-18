@@ -33,6 +33,7 @@ export const franchiseAdminSidebarMenu = [
       { type: "link", label: "Live Orders", path: "/franchise-admin/live-orders", icon: "Activity" },
       { type: "link", label: "Completed Orders", path: "/franchise-admin/completed-orders", icon: "CheckCircle" },
       { type: "link", label: "Cancelled Orders", path: "/franchise-admin/cancelled-orders", icon: "XCircle" },
+      { type: "link", label: "Bulk Orders", path: "/franchise-admin/bulk-orders", icon: "Package" },
       { type: "link", label: "Refund Requests", path: "/franchise-admin/refund-requests", icon: "RotateCcw" },
       { type: "link", label: "Order Issues", path: "/franchise-admin/order-issues", icon: "AlertTriangle" },
     ],

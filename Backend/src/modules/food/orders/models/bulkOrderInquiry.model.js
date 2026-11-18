@@ -48,15 +48,45 @@ const bulkOrderInquirySchema = new mongoose.Schema(
       enum: ['virtual_party', 'bulk_catering', 'egift_voucher'],
       default: 'virtual_party'
     },
+    // new -> confirmed -> preparing -> ready -> completed, or rejected / cancelled. in_progress and contacted are the
+    // older statuses of inquiries made before stores handled them.
     status: {
       type: String,
-      enum: ['new', 'in_progress', 'contacted', 'completed', 'rejected'],
+      enum: ['new', 'confirmed', 'preparing', 'ready', 'completed', 'rejected', 'cancelled', 'in_progress', 'contacted'],
       default: 'new'
     },
     adminNotes: {
       type: String,
       default: ''
-    }
+    },
+    // The bulk order a customer places at a store (virtual party): the store confirms, prepares and hands it over.
+    reference: { type: String, unique: true, sparse: true, trim: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+    storeId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodStore', default: null, index: true },
+    franchiseId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodFranchise', default: null, index: true },
+    fulfilment: { type: String, enum: ['takeaway', 'delivery'], default: 'takeaway' },
+    address: {
+      street: { type: String, trim: true, default: '' },
+      landmark: { type: String, trim: true, default: '' },
+      city: { type: String, trim: true, default: '' },
+      state: { type: String, trim: true, default: '' },
+      pincode: { type: String, trim: true, default: '' }
+    },
+    partySize: { type: String, trim: true, default: '' },
+    eventTime: { type: String, trim: true, default: '' },
+    quotedAmount: { type: Number, min: 0, default: null },
+    storeNote: { type: String, trim: true, default: '' },
+    reasonText: { type: String, trim: true, default: '' },
+    history: [
+      {
+        _id: false,
+        status: String,
+        at: { type: Date, default: Date.now },
+        byRole: { type: String, default: '' },
+        byId: { type: String, default: '' },
+        note: { type: String, default: '' }
+      }
+    ]
   },
   {
     collection: 'food_bulk_order_inquiries',

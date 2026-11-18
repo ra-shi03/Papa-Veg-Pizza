@@ -29,6 +29,10 @@ import franchiseStoreManagerRoutes from '../modules/food/franchise/routes/storeM
 import franchiseStoreApprovalRoutes from '../modules/food/franchise/routes/storeApproval.routes.js';
 import franchiseStaffApprovalRoutes from '../modules/food/franchise/routes/staffApproval.routes.js';
 import kitchenStaffRoutes from '../modules/food/store/routes/kitchenStaff.routes.js';
+import storeBulkOrdersRoutes from '../modules/food/store/routes/storeBulkOrders.routes.js';
+import franchiseBulkOrdersRoutes from '../modules/food/franchise/routes/franchiseBulkOrders.routes.js';
+import { optionalCustomer } from '../core/auth/optionalCustomer.js';
+import { bulkOrderLimiters } from '../middleware/rateLimit.js';
 import storeRewardsRoutes from '../modules/food/store/routes/storeRewards.routes.js';
 import franchiseRefundsRoutes from '../modules/food/franchise/routes/franchiseRefunds.routes.js';
 import storeOrderRoutes from '../modules/food/store/routes/storeOrders.routes.js';
@@ -84,6 +88,8 @@ router.use('/v1/food/store/kitchen', kitchenOpsRoutes);
 router.use('/v1/food/store/inventory', inventoryRoutes);
 router.use('/v1/food/store/customers', storeCustomersRoutes);
 router.use('/v1/food/store/rewards', storeRewardsRoutes);
+router.use('/v1/food/store/bulk-orders', storeBulkOrdersRoutes);
+router.use('/v1/food/franchise/bulk-orders', franchiseBulkOrdersRoutes);
 router.use('/v1/food/franchise/refunds', franchiseRefundsRoutes);
 router.use('/v1/food/store/complaints', storeComplaintsRoutes);
 router.use('/v1/food/store/reviews', storeReviewsRoutes);
@@ -218,7 +224,7 @@ router.get(['/v1/food/fee-config', '/v1/fee-config'], getFeeConfigController);
 router.get(['/v1/food/orders/methods', '/v1/orders/methods', '/v1/food/order-methods', '/v1/order-methods'], getOrderMethodsController);
 
 // Public Bulk Order routes (No Auth Required)
-router.post(['/v1/food/bulk-order/inquiry', '/v1/bulk-order/inquiry'], submitInquiryPublic);
+router.post(['/v1/food/bulk-order/inquiry', '/v1/bulk-order/inquiry'], optionalCustomer, ...bulkOrderLimiters, submitInquiryPublic);
 router.get(['/v1/food/bulk-order/config', '/v1/bulk-order/config'], getConfigPublic);
 
 // Admin Bulk Order routes (platform-wide: super admin only; requireRoles('ADMIN') would also let franchise admins in)

@@ -1,3 +1,4 @@
+import { createBulkOrder, shape } from '../services/bulkOrderFlow.service.js';
 import { BulkOrderInquiry } from '../models/bulkOrderInquiry.model.js';
 import { BulkOrderConfig } from '../models/bulkOrderConfig.model.js';
 import { sendResponse } from '../../../../utils/response.js';
@@ -150,32 +151,11 @@ const DEFAULT_CONFIG = {
   }
 };
 
-/** Public: Submit Bulk Order Inquiry */
+/** Public: Submit a bulk order request (a signed-in customer's request is linked to them so they can follow it). */
 export async function submitInquiryPublic(req, res, next) {
   try {
-    const { name, organisation, phone, email, location, occasion, query, type, eventDate } = req.body || {};
-
-    if (!name || !phone || !email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Name, contact number, and email are required.'
-      });
-    }
-
-    const inquiry = await BulkOrderInquiry.create({
-      name: String(name).trim(),
-      organisation: String(organisation || '').trim(),
-      phone: String(phone).trim(),
-      email: String(email).trim().toLowerCase(),
-      location: String(location || '').trim(),
-      eventDate: String(eventDate || '').trim(),
-      occasion: String(occasion || eventDate || 'Date Selected').trim(),
-      query: String(query || '').trim(),
-      type: type || 'virtual_party',
-      status: 'new'
-    });
-
-    return sendResponse(res, 201, 'Bulk order inquiry submitted successfully', inquiry);
+    const inquiry = await createBulkOrder(req.body, req.optionalCustomerId || null);
+    return sendResponse(res, 201, 'Bulk order request submitted successfully', inquiry);
   } catch (err) {
     next(err);
   }
@@ -221,6 +201,7 @@ export async function listInquiriesAdmin(req, res, next) {
       const regex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
       filter.$or = [
         { name: regex },
+        { reference: regex },
         { organisation: regex },
         { phone: regex },
         { email: regex },
@@ -231,6 +212,7 @@ export async function listInquiriesAdmin(req, res, next) {
     const skip = (Math.max(1, parseInt(page, 10)) - 1) * parseInt(limit, 10);
     const [inquiries, total] = await Promise.all([
       BulkOrderInquiry.find(filter)
+        .populate('storeId', 'storeName address phone')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit, 10))
@@ -246,7 +228,7 @@ export async function listInquiriesAdmin(req, res, next) {
     ]);
 
     return sendResponse(res, 200, 'Bulk order inquiries retrieved', {
-      inquiries,
+      inquiries: inquiries.map((r) => ({ ...r, ...shape(r), storeId: r.storeId ? String(r.storeId._id || r.storeId) : null })),
       total,
       page: parseInt(page, 10),
       totalPages: Math.ceil(total / parseInt(limit, 10)) || 1,
@@ -262,29 +244,29 @@ export async function listInquiriesAdmin(req, res, next) {
   }
 }
 
-/** Admin: Update Inquiry Status / Notes */
+/**
+ * Admin: update the status / notes of an inquiry that has no store (E-Gift Voucher, and older inquiries).
+ * A bulk order placed at a store is handled by that store's manager: the super admin only views it.
+ */
 export async function updateInquiryStatusAdmin(req, res, next) {
   try {
     const { id } = req.params;
-    const { status, adminNotes } = req.body;
+    const { status, adminNotes } = req.body || {};
+    const ALLOWED = ['new', 'in_progress', 'contacted', 'completed', 'rejected'];
+    if (status !== undefined && !ALLOWED.includes(status)) {
+      return res.status(400).json({ success: false, message: `Status must be one of: ${ALLOWED.join(', ')}` });
+    }
+    const current = await BulkOrderInquiry.findById(id).select('storeId').lean().catch(() => null);
+    if (!current) return res.status(404).json({ success: false, message: 'Inquiry not found' });
+    if (current.storeId) {
+      return res.status(403).json({ success: false, message: 'This bulk order is handled by its store. The super admin can view it only.' });
+    }
 
     const updateFields = {};
     if (status) updateFields.status = status;
-    if (adminNotes !== undefined) updateFields.adminNotes = adminNotes;
+    if (adminNotes !== undefined) updateFields.adminNotes = String(adminNotes).slice(0, 2000);
 
-    const updated = await BulkOrderInquiry.findByIdAndUpdate(
-      id,
-      { $set: updateFields },
-      { new: true }
-    );
-
-    if (!updated) {
-      return res.status(404).json({
-        success: false,
-        message: 'Inquiry not found'
-      });
-    }
-
+    const updated = await BulkOrderInquiry.findByIdAndUpdate(id, { $set: updateFields }, { new: true, runValidators: true });
     return sendResponse(res, 200, 'Inquiry updated successfully', updated);
   } catch (err) {
     next(err);
@@ -295,6 +277,10 @@ export async function updateInquiryStatusAdmin(req, res, next) {
 export async function deleteInquiryAdmin(req, res, next) {
   try {
     const { id } = req.params;
+    const target = await BulkOrderInquiry.findById(id).select('storeId').lean().catch(() => null);
+    if (target?.storeId) {
+      return res.status(403).json({ success: false, message: 'This bulk order belongs to a store and cannot be deleted from here.' });
+    }
     const deleted = await BulkOrderInquiry.findByIdAndDelete(id);
     if (!deleted) {
       return res.status(404).json({

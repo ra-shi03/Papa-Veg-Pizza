@@ -70,3 +70,31 @@ export async function sendAdminResetOtpEmail(to, otp) {
         return false;
     }
 }
+
+let senderOverride = null;
+/** Tests replace the real sender; production uses SMTP. */
+export function setEmailSenderForTests(fn) {
+    senderOverride = fn;
+}
+
+/**
+ * Send a plain email (used for bulk order updates). Never throws: returns false when SMTP is not configured or fails.
+ * @param {{to: string, subject: string, text: string}} mail
+ */
+export async function sendEmail({ to, subject, text }) {
+    if (senderOverride) return senderOverride({ to, subject, text });
+    const trans = getTransporter();
+    if (!trans || !to) return false;
+    const from = config.emailFrom || config.emailUser;
+    const { companyName } = await getBusinessInfo().catch(() => ({ companyName: '' }));
+    const brand = companyName || 'Papa Veg Pizza';
+    const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const html = `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 520px; margin: 0 auto; padding: 20px;">${esc(text).split('\n').map((l) => `<p style="margin:0 0 8px">${l}</p>`).join('')}<hr style="border:none;border-top:1px solid #eee;margin:20px 0"><p style="color:#999;font-size:12px">${esc(brand)}</p></div>`;
+    try {
+        await trans.sendMail({ from: typeof from === 'string' && from.includes('<') ? from : `${brand} <${from}>`, to, subject, text, html });
+        return true;
+    } catch (err) {
+        logger.error(`Failed to send email to ${to}: ${err.message}`);
+        return false;
+    }
+}

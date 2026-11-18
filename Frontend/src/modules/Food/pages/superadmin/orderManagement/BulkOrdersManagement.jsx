@@ -185,6 +185,14 @@ function ImageUploadControl({
   )
 }
 
+// A bulk order placed at a store is handled by that store: the super admin views it (status is read-only).
+const STORE_STATUS_LABEL = { new: "New", confirmed: "Confirmed", preparing: "Preparing", ready: "Ready", completed: "Completed", rejected: "Declined", cancelled: "Cancelled" }
+const StoreStatusBadge = ({ status }) => (
+  <span className="inline-block text-[11px] font-bold uppercase rounded-lg px-2.5 py-1 border bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700">
+    {STORE_STATUS_LABEL[status] || status}
+  </span>
+)
+
 export default function BulkOrdersManagement() {
   const [activeTab, setActiveTab] = useState("inquiries") // 'inquiries' | 'config'
   const [activeCmsTab, setActiveCmsTab] = useState("virtual_party") // 'virtual_party' | 'egift_voucher'
@@ -650,6 +658,10 @@ export default function BulkOrdersManagement() {
               >
                 <option value="all">All Statuses</option>
                 <option value="new">New</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="preparing">Preparing</option>
+                <option value="ready">Ready</option>
+                <option value="cancelled">Cancelled</option>
                 <option value="in_progress">In Progress</option>
                 <option value="contacted">Contacted</option>
                 <option value="completed">Completed</option>
@@ -725,6 +737,10 @@ export default function BulkOrdersManagement() {
                             }`}>
                               {isVoucher ? "E-Gift Voucher" : "Virtual Party"}
                             </span>
+                            {inq.reference && <p className="m-0 mt-1 text-[10px] font-mono text-zinc-500">{inq.reference}</p>}
+                            {inq.storeName && (
+                              <p className="m-0 mt-0.5 text-[10px] text-zinc-500">{inq.storeName} · {inq.fulfilment === "delivery" ? "Delivery" : "Takeaway"}</p>
+                            )}
                           </td>
 
                           <td className="py-3.5 px-4">
@@ -767,6 +783,7 @@ export default function BulkOrdersManagement() {
                           </td>
 
                           <td className="py-3.5 px-4">
+                            {inq.storeId ? <StoreStatusBadge status={inq.status} /> : (
                             <select
                               value={inq.status}
                               disabled={updatingStatusId === inq._id}
@@ -789,6 +806,7 @@ export default function BulkOrdersManagement() {
                               <option value="completed">Completed</option>
                               <option value="rejected">Rejected</option>
                             </select>
+                            )}
                           </td>
 
                           <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
@@ -800,6 +818,7 @@ export default function BulkOrdersManagement() {
                             >
                               <Eye className="w-4 h-4" />
                             </button>
+                            {!inq.storeId && (
                             <button
                               type="button"
                               onClick={() => handleDeleteInquiry(inq._id)}
@@ -808,6 +827,7 @@ export default function BulkOrdersManagement() {
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
+                            )}
                           </td>
                         </tr>
                       )
@@ -1710,6 +1730,23 @@ export default function BulkOrdersManagement() {
                   </p>
                 </div>
 
+                {selectedInquiry.storeId && (
+                  <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-3 space-y-1.5">
+                    <p className="m-0"><span className="text-zinc-400 font-medium">Reference:</span> <b>{selectedInquiry.reference}</b></p>
+                    <p className="m-0"><span className="text-zinc-400 font-medium">Store:</span> <b>{selectedInquiry.storeName}</b></p>
+                    <p className="m-0"><span className="text-zinc-400 font-medium">Fulfilment:</span> <b>{selectedInquiry.fulfilment === "delivery" ? "Delivery" : "Takeaway"}</b>
+                      {selectedInquiry.fulfilment === "delivery" && ` · ${[selectedInquiry.address?.street, selectedInquiry.address?.landmark, selectedInquiry.address?.city, selectedInquiry.address?.pincode].filter(Boolean).join(", ")}`}</p>
+                    {selectedInquiry.partySize && <p className="m-0"><span className="text-zinc-400 font-medium">Party size:</span> <b>{selectedInquiry.partySize}</b></p>}
+                    {selectedInquiry.quotedAmount != null && <p className="m-0"><span className="text-zinc-400 font-medium">Amount quoted:</span> <b>₹{Number(selectedInquiry.quotedAmount).toLocaleString("en-IN")}</b></p>}
+                    {selectedInquiry.reasonText && <p className="m-0"><span className="text-zinc-400 font-medium">Reason:</span> {selectedInquiry.reasonText}</p>}
+                    <div className="pt-1 space-y-0.5">
+                      {(selectedInquiry.history || []).map((h, i) => (
+                        <p key={i} className="m-0 text-[11px] text-zinc-500"><b className="text-zinc-700 dark:text-zinc-300">{STORE_STATUS_LABEL[h.status] || h.status}</b> · {new Date(h.at).toLocaleString("en-IN")}{h.note ? ` · ${h.note}` : ""}</p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <span className="text-zinc-400 font-medium">Customer Query / Message:</span>
                   <div className="mt-1 p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 leading-relaxed font-sans whitespace-pre-wrap">
@@ -1719,7 +1756,8 @@ export default function BulkOrdersManagement() {
 
                 {/* Status Switcher in Modal */}
                 <div className="pt-2 flex items-center justify-between">
-                  <span className="text-zinc-400 font-medium">Update Status:</span>
+                  <span className="text-zinc-400 font-medium">{selectedInquiry.storeId ? "Status (handled by the store):" : "Update Status:"}</span>
+                  {selectedInquiry.storeId ? <StoreStatusBadge status={selectedInquiry.status} /> : (
                   <select
                     value={selectedInquiry.status}
                     onChange={(e) => handleStatusChange(selectedInquiry._id, e.target.value)}
@@ -1731,6 +1769,7 @@ export default function BulkOrdersManagement() {
                     <option value="completed">Completed</option>
                     <option value="rejected">Rejected</option>
                   </select>
+                  )}
                 </div>
               </div>
             </motion.div>

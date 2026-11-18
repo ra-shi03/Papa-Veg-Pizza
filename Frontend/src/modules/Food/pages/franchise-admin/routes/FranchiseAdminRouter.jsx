@@ -8,6 +8,7 @@ import Loader from "@food/components/Loader";
 // Lazy Loaded Pages
 const AdminHome = lazy(() => import("@food/pages/franchise-admin/dashboard/FranchiseAdminDashboard"));
 const AdminProfile = lazy(() => import("@food/pages/franchise-admin/AdminProfile"));
+const BulkOrders = lazy(() => import("@food/pages/franchise-admin/bulkOrders/BulkOrders"));
 const RefundRequests = lazy(() => import("@food/pages/franchise-admin/orders/RefundRequests"));
 const OrderIssues = lazy(() => import("@food/pages/franchise-admin/orders/OrderIssues"));
 const LiveOrders = lazy(() => import("@food/pages/franchise-admin/orders/LiveOrders"));
@@ -90,6 +91,7 @@ export default function FranchiseAdminRouter() {
           <Route path="completed-orders" element={<CompletedOrders />} />
           <Route path="cancelled-orders" element={<CancelledOrder />} />
           <Route path="refund-requests" element={<RefundRequests />} />
+          <Route path="bulk-orders" element={<BulkOrders />} />
           <Route path="order-issues" element={<OrderIssues />} />
           <Route path="products" element={<Products />} />
           <Route path="categories" element={<Categories />} />

@@ -64,3 +64,23 @@ export const publicOrderLookupLimiters = [
     lookupLimiter(10, (req) => lookupPhoneKey(req) && `phone:${lookupPhoneKey(req)}`)
 ];
 
+
+// Public bulk order requests (no sign-in): limited per caller, per phone number and per email so the page cannot be used
+// to flood a store with requests. Switched off in tests.
+const bulkKey = (req, field) => {
+    const v = String(req.body?.[field] ?? '').toLowerCase().replace(field === 'phone' ? /\D/g : /\s/g, '');
+    return field === 'phone' ? v.slice(-10) : v;
+};
+const bulkLimiter = (max, windowMs, key) => rateLimit({
+    windowMs,
+    max,
+    ...(key ? { keyGenerator: (req) => key(req) || req.ip, skip: (req) => process.env.NODE_ENV === 'test' } : { skip: () => process.env.NODE_ENV === 'test' }),
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: 'Too many bulk order requests. Please try again later.' }
+});
+export const bulkOrderLimiters = [
+    bulkLimiter(10, 60 * 60 * 1000),
+    bulkLimiter(3, 24 * 60 * 60 * 1000, (req) => bulkKey(req, 'phone') && `phone:${bulkKey(req, 'phone')}`),
+    bulkLimiter(3, 24 * 60 * 60 * 1000, (req) => bulkKey(req, 'email') && `email:${bulkKey(req, 'email')}`),
+];

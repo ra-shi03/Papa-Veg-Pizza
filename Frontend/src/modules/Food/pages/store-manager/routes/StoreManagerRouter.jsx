@@ -33,6 +33,7 @@ import Performance from "../staffManagement/Performance"
 import CustomerOrders from "../customers/CustomerOrders"
 import Complaints from "../customers/Complaints"
 import RewardCodes from "../customers/RewardCodes"
+import BulkOrders from "../bulkOrders/BulkOrders"
 import Reviews from "../customers/Reviews"
 import Profile from "../profile/Profile"
 import MyTasks from "../myTasks/MyTasks"
@@ -366,6 +367,14 @@ export default function StoreManagerRouter() {
             element={
               <RoleProtectedRoute allowedRoles={["store_manager", "assistant_manager", "store_owner"]}>
                 <Complaints />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="bulk-orders"
+            element={
+              <RoleProtectedRoute allowedRoles={["store_manager"]}>
+                <BulkOrders />
               </RoleProtectedRoute>
             }
           />

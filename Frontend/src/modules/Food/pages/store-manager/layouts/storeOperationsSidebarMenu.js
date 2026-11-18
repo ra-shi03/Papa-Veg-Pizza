@@ -41,6 +41,13 @@ export const storeOperationsSidebarMenu = [
       },
       {
         type: "link",
+        label: "Bulk Orders",
+        path: "/store-operations/bulk-orders",
+        icon: "Package",
+        allowedRoles: ["store_manager"]
+      },
+      {
+        type: "link",
         label: "Cancelled Orders",
         path: "/store-operations/orders/cancelled",
         icon: "XCircle",

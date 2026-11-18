@@ -37,6 +37,8 @@ import {
   Bell,
   Menu
 } from "lucide-react"
+import BulkOrderForm from "./bulk/BulkOrderForm"
+import MyBulkOrders from "./bulk/MyBulkOrders"
 import AnimatedPage from "@food/components/user/AnimatedPage"
 import { useProfile } from "@food/context/ProfileContext"
 import { locationAPI } from "@/services/api/location"
@@ -588,51 +590,27 @@ export default function BulkOrder() {
             </span>
           </div>
 
-          {/* INQUIRY / CONTACT Nav Links */}
+          {/* Inquiry / My Orders / Contact */}
           <div className="flex items-center gap-4 text-xs font-bold text-zinc-700 dark:text-zinc-300 shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                setViewMode("inquiry")
-                setShowOutlets(false)
-                window.scrollTo({ top: 0, behavior: "smooth" })
-              }}
-              className={`transition-all cursor-pointer bg-transparent border-0 uppercase tracking-wider text-[11px] p-0 font-bold ${
-                viewMode === "inquiry"
-                  ? "text-[#E53935] font-extrabold border-b-2 border-[#E53935] pb-0.5"
-                  : "text-zinc-500 hover:text-[#E53935]"
-              }`}
-            >
-              Inquiry
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setViewMode("contact")
-                setShowOutlets(false)
-                window.scrollTo({ top: 0, behavior: "smooth" })
-              }}
-              className={`transition-all cursor-pointer bg-transparent border-0 uppercase tracking-wider text-[11px] p-0 font-bold ${
-                viewMode === "contact"
-                  ? "text-[#E53935] font-extrabold border-b-2 border-[#E53935] pb-0.5"
-                  : "text-zinc-500 hover:text-[#E53935]"
-              }`}
-            >
-              Contact
-            </button>
+            {[["inquiry", "Order"], ["orders", "My Orders"], ["contact", "Contact"]].map(([mode, text]) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => {
+                  setViewMode(mode)
+                  setShowOutlets(false)
+                  window.scrollTo({ top: 0, behavior: "smooth" })
+                }}
+                className={`transition-all cursor-pointer bg-transparent border-0 uppercase tracking-wider text-[11px] p-0 font-bold ${
+                  viewMode === mode
+                    ? "text-[#E53935] font-extrabold border-b-2 border-[#E53935] pb-0.5"
+                    : "text-zinc-500 hover:text-[#E53935]"
+                }`}
+              >
+                {text}
+              </button>
+            ))}
           </div>
-        </div>
-
-        {/* ── Non-Working "Download App" Button (Strictly non-functional as requested) ── */}
-        <div className="px-4 py-2 border-b border-zinc-100 dark:border-zinc-800 flex justify-center">
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            className="w-full max-w-md py-2.5 bg-[#E53935] text-white font-bold text-sm tracking-wide rounded-md shadow-sm opacity-90 cursor-default border-0 select-none pointer-events-none"
-          >
-            Download App
-          </button>
         </div>
 
         {/* ── Tab Switcher: VIRTUAL PIZZA PARTY / E-GIFT VOUCHER (Inquiry View Only) ── */}
@@ -1053,185 +1031,35 @@ export default function BulkOrder() {
             </section>
           </div>
         )
+      ) : viewMode === "orders" ? (
+          <MyBulkOrders />
       ) : (
           /* ── INQUIRY PAGE VIEW (Virtual Party / E-Gift Voucher) ── */
           <>
-            {/* ── Contact Us Form Card (Same structure on both tabs as requested) ── */}
-            <section id="inquiry-form" className="bg-white dark:bg-zinc-900 rounded-none shadow-sm border border-zinc-200/80 dark:border-zinc-800 p-6">
-          <div className="mb-5">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-white m-0 tracking-tight">
-              Contact Us
-            </h2>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 m-0">
-              Please let us know your query
-            </p>
-          </div>
-
-          {isSubmitted ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="py-8 text-center space-y-3"
-            >
-              <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
-                <CheckCircle2 className="w-8 h-8" />
+            {/* ── Request form: Virtual Party (choose a store, takeaway or delivery) / E-Gift Voucher ── */}
+            <section id="inquiry-form" className="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-zinc-200/80 dark:border-zinc-800 p-5 sm:p-6">
+              <div className="mb-5">
+                <h2 className="text-xl font-extrabold text-zinc-900 dark:text-white m-0 tracking-tight">
+                  {activeTab === "virtual_party" ? "Place a bulk order" : "E-Gift Voucher inquiry"}
+                </h2>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 m-0">
+                  {activeTab === "virtual_party"
+                    ? "Pick a store near you, tell us what you need, and the store will confirm."
+                    : "Tell us how many vouchers you need and our corporate desk will get in touch."}
+                </p>
               </div>
-              <h3 className="text-base font-bold text-zinc-900 dark:text-white m-0">
-                Inquiry Received!
-              </h3>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed">
-                Thank you, <span className="font-semibold text-zinc-800 dark:text-zinc-200">{currentForm.name}</span>. Our corporate bulk desk will contact you on <span className="font-semibold text-zinc-800 dark:text-zinc-200">{currentForm.phone}</span> shortly.
-              </p>
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSubmitted(false)
-                    handleFieldChange("query", "")
-                  }}
-                  className="px-5 py-2 text-xs font-bold text-[#E53935] hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition-colors cursor-pointer border border-[#E53935]/30 bg-transparent"
-                >
-                  Send Another Inquiry
-                </button>
-              </div>
-            </motion.div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Name* */}
-              <div>
-                <input
-                  type="text"
-                  required
-                  placeholder="Name*"
-                  value={currentForm.name}
-                  onChange={(e) => handleFieldChange("name", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white text-xs outline-none focus:border-[#E53935] dark:focus:border-[#E53935] transition-colors placeholder:text-zinc-400 font-medium"
-                />
-              </div>
-
-              {/* Organisation* */}
-              <div>
-                <input
-                  type="text"
-                  placeholder={activeTab === "egift_voucher" ? "Organisation*" : "Organisation"}
-                  value={currentForm.organisation}
-                  onChange={(e) => handleFieldChange("organisation", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white text-xs outline-none focus:border-[#E53935] dark:focus:border-[#E53935] transition-colors placeholder:text-zinc-400 font-medium"
-                />
-              </div>
-
-              {/* Contact Number* */}
-              <div>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  required
-                  maxLength={10}
-                  placeholder="Contact Number*"
-                  value={currentForm.phone}
-                  onChange={(e) => handleFieldChange("phone", e.target.value.replace(/\D/g, ""))}
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white text-xs outline-none focus:border-[#E53935] dark:focus:border-[#E53935] transition-colors placeholder:text-zinc-400 font-medium"
-                />
-              </div>
-
-              {/* Email ID* */}
-              <div>
-                <input
-                  type="email"
-                  required
-                  placeholder="Email ID*"
-                  value={currentForm.email}
-                  onChange={(e) => handleFieldChange("email", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white text-xs outline-none focus:border-[#E53935] dark:focus:border-[#E53935] transition-colors placeholder:text-zinc-400 font-medium"
-                />
-              </div>
-
-              {/* Location: Area / City / State */}
-              <div>
-                <input
-                  type="text"
-                  placeholder="Location: Area / City / State"
-                  value={currentForm.location}
-                  onChange={(e) => handleFieldChange("location", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white text-xs outline-none focus:border-[#E53935] dark:focus:border-[#E53935] transition-colors placeholder:text-zinc-400 font-medium"
-                />
-              </div>
-
-              {/* Date of Event with Calendar Image & Choosing Date Option */}
-              <div
-                onClick={() => {
-                  if (dateInputRef.current) {
-                    if (dateInputRef.current.showPicker) {
-                      dateInputRef.current.showPicker()
-                    } else {
-                      dateInputRef.current.focus()
-                    }
-                  }
+              <BulkOrderForm
+                key={activeTab}
+                type={activeTab}
+                partyOptions={partyOptions}
+                voucherOptions={voucherOptions}
+                contactPhone={cp.customerCareNumber}
+                onTrack={() => {
+                  setViewMode("orders")
+                  window.scrollTo({ top: 0, behavior: "smooth" })
                 }}
-                className="relative flex items-center justify-between w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs transition-colors font-medium cursor-pointer hover:border-zinc-400 focus-within:border-[#E53935] focus-within:ring-1 focus-within:ring-[#E53935]"
-              >
-                <span
-                  className={
-                    currentForm.eventDate
-                      ? "text-zinc-900 dark:text-white font-semibold"
-                      : "text-zinc-400 dark:text-zinc-500"
-                  }
-                >
-                  {currentForm.eventDate
-                    ? new Date(currentForm.eventDate + "T00:00:00").toLocaleDateString("en-IN", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric"
-                      })
-                    : "Select Date*"}
-                </span>
-
-                <Calendar className="w-4 h-4 text-[#E53935] shrink-0 pointer-events-none" />
-
-                <input
-                  type="date"
-                  ref={dateInputRef}
-                  value={currentForm.eventDate || ""}
-                  min={new Date().toISOString().split("T")[0]}
-                  onChange={(e) => {
-                    handleFieldChange("eventDate", e.target.value)
-                    handleFieldChange("occasion", e.target.value)
-                  }}
-                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
-                />
-              </div>
-
-              {/* Your Query */}
-              <div>
-                <textarea
-                  rows={4}
-                  placeholder="Your Query"
-                  value={currentForm.query}
-                  onChange={(e) => handleFieldChange("query", e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white text-xs outline-none focus:border-[#E53935] dark:focus:border-[#E53935] transition-colors placeholder:text-zinc-400 font-medium resize-none"
-                />
-              </div>
-
-              {/* SUBMIT Button */}
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full py-3 bg-[#E53935] hover:bg-[#D32F2F] active:scale-98 disabled:opacity-50 text-white font-bold rounded-lg text-xs uppercase tracking-wider transition-all shadow-md shadow-red-500/20 cursor-pointer border-0 flex items-center justify-center gap-2"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Submitting...</span>
-                    </>
-                  ) : (
-                    "SUBMIT"
-                  )}
-                </button>
-              </div>
-            </form>
-          )}
-        </section>
+              />
+            </section>
 
         {activeTab === "virtual_party" ? (
           /* ════════════════════════════════════════════════════════════
