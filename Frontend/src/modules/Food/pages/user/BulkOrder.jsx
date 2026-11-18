@@ -576,7 +576,7 @@ export default function BulkOrder() {
 
         {/* ── Brand + section tabs (tabs get their own full-width row so nothing crowds or overflows on a phone) ── */}
         <div className="border-b border-zinc-200/80 dark:border-zinc-800">
-          <div className="px-4 pt-2.5 pb-1 flex items-center gap-2 min-w-0">
+          <div className="px-4 pt-2.5 pb-1.5 flex items-center justify-center gap-2 min-w-0">
             <img
               src={logoImg}
               alt="Papa Veg Pizza"
