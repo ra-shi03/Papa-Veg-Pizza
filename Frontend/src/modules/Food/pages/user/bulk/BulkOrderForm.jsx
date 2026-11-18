@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react"
 import { useJsApiLoader } from "@react-google-maps/api"
-import { CheckCircle2, Loader2, MapPin, Store, Truck, ShoppingBag, Phone, ListChecks, Plus, Minus, X } from "lucide-react"
+import { CheckCircle2, Loader2, MapPin, Store, Truck, ShoppingBag, Phone, ListChecks, Plus, Minus, X, Search } from "lucide-react"
 import { toast } from "sonner"
 import apiClient, { userClient } from "@/services/api/axios"
 import { locationAPI } from "@/services/api/location"
@@ -33,6 +33,74 @@ const readStoredUser = () => {
 }
 
 const today = () => new Date().toISOString().slice(0, 10)
+
+/** A search box over the store's menu: type to filter, tap an item (with its size and price) to choose it. */
+function ItemSearch({ choices, value, onChange, fieldClass }) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState("")
+  const box = useRef(null)
+  const chosen = choices.find((c) => c.key === value)
+
+  useEffect(() => {
+    if (!open) return undefined
+    const away = (e) => { if (box.current && !box.current.contains(e.target)) { setOpen(false); setQ("") } }
+    document.addEventListener("mousedown", away)
+    document.addEventListener("touchstart", away)
+    return () => { document.removeEventListener("mousedown", away); document.removeEventListener("touchstart", away) }
+  }, [open])
+
+  const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const shown = words.length ? choices.filter((c) => words.every((w) => `${c.name} ${c.size} ${c.group}`.toLowerCase().includes(w))) : choices
+  const groups = []
+  for (const c of shown.slice(0, 80)) {
+    const g = groups.find((x) => x[0] === c.group)
+    if (g) g[1].push(c); else groups.push([c.group, [c]])
+  }
+
+  return (
+    <div ref={box} className="relative">
+      <div className="relative">
+        <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <input
+          type="text"
+          className={`${fieldClass} pl-10 pr-9`}
+          placeholder="Search an item (e.g. paneer, burger)"
+          aria-label="Item"
+          autoComplete="off"
+          value={open ? q : (chosen ? `${chosen.name}${chosen.size ? ` · ${chosen.size}` : ""} — ₹${chosen.price}` : "")}
+          onFocus={() => { setOpen(true); setQ("") }}
+          onChange={(e) => { setQ(e.target.value); setOpen(true) }}
+        />
+        {chosen && !open && (
+          <button type="button" onClick={() => onChange("")} className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-transparent border-0 cursor-pointer text-zinc-400" aria-label="Clear item"><X className="w-4 h-4 mx-auto" /></button>
+        )}
+      </div>
+      {open && (
+        <div className="absolute z-30 left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl">
+          {groups.length === 0 && <p className="m-0 p-4 text-xs text-zinc-500">No item matches "{q}".</p>}
+          {groups.map(([g, list]) => (
+            <div key={g}>
+              <p className="m-0 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400 bg-zinc-50 dark:bg-zinc-950/60 sticky top-0">{g}</p>
+              {list.map((c) => (
+                <button
+                  type="button"
+                  key={c.key}
+                  onClick={() => { onChange(c.key); setOpen(false); setQ("") }}
+                  className={`w-full text-left px-3 py-2.5 flex items-center justify-between gap-3 border-0 cursor-pointer ${c.key === value ? "bg-[#E53935]/5" : "bg-transparent"} hover:bg-zinc-50 dark:hover:bg-zinc-800`}
+                >
+                  <span className="min-w-0 text-sm text-zinc-900 dark:text-white">{c.name}{c.size && <span className="text-zinc-500"> · {c.size}</span>}</span>
+                  <span className="shrink-0 text-sm font-bold text-zinc-800 dark:text-zinc-200">₹{c.price}</span>
+                </button>
+              ))}
+            </div>
+          ))}
+          {shown.length > 80 && <p className="m-0 p-3 text-[11px] text-zinc-400">Keep typing to narrow the list.</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 
 /**
  * The request form. Virtual Party: the customer picks a store near them, takeaway or delivery (with an address), the date
@@ -352,19 +420,12 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
                   const c = byKey.get(l.key)
                   return (
                     <div key={i} className="rounded-xl border border-zinc-200 dark:border-zinc-700 p-2.5 space-y-2 bg-white dark:bg-zinc-900">
-                      <select
-                        className={`${field} px-3`}
+                      <ItemSearch
+                        choices={choices}
                         value={l.key}
-                        onChange={(e) => { setLine(i, { key: e.target.value }); setErrors((p) => ({ ...p, items: "" })) }}
-                        aria-label="Item"
-                      >
-                        <option value="">Choose an item</option>
-                        {groups.map(([g, list]) => (
-                          <optgroup key={g} label={g}>
-                            {list.map((o) => <option key={o.key} value={o.key}>{o.name}{o.size ? ` · ${o.size}` : ""} — ₹{o.price}</option>)}
-                          </optgroup>
-                        ))}
-                      </select>
+                        fieldClass={field}
+                        onChange={(key) => { setLine(i, { key }); setErrors((p) => ({ ...p, items: "" })) }}
+                      />
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs text-zinc-500 min-w-0">
                           {c ? <><b className="text-zinc-800 dark:text-zinc-200">₹{c.price}</b> each · <b className="text-zinc-800 dark:text-zinc-200">₹{(c.price * (Number(l.qty) || 0)).toLocaleString("en-IN")}</b></> : "Pick an item and quantity"}
