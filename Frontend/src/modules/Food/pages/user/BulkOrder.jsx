@@ -550,7 +550,7 @@ export default function BulkOrder() {
   ]
 
   return (
-    <AnimatedPage className="min-h-screen bg-white dark:bg-black font-sans pb-16">
+    <AnimatedPage className="min-h-screen bg-white dark:bg-black font-sans pb-16 overflow-x-hidden">
       {/* ── Sticky Header Wrapper (Sticks as user scrolls) ── */}
       <div className="sticky top-0 z-40 bg-white dark:bg-zinc-900 shadow-xs">
         {/* ── Top App Bar ── */}
@@ -574,24 +574,20 @@ export default function BulkOrder() {
           </h1>
         </header>
 
-        {/* ── Brand Sub-Header (Papa Veg Pizza Logo & Nav) ── */}
-        <div className="border-b border-zinc-200/80 dark:border-zinc-800 px-4 py-2.5 flex items-center justify-between">
-          <div className="flex items-center gap-2 shrink-0">
+        {/* ── Brand + section tabs (tabs get their own full-width row so nothing crowds or overflows on a phone) ── */}
+        <div className="border-b border-zinc-200/80 dark:border-zinc-800">
+          <div className="px-4 pt-2.5 pb-1 flex items-center gap-2 min-w-0">
             <img
               src={logoImg}
               alt="Papa Veg Pizza"
-              className="w-7 h-7 sm:w-8 sm:h-8 object-contain"
+              className="w-7 h-7 object-contain shrink-0"
               onError={(e) => {
                 e.target.style.display = "none"
               }}
             />
-            <span className="text-base sm:text-lg font-extrabold text-[#E53935] tracking-tight whitespace-nowrap">
-              Papa Veg Pizza
-            </span>
+            <span className="text-base font-extrabold text-[#E53935] tracking-tight truncate">Papa Veg Pizza</span>
           </div>
-
-          {/* Inquiry / My Orders / Contact */}
-          <div className="flex items-center gap-4 text-xs font-bold text-zinc-700 dark:text-zinc-300 shrink-0">
+          <nav className="grid grid-cols-3" aria-label="Bulk order sections">
             {[["inquiry", "Order"], ["orders", "My Orders"], ["contact", "Contact"]].map(([mode, text]) => (
               <button
                 key={mode}
@@ -601,16 +597,16 @@ export default function BulkOrder() {
                   setShowOutlets(false)
                   window.scrollTo({ top: 0, behavior: "smooth" })
                 }}
-                className={`transition-all cursor-pointer bg-transparent border-0 uppercase tracking-wider text-[11px] p-0 font-bold ${
+                className={`py-2.5 text-center uppercase tracking-wider text-[11px] font-bold bg-transparent border-0 border-b-2 cursor-pointer transition-colors ${
                   viewMode === mode
-                    ? "text-[#E53935] font-extrabold border-b-2 border-[#E53935] pb-0.5"
-                    : "text-zinc-500 hover:text-[#E53935]"
+                    ? "text-[#E53935] border-[#E53935] font-extrabold"
+                    : "text-zinc-500 border-transparent hover:text-[#E53935]"
                 }`}
               >
                 {text}
               </button>
             ))}
-          </div>
+          </nav>
         </div>
 
         {/* ── Tab Switcher: VIRTUAL PIZZA PARTY / E-GIFT VOUCHER (Inquiry View Only) ── */}

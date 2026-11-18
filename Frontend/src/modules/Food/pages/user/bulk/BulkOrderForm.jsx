@@ -237,7 +237,7 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
                   >
                     <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${on ? "bg-[#E53935] text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"}`}><Store className="w-4 h-4" /></span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-bold text-zinc-900 dark:text-white truncate">{s.storeName}</span>
+                      <span className="block text-sm font-bold text-zinc-900 dark:text-white leading-snug break-words">{s.storeName}</span>
                       <span className="block text-[11px] text-zinc-500 truncate">{s.address}</span>
                     </span>
                     <span className="text-[11px] font-bold text-[#E53935] shrink-0 flex items-center gap-1"><MapPin className="w-3 h-3" />{Number(s.distanceKm).toFixed(1)} km</span>
