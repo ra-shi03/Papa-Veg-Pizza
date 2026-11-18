@@ -39,6 +39,7 @@ const today = () => new Date().toISOString().slice(0, 10)
  */
 export default function BulkOrderForm({ type, partyOptions = [], voucherOptions = [], onTrack, contactPhone }) {
   const isParty = type === "virtual_party"
+  const isOther = (v) => /^other$/i.test(String(v || "").trim())
   const profile = useProfile?.() || {}
   const defaultAddress = useMemo(() => {
     try {
@@ -57,6 +58,7 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
     eventDate: "",
     eventTime: "",
     partySize: "",
+    partySizeOther: "",
     query: "",
     fulfilment: "takeaway",
     street: "",
@@ -126,6 +128,7 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
     if (f.name.trim().length < 2) e.name = "Enter your name"
     if (!/^\d{10}$/.test(f.phone.replace(/\D/g, "").slice(-10))) e.phone = "Enter a valid 10-digit number"
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) e.email = "Enter a valid email address"
+    if (isOther(f.partySize) && !f.partySizeOther.trim()) e.partySizeOther = "Tell us how many people or what you need"
     if (isParty) {
       if (!storeId) e.store = "Choose a store near you"
       if (!f.eventDate) e.eventDate = "Choose the date"
@@ -153,7 +156,7 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
         email: f.email.trim(),
         eventDate: f.eventDate,
         eventTime: f.eventTime,
-        partySize: f.partySize,
+        partySize: isOther(f.partySize) ? `Other: ${f.partySizeOther.trim()}` : f.partySize,
         query: f.query.trim(),
         type,
         ...(isParty
@@ -302,6 +305,12 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
                 {partyOptions.map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
             )}
+            {isOther(f.partySize) && (
+              <div className="mt-3">
+                <input className={field} placeholder="Tell us your party size or requirement" maxLength={100} value={f.partySizeOther} onChange={(e) => set("partySizeOther", e.target.value)} autoFocus />
+                <Err k="partySizeOther" />
+              </div>
+            )}
           </div>
         </>
       )}
@@ -313,6 +322,12 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
             <option value="">Select</option>
             {voucherOptions.map((o) => <option key={o} value={o}>{o}</option>)}
           </select>
+          {isOther(f.partySize) && (
+            <div className="mt-3">
+              <input className={field} placeholder="Tell us how many vouchers you need" maxLength={100} value={f.partySizeOther} onChange={(e) => set("partySizeOther", e.target.value)} autoFocus />
+              <Err k="partySizeOther" />
+            </div>
+          )}
         </div>
       )}
 
