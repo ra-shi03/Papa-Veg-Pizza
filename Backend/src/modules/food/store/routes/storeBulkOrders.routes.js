@@ -19,5 +19,7 @@ router.get('/:id', wrap('Bulk order', async (req) => ({ order: await svc.getForS
 router.post('/:id/confirm', wrap('Bulk order confirmed', async (req) => ({ order: await svc.storeConfirm(req.user, req.params.id, req.body) })));
 router.post('/:id/reject', wrap('Bulk order declined', async (req) => ({ order: await svc.storeReject(req.user, req.params.id, req.body?.reason) })));
 router.post('/:id/status', wrap('Bulk order updated', async (req) => ({ order: await svc.storeAdvance(req.user, req.params.id, req.body?.status) })));
+router.get('/:id/riders', wrap('Delivery partners', async (req) => ({ riders: await svc.ridersForBulk(req.user, req.params.id) })));
+router.post('/:id/assign-rider', wrap('Delivery partner assigned', async (req) => ({ order: await svc.assignRiderToBulk(req.user, req.params.id, req.body?.riderId) })));
 router.post('/:id/cancel', wrap('Bulk order cancelled', async (req) => ({ order: await svc.storeCancel(req.user, req.params.id, req.body?.reason) })));
 export default router;

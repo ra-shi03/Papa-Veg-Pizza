@@ -4,11 +4,11 @@ import { toast } from "sonner";
 import { adminClient } from "@/services/api/axios";
 
 const STATUS = {
-  new: "New", confirmed: "Confirmed", preparing: "Preparing", ready: "Ready", completed: "Completed", rejected: "Declined", cancelled: "Cancelled",
+  new: "New", confirmed: "Confirmed", preparing: "Preparing", ready: "Ready", out_for_delivery: "Out for delivery", completed: "Completed", rejected: "Declined", cancelled: "Cancelled",
 };
 const CLS = {
   new: "bg-amber-50 text-amber-700 border-amber-200", confirmed: "bg-blue-50 text-blue-700 border-blue-200", preparing: "bg-indigo-50 text-indigo-700 border-indigo-200",
-  ready: "bg-emerald-50 text-emerald-700 border-emerald-200", completed: "bg-emerald-600 text-white border-emerald-600", rejected: "bg-red-50 text-red-700 border-red-200", cancelled: "bg-zinc-100 text-zinc-600 border-zinc-200",
+  ready: "bg-emerald-50 text-emerald-700 border-emerald-200", out_for_delivery: "bg-sky-50 text-sky-700 border-sky-200", completed: "bg-emerald-600 text-white border-emerald-600", rejected: "bg-red-50 text-red-700 border-red-200", cancelled: "bg-zinc-100 text-zinc-600 border-zinc-200",
 };
 const when = (d) => (d ? new Date(d).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "-");
 
@@ -90,6 +90,8 @@ export default function BulkOrders() {
               </div>
             )}
             {open.query && <p className="m-0 whitespace-pre-wrap"><b>Special requests:</b> {open.query}</p>}
+            {open.quotedAmount != null && <p className="m-0"><b>Payment:</b> {open.paymentMethod === "online" ? "Online" : "Cash / UPI"} · {open.paymentStatus === "paid" ? "Paid" : "Not paid yet"}</p>}
+            {open.rider && <p className="m-0"><b>Delivery partner:</b> {open.rider.name}{open.rider.phone ? ` · ${open.rider.phone}` : ""}</p>}
             {open.quotedAmount != null && <p className="m-0"><b>Amount quoted:</b> ₹{Number(open.quotedAmount).toLocaleString("en-IN")}</p>}
             {open.reasonText && <p className="m-0"><b>Reason:</b> {open.reasonText}</p>}
             <div className="border-t border-zinc-100 dark:border-zinc-800 pt-2 space-y-0.5">

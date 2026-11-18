@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react"
 import { useJsApiLoader } from "@react-google-maps/api"
-import { CheckCircle2, Loader2, MapPin, Store, Truck, ShoppingBag, Phone, ListChecks, Plus, Minus, X, Search } from "lucide-react"
+import { useNavigate } from "react-router-dom"
+import { CheckCircle2, Loader2, MapPin, Store, Truck, ShoppingBag, Phone, ListChecks, Plus, Minus, X, Search, Banknote, CreditCard } from "lucide-react"
 import { toast } from "sonner"
 import apiClient, { userClient } from "@/services/api/axios"
 import { locationAPI } from "@/services/api/location"
@@ -121,6 +122,9 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
     partySizeOther: "",
     query: "",
     fulfilment: "takeaway",
+    paymentMethod: "cod",
+    lat: null,
+    lng: null,
     street: "",
     landmark: "",
     city: "",
@@ -133,12 +137,33 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
 
   // City and state suggestions from Google Places (the project map key). Picking a city also fills its state.
   const { isLoaded: mapsReady } = useJsApiLoader(ADMIN_GOOGLE_MAPS_LOADER)
+  const streetRef = useRef(null)
   const cityRef = useRef(null)
   const stateRef = useRef(null)
   const delivery = isParty && f.fulfilment === "delivery"
   useEffect(() => {
     if (!mapsReady || !delivery || !window.google?.maps?.places) return undefined
     const made = []
+    if (streetRef.current) {
+      // the exact address: picking a suggestion also saves its map point, where the delivery partner goes
+      const ac = new window.google.maps.places.Autocomplete(streetRef.current, { componentRestrictions: { country: "in" }, fields: ["address_components", "geometry", "name", "formatted_address"] })
+      ac.addListener("place_changed", () => {
+        const place = ac.getPlace()
+        if (!place?.geometry?.location) return
+        const comp = (t) => place.address_components?.find((c) => c.types.includes(t))?.long_name || ""
+        setF((p) => ({
+          ...p,
+          street: [place.name, comp("sublocality_level_1") || comp("sublocality")].filter(Boolean).join(", ") || place.formatted_address || p.street,
+          city: comp("locality") || comp("administrative_area_level_2") || p.city,
+          state: comp("administrative_area_level_1") || p.state,
+          pincode: comp("postal_code") || p.pincode,
+          lat: place.geometry.location.lat(),
+          lng: place.geometry.location.lng(),
+        }))
+        setErrors((p) => ({ ...p, street: "", city: "" }))
+      })
+      made.push(ac)
+    }
     if (cityRef.current) {
       const ac = new window.google.maps.places.Autocomplete(cityRef.current, { types: ["(cities)"], componentRestrictions: { country: "in" }, fields: ["address_components", "name"] })
       ac.addListener("place_changed", () => {
@@ -162,6 +187,7 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
   }, [mapsReady, delivery])
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(null)
+  const navigate = useNavigate()
 
   // Stores near the customer (within the radius the super admin set), nearest first
   const [stores, setStores] = useState([])
@@ -282,8 +308,9 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
           ? {
               storeId,
               fulfilment: f.fulfilment,
+              paymentMethod: f.paymentMethod,
               ...(f.fulfilment === "delivery"
-                ? { address: { street: f.street.trim(), landmark: f.landmark.trim(), city: f.city.trim(), state: f.state.trim(), pincode: f.pincode.trim() } }
+                ? { address: { street: f.street.trim(), landmark: f.landmark.trim(), city: f.city.trim(), state: f.state.trim(), pincode: f.pincode.trim(), ...(f.lat != null ? { lat: f.lat, lng: f.lng } : {}) } }
                 : {}),
             }
           : {}),
@@ -300,6 +327,17 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
   }
 
   const Err = ({ k }) => (errors[k] ? <p className="mt-1 text-[11px] font-semibold text-[#E53935]">{errors[k]}</p> : null)
+
+  // A bulk order at a store becomes a real order (payment, delivery partner), so the customer has to be signed in
+  if (isParty && !isSignedIn()) {
+    return (
+      <div className="py-8 text-center space-y-3">
+        <p className="m-0 text-sm text-zinc-700 dark:text-zinc-200 font-semibold">Sign in to place a bulk order</p>
+        <p className="m-0 text-xs text-zinc-500 max-w-xs mx-auto">So the store and the delivery partner can reach you, and you can follow and pay for your order.</p>
+        <button type="button" onClick={() => navigate("/user/auth/login")} className="h-11 px-6 rounded-xl bg-[#E53935] text-white text-sm font-bold border-0 cursor-pointer">Sign in</button>
+      </div>
+    )
+  }
 
   if (done) {
     return (
@@ -393,7 +431,8 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
             <div className="space-y-3 rounded-xl bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800 p-4">
               <span className={label}>Delivery address</span>
               <div>
-                <input className={field} placeholder="House / flat, street" value={f.street} onChange={(e) => set("street", e.target.value)} />
+                <input ref={streetRef} autoComplete="off" className={field} placeholder="Search your address, or type it" value={f.street} onChange={(e) => setF((p) => ({ ...p, street: e.target.value, lat: null, lng: null }))} />
+                {f.lat != null && <p className="mt-1 text-[11px] font-semibold text-emerald-600 flex items-center gap-1"><MapPin className="w-3 h-3" />Location saved for the delivery partner</p>}
                 <Err k="street" />
               </div>
               <input className={field} placeholder="Landmark (optional)" value={f.landmark} onChange={(e) => set("landmark", e.target.value)} />
@@ -504,9 +543,30 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
         </div>
       )}
 
+      {isParty && (
+        <div>
+          <span className={label}>5. How will you pay?</span>
+          <div className="grid grid-cols-2 gap-2">
+            {[{ id: "cod", t: "Cash / UPI", d: f.fulfilment === "delivery" ? "On delivery" : "When you collect", I: Banknote }, { id: "online", t: "Pay online", d: "After the store confirms", I: CreditCard }].map(({ id, t, d, I }) => (
+              <button
+                type="button"
+                key={id}
+                onClick={() => set("paymentMethod", id)}
+                className={`rounded-xl border px-3 py-3 text-left cursor-pointer transition-all ${f.paymentMethod === id ? "border-[#E53935] bg-[#E53935]/5 ring-2 ring-[#E53935]/15" : "border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900"}`}
+              >
+                <I className={`w-5 h-5 mb-1 ${f.paymentMethod === id ? "text-[#E53935]" : "text-zinc-500"}`} />
+                <span className="block text-sm font-bold text-zinc-900 dark:text-white">{t}</span>
+                <span className="block text-[11px] text-zinc-500">{d}</span>
+              </button>
+            ))}
+          </div>
+          {f.paymentMethod === "online" && <p className="mt-2 mb-0 text-[11px] text-zinc-500">You pay online from My Orders once the store confirms the final amount. The store starts preparing after your payment.</p>}
+        </div>
+      )}
+
       {/* About you */}
       <div className="space-y-3">
-        <span className={label}>{isParty ? "5. About you" : "About you"}</span>
+        <span className={label}>{isParty ? "6. About you" : "About you"}</span>
         <div>
           <input className={field} placeholder="Name*" value={f.name} onChange={(e) => set("name", e.target.value)} autoComplete="name" />
           <Err k="name" />
@@ -539,7 +599,7 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
         {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</> : isParty ? "Send request to the store" : "Submit inquiry"}
       </button>
       <p className="text-center text-[11px] text-zinc-500 m-0">
-        {isParty ? "The store confirms the price and timing. You pay when you collect or receive the order." : "Our corporate desk will get back to you."}
+        {isParty ? f.paymentMethod === "online" ? "The store confirms the price and timing, then you pay online." : "The store confirms the price and timing. You pay when you collect or receive the order." : "Our corporate desk will get back to you."}
         {contactPhone && (
           <a href={`tel:${String(contactPhone).replace(/\s+/g, "")}`} className="ml-1 font-bold text-[#E53935] inline-flex items-center gap-1"><Phone className="w-3 h-3" />Call us</a>
         )}

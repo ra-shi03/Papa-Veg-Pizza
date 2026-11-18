@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Check, ChevronDown, Loader2, MapPin, ShoppingBag, Store, Truck, X } from "lucide-react"
+import { Banknote, Check, ChevronDown, CreditCard, Loader2, MapPin, Phone, ShoppingBag, Store, Truck, X } from "lucide-react"
 import { toast } from "sonner"
 import { userClient } from "@/services/api/axios"
+import { orderAPI } from "@food/api"
+import { initRazorpayPayment } from "@food/utils/razorpay"
 
 const isSignedIn = () => {
   try {
@@ -17,11 +19,13 @@ const STATUS = {
   confirmed: { label: "Confirmed", cls: "bg-blue-50 text-blue-700 border-blue-200" },
   preparing: { label: "Being prepared", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" },
   ready: { label: "Ready", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  out_for_delivery: { label: "Out for delivery", cls: "bg-sky-50 text-sky-700 border-sky-200" },
   completed: { label: "Completed", cls: "bg-emerald-600 text-white border-emerald-600" },
   rejected: { label: "Declined", cls: "bg-red-50 text-red-700 border-red-200" },
   cancelled: { label: "Cancelled", cls: "bg-zinc-100 text-zinc-600 border-zinc-200" },
 }
-const STEPS = ["new", "confirmed", "preparing", "ready", "completed"]
+const stepsFor = (o) => (o.fulfilment === "delivery" ? ["new", "confirmed", "preparing", "ready", "out_for_delivery", "completed"] : ["new", "confirmed", "preparing", "ready", "completed"])
+const STEP_LABEL = { new: "Sent", out_for_delivery: "On the way", completed: "Delivered" }
 
 const when = (d) => (d ? new Date(d).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "")
 
@@ -32,6 +36,45 @@ export default function MyBulkOrders() {
   const [error, setError] = useState(false)
   const [open, setOpen] = useState("")
   const [busy, setBusy] = useState("")
+
+  // Pay online: the server makes the Razorpay order, the customer pays, then the payment is verified like any order
+  const payOnline = async (o) => {
+    setBusy(o.id)
+    try {
+      const res = await userClient.post(`/food/user/bulk-orders/${o.id}/pay`, {})
+      const { razorpay, orderMongoId } = res?.data?.data || {}
+      if (!razorpay?.orderId) throw new Error("Payment could not be started")
+      await new Promise((resolve) => {
+        let settled = false
+        const done = () => { if (!settled) { settled = true; resolve() } }
+        initRazorpayPayment({
+          key: razorpay.key,
+          amount: razorpay.amount,
+          currency: razorpay.currency,
+          order_id: razorpay.orderId,
+          description: `Bulk order ${o.reference}`,
+          prefill: { name: o.name, email: o.email, contact: o.phone },
+          notes: { orderId: String(orderMongoId) },
+          handler: async (r) => {
+            try {
+              await orderAPI.verifyPayment({ orderId: String(orderMongoId), razorpayOrderId: r.razorpay_order_id, razorpayPaymentId: r.razorpay_payment_id, razorpaySignature: r.razorpay_signature })
+              toast.success("Payment received")
+            } catch (_) {
+              toast.error("Payment received but not confirmed yet. Please contact support if it does not update.")
+            }
+            done()
+          },
+          onClose: done,
+          onError: (e) => { toast.error(e?.description || "Payment failed. You can try again."); done() },
+        }).catch(() => { toast.error("Could not open the payment window. Please try again."); done() })
+      })
+      await load()
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.response?.data?.error || err?.message || "Could not start the payment")
+    } finally {
+      setBusy("")
+    }
+  }
 
   const load = useCallback(async () => {
     if (!isSignedIn()) return
@@ -104,13 +147,13 @@ export default function MyBulkOrders() {
               <div className="px-4 pb-4 border-t border-zinc-100 dark:border-zinc-800 pt-3 space-y-3">
                 {!closed && (
                   <ol className="m-0 p-0 list-none flex items-center justify-between">
-                    {STEPS.map((s, i) => {
+                    {stepsFor(o).map((s, i) => {
                       const done = reached.has(s)
                       return (
                         <li key={s} className="flex-1 flex flex-col items-center relative">
                           {i > 0 && <span className={`absolute top-3 right-1/2 w-full h-0.5 ${done ? "bg-emerald-500" : "bg-zinc-200 dark:bg-zinc-700"}`} />}
                           <span className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center text-white ${done ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-700"}`}>{done && <Check className="w-3.5 h-3.5" />}</span>
-                          <span className="mt-1 text-[9px] font-bold uppercase text-zinc-500 text-center">{s === "new" ? "Sent" : s}</span>
+                          <span className="mt-1 text-[9px] font-bold uppercase text-zinc-500 text-center">{STEP_LABEL[s] || s}</span>
                         </li>
                       )
                     })}
@@ -126,6 +169,20 @@ export default function MyBulkOrders() {
                     ))}
                     {o.estimatedTotal != null && <div className="flex justify-between pt-1 border-t border-zinc-200 dark:border-zinc-700 text-xs font-extrabold text-zinc-900 dark:text-white"><span>Estimated total</span><span>₹{Number(o.estimatedTotal).toLocaleString("en-IN")}</span></div>}
                   </div>
+                )}
+                {o.quotedAmount != null && (
+                  <div className="flex items-center justify-between rounded-xl border border-zinc-200 dark:border-zinc-700 px-3 py-2.5">
+                    <div className="text-xs">
+                      <p className="m-0 font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">{o.paymentMethod === "online" ? <CreditCard className="w-3.5 h-3.5" /> : <Banknote className="w-3.5 h-3.5" />}₹{Number(o.quotedAmount).toLocaleString("en-IN")} · {o.paymentMethod === "online" ? "Online" : o.fulfilment === "delivery" ? "Cash / UPI on delivery" : "Cash / UPI at the store"}</p>
+                      <p className={`m-0 mt-0.5 font-semibold ${o.paymentStatus === "paid" ? "text-emerald-600" : "text-amber-600"}`}>{o.paymentStatus === "paid" ? "Paid" : "Not paid yet"}</p>
+                    </div>
+                    {o.canPayOnline && (
+                      <button type="button" disabled={busy === o.id} onClick={() => payOnline(o)} className="h-9 px-4 rounded-lg bg-[#E53935] text-white text-xs font-bold border-0 cursor-pointer disabled:opacity-60">{busy === o.id ? "Please wait..." : "Pay now"}</button>
+                    )}
+                  </div>
+                )}
+                {o.rider && (
+                  <p className="m-0 text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5"><Truck className="w-3.5 h-3.5 shrink-0" /> Delivery partner: <b>{o.rider.name}</b>{o.rider.phone && <a href={`tel:${o.rider.phone}`} className="ml-1 text-[#E53935] font-bold inline-flex items-center gap-1"><Phone className="w-3 h-3" />Call</a>}</p>
                 )}
                 {o.storeNote && <p className="m-0 text-xs text-zinc-600 dark:text-zinc-300"><b>Note from the store:</b> {o.storeNote}</p>}
                 {o.reasonText && closed && <p className="m-0 text-xs text-zinc-600 dark:text-zinc-300"><b>Reason:</b> {o.reasonText}</p>}

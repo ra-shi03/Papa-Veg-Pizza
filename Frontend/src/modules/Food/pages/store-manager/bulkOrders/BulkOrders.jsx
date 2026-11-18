@@ -9,12 +9,12 @@ const STATUS = {
   confirmed: { label: "Confirmed", cls: "bg-blue-50 text-blue-700 border-blue-200" },
   preparing: { label: "Preparing", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" },
   ready: { label: "Ready", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  out_for_delivery: { label: "Out for delivery", cls: "bg-sky-50 text-sky-700 border-sky-200" },
   completed: { label: "Completed", cls: "bg-emerald-600 text-white border-emerald-600" },
   rejected: { label: "Declined", cls: "bg-red-50 text-red-700 border-red-200" },
   cancelled: { label: "Cancelled", cls: "bg-zinc-100 text-zinc-600 border-zinc-200" },
 };
-const TABS = ["all", "new", "confirmed", "preparing", "ready", "completed", "rejected", "cancelled"];
-const NEXT = { confirmed: ["preparing", "Start preparing"], preparing: ["ready", "Mark ready"] };
+const TABS = ["all", "new", "confirmed", "preparing", "ready", "out_for_delivery", "completed", "rejected", "cancelled"];
 const err = (e) => e?.response?.data?.message || e?.response?.data?.error || e?.message || "Something went wrong";
 const when = (d) => (d ? new Date(d).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "-");
 
@@ -30,6 +30,8 @@ export default function BulkOrders() {
   const [note, setNote] = useState("");
   const [reason, setReason] = useState("");
   const [mode, setMode] = useState(""); // confirm | reject | cancel
+  const [riders, setRiders] = useState([]);
+  const [riderId, setRiderId] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -51,6 +53,15 @@ export default function BulkOrders() {
     const t = setInterval(load, 30000);
     return () => clearInterval(t);
   }, [load]);
+
+  // the delivery partners this store can assign, for an open delivery order
+  useEffect(() => {
+    setRiders([]); setRiderId("");
+    if (!open || open.fulfilment !== "delivery" || !open.orderId || !["confirmed", "preparing", "ready"].includes(open.status)) return;
+    let on = true;
+    apiClient.get(`${BASE}/${open.id}/riders`).then((res) => { if (on) setRiders(res?.data?.data?.riders || []); }).catch(() => {});
+    return () => { on = false; };
+  }, [open?.id, open?.status, open?.rider?.name]);
 
   const reset = () => { setMode(""); setAmount(""); setNote(""); setReason(""); };
   const act = async (path, body, okMessage) => {
@@ -86,7 +97,7 @@ export default function BulkOrders() {
       <div className="flex gap-1.5 flex-wrap">
         {TABS.map((t) => (
           <button key={t} onClick={() => setStatus(t)} className={`px-3 py-1.5 rounded-full text-xs font-bold border cursor-pointer capitalize ${status === t ? "bg-primary text-white border-primary" : "bg-white dark:bg-zinc-900 text-zinc-600 border-zinc-200 dark:border-zinc-700"}`}>
-            {t === "rejected" ? "Declined" : t} <span className="opacity-70">({count(t)})</span>
+            {t === "rejected" ? "Declined" : t === "out_for_delivery" ? "Out for delivery" : t.replace(/_/g, " ")} <span className="opacity-70">({count(t)})</span>
           </button>
         ))}
       </div>
@@ -141,6 +152,32 @@ export default function BulkOrders() {
                 <p className="m-0 text-[10px] font-bold uppercase text-zinc-400">{open.fulfilment === "delivery" ? "Deliver to" : "Takeaway"}</p>
                 <p className="m-0 flex gap-1"><MapPin size={12} className="mt-0.5 shrink-0" />{open.fulfilment === "delivery" ? [open.address?.street, open.address?.landmark, open.address?.city, open.address?.state, open.address?.pincode].filter(Boolean).join(", ") : "The customer collects from your store"}</p>
               </div>
+              {open.quotedAmount != null && (
+                <div className="col-span-2 rounded-xl border border-zinc-200 dark:border-zinc-700 px-3 py-2">
+                  <p className="m-0 text-[10px] font-bold uppercase text-zinc-400">Payment</p>
+                  <p className="m-0 font-bold">₹{Number(open.quotedAmount).toLocaleString("en-IN")} · {open.paymentMethod === "online" ? "Online" : open.fulfilment === "delivery" ? "Cash / UPI on delivery" : "Cash / UPI at the store"}</p>
+                  <p className={`m-0 font-semibold ${open.paymentStatus === "paid" ? "text-emerald-600" : "text-amber-600"}`}>{open.paymentStatus === "paid" ? "Paid" : open.paymentMethod === "online" ? "Waiting for the customer's online payment" : "To be collected"}</p>
+                </div>
+              )}
+              {open.fulfilment === "delivery" && open.orderId && (
+                <div className="col-span-2 rounded-xl border border-zinc-200 dark:border-zinc-700 px-3 py-2 space-y-2">
+                  <p className="m-0 text-[10px] font-bold uppercase text-zinc-400">Delivery partner</p>
+                  {open.rider ? (
+                    <p className="m-0 font-bold flex items-center gap-2">{open.rider.name}{open.rider.phone && <span className="font-normal text-zinc-500 flex items-center gap-1"><Phone size={11} />{open.rider.phone}</span>}<span className="text-[10px] font-bold uppercase text-emerald-600">{open.rider.status === "accepted" ? "Accepted" : "Assigned"}</span></p>
+                  ) : (
+                    <p className="m-0 text-amber-600 font-semibold">No delivery partner yet. Assign one before the order is ready.</p>
+                  )}
+                  {["confirmed", "preparing", "ready"].includes(open.status) && (
+                    <div className="flex gap-2">
+                      <select value={riderId} onChange={(e) => setRiderId(e.target.value)} className="flex-1 min-w-0 h-9 rounded-lg border border-zinc-200 dark:border-zinc-700 px-2 text-xs bg-white dark:bg-zinc-900">
+                        <option value="">{riders.length ? (open.rider ? "Change delivery partner" : "Choose a delivery partner") : "No delivery partner available"}</option>
+                        {riders.map((r) => <option key={r._id} value={r._id}>{r.name} · {r.availability === "busy" ? "busy" : "free"}{r.distanceFromStore ? ` · ${r.distanceFromStore} km` : ""}</option>)}
+                      </select>
+                      <button disabled={busy || !riderId} onClick={() => act("assign-rider", { riderId }, "Delivery partner assigned.")} className="h-9 px-4 rounded-lg bg-primary text-white text-xs font-bold border-0 cursor-pointer disabled:opacity-50">Assign</button>
+                    </div>
+                  )}
+                </div>
+              )}
               {(open.items || []).length > 0 && (
                 <div className="col-span-2">
                   <p className="m-0 text-[10px] font-bold uppercase text-zinc-400">Items</p>
@@ -189,8 +226,28 @@ export default function BulkOrders() {
                     <button onClick={() => setMode("reject")} className="h-10 px-5 rounded-lg border border-red-300 text-red-600 text-sm font-bold bg-transparent cursor-pointer">Decline</button>
                   </>
                 )}
-                {NEXT[open.status] && <button disabled={busy} onClick={() => act("status", { status: NEXT[open.status][0] }, "Updated. The customer has been emailed.")} className="h-10 px-5 rounded-lg bg-primary text-white text-sm font-bold border-0 cursor-pointer disabled:opacity-60">{NEXT[open.status][1]}</button>}
-                {open.status === "ready" && <button disabled={busy} onClick={() => act("status", { status: "completed" }, "Order completed.")} className="h-10 px-5 rounded-lg bg-primary text-white text-sm font-bold border-0 cursor-pointer disabled:opacity-60">{open.fulfilment === "delivery" ? "Delivered" : "Handed over"}</button>}
+                {open.status === "confirmed" && (
+                  <button
+                    disabled={busy || (open.paymentMethod === "online" && open.paymentStatus !== "paid")}
+                    onClick={() => act("status", { status: "preparing" }, "Updated. The customer has been emailed.")}
+                    title={open.paymentMethod === "online" && open.paymentStatus !== "paid" ? "Waiting for the customer's online payment" : ""}
+                    className="h-10 px-5 rounded-lg bg-primary text-white text-sm font-bold border-0 cursor-pointer disabled:opacity-50"
+                  >Start preparing</button>
+                )}
+                {open.status === "preparing" && (
+                  <button
+                    disabled={busy || (open.fulfilment === "delivery" && !open.rider)}
+                    onClick={() => act("status", { status: "ready" }, "Marked ready. The customer has been emailed.")}
+                    title={open.fulfilment === "delivery" && !open.rider ? "Assign a delivery partner first" : ""}
+                    className="h-10 px-5 rounded-lg bg-primary text-white text-sm font-bold border-0 cursor-pointer disabled:opacity-50"
+                  >Mark ready</button>
+                )}
+                {open.status === "ready" && open.fulfilment !== "delivery" && (
+                  <button disabled={busy} onClick={() => act("status", { status: "completed" }, "Order handed over. Payment recorded.")} className="h-10 px-5 rounded-lg bg-primary text-white text-sm font-bold border-0 cursor-pointer disabled:opacity-60">Handed over</button>
+                )}
+                {["ready", "out_for_delivery"].includes(open.status) && open.fulfilment === "delivery" && (
+                  <p className="m-0 text-xs text-zinc-500 self-center">{open.status === "ready" ? "Waiting for the delivery partner to pick it up." : "On its way. The delivery partner completes it with the customer's code."}</p>
+                )}
                 {["confirmed", "preparing", "ready"].includes(open.status) && <button onClick={() => setMode("cancel")} className="h-10 px-5 rounded-lg border border-red-300 text-red-600 text-sm font-bold bg-transparent cursor-pointer">Cancel order</button>}
               </div>
             )}

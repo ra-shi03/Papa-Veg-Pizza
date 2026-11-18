@@ -186,7 +186,7 @@ function ImageUploadControl({
 }
 
 // A bulk order placed at a store is handled by that store: the super admin views it (status is read-only).
-const STORE_STATUS_LABEL = { new: "New", confirmed: "Confirmed", preparing: "Preparing", ready: "Ready", completed: "Completed", rejected: "Declined", cancelled: "Cancelled" }
+const STORE_STATUS_LABEL = { new: "New", confirmed: "Confirmed", preparing: "Preparing", ready: "Ready", out_for_delivery: "Out for delivery", completed: "Completed", rejected: "Declined", cancelled: "Cancelled" }
 const StoreStatusBadge = ({ status }) => (
   <span className="inline-block text-[11px] font-bold uppercase rounded-lg px-2.5 py-1 border bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700">
     {STORE_STATUS_LABEL[status] || status}
@@ -1746,6 +1746,8 @@ export default function BulkOrdersManagement() {
                         {selectedInquiry.estimatedTotal != null && <p className="m-0 flex justify-between"><span className="text-zinc-400 font-medium">Estimated total</span><b>₹{Number(selectedInquiry.estimatedTotal).toLocaleString("en-IN")}</b></p>}
                       </div>
                     )}
+                    {selectedInquiry.quotedAmount != null && <p className="m-0"><span className="text-zinc-400 font-medium">Payment:</span> <b>{selectedInquiry.paymentMethod === "online" ? "Online" : "Cash / UPI"} · {selectedInquiry.paymentStatus === "paid" ? "Paid" : "Not paid yet"}</b></p>}
+                    {selectedInquiry.rider && <p className="m-0"><span className="text-zinc-400 font-medium">Delivery partner:</span> <b>{selectedInquiry.rider.name}</b>{selectedInquiry.rider.phone ? ` · ${selectedInquiry.rider.phone}` : ""}</p>}
                     {selectedInquiry.quotedAmount != null && <p className="m-0"><span className="text-zinc-400 font-medium">Amount quoted:</span> <b>₹{Number(selectedInquiry.quotedAmount).toLocaleString("en-IN")}</b></p>}
                     {selectedInquiry.reasonText && <p className="m-0"><span className="text-zinc-400 font-medium">Reason:</span> {selectedInquiry.reasonText}</p>}
                     <div className="pt-1 space-y-0.5">

@@ -2252,3 +2252,94 @@ export const getOrderHistoryPublic = async (phone, orderId) => {
 };
 
 
+// ---------------------------------------------------------------------------------------------
+// Bulk orders: when a store confirms a bulk order, a real order is made from it, so the store's kitchen flow, the
+// rider app (OTP and handover photo for a delivery), cash collection and the finance ledger all work as for any order.
+// ---------------------------------------------------------------------------------------------
+export async function createOrderFromBulkOrder(bulk, store) {
+  const amount = Math.round((Number(bulk.quotedAmount ?? bulk.estimatedTotal) || 0) * 100) / 100;
+  if (!(amount >= 0)) throw new ValidationError('The bulk order has no amount.');
+  const delivery = bulk.fulfilment === 'delivery';
+  const online = bulk.paymentMethod === 'online';
+  const lat = Number(bulk.address?.lat);
+  const lng = Number(bulk.address?.lng);
+  const hasPoint = Number.isFinite(lat) && Number.isFinite(lng);
+
+  const deliveryAddress = delivery
+    ? {
+      label: 'Other', name: bulk.name, fullName: bulk.name, street: bulk.address?.street || '', additionalDetails: bulk.address?.landmark || '',
+      city: bulk.address?.city || store.city || '', state: bulk.address?.state || store.state || bulk.address?.city || 'NA', zipCode: bulk.address?.pincode || '', phone: bulk.phone,
+      ...(hasPoint ? { location: { type: 'Point', coordinates: [lng, lat] } } : {}),
+    }
+    : {
+      label: 'Other', name: bulk.name, fullName: bulk.name, street: `Collect at ${store.storeName || 'the store'}`, additionalDetails: '',
+      city: store.city || '', state: store.state || '', zipCode: store.pincode || '', phone: bulk.phone,
+    };
+
+  const pricing = { subtotal: amount, tax: 0, packagingFee: 0, deliveryFee: 0, platformFee: 0, handlingFee: 0, discount: 0, total: amount };
+  const payment = { method: online ? 'razorpay' : 'cash', status: online ? 'created' : 'cod_pending', amountDue: amount, razorpay: {}, qr: {} };
+
+  let distanceKm = null;
+  if (hasPoint && store.location?.coordinates?.length === 2) {
+    const [rLng, rLat] = store.location.coordinates;
+    const d = haversineKm(rLat, rLng, lat, lng);
+    distanceKm = Number.isFinite(d) ? d : null;
+  }
+  const riderEarning = delivery ? await getRiderEarning(distanceKm) : 0;
+  const { commissionAmount: storeCommission } = await foodTransactionService.getStoreCommissionSnapshot({ pricing, storeId: String(store._id) });
+  pricing.storeCommission = storeCommission || 0;
+  const settings = await getDispatchSettings();
+
+  const order = new FoodOrder({
+    userId: bulk.userId,
+    storeId: store._id,
+    franchiseId: store.franchiseId,
+    zoneId: store.zoneId,
+    items: (bulk.items || []).map((i) => ({ itemId: i.itemId, name: i.name, price: i.price, quantity: i.quantity, size: i.size || '', crust: i.crust || '', kind: 'product' })),
+    deliveryAddress,
+    customerName: bulk.name,
+    customerPhone: bulk.phone,
+    customerEmail: bulk.email,
+    pricing,
+    payment,
+    orderStatus: 'confirmed',
+    dispatch: { modeAtCreation: settings.dispatchMode, status: 'unassigned' },
+    statusHistory: [
+      { at: new Date(), byRole: 'SYSTEM', from: '', to: 'created', note: `Bulk order ${bulk.reference} placed` },
+      { at: new Date(), byRole: 'STORE_MANAGER', from: 'created', to: 'confirmed', note: 'Confirmed by the store' },
+    ],
+    note: [`Bulk order ${bulk.reference}`, bulk.query].filter(Boolean).join(' | '),
+    orderMethod: delivery ? 'delivery' : 'takeaway',
+    isPickup: !delivery,
+    deliveryFleet: 'standard',
+    riderEarning,
+    platformProfit: Math.max(0, (storeCommission || 0) - riderEarning),
+  });
+  await order.save();
+  try {
+    await foodTransactionService.createInitialTransaction({ ...(order.toObject?.() || order), pricing, payment });
+  } catch (err) {
+    await FoodOrder.deleteOne({ _id: order._id }).catch(() => {});
+    throw err;
+  }
+  return order;
+}
+
+/** A Razorpay payment for the order made from a bulk order (the customer pays online after the store confirms). */
+export async function startBulkOrderPayment(userId, orderId) {
+  const order = await FoodOrder.findOne({ _id: orderId, userId: new mongoose.Types.ObjectId(userId) });
+  if (!order) throw new NotFoundError('Order not found');
+  if (String(order.payment?.method) !== 'razorpay') throw new ValidationError('This order is paid on delivery.');
+  if (['paid', 'captured'].includes(String(order.payment?.status || '').toLowerCase())) throw new ValidationError('This order is already paid.');
+  if (!isRazorpayConfigured()) throw new ValidationError('Online payment is not available right now.');
+  const amountPaise = Math.round((order.pricing?.total ?? 0) * 100);
+  if (amountPaise < 100) throw new ValidationError('Amount too low for online payment');
+  let rz;
+  try {
+    rz = await createRazorpayOrder(amountPaise, 'INR', order._id.toString());
+  } catch (err) {
+    throw new ValidationError(err?.message || 'Payment gateway error');
+  }
+  await FoodOrder.updateOne({ _id: order._id }, { $set: { 'payment.razorpay': { orderId: rz.id, paymentId: '', signature: '' }, 'payment.status': 'created' } });
+  return { orderMongoId: String(order._id), razorpay: { key: getRazorpayKeyId(), orderId: rz.id, amount: rz.amount, currency: rz.currency || 'INR' } };
+}

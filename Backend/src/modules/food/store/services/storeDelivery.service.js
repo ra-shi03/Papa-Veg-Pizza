@@ -482,6 +482,7 @@ async function handOverToCustomer(ctx, order, notes) {
   getIO()?.to(rooms.user(String(order.userId))).emit('order_status_update', { orderMongoId: String(order._id), orderId: String(order._id), orderStatus: 'delivered' });
   getIO()?.to(rooms.store(String(order.storeId))).emit('order_status_update', { orderMongoId: String(order._id), orderId: String(order._id), orderStatus: 'delivered' });
   awardOrderPointsSafely(order._id);
+  import('../../orders/services/bulkOrderFlow.service.js').then((m) => m.syncBulkForOrderSafely(order._id)).catch(() => {});
   return { orderId: String(order._id), orderNumber: order.order_id || String(order._id), orderStatus: order.orderStatus, pickedUpAt: at };
 }
 

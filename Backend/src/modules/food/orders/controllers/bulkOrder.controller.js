@@ -1,4 +1,4 @@
-import { createBulkOrder, shape } from '../services/bulkOrderFlow.service.js';
+import { createBulkOrder, hydrate } from '../services/bulkOrderFlow.service.js';
 import { BulkOrderInquiry } from '../models/bulkOrderInquiry.model.js';
 import { BulkOrderConfig } from '../models/bulkOrderConfig.model.js';
 import { sendResponse } from '../../../../utils/response.js';
@@ -228,7 +228,7 @@ export async function listInquiriesAdmin(req, res, next) {
     ]);
 
     return sendResponse(res, 200, 'Bulk order inquiries retrieved', {
-      inquiries: inquiries.map((r) => ({ ...r, ...shape(r), storeId: r.storeId ? String(r.storeId._id || r.storeId) : null })),
+      inquiries: await hydrate(inquiries),
       total,
       page: parseInt(page, 10),
       totalPages: Math.ceil(total / parseInt(limit, 10)) || 1,

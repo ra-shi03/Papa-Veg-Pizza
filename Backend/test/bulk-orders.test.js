@@ -68,10 +68,11 @@ describe('placing a bulk order', () => {
         assert.equal(o.address.pincode, '452001');
     });
 
-    test('a guest can place one too, but cannot track it', async () => {
-        const o = ok(await fx.call('POST', PUBLIC, null, form({ email: 'guest@example.com' })), 201);
-        const row = await BulkOrderInquiry.findById(o.id).lean();
-        assert.equal(row.userId, null);
+    test('a store bulk order needs a signed-in customer (it becomes a real order); a payment method must be cod or online', async () => {
+        const guest = await fx.call('POST', PUBLIC, null, form({ email: 'guest@example.com' }));
+        assert.equal(guest.status, 400);
+        assert.match(guest.body.message || guest.body.error, /sign in/i);
+        assert.equal((await place({ paymentMethod: 'cheque' })).status, 400);
     });
 
     test('an e-gift voucher inquiry needs no store and stays with the super admin', async () => {
@@ -178,5 +179,154 @@ describe('super admin and franchise admin only view', () => {
         assert.deepEqual(ok(await fx.call('GET', '/v1/food/franchise/bulk-orders', B.adminToken)).orders, []);
         assert.equal((await fx.call('GET', '/v1/food/franchise/bulk-orders', A.managerToken)).status, 403);
         assert.equal((await fx.call('POST', `/v1/food/franchise/bulk-orders/${a[0].id}/confirm`, A.adminToken, {})).status, 404, 'no action routes');
+    });
+});
+
+
+describe('a delivery bulk order runs on the rider system', () => {
+    let o; let orderDoc; let rider; let FoodOrder;
+    const delivery = (extra = {}) => place({ fulfilment: 'delivery', address: { street: '12 MG Road', city: 'Indore', state: 'MP', pincode: '452001', lat: 22.72, lng: 75.86 }, ...extra });
+    const mine = async (id) => ok(await fx.call('GET', `/v1/food/user/bulk-orders/${id}`, A.customerToken)).order;
+    const setOrder = (patch) => FoodOrder.updateOne({ _id: orderDoc._id }, { $set: patch });
+
+    before(async () => {
+        ({ FoodOrder } = await import('../src/modules/food/orders/models/order.model.js'));
+        const { default: mongoose } = await import('mongoose');
+        const _id = new mongoose.Types.ObjectId();
+        await mongoose.connection.collection('food_delivery_partners').insertOne({
+            _id, name: 'Test Rider', phone: '9811100099', status: 'approved', availabilityStatus: 'online', storeId: new mongoose.Types.ObjectId(A.storeId), createdAt: new Date(), updatedAt: new Date(),
+        });
+        rider = String(_id);
+        o = ok(await delivery(), 201);
+    });
+
+    test('confirming makes a real delivery order with the agreed amount, to be paid in cash', async () => {
+        const c = ok(await store(`/${o.id}/confirm`, 'POST', { quotedAmount: 15000 })).order;
+        assert.ok(c.orderId);
+        orderDoc = await FoodOrder.findById(c.orderId).lean();
+        assert.equal(orderDoc.orderMethod, 'delivery');
+        assert.equal(orderDoc.isPickup, false);
+        assert.equal(orderDoc.pricing.total, 15000);
+        assert.equal(orderDoc.payment.method, 'cash');
+        assert.deepEqual(orderDoc.deliveryAddress.location.coordinates, [75.86, 22.72]);
+        assert.equal(c.paymentStatus, 'pending');
+        assert.equal(c.paymentMethod, 'cod');
+    });
+
+    test('it cannot be marked ready without a delivery partner, and the store cannot complete it by hand', async () => {
+        ok(await store(`/${o.id}/status`, 'POST', { status: 'preparing' }));
+        const r = await store(`/${o.id}/status`, 'POST', { status: 'ready' });
+        assert.equal(r.status, 400);
+        assert.match(r.body.message || r.body.error, /delivery partner/i);
+        assert.equal((await store(`/${o.id}/status`, 'POST', { status: 'completed' })).status, 400);
+    });
+
+    test('the store sees its riders, assigns one, and the customer sees the rider', async () => {
+        const riders = ok(await store(`/${o.id}/riders`)).riders;
+        assert.ok(riders.some((x) => x._id === rider));
+        assert.equal((await store(`/${o.id}/riders`, 'GET', undefined, B.managerToken)).status, 404, 'another store');
+        const a = ok(await store(`/${o.id}/assign-rider`, 'POST', { riderId: rider })).order;
+        assert.equal(a.rider.name, 'Test Rider');
+        assert.equal(ok(await store(`/${o.id}/status`, 'POST', { status: 'ready' })).order.status, 'ready');
+        assert.equal((await mine(o.id)).rider.name, 'Test Rider');
+    });
+
+    test('the rider\'s steps move the bulk order, and a paid order shows as paid', async () => {
+        await setOrder({ orderStatus: 'picked_up' });
+        assert.equal((await mine(o.id)).status, 'out_for_delivery');
+        await setOrder({ orderStatus: 'delivered', 'payment.status': 'paid' });
+        const done = await mine(o.id);
+        assert.equal(done.status, 'completed');
+        assert.equal(done.paymentStatus, 'paid');
+        assert.ok(emails.some((m) => /out for delivery/i.test(m.subject)));
+        assert.ok(emails.some((m) => /completed/i.test(m.subject)));
+    });
+
+    test('someone else\'s store cannot assign a rider', async () => {
+        const o2 = ok(await delivery({ query: 'other' }), 201);
+        ok(await store(`/${o2.id}/confirm`, 'POST', {}));
+        assert.equal((await store(`/${o2.id}/assign-rider`, 'POST', { riderId: rider }, B.managerToken)).status, 404);
+    });
+});
+
+describe('paying online', () => {
+    let o; let orderDoc; let FoodOrder;
+    before(async () => {
+        ({ FoodOrder } = await import('../src/modules/food/orders/models/order.model.js'));
+        o = ok(await place({ paymentMethod: 'online', query: 'online order' }), 201);
+    });
+
+    test('the choice is kept; nothing can be paid before the store confirms', async () => {
+        assert.equal(o.paymentMethod, 'online');
+        assert.equal(o.paymentStatus, 'pending');
+        assert.equal((await fx.call('POST', `/v1/food/user/bulk-orders/${o.id}/pay`, A.customerToken, {})).status, 400);
+    });
+
+    test('after confirming it can be paid, but the store cannot prepare it until it is paid', async () => {
+        const c = ok(await store(`/${o.id}/confirm`, 'POST', {})).order;
+        assert.equal(c.canPayOnline, true);
+        orderDoc = await FoodOrder.findById(c.orderId).lean();
+        assert.equal(orderDoc.payment.method, 'razorpay');
+        const r = await store(`/${o.id}/status`, 'POST', { status: 'preparing' });
+        assert.equal(r.status, 400);
+        assert.match(r.body.message || r.body.error, /pay online/i);
+        // no payment gateway in the test: the customer is told so rather than shown a broken screen
+        const pay = await fx.call('POST', `/v1/food/user/bulk-orders/${o.id}/pay`, A.customerToken, {});
+        assert.equal(pay.status, 400);
+        assert.match(pay.body.message || pay.body.error, /not available/i);
+        assert.equal((await fx.call('POST', `/v1/food/user/bulk-orders/${o.id}/pay`, B.customerToken, {})).status, 404, 'another customer');
+    });
+
+    test('once paid, it shows as paid and preparing is allowed', async () => {
+        await FoodOrder.updateOne({ _id: orderDoc._id }, { $set: { 'payment.status': 'paid' } });
+        const mineNow = ok(await fx.call('GET', `/v1/food/user/bulk-orders/${o.id}`, A.customerToken)).order;
+        assert.equal(mineNow.paymentStatus, 'paid');
+        assert.equal(mineNow.canPayOnline, false);
+        assert.equal(ok(await store(`/${o.id}/status`, 'POST', { status: 'preparing' })).order.status, 'preparing');
+    });
+
+    test('if the store cancels an order that was paid online, the money goes back to the customer\'s wallet', async () => {
+        const before = (await fx.call('GET', '/v1/food/user/wallet/me', A.customerToken)).body.data.wallet.balance;
+        const c = ok(await store(`/${o.id}/cancel`, 'POST', { reason: 'Oven broke down' })).order;
+        assert.equal(c.status, 'cancelled');
+        const after = (await fx.call('GET', '/v1/food/user/wallet/me', A.customerToken)).body.data.wallet.balance;
+        assert.equal(after, before + 18000, 'the 40 pizzas total');
+    });
+});
+
+
+describe('the delivery partner delivers a bulk order with the real rider steps', () => {
+    test('accept, pick up, reach the customer, OTP and photo: the bulk order completes and the cash is recorded', async () => {
+        const rider = await fx.partner();
+        const { default: mongoose } = await import('mongoose');
+        await mongoose.connection.collection('food_delivery_partners').updateOne({ _id: new mongoose.Types.ObjectId(rider.id) }, { $set: { storeId: new mongoose.Types.ObjectId(A.storeId), name: 'Rider Real' } });
+        const o = ok(await place({ fulfilment: 'delivery', query: 'real rider', address: { street: '5 Palasia', city: 'Indore', state: 'MP', pincode: '452001' } }), 201);
+        const c = ok(await store(`/${o.id}/confirm`, 'POST', { quotedAmount: 9000 })).order;
+        ok(await store(`/${o.id}/status`, 'POST', { status: 'preparing' }));
+        ok(await store(`/${o.id}/assign-rider`, 'POST', { riderId: rider.id }));
+        ok(await store(`/${o.id}/status`, 'POST', { status: 'ready' }));
+        const R = (path) => `/v1/food/delivery/orders/${c.orderId}/${path}`;
+        assert.equal((await fx.call('PATCH', R('accept'), rider.token, {})).status, 200);
+        const { FoodOrder: FO } = await import('../src/modules/food/orders/models/order.model.js');
+        const pick = await fx.call('PATCH', R('confirm-pickup'), rider.token, { confirmedOrderId: c.orderId });
+        assert.equal(pick.status, 200, JSON.stringify(pick.body));
+        assert.equal(ok(await fx.call('GET', `/v1/food/user/bulk-orders/${o.id}`, A.customerToken)).order.status, 'out_for_delivery');
+        assert.equal((await fx.call('PATCH', R('reached-drop'), rider.token, {})).status, 200);
+        const otp = (await FO.findById(c.orderId).select('+deliveryOtp').lean()).deliveryOtp;
+        const done = await fx.call('PATCH', R('complete'), rider.token, { otp, paymentMethod: 'cash', handoverPhotoUrl: 'https://example.com/proof.jpg' });
+        assert.equal(done.status, 200, JSON.stringify(done.body));
+        await new Promise((r) => setTimeout(r, 300));
+        const finalOrder = ok(await fx.call('GET', `/v1/food/user/bulk-orders/${o.id}`, A.customerToken)).order;
+        assert.equal(finalOrder.status, 'completed');
+        assert.equal(finalOrder.paymentStatus, 'paid');
+        assert.equal(finalOrder.rider.name, 'Rider Real');
+    });
+});
+
+describe('a delivery address without a state still makes an order', () => {
+    test('the store\'s state is used when the customer leaves it empty', async () => {
+        const o = ok(await place({ fulfilment: 'delivery', query: 'no state', address: { street: '9 Vijay Nagar', city: 'Indore' } }), 201);
+        const c = ok(await store(`/${o.id}/confirm`, 'POST', {})).order;
+        assert.ok(c.orderId);
     });
 });

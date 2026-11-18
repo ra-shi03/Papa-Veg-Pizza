@@ -35,7 +35,7 @@ import {
     listMyRefundsController,
     getMyRefundController
 } from '../controllers/userWallet.controller.js';
-import { listMyBulkOrders, getMyBulkOrder, cancelMyBulkOrder } from '../controllers/userBulkOrders.controller.js';
+import { listMyBulkOrders, getMyBulkOrder, cancelMyBulkOrder, payMyBulkOrder } from '../controllers/userBulkOrders.controller.js';
 import {
     getUserReferralDetailsController,
     getUserReferralStatsController
@@ -77,6 +77,7 @@ router.post('/wallet/payments/:id/release', releaseWalletPaymentController);
 router.get('/bulk-orders', listMyBulkOrders);
 router.get('/bulk-orders/:id', getMyBulkOrder);
 router.post('/bulk-orders/:id/cancel', cancelMyBulkOrder);
+router.post('/bulk-orders/:id/pay', payMyBulkOrder);
 
 // Cheesy Rewards (points) — separate from the wallet
 router.get('/rewards/me', getMyRewardsController);

@@ -52,7 +52,7 @@ const bulkOrderInquirySchema = new mongoose.Schema(
     // older statuses of inquiries made before stores handled them.
     status: {
       type: String,
-      enum: ['new', 'confirmed', 'preparing', 'ready', 'completed', 'rejected', 'cancelled', 'in_progress', 'contacted'],
+      enum: ['new', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed', 'rejected', 'cancelled', 'in_progress', 'contacted'],
       default: 'new'
     },
     adminNotes: {
@@ -64,13 +64,19 @@ const bulkOrderInquirySchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
     storeId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodStore', default: null, index: true },
     franchiseId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodFranchise', default: null, index: true },
+    paymentMethod: { type: String, enum: ['cod', 'online'], default: 'cod' },
+    // the real order made when the store confirms: it carries the kitchen, rider and payment steps
+    orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodOrder', default: null, index: true },
     fulfilment: { type: String, enum: ['takeaway', 'delivery'], default: 'takeaway' },
     address: {
       street: { type: String, trim: true, default: '' },
       landmark: { type: String, trim: true, default: '' },
       city: { type: String, trim: true, default: '' },
       state: { type: String, trim: true, default: '' },
-      pincode: { type: String, trim: true, default: '' }
+      pincode: { type: String, trim: true, default: '' },
+      // the point the customer picked on the map (place suggestions): where the rider goes
+      lat: { type: Number, default: null },
+      lng: { type: Number, default: null }
     },
     partySize: { type: String, trim: true, default: '' },
     eventTime: { type: String, trim: true, default: '' },

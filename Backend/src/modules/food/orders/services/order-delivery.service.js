@@ -189,6 +189,8 @@ async function getPartnerCashCapacity(deliveryPartnerId) {
 }
 
 function emitOrderUpdate(order, deliveryPartnerId, options = {}) {
+  // a bulk order made into this order follows its steps (picked up, delivered)
+  import('./bulkOrderFlow.service.js').then((m) => m.syncBulkForOrderSafely(order?._id)).catch(() => {});
   const shouldSendMilestonePush = options?.sendMilestonePush !== false;
   try {
     const io = getIO();
