@@ -4,7 +4,6 @@ import { toast } from "sonner"
 import apiClient, { userClient } from "@/services/api/axios"
 import { locationAPI } from "@/services/api/location"
 import { readSavedCoords } from "@food/utils/savedLocation"
-import { useProfile } from "@food/context/ProfileContext"
 
 const field =
   "w-full h-12 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 text-sm text-zinc-900 dark:text-white outline-none focus:border-[#E53935] focus:ring-2 focus:ring-[#E53935]/15 transition-colors placeholder:text-zinc-400"
@@ -40,15 +39,6 @@ const today = () => new Date().toISOString().slice(0, 10)
 export default function BulkOrderForm({ type, partyOptions = [], voucherOptions = [], onTrack, contactPhone }) {
   const isParty = type === "virtual_party"
   const isOther = (v) => /^other$/i.test(String(v || "").trim())
-  const profile = useProfile?.() || {}
-  const defaultAddress = useMemo(() => {
-    try {
-      return profile.getDefaultAddress?.() || (Array.isArray(profile.addresses) ? profile.addresses[0] : null) || null
-    } catch (_) {
-      return null
-    }
-  }, [profile])
-
   const stored = useMemo(readStoredUser, [])
   const [f, setF] = useState({
     name: stored.name,
@@ -109,19 +99,6 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
     }
     return () => { cancelled = true }
   }, [isParty])
-
-  // The delivery address starts as the customer's saved address
-  useEffect(() => {
-    if (!defaultAddress) return
-    setF((p) => (p.street || p.city ? p : {
-      ...p,
-      street: defaultAddress.street || defaultAddress.houseNumber || "",
-      landmark: defaultAddress.additionalDetails || "",
-      city: defaultAddress.city || "",
-      state: defaultAddress.state || "",
-      pincode: defaultAddress.zipCode || defaultAddress.pincode || "",
-    }))
-  }, [defaultAddress])
 
   const validate = () => {
     const e = {}
