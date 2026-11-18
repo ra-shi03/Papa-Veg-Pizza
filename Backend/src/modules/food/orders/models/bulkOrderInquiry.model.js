@@ -74,6 +74,19 @@ const bulkOrderInquirySchema = new mongoose.Schema(
     },
     partySize: { type: String, trim: true, default: '' },
     eventTime: { type: String, trim: true, default: '' },
+    // What the customer picked, priced at the store's own prices when they sent it
+    items: [
+      {
+        _id: false,
+        itemId: { type: String, default: '' },
+        name: { type: String, default: '' },
+        size: { type: String, default: '' },
+        crust: { type: String, default: '' },
+        price: { type: Number, min: 0, default: 0 },
+        quantity: { type: Number, min: 1, default: 1 }
+      }
+    ],
+    estimatedTotal: { type: Number, min: 0, default: null },
     quotedAmount: { type: Number, min: 0, default: null },
     storeNote: { type: String, trim: true, default: '' },
     reasonText: { type: String, trim: true, default: '' },

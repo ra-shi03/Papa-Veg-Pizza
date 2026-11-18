@@ -82,7 +82,14 @@ export default function BulkOrders() {
             <p className="m-0"><b>Customer:</b> {open.name}{open.organisation ? ` (${open.organisation})` : ""} · {open.phone} · {open.email}</p>
             <p className="m-0"><b>{open.fulfilment === "delivery" ? "Delivery to" : "Takeaway"}:</b> {open.fulfilment === "delivery" ? [open.address?.street, open.address?.landmark, open.address?.city, open.address?.pincode].filter(Boolean).join(", ") : "Collect from the store"}</p>
             {open.partySize && <p className="m-0"><b>Party size:</b> {open.partySize}</p>}
-            {open.query && <p className="m-0 whitespace-pre-wrap"><b>Details:</b> {open.query}</p>}
+            {(open.items || []).length > 0 && (
+              <div>
+                <b>Items:</b>
+                {open.items.map((it, i) => <p key={i} className="m-0 flex justify-between gap-3"><span>{it.quantity} × {it.name}{it.size ? ` (${it.size})` : ""}</span><span>₹{Number(it.lineTotal).toLocaleString("en-IN")}</span></p>)}
+                {open.estimatedTotal != null && <p className="m-0 flex justify-between font-black"><span>Estimated total</span><span>₹{Number(open.estimatedTotal).toLocaleString("en-IN")}</span></p>}
+              </div>
+            )}
+            {open.query && <p className="m-0 whitespace-pre-wrap"><b>Special requests:</b> {open.query}</p>}
             {open.quotedAmount != null && <p className="m-0"><b>Amount quoted:</b> ₹{Number(open.quotedAmount).toLocaleString("en-IN")}</p>}
             {open.reasonText && <p className="m-0"><b>Reason:</b> {open.reasonText}</p>}
             <div className="border-t border-zinc-100 dark:border-zinc-800 pt-2 space-y-0.5">

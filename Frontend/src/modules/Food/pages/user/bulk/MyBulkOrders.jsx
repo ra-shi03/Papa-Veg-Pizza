@@ -116,6 +116,17 @@ export default function MyBulkOrders() {
                     })}
                   </ol>
                 )}
+                {(o.items || []).length > 0 && (
+                  <div className="rounded-xl bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-100 dark:border-zinc-800 p-3 space-y-1">
+                    {o.items.map((it, i) => (
+                      <div key={i} className="flex justify-between gap-3 text-xs text-zinc-700 dark:text-zinc-300">
+                        <span className="min-w-0">{it.quantity} × {it.name}{it.size ? ` (${it.size})` : ""}</span>
+                        <span className="shrink-0 font-semibold">₹{Number(it.lineTotal).toLocaleString("en-IN")}</span>
+                      </div>
+                    ))}
+                    {o.estimatedTotal != null && <div className="flex justify-between pt-1 border-t border-zinc-200 dark:border-zinc-700 text-xs font-extrabold text-zinc-900 dark:text-white"><span>Estimated total</span><span>₹{Number(o.estimatedTotal).toLocaleString("en-IN")}</span></div>}
+                  </div>
+                )}
                 {o.storeNote && <p className="m-0 text-xs text-zinc-600 dark:text-zinc-300"><b>Note from the store:</b> {o.storeNote}</p>}
                 {o.reasonText && closed && <p className="m-0 text-xs text-zinc-600 dark:text-zinc-300"><b>Reason:</b> {o.reasonText}</p>}
                 {o.fulfilment === "delivery" ? (

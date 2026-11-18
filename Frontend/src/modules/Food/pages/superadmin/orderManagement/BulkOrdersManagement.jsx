@@ -1737,6 +1737,15 @@ export default function BulkOrdersManagement() {
                     <p className="m-0"><span className="text-zinc-400 font-medium">Fulfilment:</span> <b>{selectedInquiry.fulfilment === "delivery" ? "Delivery" : "Takeaway"}</b>
                       {selectedInquiry.fulfilment === "delivery" && ` · ${[selectedInquiry.address?.street, selectedInquiry.address?.landmark, selectedInquiry.address?.city, selectedInquiry.address?.pincode].filter(Boolean).join(", ")}`}</p>
                     {selectedInquiry.partySize && <p className="m-0"><span className="text-zinc-400 font-medium">Party size:</span> <b>{selectedInquiry.partySize}</b></p>}
+                    {(selectedInquiry.items || []).length > 0 && (
+                      <div>
+                        <span className="text-zinc-400 font-medium">Items:</span>
+                        {selectedInquiry.items.map((it, i) => (
+                          <p key={i} className="m-0 flex justify-between gap-3"><span>{it.quantity} × {it.name}{it.size ? ` (${it.size})` : ""}</span><b>₹{Number(it.lineTotal).toLocaleString("en-IN")}</b></p>
+                        ))}
+                        {selectedInquiry.estimatedTotal != null && <p className="m-0 flex justify-between"><span className="text-zinc-400 font-medium">Estimated total</span><b>₹{Number(selectedInquiry.estimatedTotal).toLocaleString("en-IN")}</b></p>}
+                      </div>
+                    )}
                     {selectedInquiry.quotedAmount != null && <p className="m-0"><span className="text-zinc-400 font-medium">Amount quoted:</span> <b>₹{Number(selectedInquiry.quotedAmount).toLocaleString("en-IN")}</b></p>}
                     {selectedInquiry.reasonText && <p className="m-0"><span className="text-zinc-400 font-medium">Reason:</span> {selectedInquiry.reasonText}</p>}
                     <div className="pt-1 space-y-0.5">

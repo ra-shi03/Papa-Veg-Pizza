@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react"
 import { useJsApiLoader } from "@react-google-maps/api"
-import { CheckCircle2, Loader2, MapPin, Store, Truck, ShoppingBag, Phone, ListChecks } from "lucide-react"
+import { CheckCircle2, Loader2, MapPin, Store, Truck, ShoppingBag, Phone, ListChecks, Plus, Minus, X } from "lucide-react"
 import { toast } from "sonner"
 import apiClient, { userClient } from "@/services/api/axios"
 import { locationAPI } from "@/services/api/location"
@@ -62,6 +62,7 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
   const [errors, setErrors] = useState({})
 
+
   // City and state suggestions from Google Places (the project map key). Picking a city also fills its state.
   const { isLoaded: mapsReady } = useJsApiLoader(ADMIN_GOOGLE_MAPS_LOADER)
   const cityRef = useRef(null)
@@ -99,6 +100,45 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
   const [storeState, setStoreState] = useState("loading") // loading | ready | nolocation | error
   const [radiusKm, setRadiusKm] = useState(null)
   const [storeId, setStoreId] = useState("")
+
+  // What the customer needs: products of the chosen store with their prices, and a quantity for each
+  const [products, setProducts] = useState([])
+  const [productsState, setProductsState] = useState("idle") // idle | loading | ready | error
+  const [lines, setLines] = useState([{ key: "", qty: 1 }])
+  useEffect(() => {
+    if (!isParty || !storeId) return undefined
+    let cancelled = false
+    setProductsState("loading")
+    setLines([{ key: "", qty: 1 }])
+    apiClient.get("/food/products/public", { params: { storeId }, _isFallback: true })
+      .then((res) => {
+        if (cancelled) return
+        const list = res?.data?.data
+        setProducts(Array.isArray(list) ? list : [])
+        setProductsState("ready")
+      })
+      .catch(() => { if (!cancelled) setProductsState("error") })
+    return () => { cancelled = true }
+  }, [isParty, storeId])
+
+  // One choice per product and size, with its price at this store
+  const choices = useMemo(() => {
+    const out = []
+    for (const p of products) {
+      if (p.inStock === false) continue
+      const sizes = Array.isArray(p.sizes) && p.sizes.length ? p.sizes : [{ size: "", price: p.price }]
+      for (const sz of sizes) out.push({ key: `${p._id}|${sz.size || ""}`, id: String(p._id), size: sz.size || "", name: p.name, price: Number(sz.price) || 0, group: p.category?.label || "Menu" })
+    }
+    return out
+  }, [products])
+  const byKey = useMemo(() => new Map(choices.map((c) => [c.key, c])), [choices])
+  const groups = useMemo(() => {
+    const g = new Map()
+    for (const c of choices) g.set(c.group, [...(g.get(c.group) || []), c])
+    return [...g.entries()]
+  }, [choices])
+  const total = lines.reduce((n, l) => n + (byKey.get(l.key)?.price || 0) * (Number(l.qty) || 0), 0)
+  const setLine = (i, patch) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)))
 
   useEffect(() => {
     if (!isParty) return undefined
@@ -140,6 +180,7 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
     if (isOther(f.partySize) && !f.partySizeOther.trim()) e.partySizeOther = "Tell us how many people or what you need"
     if (isParty) {
       if (!storeId) e.store = "Choose a store near you"
+      if (!lines.some((l) => byKey.has(l.key) && Number(l.qty) >= 1)) e.items = "Choose at least one item"
       if (!f.eventDate) e.eventDate = "Choose the date"
       if (f.fulfilment === "delivery") {
         if (!f.street.trim()) e.street = "Enter the delivery address"
@@ -168,6 +209,7 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
         partySize: isOther(f.partySize) ? `Other: ${f.partySizeOther.trim()}` : f.partySize,
         query: f.query.trim(),
         type,
+        ...(isParty ? { items: lines.filter((l) => byKey.has(l.key) && Number(l.qty) >= 1).map((l) => ({ itemId: byKey.get(l.key).id, size: byKey.get(l.key).size, quantity: Math.floor(Number(l.qty)) })) } : {}),
         ...(isParty
           ? {
               storeId,
@@ -298,9 +340,70 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
             </div>
           )}
 
-          {/* 3. When and how many */}
+          {/* 3. What do you need */}
           <div>
-            <span className={label}>3. When and how many</span>
+            <span className={label}>3. What do you need?</span>
+            {productsState === "loading" && <p className="text-xs text-zinc-500 flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading the menu...</p>}
+            {productsState === "error" && <p className="text-xs text-[#E53935]">Could not load the menu. Please try again.</p>}
+            {productsState === "ready" && choices.length === 0 && <p className="text-xs text-zinc-500">This store has no items available right now.</p>}
+            {productsState === "ready" && choices.length > 0 && (
+              <div className="space-y-2">
+                {lines.map((l, i) => {
+                  const c = byKey.get(l.key)
+                  return (
+                    <div key={i} className="rounded-xl border border-zinc-200 dark:border-zinc-700 p-2.5 space-y-2 bg-white dark:bg-zinc-900">
+                      <select
+                        className={`${field} px-3`}
+                        value={l.key}
+                        onChange={(e) => { setLine(i, { key: e.target.value }); setErrors((p) => ({ ...p, items: "" })) }}
+                        aria-label="Item"
+                      >
+                        <option value="">Choose an item</option>
+                        {groups.map(([g, list]) => (
+                          <optgroup key={g} label={g}>
+                            {list.map((o) => <option key={o.key} value={o.key}>{o.name}{o.size ? ` · ${o.size}` : ""} — ₹{o.price}</option>)}
+                          </optgroup>
+                        ))}
+                      </select>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-zinc-500 min-w-0">
+                          {c ? <><b className="text-zinc-800 dark:text-zinc-200">₹{c.price}</b> each · <b className="text-zinc-800 dark:text-zinc-200">₹{(c.price * (Number(l.qty) || 0)).toLocaleString("en-IN")}</b></> : "Pick an item and quantity"}
+                        </span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700">
+                            <button type="button" onClick={() => setLine(i, { qty: Math.max(1, (Number(l.qty) || 1) - 1) })} className="w-9 h-10 bg-transparent border-0 cursor-pointer text-zinc-600" aria-label="Less"><Minus className="w-3.5 h-3.5 mx-auto" /></button>
+                            <input
+                              type="number" inputMode="numeric" min={1} max={500}
+                              value={l.qty}
+                              onChange={(e) => setLine(i, { qty: e.target.value === "" ? "" : Math.min(500, Math.max(1, Math.floor(Number(e.target.value)) || 1)) })}
+                              className="w-12 h-10 text-center text-sm font-bold bg-transparent border-0 outline-none text-zinc-900 dark:text-white"
+                              aria-label="Quantity"
+                            />
+                            <button type="button" onClick={() => setLine(i, { qty: Math.min(500, (Number(l.qty) || 0) + 1) })} className="w-9 h-10 bg-transparent border-0 cursor-pointer text-zinc-600" aria-label="More"><Plus className="w-3.5 h-3.5 mx-auto" /></button>
+                          </div>
+                          {lines.length > 1 && (
+                            <button type="button" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} className="w-8 h-10 bg-transparent border-0 cursor-pointer text-zinc-400 hover:text-[#E53935]" aria-label="Remove item"><X className="w-4 h-4 mx-auto" /></button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+                <button type="button" onClick={() => setLines((ls) => [...ls, { key: "", qty: 1 }])} className="h-10 px-4 rounded-xl border border-dashed border-[#E53935] text-[#E53935] text-xs font-bold bg-transparent cursor-pointer flex items-center gap-1.5">
+                  <Plus className="w-3.5 h-3.5" /> Add another item
+                </button>
+                <div className="flex items-center justify-between rounded-xl bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800 px-4 py-3">
+                  <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Estimated total</span>
+                  <span className="text-base font-extrabold text-zinc-900 dark:text-white">₹{total.toLocaleString("en-IN")}</span>
+                </div>
+              </div>
+            )}
+            <Err k="items" />
+          </div>
+
+          {/* 4. When and how many */}
+          <div>
+            <span className={label}>4. When and how many</span>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <input type="date" min={today()} className={field} value={f.eventDate} onChange={(e) => set("eventDate", e.target.value)} aria-label="Date" />
@@ -342,7 +445,7 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
 
       {/* About you */}
       <div className="space-y-3">
-        <span className={label}>{isParty ? "4. About you" : "About you"}</span>
+        <span className={label}>{isParty ? "5. About you" : "About you"}</span>
         <div>
           <input className={field} placeholder="Name*" value={f.name} onChange={(e) => set("name", e.target.value)} autoComplete="name" />
           <Err k="name" />
@@ -360,7 +463,7 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
         </div>
         <textarea
           className={`${field} h-28 py-3 resize-none`}
-          placeholder={isParty ? "What would you like? (pizzas, quantity, any special request)" : "Your query"}
+          placeholder={isParty ? "Special requests (optional)" : "Your query"}
           value={f.query}
           maxLength={2000}
           onChange={(e) => set("query", e.target.value)}

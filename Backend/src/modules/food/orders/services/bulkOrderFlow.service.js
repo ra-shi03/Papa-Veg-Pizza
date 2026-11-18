@@ -2,8 +2,10 @@ import mongoose from 'mongoose';
 import crypto from 'node:crypto';
 import { z } from 'zod';
 import { BulkOrderInquiry } from '../models/bulkOrderInquiry.model.js';
+import { Product } from '../../admin/models/product.model.js';
 import { FoodStore } from '../../store/models/store.model.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
+import { priceCartItems } from './catalog-pricing.service.js';
 import { sendEmail } from '../../../../utils/email.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 import { logger } from '../../../../utils/logger.js';
@@ -27,6 +29,12 @@ const inquirySchema = z.object({
   occasion: text(120).optional().default(''),
   partySize: text(120).optional().default(''),
   query: text(2000).optional().default(''),
+  items: z.array(z.object({
+    itemId: z.string().regex(ID_RE, 'Choose a valid item'),
+    size: text(40).optional().default(''),
+    crust: text(60).optional().default(''),
+    quantity: z.coerce.number().int().min(1, 'Quantity must be at least 1').max(500, 'That is too many of one item. Please call the store.'),
+  })).max(40, 'Too many different items').optional().default([]),
   type: z.enum(['virtual_party', 'bulk_catering', 'egift_voucher']).optional().default('virtual_party'),
   fulfilment: z.enum(['takeaway', 'delivery']).optional().default('takeaway'),
   storeId: z.string().regex(ID_RE, 'Choose a store').optional(),
@@ -49,6 +57,7 @@ const STATUS_TEXT = {
   cancelled: 'cancelled',
 };
 
+const itemLines = (inq) => (inq.items || []).map((i) => `- ${i.quantity} x ${i.name}${i.size ? ` (${i.size})` : ''}`).join('\n');
 const money = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
 function mailFor(inq, store, event) {
@@ -58,7 +67,7 @@ function mailFor(inq, store, event) {
   const head = `Hi ${inq.name},`;
   const ref = `Reference: ${inq.reference}`;
   const lines = {
-    new: [head, '', `We have received your bulk order request at ${store?.storeName || 'our store'}. The store will review it and confirm shortly.`, ref, where, inq.eventDate ? `Date: ${inq.eventDate}${inq.eventTime ? ` ${inq.eventTime}` : ''}` : ''],
+    new: [head, '', `We have received your bulk order request at ${store?.storeName || 'our store'}. The store will review it and confirm shortly.`, ref, where, itemLines(inq), inq.estimatedTotal != null ? `Estimated total: ${money(inq.estimatedTotal)}` : '', inq.eventDate ? `Date: ${inq.eventDate}${inq.eventTime ? ` ${inq.eventTime}` : ''}` : ''],
     confirmed: [head, '', `${store?.storeName || 'The store'} has confirmed your bulk order.`, ref, inq.quotedAmount != null ? `Amount: ${money(inq.quotedAmount)} (pay when you ${inq.fulfilment === 'delivery' ? 'receive' : 'collect'} the order)` : '', inq.storeNote ? `Note from the store: ${inq.storeNote}` : '', where],
     preparing: [head, '', 'Your bulk order is being prepared.', ref, where],
     ready: [head, '', inq.fulfilment === 'delivery' ? 'Your bulk order is ready and will be delivered to you shortly.' : 'Your bulk order is ready. You can collect it now.', ref, where],
@@ -100,6 +109,22 @@ export async function createBulkOrder(body, userId = null) {
     store = await FoodStore.findOne({ _id: d.storeId, isActive: true, approvalStatus: { $in: ['Approved', 'approved'] } }).select('storeName address franchiseId').lean();
     if (!store) throw new ValidationError('This store is not taking orders right now. Please choose another.');
     if (d.fulfilment === 'delivery' && (!d.address.street || !d.address.city)) throw new ValidationError('Enter the delivery address (street and city)');
+    if (d.items.length === 0) throw new ValidationError('Choose at least one item');
+  }
+
+  // The items are priced here, at the chosen store's prices; the client's prices are never used
+  let pricedItems = [];
+  let estimatedTotal = null;
+  if (store && d.items.length) {
+    const merged = new Map();
+    for (const it of d.items) {
+      const key = `${it.itemId}|${it.size}|${it.crust}`;
+      merged.set(key, merged.has(key) ? { ...it, quantity: merged.get(key).quantity + it.quantity } : it);
+    }
+    const priced = await priceCartItems(null, [...merged.values()].map((it) => ({ ...it, name: '', price: 0, kind: 'product' })), { storeId: store._id });
+    const names = new Map((await Product.find({ _id: { $in: priced.items.map((it) => it.itemId) } }).select('name').lean()).map((pr) => [String(pr._id), pr.name]));
+    pricedItems = priced.items.map((it) => ({ itemId: String(it.itemId), name: names.get(String(it.itemId)) || it.name, size: it.size || '', crust: it.crust || '', price: it.price, quantity: it.quantity }));
+    estimatedTotal = priced.subtotal;
   }
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -107,7 +132,7 @@ export async function createBulkOrder(body, userId = null) {
       const inq = await BulkOrderInquiry.create({
         name: d.name, organisation: d.organisation, phone: d.phone, email: d.email, location: d.location,
         eventDate: d.eventDate, eventTime: d.eventTime, occasion: d.occasion || d.partySize || d.eventDate || 'Date Selected', partySize: d.partySize,
-        query: d.query, type: d.type, status: 'new', reference: referenceNumber(),
+        query: d.query, items: pricedItems, estimatedTotal, type: d.type, status: 'new', reference: referenceNumber(),
         userId: userId && mongoose.Types.ObjectId.isValid(String(userId)) ? userId : null,
         ...(store ? { storeId: store._id, franchiseId: store.franchiseId, fulfilment: d.fulfilment, address: d.fulfilment === 'delivery' ? d.address : {} } : {}),
         history: [{ status: 'new', byRole: 'CUSTOMER', note: 'Request placed' }],
@@ -150,6 +175,8 @@ export function shape(inq, store = null) {
     storeName: s?.storeName || '',
     storeAddress: s?.address || '',
     storePhone: s?.phone || '',
+    items: (inq.items || []).map((i) => ({ itemId: i.itemId, name: i.name, size: i.size || '', crust: i.crust || '', price: i.price, quantity: i.quantity, lineTotal: Math.round(i.price * i.quantity * 100) / 100 })),
+    estimatedTotal: inq.estimatedTotal ?? null,
     quotedAmount: inq.quotedAmount ?? null,
     storeNote: inq.storeNote || '',
     reasonText: inq.reasonText || '',
@@ -231,6 +258,10 @@ export async function storeConfirm(user, id, { quotedAmount, note } = {}) {
   if (quotedAmount !== undefined && quotedAmount !== null && quotedAmount !== '') {
     amount = Number(quotedAmount);
     if (!Number.isFinite(amount) || amount < 0 || amount > 10000000) throw new ValidationError('Enter a valid amount.');
+  }
+  if (amount === null) {
+    const current = await BulkOrderInquiry.findOne({ _id: oid(id), storeId }).select('estimatedTotal').lean();
+    if (current?.estimatedTotal != null) amount = current.estimatedTotal; // the amount from the items, unless the store names another
   }
   const inq = await moveTo({ _id: oid(id), storeId, status: 'new' }, 'confirmed', { ...actor(user), note: String(note || '').slice(0, 300), set: { quotedAmount: amount, storeNote: String(note || '').trim().slice(0, 300) } });
   if (!inq) throw new ValidationError('Only a new request can be confirmed.');

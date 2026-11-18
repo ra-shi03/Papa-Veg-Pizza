@@ -141,7 +141,16 @@ export default function BulkOrders() {
                 <p className="m-0 text-[10px] font-bold uppercase text-zinc-400">{open.fulfilment === "delivery" ? "Deliver to" : "Takeaway"}</p>
                 <p className="m-0 flex gap-1"><MapPin size={12} className="mt-0.5 shrink-0" />{open.fulfilment === "delivery" ? [open.address?.street, open.address?.landmark, open.address?.city, open.address?.state, open.address?.pincode].filter(Boolean).join(", ") : "The customer collects from your store"}</p>
               </div>
-              {open.query && <div className="col-span-2"><p className="m-0 text-[10px] font-bold uppercase text-zinc-400">Order details</p><p className="m-0 whitespace-pre-wrap">{open.query}</p></div>}
+              {(open.items || []).length > 0 && (
+                <div className="col-span-2">
+                  <p className="m-0 text-[10px] font-bold uppercase text-zinc-400">Items</p>
+                  {open.items.map((it, i) => (
+                    <p key={i} className="m-0 flex justify-between gap-3"><span>{it.quantity} × {it.name}{it.size ? ` (${it.size})` : ""}</span><span className="font-semibold">₹{Number(it.lineTotal).toLocaleString("en-IN")}</span></p>
+                  ))}
+                  {open.estimatedTotal != null && <p className="m-0 mt-1 flex justify-between font-black border-t border-zinc-200 pt-1"><span>Estimated total</span><span>₹{Number(open.estimatedTotal).toLocaleString("en-IN")}</span></p>}
+                </div>
+              )}
+              {open.query && <div className="col-span-2"><p className="m-0 text-[10px] font-bold uppercase text-zinc-400">Special requests</p><p className="m-0 whitespace-pre-wrap">{open.query}</p></div>}
               {open.quotedAmount != null && <div><p className="m-0 text-[10px] font-bold uppercase text-zinc-400">Amount</p><p className="m-0 font-bold">₹{Number(open.quotedAmount).toLocaleString("en-IN")}</p></div>}
               {open.storeNote && <div><p className="m-0 text-[10px] font-bold uppercase text-zinc-400">Your note</p><p className="m-0">{open.storeNote}</p></div>}
             </div>
@@ -176,7 +185,7 @@ export default function BulkOrders() {
               <div className="flex flex-wrap gap-2">
                 {open.status === "new" && (
                   <>
-                    <button onClick={() => setMode("confirm")} className="h-10 px-5 rounded-lg bg-emerald-600 text-white text-sm font-bold border-0 cursor-pointer flex items-center gap-1.5"><Check size={14} />Confirm</button>
+                    <button onClick={() => { setAmount(open.estimatedTotal != null ? String(open.estimatedTotal) : ""); setMode("confirm"); }} className="h-10 px-5 rounded-lg bg-emerald-600 text-white text-sm font-bold border-0 cursor-pointer flex items-center gap-1.5"><Check size={14} />Confirm</button>
                     <button onClick={() => setMode("reject")} className="h-10 px-5 rounded-lg border border-red-300 text-red-600 text-sm font-bold bg-transparent cursor-pointer">Decline</button>
                   </>
                 )}

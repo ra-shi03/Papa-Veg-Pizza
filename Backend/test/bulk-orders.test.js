@@ -4,16 +4,20 @@ import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createFixture } from './helpers/fixture.js';
 
-let fx; let A; let B; let BulkOrderInquiry; let emails;
+let fx; let A; let B; let BulkOrderInquiry; let emails; let pizza; let items;
 const PUBLIC = '/v1/food/bulk-order/inquiry';
 const ok = (res, status = 200) => { assert.equal(res.status, status, JSON.stringify(res.body)); return res.body.data; };
-const form = (extra = {}) => ({ name: 'Ravi Kumar', phone: '98123 45678', email: 'ravi@example.com', type: 'virtual_party', fulfilment: 'takeaway', storeId: A.storeId, eventDate: '2026-12-20', partySize: 'Corporate Gathering (20-50 people)', query: '40 pizzas please', ...extra });
+const form = (extra = {}) => ({ items, name: 'Ravi Kumar', phone: '98123 45678', email: 'ravi@example.com', type: 'virtual_party', fulfilment: 'takeaway', storeId: A.storeId, eventDate: '2026-12-20', partySize: 'Corporate Gathering (20-50 people)', query: '40 pizzas please', ...extra });
 const place = (extra, token = A.customerToken) => fx.call('POST', PUBLIC, token, form(extra));
 const store = (path, method = 'GET', body, token = A.managerToken) => fx.call(method, `/v1/food/store/bulk-orders${path}`, token, body);
 
 before(async () => {
     fx = await createFixture(); A = fx.F.A; B = fx.F.B;
     ({ BulkOrderInquiry } = await import('../src/modules/food/orders/models/bulkOrderInquiry.model.js'));
+    const { Product } = await import('../src/modules/food/admin/models/product.model.js');
+    const mongoose = (await import('./helpers/fixture.js')).mongoose;
+    pizza = await Product.create({ name: 'Farmhouse', categoryId: new mongoose.Types.ObjectId(), status: 'Active', sizes: [{ size: 'Medium', price: 300 }, { size: 'Large', price: 450 }], basePrice: 300, price: 300 });
+    items = [{ itemId: String(pizza._id), size: 'Large', quantity: 40 }];
     const { setEmailSenderForTests } = await import('../src/utils/email.js');
     emails = [];
     setEmailSenderForTests(async (mail) => { emails.push(mail); return true; });
@@ -30,6 +34,11 @@ describe('placing a bulk order', () => {
         await bad({ storeId: '6afc00000000000000000000' }, /not taking orders/);
         await bad({ fulfilment: 'delivery' }, /address/i);
         await bad({ type: 'hacked' }, /./);
+        await bad({ items: [] }, /at least one item/i);
+        await bad({ items: [{ itemId: String(pizza._id), size: 'Large', quantity: 0 }] }, /at least 1/);
+        await bad({ items: [{ itemId: String(pizza._id), size: 'Large', quantity: 9999 }] }, /too many/i);
+        await bad({ items: [{ itemId: '6afc00000000000000000001', quantity: 2 }] }, /./);
+        await bad({ items: [{ itemId: String(pizza._id), size: 'Huge', quantity: 2 }] }, /not sold in size/);
         assert.equal((await place({ name: { $gt: '' } })).status, 400, 'an object is not a name');
         assert.equal(await BulkOrderInquiry.countDocuments({ email: 'not-an-email' }), 0);
     });
@@ -44,6 +53,12 @@ describe('placing a bulk order', () => {
         assert.equal(o.storeId, A.storeId);
         const mail = emails.find((m) => /new|received/i.test(m.subject) && m.to === 'ravi@example.com');
         assert.ok(mail && mail.text.includes(o.reference));
+    });
+
+    test('the items are priced at the store\'s prices, the client\'s prices are ignored, and the same item is added up', async () => {
+        const o = ok(await place({ items: [{ itemId: String(pizza._id), size: 'Large', quantity: 10, price: 1 }, { itemId: String(pizza._id), size: 'Large', quantity: 30 }, { itemId: String(pizza._id), size: 'Medium', quantity: 2 }] }), 201);
+        assert.deepEqual(o.items.map((i) => [i.name, i.size, i.price, i.quantity]), [['Farmhouse', 'Large', 450, 40], ['Farmhouse', 'Medium', 300, 2]]);
+        assert.equal(o.estimatedTotal, 40 * 450 + 2 * 300);
     });
 
     test('a delivery order keeps its address', async () => {
@@ -110,6 +125,7 @@ describe('the store handles it', () => {
         const o = ok(await store(`/${id}/confirm`, 'POST', { quotedAmount: 12500, note: 'Ready by 6 pm' })).order;
         assert.equal(o.status, 'confirmed');
         assert.equal(o.quotedAmount, 12500);
+        assert.equal(o.estimatedTotal, 18000, 'the estimate from the items stays on record');
         assert.ok(emails.some((m) => /confirmed/i.test(m.subject) && m.text.includes('12,500')));
         assert.equal((await store(`/${id}/confirm`, 'POST', {})).status, 400, 'only once');
     });
@@ -129,6 +145,14 @@ describe('the store handles it', () => {
         ok(await store(`/${o2}/confirm`, 'POST', {}));
         assert.equal((await store(`/${o2}/cancel`, 'POST', {})).status, 400, 'reason required');
         assert.equal(ok(await store(`/${o2}/cancel`, 'POST', { reason: 'Oven broke down' })).order.status, 'cancelled');
+    });
+});
+
+describe('confirming without an amount uses the items\' total', () => {
+    test('quotedAmount defaults to the estimate', async () => {
+        const o = ok(await place({ query: 'default amount' }), 201);
+        const done = ok(await store(`/${o.id}/confirm`, 'POST', {})).order;
+        assert.equal(done.quotedAmount, 18000);
     });
 });
 
