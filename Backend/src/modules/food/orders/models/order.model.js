@@ -25,7 +25,26 @@ const orderItemSchema = new mongoose.Schema(
             }],
             default: []
         },
-        isLimitedOffer: { type: Boolean, default: false }
+        isLimitedOffer: { type: Boolean, default: false },
+        // A combo is one line on the bill and several things to make. `components` is what is inside it, decided by the
+        // server (from the combo the super admin made, or from the pizzas picked in the Combo Builder), never by the app:
+        //   kitchen: true  -> a pizza / sandwich / taco the kitchen makes (one kitchen card each)
+        //   kitchen: false -> a dip, crispies or a drink that is packed with the order
+        comboType: { type: String, enum: ['', 'builder', 'meal'], default: '' },
+        components: {
+            type: [{
+                _id: false,
+                label: { type: String, trim: true, default: '' }, // the slot, e.g. "Drink"
+                name: { type: String, required: true, trim: true },
+                size: { type: String, trim: true, default: '' },
+                crust: { type: String, trim: true, default: '' },
+                quantity: { type: Number, min: 1, default: 1 }, // per one combo
+                kitchen: { type: Boolean, default: false },
+                productId: { type: String, trim: true, default: '' },
+                slot: { type: String, trim: true, default: '' } // the combo item this was chosen for (to rebuild a reorder)
+            }],
+            default: []
+        }
     },
     { _id: false }
 );

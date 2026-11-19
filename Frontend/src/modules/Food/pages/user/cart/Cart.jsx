@@ -339,6 +339,8 @@ export default function Cart() {
             toppings: c.toppings,
             meals: c.meals,
             extraCheese: c.extraCheese,
+            comboLines: c.comboLines,
+            comboChoices: c.comboChoices,
             isLimitedOffer: !!c.isLimitedOffer,
             offerToken: c.offerToken,
             offerExpiresAt: c.offerExpiresAt,

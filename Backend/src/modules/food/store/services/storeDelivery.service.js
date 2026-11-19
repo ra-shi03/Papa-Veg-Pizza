@@ -283,7 +283,7 @@ export async function readyOrders(user, q = {}) {
     packagingCompletedAt: o.kitchen?.readyAt || o.updatedAt,
     assignedRiderId: o.dispatch?.deliveryPartnerId ? String(o.dispatch.deliveryPartnerId) : null,
     deliveryAddress: addressText(o.deliveryAddress),
-    items: (o.items || []).map((i) => ({ name: i.name, quantity: i.quantity, size: i.size || '' })),
+    items: (o.items || []).map((i) => ({ name: i.name, quantity: i.quantity, size: i.size || '', ...(i.components?.length ? { components: i.components.map((c) => ({ label: c.label || '', name: c.name, size: c.size || '', quantity: c.quantity || 1 })) } : {}) })),
   }));
   if (q.status && q.status !== 'All') rows = rows.filter((r) => r.deliveryStatus === String(q.status).toLowerCase());
   return rows;
@@ -336,7 +336,7 @@ export async function tracking(user, orderId, q = {}) {
     } : null,
     order: {
       orderId: order.order_id || String(order._id), amount: order.pricing?.total || 0, status: deliveryStatusOf(order),
-      items: (order.items || []).map((i) => ({ name: i.name, quantity: i.quantity, size: i.size || '' })), pickupTime: pickup || '',
+      items: (order.items || []).map((i) => ({ name: i.name, quantity: i.quantity, size: i.size || '', ...(i.components?.length ? { components: i.components.map((c) => ({ label: c.label || '', name: c.name, size: c.size || '', quantity: c.quantity || 1 })) } : {}) })), pickupTime: pickup || '',
     },
     store: { latitude: ctx.store.latitude ?? null, longitude: ctx.store.longitude ?? null },
     timeline: {

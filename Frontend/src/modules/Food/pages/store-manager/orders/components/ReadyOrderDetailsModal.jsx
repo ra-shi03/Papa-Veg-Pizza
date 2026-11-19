@@ -1,3 +1,4 @@
+import ComboComponents from "./ComboComponents";
 import React from "react";
 import { Modal, Tabs, Collapse, Tag, Divider, Button, Timeline } from "antd";
 import {
@@ -170,6 +171,7 @@ export default function ReadyOrderDetailsModal({
                 key={idx}
                 className="mb-2 bg-slate-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-800 rounded-xl overflow-hidden"
               >
+                <ComboComponents item={item} className="mx-2 mt-2" />
                 <div className="flex gap-4 p-2 text-xs font-semibold">
                   {item.image && (
                     <img

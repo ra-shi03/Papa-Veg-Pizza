@@ -1,3 +1,4 @@
+import ComboComponents from "../../orders/components/ComboComponents";
 import React from "react";
 import { Play, ClipboardCheck, Lock, Check, Printer, ExternalLink, ChefHat } from "lucide-react";
 import { Tooltip } from "antd";
@@ -105,9 +106,16 @@ export default function PackagingTable({
                     <td className="py-3.5 px-4">
                       <div className="flex flex-col gap-0.5">
                         {visibleItems.map((it, idx) => (
-                          <span key={idx} className="text-[10px] font-bold text-slate-700 dark:text-zinc-300 truncate max-w-[180px]">
-                            {it.quantity} × {it.name} ({it.size})
-                          </span>
+                          <React.Fragment key={idx}>
+                            <span className="text-[10px] font-bold text-slate-700 dark:text-zinc-300 truncate max-w-[180px]">
+                              {it.quantity} × {it.name}{it.size ? ` (${it.size})` : ""}
+                            </span>
+                            {it.components?.length > 0 && (
+                              <span className="text-[9px] font-semibold text-sky-600 dark:text-sky-400 truncate max-w-[180px]" title={it.components.map((c) => c.name).join(", ")}>
+                                incl. {it.components.map((c) => c.name).join(", ")}
+                              </span>
+                            )}
+                          </React.Fragment>
                         ))}
                         {extraItemsCount > 0 && (
                           <span className="text-[9px] text-[var(--primary)] font-black">+{extraItemsCount} more items</span>
@@ -239,8 +247,11 @@ export default function PackagingTable({
 
                   <div className="mt-2 space-y-0.5">
                     {order.items?.map((it, idx) => (
-                      <div key={idx} className="text-[10px] font-medium text-slate-600 dark:text-zinc-300">
-                        {it.quantity} × {it.name} ({it.size})
+                      <div key={idx}>
+                        <div className="text-[10px] font-medium text-slate-600 dark:text-zinc-300">
+                          {it.quantity} × {it.name}{it.size ? ` (${it.size})` : ""}
+                        </div>
+                        <ComboComponents item={it} className="mt-1" />
                       </div>
                     ))}
                   </div>

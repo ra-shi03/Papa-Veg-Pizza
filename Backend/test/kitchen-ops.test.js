@@ -19,7 +19,14 @@ const makeStaff = async (managerToken, role, tag) => {
     const email = `${tag}${fx.ts}@example.invalid`;
     const res = await fx.call('POST', '/v1/food/store/staff', managerToken, { fullName: `Name ${tag}`, email, phone: `7${String(++phoneSeq).padStart(2, '0')}${String(fx.ts).slice(-7)}`, password: PASSWORD, role });
     assert.equal(res.status, 201, `create ${tag}: ${JSON.stringify(res.body)}`);
-    return { id: res.body.data.userId, name: `Name ${tag}`, token: await login(email) };
+    // New staff sign in only after their franchise admin approves them
+    const adminToken = managerToken === fx.F.A.managerToken ? fx.F.A.adminToken : fx.F.B.adminToken;
+    const ok = await fx.call('PATCH', `/v1/staff-approvals/${res.body.data._id}/approve`, adminToken, {});
+    assert.equal(ok.status, 200, `approve ${tag}: ${JSON.stringify(ok.body)}`);
+    const token = await login(email);
+    // Staff can be given work only when clocked in (attendance gating)
+    await fx.call('POST', '/v1/store/attendance/clock-in', token);
+    return { id: res.body.data.userId, name: `Name ${tag}`, token };
 };
 const newOrder = async (f, items) => {
     const ref = `KO${fx.ts}${orderNo++}`;
@@ -631,5 +638,78 @@ describe('staff management scope', () => {
         assert.equal(res.status, 201);
         const staff = (await fx.call('GET', '/v1/food/store/staff', A.managerToken)).body.data;
         assert.equal(JSON.stringify(staff).includes(`xb${fx.ts}`), false, 'B\'s new staff member is not in A\'s list');
+    });
+});
+
+describe('combos in the kitchen', () => {
+    let KitchenItem;
+    before(async () => { ({ KitchenItem } = await import('../src/modules/food/store/models/kitchenItem.model.js')); });
+    // A combo is one line on the bill and several things to make: one kitchen card for each pizza in it.
+    const pizzas = (extra = {}) => [
+        { name: 'Classic Margherita', size: 'Medium', crust: 'Thin', quantity: 1, kitchen: true, productId: 'p1', ...extra },
+        { name: 'Paneer Tikka', size: 'Medium', crust: 'Thin', quantity: 1, kitchen: true, productId: 'p2' },
+    ];
+    const comboLine = (over = {}) => ({ itemId: 'combo-offer-p1-p2', name: '1 PLUS 1 Offer', quantity: 2, price: 150, comboType: 'builder', components: pizzas(), ...over });
+    const bread = { itemId: 'b', name: 'Garlic Bread', quantity: 1, price: 100 };
+
+    test('a Combo Builder combo is one card per pizza, each for the number of combos ordered', async () => {
+        const o = await kitchenOrder([comboLine(), bread]);
+        const cards = await itemsOf(o);
+        assert.equal(cards.length, 3, JSON.stringify(cards.map((c) => c.name || c.pizzaName)));
+        const names = cards.map((c) => c.name || c.pizzaName || c.itemName);
+        for (const n of ['Classic Margherita', 'Paneer Tikka', 'Garlic Bread']) assert.ok(names.includes(n), `${n} in ${names}`);
+        const rows = await KitchenItem.find({ orderId: o.id }).sort({ index: 1 }).lean();
+        assert.deepEqual(rows.map((r) => [r.index, r.lineIndex, r.name, r.quantity, r.comboName]), [
+            [0, 0, 'Classic Margherita', 2, '1 PLUS 1 Offer'],
+            [1, 0, 'Paneer Tikka', 2, '1 PLUS 1 Offer'],
+            [2, 1, 'Garlic Bread', 1, ''],
+        ]);
+    });
+
+    test('a meal combo makes cards for what is made; dips, crispies and drinks are packed, not made', async () => {
+        const meal = { itemId: 'meal-1', name: 'Double Veg Pizza Meal', quantity: 1, price: 149, comboType: 'meal', components: [
+            { label: 'Wow Pizza', name: 'Corn Paneer', size: 'Regular', quantity: 1, kitchen: true, productId: 'p1' },
+            { name: 'Chatpati Chilli Dip', quantity: 1, kitchen: false },
+            { label: 'Drink', name: 'Coke', quantity: 1, kitchen: false },
+        ] };
+        const o = await kitchenOrder([meal]);
+        await itemsOf(o); // the cards are made the first time a kitchen screen loads the order
+        const rows = await KitchenItem.find({ orderId: o.id }).lean();
+        assert.deepEqual(rows.map((r) => r.name), ['Corn Paneer'], 'only the pizza has a card');
+        // the store sees the whole combo, drinks and dips included
+        const queue = (await get(sup, '/queue')).body.data.orders.find((x) => x.orderNumber === o.ref);
+        const line = queue.items[0];
+        assert.equal(line.comboType, 'meal');
+        assert.deepEqual(line.components.map((c) => [c.label, c.name, c.kitchen]), [['Wow Pizza', 'Corn Paneer', true], ['', 'Chatpati Chilli Dip', false], ['Drink', 'Coke', false]]);
+    });
+
+    test('a combo with nothing to bake still has one card, and a normal order is unchanged', async () => {
+        const drinksOnly = { itemId: 'meal-2', name: 'Snack Combo', quantity: 1, price: 90, comboType: 'meal', components: [{ name: 'Coke', quantity: 1, kitchen: false }] };
+        const o = await kitchenOrder([drinksOnly, bread]);
+        await itemsOf(o);
+        assert.deepEqual((await KitchenItem.find({ orderId: o.id }).sort({ index: 1 }).lean()).map((r) => [r.index, r.lineIndex, r.name]), [[0, 0, 'Snack Combo'], [1, 1, 'Garlic Bread']]);
+        const plain = await kitchenOrder();
+        await itemsOf(plain);
+        assert.deepEqual((await KitchenItem.find({ orderId: plain.id }).lean()).map((r) => [r.index, r.name]), [[0, 'Margherita']]);
+    });
+
+    test('rejecting one pizza of a combo takes the whole combo off the bill, once', async () => {
+        const o = await kitchenOrder([comboLine(), bread]);
+        const queue = (await get(sup, '/queue')).body.data.orders.find((x) => x.orderNumber === o.ref);
+        const [comboRow, breadRow] = queue.items;
+        const cards = await KitchenItem.find({ orderId: o.id }).sort({ index: 1 }).lean();
+        // reject only the second pizza's card
+        const res = await post(sup, '/orders/item-reject', { orderId: o.id, reason: 'Out of paneer', itemIds: [String(cards[1]._id)] });
+        assert.equal(res.status, 200, JSON.stringify(res.body));
+        assert.equal(res.body.data.billReducedBy, 300, 'the combo line (150 x 2) comes off once, not per pizza');
+        const after = await KitchenItem.find({ orderId: o.id }).sort({ index: 1 }).lean();
+        assert.deepEqual(after.map((r) => r.rejected), [true, true, false], 'both pizzas of the combo are rejected, the bread is not');
+        assert.equal(res.body.data.total, 100);
+        // the queue marks the combo line rejected and the bread not
+        const q2 = (await get(sup, '/queue')).body.data.orders.find((x) => x.orderNumber === o.ref);
+        assert.deepEqual(q2.items.map((i) => i.rejected), [true, false]);
+        // and the combo cannot be rejected together with everything else
+        assert.equal((await post(sup, '/orders/item-reject', { orderId: o.id, reason: 'x', itemIds: [String(after[2]._id)] })).status, 400, 'nothing would be left');
+        assert.ok(comboRow && breadRow);
     });
 });

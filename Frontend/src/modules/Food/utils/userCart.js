@@ -38,12 +38,31 @@ const splitAddons = (addons = []) => {
   return { toppings, meals, extraCheese }
 }
 
+/**
+ * A combo order line records what was inside it (`components`). To order it again the cart needs what the customer
+ * had picked: the pizzas for a Combo Builder combo, the choice for each "pick one" slot of a meal combo.
+ */
+const comboPicks = (line) => {
+  const parts = Array.isArray(line.components) ? line.components : []
+  if (line.comboType === "builder") {
+    return { comboLines: parts.filter((p) => p.productId).map((p) => ({ productId: p.productId, name: p.name, size: p.size, crust: p.crust })) }
+  }
+  if (line.comboType === "meal") {
+    const comboChoices = {}
+    parts.forEach((p) => { if (p.slot) comboChoices[p.slot] = p.name })
+    return Object.keys(comboChoices).length ? { comboChoices } : {}
+  }
+  return {}
+}
+
 /** The cart line key for a previously ordered line. Same shape as the menu's, so the same pizza merges into one line. */
 export function lineKeyFor(line) {
   const size = line.size || ""
   const { toppings, meals, extraCheese } = splitAddons(line.selectedAddons)
   const id = line.itemId || line.id || line._id
-  return `${id}-${size}-${line.crust || ""}-${extraCheese ? "cheese" : "no"}-${[...toppings].sort().join("-")}-${[...meals].sort().join("-")}`
+  // the same meal with a different drink is a different line
+  const picked = line.comboType === "meal" ? `-meal-${Object.values(comboPicks(line).comboChoices || {}).sort().join("-")}` : ""
+  return `${id}-${size}-${line.crust || ""}-${extraCheese ? "cheese" : "no"}-${[...toppings].sort().join("-")}-${[...meals].sort().join("-")}${picked}`
 }
 
 function specFor(line) {
@@ -65,6 +84,7 @@ function specFor(line) {
     toppings,
     meals,
     extraCheese,
+    ...comboPicks(line),
   }
 }
 

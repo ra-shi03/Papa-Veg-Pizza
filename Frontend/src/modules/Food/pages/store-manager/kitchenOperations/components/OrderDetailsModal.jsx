@@ -1,3 +1,4 @@
+import ComboComponents from "../../orders/components/ComboComponents";
 import React from "react";
 import { Modal, Tabs, Tag } from "antd";
 import {
@@ -129,6 +130,7 @@ export default function OrderDetailsModal({
                   <span className="text-slate-900 dark:text-white font-extrabold">{formatCurrency(item.subtotal)}</span>
                 </div>
               </div>
+              <ComboComponents item={item} />
 
               {item.toppings?.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1">

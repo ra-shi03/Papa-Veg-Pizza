@@ -13,7 +13,7 @@ import {
   assignStaff, moveToStage,
 } from './storeOrders.service.js';
 import { notifyUsers } from './kitchenTasks.service.js';
-import { ensureItems, syncOrderStage, visibleKitchenOrders, priorityLabel, isDelayed, IN_KITCHEN } from './kitchenItems.service.js';
+import { ensureItems, lineOf, syncOrderStage, visibleKitchenOrders, priorityLabel, isDelayed, IN_KITCHEN } from './kitchenItems.service.js';
 import { notifyOwnersSafely } from '../../orders/services/order.helpers.js';
 import { applyItemRejection } from './itemRejectionPricing.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
@@ -63,7 +63,9 @@ const pizzaChefId = (o) => idStr(o.kitchen?.staff?.pizza_chef?.userId) || null;
 
 function toQueueOrder(order, itemRows) {
   const ops = toOpsOrder(order);
-  const rowByIndex = new Map(itemRows.map((r) => [r.index, r]));
+  // one row per order line (a combo has several cards: the first stands for the line)
+  const rowByIndex = new Map();
+  [...itemRows].sort((a, b) => a.index - b.index).forEach((r) => { if (!rowByIndex.has(lineOf(r))) rowByIndex.set(lineOf(r), r); });
   const k = order.kitchen || {};
   return {
     ...ops,
@@ -167,15 +169,20 @@ export async function rejectItems(user, { orderId, itemIds, reason, notifyCustom
 
   await ensureItems([order.toObject()]);
   const all = await KitchenItem.find({ orderId: order._id });
-  const chosen = all.filter((r) => ids.includes(String(r._id)));
-  if (chosen.length !== new Set(ids).size) throw new ValidationError('Some items do not belong to this order');
+  const picked = all.filter((r) => ids.includes(String(r._id)));
+  if (picked.length !== new Set(ids).size) throw new ValidationError('Some items do not belong to this order');
+  // A combo is sold as one thing: rejecting one pizza of it takes the whole combo off the bill (and off the kitchen)
+  const comboLines = new Set(picked.map(lineOf).filter((line) => (order.items[line]?.components || []).length > 0));
+  const chosen = all.filter((r) => picked.includes(r) || comboLines.has(lineOf(r)));
   const remaining = all.filter((r) => !r.rejected && !chosen.includes(r));
   if (!remaining.length) throw new ValidationError('Cannot reject every item. Reject the whole order instead.');
 
   const newlyRejected = chosen.filter((r) => !r.rejected);
   await KitchenItem.updateMany({ _id: { $in: chosen.map((r) => r._id) } }, { $set: { rejected: true, rejectReason: why } });
   logStep(order, user, `Items rejected: ${chosen.map((r) => r.name).join(', ')}. Reason: ${why}`);
-  const adjustment = await applyItemRejection(order, newlyRejected.map((r) => order.items[r.index]).filter(Boolean), { reason: why, byUserId: user.userId });
+  // each order line is taken off the bill once, however many kitchen cards it had
+  const rejectedLines = [...new Set(newlyRejected.map(lineOf))].map((line) => order.items[line]).filter(Boolean);
+  const adjustment = await applyItemRejection(order, rejectedLines, { reason: why, byUserId: user.userId });
   if (adjustment) logStep(order, user, `Bill reduced by Rs ${adjustment.reduction}${adjustment.refund ? ' (refund requested)' : ''}`);
   await order.save();
   await syncOrderStage(user, storeId, order._id);
@@ -329,7 +336,8 @@ function toPackagingOrder(order) {
       phone: ops.customer.phone,
       deliveryAddress: { street: ops.deliveryAddress.houseNumber, area: ops.deliveryAddress.landmark, city: ops.deliveryAddress.city, zipcode: ops.deliveryAddress.pincode },
     },
-    items: ops.items.map((i) => ({ name: i.name, quantity: i.quantity, size: i.size })),
+    // the packer checks the bag against this: for a combo that includes the dips, crispies and drinks
+    items: ops.items.map((i) => ({ name: i.name, quantity: i.quantity, size: i.size, comboType: i.comboType, components: i.components })),
     deliveryType: 'Delivery',
     packaging_status: packStatus(order),
     status: order.orderStatus === 'ready_for_pickup' ? 'ready' : 'preparing',

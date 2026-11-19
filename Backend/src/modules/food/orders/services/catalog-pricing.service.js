@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { Product } from '../../admin/models/product.model.js';
 import { Addon } from '../../admin/models/addon.model.js';
 import { FoodCombo } from '../../admin/models/combo.model.js';
+import { loadComboBuilderOptions } from '../../settings/services/comboBuilder.service.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { addonPrice, getOfferMinCartValue, verifyOfferClaim } from '../../settings/controllers/cartConfig.controller.js';
 import { StoreProductPrice } from '../../franchise/models/storeProductPrice.model.js';
@@ -101,10 +102,59 @@ async function priceProductLine(item, addons, storeRules) {
   return { price: round2(unit), size: sizeName, crust, selectedAddons, isVeg: product.vegType !== 'non-veg' };
 }
 
+/** One line of text for what is in a combo: "Wow Pizza: Corn Paneer (Regular) + Drink: Coke". Kept as the item's notes. */
+export const describeComponents = (components = []) =>
+  components
+    .map((c) => `${c.label ? `${c.label}: ` : ''}${c.name}${c.size ? ` (${c.size})` : ''}${c.crust ? `, ${c.crust}` : ''}${c.quantity > 1 ? ` x${c.quantity}` : ''}`)
+    .join(' + ');
+
+/**
+ * A meal combo the super admin made. The price is the combo's own price. What is inside it is rebuilt here from the
+ * combo and the customer's choice for each "pick one" slot (the first option when they did not choose), so the kitchen
+ * and the packer get the real list, and an unknown choice is refused.
+ */
 async function priceComboLine(item) {
   const combo = mongoose.isValidObjectId(item.itemId) ? await FoodCombo.findById(item.itemId).lean() : null;
   if (!combo || combo.status !== 'active') return null;
-  return { price: round2(Number(combo.price) || 0), size: '', crust: '', selectedAddons: [] };
+  const wanted = item.comboChoices && typeof item.comboChoices === 'object' ? item.comboChoices : {};
+  const components = [];
+  for (const slot of combo.items || []) {
+    const quantity = Math.max(1, Number(slot.quantity) || 1);
+    if ((slot.choices || []).length > 0) {
+      const name = wanted[String(slot._id)];
+      const pick = name ? slot.choices.find((c) => same(c.name, name)) : slot.choices[0];
+      if (!pick) throw new ValidationError(`"${name}" is not available for "${slot.name}" in "${combo.name}".`);
+      components.push({ label: slot.name, name: pick.name, size: pick.size || '', crust: '', quantity, kitchen: !!pick.productId, productId: pick.productId ? String(pick.productId) : '', slot: String(slot._id) });
+    } else {
+      components.push({ label: '', name: slot.name, size: slot.size || '', crust: '', quantity, kitchen: !!slot.productId, productId: slot.productId ? String(slot.productId) : '', slot: '' });
+    }
+  }
+  return {
+    price: round2(Number(combo.price) || 0), size: '', crust: '', selectedAddons: [],
+    name: combo.name, comboType: 'meal', components, notes: describeComponents(components),
+  };
+}
+
+/**
+ * A combo made in the Combo Builder (the customer picked pizzas). The app sends only which pizzas; the price is the sum
+ * of those pizzas at the configured size with the combo discount, taken from the same settings the builder page shows.
+ */
+async function priceBuilderComboLine(item) {
+  const { config, options } = await loadComboBuilderOptions();
+  if (!config.isActive) throw new ValidationError('This combo offer is not available right now.');
+  const byId = new Map(options.map((o) => [o.id, o]));
+  const picks = (item.comboLines || []).map((l) => byId.get(String(l.productId)));
+  if (picks.length !== config.slotCount || picks.some((p) => !p)) {
+    throw new ValidationError('This combo has changed or is no longer available. Please build it again.');
+  }
+  const components = picks.map((p) => ({ label: '', name: p.name, size: p.size, crust: p.crust || '', quantity: 1, kitchen: true, productId: p.id, slot: '' }));
+  return {
+    price: round2(picks.reduce((sum, p) => sum + p.finalPrice, 0)), size: '', crust: '', selectedAddons: [],
+    // the same id for the same pizzas, so one id never means two different combos
+    itemId: `combo-offer-${picks.map((p) => p.id).join('-')}`,
+    name: config.offerName || 'Pizza Combo', comboType: 'builder', components, notes: describeComponents(components),
+    isVeg: picks.every((p) => p.vegType !== 'non-veg'),
+  };
 }
 
 async function priceAddonLine(item) {
@@ -133,7 +183,7 @@ export async function priceCartItems(userId, clientItems, { storeId } = {}) {
   const priced = [];
   const offerClaims = [];
   for (const item of items) {
-    const { offerToken, toppings, meals, extraCheese, ...rest } = item;
+    const { offerToken, toppings, meals, extraCheese, comboLines, comboChoices, ...rest } = item;
 
     if (offerToken) {
       const claim = verifyOfferClaim(offerToken, item.itemId, userId);
@@ -146,6 +196,7 @@ export async function priceCartItems(userId, clientItems, { storeId } = {}) {
 
     let line;
     if (item.kind === 'addon' || item.kind === 'topping') line = await priceAddonLine(item);
+    else if (Array.isArray(comboLines) && comboLines.length > 0) line = await priceBuilderComboLine(item);
     else line = (await priceProductLine(item, addons, storeRules)) || (await priceComboLine(item));
     if (!line) throw unavailable(item);
 

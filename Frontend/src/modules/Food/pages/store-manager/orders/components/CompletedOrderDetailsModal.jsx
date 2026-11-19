@@ -1,3 +1,4 @@
+import ComboComponents from "./ComboComponents";
 import React from "react";
 import { Drawer, Tabs, Collapse, Tag, Divider, Button, Timeline, Rate } from "antd";
 import {
@@ -240,6 +241,7 @@ export default function CompletedOrderDetailsModal({
                 }
               >
                 <div className="pl-12 py-2 text-xs border-t border-zinc-100 dark:border-zinc-800/60 font-semibold space-y-2 text-slate-700 dark:text-zinc-350">
+                  <ComboComponents item={item} />
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <span className="text-zinc-400 block mb-0.5">Crust / Variant</span>

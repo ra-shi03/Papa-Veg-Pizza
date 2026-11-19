@@ -21,11 +21,16 @@ Also: customer, delivery_partner.
 
 ## Status
 DONE: auth; super admin control of user-app content.
+DONE: complaints end to end. Customer sends (/food/user/complaints), store manager replies and resolves (/food/store/complaints), franchise admin
+handles them on the Customer Complaints desk (/food/admin/stores/complaints/desk: notes, resolve, close; no assigning, escalation or SLA by design). Test: Backend/test/complaint-desk.test.js.
+DONE: combos end to end (Combo Builder + meal combos). The server prices a builder combo from the combo-page settings and records what is
+inside every combo line (`components`); the kitchen gets one card per pizza (`kitchenUnits`, KitchenItem.lineIndex); the store, packer and
+rider payloads carry the contents. Tests: Backend/test/combos.test.js, combo-flow.test.js, the combos block in kitchen-ops.test.js.
 DONE (store ops order flow, see docs/rider-flow.md section 5): store manager > supervisor > staff tasks gated by attendance
 and stations; real data in Completed Order details; manual rider assignment (`dispatch.manual`) is never undone by
 auto-dispatch, its timeout job or the startup watchdog; Confirm Pickup accepts the rider at handover; handover photo
 required to complete a delivery (`deliveryVerification.handoverPhotoUrl`).
-PENDING: staff management, inventory, customers/menu APIs, complaints, dashboards, sockets, delivery/orders
+PENDING: staff management, inventory, customers/menu APIs, dashboards, sockets, delivery/orders
 verification (open: store Confirm Pickup skips the rider's bill photo; handover photo not shown in the store panel yet).
 Defer: finance, marketing, reports, rewards.
 

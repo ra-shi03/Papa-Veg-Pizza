@@ -12,7 +12,11 @@ const kitchenItemSchema = new mongoose.Schema(
     {
         orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodOrder', required: true, index: true },
         storeId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodStore', required: true, index: true },
-        index: { type: Number, required: true, min: 0 }, // position in order.items
+        index: { type: Number, required: true, min: 0 }, // position among the order's kitchen cards
+        // Which order line this card belongs to (position in order.items). A combo has one card per pizza in it, so
+        // several cards share a lineIndex. Cards made before combos have none: their index is the line.
+        lineIndex: { type: Number, default: null, min: 0 },
+        comboName: { type: String, default: '', trim: true },
         name: { type: String, default: '', trim: true },
         size: { type: String, default: '', trim: true },
         crust: { type: String, default: '', trim: true },

@@ -198,6 +198,9 @@ export const toOpsOrder = (order) => {
       unitPrice: i.price,
       subtotal: i.price * i.quantity,
       isLimitedOffer: !!i.isLimitedOffer,
+      // a combo: what is inside it (the pizzas the kitchen makes, and the dips / drinks that are packed)
+      comboType: i.comboType || '',
+      components: (i.components || []).map((c) => ({ label: c.label || '', name: c.name, size: c.size || '', crust: c.crust || '', quantity: c.quantity || 1, kitchen: !!c.kitchen })),
       customizations: {
         crustType: i.crust || '',
         cheeseLevel: '',

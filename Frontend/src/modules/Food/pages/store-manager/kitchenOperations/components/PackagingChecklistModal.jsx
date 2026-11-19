@@ -1,3 +1,4 @@
+import ComboComponents from "../../orders/components/ComboComponents";
 import React, { useState, useEffect } from "react";
 import { Modal, Checkbox, Input } from "antd";
 import { ClipboardCheck, Sparkles, AlertCircle } from "lucide-react";
@@ -101,6 +102,18 @@ export default function PackagingChecklistModal({ visible, onClose, order, onSub
       }
     >
       <div className="py-4 space-y-4 text-xs">
+        {/* Combos in the order: the packer checks every part (dips, crispies, drinks too) is in the bag */}
+        {order.items?.some((i) => i.components?.length > 0) && (
+          <div className="space-y-2">
+            <p className="m-0 text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-zinc-500">Combos in this order: check every part is in the bag</p>
+            {order.items.filter((i) => i.components?.length > 0).map((i, idx) => (
+              <div key={idx}>
+                <p className="m-0 mb-1 text-[11px] font-extrabold text-slate-800 dark:text-zinc-200">{i.quantity} × {i.name}</p>
+                <ComboComponents item={i} />
+              </div>
+            ))}
+          </div>
+        )}
         {/* Verification lists */}
         <div className="space-y-3 pr-1 max-h-[300px] overflow-y-auto">
           {checklistItems.map((item) => (

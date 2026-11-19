@@ -1,3 +1,4 @@
+import ComboComponents from "../../orders/components/ComboComponents";
 import React from "react";
 import { ShoppingCart, MapPin, Clock, CreditCard, User } from "lucide-react";
 
@@ -82,18 +83,21 @@ export default function OrderDetailsCard({ order }) {
 
         <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
           {Array.isArray(order.items) && order.items.map((item, idx) => (
-            <div key={idx} className="flex justify-between items-center bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 p-2 rounded-xl">
-              <div>
-                <span className="font-extrabold text-slate-900 dark:text-white">{item.name}</span>
-                {item.size && (
-                  <span className="text-[9px] text-slate-455 dark:text-zinc-555 block font-bold mt-0.5">
-                    Size: {item.size} {item.crust ? `• ${item.crust}` : ""}
-                  </span>
-                )}
+            <div key={idx} className="bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 p-2 rounded-xl">
+              <div className="flex justify-between items-center">
+                <div>
+                  <span className="font-extrabold text-slate-900 dark:text-white">{item.name}</span>
+                  {item.size && (
+                    <span className="text-[9px] text-slate-455 dark:text-zinc-555 block font-bold mt-0.5">
+                      Size: {item.size} {item.crust ? `• ${item.crust}` : ""}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] font-black text-slate-455 shrink-0">
+                  Qty {item.quantity}
+                </span>
               </div>
-              <span className="text-[10px] font-black text-slate-455 shrink-0">
-                Qty {item.quantity}
-              </span>
+              <ComboComponents item={item} plain className="mt-1.5" />
             </div>
           ))}
         </div>

@@ -119,6 +119,9 @@ export const toOrderItems = (cartItems) => cartItems.map((item) => ({
   ...(item.toppings?.length ? { toppings: item.toppings } : {}),
   ...(item.meals?.length ? { meals: item.meals } : {}),
   ...(item.extraCheese ? { extraCheese: true } : {}),
+  // A combo: only what the customer picked. The server works out what is inside it and what it costs.
+  ...(item.comboLines?.length ? { comboLines: item.comboLines.map((l) => ({ productId: String(l.productId) })) } : {}),
+  ...(item.comboChoices && Object.keys(item.comboChoices).length ? { comboChoices: item.comboChoices } : {}),
   notes: item.description || "",
   ...(item.offerToken ? { offerToken: item.offerToken } : {}),
 }))

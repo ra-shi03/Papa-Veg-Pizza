@@ -24,7 +24,10 @@ const orderItemSchema = z.object({
         type: z.string().optional(),
         price: z.number().min(0).optional()
     })).optional(),
-    offerToken: z.string().optional()
+    offerToken: z.string().optional(),
+    // Combos: what the customer picked. The server decides what is in the combo and what it costs.
+    comboLines: z.array(z.object({ productId: z.string().min(1).max(40) })).max(6).optional(),
+    comboChoices: z.record(z.string().max(40), z.string().max(120)).optional()
 });
 
 const addressSchema = z.object({

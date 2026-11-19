@@ -15,7 +15,14 @@ const makeStaff = async (managerToken, role, tag) => {
     const email = `${tag}${fx.ts}@example.invalid`;
     const res = await fx.call('POST', '/v1/food/store/staff', managerToken, { fullName: `Name ${tag}`, email, phone: `7${String(++phoneSeq).padStart(2, '0')}${String(fx.ts).slice(-7)}`, password: PASSWORD, role });
     assert.equal(res.status, 201, `create ${tag}: ${JSON.stringify(res.body)}`);
-    return { id: res.body.data.userId, name: `Name ${tag}`, token: await login(email) };
+    // New staff sign in only after their franchise admin approves them
+    const adminToken = managerToken === fx.F.A.managerToken ? fx.F.A.adminToken : fx.F.B.adminToken;
+    const ok = await fx.call('PATCH', `/v1/staff-approvals/${res.body.data._id}/approve`, adminToken, {});
+    assert.equal(ok.status, 200, `approve ${tag}: ${JSON.stringify(ok.body)}`);
+    const token = await login(email);
+    // Staff can be given work only when clocked in (attendance gating)
+    await fx.call('POST', '/v1/store/attendance/clock-in', token);
+    return { id: res.body.data.userId, name: `Name ${tag}`, token };
 };
 const newOrder = async (f) => {
     const ref = `KT${fx.ts}${orderNo++}`;

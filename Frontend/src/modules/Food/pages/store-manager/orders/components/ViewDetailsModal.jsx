@@ -1,3 +1,4 @@
+import ComboComponents from "./ComboComponents";
 import React from "react";
 import { Modal, Tabs, Collapse, Tag, Divider, Button } from "antd";
 import {
@@ -287,6 +288,7 @@ export default function ViewDetailsModal({
                 className="mb-2 bg-muted border border-border rounded-2xl overflow-hidden hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors"
               >
                 <div className="px-4 pb-4 text-[11px] border-t border-border pt-3 mt-1 space-y-2.5">
+                  <ComboComponents item={item} />
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
                     <div>
                       <p className="text-zinc-400 font-bold uppercase text-[9px] mb-0.5">Crust Type</p>

@@ -15,7 +15,11 @@ const makeStaff = async (role, tag) => {
         fullName: `Name ${tag}`, email, phone: `6${String(++phoneSeq).padStart(2, '0')}${String(fx.ts).slice(-7)}`, password: PASSWORD, role,
     });
     assert.equal(res.status, 201, JSON.stringify(res.body));
-    return { id: res.body.data.userId, token: await login(email) };
+    const ok = await fx.call('PATCH', `/v1/staff-approvals/${res.body.data._id}/approve`, A.adminToken, {});
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    const token = await login(email);
+    await fx.call('POST', '/v1/store/attendance/clock-in', token); // staff can be given work only when clocked in
+    return { id: res.body.data.userId, token };
 };
 const makeOrder = async (status, supervisorId, set = {}) => {
     const ref = `SA${fx.ts}${seq++}`;

@@ -58,11 +58,38 @@ export async function visibleKitchenOrders(user, extra = {}) {
   return FoodOrder.find(filter).sort({ createdAt: -1 }).limit(200).lean();
 }
 
+/**
+ * The cards the kitchen works on for an order: one per thing it makes. A normal line is one card. A combo is one card for
+ * each pizza (sandwich, taco) in it, so two pizzas in a combo are two cards the chefs and bakers can move on their own;
+ * the dips, crispies and drinks in it are packed, not made, so they have no card (the packer sees them on the order).
+ */
+export function kitchenUnits(order) {
+  const units = [];
+  (order.items || []).forEach((it, lineIndex) => {
+    const made = (it.components || []).filter((c) => c.kitchen);
+    if (made.length > 0) {
+      made.forEach((c) => units.push({
+        lineIndex, name: c.name || '', size: c.size || '', crust: c.crust || '', toppings: [],
+        quantity: Math.max(1, (c.quantity || 1) * (it.quantity || 1)), comboName: it.name || '',
+      }));
+    } else {
+      units.push({
+        lineIndex, name: it.name || '', size: it.size || it.variantName || '', crust: it.crust || '',
+        toppings: (it.selectedAddons || []).map((a) => a.name), quantity: it.quantity || 1, comboName: '',
+      });
+    }
+  });
+  return units;
+}
+
+/** The order line a kitchen card belongs to. Cards made before combos existed have no lineIndex: theirs is the index. */
+export const lineOf = (row) => (Number.isInteger(row.lineIndex) ? row.lineIndex : row.index);
+
 /** Creates the per-pizza rows of orders that entered the kitchen (idempotent). */
 export async function ensureItems(orders) {
   const ops = [];
   for (const order of orders) {
-    (order.items || []).forEach((it, index) => {
+    kitchenUnits(order).forEach((unit, index) => {
       ops.push({
         updateOne: {
           filter: { orderId: order._id, index },
@@ -71,11 +98,13 @@ export async function ensureItems(orders) {
               orderId: order._id,
               storeId: order.storeId,
               index,
-              name: it.name || '',
-              size: it.size || it.variantName || '',
-              crust: it.crust || '',
-              toppings: (it.selectedAddons || []).map((a) => a.name),
-              quantity: it.quantity || 1,
+              lineIndex: unit.lineIndex,
+              comboName: unit.comboName,
+              name: unit.name,
+              size: unit.size,
+              crust: unit.crust,
+              toppings: unit.toppings,
+              quantity: unit.quantity,
             },
           },
           upsert: true,
