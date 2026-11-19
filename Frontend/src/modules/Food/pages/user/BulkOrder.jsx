@@ -843,188 +843,105 @@ export default function BulkOrder() {
             </div>
           ) : (
             <div className="space-y-6">
-              {/* 1. Feedback & Queries Card */}
-              <section className="bg-white dark:bg-zinc-900 rounded-none border border-zinc-200/90 dark:border-zinc-800 p-6 sm:p-7 text-center space-y-4 shadow-sm">
-                <p className="text-sm text-zinc-600 dark:text-zinc-300 font-medium m-0 leading-relaxed">
-                  {cp.feedbackHeading || "Have any feedback or queries? We'd love to hear from you. Write to us at"}
-                </p>
-                {cp.feedbackEmail && (
-                <a
-                  href={`mailto:${cp.feedbackEmail}`}
-                  className="text-sm sm:text-base font-normal text-[#E53935] hover:underline block break-all tracking-tight"
-                >
-                  {cp.feedbackEmail}
-                </a>
-                )}
-
-                {/* Nearest Outlet Button in Papa Veg Pizza Red */}
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowOutlets(true)
-                      window.scrollTo({ top: 0, behavior: "smooth" })
-                    }}
-                    className="w-full py-3.5 px-4 bg-[#E53935] hover:bg-[#D32F2F] active:scale-[0.99] text-white font-extrabold text-xs sm:text-sm tracking-wider uppercase rounded-xl transition-all shadow-md shadow-red-500/20 cursor-pointer border-0 flex items-center justify-center gap-2"
-                  >
-                    <MapPin className="w-4 h-4" />
-                    <span>{cp.outletButtonText || "FIND YOUR NEAREST OUTLET"}</span>
-                  </button>
+              {/* 1. Help card: feedback, email and the nearest outlet */}
+              <section className="rounded-2xl overflow-hidden bg-gradient-to-br from-[#b71c1c] via-[#c62828] to-[#E53935] text-white p-5 shadow-md shadow-red-500/20 space-y-4">
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest bg-white/20 px-2.5 py-0.5 rounded-full inline-block">We're here to help</span>
+                  <p className="text-sm font-medium m-0 leading-relaxed text-white/95">
+                    {cp.feedbackHeading || "Have any feedback or queries? We'd love to hear from you. Write to us at"}
+                  </p>
+                  {cp.feedbackEmail && (
+                    <a href={`mailto:${cp.feedbackEmail}`} className="text-base font-bold text-white underline underline-offset-2 break-all">{cp.feedbackEmail}</a>
+                  )}
                 </div>
-
-                <p className="text-xs text-zinc-600 dark:text-zinc-400 m-0 leading-relaxed pt-1">
+                <button
+                  type="button"
+                  onClick={() => { setShowOutlets(true); window.scrollTo({ top: 0, behavior: "smooth" }) }}
+                  className="w-full h-12 px-4 bg-white text-[#E53935] active:scale-[0.99] font-extrabold text-xs tracking-wider uppercase rounded-xl transition-all shadow-sm cursor-pointer border-0 flex items-center justify-center gap-2"
+                >
+                  <MapPin className="w-4 h-4" />
+                  <span>{cp.outletButtonText || "FIND YOUR NEAREST OUTLET"}</span>
+                </button>
+                <p className="text-xs text-white/85 m-0 leading-relaxed">
                   {cp.outletHelpText || "Try our delicious treats and satisfy hunger with Papa Veg Pizza."}{" "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowOutlets(true)
-                      window.scrollTo({ top: 0, behavior: "smooth" })
-                    }}
-                    className="font-bold text-[#E53935] hover:underline bg-transparent border-0 p-0 inline cursor-pointer text-xs"
-                  >
+                  <button type="button" onClick={() => { setShowOutlets(true); window.scrollTo({ top: 0, behavior: "smooth" }) }} className="font-bold text-white underline bg-transparent border-0 p-0 inline cursor-pointer text-xs">
                     {cp.locateLinkText || "Locate Nearby Pizza Stores"}
                   </button>{" "}
                   nearest to you.
                 </p>
               </section>
 
-            {/* 2. Customer Care Number */}
-            <section className="space-y-1.5 py-1">
-              <h2 className="text-sm font-bold text-zinc-900 dark:text-white m-0 tracking-tight">
-                {cp.customerCareTitle || "Papa Veg Pizza Customer Care Number"}
-              </h2>
-              <div className="flex flex-wrap items-center gap-3 pt-1">
-                {cp.customerCareNumber && (
-                <a
-                  href={`tel:${cp.customerCareNumber.replace(/\s+/g, "")}`}
-                  className="text-base sm:text-lg font-bold text-[#E53935] hover:underline inline-flex items-center gap-2"
-                >
-                  <Phone className="w-4 h-4 text-[#E53935]" />
-                  <span>{cp.customerCareNumber}</span>
-                </a>
-                )}
-              </div>
-            </section>
+              {/* 2. Quick contact: call and write */}
+              {(cp.customerCareNumber || cp.feedbackEmail) && (
+                <section className="space-y-2">
+                  <h2 className="text-sm font-bold text-zinc-900 dark:text-white m-0 tracking-tight">{cp.customerCareTitle || "Papa Veg Pizza Customer Care"}</h2>
+                  <div className="grid grid-cols-2 gap-3">
+                    {cp.customerCareNumber && (
+                      <a href={`tel:${cp.customerCareNumber.replace(/\s+/g, "")}`} className="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 p-3.5 flex flex-col gap-2 no-underline shadow-sm active:scale-[0.98] transition-transform min-w-0">
+                        <span className="w-9 h-9 rounded-full bg-red-50 dark:bg-red-950/40 text-[#E53935] flex items-center justify-center"><Phone className="w-4 h-4" /></span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Call us</span>
+                        <span className="text-sm font-extrabold text-zinc-900 dark:text-white break-words">{cp.customerCareNumber}</span>
+                      </a>
+                    )}
+                    {cp.feedbackEmail && (
+                      <a href={`mailto:${cp.feedbackEmail}`} className="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 p-3.5 flex flex-col gap-2 no-underline shadow-sm active:scale-[0.98] transition-transform min-w-0">
+                        <span className="w-9 h-9 rounded-full bg-red-50 dark:bg-red-950/40 text-[#E53935] flex items-center justify-center"><Mail className="w-4 h-4" /></span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Write to us</span>
+                        <span className="text-sm font-extrabold text-zinc-900 dark:text-white break-all">{cp.feedbackEmail}</span>
+                      </a>
+                    )}
+                  </div>
+                </section>
+              )}
 
-            {/* 3. Corporate Office Address */}
-            <section className="space-y-2.5 py-1">
-              <h2 className="text-sm font-bold text-zinc-900 dark:text-white m-0 flex items-center gap-2 tracking-tight">
-                <Building className="w-4 h-4 text-[#E53935]" />
-                <span>{cp.corporateOfficeTitle || "Papa Veg Pizza Corporate Office"}</span>
-              </h2>
-              <div className="text-xs text-zinc-600 dark:text-zinc-400 space-y-1 leading-relaxed">
-                <p className="font-normal text-zinc-700 dark:text-zinc-300 m-0">
-                  {cp.companyName}
-                </p>
-                {cp.addressLine1 && <p className="m-0">{cp.addressLine1}</p>}
-                {cp.addressLine2 && <p className="m-0">{cp.addressLine2}</p>}
-              </div>
-            </section>
-
-            {/* 4. Interactive Google Map (Dynamic Search: Papa Veg Pizza + Customer City) */}
-            <section className="bg-white dark:bg-zinc-900 rounded-none border border-zinc-200/90 dark:border-zinc-800 overflow-hidden shadow-sm relative">
-              <div className="relative h-64 sm:h-72 w-full bg-zinc-100 dark:bg-zinc-800">
-                <iframe
-                  title="Corporate Office Location"
-                  src={mapEmbedUrl}
-                  className="w-full h-full border-0"
-                  loading="lazy"
-                  allowFullScreen
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
-                <a
-                  href={mapExternalUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="absolute top-3 left-3 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xs text-zinc-800 dark:text-zinc-200 hover:text-[#E53935] px-3 py-1.5 rounded-lg text-xs font-bold shadow-md border border-zinc-200 dark:border-zinc-700 flex items-center gap-1.5 no-underline transition-all hover:scale-105"
-                >
-                  <span>Open in Maps</span>
-                  <ExternalLink className="w-3.5 h-3.5 text-[#E53935]" />
-                </a>
-              </div>
-            </section>
-
-            {/* 5. Social Media Channels (Full Width Black Card) */}
-            <section className="-mx-4 -mb-5 w-[calc(100%+2rem)] bg-gradient-to-b from-zinc-900 to-zinc-950 text-white rounded-none p-6 sm:p-8 space-y-6 shadow-md border-y border-zinc-800 border-x-0 text-center">
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#E53935] bg-red-950/50 border border-red-800/40 px-2.5 py-0.5 rounded-full inline-block">
-                  Stay In Touch
-                </span>
-                <h3 className="text-sm font-bold text-zinc-200 m-0">
-                  Official Papa Veg Pizza Channels
-                </h3>
-              </div>
-
-              <div className="space-y-6 pt-2">
-                {/* Facebook */}
-                {cp.facebookUrl && (
-                  <a
-                    href={cp.facebookUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group flex flex-col items-center gap-2 no-underline transition-transform active:scale-95"
-                  >
-                    <div className="w-12 h-12 rounded-full bg-[#1877F2]/20 border border-[#1877F2]/40 text-[#1877F2] group-hover:bg-[#1877F2] group-hover:text-white flex items-center justify-center transition-all shadow-sm">
-                      <Facebook className="w-5 h-5 fill-current" />
+              {/* 3. Corporate office */}
+              {(cp.companyName || cp.addressLine1 || cp.addressLine2) && (
+                <section className="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 p-4 shadow-sm flex gap-3">
+                  <span className="w-9 h-9 shrink-0 rounded-full bg-red-50 dark:bg-red-950/40 text-[#E53935] flex items-center justify-center"><Building className="w-4 h-4" /></span>
+                  <div className="min-w-0 space-y-1">
+                    <h2 className="text-sm font-bold text-zinc-900 dark:text-white m-0 tracking-tight">{cp.corporateOfficeTitle || "Papa Veg Pizza Corporate Office"}</h2>
+                    <div className="text-xs text-zinc-600 dark:text-zinc-400 space-y-0.5 leading-relaxed">
+                      {cp.companyName && <p className="font-semibold text-zinc-800 dark:text-zinc-200 m-0">{cp.companyName}</p>}
+                      {cp.addressLine1 && <p className="m-0">{cp.addressLine1}</p>}
+                      {cp.addressLine2 && <p className="m-0">{cp.addressLine2}</p>}
                     </div>
-                    <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white group-hover:underline">
-                      {cp.facebookText || "Visit our page on Facebook"}
-                    </span>
-                  </a>
-                )}
+                  </div>
+                </section>
+              )}
 
-                {/* Google */}
-                {cp.googleUrl && (
-                  <a
-                    href={cp.googleUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group flex flex-col items-center gap-2 no-underline transition-transform active:scale-95"
-                  >
-                    <div className="w-12 h-12 rounded-full bg-[#EA4335]/20 border border-[#EA4335]/40 text-[#EA4335] group-hover:bg-[#EA4335] group-hover:text-white flex items-center justify-center transition-all shadow-sm">
-                      <span className="text-sm font-black font-sans">g+</span>
-                    </div>
-                    <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white group-hover:underline">
-                      {cp.googleText || "Visit our page on Google"}
-                    </span>
+              {/* 4. Map */}
+              <section className="rounded-2xl overflow-hidden border border-zinc-200/80 dark:border-zinc-800 shadow-sm relative bg-zinc-100 dark:bg-zinc-800">
+                <div className="relative h-56 w-full">
+                  <iframe title="Corporate Office Location" src={mapEmbedUrl} className="w-full h-full border-0" loading="lazy" allowFullScreen referrerPolicy="no-referrer-when-downgrade" />
+                  <a href={mapExternalUrl} target="_blank" rel="noopener noreferrer" className="absolute top-3 left-3 bg-white/95 text-zinc-800 hover:text-[#E53935] px-3 py-1.5 rounded-lg text-xs font-bold shadow-md border border-zinc-200 inline-flex items-center gap-1.5 no-underline">
+                    <span>Open in Maps</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-[#E53935]" />
                   </a>
-                )}
+                </div>
+              </section>
 
-                {/* Instagram */}
-                {cp.instagramUrl && (
-                  <a
-                    href={cp.instagramUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group flex flex-col items-center gap-2 no-underline transition-transform active:scale-95"
-                  >
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500/20 via-rose-500/20 to-purple-500/20 border border-rose-500/40 text-rose-400 group-hover:bg-gradient-to-tr group-hover:from-amber-500 group-hover:via-rose-500 group-hover:to-purple-500 group-hover:text-white flex items-center justify-center transition-all shadow-sm">
-                      <Instagram className="w-5 h-5" />
-                    </div>
-                    <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white group-hover:underline">
-                      {cp.instagramText || "Visit our page on Instagram"}
-                    </span>
-                  </a>
-                )}
-
-                {/* Twitter / X */}
-                {cp.twitterUrl && (
-                  <a
-                    href={cp.twitterUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group flex flex-col items-center gap-2 no-underline transition-transform active:scale-95"
-                  >
-                    <div className="w-12 h-12 rounded-full bg-[#1DA1F2]/20 border border-[#1DA1F2]/40 text-[#1DA1F2] group-hover:bg-[#1DA1F2] group-hover:text-white flex items-center justify-center transition-all shadow-sm">
-                      <Twitter className="w-5 h-5 fill-current" />
-                    </div>
-                    <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white group-hover:underline">
-                      {cp.twitterText || "Follow us on twitter for latest updates"}
-                    </span>
-                  </a>
-                )}
-              </div>
-            </section>
+              {/* 5. Social channels: one compact row of icons */}
+              {(cp.facebookUrl || cp.googleUrl || cp.instagramUrl || cp.twitterUrl) && (
+                <section className="rounded-2xl bg-gradient-to-b from-zinc-900 to-zinc-950 text-white p-5 text-center space-y-4 shadow-md">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#ff6b67] bg-red-950/50 border border-red-800/40 px-2.5 py-0.5 rounded-full inline-block">Stay in touch</span>
+                    <h3 className="text-sm font-bold text-zinc-200 m-0">Official Papa Veg Pizza Channels</h3>
+                  </div>
+                  <div className="flex items-start justify-center gap-5">
+                    {[
+                      [cp.facebookUrl, cp.facebookText || "Facebook", "Facebook", <Facebook key="f" className="w-5 h-5 fill-current" />, "bg-[#1877F2]/20 border-[#1877F2]/40 text-[#4c9bff]"],
+                      [cp.googleUrl, cp.googleText || "Google", "Google", <span key="g" className="text-sm font-black font-sans">g+</span>, "bg-[#EA4335]/20 border-[#EA4335]/40 text-[#ff7b6f]"],
+                      [cp.instagramUrl, cp.instagramText || "Instagram", "Instagram", <Instagram key="i" className="w-5 h-5" />, "bg-rose-500/20 border-rose-500/40 text-rose-300"],
+                      [cp.twitterUrl, cp.twitterText || "Twitter", "Twitter", <Twitter key="t" className="w-5 h-5 fill-current" />, "bg-[#1DA1F2]/20 border-[#1DA1F2]/40 text-[#5cc0ff]"],
+                    ].filter(([url]) => url).map(([url, label, short, icon, cls]) => (
+                      <a key={short} href={url} target="_blank" rel="noopener noreferrer" aria-label={label} title={label} className="flex flex-col items-center gap-1.5 no-underline active:scale-95 transition-transform">
+                        <span className={`w-12 h-12 rounded-full border flex items-center justify-center ${cls}`}>{icon}</span>
+                        <span className="text-[11px] font-semibold text-zinc-300">{short}</span>
+                      </a>
+                    ))}
+                  </div>
+                </section>
+              )}
           </div>
         )
       ) : viewMode === "orders" ? (
