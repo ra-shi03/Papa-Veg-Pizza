@@ -4,6 +4,7 @@ import { Save } from 'lucide-react';
 import { adminAPI } from '@food/api';
 
 // Fees the customer is charged on every order, and the cancellation policy. The server applies exactly these values.
+// Each field has a Shown/Hidden switch: Hidden means that charge is not applied and not shown in the cart or bill.
 const FIELDS = [
   { key: 'handlingFee', label: 'Handling charge (₹)', hint: 'Flat amount added to every order. GST is charged on it.' },
   { key: 'platformFee', label: 'Platform fee (₹)', hint: 'Flat amount added to every order.' },
@@ -20,6 +21,8 @@ const blank = Object.fromEntries(FIELDS.map((f) => [f.key, '']));
 export default function FeesAndCharges() {
   const [values, setValues] = useState(blank);
   const [ranges, setRanges] = useState([]);
+  // true = shown to the customer in the cart and bill (and charged); missing counts as on
+  const [toggles, setToggles] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -30,6 +33,7 @@ export default function FeesAndCharges() {
         if (doc) {
           setValues(Object.fromEntries(FIELDS.map((f) => [f.key, doc[f.key] ?? ''])));
           setRanges(doc.deliveryFeeRanges || []);
+          setToggles(doc.feeToggles || {});
         }
       })
       .catch(() => toast.error('Could not load fee settings'))
@@ -42,6 +46,7 @@ export default function FeesAndCharges() {
     setSaving(true);
     try {
       const body = Object.fromEntries(FIELDS.map((f) => [f.key, values[f.key] === '' ? null : Number(values[f.key])]));
+      body.feeToggles = Object.fromEntries(FIELDS.map((f) => [f.key, toggles[f.key] !== false]));
       body.deliveryFeeRanges = ranges.map((r) => ({ min: Number(r.min), max: Number(r.max), fee: Number(r.fee) }));
       await adminAPI.createOrUpdateFeeSettings(body);
       toast.success('Fees saved. New orders use them immediately.');
@@ -63,12 +68,23 @@ export default function FeesAndCharges() {
 
       <div className="grid gap-4 sm:grid-cols-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4">
         {FIELDS.map((f) => (
-          <label key={f.key} className="block">
-            <span className="text-xs font-semibold text-black dark:text-zinc-100">{f.label}</span>
-            <input type="number" min="0" step="any" disabled={loading} className={input} value={values[f.key]}
+          <div key={f.key} className="block">
+            <div className="flex items-center justify-between gap-2">
+              <label htmlFor={`fee-${f.key}`} className="text-xs font-semibold text-black dark:text-zinc-100">{f.label}</label>
+              <button type="button" role="switch" aria-checked={toggles[f.key] !== false} disabled={loading}
+                title={toggles[f.key] !== false ? 'Shown to customers in cart & bill' : 'Hidden from customers and not charged'}
+                onClick={() => setToggles((t) => ({ ...t, [f.key]: t[f.key] === false }))}
+                className="inline-flex items-center gap-1.5 text-[11px] text-zinc-600 dark:text-zinc-400">
+                <span className={`relative inline-block h-5 w-9 rounded-full transition-colors ${toggles[f.key] !== false ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'}`}>
+                  <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${toggles[f.key] !== false ? 'translate-x-4' : ''}`} />
+                </span>
+                {toggles[f.key] !== false ? 'Shown' : 'Hidden'}
+              </button>
+            </div>
+            <input id={`fee-${f.key}`} type="number" min="0" step="any" disabled={loading} className={`${input} ${toggles[f.key] === false ? 'opacity-50' : ''}`} value={values[f.key]}
               onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))} />
             <span className="text-[11px] text-zinc-500">{f.hint}</span>
-          </label>
+          </div>
         ))}
       </div>
 

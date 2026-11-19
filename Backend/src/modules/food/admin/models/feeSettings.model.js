@@ -25,6 +25,9 @@ const feeSettingsSchema = new mongoose.Schema(
         cancellationFee: { type: Number, min: 0 },
         // Minutes after placing an order during which cancelling is free.
         cancellationFreeMinutes: { type: Number, min: 0 },
+        // Per-field switch: false hides that charge from the customer's cart and bill and it is not applied.
+        // A key that is missing counts as on.
+        feeToggles: { type: mongoose.Schema.Types.Mixed, default: {} },
         isActive: { type: Boolean, default: true, index: true }
     },
     { collection: 'food_fee_settings', timestamps: true }

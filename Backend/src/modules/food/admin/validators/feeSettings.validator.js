@@ -18,6 +18,7 @@ const feeSettingsUpsertSchema = z.object({
     handlingFee: z.number().min(0).nullable().optional(),
     cancellationFee: z.number().min(0).nullable().optional(),
     cancellationFreeMinutes: z.number().min(0).nullable().optional(),
+    feeToggles: z.record(z.boolean()).optional(),
     isActive: z.boolean().optional()
 });
 
@@ -54,6 +55,9 @@ export const validateFeeSettingsUpsertDto = (body) => {
             body?.packagingFee === null ? null : body?.packagingFee !== undefined ? Number(body.packagingFee) : undefined,
         gstRate:
             body?.gstRate === null ? null : body?.gstRate !== undefined ? Number(body.gstRate) : undefined,
+        feeToggles: body?.feeToggles && typeof body.feeToggles === 'object'
+            ? Object.fromEntries(Object.entries(body.feeToggles).map(([k, v]) => [k, Boolean(v)]))
+            : undefined,
         isActive: body?.isActive !== undefined ? Boolean(body.isActive) : undefined
     };
     for (const key of ['handlingFee', 'cancellationFee', 'cancellationFreeMinutes']) {

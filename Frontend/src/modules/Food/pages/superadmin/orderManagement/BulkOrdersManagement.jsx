@@ -193,6 +193,17 @@ const StoreStatusBadge = ({ status }) => (
   </span>
 )
 
+// Location shown for an inquiry: the typed location, else the delivery address, else the store
+function inquiryLocation(inq) {
+  if (!inq) return "";
+  if (inq.location) return inq.location;
+  const a = inq.address || {};
+  const addr = [a.street, a.landmark, a.city, a.state, a.pincode].filter(Boolean).join(", ");
+  if (addr) return addr;
+  if (inq.fulfilment === "takeaway" && inq.storeName) return `Pickup · ${inq.storeName}`;
+  return "";
+}
+
 export default function BulkOrdersManagement() {
   const [activeTab, setActiveTab] = useState("inquiries") // 'inquiries' | 'config'
   const [activeCmsTab, setActiveCmsTab] = useState("virtual_party") // 'virtual_party' | 'egift_voucher'
@@ -773,7 +784,7 @@ export default function BulkOrdersManagement() {
                           </td>
 
                           <td className="py-3.5 px-4 text-zinc-600 dark:text-zinc-400">
-                            {inq.location || "N/A"}
+                            {inquiryLocation(inq) || "N/A"}
                           </td>
 
                           <td className="py-3.5 px-4">
@@ -1719,7 +1730,7 @@ export default function BulkOrdersManagement() {
                 <div>
                   <span className="text-zinc-400 font-medium">Location:</span>
                   <p className="font-semibold text-zinc-800 dark:text-zinc-200 mt-0.5 m-0">
-                    {selectedInquiry.location || "N/A"}
+                    {inquiryLocation(selectedInquiry) || "N/A"}
                   </p>
                 </div>
 

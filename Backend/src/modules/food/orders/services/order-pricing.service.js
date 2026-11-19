@@ -29,8 +29,17 @@ const DEFAULT_FEES = {
 // The fees the super admin configured (all zero until they save any).
 async function loadFeeSettings() {
   const doc = await FoodFeeSettings.findOne({ isActive: true }).sort({ createdAt: -1 }).lean();
+  if (!doc) return DEFAULT_FEES;
+  // A charge the super admin switched off (Fees & Charges toggle) is not applied and not shown: treat it as 0.
+  const toggles = doc.feeToggles || {};
+  const off = (k) => toggles[k] === false;
+  const effective = { ...doc };
+  for (const k of ['handlingFee', 'platformFee', 'packagingFee', 'deliveryFee', 'freeDeliveryThreshold', 'gstRate', 'cancellationFee', 'cancellationFreeMinutes']) {
+    if (off(k)) effective[k] = 0;
+  }
+  if (off('deliveryFee')) { effective.deliveryFeeRanges = []; effective.freeDeliveryUpTo = 0; }
   // Once the super admin has saved settings, a field they left blank means 0, not the built-in default.
-  return doc || DEFAULT_FEES;
+  return effective;
 }
 
 // Public view of the fees, so the cart can show the same numbers the server will charge.
@@ -48,6 +57,8 @@ export async function getPublicFeeConfig() {
     gstRate: pick('gstRate'),
     cancellationFee: pick('cancellationFee'),
     cancellationFreeMinutes: pick('cancellationFreeMinutes'),
+    // which charges the customer should see; a switched-off one is already 0 above
+    feeToggles: f.feeToggles || {},
   };
 }
 

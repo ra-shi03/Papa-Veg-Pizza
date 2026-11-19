@@ -1927,6 +1927,8 @@ export async function upsertFeeSettings(body) {
             else if (body[key] !== undefined) $set[key] = body[key];
         }
 
+        if (body.feeToggles !== undefined) $set.feeToggles = body.feeToggles;
+
         if (body.isActive !== undefined) $set.isActive = body.isActive;
 
         const update = {};
@@ -1940,6 +1942,7 @@ export async function upsertFeeSettings(body) {
 
     const payload = {
         deliveryFeeRanges: body.deliveryFeeRanges ?? [],
+        feeToggles: body.feeToggles ?? {},
         isActive: body.isActive !== false
     };
     if (body.deliveryFee !== undefined && body.deliveryFee !== null) payload.deliveryFee = body.deliveryFee;
