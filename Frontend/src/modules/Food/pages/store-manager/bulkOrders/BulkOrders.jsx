@@ -152,11 +152,11 @@ export default function BulkOrders() {
                 <p className="m-0 text-[10px] font-bold uppercase text-zinc-400">{open.fulfilment === "delivery" ? "Deliver to" : "Takeaway"}</p>
                 <p className="m-0 flex gap-1"><MapPin size={12} className="mt-0.5 shrink-0" />{open.fulfilment === "delivery" ? [open.address?.street, open.address?.landmark, open.address?.city, open.address?.state, open.address?.pincode].filter(Boolean).join(", ") : "The customer collects from your store"}</p>
               </div>
-              {open.quotedAmount != null && (
+              {(open.quotedAmount != null || open.paymentMethod === "online") && (
                 <div className="col-span-2 rounded-xl border border-zinc-200 dark:border-zinc-700 px-3 py-2">
                   <p className="m-0 text-[10px] font-bold uppercase text-zinc-400">Payment</p>
-                  <p className="m-0 font-bold">₹{Number(open.quotedAmount).toLocaleString("en-IN")} · {open.paymentMethod === "online" ? "Online" : open.fulfilment === "delivery" ? "Cash / UPI on delivery" : "Cash / UPI at the store"}</p>
-                  <p className={`m-0 font-semibold ${open.paymentStatus === "paid" ? "text-emerald-600" : "text-amber-600"}`}>{open.paymentStatus === "paid" ? "Paid" : open.paymentMethod === "online" ? "Waiting for the customer's online payment" : "To be collected"}</p>
+                  <p className="m-0 font-bold">₹{Number(open.quotedAmount ?? open.estimatedTotal ?? 0).toLocaleString("en-IN")} · {open.paymentMethod === "online" ? "Online" : open.fulfilment === "delivery" ? "Cash / UPI on delivery" : "Cash / UPI at the store"}</p>
+                  <p className={`m-0 font-semibold ${open.paymentStatus === "paid" ? "text-emerald-600" : "text-amber-600"}`}>{open.paymentStatus === "paid" ? (open.paidOnline ? "Paid online" : "Paid") : open.paymentStatus === "refunded" ? "Refunded" : open.paymentMethod === "online" ? "Waiting for the customer's online payment" : "To be collected"}</p>
                 </div>
               )}
               {open.fulfilment === "delivery" && open.orderId && (
@@ -200,7 +200,7 @@ export default function BulkOrders() {
 
             {mode === "confirm" && (
               <div className="space-y-2 rounded-xl bg-zinc-50 dark:bg-zinc-950/40 p-3">
-                <input type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount to pay (₹)" className="w-full h-10 rounded-lg border border-zinc-200 dark:border-zinc-700 px-3 text-sm bg-white dark:bg-zinc-900" />
+                <input type="number" min="0" value={amount} readOnly={!!open.paidOnline} onChange={(e) => setAmount(e.target.value)} placeholder="Amount to pay (₹)" className="w-full h-10 rounded-lg border border-zinc-200 dark:border-zinc-700 px-3 text-sm bg-white dark:bg-zinc-900" />
                 <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder="Note for the customer (timing, payment...)" className="w-full h-10 rounded-lg border border-zinc-200 dark:border-zinc-700 px-3 text-sm bg-white dark:bg-zinc-900" />
                 <div className="flex gap-2">
                   <button disabled={busy} onClick={() => act("confirm", { quotedAmount: amount === "" ? undefined : Number(amount), note }, "Bulk order confirmed. The customer has been emailed.")} className="flex-1 h-10 rounded-lg bg-emerald-600 text-white text-sm font-bold border-0 cursor-pointer disabled:opacity-60">{busy ? "Confirming..." : "Confirm order"}</button>
@@ -222,7 +222,7 @@ export default function BulkOrders() {
               <div className="flex flex-wrap gap-2">
                 {open.status === "new" && (
                   <>
-                    <button onClick={() => { setAmount(open.estimatedTotal != null ? String(open.estimatedTotal) : ""); setMode("confirm"); }} className="h-10 px-5 rounded-lg bg-emerald-600 text-white text-sm font-bold border-0 cursor-pointer flex items-center gap-1.5"><Check size={14} />Confirm</button>
+                    <button disabled={open.paymentMethod === "online" && open.paymentStatus !== "paid"} title={open.paymentMethod === "online" && open.paymentStatus !== "paid" ? "Waiting for the customer's online payment" : ""} onClick={() => { setAmount(open.paidOnline ? String(open.paidOnline.amount) : open.estimatedTotal != null ? String(open.estimatedTotal) : ""); setMode("confirm"); }} className="h-10 px-5 rounded-lg bg-emerald-600 text-white text-sm font-bold border-0 cursor-pointer flex items-center gap-1.5"><Check size={14} />Confirm</button>
                     <button onClick={() => setMode("reject")} className="h-10 px-5 rounded-lg border border-red-300 text-red-600 text-sm font-bold bg-transparent cursor-pointer">Decline</button>
                   </>
                 )}

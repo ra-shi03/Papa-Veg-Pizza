@@ -65,6 +65,16 @@ const bulkOrderInquirySchema = new mongoose.Schema(
     storeId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodStore', default: null, index: true },
     franchiseId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodFranchise', default: null, index: true },
     paymentMethod: { type: String, enum: ['cod', 'online'], default: 'cod' },
+    // Paying online: the customer pays the estimated total (Razorpay) when placing the request; the store can confirm only
+    // once it is paid, and the amount cannot change after that.
+    payment: {
+      status: { type: String, enum: ['none', 'created', 'paid', 'refunded', 'refund_failed'], default: 'none' },
+      razorpayOrderId: { type: String, default: '' },
+      paymentId: { type: String, default: '' },
+      amount: { type: Number, default: 0 },
+      paidAt: { type: Date, default: null },
+      refundId: { type: String, default: '' }
+    },
     // the real order made when the store confirms: it carries the kitchen, rider and payment steps
     orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodOrder', default: null, index: true },
     fulfilment: { type: String, enum: ['takeaway', 'delivery'], default: 'takeaway' },

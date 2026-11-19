@@ -5,6 +5,7 @@ import { CheckCircle2, Loader2, MapPin, Store, Truck, ShoppingBag, Phone, ListCh
 import { toast } from "sonner"
 import apiClient, { userClient } from "@/services/api/axios"
 import { locationAPI } from "@/services/api/location"
+import { payBulkOrder } from "./payOnline"
 import { readSavedCoords } from "@food/utils/savedLocation"
 import { ADMIN_GOOGLE_MAPS_LOADER } from "@food/utils/adminGoogleMaps"
 
@@ -318,7 +319,19 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
       // A signed-in customer's request is linked to them, so they can follow it under My Orders
       const client = isSignedIn() ? userClient : apiClient
       const res = await client.post("/food/bulk-order/inquiry", body)
-      setDone(res?.data?.data || { reference: "" })
+      const placed = res?.data?.data || { reference: "" }
+      // paying online: the Razorpay checkout opens straight away for the estimated total
+      let paid = false
+      let payError = ""
+      if (isParty && f.paymentMethod === "online" && placed.id) {
+        try {
+          paid = (await payBulkOrder(placed)).paid
+        } catch (e) {
+          payError = e?.message || "The payment did not go through."
+          toast.error(payError)
+        }
+      }
+      setDone({ ...placed, paid, payNeeded: isParty && f.paymentMethod === "online" && !paid })
     } catch (err) {
       toast.error(err?.response?.data?.message || err?.response?.data?.error || "Could not send your request. Please try again.")
     } finally {
@@ -346,6 +359,7 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
           <CheckCircle2 className="w-9 h-9" />
         </div>
         <h3 className="text-lg font-extrabold text-zinc-900 dark:text-white m-0">{isParty ? "Request sent to the store" : "Inquiry received"}</h3>
+        {done.paid && <p className="m-0 text-sm font-bold text-emerald-600">Payment received</p>}
         {done.reference && (
           <p className="m-0 text-sm text-zinc-500">
             Your reference <span className="font-extrabold text-zinc-900 dark:text-white tracking-wider">{done.reference}</span>
@@ -353,7 +367,7 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
         )}
         <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed">
           {isParty
-            ? `${done.storeName || "The store"} will review it and confirm. We have emailed you the details and will email you at every step.`
+            ? (done.payNeeded ? `Your request is saved, but the payment is not done yet. Open My Orders and tap Pay now; ${done.storeName || "the store"} can confirm it once it is paid.` : `${done.storeName || "The store"} will review it and confirm. We have emailed you the details and will email you at every step.`)
             : "Our corporate desk will contact you shortly. We have emailed you a confirmation."}
         </p>
         <div className="flex flex-col gap-2 pt-2 max-w-xs mx-auto">
@@ -547,7 +561,7 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
         <div>
           <span className={label}>5. How will you pay?</span>
           <div className="grid grid-cols-2 gap-2">
-            {[{ id: "cod", t: "Cash / UPI", d: f.fulfilment === "delivery" ? "On delivery" : "When you collect", I: Banknote }, { id: "online", t: "Pay online", d: "After the store confirms", I: CreditCard }].map(({ id, t, d, I }) => (
+            {[{ id: "cod", t: "Cash / UPI", d: f.fulfilment === "delivery" ? "On delivery" : "When you collect", I: Banknote }, { id: "online", t: "Pay online", d: "Pay now with Razorpay", I: CreditCard }].map(({ id, t, d, I }) => (
               <button
                 type="button"
                 key={id}
@@ -560,7 +574,7 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
               </button>
             ))}
           </div>
-          {f.paymentMethod === "online" && <p className="mt-2 mb-0 text-[11px] text-zinc-500">You pay online from My Orders once the store confirms the final amount. The store starts preparing after your payment.</p>}
+          {f.paymentMethod === "online" && <p className="mt-2 mb-0 text-[11px] text-zinc-500">You pay the estimated total online (Razorpay) when you send the request. The store confirms after your payment, and you are refunded if it cannot take the order.</p>}
         </div>
       )}
 
@@ -596,10 +610,10 @@ export default function BulkOrderForm({ type, partyOptions = [], voucherOptions 
         disabled={submitting}
         className="w-full h-12 rounded-xl bg-[#E53935] hover:bg-[#d32f2f] text-white text-sm font-extrabold tracking-wide border-0 cursor-pointer shadow-md shadow-[#E53935]/25 disabled:opacity-60 flex items-center justify-center gap-2"
       >
-        {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</> : isParty ? "Send request to the store" : "Submit inquiry"}
+        {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> {f.paymentMethod === "online" && isParty ? "Please wait..." : "Sending..."}</> : isParty ? (f.paymentMethod === "online" ? `Pay ₹${total.toLocaleString("en-IN")} and send request` : "Send request to the store") : "Submit inquiry"}
       </button>
       <p className="text-center text-[11px] text-zinc-500 m-0">
-        {isParty ? f.paymentMethod === "online" ? "The store confirms the price and timing, then you pay online." : "The store confirms the price and timing. You pay when you collect or receive the order." : "Our corporate desk will get back to you."}
+        {isParty ? f.paymentMethod === "online" ? "You pay the estimated total now. The store confirms the timing." : "The store confirms the price and timing. You pay when you collect or receive the order." : "Our corporate desk will get back to you."}
         {contactPhone && (
           <a href={`tel:${String(contactPhone).replace(/\s+/g, "")}`} className="ml-1 font-bold text-[#E53935] inline-flex items-center gap-1"><Phone className="w-3 h-3" />Call us</a>
         )}

@@ -1,5 +1,5 @@
 import { sendResponse } from '../../../../utils/response.js';
-import { listMine, getMine, cancelMine, startOnlinePayment } from '../../orders/services/bulkOrderFlow.service.js';
+import { listMine, getMine, cancelMine, startOnlinePayment, verifyOnlinePayment } from '../../orders/services/bulkOrderFlow.service.js';
 
 // The signed-in customer's own bulk orders (from the verified token, never an id in the body).
 export const listMyBulkOrders = async (req, res, next) => {
@@ -31,6 +31,15 @@ export const cancelMyBulkOrder = async (req, res, next) => {
 export const payMyBulkOrder = async (req, res, next) => {
     try {
         return sendResponse(res, 200, 'Payment started', await startOnlinePayment(req.user?.userId, req.params.id));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const verifyMyBulkOrderPayment = async (req, res, next) => {
+    try {
+        const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body || {};
+        return sendResponse(res, 200, 'Payment verified', { order: await verifyOnlinePayment(req.user?.userId, req.params.id, { razorpayOrderId, razorpayPaymentId, razorpaySignature }) });
     } catch (err) {
         next(err);
     }

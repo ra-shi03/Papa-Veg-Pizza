@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { Banknote, Check, ChevronDown, CreditCard, Loader2, MapPin, Phone, ShoppingBag, Store, Truck, X } from "lucide-react"
 import { toast } from "sonner"
 import { userClient } from "@/services/api/axios"
-import { orderAPI } from "@food/api"
-import { initRazorpayPayment } from "@food/utils/razorpay"
+import { payBulkOrder } from "./payOnline"
 
 const isSignedIn = () => {
   try {
@@ -37,40 +36,14 @@ export default function MyBulkOrders() {
   const [open, setOpen] = useState("")
   const [busy, setBusy] = useState("")
 
-  // Pay online: the server makes the Razorpay order, the customer pays, then the payment is verified like any order
   const payOnline = async (o) => {
     setBusy(o.id)
     try {
-      const res = await userClient.post(`/food/user/bulk-orders/${o.id}/pay`, {})
-      const { razorpay, orderMongoId } = res?.data?.data || {}
-      if (!razorpay?.orderId) throw new Error("Payment could not be started")
-      await new Promise((resolve) => {
-        let settled = false
-        const done = () => { if (!settled) { settled = true; resolve() } }
-        initRazorpayPayment({
-          key: razorpay.key,
-          amount: razorpay.amount,
-          currency: razorpay.currency,
-          order_id: razorpay.orderId,
-          description: `Bulk order ${o.reference}`,
-          prefill: { name: o.name, email: o.email, contact: o.phone },
-          notes: { orderId: String(orderMongoId) },
-          handler: async (r) => {
-            try {
-              await orderAPI.verifyPayment({ orderId: String(orderMongoId), razorpayOrderId: r.razorpay_order_id, razorpayPaymentId: r.razorpay_payment_id, razorpaySignature: r.razorpay_signature })
-              toast.success("Payment received")
-            } catch (_) {
-              toast.error("Payment received but not confirmed yet. Please contact support if it does not update.")
-            }
-            done()
-          },
-          onClose: done,
-          onError: (e) => { toast.error(e?.description || "Payment failed. You can try again."); done() },
-        }).catch(() => { toast.error("Could not open the payment window. Please try again."); done() })
-      })
+      const { paid } = await payBulkOrder(o)
+      if (paid) toast.success("Payment received. The store will confirm your order.")
       await load()
     } catch (err) {
-      toast.error(err?.response?.data?.message || err?.response?.data?.error || err?.message || "Could not start the payment")
+      toast.error(err?.message || "Could not complete the payment")
     } finally {
       setBusy("")
     }
@@ -170,10 +143,10 @@ export default function MyBulkOrders() {
                     {o.estimatedTotal != null && <div className="flex justify-between pt-1 border-t border-zinc-200 dark:border-zinc-700 text-xs font-extrabold text-zinc-900 dark:text-white"><span>Estimated total</span><span>₹{Number(o.estimatedTotal).toLocaleString("en-IN")}</span></div>}
                   </div>
                 )}
-                {o.quotedAmount != null && (
+                {(o.quotedAmount != null || o.paymentMethod === "online") && (
                   <div className="flex items-center justify-between rounded-xl border border-zinc-200 dark:border-zinc-700 px-3 py-2.5">
                     <div className="text-xs">
-                      <p className="m-0 font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">{o.paymentMethod === "online" ? <CreditCard className="w-3.5 h-3.5" /> : <Banknote className="w-3.5 h-3.5" />}₹{Number(o.quotedAmount).toLocaleString("en-IN")} · {o.paymentMethod === "online" ? "Online" : o.fulfilment === "delivery" ? "Cash / UPI on delivery" : "Cash / UPI at the store"}</p>
+                      <p className="m-0 font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">{o.paymentMethod === "online" ? <CreditCard className="w-3.5 h-3.5" /> : <Banknote className="w-3.5 h-3.5" />}₹{Number(o.quotedAmount ?? o.estimatedTotal ?? 0).toLocaleString("en-IN")} · {o.paymentMethod === "online" ? "Online" : o.fulfilment === "delivery" ? "Cash / UPI on delivery" : "Cash / UPI at the store"}</p>
                       <p className={`m-0 mt-0.5 font-semibold ${o.paymentStatus === "paid" ? "text-emerald-600" : "text-amber-600"}`}>{o.paymentStatus === "paid" ? "Paid" : "Not paid yet"}</p>
                     </div>
                     {o.canPayOnline && (

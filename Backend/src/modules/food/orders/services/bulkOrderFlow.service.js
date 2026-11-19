@@ -9,6 +9,7 @@ import { priceCartItems } from './catalog-pricing.service.js';
 import { FoodOrder } from '../models/order.model.js';
 import { createOrderFromBulkOrder } from './order.service.js';
 import { updateOrderStatusStore } from './order.service.js';
+import { createRazorpayOrder, getRazorpayKeyId, isRazorpayConfigured, verifyPaymentSignature, fetchRazorpayPayment, initiateRazorpayRefund } from '../helpers/razorpay.helper.js';
 import { sendEmail } from '../../../../utils/email.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 import { logger } from '../../../../utils/logger.js';
@@ -55,6 +56,7 @@ const inquirySchema = z.object({
 
 const STATUS_TEXT = {
   new: 'received',
+  paid: 'payment received',
   confirmed: 'confirmed by the store',
   preparing: 'being prepared',
   ready: 'ready',
@@ -77,6 +79,7 @@ function mailFor(inq, store, event) {
     new: [head, '', `We have received your bulk order request at ${store?.storeName || 'our store'}. The store will review it and confirm shortly.`, ref, where, itemLines(inq), inq.estimatedTotal != null ? `Estimated total: ${money(inq.estimatedTotal)}` : '', inq.eventDate ? `Date: ${inq.eventDate}${inq.eventTime ? ` ${inq.eventTime}` : ''}` : ''],
     confirmed: [head, '', `${store?.storeName || 'The store'} has confirmed your bulk order.`, ref, inq.quotedAmount != null ? (inq.paymentMethod === 'online' ? `Amount: ${money(inq.quotedAmount)}. Please pay online from My Orders in the app so the store can start preparing.` : `Amount: ${money(inq.quotedAmount)} (pay by cash or UPI when you ${inq.fulfilment === 'delivery' ? 'receive' : 'collect'} the order)`) : '', inq.storeNote ? `Note from the store: ${inq.storeNote}` : '', where],
     preparing: [head, '', 'Your bulk order is being prepared.', ref, where],
+    paid: [head, '', `We received your online payment of ${money(inq.payment?.amount)}. The store will review your request and confirm.`, ref],
     out_for_delivery: [head, '', 'Your bulk order is on its way to you.', ref, where],
     ready: [head, '', inq.fulfilment === 'delivery' ? 'Your bulk order is ready and will be delivered to you shortly.' : 'Your bulk order is ready. You can collect it now.', ref, where],
     completed: [head, '', inq.fulfilment === 'delivery' ? 'Your bulk order has been delivered. Enjoy!' : 'Your bulk order has been handed over. Enjoy!', ref],
@@ -246,8 +249,9 @@ export function shape(inq, store = null, linked = null) {
     adminNotes: inq.adminNotes || '',
     paymentMethod: inq.paymentMethod || 'cod',
     // paid when the customer paid online, or when the rider / store recorded the cash; otherwise still to pay
-    paymentStatus: inq.type === 'egift_voucher' ? '' : (paid ? 'paid' : 'pending'),
-    canPayOnline: online && !paid && !!inq.orderId && !['cancelled', 'rejected', 'completed'].includes(inq.status),
+    paymentStatus: inq.type === 'egift_voucher' ? '' : (inq.payment?.status === 'refunded' ? 'refunded' : (paid || inq.payment?.status === 'paid') ? 'paid' : 'pending'),
+    canPayOnline: online && inq.status === 'new' && inq.payment?.status !== 'paid',
+    paidOnline: inq.payment?.status === 'paid' ? { amount: inq.payment.amount, at: inq.payment.paidAt } : null,
     orderId: inq.orderId ? String(inq.orderId) : null,
     rider: partner ? { name: partner.name || '', phone: partner.phone || '', status: linked.dispatch?.status || '' } : null,
     history: (inq.history || []).map((h) => ({ status: h.status, at: h.at, byRole: h.byRole, note: h.note || '' })),
@@ -287,18 +291,81 @@ async function moveTo(filter, next, { byRole, byId, note = '', set = {} }) {
 export async function cancelMine(userId, id) {
   const inq = await moveTo({ _id: oid(id), userId: oid(userId), status: 'new' }, 'cancelled', { byRole: 'CUSTOMER', byId: userId, note: 'Cancelled by the customer', set: { reasonText: 'Cancelled by the customer' } });
   if (!inq) throw new ValidationError('Only a request the store has not confirmed yet can be cancelled.');
+  await refundOnlinePayment(inq);
   notifyCustomer(inq, 'cancelled');
   return getMine(userId, id);
 }
 
-/** Pay online: a Razorpay payment for the order behind this bulk order. The customer then verifies it with the usual verify-payment call. */
+/**
+ * Pay online: a Razorpay order for the estimated total, made when the customer places the request (or later from My
+ * Orders). The customer then sends the Razorpay answer to verifyOnlinePayment.
+ */
 export async function startOnlinePayment(userId, id) {
   const row = await BulkOrderInquiry.findOne({ _id: oid(id), userId: oid(userId) }).lean();
   if (!row) throw new NotFoundError('Bulk order not found');
-  if (!row.orderId) throw new ValidationError('You can pay once the store has confirmed your order.');
-  if (['cancelled', 'rejected', 'completed'].includes(row.status)) throw new ValidationError('This order is closed.');
-  const { startBulkOrderPayment } = await import('./order.service.js');
-  return startBulkOrderPayment(userId, row.orderId);
+  if (row.paymentMethod !== 'online') throw new ValidationError('This order is paid in cash.');
+  if (row.status !== 'new') throw new ValidationError('This order can no longer be paid.');
+  if (row.payment?.status === 'paid') throw new ValidationError('This order is already paid.');
+  if (!isRazorpayConfigured()) throw new ValidationError('Online payment is not available right now.');
+  const amount = Math.round((Number(row.estimatedTotal) || 0) * 100) / 100;
+  const amountPaise = Math.round(amount * 100);
+  if (amountPaise < 100) throw new ValidationError('Amount too low for online payment');
+  let rz;
+  try {
+    rz = await createRazorpayOrder(amountPaise, 'INR', `bulk_${row.reference}`);
+  } catch (err) {
+    throw new ValidationError(err?.message || 'Payment gateway error');
+  }
+  await BulkOrderInquiry.updateOne({ _id: row._id, 'payment.status': { $ne: 'paid' } }, { $set: { 'payment.status': 'created', 'payment.razorpayOrderId': rz.id, 'payment.amount': amount } });
+  return { razorpay: { key: getRazorpayKeyId(), orderId: rz.id, amount: rz.amount, currency: rz.currency || 'INR' } };
+}
+
+/** The customer paid: check the proof with Razorpay (right order, right amount, captured) and mark it paid, once. */
+export async function verifyOnlinePayment(userId, id, dto = {}) {
+  const row = await BulkOrderInquiry.findOne({ _id: oid(id), userId: oid(userId) }).lean();
+  if (!row) throw new NotFoundError('Bulk order not found');
+  const expected = String(row.payment?.razorpayOrderId || '');
+  if (row.payment?.status === 'paid') {
+    if (expected && dto.razorpayOrderId === expected && dto.razorpayPaymentId === row.payment.paymentId) return getMine(userId, id);
+    throw new ValidationError('This order is already paid.');
+  }
+  if (!expected || row.paymentMethod !== 'online') throw new ValidationError('This order is not waiting for an online payment.');
+  if (['cancelled', 'rejected'].includes(row.status)) throw new ValidationError('This order can no longer be paid.');
+  if (dto.razorpayOrderId !== expected) throw new ValidationError('Payment verification failed');
+  if (!verifyPaymentSignature(expected, dto.razorpayPaymentId, dto.razorpaySignature)) throw new ValidationError('Payment verification failed');
+  let rz;
+  try {
+    rz = await fetchRazorpayPayment(dto.razorpayPaymentId);
+  } catch {
+    throw new ValidationError('Could not confirm the payment with the gateway. Please try again.');
+  }
+  const paise = Math.round(Number(row.payment.amount) * 100);
+  if (!rz || String(rz.order_id || '') !== expected || !['captured', 'authorized'].includes(String(rz.status || '')) || Number(rz.amount) !== paise || String(rz.currency || 'INR').toUpperCase() !== 'INR') {
+    throw new ValidationError('Payment verification failed');
+  }
+  const claimed = await BulkOrderInquiry.findOneAndUpdate(
+    { _id: row._id, 'payment.status': { $ne: 'paid' } },
+    { $set: { 'payment.status': 'paid', 'payment.paymentId': dto.razorpayPaymentId, 'payment.paidAt': new Date() }, $push: { history: { status: row.status, at: new Date(), byRole: 'CUSTOMER', byId: String(userId), note: `Paid ₹${row.payment.amount} online` } } },
+    { new: true }
+  );
+  if (claimed) {
+    notifyCustomer(claimed, 'paid');
+    try { getIO()?.to(rooms.store(String(claimed.storeId))).emit('bulk_order_new', { id: String(claimed._id), reference: claimed.reference }); } catch (_) { /* ignore */ }
+  }
+  return getMine(userId, id);
+}
+
+/** An online payment that has to go back (the request was declined or cancelled before an order was made). */
+async function refundOnlinePayment(inq) {
+  if (inq.payment?.status !== 'paid' || !inq.payment.paymentId) return;
+  try {
+    const res = await initiateRazorpayRefund(inq.payment.paymentId, inq.payment.amount);
+    await BulkOrderInquiry.updateOne({ _id: inq._id }, { $set: { 'payment.status': res?.success ? 'refunded' : 'refund_failed', 'payment.refundId': res?.refundId || '' } });
+    if (!res?.success) logger.error(`[BulkOrder] refund failed for ${inq.reference}: ${res?.error || 'unknown'}`);
+  } catch (err) {
+    await BulkOrderInquiry.updateOne({ _id: inq._id }, { $set: { 'payment.status': 'refund_failed' } });
+    logger.error(`[BulkOrder] refund failed for ${inq.reference}: ${err.message}`);
+  }
 }
 
 /** Called when the linked order changes (rider steps, handover): brings the bulk order up to date and emails the customer. */
@@ -359,6 +426,12 @@ export async function storeConfirm(user, id, { quotedAmount, note } = {}) {
     const current = await BulkOrderInquiry.findOne({ _id: oid(id), storeId }).select('estimatedTotal').lean();
     if (current?.estimatedTotal != null) amount = current.estimatedTotal; // the amount from the items, unless the store names another
   }
+  // An online order is confirmed only once the customer has paid, and for exactly what they paid
+  const own = await BulkOrderInquiry.findOne({ _id: oid(id), storeId }).select('paymentMethod payment').lean();
+  if (own?.paymentMethod === 'online') {
+    if (own.payment?.status !== 'paid') throw new ValidationError("The customer chose to pay online. Wait for their payment before confirming.");
+    amount = own.payment.amount;
+  }
   if (amount === null) throw new ValidationError('Enter the amount the customer has to pay.');
   const inq = await moveTo({ _id: oid(id), storeId, status: 'new' }, 'confirmed', { ...actor(user), note: String(note || '').slice(0, 300), set: { quotedAmount: amount, storeNote: String(note || '').trim().slice(0, 300) } });
   if (!inq) throw new ValidationError('Only a new request can be confirmed.');
@@ -384,6 +457,7 @@ export async function storeReject(user, id, reason) {
   if (!why) throw new ValidationError('Give a reason so the customer knows why.');
   const inq = await moveTo({ _id: oid(id), storeId, status: 'new' }, 'rejected', { ...actor(user), note: why.slice(0, 300), set: { reasonText: why.slice(0, 300) } });
   if (!inq) throw new ValidationError('Only a new request can be declined.');
+  await refundOnlinePayment(inq);
   notifyCustomer(inq, 'rejected');
   return getForStore(user, id);
 }

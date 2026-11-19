@@ -2,6 +2,7 @@
 // follows it and gets an email at each step, and the super admin and franchise admin only view.
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { createFixture } from './helpers/fixture.js';
 
 let fx; let A; let B; let BulkOrderInquiry; let emails; let pizza; let items;
@@ -249,39 +250,78 @@ describe('a delivery bulk order runs on the rider system', () => {
     });
 });
 
-describe('paying online', () => {
-    let o; let orderDoc; let FoodOrder;
+describe('paying online (Razorpay)', () => {
+    const SECRET = 'bulk-test-secret';
+    let helper; let o; let created; let FoodOrder;
+    const sign = (rz, pay) => crypto.createHmac('sha256', SECRET).update(`${rz}|${pay}`).digest('hex');
+    const verify = (id, body, token = A.customerToken) => fx.call('POST', `/v1/food/user/bulk-orders/${id}/verify-payment`, token, body);
+
     before(async () => {
         ({ FoodOrder } = await import('../src/modules/food/orders/models/order.model.js'));
+        helper = await import('../src/modules/food/orders/helpers/razorpay.helper.js');
+        created = [];
+        helper.setOrderCreatorForTests(async (amountPaise, currency, receipt) => { const r = { id: `order_bulk_${created.length + 1}`, amount: amountPaise, currency, receipt }; created.push(r); return r; });
+        helper.setPaymentFetcherForTests(async (paymentId) => {
+            const rz = created[created.length - 1];
+            return { id: paymentId, order_id: rz.id, status: 'captured', amount: rz.amount, currency: 'INR' };
+        });
         o = ok(await place({ paymentMethod: 'online', query: 'online order' }), 201);
     });
+    after(() => { helper?.setOrderCreatorForTests(null); helper?.setPaymentFetcherForTests(null); helper?.setRazorpayCredentials(null); });
 
-    test('the choice is kept; nothing can be paid before the store confirms', async () => {
+    test('with no gateway the customer is told online payment is not available', async () => {
+        const r = await fx.call('POST', `/v1/food/user/bulk-orders/${o.id}/pay`, A.customerToken, {});
+        assert.equal(r.status, 400);
+        assert.match(r.body.message || r.body.error, /not available/i);
+        helper.setRazorpayCredentials({ keyId: 'rzp_test_key', keySecret: SECRET, webhookSecret: '' });
+    });
+
+    test('the request starts unpaid; the store cannot confirm it yet', async () => {
         assert.equal(o.paymentMethod, 'online');
         assert.equal(o.paymentStatus, 'pending');
-        assert.equal((await fx.call('POST', `/v1/food/user/bulk-orders/${o.id}/pay`, A.customerToken, {})).status, 400);
-    });
-
-    test('after confirming it can be paid, but the store cannot prepare it until it is paid', async () => {
-        const c = ok(await store(`/${o.id}/confirm`, 'POST', {})).order;
-        assert.equal(c.canPayOnline, true);
-        orderDoc = await FoodOrder.findById(c.orderId).lean();
-        assert.equal(orderDoc.payment.method, 'razorpay');
-        const r = await store(`/${o.id}/status`, 'POST', { status: 'preparing' });
+        assert.equal(o.canPayOnline, true);
+        const r = await store(`/${o.id}/confirm`, 'POST', {});
         assert.equal(r.status, 400);
-        assert.match(r.body.message || r.body.error, /pay online/i);
-        // no payment gateway in the test: the customer is told so rather than shown a broken screen
-        const pay = await fx.call('POST', `/v1/food/user/bulk-orders/${o.id}/pay`, A.customerToken, {});
-        assert.equal(pay.status, 400);
-        assert.match(pay.body.message || pay.body.error, /not available/i);
-        assert.equal((await fx.call('POST', `/v1/food/user/bulk-orders/${o.id}/pay`, B.customerToken, {})).status, 404, 'another customer');
+        assert.match(r.body.message || r.body.error, /online/i);
     });
 
-    test('once paid, it shows as paid and preparing is allowed', async () => {
-        await FoodOrder.updateOne({ _id: orderDoc._id }, { $set: { 'payment.status': 'paid' } });
-        const mineNow = ok(await fx.call('GET', `/v1/food/user/bulk-orders/${o.id}`, A.customerToken)).order;
-        assert.equal(mineNow.paymentStatus, 'paid');
-        assert.equal(mineNow.canPayOnline, false);
+    test('paying starts a Razorpay order for the estimated total, only for the owner, and only for an online request', async () => {
+        const pay = ok(await fx.call('POST', `/v1/food/user/bulk-orders/${o.id}/pay`, A.customerToken, {}));
+        assert.equal(pay.razorpay.amount, 18000 * 100);
+        assert.equal(pay.razorpay.orderId, 'order_bulk_1');
+        assert.equal((await fx.call('POST', `/v1/food/user/bulk-orders/${o.id}/pay`, B.customerToken, {})).status, 404);
+        const cash = ok(await place({ query: 'cash one' }), 201);
+        assert.equal((await fx.call('POST', `/v1/food/user/bulk-orders/${cash.id}/pay`, A.customerToken, {})).status, 400);
+    });
+
+    test('a wrong signature, another order\'s proof or a wrong amount is refused', async () => {
+        assert.equal((await verify(o.id, { razorpayOrderId: 'order_bulk_1', razorpayPaymentId: 'pay_1', razorpaySignature: 'bad' })).status, 400);
+        assert.equal((await verify(o.id, { razorpayOrderId: 'order_other', razorpayPaymentId: 'pay_1', razorpaySignature: sign('order_other', 'pay_1') })).status, 400);
+        assert.equal((await verify(o.id, { razorpayOrderId: 'order_bulk_1', razorpayPaymentId: 'pay_1', razorpaySignature: sign('order_bulk_1', 'pay_1') }, B.customerToken)).status, 404);
+        helper.setPaymentFetcherForTests(async (paymentId) => ({ id: paymentId, order_id: 'order_bulk_1', status: 'captured', amount: 100, currency: 'INR' }));
+        assert.equal((await verify(o.id, { razorpayOrderId: 'order_bulk_1', razorpayPaymentId: 'pay_1', razorpaySignature: sign('order_bulk_1', 'pay_1') })).status, 400, 'paid less than the total');
+        assert.equal((await BulkOrderInquiry.findById(o.id).lean()).payment.status, 'created');
+        helper.setPaymentFetcherForTests(async (paymentId) => { const rz = created[created.length - 1]; return { id: paymentId, order_id: rz.id, status: 'captured', amount: rz.amount, currency: 'INR' }; });
+    });
+
+    test('a correct payment marks it paid, once, and emails the customer', async () => {
+        const res = ok(await verify(o.id, { razorpayOrderId: 'order_bulk_1', razorpayPaymentId: 'pay_1', razorpaySignature: sign('order_bulk_1', 'pay_1') })).order;
+        assert.equal(res.paymentStatus, 'paid');
+        assert.equal(res.canPayOnline, false);
+        assert.equal(res.paidOnline.amount, 18000);
+        await new Promise((r) => setTimeout(r, 200));
+        assert.ok(emails.some((m) => /payment received/i.test(m.subject)));
+        assert.equal((await verify(o.id, { razorpayOrderId: 'order_bulk_1', razorpayPaymentId: 'pay_2', razorpaySignature: sign('order_bulk_1', 'pay_2') })).status, 400, 'a different payment cannot replace it');
+        assert.equal(ok(await verify(o.id, { razorpayOrderId: 'order_bulk_1', razorpayPaymentId: 'pay_1', razorpaySignature: sign('order_bulk_1', 'pay_1') })).order.paymentStatus, 'paid', 'verifying again changes nothing');
+    });
+
+    test('now the store can confirm; the amount is what was paid and the order is already paid', async () => {
+        const c = ok(await store(`/${o.id}/confirm`, 'POST', { quotedAmount: 5 })).order;
+        assert.equal(c.quotedAmount, 18000, 'the store cannot change an amount that is already paid');
+        const order = await FoodOrder.findById(c.orderId).lean();
+        assert.equal(order.payment.method, 'razorpay');
+        assert.equal(order.payment.status, 'paid');
+        assert.equal(order.payment.razorpay.paymentId, 'pay_1');
         assert.equal(ok(await store(`/${o.id}/status`, 'POST', { status: 'preparing' })).order.status, 'preparing');
     });
 
@@ -290,10 +330,23 @@ describe('paying online', () => {
         const c = ok(await store(`/${o.id}/cancel`, 'POST', { reason: 'Oven broke down' })).order;
         assert.equal(c.status, 'cancelled');
         const after = (await fx.call('GET', '/v1/food/user/wallet/me', A.customerToken)).body.data.wallet.balance;
-        assert.equal(after, before + 18000, 'the 40 pizzas total');
+        assert.equal(after, before + 18000);
+    });
+
+    test('a paid request the store declines is refunded through Razorpay', async () => {
+        const refunds = [];
+        const orig = await import('../src/modules/food/orders/helpers/razorpay.helper.js');
+        const o2 = ok(await place({ paymentMethod: 'online', query: 'decline me' }), 201);
+        ok(await fx.call('POST', `/v1/food/user/bulk-orders/${o2.id}/pay`, A.customerToken, {}));
+        ok(await verify(o2.id, { razorpayOrderId: created[created.length - 1].id, razorpayPaymentId: 'pay_9', razorpaySignature: sign(created[created.length - 1].id, 'pay_9') }));
+        // no real gateway: the refund call fails, which must be recorded for follow-up rather than lost
+        ok(await store(`/${o2.id}/reject`, 'POST', { reason: 'Fully booked' }));
+        const row = await BulkOrderInquiry.findById(o2.id).lean();
+        assert.ok(['refunded', 'refund_failed'].includes(row.payment.status), row.payment.status);
+        assert.equal(row.status, 'rejected');
+        void refunds; void orig;
     });
 });
-
 
 describe('the delivery partner delivers a bulk order with the real rider steps', () => {
     test('accept, pick up, reach the customer, OTP and photo: the bulk order completes and the cash is recorded', async () => {

@@ -45,7 +45,14 @@ export function getRazorpayInstance(override) {
     return new Razorpay({ key_id: keyId, key_secret: keySecret });
 }
 
+let orderCreatorForTests = null;
+/** Tests replace the gateway call that makes a Razorpay order. */
+export function setOrderCreatorForTests(fn) {
+    orderCreatorForTests = fn;
+}
+
 export function createRazorpayOrder(amountPaise, currency = 'INR', receipt = '') {
+    if (orderCreatorForTests) return orderCreatorForTests(amountPaise, currency, receipt);
     const instance = getRazorpayInstance();
     if (!instance) return Promise.reject(new Error('Razorpay not configured'));
     return instance.orders.create({

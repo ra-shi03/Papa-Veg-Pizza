@@ -2277,7 +2277,11 @@ export async function createOrderFromBulkOrder(bulk, store) {
     };
 
   const pricing = { subtotal: amount, tax: 0, packagingFee: 0, deliveryFee: 0, platformFee: 0, handlingFee: 0, discount: 0, total: amount };
-  const payment = { method: online ? 'razorpay' : 'cash', status: online ? 'created' : 'cod_pending', amountDue: amount, razorpay: {}, qr: {} };
+  // paid online when the customer placed the request: the order is already paid
+  const prepaid = online && bulk.payment?.status === 'paid';
+  const payment = prepaid
+    ? { method: 'razorpay', status: 'paid', amountDue: amount, razorpay: { orderId: bulk.payment.razorpayOrderId, paymentId: bulk.payment.paymentId, signature: '' }, qr: {} }
+    : { method: online ? 'razorpay' : 'cash', status: online ? 'created' : 'cod_pending', amountDue: amount, razorpay: {}, qr: {} };
 
   let distanceKm = null;
   if (hasPoint && store.location?.coordinates?.length === 2) {
@@ -2318,28 +2322,12 @@ export async function createOrderFromBulkOrder(bulk, store) {
   await order.save();
   try {
     await foodTransactionService.createInitialTransaction({ ...(order.toObject?.() || order), pricing, payment });
+    if (prepaid) {
+      await foodTransactionService.updateTransactionStatus(order._id, 'captured', { status: 'captured', razorpayPaymentId: bulk.payment.paymentId, recordedByRole: 'SYSTEM' }).catch((e) => logger.error(`Bulk order payment record failed: ${e.message}`));
+    }
   } catch (err) {
     await FoodOrder.deleteOne({ _id: order._id }).catch(() => {});
     throw err;
   }
   return order;
-}
-
-/** A Razorpay payment for the order made from a bulk order (the customer pays online after the store confirms). */
-export async function startBulkOrderPayment(userId, orderId) {
-  const order = await FoodOrder.findOne({ _id: orderId, userId: new mongoose.Types.ObjectId(userId) });
-  if (!order) throw new NotFoundError('Order not found');
-  if (String(order.payment?.method) !== 'razorpay') throw new ValidationError('This order is paid on delivery.');
-  if (['paid', 'captured'].includes(String(order.payment?.status || '').toLowerCase())) throw new ValidationError('This order is already paid.');
-  if (!isRazorpayConfigured()) throw new ValidationError('Online payment is not available right now.');
-  const amountPaise = Math.round((order.pricing?.total ?? 0) * 100);
-  if (amountPaise < 100) throw new ValidationError('Amount too low for online payment');
-  let rz;
-  try {
-    rz = await createRazorpayOrder(amountPaise, 'INR', order._id.toString());
-  } catch (err) {
-    throw new ValidationError(err?.message || 'Payment gateway error');
-  }
-  await FoodOrder.updateOne({ _id: order._id }, { $set: { 'payment.razorpay': { orderId: rz.id, paymentId: '', signature: '' }, 'payment.status': 'created' } });
-  return { orderMongoId: String(order._id), razorpay: { key: getRazorpayKeyId(), orderId: rz.id, amount: rz.amount, currency: rz.currency || 'INR' } };
 }
