@@ -200,6 +200,7 @@ describe('a delivery bulk order runs on the rider system', () => {
         ({ FoodOrder } = await import('../src/modules/food/orders/models/order.model.js'));
         const { default: mongoose } = await import('mongoose');
         await placeStoreAt(22.72, 75.86);
+        await mongoose.connection.collection('food_delivery_commission_rules').insertOne({ minDistance: 0, maxDistance: null, commissionPerKm: 10, basePayout: 30, status: true, createdAt: new Date(), updatedAt: new Date() });
         const _id = new mongoose.Types.ObjectId();
         const far = new mongoose.Types.ObjectId(); const off = new mongoose.Types.ObjectId();
         await mongoose.connection.collection('food_delivery_partners').insertMany([
@@ -225,6 +226,13 @@ describe('a delivery bulk order runs on the rider system', () => {
         assert.deepEqual(orderDoc.deliveryAddress.location.coordinates, [75.86, 22.72]);
         assert.equal(c.paymentStatus, 'pending');
         assert.equal(c.paymentMethod, 'cod');
+    });
+
+    test('the rider is offered a real earning for the trip, not zero', async () => {
+        const far = ok(await delivery({ address: { street: '1 Far Road', city: 'Indore', state: 'MP', pincode: '452001', lat: 22.76, lng: 75.86 } }), 201);
+        const c = ok(await store(`/${far.id}/confirm`, 'POST', { quotedAmount: 5000 })).order;
+        const d = await FoodOrder.findById(c.orderId).lean();
+        assert.ok(d.riderEarning > 30, `riderEarning ${d.riderEarning}`);
     });
 
     test('it cannot be marked ready without a delivery partner, and the store cannot complete it by hand', async () => {

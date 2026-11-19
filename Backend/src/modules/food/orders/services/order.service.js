@@ -2284,8 +2284,10 @@ export async function createOrderFromBulkOrder(bulk, store) {
     : { method: online ? 'razorpay' : 'cash', status: online ? 'created' : 'cod_pending', amountDue: amount, razorpay: {}, qr: {} };
 
   let distanceKm = null;
-  if (hasPoint && store.location?.coordinates?.length === 2) {
-    const [rLng, rLat] = store.location.coordinates;
+  // the store keeps its position as latitude/longitude (a few older records as a GeoJSON point)
+  const sPoint = store.location?.coordinates?.length === 2 ? store.location.coordinates : [Number(store.longitude), Number(store.latitude)];
+  if (hasPoint && sPoint.every((n) => Number.isFinite(n))) {
+    const [rLng, rLat] = sPoint;
     const d = haversineKm(rLat, rLng, lat, lng);
     distanceKm = Number.isFinite(d) ? d : null;
   }
