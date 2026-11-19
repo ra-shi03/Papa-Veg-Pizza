@@ -178,7 +178,11 @@ export default function DeliveryLocation() {
   }, [activeService]);
 
   return (
-    <div className="min-h-[100dvh] bg-white flex flex-col">
+    <div
+      className="min-h-[100dvh] flex flex-col"
+      // same background as the home page
+      style={{ background: 'radial-gradient(circle at top left, #FFF4F3 0%, #F8F6F2 40%, #F5F3EF 80%, #F8F6F2 100%)' }}
+    >
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-4 border-b border-zinc-100">
         <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full hover:bg-zinc-100">

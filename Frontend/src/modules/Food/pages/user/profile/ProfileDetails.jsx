@@ -367,7 +367,7 @@ export default function ProfileDetails() {
     { key: "orders", label: "My Orders", icon: "receipt_long", onClick: () => go("/user/order-history") },
     { key: "complaints", label: "My Complaints", icon: "report", onClick: () => go("/user/complaints") },
     { key: "help", label: "Need Help", icon: "support_agent", onClick: () => go("/user/help") },
-    { key: "delete", label: "Delete my account", icon: "person_remove", onClick: () => setShowDeleteModal(true) },
+    { key: "delete", label: "Delete my account", icon: "person_remove", onClick: () => setShowDeleteModal(true), danger: true },
     { key: "logout", label: "Logout", icon: "power_settings_new", onClick: () => setShowLogoutModal(true), danger: true },
   ]
 

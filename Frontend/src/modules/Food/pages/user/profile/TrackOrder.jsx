@@ -141,9 +141,9 @@ export default function TrackOrder() {
   }
 
   return (
-    <AnimatedPage className="min-h-screen bg-[#F8F9FA] dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans select-none pb-24">
+    <AnimatedPage className="min-h-screen bg-[radial-gradient(circle_at_top_left,#FFF4F3_0%,#F8F6F2_40%,#F5F3EF_80%,#F8F6F2_100%)] dark:bg-none dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans select-none pb-24">
       {/* Top Header matching Image 2 with project theme */}
-      <header className="sticky top-0 z-40 bg-white dark:bg-zinc-900 border-b border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur dark:bg-zinc-900 border-b border-zinc-200/60 dark:border-zinc-800">
         <div className="max-w-xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
@@ -184,12 +184,19 @@ export default function TrackOrder() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.2 }}
-              className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 p-6 sm:p-8 shadow-sm"
+              className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-[0_6px_24px_rgba(0,0,0,0.05)] p-6 sm:p-8"
             >
-              <form onSubmit={handleTrackOrder} className="space-y-6">
+              <div className="flex flex-col items-center text-center mb-6">
+                <span className="w-14 h-14 rounded-2xl bg-[#E53935]/10 text-[#E53935] flex items-center justify-center">
+                  <Search className="w-7 h-7" strokeWidth={1.8} />
+                </span>
+                <h2 className="text-lg font-extrabold text-zinc-900 dark:text-white mt-3 m-0">Find your order</h2>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 m-0">Enter your mobile number and Order ID to see where it is.</p>
+              </div>
+              <form onSubmit={handleTrackOrder} className="space-y-5">
                 {/* Mobile No. Input with Underline Style (matching Image 2) */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-zinc-600 dark:text-zinc-300 ml-0.5">
                     Mobile No.*
                   </label>
                   <input
@@ -202,13 +209,13 @@ export default function TrackOrder() {
                       setMobileNumber(e.target.value.replace(/\D/g, "").slice(0, 10))
                     }}
                     placeholder="Enter 10-digit mobile number"
-                    className="w-full pb-2 pt-1 border-0 border-b-2 border-zinc-200 dark:border-zinc-700 focus:border-[#E53935] dark:focus:border-[#E53935] outline-none text-base font-semibold text-zinc-900 dark:text-white bg-transparent transition-colors placeholder:text-zinc-300 dark:placeholder:text-zinc-600"
+                    className="w-full h-12 px-4 rounded-xl border border-zinc-200 dark:border-zinc-700 focus:border-[#E53935] dark:focus:border-[#E53935] focus:ring-4 focus:ring-[#E53935]/10 outline-none text-[15px] font-semibold text-zinc-900 dark:text-white bg-zinc-50 dark:bg-zinc-800/60 transition placeholder:text-zinc-400 dark:placeholder:text-zinc-500 placeholder:font-normal"
                   />
                 </div>
 
                 {/* Order ID Input with Underline Style (matching Image 2) */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-zinc-600 dark:text-zinc-300 ml-0.5">
                     Order ID*
                   </label>
                   <input
@@ -219,7 +226,7 @@ export default function TrackOrder() {
                       setOrderId(e.target.value.trim())
                     }}
                     placeholder="e.g. ORD-1002 or Order Mongo ID"
-                    className="w-full pb-2 pt-1 border-0 border-b-2 border-zinc-200 dark:border-zinc-700 focus:border-[#E53935] dark:focus:border-[#E53935] outline-none text-base font-semibold text-zinc-900 dark:text-white bg-transparent transition-colors placeholder:text-zinc-300 dark:placeholder:text-zinc-600 uppercase font-mono tracking-wide"
+                    className="w-full h-12 px-4 rounded-xl border border-zinc-200 dark:border-zinc-700 focus:border-[#E53935] dark:focus:border-[#E53935] focus:ring-4 focus:ring-[#E53935]/10 outline-none text-[15px] font-semibold text-zinc-900 dark:text-white bg-zinc-50 dark:bg-zinc-800/60 transition placeholder:text-zinc-400 dark:placeholder:text-zinc-500 placeholder:font-normal placeholder:normal-case placeholder:font-sans placeholder:tracking-normal uppercase font-mono tracking-wide"
                   />
                 </div>
 
@@ -236,7 +243,7 @@ export default function TrackOrder() {
                   <button
                     type="submit"
                     disabled={loading || mobileNumber.length < 10 || !orderId.trim()}
-                    className="w-full sm:w-44 py-3 bg-[#E53935] hover:bg-[#D32F2F] active:scale-95 disabled:opacity-40 disabled:pointer-events-none text-white font-bold rounded-xl text-sm uppercase tracking-wider transition-all shadow-md shadow-red-500/20 cursor-pointer border-0 flex items-center justify-center gap-2"
+                    className="w-full h-12 bg-[#E53935] hover:bg-[#D32F2F] active:scale-95 disabled:opacity-40 disabled:pointer-events-none text-white font-bold rounded-xl text-sm uppercase tracking-wider transition-all shadow-[0_8px_20px_rgba(229,57,53,0.25)] cursor-pointer border-0 flex items-center justify-center gap-2"
                   >
                     {loading ? (
                       <>
@@ -261,7 +268,7 @@ export default function TrackOrder() {
               className="space-y-4"
             >
               {/* Order Status Hero Card */}
-              <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 p-5 shadow-xs">
+              <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-[0_6px_24px_rgba(0,0,0,0.05)] p-5">
                 <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 pb-3 mb-4">
                   <div>
                     <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
@@ -288,7 +295,7 @@ export default function TrackOrder() {
                 {/* Status Hero Details */}
                 <div className="flex items-start gap-3.5">
                   <div
-                    className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
+                    className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
                       orderData.isCancelled
                         ? "bg-rose-100 dark:bg-rose-950/50 text-rose-600"
                         : orderData.status === "delivered"
@@ -326,7 +333,7 @@ export default function TrackOrder() {
 
               {/* Progress Timeline */}
               {!orderData.isCancelled && orderData.timeline && (
-                <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 p-5 shadow-xs">
+                <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-[0_6px_24px_rgba(0,0,0,0.05)] p-5">
                   <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4">
                     Live Progress
                   </h4>
@@ -371,7 +378,7 @@ export default function TrackOrder() {
 
               {/* Delivery Partner Info (if assigned) */}
               {orderData.deliveryPartner && (
-                <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 p-4 shadow-xs flex items-center justify-between">
+                <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-[0_6px_24px_rgba(0,0,0,0.05)] p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-950/50 text-[#E53935] flex items-center justify-center shrink-0">
                       <Bike className="w-5 h-5" />
@@ -401,7 +408,7 @@ export default function TrackOrder() {
               {/* Delivery Address & Store */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Store Card */}
-                <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 p-4 shadow-xs space-y-1">
+                <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-[0_6px_24px_rgba(0,0,0,0.05)] p-4 space-y-1">
                   <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 text-xs font-semibold">
                     <Store className="w-4 h-4 text-[#E53935]" />
                     <span>Store</span>
@@ -417,7 +424,7 @@ export default function TrackOrder() {
                 </div>
 
                 {/* Address Card */}
-                <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 p-4 shadow-xs space-y-1">
+                <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-[0_6px_24px_rgba(0,0,0,0.05)] p-4 space-y-1">
                   <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 text-xs font-semibold">
                     <MapPin className="w-4 h-4 text-[#E53935]" />
                     <span>Delivery Location</span>
@@ -433,7 +440,7 @@ export default function TrackOrder() {
 
               {/* Items & Bill Summary */}
               {orderData.items && orderData.items.length > 0 && (
-                <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 p-4 shadow-xs space-y-3">
+                <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-[0_6px_24px_rgba(0,0,0,0.05)] p-4 space-y-3">
                   <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
                     <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
                       <ShoppingBag className="w-3.5 h-3.5" />
