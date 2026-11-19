@@ -24,7 +24,7 @@ const STATUS = {
   cancelled: { label: "Cancelled", cls: "bg-zinc-100 text-zinc-600 border-zinc-200" },
 }
 const stepsFor = (o) => (o.fulfilment === "delivery" ? ["new", "confirmed", "preparing", "ready", "out_for_delivery", "completed"] : ["new", "confirmed", "preparing", "ready", "completed"])
-const STEP_LABEL = { new: "Sent", out_for_delivery: "On the way", completed: "Delivered" }
+const stepLabel = (s, o) => ({ new: "Sent", confirmed: "Accepted", preparing: "Preparing", ready: "Ready", out_for_delivery: "On the way", completed: o.fulfilment === "delivery" ? "Delivered" : "Collected" }[s] || s)
 
 const when = (d) => (d ? new Date(d).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "")
 
@@ -119,14 +119,14 @@ export default function MyBulkOrders() {
             {expanded && (
               <div className="px-4 pb-4 border-t border-zinc-100 dark:border-zinc-800 pt-3 space-y-3">
                 {!closed && (
-                  <ol className="m-0 p-0 list-none flex items-center justify-between">
+                  <ol className="m-0 p-0 list-none flex items-start">
                     {stepsFor(o).map((s, i) => {
                       const done = reached.has(s)
                       return (
-                        <li key={s} className="flex-1 flex flex-col items-center relative">
+                        <li key={s} className="flex-1 min-w-0 flex flex-col items-center relative">
                           {i > 0 && <span className={`absolute top-3 right-1/2 w-full h-0.5 ${done ? "bg-emerald-500" : "bg-zinc-200 dark:bg-zinc-700"}`} />}
                           <span className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center text-white ${done ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-700"}`}>{done && <Check className="w-3.5 h-3.5" />}</span>
-                          <span className="mt-1 text-[9px] font-bold uppercase text-zinc-500 text-center">{STEP_LABEL[s] || s}</span>
+                          <span className={`mt-1.5 px-0.5 text-[9px] leading-tight font-bold uppercase tracking-tight text-center w-full break-words ${done ? "text-zinc-800 dark:text-zinc-100" : "text-zinc-400"}`}>{stepLabel(s, o)}</span>
                         </li>
                       )
                     })}
