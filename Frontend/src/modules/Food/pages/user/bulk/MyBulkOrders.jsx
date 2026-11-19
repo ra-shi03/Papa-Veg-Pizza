@@ -62,7 +62,7 @@ export default function MyBulkOrders() {
 
   useEffect(() => {
     load()
-    const t = setInterval(load, 30000) // the store may confirm while the page is open
+    const t = setInterval(load, 10000) // the store may confirm while the page is open
     return () => clearInterval(t)
   }, [load])
 
@@ -126,7 +126,7 @@ export default function MyBulkOrders() {
                         <li key={s} className="flex-1 min-w-0 flex flex-col items-center relative">
                           {i > 0 && <span className={`absolute top-3 right-1/2 w-full h-0.5 ${done ? "bg-emerald-500" : "bg-zinc-200 dark:bg-zinc-700"}`} />}
                           <span className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center text-white ${done ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-700"}`}>{done && <Check className="w-3.5 h-3.5" />}</span>
-                          <span className={`mt-1.5 px-0.5 text-[9px] leading-tight font-bold uppercase tracking-tight text-center w-full break-words ${done ? "text-zinc-800 dark:text-zinc-100" : "text-zinc-400"}`}>{stepLabel(s, o)}</span>
+                          <span className={`mt-1.5 px-0.5 text-[10px] leading-tight font-bold text-center w-full whitespace-nowrap ${done ? "text-zinc-800 dark:text-zinc-100" : "text-zinc-400"}`}>{stepLabel(s, o)}</span>
                         </li>
                       )
                     })}
@@ -157,6 +157,7 @@ export default function MyBulkOrders() {
                 {o.rider && (
                   <p className="m-0 text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5"><Truck className="w-3.5 h-3.5 shrink-0" /> Delivery partner: <b>{o.rider.name}</b>{o.rider.phone && <a href={`tel:${o.rider.phone}`} className="ml-1 text-[#E53935] font-bold inline-flex items-center gap-1"><Phone className="w-3 h-3" />Call</a>}</p>
                 )}
+                {o.deliveryOtp && (<div className="rounded-xl border-2 border-emerald-500 bg-emerald-50 px-3 py-2 text-center"><p className="m-0 text-[11px] font-semibold text-emerald-800">Your delivery partner has arrived. Tell them this code to receive your order</p><p className="m-0 mt-1 text-2xl font-black tracking-[0.4em] text-emerald-700">{o.deliveryOtp}</p></div>)}
                 {o.storeNote && <p className="m-0 text-xs text-zinc-600 dark:text-zinc-300"><b>Note from the store:</b> {o.storeNote}</p>}
                 {o.reasonText && closed && <p className="m-0 text-xs text-zinc-600 dark:text-zinc-300"><b>Reason:</b> {o.reasonText}</p>}
                 {o.fulfilment === "delivery" ? (

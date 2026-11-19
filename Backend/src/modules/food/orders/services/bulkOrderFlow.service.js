@@ -199,17 +199,20 @@ async function syncFromOrder(row, linked) {
 }
 
 /** The linked orders (status, payment, rider) for a list of bulk orders. */
-export async function hydrate(rows) {
+// `withOtp`: only the customer's own screens get the delivery code, and only while the rider is at the door.
+export async function hydrate(rows, { withOtp = false } = {}) {
   const ids = rows.filter((r) => r.orderId).map((r) => r.orderId);
   const orders = ids.length
-    ? await FoodOrder.find({ _id: { $in: ids } }).select('orderStatus payment dispatch order_id deliveryState').populate('dispatch.deliveryPartnerId', 'name phone').lean()
+    ? await FoodOrder.find({ _id: { $in: ids } }).select(`orderStatus payment dispatch order_id deliveryState${withOtp ? ' +deliveryOtp' : ''}`).populate('dispatch.deliveryPartnerId', 'name phone').lean()
     : [];
   const byId = new Map(orders.map((o) => [String(o._id), o]));
   const out = [];
   for (const raw of rows) {
     const linked = raw.orderId ? byId.get(String(raw.orderId)) : null;
     const row = await syncFromOrder(raw, linked);
-    out.push(shape(row, null, linked));
+    const shaped = shape(row, null, linked);
+    if (withOtp && (linked?.orderStatus === 'reached_drop' || (linked?.orderStatus === 'picked_up' && linked.deliveryState?.status === 'reached_drop')) && linked.deliveryOtp) shaped.deliveryOtp = String(linked.deliveryOtp);
+    out.push(shaped);
   }
   return out;
 }
@@ -270,13 +273,13 @@ const populateStore = (q) => q.populate('storeId', 'storeName address phone');
 // ---- customer
 export async function listMine(userId) {
   const rows = await populateStore(BulkOrderInquiry.find({ userId: oid(userId) }).sort({ createdAt: -1 }).limit(50)).lean();
-  return hydrate(rows);
+  return hydrate(rows, { withOtp: true });
 }
 
 export async function getMine(userId, id) {
   const row = await populateStore(BulkOrderInquiry.findOne({ _id: oid(id), userId: oid(userId) })).lean();
   if (!row) throw new NotFoundError('Bulk order not found');
-  return (await hydrate([row]))[0];
+  return (await hydrate([row], { withOtp: true }))[0];
 }
 
 async function moveTo(filter, next, { byRole, byId, note = '', set = {} }) {
