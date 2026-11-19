@@ -250,7 +250,7 @@ export function shape(inq, store = null, linked = null) {
     paymentMethod: inq.paymentMethod || 'cod',
     // paid when the customer paid online, or when the rider / store recorded the cash; otherwise still to pay
     paymentStatus: inq.type === 'egift_voucher' ? '' : (inq.payment?.status === 'refunded' ? 'refunded' : (paid || inq.payment?.status === 'paid') ? 'paid' : 'pending'),
-    canPayOnline: online && inq.status === 'new' && inq.payment?.status !== 'paid',
+    canPayOnline: online && !paid && inq.payment?.status !== 'paid' && ['new', 'confirmed', 'preparing', 'ready'].includes(inq.status),
     paidOnline: inq.payment?.status === 'paid' ? { amount: inq.payment.amount, at: inq.payment.paidAt } : null,
     orderId: inq.orderId ? String(inq.orderId) : null,
     rider: partner ? { name: partner.name || '', phone: partner.phone || '', status: linked.dispatch?.status || '' } : null,
@@ -304,10 +304,11 @@ export async function startOnlinePayment(userId, id) {
   const row = await BulkOrderInquiry.findOne({ _id: oid(id), userId: oid(userId) }).lean();
   if (!row) throw new NotFoundError('Bulk order not found');
   if (row.paymentMethod !== 'online') throw new ValidationError('This order is paid in cash.');
-  if (row.status !== 'new') throw new ValidationError('This order can no longer be paid.');
+  if (!['new', 'confirmed', 'preparing', 'ready'].includes(row.status)) throw new ValidationError('This order can no longer be paid.');
   if (row.payment?.status === 'paid') throw new ValidationError('This order is already paid.');
   if (!isRazorpayConfigured()) throw new ValidationError('Online payment is not available right now.');
-  const amount = Math.round((Number(row.estimatedTotal) || 0) * 100) / 100;
+  // before the store confirms: the estimated total; after it: the amount the store agreed
+  const amount = Math.round((Number(row.quotedAmount ?? row.estimatedTotal) || 0) * 100) / 100;
   const amountPaise = Math.round(amount * 100);
   if (amountPaise < 100) throw new ValidationError('Amount too low for online payment');
   let rz;
@@ -348,6 +349,12 @@ export async function verifyOnlinePayment(userId, id, dto = {}) {
     { $set: { 'payment.status': 'paid', 'payment.paymentId': dto.razorpayPaymentId, 'payment.paidAt': new Date() }, $push: { history: { status: row.status, at: new Date(), byRole: 'CUSTOMER', byId: String(userId), note: `Paid ₹${row.payment.amount} online` } } },
     { new: true }
   );
+  if (claimed && claimed.orderId) {
+    // an order was already made (the store confirmed before the payment): it is paid now
+    await FoodOrder.updateOne({ _id: claimed.orderId }, { $set: { 'payment.method': 'razorpay', 'payment.status': 'paid', 'payment.razorpay.orderId': expected, 'payment.razorpay.paymentId': dto.razorpayPaymentId } });
+    const { updateTransactionStatus } = await import('./foodTransaction.service.js');
+    await updateTransactionStatus(claimed.orderId, 'captured', { status: 'captured', razorpayPaymentId: dto.razorpayPaymentId, recordedByRole: 'CUSTOMER', recordedById: userId }).catch((e) => logger.error(`[BulkOrder] ledger update failed: ${e.message}`));
+  }
   if (claimed) {
     notifyCustomer(claimed, 'paid');
     try { getIO()?.to(rooms.store(String(claimed.storeId))).emit('bulk_order_new', { id: String(claimed._id), reference: claimed.reference }); } catch (_) { /* ignore */ }

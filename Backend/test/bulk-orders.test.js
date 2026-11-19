@@ -383,3 +383,42 @@ describe('a delivery address without a state still makes an order', () => {
         assert.ok(c.orderId);
     });
 });
+
+describe('paying after the store has already confirmed', () => {
+    const SECRET = 'bulk-late-secret';
+    const sign = (rz, pay) => crypto.createHmac('sha256', SECRET).update(`${rz}|${pay}`).digest('hex');
+    test('a confirmed online order that is still unpaid can be paid: the amount is the agreed one and the order becomes paid', async () => {
+        const helper = await import('../src/modules/food/orders/helpers/razorpay.helper.js');
+        const { FoodOrder } = await import('../src/modules/food/orders/models/order.model.js');
+        helper.setRazorpayCredentials({ keyId: 'rzp_test_key', keySecret: SECRET, webhookSecret: '' });
+        let rzOrder;
+        helper.setOrderCreatorForTests(async (amountPaise, currency) => { rzOrder = { id: 'order_late_1', amount: amountPaise, currency }; return rzOrder; });
+        helper.setPaymentFetcherForTests(async (id) => ({ id, order_id: rzOrder.id, status: 'captured', amount: rzOrder.amount, currency: 'INR' }));
+        try {
+            const o = ok(await place({ paymentMethod: 'online', query: 'pay late' }), 201);
+            // an order confirmed before it was paid (older requests): make it so
+            await BulkOrderInquiry.updateOne({ _id: o.id }, { $set: { 'payment.status': 'none' } });
+            const c = ok(await fx.call('POST', `/v1/food/store/bulk-orders/${o.id}/confirm`, A.managerToken, { quotedAmount: 12000 })).order.orderId;
+            assert.ok(c);
+        } catch (_) { /* online requests cannot be confirmed unpaid any more: build the older state directly */ }
+        const o2 = ok(await place({ paymentMethod: 'online', query: 'older flow' }), 201);
+        const { FoodStore } = await import('../src/modules/food/store/models/store.model.js');
+        const storeDoc = await FoodStore.findById(A.storeId).lean();
+        const { createOrderFromBulkOrder } = await import('../src/modules/food/orders/services/order.service.js');
+        const row = await BulkOrderInquiry.findByIdAndUpdate(o2.id, { $set: { status: 'confirmed', quotedAmount: 12000 } }, { new: true }).lean();
+        const order = await createOrderFromBulkOrder(row, storeDoc);
+        await BulkOrderInquiry.updateOne({ _id: o2.id }, { $set: { orderId: order._id } });
+        const shown = ok(await fx.call('GET', `/v1/food/user/bulk-orders/${o2.id}`, A.customerToken)).order;
+        assert.equal(shown.canPayOnline, true, 'the Pay now button shows');
+        const pay = ok(await fx.call('POST', `/v1/food/user/bulk-orders/${o2.id}/pay`, A.customerToken, {}));
+        assert.equal(pay.razorpay.amount, 12000 * 100, 'the amount the store agreed, not the estimate');
+        ok(await fx.call('POST', `/v1/food/user/bulk-orders/${o2.id}/verify-payment`, A.customerToken, { razorpayOrderId: 'order_late_1', razorpayPaymentId: 'pay_late', razorpaySignature: sign('order_late_1', 'pay_late') }));
+        const after = ok(await fx.call('GET', `/v1/food/user/bulk-orders/${o2.id}`, A.customerToken)).order;
+        assert.equal(after.paymentStatus, 'paid');
+        assert.equal(after.canPayOnline, false);
+        const fresh = await FoodOrder.findById(order._id).lean();
+        assert.equal(fresh.payment.status, 'paid');
+        assert.equal(fresh.payment.razorpay.paymentId, 'pay_late');
+        helper.setOrderCreatorForTests(null); helper.setPaymentFetcherForTests(null); helper.setRazorpayCredentials(null);
+    });
+});

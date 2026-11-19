@@ -150,7 +150,7 @@ export default function MyBulkOrders() {
                       <p className={`m-0 mt-0.5 font-semibold ${o.paymentStatus === "paid" ? "text-emerald-600" : "text-amber-600"}`}>{o.paymentStatus === "paid" ? "Paid" : "Not paid yet"}</p>
                     </div>
                     {o.canPayOnline && (
-                      <button type="button" disabled={busy === o.id} onClick={() => payOnline(o)} className="h-9 px-4 rounded-lg bg-[#E53935] text-white text-xs font-bold border-0 cursor-pointer disabled:opacity-60">{busy === o.id ? "Please wait..." : "Pay now"}</button>
+                      <button type="button" disabled={busy === o.id} onClick={() => payOnline(o)} className="h-9 px-4 rounded-lg bg-[#E53935] text-white text-xs font-bold border-0 cursor-pointer disabled:opacity-60">{busy === o.id ? "Please wait..." : `Pay ₹${Number(o.quotedAmount ?? o.estimatedTotal ?? 0).toLocaleString("en-IN")}`}</button>
                     )}
                   </div>
                 )}
