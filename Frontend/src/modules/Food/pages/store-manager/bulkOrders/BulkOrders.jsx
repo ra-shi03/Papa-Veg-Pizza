@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Loader2, RefreshCw, ShoppingBag, Truck, MapPin, Phone, Mail, X, Check } from "lucide-react";
+import { Loader2, RefreshCw, ShoppingBag, Truck, MapPin, Phone, Mail, X, Check, Printer } from "lucide-react";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
 
@@ -17,6 +17,34 @@ const STATUS = {
 const TABS = ["all", "new", "confirmed", "preparing", "ready", "out_for_delivery", "completed", "rejected", "cancelled"];
 const err = (e) => e?.response?.data?.message || e?.response?.data?.error || e?.message || "Something went wrong";
 const when = (d) => (d ? new Date(d).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "-");
+
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
+/** Opens the bill of a bulk order in a print window: the delivery partner photographs it or it goes in the bag. */
+function printBill(o) {
+  const total = o.quotedAmount ?? o.estimatedTotal ?? 0;
+  const paid = o.paymentStatus === "paid";
+  const addr = o.fulfilment === "delivery" ? [o.address?.street, o.address?.landmark, o.address?.city, o.address?.state, o.address?.pincode].filter(Boolean).join(", ") : "Collect from the store";
+  const rows = (o.items || []).map((it) => `<tr><td>${esc(it.quantity)} × ${esc(it.name)}${it.size ? ` (${esc(it.size)})` : ""}</td><td class="r">${inr(it.lineTotal)}</td></tr>`).join("");
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Bill ${esc(o.reference)}</title><style>
+    body{font-family:Arial,sans-serif;max-width:380px;margin:16px auto;padding:0 12px;color:#000;font-size:13px}
+    h1{font-size:18px;margin:0;text-align:center}.c{text-align:center;margin:2px 0}.r{text-align:right}
+    table{width:100%;border-collapse:collapse;margin:8px 0}td{padding:3px 0;vertical-align:top}
+    .t td{border-top:1px dashed #000;font-weight:bold;font-size:15px;padding-top:6px}hr{border:0;border-top:1px dashed #000}
+    .big{font-size:20px;font-weight:900;letter-spacing:1px;text-align:center;margin:8px 0}
+  </style></head><body>
+    <h1>${esc(o.storeName || "Papa Veg Pizza")}</h1><p class="c">Bulk order bill</p><hr>
+    <div class="big">${esc(o.reference)}</div>
+    <p class="c">${esc(new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }))}</p><hr>
+    <p><b>${esc(o.name)}</b><br>${esc(o.phone)}<br>${esc(addr)}</p><hr>
+    <table>${rows}<tr class="t"><td>Total</td><td class="r">${inr(total)}</td></tr></table>
+    <p class="c"><b>${paid ? "PAID ONLINE" : `COLLECT ${inr(total)} (cash / UPI)`}</b></p>
+    <hr><p class="c">Thank you!</p>
+    <script>window.onload=function(){window.focus();window.print();}</script></body></html>`;
+  const w = window.open("", "_blank", "width=480,height=700");
+  if (!w) { toast.error("Allow pop-ups to print the bill."); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+}
 
 /** Store manager: bulk orders placed at this store. Confirm with an amount, prepare, hand over. */
 export default function BulkOrders() {
@@ -248,6 +276,7 @@ export default function BulkOrders() {
                 {["ready", "out_for_delivery"].includes(open.status) && open.fulfilment === "delivery" && (
                   <p className="m-0 text-xs text-zinc-500 self-center">{open.status === "ready" ? "Waiting for the delivery partner to pick it up." : "On its way. The delivery partner completes it with the customer's code."}</p>
                 )}
+                {["confirmed", "preparing", "ready", "out_for_delivery", "completed"].includes(open.status) && <button onClick={() => printBill(open)} className="h-10 px-5 rounded-lg border border-zinc-300 text-zinc-700 text-sm font-bold bg-transparent cursor-pointer flex items-center gap-1.5"><Printer size={14} />Print bill</button>}
                 {["confirmed", "preparing", "ready"].includes(open.status) && <button onClick={() => setMode("cancel")} className="h-10 px-5 rounded-lg border border-red-300 text-red-600 text-sm font-bold bg-transparent cursor-pointer">Cancel order</button>}
               </div>
             )}
