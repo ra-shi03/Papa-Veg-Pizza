@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
-import { ArrowLeft, Printer, Search, X, AlertTriangle, ChevronDown, Flame, Leaf, RotateCcw, SlidersHorizontal } from "lucide-react"
+import { ArrowLeft, Printer, Search, X, AlertTriangle, ChevronDown, Flame, Leaf, RotateCcw, SlidersHorizontal, Minus, Plus, ListFilter } from "lucide-react"
 import apiClient from "@/services/api/axios"
 
 // Everything on this page comes from the super admin (Super Admin > User App > Nutrition Info).
@@ -15,6 +15,26 @@ const SORTS = [
   { id: "kcal-asc", label: "Lowest calories" },
   { id: "protein-desc", label: "Most protein" },
 ]
+
+// One-tap diet filters (all picked ones must match)
+const QUICK = [
+  { id: "light", label: "Under 250 kcal", test: (i) => i.calories < 250 },
+  { id: "protein", label: "High protein (10g+)", test: (i) => i.protein >= 10 },
+  { id: "lowsugar", label: "Low sugar (5g or less)", test: (i) => i.sugars <= 5 },
+  { id: "lowsodium", label: "Low sodium (400mg or less)", test: (i) => i.sodium <= 400 },
+]
+const NUMERIC = ["calories", "totalFat", "satFat", "transFat", "cholesterol", "sodium", "carbs", "fiber", "sugars", "protein", "calcium", "iron"]
+// The same item for 2, 3 ... servings (calcium and iron are % daily value, so they scale too)
+const scaled = (item, n) => (n === 1 ? item : { ...item, ...Object.fromEntries(NUMERIC.map((k) => [k, Math.round((Number(item[k]) || 0) * n * 10) / 10])) })
+
+// The Indian green "veg" mark: every Papa Veg item is vegetarian
+function VegMark() {
+  return (
+    <span className="inline-flex items-center justify-center w-3.5 h-3.5 border-[1.5px] border-[#2e7d32] rounded-[3px] shrink-0" title="Vegetarian" aria-label="Vegetarian">
+      <span className="w-1.5 h-1.5 rounded-full bg-[#2e7d32]" />
+    </span>
+  )
+}
 
 function macroSplit(item) {
   const kcal = { protein: (item.protein || 0) * 4, carbs: (item.carbs || 0) * 4, fat: (item.totalFat || 0) * 9 }
@@ -66,13 +86,13 @@ function ItemCard({ item, ui, onOpen, avoided }) {
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <p className="font-bold text-[15px] leading-snug line-clamp-2" style={{ color: ui.text }}>{item.name}</p>
+          <p className="font-bold text-[15px] leading-snug line-clamp-2" style={{ color: ui.text }}><span className="inline-block mr-1.5 align-[-1px]"><VegMark /></span>{item.name}</p>
           <span className="shrink-0 inline-flex items-center gap-0.5 text-[13px] font-bold" style={{ color: ui.text }}>
             <Flame className="w-3.5 h-3.5 text-[#E53935]" />{item.calories}
             <span className="text-[11px] font-medium" style={{ color: ui.muted }}>kcal</span>
           </span>
         </div>
-        <p className="text-xs mt-0.5" style={{ color: ui.muted }}>{[item.category, item.servingSize].filter(Boolean).join(" · ")}</p>
+        <p className="text-xs mt-0.5" style={{ color: ui.muted }}>{item.servingSize || item.category}</p>
         <div className="mt-2"><MacroBar item={item} ui={ui} /></div>
         <div className="mt-1.5 flex items-center gap-3 text-[11px]" style={{ color: ui.muted }}>
           <span><b style={{ color: ui.text }}>{item.protein}g</b> protein</span>
@@ -152,9 +172,11 @@ function FactsLabel({ item, disclaimer }) {
   )
 }
 
-function DetailSheet({ item, page, ui, onClose }) {
+function DetailSheet({ item: base, page, ui, onClose }) {
   const reduce = useReducedMotion()
   const [showLabel, setShowLabel] = useState(false)
+  const [servings, setServings] = useState(1)
+  const item = scaled(base, servings)
   const split = macroSplit(item)
 
   useEffect(() => {
@@ -187,7 +209,7 @@ function DetailSheet({ item, page, ui, onClose }) {
           <div className="flex items-start gap-3">
             {item.image && <img src={item.image} alt="" className="w-16 h-16 rounded-xl object-cover shrink-0" />}
             <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-extrabold leading-snug" style={{ color: ui.text }}>{item.name}</h2>
+              <h2 className="text-lg font-extrabold leading-snug flex items-start gap-2" style={{ color: ui.text }}><span className="mt-1.5"><VegMark /></span>{item.name}</h2>
               <p className="text-xs mt-0.5" style={{ color: ui.muted }}>{[item.category, item.servingSize].filter(Boolean).join(" · ")}</p>
             </div>
             <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-full border-0 cursor-pointer" style={{ backgroundColor: ui.card, color: ui.text }}>
@@ -196,11 +218,30 @@ function DetailSheet({ item, page, ui, onClose }) {
           </div>
           {item.description && <p className="text-sm mt-3 leading-relaxed" style={{ color: ui.muted }}>{item.description}</p>}
 
+          {/* Servings */}
+          <div className="mt-3 flex items-center justify-between rounded-2xl px-4 py-2.5" style={{ backgroundColor: ui.card }}>
+            <div>
+              <p className="text-sm font-bold" style={{ color: ui.text }}>Servings</p>
+              <p className="text-[11px]" style={{ color: ui.muted }}>{base.servingSize || "1 serving"} each</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setServings((n) => Math.max(1, n - 1))} disabled={servings <= 1} aria-label="Fewer servings"
+                className="w-8 h-8 rounded-full flex items-center justify-center border-0 cursor-pointer disabled:opacity-35" style={{ backgroundColor: ui.soft, color: ui.text }}>
+                <Minus className="w-4 h-4" />
+              </button>
+              <span className="w-5 text-center text-base font-extrabold" style={{ color: ui.text }} aria-live="polite">{servings}</span>
+              <button onClick={() => setServings((n) => Math.min(8, n + 1))} disabled={servings >= 8} aria-label="More servings"
+                className="w-8 h-8 rounded-full flex items-center justify-center border-0 cursor-pointer disabled:opacity-35 text-white" style={{ backgroundColor: "#E53935" }}>
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
           {/* Calories + macro split */}
           <div className="mt-4 rounded-2xl p-4" style={{ backgroundColor: ui.card }}>
             <div className="flex items-end justify-between">
               <div>
-                <p className="text-[11px] font-semibold tracking-wide uppercase" style={{ color: ui.muted }}>Per serving</p>
+                <p className="text-[11px] font-semibold tracking-wide uppercase" style={{ color: ui.muted }}>{servings === 1 ? "Per serving" : `For ${servings} servings`}</p>
                 <p className="text-4xl font-black leading-none mt-1" style={{ color: ui.text }}>
                   {item.calories}<span className="text-base font-semibold ml-1" style={{ color: ui.muted }}>kcal</span>
                 </p>
@@ -300,6 +341,8 @@ export default function Nutrition() {
   const [query, setQuery] = useState("")
   const [category, setCategory] = useState("All")
   const [avoid, setAvoid] = useState([])
+  const [quick, setQuick] = useState([])
+  const [showFilters, setShowFilters] = useState(false)
   const [sort, setSort] = useState("menu")
   const [active, setActive] = useState(null)
   const [isDarkMode] = useState(() => {
@@ -346,16 +389,27 @@ export default function Nutrition() {
     const q = query.trim().toLowerCase()
     const list = items.filter((i) =>
       (category === "All" || i.category === category) &&
-      (!q || `${i.name} ${i.description || ""}`.toLowerCase().includes(q)) &&
-      !avoid.some((a) => (i.allergens || []).includes(a))
+      (!q || `${i.name} ${i.category || ""} ${i.description || ""}`.toLowerCase().includes(q)) &&
+      !avoid.some((a) => (i.allergens || []).includes(a)) &&
+      quick.every((id) => QUICK.find((x) => x.id === id).test(i))
     )
     if (sort === "kcal-asc") return [...list].sort((a, b) => a.calories - b.calories)
     if (sort === "protein-desc") return [...list].sort((a, b) => b.protein - a.protein)
     return list
-  }, [items, query, category, avoid, sort])
+  }, [items, query, category, avoid, quick, sort])
 
-  const filtersOn = query || category !== "All" || avoid.length > 0
-  const clearFilters = () => { setQuery(""); setCategory("All"); setAvoid([]) }
+  const filtersOn = query || category !== "All" || avoid.length > 0 || quick.length > 0
+  const filterCount = avoid.length + quick.length
+  const clearFilters = () => { setQuery(""); setCategory("All"); setAvoid([]); setQuick([]) }
+  const toggleQuick = (id) => setQuick((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  // With everything showing in menu order, list the items under their category heading
+  const grouped = category === "All" && sort === "menu" && !query.trim()
+  const groups = useMemo(() => {
+    if (!grouped) return []
+    const map = new Map()
+    for (const i of shown) { const k = i.category || "Menu"; if (!map.has(k)) map.set(k, []); map.get(k).push(i) }
+    return [...map.entries()]
+  }, [shown, grouped])
   const toggleAvoid = (a) => setAvoid((prev) => (prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]))
   const goBack = () => (window.history.state?.idx > 0 ? navigate(-1) : navigate("/user/account", { replace: true }))
 
@@ -396,6 +450,13 @@ export default function Nutrition() {
             <p className="text-[11px] font-bold tracking-widest uppercase text-white/80">100% vegetarian</p>
             <h2 className="text-xl font-extrabold text-white mt-0.5">{page.headline || "Nutrition & Allergens"}</h2>
             {page.intro && <p className="text-sm text-white/85 mt-1 leading-relaxed pr-10">{page.intro}</p>}
+            {items.length > 0 && (
+              <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold text-white">
+                <span className="px-2.5 py-1 rounded-full bg-white/20">{items.length} dishes</span>
+                <span className="px-2.5 py-1 rounded-full bg-white/20">{categories.length - 1} categories</span>
+                {allergens.length > 0 && <span className="px-2.5 py-1 rounded-full bg-white/20">{allergens.length} allergens tracked</span>}
+              </div>
+            )}
           </div>
 
           {loading ? (
@@ -417,42 +478,75 @@ export default function Nutrition() {
             </div>
           ) : (
             <>
-              {/* Search */}
-              <div className="mt-4 relative">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: ui.muted }} />
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search pizzas, sides, desserts…"
-                  className="w-full h-11 rounded-xl pl-10 pr-10 text-sm outline-none border focus:border-[#E53935]"
-                  style={{ backgroundColor: ui.card, color: ui.text, borderColor: ui.line }}
-                />
-                {query && (
-                  <button onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 border-0 bg-transparent cursor-pointer" style={{ color: ui.muted }}>
-                    <X className="w-4 h-4" />
+              {/* Search + categories stay in view while the list scrolls */}
+              <div className="sticky top-14 z-20 -mx-4 px-4 pt-3 pb-2" style={{ backgroundColor: ui.page }}>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: ui.muted }} />
+                    <input
+                      type="search"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Search pizzas, sides, desserts…"
+                      aria-label="Search nutrition information"
+                      className="w-full h-11 rounded-xl pl-10 pr-10 text-sm outline-none border focus:border-[#E53935]"
+                      style={{ backgroundColor: ui.card, color: ui.text, borderColor: ui.line }}
+                    />
+                    {query && (
+                      <button onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 border-0 bg-transparent cursor-pointer" style={{ color: ui.muted }}>
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setShowFilters((v) => !v)}
+                    aria-expanded={showFilters}
+                    aria-label="Diet and allergen filters"
+                    className="relative h-11 px-3.5 rounded-xl border cursor-pointer flex items-center gap-1.5 text-sm font-semibold"
+                    style={showFilters || filterCount ? { backgroundColor: "#E53935", color: "#fff", borderColor: "#E53935" } : { backgroundColor: ui.card, color: ui.text, borderColor: ui.line }}
+                  >
+                    <ListFilter className="w-4 h-4" />Filters
+                    {filterCount > 0 && <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-white text-[#E53935] text-[11px] font-extrabold flex items-center justify-center">{filterCount}</span>}
                   </button>
+                </div>
+
+                {categories.length > 2 && (
+                  <div className="mt-2.5 -mx-4 px-4 flex gap-2 overflow-x-auto hide-scrollbar">
+                    {categories.map((c) => <Chip key={c} ui={ui} active={category === c} onClick={() => setCategory(c)}>{c}</Chip>)}
+                  </div>
                 )}
               </div>
 
-              {/* Categories */}
-              {categories.length > 2 && (
-                <div className="mt-3 -mx-4 px-4 flex gap-2 overflow-x-auto hide-scrollbar">
-                  {categories.map((c) => <Chip key={c} ui={ui} active={category === c} onClick={() => setCategory(c)}>{c}</Chip>)}
-                </div>
-              )}
+              <AnimatePresence initial={false}>
+                {showFilters && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-2 rounded-2xl p-3.5 space-y-3" style={{ backgroundColor: ui.card, boxShadow: ui.shadow }}>
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wide mb-1.5" style={{ color: ui.muted }}>Diet</p>
+                        <div className="flex flex-wrap gap-2">
+                          {QUICK.map((q) => <Chip key={q.id} ui={ui} active={quick.includes(q.id)} onClick={() => toggleQuick(q.id)}>{q.label}</Chip>)}
+                        </div>
+                      </div>
+                      {allergens.length > 0 && (
+                        <div>
+                          <p className="text-[11px] font-bold uppercase tracking-wide mb-1.5" style={{ color: ui.muted }}>Hide items containing</p>
+                          <div className="flex flex-wrap gap-2">
+                            {allergens.map((a) => <Chip key={a} ui={ui} tone="amber" active={avoid.includes(a)} onClick={() => toggleAvoid(a)}>{avoid.includes(a) && <X className="w-3 h-3" />}{a}</Chip>)}
+                          </div>
+                        </div>
+                      )}
+                      {filterCount > 0 && (
+                        <button onClick={() => { setAvoid([]); setQuick([]) }} className="text-xs font-bold text-[#E53935] bg-transparent border-0 p-0 cursor-pointer">Reset filters</button>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-              {/* Allergen filter + sort */}
-              {allergens.length > 0 && (
-                <div className="mt-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wide mb-1.5" style={{ color: ui.muted }}>Hide items with</p>
-                  <div className="-mx-4 px-4 flex gap-2 overflow-x-auto hide-scrollbar">
-                    {allergens.map((a) => <Chip key={a} ui={ui} tone="amber" active={avoid.includes(a)} onClick={() => toggleAvoid(a)}>{avoid.includes(a) && <X className="w-3 h-3" />}{a}</Chip>)}
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-4 mb-2 flex items-center justify-between">
+              <div className="mt-3 mb-3 flex items-center justify-between">
                 <p className="text-xs" style={{ color: ui.muted }} aria-live="polite">
                   {shown.length} of {items.length} items
                   {filtersOn && <button onClick={clearFilters} className="ml-2 font-bold text-[#E53935] bg-transparent border-0 p-0 cursor-pointer">Clear</button>}
@@ -471,9 +565,24 @@ export default function Nutrition() {
                   <button onClick={clearFilters} className="mt-2 text-sm font-bold text-[#E53935] bg-transparent border-0 cursor-pointer">Clear filters</button>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {shown.map((item) => <ItemCard key={item._id} item={item} ui={ui} avoided={avoid} onOpen={() => setActive(item)} />)}
-                </div>
+                grouped ? (
+                  <div className="space-y-5">
+                    {groups.map(([name, list]) => (
+                      <section key={name} aria-label={name}>
+                        <h3 className="flex items-baseline gap-2 text-[13px] font-extrabold uppercase tracking-wide mb-2" style={{ color: ui.text }}>
+                          {name}<span className="text-[11px] font-semibold normal-case tracking-normal" style={{ color: ui.muted }}>{list.length} {list.length === 1 ? "item" : "items"}</span>
+                        </h3>
+                        <div className="space-y-3">
+                          {list.map((item) => <ItemCard key={item._id} item={item} ui={ui} avoided={avoid} onOpen={() => setActive(item)} />)}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {shown.map((item) => <ItemCard key={item._id} item={item} ui={ui} avoided={avoid} onOpen={() => setActive(item)} />)}
+                  </div>
+                )
               )}
 
               <div className="mt-5 flex items-center justify-center gap-4 text-[11px]" style={{ color: ui.muted }}>
