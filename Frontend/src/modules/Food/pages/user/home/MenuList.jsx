@@ -1845,7 +1845,10 @@ export default function MenuList() {
           </div>
 
           {/* Compact Action Buttons on Right (Appears when scrolled, matching Image 2 & 3) */}
-          <div className={`flex items-center gap-1.5 overflow-hidden transition-all duration-300 shrink-0 ${
+          <div className={`flex items-center gap-1.5 transition-all duration-300 shrink-0 ${
+            // clipped while it collapses; not clipped while the sort menu is open, so the menu is not cut off
+            showSortMenu && isScrolled ? "overflow-visible" : "overflow-hidden"
+          } ${
             isScrolled 
               ? "max-w-[120px] opacity-100 ml-0.5" 
               : "max-w-0 opacity-0 -ml-2 pointer-events-none"
@@ -1920,7 +1923,11 @@ export default function MenuList() {
 
         {/* Row 2: Expanded Filters (Visible only when at top / !isScrolled) */}
         {(menuFilters.vegOnly?.enabled !== false || menuFilters.sortBy?.enabled !== false) && (
-          <div className={`px-3.5 sm:px-4 flex items-center gap-2 relative overflow-hidden transition-all duration-300 ${
+          <div className={`px-3.5 sm:px-4 flex items-center gap-2 relative transition-all duration-300 ${
+            // The row is clipped while it collapses on scroll. While the sort menu is open the row must not clip:
+            // the menu opens below the button, outside the row's 48px, and would otherwise be cut off (the bug).
+            showSortMenu && !isScrolled ? "overflow-visible" : "overflow-hidden"
+          } ${
             isScrolled 
               ? "max-h-0 opacity-0 pb-0 pointer-events-none" 
               : "max-h-12 opacity-100 pb-3"
