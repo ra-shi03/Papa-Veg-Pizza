@@ -4,14 +4,11 @@ import {
   RotateCcw, ChevronLeft, ChevronRight, Eye, Trash2, 
   Mail, Phone, Calendar, ArrowUpDown, MoreVertical, PlusCircle, 
   Package, MapPin, ClipboardList, AlertTriangle, CheckCircle2, 
-  UserPlus, Check, TrendingUp, UserCheck, Clock, ShieldCheck, LifeBuoy
+  UserPlus, Check, TrendingUp, UserCheck, ShieldCheck
 } from "lucide-react";
 import { useComplaints } from "./hooks/useComplaints";
 import ComplaintDrawer from "./components/ComplaintDrawer";
 import { 
-  CreateComplaintModal, 
-  AssignComplaintModal, 
-  EscalateComplaintModal, 
   ExportComplaintsModal
 } from "./components/ComplaintModals";
 import {
@@ -19,7 +16,6 @@ import {
   CloseTicketModal,
   AddComplaintNoteModal
 } from "./components/ComplaintDetailModals";
-import { mockStores } from "./mockData";
 
 export default function CustomerComplaints() {
   const useComplaintsHook = useComplaints();
@@ -41,8 +37,6 @@ export default function CustomerComplaints() {
     setPriority,
     status,
     setStatus,
-    assignedTo,
-    setAssignedTo,
     dateFilter,
     setDateFilter,
     customDateRange,
@@ -52,14 +46,12 @@ export default function CustomerComplaints() {
     sortOrder,
     setSortOrder,
     stats,
+    stores,
+    categories,
     complaintDetails,
     fetchComplaintDetails,
-    createComplaint,
-    assignComplaint,
-    escalateComplaint,
     resolveComplaint,
     closeTicket,
-    deleteComplaint,
     addComplaintNote,
     deleteComplaintNote,
     exportComplaints,
@@ -70,9 +62,6 @@ export default function CustomerComplaints() {
   const [localSearch, setLocalSearch] = useState(search);
   
   // Modals visibility states
-  const [showCreate, setShowCreate] = useState(false);
-  const [showAssign, setShowAssign] = useState(false);
-  const [showEscalate, setShowEscalate] = useState(false);
   const [showResolve, setShowResolve] = useState(false);
   const [showClose, setShowClose] = useState(false);
   const [showExport, setShowExport] = useState(false);
@@ -87,6 +76,8 @@ export default function CustomerComplaints() {
   // Active action menu row ID
   const [activeMenuId, setActiveMenuId] = useState(null);
   const menuRef = useRef(null);
+  // Where the open actions menu sits on screen (fixed, so the table never clips it)
+  const [menuPos, setMenuPos] = useState(null);
 
   // Debouncing Search Input
   useEffect(() => {
@@ -105,8 +96,15 @@ export default function CustomerComplaints() {
         setActiveMenuId(null);
       }
     }
+    const closeMenu = () => setActiveMenuId(null);
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    window.addEventListener("scroll", closeMenu, true);
+    window.addEventListener("resize", closeMenu);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("scroll", closeMenu, true);
+      window.removeEventListener("resize", closeMenu);
+    };
   }, []);
 
   // Handle Sort Change
@@ -141,20 +139,12 @@ export default function CustomerComplaints() {
     
     if (action === "view") {
       setShowDrawer(true);
-    } else if (action === "assign") {
-      setShowAssign(true);
-    } else if (action === "escalate") {
-      setShowEscalate(true);
     } else if (action === "resolve") {
       setShowResolve(true);
     } else if (action === "close") {
       setShowClose(true);
     } else if (action === "add-note") {
       setShowAddNote(true);
-    } else if (action === "delete") {
-      if (window.confirm("Are you sure you want to permanently delete this complaint ticket?")) {
-        deleteComplaint(complaint._id);
-      }
     }
   };
 
@@ -175,7 +165,6 @@ export default function CustomerComplaints() {
     switch (s) {
       case "Open": return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
       case "In Progress": return "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
-      case "Escalated": return "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20";
       case "Resolved": return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
       case "Closed": return "bg-zinc-550/10 text-zinc-500 dark:text-zinc-400 border-zinc-550/20";
       default: return "bg-slate-500/10 text-slate-650 border-slate-500/20";
@@ -197,7 +186,7 @@ export default function CustomerComplaints() {
             </span>
           </div>
           <p className="text-zinc-450 dark:text-zinc-400 mt-0.5 text-[10px] font-medium font-semibold">
-            Track support tickets, assign representatives, trigger refund dispatch, and monitor SLAs.
+            Track customer complaints and resolve them.
           </p>
         </div>
 
@@ -211,14 +200,6 @@ export default function CustomerComplaints() {
           </button>
           
           <button 
-            onClick={() => setShowCreate(true)}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 bg-[var(--primary)] text-white hover:opacity-95 rounded-lg shadow-sm font-bold uppercase transition-all cursor-pointer"
-          >
-            <Plus size={13} />
-            <span>New Ticket</span>
-          </button>
-          
-          <button 
             onClick={() => { refetch(); }}
             className="p-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-750 rounded-lg transition-all text-zinc-600 dark:text-zinc-300 cursor-pointer"
             title="Refresh database"
@@ -229,7 +210,7 @@ export default function CustomerComplaints() {
       </header>
 
       {/* KPI Bento Grid */}
-      <section className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+      <section className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
         
         {/* Card 1: Open Complaints */}
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3.5 rounded-xl shadow-xs flex items-center justify-between hover:scale-[1.01] transition-all">
@@ -256,18 +237,7 @@ export default function CustomerComplaints() {
           </div>
         </div>
 
-        {/* Card 3: Escalated Tickets */}
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3.5 rounded-xl shadow-xs flex items-center justify-between hover:scale-[1.01] transition-all">
-          <div className="space-y-1">
-            <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Escalated</p>
-            <p className="text-lg font-black text-orange-600 dark:text-orange-400">{stats.escalated}</p>
-          </div>
-          <div className="p-2 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-500">
-            <LifeBuoy size={16} />
-          </div>
-        </div>
-
-        {/* Card 4: Resolved Today */}
+        {/* Card 3: Resolved Today */}
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3.5 rounded-xl shadow-xs flex items-center justify-between hover:scale-[1.01] transition-all">
           <div className="space-y-1">
             <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Resolved Today</p>
@@ -278,18 +248,7 @@ export default function CustomerComplaints() {
           </div>
         </div>
 
-        {/* Card 5: Avg Handling Time */}
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3.5 rounded-xl shadow-xs flex items-center justify-between hover:scale-[1.01] transition-all">
-          <div className="space-y-1">
-            <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Avg Handling Time</p>
-            <p className="text-lg font-black text-amber-600 dark:text-amber-500">{stats.avgResolutionTimeHours} Hrs</p>
-          </div>
-          <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-500">
-            <Clock size={16} />
-          </div>
-        </div>
-
-        {/* Card 6: Month's Total */}
+        {/* Card 4: Month's Total */}
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3.5 rounded-xl shadow-xs flex items-center justify-between hover:scale-[1.01] transition-all">
           <div className="space-y-1">
             <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">This Month Total</p>
@@ -328,7 +287,7 @@ export default function CustomerComplaints() {
               className="w-full p-2 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 focus:outline-none font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer"
             >
               <option value="All">All Store Branches</option>
-              {mockStores.map(store => (
+              {stores.map(store => (
                 <option key={store.id} value={store.id}>{store.name}</option>
               ))}
             </select>
@@ -342,12 +301,9 @@ export default function CustomerComplaints() {
               className="w-full p-2 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 focus:outline-none font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer"
             >
               <option value="All">All Categories</option>
-              <option value="Food Quality">Food Quality</option>
-              <option value="Delivery">Delivery</option>
-              <option value="Payment">Payment</option>
-              <option value="Missing Item">Missing Item</option>
-              <option value="App Issue">App Issue</option>
-              <option value="Other">Other</option>
+              {categories.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
             </select>
           </div>
 
@@ -376,7 +332,6 @@ export default function CustomerComplaints() {
               <option value="All">All Statuses</option>
               <option value="Open">Open</option>
               <option value="In Progress">In Progress</option>
-              <option value="Escalated">Escalated</option>
               <option value="Resolved">Resolved</option>
               <option value="Closed">Closed</option>
             </select>
@@ -436,7 +391,6 @@ export default function CustomerComplaints() {
                 setCategory("All");
                 setPriority("All");
                 setStatus("All");
-                setAssignedTo("All");
                 setDateFilter("All");
                 setCustomDateRange({ start: "", end: "" });
                 setSortBy("createdAt");
@@ -487,7 +441,6 @@ export default function CustomerComplaints() {
                     <ArrowUpDown size={11} />
                   </div>
                 </th>
-                <th className="px-4 py-3">Representative</th>
                 <th className="px-4 py-3 cursor-pointer select-none" onClick={() => handleSort("createdAt")}>
                   <div className="flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-250">
                     Registered
@@ -567,15 +520,6 @@ export default function CustomerComplaints() {
                       </span>
                     </td>
 
-                    {/* Assigned To */}
-                    <td className="px-4 py-3 text-xs">
-                      {comp.assignedTo ? (
-                        <span className="font-bold text-zinc-700 dark:text-zinc-200">{comp.assignedTo}</span>
-                      ) : (
-                        <span className="text-red-500 font-extrabold uppercase text-[9px]">Unassigned</span>
-                      )}
-                    </td>
-
                     {/* Registered Date */}
                     <td className="px-4 py-3 font-medium text-zinc-500 dark:text-zinc-400">
                       {formatDate(comp.createdAt)}
@@ -596,7 +540,15 @@ export default function CustomerComplaints() {
 
                         <div className="relative">
                           <button
-                            onClick={() => setActiveMenuId(activeMenuId === comp._id ? null : comp._id)}
+                            onClick={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const opensUp = rect.bottom + 230 > window.innerHeight;
+                              setMenuPos({
+                                right: Math.max(8, window.innerWidth - rect.right),
+                                ...(opensUp ? { bottom: window.innerHeight - rect.top + 4 } : { top: rect.bottom + 4 })
+                              });
+                              setActiveMenuId(activeMenuId === comp._id ? null : comp._id);
+                            }}
                             className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors cursor-pointer"
                           >
                             <MoreVertical size={14} />
@@ -605,7 +557,8 @@ export default function CustomerComplaints() {
                           {activeMenuId === comp._id && (
                             <div 
                               ref={menuRef} 
-                              className="absolute right-0 mt-1 w-36 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-lg z-50 overflow-hidden divide-y divide-zinc-100 dark:divide-zinc-800/80 animate-fade-down duration-100"
+                              style={menuPos || undefined}
+                              className="fixed w-36 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-lg z-50 overflow-hidden divide-y divide-zinc-100 dark:divide-zinc-800/80 animate-fade-down duration-100"
                             >
                               <div className="py-1">
                                 <button
@@ -614,24 +567,6 @@ export default function CustomerComplaints() {
                                 >
                                   <Eye size={12} />
                                   <span>View Drawer</span>
-                                </button>
-                                
-                                <button
-                                  onClick={() => handleActionClick(comp, "assign")}
-                                  disabled={comp.status === "Closed"}
-                                  className="w-full text-left px-3 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5 text-zinc-650 dark:text-zinc-350 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed font-semibold"
-                                >
-                                  <UserPlus size={12} />
-                                  <span>Assign Agent</span>
-                                </button>
-
-                                <button
-                                  onClick={() => handleActionClick(comp, "escalate")}
-                                  disabled={comp.status === "Closed"}
-                                  className="w-full text-left px-3 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-850 flex items-center gap-1.5 text-zinc-650 dark:text-zinc-350 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed font-semibold"
-                                >
-                                  <AlertTriangle size={12} />
-                                  <span>Escalate SLA</span>
                                 </button>
                               </div>
 
@@ -652,16 +587,6 @@ export default function CustomerComplaints() {
                                 >
                                   <CheckCircle2 size={12} />
                                   <span>Close Ticket</span>
-                                </button>
-                              </div>
-
-                              <div className="py-1 bg-rose-500/5">
-                                <button
-                                  onClick={() => handleActionClick(comp, "delete")}
-                                  className="w-full text-left px-3 py-1.5 hover:bg-rose-500/10 flex items-center gap-1.5 text-rose-600 cursor-pointer font-semibold"
-                                >
-                                  <Trash2 size={12} />
-                                  <span>Delete Ticket</span>
                                 </button>
                               </div>
                             </div>
@@ -742,39 +667,11 @@ export default function CustomerComplaints() {
         onClose={() => setShowDrawer(false)}
         complaintId={activeComplaint?._id}
         useComplaintsHook={useComplaintsHook}
-        onAssignClick={(c) => handleActionClick(c, "assign")}
-        onEscalateClick={(c) => handleActionClick(c, "escalate")}
         onResolveClick={(c) => handleActionClick(c, "resolve")}
         onCloseClick={(c) => handleActionClick(c, "close")}
-        onDeleteClick={(id) => {
-          if (window.confirm("Are you sure you want to delete this ticket?")) {
-            deleteComplaint(id);
-            setShowDrawer(false);
-          }
-        }}
       />
 
       {/* Actions Modals */}
-      <CreateComplaintModal
-        isOpen={showCreate}
-        onClose={() => setShowCreate(false)}
-        onCreate={createComplaint}
-      />
-
-      <AssignComplaintModal
-        isOpen={showAssign}
-        onClose={() => setShowAssign(false)}
-        complaint={activeComplaint}
-        onAssign={assignComplaint}
-      />
-
-      <EscalateComplaintModal
-        isOpen={showEscalate}
-        onClose={() => setShowEscalate(false)}
-        complaint={activeComplaint}
-        onEscalate={escalateComplaint}
-      />
-
       <ResolveComplaintModal
         isOpen={showResolve}
         onClose={() => setShowResolve(false)}
@@ -792,6 +689,7 @@ export default function CustomerComplaints() {
       <ExportComplaintsModal
         isOpen={showExport}
         onClose={() => setShowExport(false)}
+        stores={stores}
         onExport={exportComplaints}
       />
 

@@ -17,13 +17,13 @@ export default function ReplyToReviewModal({
   const [text, setText] = useState("");
   const isReadOnly = userRole === "assistant_manager";
 
-  if (!visible) return null;
-
+  // Hooks first, the early return after them: returning before a hook changes the hook count when the modal opens
+  // and React replaces the whole page with "Something went wrong".
   useEffect(() => {
-    if (data?.review) {
+    if (visible && data?.review) {
       setText("");
     }
-  }, [data]);
+  }, [visible, data]);
 
   const handlePublish = (e) => {
     e.preventDefault();
@@ -77,6 +77,8 @@ export default function ReplyToReviewModal({
   };
 
   const { review = {}, customer = {} } = data || {};
+
+  if (!visible) return null;
 
   return (
     <div 

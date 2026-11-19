@@ -24,6 +24,27 @@ const supportTicketSchema = new mongoose.Schema(
             }],
             default: []
         },
+        // Franchise / head office handling (Customer Complaints desk). The customer and the store never see these.
+        closedAt: { type: Date, default: null },
+        notes: {
+            type: [{
+                note: { type: String, required: true, trim: true, maxlength: 1000 },
+                byName: { type: String, default: '', trim: true },
+                at: { type: Date, default: Date.now }
+            }],
+            default: []
+        },
+        activity: {
+            type: [{
+                _id: false,
+                action: { type: String, required: true, trim: true },
+                oldValue: { type: String, default: '' },
+                newValue: { type: String, default: '' },
+                byName: { type: String, default: '', trim: true },
+                at: { type: Date, default: Date.now }
+            }],
+            default: []
+        },
         resolution: {
             type: new mongoose.Schema({
                 actionTaken: { type: String, default: '', trim: true, maxlength: 500 },

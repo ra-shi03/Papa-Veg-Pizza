@@ -120,7 +120,7 @@ export default function ComplaintDetailsModal({
                   <div>
                     <span className="text-[10px] text-zinc-400 block mb-1">COMPLAINT ID</span>
                     <span className="font-mono text-zinc-850 dark:text-zinc-200 font-extrabold bg-zinc-200/50 dark:bg-zinc-805 px-2 py-0.5 rounded text-[10px]">
-                      {complaint._id}
+                      {complaint.ticketNumber || complaint._id}
                     </span>
                   </div>
                   <div>

@@ -6,7 +6,6 @@ import {
   Check, Eye, AlertTriangle, AlertCircle, RefreshCw,
   Send, ExternalLink, HelpCircle
 } from "lucide-react";
-import { mockStores } from "../mockData";
 
 // Helper to format date nicely
 const formatDateTime = (value) => {
@@ -31,11 +30,8 @@ export default function ComplaintDrawer({
   onClose,
   complaintId,
   useComplaintsHook,
-  onAssignClick,
-  onEscalateClick,
   onResolveClick,
-  onCloseClick,
-  onDeleteClick
+  onCloseClick
 }) {
   const {
     complaintDetails,
@@ -90,60 +86,11 @@ export default function ComplaintDrawer({
     switch (status) {
       case "Open": return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
       case "In Progress": return "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
-      case "Escalated": return "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20";
       case "Resolved": return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
       case "Closed": return "bg-zinc-550/10 text-zinc-500 dark:text-zinc-400 border-zinc-500/20";
       default: return "bg-slate-500/10 text-slate-600 border-slate-500/20";
     }
   };
-
-  // Compute SLA SLA breach logic based on priorities
-  // Critical: 4h, High: 12h, Medium: 24h, Low: 48h
-  const getSLADurationHours = (priority) => {
-    if (priority === "Critical") return 4;
-    if (priority === "High") return 12;
-    if (priority === "Medium") return 24;
-    return 48; // Low
-  };
-
-  const getSLADeadline = (createdStr, priority) => {
-    const created = new Date(createdStr);
-    const hours = getSLADurationHours(priority);
-    return new Date(created.getTime() + hours * 60 * 60 * 1000);
-  };
-
-  const getSLANavigation = () => {
-    if (!complaintDetails) return null;
-    const { createdAt, priority, status, resolvedAt, handlingTimeHours } = complaintDetails;
-    const limit = getSLADurationHours(priority);
-    const deadline = getSLADeadline(createdAt, priority);
-    const now = new Date();
-
-    if (status === "Resolved" || status === "Closed") {
-      const timeSpent = handlingTimeHours || 0;
-      const breached = timeSpent > limit;
-      return {
-        breached,
-        text: breached 
-          ? `SLA Breached (Resolved in ${timeSpent}h vs limit ${limit}h)` 
-          : `Within SLA (Resolved in ${timeSpent}h vs limit ${limit}h)`,
-        color: breached ? "text-rose-600 bg-rose-50 dark:bg-rose-950/20 border-rose-200" : "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200"
-      };
-    } else {
-      const remainingMs = deadline - now;
-      const remainingHrs = (remainingMs / (1000 * 60 * 60)).toFixed(1);
-      const breached = remainingMs < 0;
-      return {
-        breached,
-        text: breached
-          ? `SLA Breached (Overdue by ${Math.abs(remainingHrs)}h | limit ${limit}h)`
-          : `Within SLA (Deadline in ${remainingHrs}h | limit ${limit}h)`,
-        color: breached ? "text-rose-600 bg-rose-50 dark:bg-rose-950/20 border-rose-200" : "text-amber-600 bg-amber-50 dark:bg-amber-950/20 border-amber-200"
-      };
-    }
-  };
-
-  const slaData = getSLANavigation();
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
@@ -191,19 +138,6 @@ export default function ComplaintDrawer({
           </button>
         </div>
 
-        {/* SLA Status Bar */}
-        {complaintDetails && slaData && (
-          <div className={`px-5 py-2 border-b border-zinc-150 dark:border-zinc-850 text-[10px] font-extrabold flex items-center justify-between border ${slaData.color}`}>
-            <span className="flex items-center gap-1.5 uppercase">
-              {slaData.breached ? <AlertCircle size={12} className="text-rose-500" /> : <Clock size={12} />}
-              {slaData.text}
-            </span>
-            <span className="text-[9px] font-bold text-zinc-450 dark:text-zinc-400">
-              SLA Limit: {getSLADurationHours(complaintDetails.priority)} Hours
-            </span>
-          </div>
-        )}
-
         {/* Tab Selection Bar */}
         <div className="flex bg-white dark:bg-zinc-900 border-b border-zinc-150 dark:border-zinc-850 px-4 overflow-x-auto scrollbar-none gap-2">
           {tabs.map(tab => {
@@ -246,19 +180,6 @@ export default function ComplaintDrawer({
                         <h4 className="text-[10px] font-bold uppercase text-zinc-400">Grievance Category</h4>
                         <p className="text-sm font-extrabold text-zinc-900 dark:text-white mt-0.5">{complaintDetails.category}</p>
                       </div>
-                      <div>
-                        <h4 className="text-[10px] font-bold uppercase text-zinc-400 text-right">Assignee</h4>
-                        <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 text-right mt-0.5">
-                          {complaintDetails.assignedTo ? (
-                            <span className="flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                              {complaintDetails.assignedTo}
-                            </span>
-                          ) : (
-                            <span className="text-rose-500 font-extrabold uppercase">Unassigned</span>
-                          )}
-                        </p>
-                      </div>
                     </div>
 
                     <div className="border-t border-zinc-100 dark:border-zinc-800 pt-3">
@@ -275,24 +196,6 @@ export default function ComplaintDrawer({
                     
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                       <button
-                        onClick={() => onAssignClick(complaintDetails)}
-                        disabled={complaintDetails.status === "Closed"}
-                        className="flex items-center justify-center gap-1.5 py-2.5 px-3 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-lg text-[10px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                      >
-                        <User size={13} className="text-emerald-500" />
-                        Assign Staff
-                      </button>
-
-                      <button
-                        onClick={() => onEscalateClick(complaintDetails)}
-                        disabled={complaintDetails.status === "Closed"}
-                        className="flex items-center justify-center gap-1.5 py-2.5 px-3 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-lg text-[10px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                      >
-                        <AlertTriangle size={13} className="text-red-500" />
-                        Escalate
-                      </button>
-
-                      <button
                         onClick={() => onResolveClick(complaintDetails)}
                         disabled={complaintDetails.status === "Closed" || complaintDetails.status === "Resolved"}
                         className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all"
@@ -308,14 +211,6 @@ export default function ComplaintDrawer({
                       >
                         <CheckCircle2 size={13} />
                         Close & Lock
-                      </button>
-
-                      <button
-                        onClick={() => onDeleteClick(complaintDetails._id)}
-                        className="flex items-center justify-center gap-1.5 py-2.5 px-3 border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 text-rose-600 rounded-lg text-[10px] font-bold uppercase tracking-wider cursor-pointer transition-all"
-                      >
-                        <Trash2 size={13} />
-                        Delete Ticket
                       </button>
                     </div>
                   </div>
@@ -353,23 +248,13 @@ export default function ComplaintDrawer({
                         <span className="text-[9px] font-bold uppercase text-zinc-400 block mb-0.5">Email</span>
                         <span className="text-xs font-bold text-zinc-800 dark:text-zinc-250 truncate block max-w-full">{complaintDetails.customer?.email || "N/A"}</span>
                       </div>
-                      <div>
-                        <span className="text-[9px] font-bold uppercase text-zinc-400 block mb-0.5">Verified</span>
-                        <span className="text-xs font-bold">
-                          {complaintDetails.customer?.isVerified ? (
-                            <span className="text-green-600 flex items-center gap-0.5">Yes (OTP Verified)</span>
-                          ) : (
-                            <span className="text-red-500 flex items-center gap-0.5">Unverified Mobile</span>
-                          )}
-                        </span>
-                      </div>
                     </div>
                   </div>
 
                   {/* Spending Analytics */}
                   <div className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-xl p-4 shadow-xs">
-                    <h4 className="text-[10px] font-extrabold uppercase text-zinc-900 dark:text-white tracking-wider mb-3">Franchise Loyalty & Spending Analytics</h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <h4 className="text-[10px] font-extrabold uppercase text-zinc-900 dark:text-white tracking-wider mb-3">Spending at this franchise</h4>
+                    <div className="grid grid-cols-3 gap-3">
                       <div className="p-2.5 bg-slate-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-850 rounded-lg">
                         <span className="text-[8px] font-bold text-zinc-400 uppercase">Total Orders</span>
                         <div className="text-sm font-extrabold text-zinc-850 dark:text-white mt-0.5">{complaintDetails.customer?.totalOrders || 0}</div>
@@ -382,24 +267,7 @@ export default function ComplaintDrawer({
                         <span className="text-[8px] font-bold text-zinc-400 uppercase">Avg Order Value</span>
                         <div className="text-sm font-extrabold text-zinc-850 dark:text-white mt-0.5">₹{complaintDetails.customer?.avgOrderValue || 0}</div>
                       </div>
-                      <div className="p-2.5 bg-slate-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-850 rounded-lg">
-                        <span className="text-[8px] font-bold text-zinc-400 uppercase">Loyalty Points</span>
-                        <div className="text-sm font-extrabold text-purple-600 dark:text-purple-400 mt-0.5">{complaintDetails.customer?.loyaltyPoints || 0} Points</div>
-                      </div>
                     </div>
-
-                    {complaintDetails.customer?.tags?.length > 0 && (
-                      <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800">
-                        <span className="text-[9px] font-bold uppercase text-zinc-400 block mb-1.5">System Assignment Tags</span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {complaintDetails.customer.tags.map(t => (
-                            <span key={t} className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded text-[9px] font-bold">
-                              {t}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
@@ -592,19 +460,6 @@ export default function ComplaintDrawer({
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3 pt-2">
-                        <div className="p-3 bg-slate-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-850 rounded-lg">
-                          <span className="text-[8px] font-bold text-zinc-450 uppercase block mb-1">Handling duration</span>
-                          <strong className="text-xs font-extrabold text-zinc-800 dark:text-zinc-100">{complaintDetails.handlingTimeHours} Hours</strong>
-                        </div>
-                        <div className="p-3 bg-slate-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-850 rounded-lg">
-                          <span className="text-[8px] font-bold text-zinc-450 uppercase block mb-1">SLA Compliance</span>
-                          <span className={`text-xs font-extrabold ${slaData?.breached ? "text-rose-500" : "text-emerald-500"}`}>
-                            {slaData?.breached ? "BREACHED" : "COMPLIANT"}
-                          </span>
-                        </div>
-                      </div>
-
                       <div className="border-t border-zinc-100 dark:border-zinc-800 pt-3">
                         <h4 className="text-[10px] font-bold uppercase text-zinc-400 mb-1.5">Resolution summary</h4>
                         <div className="p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-850 rounded-lg font-bold text-zinc-700 dark:text-zinc-300 text-xs">
@@ -621,7 +476,7 @@ export default function ComplaintDrawer({
                       <div className="space-y-1.5">
                         <h4 className="text-sm font-extrabold text-zinc-900 dark:text-white uppercase tracking-wider">Resolution Pending</h4>
                         <p className="text-[10px] text-zinc-400 max-w-sm mx-auto leading-normal">
-                          This support case is currently actively open. Perform operations from the <strong className="font-extrabold">Complaint Info</strong> tab to assign support desk managers and dispatch compensation.
+                          This support case is currently actively open. Perform operations from the <strong className="font-extrabold">Complaint Info</strong> tab to resolve it and record any compensation.
                         </p>
                       </div>
 

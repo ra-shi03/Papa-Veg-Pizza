@@ -22,6 +22,10 @@ const makeStaff = async (managerToken, role, tag) => {
     const email = `${tag}${fx.ts}@example.invalid`;
     const res = await fx.call('POST', '/v1/food/store/staff', managerToken, { fullName: `Name ${tag}`, email, phone: `7${String(++phoneSeq).padStart(2, '0')}${String(fx.ts).slice(-7)}`, password: PASSWORD, role });
     assert.equal(res.status, 201, `create ${tag}: ${JSON.stringify(res.body)}`);
+    // New staff sign in only after their franchise admin approves them
+    const adminToken = managerToken === A.managerToken ? A.adminToken : B.adminToken;
+    const ok = await fx.call('PATCH', `/v1/staff-approvals/${res.body.data._id}/approve`, adminToken, {});
+    assert.equal(ok.status, 200, `approve ${tag}: ${JSON.stringify(ok.body)}`);
     return { id: res.body.data.userId, token: await login(email) };
 };
 /** An order at store `f` for customer `userId`. */
@@ -176,6 +180,8 @@ describe('complaints', () => {
         assert.deepEqual(a.complaints.map((c) => c._id), [aComplaint]);
         const c = a.complaints[0];
         assert.equal(c.complaintType, 'missing_items');
+        assert.match(c.ticketNumber, /^TKT-[0-9A-F]{6}$/, 'the screens show a short ticket number, not the database id');
+        assert.equal((await list(MGR_A(), `&search=${c.ticketNumber}`)).complaints.some((x) => x._id === c._id), true, 'and it can be searched');
         assert.equal(c.status, 'pending');
         assert.equal(c.priority, 'medium');
         assert.equal(c.customerName, 'Alice Rao');

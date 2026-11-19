@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { FoodSupportTicket } from '../models/supportTicket.model.js';
 import { sendResponse, sendError } from '../../../../utils/response.js';
 import { emitSupportMessage, MAX_CUSTOMER_MESSAGES, REPORT_WINDOW_MS, MAX_TICKETS_PER_ORDER } from '../services/supportChat.js';
+import { cleanProofImages } from '../services/complaintProof.js';
 
 export async function createSupportTicketController(req, res, next) {
     try {
@@ -18,7 +19,9 @@ export async function createSupportTicketController(req, res, next) {
             userId: new mongoose.Types.ObjectId(userId),
             type,
             issueType,
-            description
+            description,
+            // Proof photos (order complaints): only our own uploads are kept
+            images: type === 'order' ? cleanProofImages(body.images) : []
         };
         if (type === 'order') {
             if (!body.orderId || !mongoose.Types.ObjectId.isValid(body.orderId)) {
@@ -75,6 +78,7 @@ const toCustomerTicket = (t, orderNumbers, storeNames) => ({
     storeName: storeNames.get(String(t.storeId)) || '',
     issueType: t.issueType,
     description: t.description,
+    images: t.images || [],
     status: t.status,
     adminResponse: t.adminResponse || '',
     responses: (t.responses || []).map((r) => ({ message: r.message, byRole: r.byRole, at: r.at })),

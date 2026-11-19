@@ -13,6 +13,7 @@ import { config } from '../../../../config/env.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 import { storeArea, nearbyAddressFilter } from './nearby.js';
 import { emitSupportMessage } from '../../user/services/supportChat.js';
+import { ticketNumberOf, emailsOf } from '../../admin/services/complaintDesk.service.js';
 
 // Store manager panel: Customers & Orders, Complaints, Reviews.
 //
@@ -307,12 +308,13 @@ export async function orderDetails(user, orderId, q = {}) {
   if (!isId(orderId)) throw new NotFoundError('Order not found');
   const order = await FoodOrder.findOne(ordersIn(ctx, { _id: toId(orderId) })).lean();
   if (!order) throw new NotFoundError('Order not found');
-  const [store, u, refunds] = await Promise.all([
+  const [store, u, emails, refunds] = await Promise.all([
     FoodStore.findById(ctx.storeId).select('storeName').lean(),
     User.findById(order.userId).select('mobile email').lean(),
+    emailsOf([order.userId]),
     Refund.find({ orderId: order._id }).sort({ createdAt: -1 }).lean(),
   ]);
-  const who = customerContact(ctx, { mobile: order.customerPhone || u?.mobile || '', email: u?.email || '' });
+  const who = customerContact(ctx, { mobile: order.customerPhone || u?.mobile || '', email: u?.email || order.customerEmail || emails.get(String(order.userId)) || '' });
   return {
     order: { ...orderSummary(order), customerName: order.customerName || 'Customer', customerMobile: who.mobile, customerEmail: who.email, storeName: store?.storeName || '' },
     items: (order.items || []).map((i) => ({
@@ -345,17 +347,18 @@ async function complaintsOf(ctx, extra = {}) {
 async function decorate(ctx, tickets) {
   const orderIds = tickets.map((t) => t.orderId).filter(Boolean);
   const userIds = [...new Set(tickets.map((t) => String(t.userId)))].map(toId);
-  const [orders, users, latest] = await Promise.all([
+  const [orders, users, emails, latest] = await Promise.all([
     FoodOrder.find({ _id: { $in: orderIds }, storeId: ctx.storeId }).select('order_id').lean(),
     User.find({ _id: { $in: userIds } }).select('mobile email').lean(),
-    FoodOrder.aggregate([{ $match: { storeId: ctx.storeId, userId: { $in: userIds } } }, { $sort: { createdAt: -1 } }, { $group: { _id: '$userId', name: { $first: '$customerName' }, phone: { $first: '$customerPhone' } } }]),
+    emailsOf(userIds),
+    FoodOrder.aggregate([{ $match: { storeId: ctx.storeId, userId: { $in: userIds }, customerName: { $nin: ['', null] } } }, { $sort: { createdAt: -1 } }, { $group: { _id: '$userId', name: { $first: '$customerName' }, phone: { $first: '$customerPhone' } } }]),
   ]);
   const orderById = new Map(orders.map((o) => [String(o._id), o]));
   const userById = new Map(users.map((u) => [String(u._id), u]));
   const nameById = new Map(latest.map((l) => [String(l._id), l]));
   return tickets.map((t) => {
     const u = userById.get(String(t.userId)) || {};
-    const who = contact(ctx, { mobile: u.mobile || nameById.get(String(t.userId))?.phone || '', email: u.email || '' });
+    const who = contact(ctx, { mobile: u.mobile || nameById.get(String(t.userId))?.phone || '', email: u.email || emails.get(String(t.userId)) || '' });
     return toComplaint(t, {
       customerName: nameById.get(String(t.userId))?.name || 'Customer',
       customerMobile: who.mobile,
@@ -367,6 +370,7 @@ async function decorate(ctx, tickets) {
 
 const toComplaint = (t, extra = {}) => ({
   _id: String(t._id),
+  ticketNumber: ticketNumberOf(t._id), // what the screens show; the database id stays for the actions
   storeId: String(t.storeId),
   customerId: String(t.userId),
   orderId: t.orderId ? String(t.orderId) : '',
@@ -391,7 +395,7 @@ export async function listComplaints(user, q = {}) {
   let list = await complaintsOf(ctx, filter);
   if (!isAll(q.complaintType)) list = list.filter((c) => c.complaintType === complaintTypeOf(q.complaintType));
   const search = str(q.search, 80).toLowerCase();
-  if (search) list = list.filter((c) => [c._id, c.description, c.complaintType, c.customerName, c.customerEmail, c.customerMobile, c.orderNumber].some((v) => String(v).toLowerCase().includes(search)));
+  if (search) list = list.filter((c) => [c._id, c.ticketNumber, c.description, c.complaintType, c.customerName, c.customerEmail, c.customerMobile, c.orderNumber].some((v) => String(v).toLowerCase().includes(search)));
   list = list.filter((c) => inRange(c.createdAt, q));
   const keyOf = (c, by) => ({
     createdAt: new Date(c.createdAt).getTime(), priority: PRIORITY_RANK[c.priority] || 0, status: c.status, complaintType: c.complaintType, customerName: c.customerName,

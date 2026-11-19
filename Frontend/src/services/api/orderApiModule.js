@@ -152,6 +152,8 @@ export const orderAPI = {
         orderId: payload.orderId,
         issueType: payload.complaintType,
         description: payload.subject ? `${payload.subject}: ${payload.description}` : payload.description,
+        // proof photos, already uploaded (the server keeps only our own uploads)
+        images: Array.isArray(payload.images) ? payload.images : [],
       }
     ),
   /**

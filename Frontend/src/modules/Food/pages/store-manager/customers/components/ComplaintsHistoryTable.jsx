@@ -28,7 +28,7 @@ export default function ComplaintsHistoryTable({ complaints = [] }) {
           {complaints.map((comp) => (
             <tr key={comp._id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-850/10 transition-colors">
               <td className="px-4 py-2.5 font-mono font-extrabold text-[10px] text-zinc-900 dark:text-white uppercase">
-                {comp._id}
+                {comp.ticketNumber || comp._id}
               </td>
               <td className="px-4 py-2.5 text-zinc-850 dark:text-zinc-200 font-bold max-w-[200px] truncate" title={comp.issue || comp.description || ""}>
                 {comp.issue || comp.description || comp.complaintType || "Complaint"}

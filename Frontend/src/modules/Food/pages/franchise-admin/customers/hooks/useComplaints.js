@@ -1,25 +1,30 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { 
-  mockCustomerComplaintsExpanded, 
-  mockComplaintLogs, 
-  mockComplaintNotes, 
-  mockEmployees,
-  mockStores
-} from "../mockData";
+import { adminClient } from "@/services/api/axios";
 
-// Initialize Local Mock DB in localStorage if it doesn't exist
-const initMockDB = () => {
-  if (!localStorage.getItem("pv_complaints_initialized")) {
-    localStorage.setItem("pv_complaints", JSON.stringify(mockCustomerComplaintsExpanded));
-    localStorage.setItem("pv_complaint_logs", JSON.stringify(mockComplaintLogs));
-    localStorage.setItem("pv_complaint_notes", JSON.stringify(mockComplaintNotes));
-    localStorage.setItem("pv_complaints_initialized", "true");
-  }
+// Customer Complaints desk. Everything comes from the server (/food/admin/stores/complaints/desk): the complaints
+// customers raised about this franchise's stores, the numbers, the lists for the filters, and the actions.
+const DESK = "/food/admin/stores/complaints/desk";
+
+const errorOf = (err, fallback) => err?.response?.data?.message || err?.message || fallback;
+
+// "Today" / "This Week" / "This Month" / a custom range -> the dates the server filters on
+const rangeOf = (dateFilter, custom) => {
+  const now = new Date();
+  const day = (d) => d.toISOString().slice(0, 10);
+  if (dateFilter === "Today") return { fromDate: day(now), toDate: day(now) };
+  if (dateFilter === "This Week") return { fromDate: day(new Date(now.getTime() - 6 * 86400000)), toDate: day(now) };
+  if (dateFilter === "This Month") return { fromDate: day(new Date(now.getFullYear(), now.getMonth(), 1)), toDate: day(now) };
+  if (dateFilter === "Custom Range" && custom?.start && custom?.end) return { fromDate: custom.start, toDate: custom.end };
+  return {};
 };
 
-const getDB = (key) => JSON.parse(localStorage.getItem(key) || "[]");
-const setDB = (key, data) => localStorage.setItem(key, JSON.stringify(data));
+const EMPTY_STATS = {
+  openComplaints: 0,
+  highPriority: 0,
+  resolvedToday: 0,
+  totalComplaintsThisMonth: 0
+};
 
 export function useComplaints() {
   const [complaints, setComplaints] = useState([]);
@@ -34,542 +39,134 @@ export function useComplaints() {
   const [category, setCategory] = useState("All");
   const [priority, setPriority] = useState("All");
   const [status, setStatus] = useState("All");
-  const [assignedTo, setAssignedTo] = useState("All");
   const [dateFilter, setDateFilter] = useState("All");
   const [customDateRange, setCustomDateRange] = useState({ start: "", end: "" });
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState("desc");
 
-  // Stats State
-  const [stats, setStats] = useState({
-    openComplaints: 0,
-    highPriority: 0,
-    escalated: 0,
-    resolvedToday: 0,
-    avgResolutionTimeHours: 0,
-    totalComplaintsThisMonth: 0
-  });
+  // Numbers and the lists the filter boxes are built from
+  const [stats, setStats] = useState(EMPTY_STATS);
+  const [stores, setStores] = useState([]);
+  const [categories, setCategories] = useState([]);
 
   // Detailed Complaint view
   const [complaintDetails, setComplaintDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
-  useEffect(() => {
-    initMockDB();
-    fetchStats();
-    fetchComplaintsList();
-  }, []);
+  const latest = useRef(0); // only the newest answer is shown
 
-  // Fetch statistics
-  const fetchStats = useCallback(() => {
-    initMockDB();
-    const list = getDB("pv_complaints");
-
-    const openComplaints = list.filter(c => c.status === "Open").length;
-    const highPriority = list.filter(c => c.priority === "High" || c.priority === "Critical").length;
-    const escalated = list.filter(c => c.status === "Escalated").length;
-
-    // Resolved today
-    const now = new Date();
-    const todayStr = now.toDateString();
-    const resolvedToday = list.filter(c => {
-      if (c.status !== "Resolved" || !c.resolvedAt) return false;
-      const resDate = new Date(c.resolvedAt);
-      return resDate.toDateString() === todayStr;
-    }).length;
-
-    // Avg resolution time in hours
-    const resolvedTickets = list.filter(c => c.handlingTimeHours !== null && c.handlingTimeHours !== undefined);
-    const totalHours = resolvedTickets.reduce((sum, c) => sum + c.handlingTimeHours, 0);
-    const avgResolutionTimeHours = resolvedTickets.length > 0 
-      ? parseFloat((totalHours / resolvedTickets.length).toFixed(1))
-      : 0;
-
-    // Total complaints this month
-    const thisMonth = now.getMonth();
-    const thisYear = now.getFullYear();
-    const totalComplaintsThisMonth = list.filter(c => {
-      const created = new Date(c.createdAt);
-      return created.getMonth() === thisMonth && created.getFullYear() === thisYear;
-    }).length;
-
-    setStats({
-      openComplaints,
-      highPriority,
-      escalated,
-      resolvedToday,
-      avgResolutionTimeHours,
-      totalComplaintsThisMonth
-    });
-  }, []);
-
-  // Fetch list with filters
-  const fetchComplaintsList = useCallback(() => {
+  const fetchComplaintsList = useCallback(async () => {
+    const ticket = ++latest.current;
     setLoading(true);
-    initMockDB();
-
-    setTimeout(() => {
-      const list = getDB("pv_complaints");
-      const users = getDB("pv_users");
-      const stores = mockStores;
-
-      // Join customer information
-      let result = list.map(c => {
-        // Find customer user object
-        const cust = getDB("pv_customers").find(cu => cu._id === c.customerId) || {};
-        const user = users.find(u => u._id === cust.userId) || {};
-        const store = stores.find(s => s.id === c.storeId) || {};
-        return {
-          ...c,
-          customerName: user.fullName || "Guest Customer",
-          customerPhone: user.mobile || "N/A",
-          storeName: store.name || "N/A"
-        };
-      });
-
-      // Filter by Search Query (Ticket ID, Customer Name, Order ID, Phone Number)
-      if (search.trim()) {
-        const term = search.toLowerCase();
-        result = result.filter(item => 
-          item.ticketNumber?.toLowerCase().includes(term) ||
-          item.customerName?.toLowerCase().includes(term) ||
-          item.orderId?.toLowerCase().includes(term) ||
-          item.customerPhone?.includes(term)
-        );
-      }
-
-      // Dropdown filters
-      if (storeId !== "All") {
-        result = result.filter(item => item.storeId === storeId);
-      }
-      if (category !== "All") {
-        result = result.filter(item => item.category === category);
-      }
-      if (priority !== "All") {
-        result = result.filter(item => item.priority === priority);
-      }
-      if (status !== "All") {
-        result = result.filter(item => item.status === status);
-      }
-      if (assignedTo !== "All") {
-        result = result.filter(item => item.assignedTo === assignedTo);
-      }
-
-      // Filter by Date Created Range
-      if (dateFilter !== "All") {
-        const now = new Date();
-        const todayStr = now.toDateString();
-        
-        result = result.filter(item => {
-          const created = new Date(item.createdAt);
-          const diffTime = Math.abs(now - created);
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-          if (dateFilter === "Today") {
-            return created.toDateString() === todayStr;
-          }
-          if (dateFilter === "This Week") {
-            return diffDays <= 7;
-          }
-          if (dateFilter === "This Month") {
-            return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
-          }
-          if (dateFilter === "Custom Range" && customDateRange.start && customDateRange.end) {
-            const start = new Date(customDateRange.start);
-            const end = new Date(customDateRange.end);
-            end.setHours(23, 59, 59, 999);
-            return created >= start && created <= end;
-          }
-          return true;
-        });
-      }
-
-      // Sort
-      result.sort((a, b) => {
-        let valA = a[sortBy];
-        let valB = b[sortBy];
-
-        if (sortBy === "ticketNumber" || sortBy === "category" || sortBy === "priority" || sortBy === "status") {
-          valA = (valA || "").toLowerCase();
-          valB = (valB || "").toLowerCase();
-          return sortOrder === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
-        }
-
-        valA = Number(valA) || valA || 0;
-        valB = Number(valB) || valB || 0;
-        return sortOrder === "asc" ? valA - valB : valB - valA;
-      });
-
-      // Pagination
-      setTotalCount(result.length);
-      const startIndex = (currentPage - 1) * pageSize;
-      const paginatedList = result.slice(startIndex, startIndex + pageSize);
-      setComplaints(paginatedList);
-      setLoading(false);
-    }, 450);
-  }, [search, storeId, category, priority, status, assignedTo, dateFilter, customDateRange, sortBy, sortOrder, currentPage, pageSize]);
+    try {
+      const params = {
+        page: currentPage,
+        limit: pageSize,
+        sortBy,
+        sortOrder,
+        ...rangeOf(dateFilter, customDateRange)
+      };
+      if (search.trim()) params.search = search.trim();
+      if (storeId !== "All") params.storeId = storeId;
+      if (category !== "All") params.category = category;
+      if (priority !== "All") params.priority = priority;
+      if (status !== "All") params.status = status;
+      const res = await adminClient.get(DESK, { params });
+      if (ticket !== latest.current) return;
+      const data = res?.data?.data || {};
+      setComplaints(data.complaints || []);
+      setTotalCount(data.total || 0);
+      setStats({ ...EMPTY_STATS, ...(data.stats || {}) });
+      setStores(data.stores || []);
+      setCategories(data.categories || []);
+    } catch (err) {
+      if (ticket !== latest.current) return;
+      setComplaints([]);
+      setTotalCount(0);
+      toast.error(errorOf(err, "Could not load the complaints"));
+    } finally {
+      if (ticket === latest.current) setLoading(false);
+    }
+  }, [search, storeId, category, priority, status, dateFilter, customDateRange, sortBy, sortOrder, currentPage, pageSize]);
 
   // Re-fetch when filters change
   useEffect(() => {
     fetchComplaintsList();
   }, [fetchComplaintsList]);
 
-  // Fetch populated complaint details
-  const fetchComplaintDetails = useCallback((id) => {
+  // The numbers are part of the same answer
+  const fetchStats = fetchComplaintsList;
+
+  const fetchComplaintDetails = useCallback(async (id) => {
     setLoadingDetails(true);
-    initMockDB();
-
-    setTimeout(() => {
-      const list = getDB("pv_complaints");
-      const users = getDB("pv_users");
-      const orders = getDB("pv_orders");
-      const stores = mockStores;
-      const logs = getDB("pv_complaint_logs");
-      const notes = getDB("pv_complaint_notes");
-
-      const complaint = list.find(c => c._id === id);
-      if (!complaint) {
-        toast.error("Complaint ticket not found");
-        setLoadingDetails(false);
-        return;
-      }
-
-      // Customer Info
-      const cust = getDB("pv_customers").find(cu => cu._id === complaint.customerId) || {};
-      const user = users.find(u => u._id === cust.userId) || {};
-      const customerPopulated = {
-        ...cust,
-        ...user,
-        _id: cust._id,
-        userId: cust.userId
-      };
-
-      // Order Info
-      const orderPopulated = orders.find(o => o._id === complaint.orderId || o.orderNumber === complaint.orderId) || null;
-
-      // Filter sub-collections
-      const ticketLogs = logs.filter(l => l.complaintId === id);
-      const ticketNotes = notes.filter(n => n.complaintId === id);
-      const storeObj = stores.find(s => s.id === complaint.storeId) || {};
-
-      setComplaintDetails({
-        ...complaint,
-        storeName: storeObj.name || "N/A",
-        customer: customerPopulated,
-        order: orderPopulated,
-        logs: ticketLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)),
-        notes: ticketNotes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      });
-
+    try {
+      const res = await adminClient.get(`${DESK}/${id}`);
+      setComplaintDetails(res?.data?.data || null);
+    } catch (err) {
+      setComplaintDetails(null);
+      toast.error(errorOf(err, "Complaint ticket not found"));
+    } finally {
       setLoadingDetails(false);
-    }, 300);
+    }
   }, []);
 
-  // 1. Create Ticket
-  const createComplaint = useCallback((data) => {
-    initMockDB();
-    const list = getDB("pv_complaints");
-    const logs = getDB("pv_complaint_logs");
-
-    const tktNumber = `TKT-${Math.floor(10000 + Math.random() * 90000)}`;
-    const newTicket = {
-      _id: `comp-${Date.now()}`,
-      ticketNumber: tktNumber,
-      customerId: data.customerId,
-      orderId: data.orderId,
-      storeId: data.storeId || "store-01",
-      category: data.category,
-      priority: data.priority,
-      description: data.description,
-      attachments: data.attachments || [],
-      status: "Open",
-      assignedTo: data.assignedTo || "",
-      resolution: "",
-      createdAt: new Date().toISOString(),
-      resolvedAt: "",
-      handlingTimeHours: null
-    };
-
-    list.unshift(newTicket);
-    setDB("pv_complaints", list);
-
-    // Timeline Log
-    logs.push({
-      _id: `log-${Date.now()}`,
-      complaintId: newTicket._id,
-      action: "Complaint Created",
-      oldValue: "",
-      newValue: "Open",
-      performedBy: "Admin Shubham",
-      timestamp: new Date().toISOString()
-    });
-
-    if (data.assignedTo) {
-      logs.push({
-        _id: `log-${Date.now() + 1}`,
-        complaintId: newTicket._id,
-        action: "Assigned To Staff",
-        oldValue: "",
-        newValue: data.assignedTo,
-        performedBy: "Admin Shubham",
-        timestamp: new Date().toISOString()
-      });
-      newTicket.status = "In Progress";
-      setDB("pv_complaints", list);
+  // One action on a complaint: send it, show what the server answered, refresh the table and the numbers
+  const act = useCallback(async (id, method, path, body, success) => {
+    try {
+      const res = await adminClient({ method, url: `${DESK}/${id}${path}`, data: body });
+      const detail = res?.data?.data;
+      if (detail) setComplaintDetails((current) => (current && current._id === id ? detail : current));
+      if (success) toast.success(success);
+      fetchComplaintsList();
+      return true;
+    } catch (err) {
+      toast.error(errorOf(err, "That did not work. Please try again."));
+      return false;
     }
+  }, [fetchComplaintsList]);
 
-    setDB("pv_complaint_logs", logs);
+  const resolveComplaint = useCallback(
+    (id, data) => act(id, "post", "/resolve", {
+      resolutionType: data.resolutionType,
+      refundAmount: data.refundAmount,
+      couponCode: data.couponCode,
+      remarks: data.remarks
+    }, "Complaint ticket marked as resolved"),
+    [act]
+  );
 
-    fetchComplaintsList();
-    fetchStats();
-    toast.success(`Complaint Ticket ${tktNumber} generated successfully`);
-    return true;
-  }, [fetchComplaintsList, fetchStats]);
+  const closeTicket = useCallback(
+    (id, data) => act(id, "post", "/close", { closingRemarks: data.closingRemarks }, "Ticket closed and locked"),
+    [act]
+  );
 
-  // 2. Assign Complaint
-  const assignComplaint = useCallback((id, data) => {
-    initMockDB();
-    const list = getDB("pv_complaints");
-    const logs = getDB("pv_complaint_logs");
+  const addComplaintNote = useCallback(
+    (complaintId, noteText) => act(complaintId, "post", "/notes", { note: noteText }, "Complaint internal note added"),
+    [act]
+  );
 
-    const ticketIndex = list.findIndex(c => c._id === id);
-    if (ticketIndex === -1) return false;
+  const deleteComplaintNote = useCallback(
+    (complaintId, noteId) => act(complaintId, "delete", `/notes/${noteId}`, undefined, "Internal note removed"),
+    [act]
+  );
 
-    const oldAssignee = list[ticketIndex].assignedTo;
-    list[ticketIndex].assignedTo = data.assignedTo;
-    list[ticketIndex].status = "In Progress";
-    list[ticketIndex].priority = data.priority || list[ticketIndex].priority;
-    setDB("pv_complaints", list);
-
-    // Logs
-    logs.push({
-      _id: `log-${Date.now()}`,
-      complaintId: id,
-      action: "Assigned To Staff",
-      oldValue: oldAssignee,
-      newValue: data.assignedTo,
-      performedBy: "Admin Shubham",
-      timestamp: new Date().toISOString()
-    });
-    setDB("pv_complaint_logs", logs);
-
-    fetchComplaintsList();
-    fetchStats();
-    fetchComplaintDetails(id);
-
-    toast.success(`Ticket assigned to ${data.assignedTo}`);
-    return true;
-  }, [fetchComplaintsList, fetchStats, fetchComplaintDetails]);
-
-  // 3. Escalate Complaint
-  const escalateComplaint = useCallback((id, data) => {
-    initMockDB();
-    const list = getDB("pv_complaints");
-    const logs = getDB("pv_complaint_logs");
-
-    const index = list.findIndex(c => c._id === id);
-    if (index === -1) return false;
-
-    const oldStatus = list[index].status;
-    list[index].status = "Escalated";
-    list[index].priority = data.priority || list[index].priority;
-    setDB("pv_complaints", list);
-
-    logs.push({
-      _id: `log-${Date.now()}`,
-      complaintId: id,
-      action: "Escalated",
-      oldValue: oldStatus,
-      newValue: "Escalated",
-      performedBy: "Admin Shubham",
-      timestamp: new Date().toISOString()
-    });
-    setDB("pv_complaint_logs", logs);
-
-    fetchComplaintsList();
-    fetchStats();
-    fetchComplaintDetails(id);
-
-    toast.warning(`Ticket escalated to ${data.escalateTo}. Remarks: ${data.comments}`);
-    return true;
-  }, [fetchComplaintsList, fetchStats, fetchComplaintDetails]);
-
-  // 4. Resolve Complaint
-  const resolveComplaint = useCallback((id, data) => {
-    initMockDB();
-    const list = getDB("pv_complaints");
-    const logs = getDB("pv_complaint_logs");
-
-    const index = list.findIndex(c => c._id === id);
-    if (index === -1) return false;
-
-    const oldStatus = list[index].status;
-    const createdDate = new Date(list[index].createdAt);
-    const now = new Date();
-    const handlingTimeHours = parseFloat((Math.abs(now - createdDate) / (1000 * 60 * 60)).toFixed(1));
-
-    list[index].status = "Resolved";
-    list[index].resolvedAt = now.toISOString();
-    list[index].resolution = `Type: ${data.resolutionType}. Details: ${data.remarks}`;
-    list[index].handlingTimeHours = handlingTimeHours;
-    setDB("pv_complaints", list);
-
-    // Logs
-    logs.push({
-      _id: `log-${Date.now()}`,
-      complaintId: id,
-      action: "Resolved",
-      oldValue: oldStatus,
-      newValue: "Resolved",
-      performedBy: "Admin Shubham",
-      timestamp: now.toISOString()
-    });
-
-    if (data.resolutionType === "Refund") {
-      logs.push({
-        _id: `log-${Date.now() + 1}`,
-        complaintId: id,
-        action: "Refund Initiated",
-        oldValue: "",
-        newValue: `₹${data.refundAmount}`,
-        performedBy: "Admin Shubham",
-        timestamp: now.toISOString()
-      });
-    } else if (data.resolutionType === "Coupon Compensation") {
-      logs.push({
-        _id: `log-${Date.now() + 2}`,
-        complaintId: id,
-        action: "Coupon Issued",
-        oldValue: "",
-        newValue: `Code: ${data.couponCode || 'COMP100'} (Value: ₹${data.couponValue})`,
-        performedBy: "Admin Shubham",
-        timestamp: now.toISOString()
-      });
-    }
-
-    setDB("pv_complaint_logs", logs);
-
-    fetchComplaintsList();
-    fetchStats();
-    fetchComplaintDetails(id);
-
-    toast.success("Complaint Ticket marked as resolved");
-    return true;
-  }, [fetchComplaintsList, fetchStats, fetchComplaintDetails]);
-
-  // 5. Close Ticket
-  const closeTicket = useCallback((id, data) => {
-    initMockDB();
-    const list = getDB("pv_complaints");
-    const logs = getDB("pv_complaint_logs");
-
-    const index = list.findIndex(c => c._id === id);
-    if (index === -1) return false;
-
-    const oldStatus = list[index].status;
-    list[index].status = "Closed";
-    list[index].resolution += ` | Closed remarks: ${data.closingRemarks}`;
-    setDB("pv_complaints", list);
-
-    logs.push({
-      _id: `log-${Date.now()}`,
-      complaintId: id,
-      action: "Closed",
-      oldValue: oldStatus,
-      newValue: "Closed",
-      performedBy: "Admin Shubham",
-      timestamp: new Date().toISOString()
-    });
-    setDB("pv_complaint_logs", logs);
-
-    fetchComplaintsList();
-    fetchStats();
-    fetchComplaintDetails(id);
-
-    toast.success("Ticket closed and locked");
-    return true;
-  }, [fetchComplaintsList, fetchStats, fetchComplaintDetails]);
-
-  // 6. Delete Ticket
-  const deleteComplaint = useCallback((id) => {
-    initMockDB();
-    const list = getDB("pv_complaints");
-    const filtered = list.filter(c => c._id !== id);
-    setDB("pv_complaints", filtered);
-
-    fetchComplaintsList();
-    fetchStats();
-    toast.error("Complaint ticket removed from database");
-    return true;
-  }, [fetchComplaintsList, fetchStats]);
-
-  // 7. Add Internal Note
-  const addComplaintNote = useCallback((complaintId, noteText) => {
-    initMockDB();
-    const notes = getDB("pv_complaint_notes");
-
-    const newNote = {
-      _id: `note-${Date.now()}`,
-      complaintId,
-      note: noteText,
-      createdBy: "Admin Shubham",
-      createdAt: new Date().toISOString()
-    };
-
-    notes.push(newNote);
-    setDB("pv_complaint_notes", notes);
-
-    fetchComplaintDetails(complaintId);
-    toast.success("Complaint internal note added");
-    return true;
-  }, [fetchComplaintDetails]);
-
-  // 8. Delete Internal Note
-  const deleteComplaintNote = useCallback((complaintId, noteId) => {
-    initMockDB();
-    const notes = getDB("pv_complaint_notes");
-    const filtered = notes.filter(n => n._id !== noteId);
-    setDB("pv_complaint_notes", filtered);
-
-    fetchComplaintDetails(complaintId);
-    toast.success("Internal note removed");
-    return true;
-  }, [fetchComplaintDetails]);
-
-  // Export Complaints
-  const exportComplaints = useCallback((format, exportFilters) => {
-    const list = getDB("pv_complaints");
-    const users = getDB("pv_users");
-    const stores = mockStores;
-
-    let result = list.map(c => {
-      const cust = getDB("pv_customers").find(cu => cu._id === c.customerId) || {};
-      const user = users.find(u => u._id === cust.userId) || {};
-      const storeObj = stores.find(s => s.id === c.storeId) || {};
-      return {
-        ...c,
-        customerName: user.fullName || "Guest",
-        storeName: storeObj.name || "N/A"
-      };
-    });
-
-    if (exportFilters.storeId && exportFilters.storeId !== "All") {
-      result = result.filter(item => item.storeId === exportFilters.storeId);
-    }
-    if (exportFilters.status && exportFilters.status !== "All") {
-      result = result.filter(item => item.status === exportFilters.status);
-    }
-    if (exportFilters.priority && exportFilters.priority !== "All") {
-      result = result.filter(item => item.priority === exportFilters.priority);
-    }
-    if (exportFilters.dateRange && exportFilters.dateRange.start && exportFilters.dateRange.end) {
-      const start = new Date(exportFilters.dateRange.start);
-      const end = new Date(exportFilters.dateRange.end);
-      end.setHours(23, 59, 59, 999);
-      result = result.filter(item => {
-        const created = new Date(item.createdAt);
-        return created >= start && created <= end;
-      });
+  // Export Complaints: the same filters as the export box, taken from the server
+  const exportComplaints = useCallback(async (format, exportFilters = {}) => {
+    let result = [];
+    try {
+      const params = { limit: 500, sortBy: "createdAt", sortOrder: "desc" };
+      if (exportFilters.storeId && exportFilters.storeId !== "All") params.storeId = exportFilters.storeId;
+      if (exportFilters.status && exportFilters.status !== "All") params.status = exportFilters.status;
+      if (exportFilters.priority && exportFilters.priority !== "All") params.priority = exportFilters.priority;
+      if (exportFilters.dateRange?.start && exportFilters.dateRange?.end) {
+        params.fromDate = exportFilters.dateRange.start;
+        params.toDate = exportFilters.dateRange.end;
+      }
+      const res = await adminClient.get(DESK, { params });
+      result = res?.data?.data?.complaints || [];
+    } catch (err) {
+      toast.error(errorOf(err, "Could not load the complaints to export"));
+      return;
     }
 
     if (result.length === 0) {
@@ -581,7 +178,7 @@ export function useComplaints() {
     const filename = `complaints_export_${timestamp}`;
 
     if (format === "CSV") {
-      const headers = ["Ticket ID", "Customer", "Order ID", "Store", "Category", "Priority", "Status", "Assigned To", "Date Created", "Resolution"];
+      const headers = ["Ticket ID", "Customer", "Order ID", "Store", "Category", "Priority", "Status", "Date Created", "Resolution"];
       const csvContent = [
         headers.join(","),
         ...result.map(c => [
@@ -592,7 +189,6 @@ export function useComplaints() {
           c.category,
           c.priority,
           c.status,
-          c.assignedTo || "Unassigned",
           new Date(c.createdAt).toLocaleDateString("en-IN"),
           `"${(c.resolution || "").replace(/"/g, '""')}"`
         ].join(","))
@@ -608,7 +204,7 @@ export function useComplaints() {
       document.body.removeChild(a);
       toast.success("CSV download completed");
     } else if (format === "Excel") {
-      const headers = ["Ticket ID", "Customer", "Order ID", "Store", "Category", "Priority", "Status", "Assigned To", "Date Created", "Resolution"];
+      const headers = ["Ticket ID", "Customer", "Order ID", "Store", "Category", "Priority", "Status", "Date Created", "Resolution"];
       const tableRows = result.map(c => `
         <tr>
           <td>${c.ticketNumber}</td>
@@ -618,7 +214,6 @@ export function useComplaints() {
           <td>${c.category}</td>
           <td>${c.priority}</td>
           <td>${c.status}</td>
-          <td>${c.assignedTo || "Unassigned"}</td>
           <td>${new Date(c.createdAt).toLocaleDateString("en-IN")}</td>
           <td>${c.resolution || ""}</td>
         </tr>
@@ -664,13 +259,12 @@ export function useComplaints() {
             c.category,
             c.priority,
             c.status,
-            c.assignedTo || "Unassigned",
-            new Date(c.createdAt).toLocaleDateString("en-IN"),
+              new Date(c.createdAt).toLocaleDateString("en-IN"),
             c.resolution || "N/A"
           ]);
 
           autoTable(doc, {
-            head: [["Ticket ID", "Customer", "Order ID", "Store", "Category", "Priority", "Status", "Assigned To", "Created", "Resolution"]],
+            head: [["Ticket ID", "Customer", "Order ID", "Store", "Category", "Priority", "Status", "Created", "Resolution"]],
             body: bodyData,
             startY: 28,
             styles: { fontSize: 8 }
@@ -701,8 +295,6 @@ export function useComplaints() {
     setPriority,
     status,
     setStatus,
-    assignedTo,
-    setAssignedTo,
     dateFilter,
     setDateFilter,
     customDateRange,
@@ -712,18 +304,17 @@ export function useComplaints() {
     sortOrder,
     setSortOrder,
     stats,
+    stores,
+    categories,
     complaintDetails,
     loadingDetails,
     fetchComplaintDetails,
-    createComplaint,
-    assignComplaint,
-    escalateComplaint,
     resolveComplaint,
     closeTicket,
-    deleteComplaint,
     addComplaintNote,
     deleteComplaintNote,
     exportComplaints,
+    fetchStats,
     refetch: fetchComplaintsList
   };
 }

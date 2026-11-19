@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -15,8 +15,12 @@ import {
   ShieldCheck,
   XCircle,
   History,
+  Camera,
+  ImagePlus,
+  X,
+  RotateCcw,
 } from "lucide-react"
-import { orderAPI } from "@food/api"
+import { orderAPI, uploadAPI } from "@food/api"
 import useAppBackNavigation from "@food/hooks/useAppBackNavigation"
 import { toast } from "sonner"
 
@@ -29,6 +33,29 @@ const COMPLAINT_TYPES = [
   { value: "Late Delivery", label: "Late delivery", icon: Clock, askItems: false, hints: ["Order arrived very late", "Delivery took longer than promised"] },
   { value: "Other", label: "Something else", icon: MessageCircle, askItems: false, hints: [] },
 ]
+
+const MAX_PHOTOS = 3
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024 // the server's limit for one image
+const MAX_SIDE = 1600 // phone photos are shrunk to this before they are sent: faster on mobile data
+
+// A phone photo is often 5-10 MB. Shrink it to a JPEG that is plenty to read; if the browser cannot decode it
+// (e.g. HEIC outside Safari) the original goes up as it is, as long as it is small enough.
+async function preparePhoto(file) {
+  if (!file.type.startsWith("image/")) throw new Error("Please choose a photo")
+  try {
+    const bitmap = await createImageBitmap(file)
+    const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height))
+    const canvas = document.createElement("canvas")
+    canvas.width = Math.round(bitmap.width * scale)
+    canvas.height = Math.round(bitmap.height * scale)
+    canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    bitmap.close?.()
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85))
+    if (blob && blob.size < file.size) return new File([blob], `proof-${Date.now()}.jpg`, { type: "image/jpeg" })
+  } catch (_) {}
+  if (file.size > MAX_UPLOAD_BYTES) throw new Error("That photo is too large (max 5 MB)")
+  return file
+}
 
 const SUBJECT_MAX = 200
 const DESC_MAX = 1000
@@ -50,7 +77,12 @@ export default function SubmitComplaint() {
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
   const [touched, setTouched] = useState({})
-  const [form, setForm] = useState({ complaintType: "", subject: "", description: "", items: [] })
+  const [form, setForm] = useState({ complaintType: "", subject: "", description: "", items: [], images: [] })
+  // photos still on their way up (or failed): { key, preview, status: "uploading" | "error", file, message }
+  const [pending, setPending] = useState([])
+  const [viewing, setViewing] = useState("")
+  const cameraRef = useRef(null)
+  const galleryRef = useRef(null)
 
   const load = useCallback(async () => {
     if (!orderId) {
@@ -111,6 +143,50 @@ export default function SubmitComplaint() {
   const touch = (k) => setTouched((t) => ({ ...t, [k]: true }))
   const show = (k) => (touched[k] || touched.all) && errors[k]
 
+  // Escape closes the full-size photo
+  useEffect(() => {
+    if (!viewing) return undefined
+    const onKey = (e) => { if (e.key === "Escape") setViewing("") }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [viewing])
+
+  const uploadOne = useCallback(async (entry) => {
+    setPending((p) => p.map((x) => (x.key === entry.key ? { ...x, status: "uploading", message: "" } : x)))
+    try {
+      const ready = await preparePhoto(entry.file)
+      const res = await uploadAPI.uploadMedia(ready)
+      const url = res?.data?.data?.url
+      if (!url) throw new Error("Upload failed")
+      setForm((f) => (f.images.length >= MAX_PHOTOS ? f : { ...f, images: [...f.images, url] }))
+      setPending((p) => p.filter((x) => x.key !== entry.key))
+      try { URL.revokeObjectURL(entry.preview) } catch (_) {}
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || "Upload failed"
+      setPending((p) => p.map((x) => (x.key === entry.key ? { ...x, status: "error", message } : x)))
+    }
+  }, [])
+
+  const addPhotos = (fileList) => {
+    const files = Array.from(fileList || [])
+    if (!files.length) return
+    const room = MAX_PHOTOS - form.images.length - pending.length
+    if (room <= 0) return toast.error(`You can add up to ${MAX_PHOTOS} photos`)
+    if (files.length > room) toast.info(`Only ${room} more photo${room === 1 ? "" : "s"} can be added`)
+    files.slice(0, room).forEach((file, i) => {
+      const entry = { key: `${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`, file, preview: URL.createObjectURL(file), status: "uploading", message: "" }
+      setPending((p) => [...p, entry])
+      uploadOne(entry)
+    })
+  }
+  const removePhoto = (url) => setForm((f) => ({ ...f, images: f.images.filter((u) => u !== url) }))
+  const dropPending = (entry) => {
+    setPending((p) => p.filter((x) => x.key !== entry.key))
+    try { URL.revokeObjectURL(entry.preview) } catch (_) {}
+  }
+  const photoCount = form.images.length + pending.length
+  const uploading = pending.some((x) => x.status === "uploading")
+
   const pickType = (value) => {
     setForm((f) => ({ ...f, complaintType: value, items: [] }))
     touch("complaintType")
@@ -125,6 +201,8 @@ export default function SubmitComplaint() {
       toast.error(errors.complaintType || errors.subject || errors.description)
       return
     }
+    if (uploading) return toast.info("Your photos are still uploading. One moment.")
+    if (pending.some((x) => x.status === "error")) return toast.error("Remove or retry the photo that did not upload")
     const orderMongoId = String(order?._id || orderId || "")
     if (!orderMongoId) return toast.error("Order ID not available")
     const affected = type?.askItems && form.items.length ? `Affected items: ${form.items.join(", ")}\n\n` : ""
@@ -135,6 +213,7 @@ export default function SubmitComplaint() {
         complaintType: form.complaintType,
         subject: form.subject.trim(),
         description: `${affected}${form.description.trim()}`.slice(0, DESC_MAX + 300),
+        images: form.images,
       })
       if (response?.data?.success) {
         try { sessionStorage.removeItem(draftKey(orderId)) } catch (_) {}
@@ -322,6 +401,62 @@ export default function SubmitComplaint() {
           </div>
         </section>
 
+        {/* proof: take a photo or pick one */}
+        <section>
+          <div className="flex items-baseline justify-between">
+            <span className={label}>Add proof <span className="font-medium normal-case text-gray-400">(optional)</span></span>
+            <span className="text-[11px] font-medium text-gray-400">{photoCount}/{MAX_PHOTOS}</span>
+          </div>
+          <p className="-mt-1 mb-2.5 text-xs text-gray-500 dark:text-gray-400">A clear photo of the food or the box helps the store sort it out faster.</p>
+
+          <div className="flex flex-wrap gap-2.5">
+            {form.images.map((url, i) => (
+              <div key={url} className="relative h-20 w-20 overflow-hidden rounded-xl border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800">
+                <button type="button" onClick={() => setViewing(url)} aria-label={`View photo ${i + 1}`} className="h-full w-full">
+                  <img src={url} alt={`Proof ${i + 1}`} className="h-full w-full object-cover" />
+                </button>
+                <button type="button" onClick={() => removePhoto(url)} aria-label={`Remove photo ${i + 1}`} className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/65 text-white active:scale-90">
+                  <X className="h-3 w-3" strokeWidth={3} />
+                </button>
+              </div>
+            ))}
+
+            {pending.map((entry) => (
+              <div key={entry.key} className={`relative h-20 w-20 overflow-hidden rounded-xl border ${entry.status === "error" ? "border-red-300" : "border-gray-200 dark:border-gray-700"}`}>
+                <img src={entry.preview} alt="" className={`h-full w-full object-cover ${entry.status === "uploading" ? "opacity-50" : "opacity-40"}`} />
+                {entry.status === "uploading" ? (
+                  <span className="absolute inset-0 flex items-center justify-center"><span className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-[var(--primary)]" /></span>
+                ) : (
+                  <button type="button" onClick={() => uploadOne(entry)} aria-label="Try uploading again" className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 bg-white/70 text-[10px] font-bold text-red-600">
+                    <RotateCcw className="h-4 w-4" /> Retry
+                  </button>
+                )}
+                <button type="button" onClick={() => dropPending(entry)} aria-label="Remove photo" className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/65 text-white active:scale-90">
+                  <X className="h-3 w-3" strokeWidth={3} />
+                </button>
+              </div>
+            ))}
+
+            {photoCount < MAX_PHOTOS && (
+              <>
+                <button type="button" onClick={() => cameraRef.current?.click()} className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-gray-300 bg-white text-[11px] font-bold text-gray-600 active:scale-95 dark:border-gray-700 dark:bg-[#121212] dark:text-gray-300">
+                  <Camera className="h-5 w-5 text-[var(--primary)]" /> Take photo
+                </button>
+                <button type="button" onClick={() => galleryRef.current?.click()} className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-gray-300 bg-white text-[11px] font-bold text-gray-600 active:scale-95 dark:border-gray-700 dark:bg-[#121212] dark:text-gray-300">
+                  <ImagePlus className="h-5 w-5 text-[var(--primary)]" /> Upload
+                </button>
+              </>
+            )}
+          </div>
+          {pending.some((x) => x.status === "error") && (
+            <p className="mt-1.5 text-xs font-medium text-red-500">{pending.find((x) => x.status === "error")?.message}</p>
+          )}
+
+          {/* "capture" opens the camera on a phone; on a computer both open the file picker */}
+          <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { addPhotos(e.target.files); e.target.value = "" }} />
+          <input ref={galleryRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { addPhotos(e.target.files); e.target.value = "" }} />
+        </section>
+
         <div className="flex gap-3 rounded-2xl border border-sky-100 bg-sky-50 p-4 dark:border-sky-900/30 dark:bg-sky-900/10">
           <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-sky-600 dark:text-sky-400" />
           <div className="text-xs leading-relaxed text-sky-900 dark:text-sky-200">
@@ -334,17 +469,29 @@ export default function SubmitComplaint() {
         <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-gray-100 bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur dark:border-gray-800 dark:bg-[#121212]/95">
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || uploading}
             className={`flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white shadow-md transition active:scale-[0.98] disabled:cursor-not-allowed ${valid ? "bg-[var(--primary)]" : "bg-[var(--primary)]/55"}`}
           >
             {submitting ? (
               <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Sending…</>
+            ) : uploading ? (
+              <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Uploading photo…</>
             ) : (
               "Submit complaint"
             )}
           </button>
         </div>
       </form>
+
+      {/* a photo, full size */}
+      <AnimatePresence>
+        {viewing && (
+          <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setViewing("")}>
+            <button type="button" aria-label="Close" className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white"><X className="h-5 w-5" /></button>
+            <img src={viewing} alt="Proof" className="max-h-full max-w-full rounded-lg object-contain" onClick={(e) => e.stopPropagation()} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* sent */}
       <AnimatePresence>

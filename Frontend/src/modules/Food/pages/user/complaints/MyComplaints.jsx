@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -19,11 +19,15 @@ import {
   Reply as ReplyIcon,
   Search,
   RefreshCw,
+  Camera,
 } from "lucide-react"
 import { orderAPI, supportAPI } from "@food/api"
 import useAppBackNavigation from "@food/hooks/useAppBackNavigation"
+import { toast } from "sonner"
 
 const PAGE_SIZE = 20
+// How often an open page checks for news from the store (the same rhythm as the store screens)
+const POLL_MS = 10000
 
 const STATUS = {
   open: { label: "Received", step: 0, chip: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400", bar: "bg-amber-400" },
@@ -98,7 +102,17 @@ function Progress({ step }) {
 
 function ComplaintCard({ ticket, index }) {
   const [open, setOpen] = useState(false)
+  const [viewing, setViewing] = useState("")
+  const photos = ticket.images || []
   const status = STATUS[ticket.status] || STATUS.open
+  // Escape closes the full-size photo
+  useEffect(() => {
+    if (!viewing) return undefined
+    const onKey = (e) => { if (e.key === "Escape") setViewing("") }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [viewing])
+
   const Icon = TYPE_ICON[ticket.issueType] || MessageCircle
   const outcome = ticket.resolution
   const replies = ticket.responses || []
@@ -137,6 +151,19 @@ function ComplaintCard({ ticket, index }) {
           </div>
         )}
 
+        {photos.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-gray-400"><Camera className="h-3.5 w-3.5" /> Your proof</span>
+            <div className="flex gap-1.5">
+              {photos.map((url, i) => (
+                <button key={url} type="button" onClick={() => setViewing(url)} aria-label={`View proof photo ${i + 1}`} className="h-12 w-12 overflow-hidden rounded-lg border border-gray-200 bg-gray-100 active:scale-95 dark:border-gray-700 dark:bg-gray-800">
+                  <img src={url} alt={`Proof ${i + 1}`} className="h-full w-full object-cover" loading="lazy" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <Progress step={status.step} />
 
         <div className="flex items-center justify-between text-[11px] text-gray-400">
@@ -154,6 +181,15 @@ function ComplaintCard({ ticket, index }) {
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="space-y-2 overflow-hidden">
               {replies.map((reply, i) => <Reply key={i} title="Reply from the store" message={reply.message} at={reply.at} />)}
               {ticket.adminResponse && <Reply title="Reply from Papa Veg Pizza" message={ticket.adminResponse} tone="admin" />}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {viewing && (
+            <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setViewing("")}>
+              <button type="button" aria-label="Close" className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white"><X className="h-5 w-5" /></button>
+              <img src={viewing} alt="Proof" className="max-h-full max-w-full rounded-lg object-contain" onClick={(e) => e.stopPropagation()} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -286,6 +322,58 @@ export default function MyComplaints() {
   useEffect(() => {
     refresh()
   }, [refresh])
+
+  // While the page is open it quietly checks for news: no spinner, no jumping around. A complaint that the store or the
+  // franchise answers or resolves updates in place, and the customer is told with a short message.
+  const ticketsRef = useRef([])
+  const inFlight = useRef(false)
+  useEffect(() => {
+    ticketsRef.current = tickets
+  }, [tickets])
+
+  const quietRefresh = useCallback(async () => {
+    if (inFlight.current) return
+    inFlight.current = true
+    try {
+      const res = await supportAPI.getMyTickets({ page: 1, limit: PAGE_SIZE })
+      const data = res?.data?.data || {}
+      const fresh = Array.isArray(data.tickets) ? data.tickets : []
+      const before = new Map(ticketsRef.current.map((t) => [t._id, t]))
+      const replies = (t) => (t.responses || []).length + (t.adminResponse ? 1 : 0)
+      fresh.forEach((t) => {
+        const old = before.get(t._id)
+        if (!old) return
+        if (old.status !== "resolved" && t.status === "resolved") toast.success(`Your ${t.issueType} complaint was resolved`)
+        else if (replies(t) > replies(old)) toast(`New reply on your ${t.issueType} complaint`)
+        else if (old.status === "open" && t.status === "in-progress") toast.info(`Your ${t.issueType} complaint is being looked at`)
+      })
+      // the newest page replaces what we had of it; older pages the customer already opened stay where they are
+      setTickets((current) => {
+        const ids = new Set(fresh.map((t) => t._id))
+        return [...fresh, ...current.filter((t) => !ids.has(t._id))]
+      })
+      setTotal(data.total || 0)
+      setFailed(false)
+    } catch {
+      // a missed check is not worth interrupting the customer for; the next one tries again
+    } finally {
+      inFlight.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    const check = () => {
+      if (document.visibilityState === "visible") quietRefresh()
+    }
+    const timer = setInterval(check, POLL_MS)
+    document.addEventListener("visibilitychange", check) // coming back to the tab checks at once
+    window.addEventListener("focus", check)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener("visibilitychange", check)
+      window.removeEventListener("focus", check)
+    }
+  }, [quietRefresh])
 
   const loadMore = async () => {
     setLoadingMore(true)

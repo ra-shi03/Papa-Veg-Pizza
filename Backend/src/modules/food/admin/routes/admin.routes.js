@@ -3,6 +3,7 @@ import { requireSuperAdmin } from '../../../../core/auth/auth.middleware.js';
 import { attachFranchiseScope } from '../../shared/franchiseScope.js';
 import * as adminController from '../controllers/admin.controller.js';
 import * as staffController from '../controllers/staff.controller.js';
+import * as complaintDesk from '../controllers/complaintDesk.controller.js';
 import * as riderApproval from '../controllers/riderApproval.controller.js';
 import * as foodApprovalController from '../controllers/foodApproval.controller.js';
 import * as addonsApprovalController from '../controllers/addonsApproval.controller.js';
@@ -78,6 +79,13 @@ router.get('/customers/:id', adminController.getCustomerById);
 // Customer complaints about stores: a franchise admin sees and handles only its own stores' complaints
 router.get('/stores/complaints', adminController.getStoreComplaints);
 router.patch('/stores/complaints/:id', adminController.updateStoreComplaint);
+// Customer Complaints desk: list with numbers, details, and the actions (resolve, close, notes)
+router.get('/stores/complaints/desk', complaintDesk.listComplaintDesk);
+router.get('/stores/complaints/desk/:id', complaintDesk.getComplaintDesk);
+router.post('/stores/complaints/desk/:id/resolve', complaintDesk.resolveComplaintDesk);
+router.post('/stores/complaints/desk/:id/close', complaintDesk.closeComplaintDesk);
+router.post('/stores/complaints/desk/:id/notes', complaintDesk.addComplaintDeskNote);
+router.delete('/stores/complaints/desk/:id/notes/:noteId', complaintDesk.deleteComplaintDeskNote);
 
 // ----- Delivery partners list: super admin sees all; a franchise admin sees only riders near / working for its own stores (read only) -----
 router.get('/delivery/partners', adminController.getDeliveryPartners);

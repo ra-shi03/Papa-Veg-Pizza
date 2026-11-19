@@ -65,7 +65,8 @@ describe('reading replies', () => {
         assert.equal(t.status, 'resolved');
         assert.deepEqual([t.resolution.actionTaken, t.resolution.refundAmount, t.resolution.couponIssued], ['Refund approved', 100, 'SORRY10']);
         const text = JSON.stringify(t);
-        for (const internal of ['resolvedById', 'resolvedBy', 'evidenceImage', 'priority', 'byName', 'userId', 'images']) assert.ok(!text.includes(internal), internal);
+        for (const internal of ['resolvedById', 'resolvedBy', 'evidenceImage', 'priority', 'byName', 'userId']) assert.ok(!text.includes(internal), internal);
+        // the customer's own proof photos do come back (complaint-desk.test.js); the store's evidence image does not
     });
     test('a customer sees only their own complaints', async () => {
         assert.equal((await mine(B.customerToken)).total, 0);

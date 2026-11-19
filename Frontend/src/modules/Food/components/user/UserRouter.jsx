@@ -49,7 +49,6 @@ const EditProfile = lazy(() => import("@food/pages/user/profile/EditProfile"))
 const MyProfile = lazy(() => import("@food/pages/user/profile/MyProfile"))
 const ProfileDetails = lazy(() => import("@food/pages/user/profile/ProfileDetails"))
 const Payments = lazy(() => import("@food/pages/user/profile/Payments"))
-const Support = lazy(() => import("@food/pages/user/profile/Support"))
 const Coupons = lazy(() => import("@food/pages/user/profile/Coupons"))
 const AllCoupons = lazy(() => import("@food/pages/user/profile/AllCoupons"))
 const About = lazy(() => import("@food/pages/user/profile/About"))
@@ -226,14 +225,6 @@ export default function UserRouter() {
             element={
               <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
                 <LocationSetup />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="account/coupons/support"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <Support />
               </ProtectedRoute>
             }
           />

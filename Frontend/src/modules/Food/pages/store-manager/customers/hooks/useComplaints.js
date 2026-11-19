@@ -79,7 +79,8 @@ export function useResolveComplaint() {
       toast.success("Complaint resolved successfully!");
     },
     onError: (err) => {
-      toast.error(err?.message || "Failed to resolve complaint");
+      // the server's own words ("Refund cannot be more than the order total", ...), not a generic network message
+      toast.error(err?.response?.data?.message || err?.message || "Failed to resolve complaint");
     }
   });
 }

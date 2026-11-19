@@ -59,7 +59,8 @@ export default function ComplaintsTable({
       case "wrong_order": return "Wrong Order";
       case "rider_behavior": return "Rider Behavior";
       case "other": return "Other";
-      default: return type;
+      // other types ('packaging_issue', 'missing_item', ...): the words, not the stored key
+      default: return String(type || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     }
   };
 
@@ -127,7 +128,7 @@ export default function ComplaintsTable({
                     {/* Complaint ID */}
                     <td className="px-5 py-3">
                       <span className="bg-zinc-150 dark:bg-zinc-800 px-2 py-0.5 rounded-md font-mono text-[10px] font-bold text-zinc-600 dark:text-zinc-400">
-                        {comp._id}
+                        {comp.ticketNumber || comp._id}
                       </span>
                     </td>
 

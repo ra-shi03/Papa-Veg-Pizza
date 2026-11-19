@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { X, Sparkles, AlertTriangle, ShieldCheck, HelpCircle } from "lucide-react";
 import { useResolveComplaint, useComplaintDetails } from "../hooks/useComplaints";
 import { Skeleton } from "@food/components/ui/skeleton";
@@ -13,28 +13,41 @@ export default function ResolveComplaintModal({
   const { data: complaint, isLoading } = useComplaintDetails(visible ? complaintId : null);
   const resolveMutation = useResolveComplaint();
 
-  const [staff, setStaff] = useState("");
   const [couponCode, setCouponCode] = useState("");
   const [refundAmount, setRefundAmount] = useState(0);
   const [replacementOrderId, setReplacementOrderId] = useState("");
   const [resolutionNotes, setResolutionNotes] = useState("");
   const [evidenceUrl, setEvidenceUrl] = useState("");
 
+  const notesRef = useRef(null);
+
   const isReadOnly = userRole === "assistant_manager";
 
-  if (!visible) return null;
+  // Every hook is called on every render, open or closed. (Returning early before a hook changes the number of hooks
+  // the moment the modal opens, and React crashes the whole page with "Something went wrong".)
 
-  // Pre-fill fields or reset when modal opens
+  // Pre-fill fields or reset each time the modal opens (or shows another complaint)
   useEffect(() => {
-    if (complaint) {
-      setStaff(complaint.resolvedBy || "");
+    if (visible && complaint) {
       setCouponCode("");
       setRefundAmount(0);
       setReplacementOrderId("");
       setResolutionNotes("");
       setEvidenceUrl("");
     }
-  }, [complaint]);
+  }, [visible, complaint]);
+
+  // Escape closes the modal, and the notes box is ready to type in once the complaint has loaded
+  useEffect(() => {
+    if (!visible) return undefined;
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [visible, onClose]);
+
+  useEffect(() => {
+    if (visible && complaint && !isReadOnly) notesRef.current?.focus();
+  }, [visible, complaint, isReadOnly]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -69,7 +82,6 @@ export default function ResolveComplaintModal({
     }
 
     const payload = {
-      staff,
       couponIssued: couponCode,
       refundAmount: Number(refundAmount),
       replacementOrderId,
@@ -101,6 +113,8 @@ export default function ResolveComplaintModal({
       maximumFractionDigits: 0
     }).format(val || 0);
   };
+
+  if (!visible) return null;
 
   return (
     <div 
@@ -146,7 +160,7 @@ export default function ResolveComplaintModal({
                   <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={15} />
                   <div>
                     <h5 className="font-extrabold text-zinc-850 dark:text-zinc-200">
-                      Resolving: {complaint._id} - {complaint.customerName}
+                      Resolving: {complaint.ticketNumber || complaint._id} - {complaint.customerName}
                     </h5>
                     <p className="text-[10px] text-zinc-450 dark:text-zinc-500 leading-relaxed font-semibold mt-0.5">
                       Issue description: "{complaint.description}"
@@ -170,21 +184,6 @@ export default function ResolveComplaintModal({
 
               {/* Form Fields Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Staff Assignment Selection */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
-                    Staff Assignee / Resolved By
-                  </label>
-                  <select
-                    disabled
-                    value={staff}
-                    onChange={(e) => setStaff(e.target.value)}
-                    className="w-full text-xs font-semibold px-3 py-2 bg-neutral-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-zinc-800 dark:text-white outline-none focus:border-[var(--primary)] transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    <option value={staff}>{staff || "You (the signed-in store manager)"}</option>
-                  </select>
-                </div>
-
                 {/* Voucher Apology Coupon Code */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider flex justify-between">
@@ -213,10 +212,15 @@ export default function ResolveComplaintModal({
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
                     Refund Amount (INR ₹)
+                    {complaint?.order?.totalAmount > 0 && (
+                      <span className="ml-1 normal-case font-semibold text-zinc-400">(up to {formatCurrency(complaint.order.totalAmount)})</span>
+                    )}
                   </label>
                   <input
                     type="number"
                     disabled={isReadOnly}
+                    min="0"
+                    max={complaint?.order?.totalAmount || undefined}
                     value={refundAmount}
                     onChange={(e) => setRefundAmount(Math.max(0, Number(e.target.value)))}
                     placeholder="e.g. 150"
@@ -240,9 +244,9 @@ export default function ResolveComplaintModal({
                 </div>
 
                 {/* Upload Image Evidence Link */}
-                <div className="flex flex-col gap-1.5 md:col-span-2">
+                <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
-                    Evidence Image URL / Path (Optional)
+                    Evidence Image URL (Optional)
                   </label>
                   <input
                     type="text"
@@ -252,6 +256,7 @@ export default function ResolveComplaintModal({
                     placeholder="e.g. https://images.unsplash.com/photo-..."
                     className="w-full text-xs font-semibold px-3.5 py-2 bg-neutral-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-zinc-800 dark:text-white placeholder-zinc-400 outline-none focus:border-[var(--primary)] transition-all disabled:opacity-50"
                   />
+                  <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500">Only images from our media library are kept.</p>
                 </div>
 
                 {/* Resolution Notes Description */}
@@ -260,6 +265,7 @@ export default function ResolveComplaintModal({
                     Resolution Actions Taken (Required)
                   </label>
                   <textarea
+                    ref={notesRef}
                     required
                     disabled={isReadOnly}
                     value={resolutionNotes}
