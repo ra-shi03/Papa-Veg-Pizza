@@ -572,7 +572,7 @@ export default function PolicyManagement() {
                         <h3 className="text-sm font-bold tracking-tight text-white">Terms & Conditions</h3>
                       </div>
                       <h4 className="text-center font-bold text-lg text-zinc-900 dark:text-zinc-100 mb-4">
-                        {policyData.title || 'Disclaimer'}
+                        {policyData.title || 'Terms & Conditions'}
                       </h4>
                       <div className="space-y-2">
                         {parseTermsSections(policyData.content).map((sec, idx) => {
@@ -584,7 +584,7 @@ export default function PolicyManagement() {
                                 onClick={() => setPreviewOpenSection(isOpen ? null : idx)}
                                 className="w-full bg-[#f4f5f7] dark:bg-zinc-800/60 px-3.5 py-2.5 flex items-center justify-between text-left text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200/50 transition-colors"
                               >
-                                <span>{sec.title}</span>
+                                <span>{sec.title.replace(/\*\*/g, '')}</span>
                                 <span className="text-[var(--primary,#E53935)] dark:text-red-400 font-bold text-sm">
                                   {isOpen ? '−' : '+'}
                                 </span>
@@ -594,7 +594,7 @@ export default function PolicyManagement() {
                                   {sec.items.map((it, i) => (
                                     <div key={i} className="flex items-start gap-2 text-zinc-600 dark:text-zinc-300">
                                       <span className="text-[8px] text-zinc-800 dark:text-zinc-200 mt-1 select-none">■</span>
-                                      <p className="flex-1 text-[11.5px] leading-relaxed">{it}</p>
+                                      <p className="flex-1 text-[11.5px] leading-relaxed">{it.replace(/\*\*/g, '')}</p>
                                     </div>
                                   ))}
                                 </div>

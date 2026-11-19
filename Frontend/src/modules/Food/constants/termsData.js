@@ -1,199 +1,144 @@
-export const DEFAULT_TERMS_SECTIONS = [
-  {
-    title: "Everyday Value Offers",
-    items: [
-      "Offer applicable only on purchase of every 2 pizzas from Everyday Value Offers Section.",
-      "Everyday Value Offer is applicable only Regular and Medium size Pizzas.",
-      "Everyday Value Offer does not apply to Pizza Mania OR Combos.",
-      "Offer is applicable on Papa Veg's own ordering channels (apps, mobile and desktop ordering site and in-store ordering), but not applicable on Aggregators.",
-      "Offer cannot be combined with any other offer/coupons.",
-      "Pizza Customisation or Crust Upgrade will be charged extra.",
-      "Everyday Value pricing is excluding any taxes or delivery charges.",
-      "For Delivery Charges, refer Delivery charges T&C."
-    ]
-  },
-  {
-    title: "Order Delivery",
-    items: [
-      "Minimum order value for delivery may vary depending on the delivery location and time of ordering.",
-      "Delivery time guarantees are subject to weather conditions, traffic restrictions, and peak operational hours.",
-      "In case of unforeseen delays, our customer care executive will contact you with updated delivery estimates.",
-      "Delivery orders will be dispatched from the nearest operational outlet."
-    ]
-  },
-  {
-    title: "Menu",
-    items: [
-      "All menu items are 100% pure vegetarian and prepared in hygienic, certified kitchens.",
-      "Prices, availability, and menu offerings are subject to change without prior notice.",
-      "Visual representations of products on the app are for illustrative purposes; actual presentation may vary slightly."
-    ]
-  },
-  {
-    title: "NONG (No Onion No Garlic) Pizza T&C",
-    items: [
-      "NONG pizzas are prepared strictly without onion and garlic ingredients for our Jain and observant customers.",
-      "Prepared using dedicated utensils, prep areas, and separate sauce bases.",
-      "Select pizzas and sides can be customized as NONG upon request during ordering."
-    ]
-  },
-  {
-    title: "Modify / Cancel the Online Order",
-    items: [
-      "Orders can only be modified or cancelled within 60 seconds of placement.",
-      "Once the kitchen starts baking your order, cancellations and modifications cannot be entertained.",
-      "In the event of a cancellation accepted by the system, refunds will be initiated to the original payment source within 3-5 business days."
-    ]
-  },
-  {
-    title: "Service Guarantee",
-    items: [
-      "We are committed to serving oven-hot, fresh vegetarian pizzas.",
-      "Any service deficiency must be reported within 15 minutes of receiving the order along with photos.",
-      "Validated complaints are eligible for replacements, store credits, or refund per company policy."
-    ]
-  },
-  {
-    title: "Delivery Charges",
-    items: [
-      "Free delivery applies on orders above the specified threshold value in your zone.",
-      "Delivery fee and surge charges (if applicable during rain or high demand) are displayed transparently at checkout.",
-      "Government taxes (GST) are applicable on delivery and handling fees."
-    ]
-  },
-  {
-    title: "Late Night Delivery",
-    items: [
-      "Late night orders (post 11:00 PM) are serviced by designated late-night operational kitchens.",
-      "Limited menu and delivery zones apply during late night operational hours.",
-      "Late night delivery convenience fee may apply as displayed during checkout."
-    ]
-  },
-  {
-    title: "Cashback or Discount on Payment page:",
-    items: [
-      "Bank offers, wallet cashbacks, and instant discounts are subject to the partnering payment gateway's terms.",
-      "Cashbacks will be credited directly by the respective bank or wallet provider within their standard turnaround time.",
-      "Papa Veg Pizza is not liable for delayed credits or cashbacks managed by third-party payment gateways."
-    ]
-  },
-  {
-    title: "T & C for E Gift Card",
-    items: [
-      "E-Gift Cards can be redeemed across the Papa Veg Pizza app and official website.",
-      "E-Gift Cards are valid for 1 year from the date of issuance and cannot be reloaded.",
-      "Multiple gift vouchers can be combined during checkout as per platform limits."
-    ]
-  },
-  {
-    title: "T & C for Gift Card",
-    items: [
-      "Physical gift cards must have an intact scratch-off PIN for redemption.",
-      "Gift cards cannot be exchanged for cash or transferred to bank accounts.",
-      "Balance inquiries can be made online via the Gift Card balance check section."
-    ]
-  },
-  {
-    title: "Domino's Wallet",
-    items: [
-      "Wallet credits can be used for 100% order payments without restriction.",
-      "Wallet balances are non-transferable and cannot be withdrawn to external bank accounts.",
-      "Promotional wallet credits may carry an expiry date as communicated during campaigns."
-    ]
-  },
-  {
-    title: "EDV Mix & Match",
-    items: [
-      "Mix & Match combinations apply to any two qualifying pizzas in the Everyday Value category.",
-      "Both pizzas must be of the same size tier (Regular or Medium) to qualify for EDV pricing.",
-      "Crust upgrades and extra toppings will be billed over and above the combo base rate."
-    ]
-  },
-  {
-    title: "Pizzas at 49",
-    items: [
-      "Special promotional pricing of ₹49 applies only to select single-topping personal pizzas.",
-      "Valid for dine-in and takeaway; delivery requires minimum order cart threshold.",
-      "Limit of 4 promotional items per user account per day."
-    ]
-  },
-  {
-    title: "Train delivery",
-    items: [
-      "Train orders are delivered at the station you choose, by the store that serves it.",
-      "Enter your train number, coach and seat. A PNR is optional and is never checked.",
-      "Payment is in cash or online, as offered at checkout. A train order can be cancelled before the store accepts it."
-    ]
-  },
-  {
-    title: "Information Security",
-    items: [
-      "Customer personal and transactional data is encrypted using 256-bit SSL encryption.",
-      "We do not store full credit/debit card numbers or CVVs on our servers.",
-      "For privacy inquiries, please review our comprehensive Privacy Policy."
-    ]
-  }
-];
+// Customer Terms & Conditions used until the super admin publishes their own
+// (Super Admin > Settings > Content Management > Policies > Terms & Conditions).
+export const DEFAULT_TERMS_TEXT = `
+# Welcome and Acceptance
+- These Terms & Conditions apply when you browse, order or pay through the Papa Veg Pizza app and website.
+- By creating an account or placing an order you agree to these terms, our **Privacy Policy**, **Cancellation Policy**, **Refund Policy** and **Shipping Policy**.
+- If you do not agree, please do not use the app.
 
-export const DEFAULT_TERMS_TEXT = DEFAULT_TERMS_SECTIONS.map(
-  section => `# ${section.title}\n${section.items.map(item => `- ${item}`).join('\n')}`
-).join('\n\n');
+# Your Account
+- You must be 18 or older, or use the app under the supervision of a parent or guardian.
+- You sign in with your mobile number and a one-time password (OTP). Never share your OTP with anyone.
+- Keep your name, phone number and addresses correct. We are not responsible for orders that fail because of wrong details.
+- You are responsible for everything done through your account. Tell us at once if you think it has been misused.
+
+# 100% Vegetarian Promise
+- Every item on our menu is 100% vegetarian.
+- Our kitchens use shared equipment, so traces of gluten, dairy, nuts, soy or mustard may be present in any item.
+- Allergen and nutrition details are shown on the **Nutrition Information** page. If you have a serious allergy, please check it before you order.
+
+# Menu, Prices and Availability
+- Prices and availability are set by the store that will prepare your order and can differ between stores.
+- Photos are for illustration. Toppings, colour and presentation may vary slightly.
+- Prices, offers and menu items can change without notice. The price shown in your cart when you place the order is the price you pay.
+- If an item is unavailable after you order, the store may contact you, replace it or remove it, and you pay only for what is served.
+
+# Placing an Order
+- An order is confirmed only after the store accepts it. A store may decline an order if it is busy, closed or cannot reach your address.
+- Check your cart, address and phone number before paying. The bill shows the food total, every fee and tax, and any discount.
+- You can follow your order from the kitchen to your door in **My Orders**.
+
+# Fees, Taxes and Charges
+- Besides the food, an order can include a handling charge, platform fee, packaging fee, delivery fee and GST.
+- Delivery fee depends on the distance from the store. Free delivery applies above the order value shown in your cart.
+- Every charge that applies to you is listed in the cart and on your bill before you pay. A charge that is not shown is not applied.
+
+# Payments
+- You can pay with the methods offered at checkout. Online payments are processed by secure third-party payment gateways.
+- We do not store your full card number, CVV or UPI PIN.
+- If money is deducted but your order is not placed, it is returned to the same payment source automatically, usually within 3 to 5 working days.
+
+# Delivery and Pickup
+- Delivery times are estimates. Traffic, weather, festivals and peak hours can cause delays.
+- Share the **delivery code** only with the delivery partner when the order is handed over. The delivery partner may take a photo at handover as proof of delivery.
+- If we cannot reach you or no one is available at the address, the order may be marked delivered or cancelled, and the cancellation rules apply.
+- For pickup orders, collect your order from the store at the time shown. Orders left uncollected may be cancelled.
+
+# Cancellations and Refunds
+- You can cancel free of charge within the cancellation window shown when you place the order. After that window, a cancellation fee may be kept from prepaid orders. Cash orders are never charged a cancellation fee.
+- Once the kitchen has started preparing your order, it may not be possible to cancel it.
+- Your order follows the cancellation rules that were shown when you placed it.
+- Approved refunds go back to the original payment source within 3 to 5 working days.
+
+# Quality Issues
+- If something is missing, wrong or not as fresh as it should be, report it from **Help and Support** within 15 minutes of delivery, with photos.
+- After checking, we may offer a replacement, store credit or a refund.
+
+# Bulk and Party Orders
+- Bulk and party orders are sent as a request. The store checks it, confirms the items, price and timing, and then you pay to confirm.
+- Bulk orders need advance notice. Menu, price and timing are confirmed by the store, not by the request form.
+- Cancellation and refund terms for a bulk order are shown when the store confirms it.
+
+# Coupons, Offers and Rewards
+- A coupon or offer can be used only as described in it: eligible items, minimum order, validity and usage limits.
+- Unless stated otherwise, one coupon can be used per order and coupons cannot be combined.
+- Reward codes give the item named in the reward. They have no cash value.
+- We may withdraw an offer, and cancel benefits, if we find misuse, fake accounts or repeated abuse.
+
+# Wallet and Referrals
+- Wallet balance can be used to pay for orders in the app. It cannot be transferred to another account.
+- Referral rewards are given only for genuine new customers who complete the required first order.
+
+# Acceptable Use
+- Do not misuse the app, place fake or prank orders, abuse our delivery partners or store staff, or try to break or copy our systems.
+- We may suspend or close an account that breaks these terms.
+
+# Privacy and Your Data
+- We use your phone number, address and location to take, prepare and deliver your orders and to improve the service.
+- We do not sell your personal data. Read the **Privacy Policy** to see what we collect and the choices you have.
+- You can ask to delete your account from the Account section of the app.
+
+# Our Responsibility
+- We take care to prepare and deliver food safely, but we are not responsible for delays or failures caused by events outside our control.
+- To the extent the law allows, our liability for any order is limited to the amount you paid for it.
+
+# Changes to These Terms
+- We may update these terms from time to time. The date at the top of this page shows when they were last changed.
+- If you keep using the app after a change, you accept the updated terms.
+
+# Contact Us
+- Questions about these terms or an order? Open **Help and Support** in the app and we will get back to you.
+`.trim();
+
+// The HTML bold tags the admin editor saves and "**bold**" both become **bold** here;
+// the Terms page turns **bold** into bold text.
+const toMarkdownish = (raw) =>
+  raw
+    .replace(/<\/?(strong|b)>/gi, "**")
+    .replace(/<h[1-3][^>]*>(.*?)<\/h[1-3]>/gi, "\n### $1\n")
+    .replace(/<li[^>]*>(.*?)<\/li>/gi, "\n- $1")
+    .replace(/<p[^>]*>(.*?)<\/p>/gi, "\n$1\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]*>/g, "") // strip any remaining tags
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+
+function splitSections(content) {
+  const lines = toMarkdownish(String(content || "").trim()).split(/\r?\n/);
+  const sections = [];
+  let current = null;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const heading = trimmed.match(/^#{1,3}\s+(.*)$/);
+    if (heading) {
+      const title = heading[1].replace(/\*\*/g, "").trim();
+      // A heading that only repeats the page title is not a section
+      if (/^(disclaimer|terms\s*(&|and)\s*conditions?)$/i.test(title.replace(/^[^\w]+/, ""))) continue;
+      current = { title, items: [] };
+      sections.push(current);
+      continue;
+    }
+    if (!current) {
+      current = { title: "Terms & Conditions", items: [] };
+      sections.push(current);
+    }
+    current.items.push(trimmed.replace(/^[-*•▪]\s+/, ""));
+  }
+  return sections;
+}
+
+export const DEFAULT_TERMS_SECTIONS = splitSections(DEFAULT_TERMS_TEXT);
 
 /**
  * Parses raw text or HTML from backend into structured accordion sections
  */
 export function parseTermsSections(content) {
-  if (!content || typeof content !== 'string') return DEFAULT_TERMS_SECTIONS;
-  const raw = content.trim();
-  if (!raw) return DEFAULT_TERMS_SECTIONS;
-
-  // Normalize HTML to markdown-like headings and bullets
-  const normalized = raw
-    .replace(/<h[1-3][^>]*>(.*?)<\/h[1-3]>/gi, "\n### $1\n")
-    .replace(/<li[^>]*>(.*?)<\/li>/gi, "\n- $1")
-    .replace(/<p[^>]*>(.*?)<\/p>/gi, "\n$1\n")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]*>/g, ""); // strip any remaining tags
-
-  const lines = normalized.split(/\r?\n/);
-  const sections = [];
-  let currentSection = null;
-
-  for (let line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-
-    const headingMatch = trimmed.match(/^#{1,3}\s+(.*)$/);
-    if (headingMatch) {
-      const headingTitle = headingMatch[1].trim();
-      // Skip top-level disclaimer heading as section
-      if (headingTitle.toLowerCase() === 'disclaimer') continue;
-
-      currentSection = {
-        title: headingTitle,
-        items: []
-      };
-      sections.push(currentSection);
-      continue;
-    }
-
-    const bulletMatch = trimmed.match(/^[-*•▪]\s+(.*)$/);
-    if (bulletMatch) {
-      const bulletText = bulletMatch[1].trim();
-      if (!currentSection) {
-        currentSection = { title: "Terms & Conditions", items: [] };
-        sections.push(currentSection);
-      }
-      currentSection.items.push(bulletText);
-    } else {
-      if (!currentSection) {
-        currentSection = { title: "Terms & Conditions", items: [] };
-        sections.push(currentSection);
-      }
-      currentSection.items.push(trimmed);
-    }
-  }
-
+  if (!content || typeof content !== "string" || !content.trim()) return DEFAULT_TERMS_SECTIONS;
+  const sections = splitSections(content);
   return sections.length > 0 ? sections : DEFAULT_TERMS_SECTIONS;
 }
-
