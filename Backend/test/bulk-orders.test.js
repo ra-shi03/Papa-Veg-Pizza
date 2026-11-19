@@ -184,8 +184,14 @@ describe('super admin and franchise admin only view', () => {
 });
 
 
+const LOC = (lat, lng) => ({ type: 'Point', coordinates: [lng, lat] });
+async function placeStoreAt(lat, lng) {
+    const { default: mongoose } = await import('mongoose');
+    await mongoose.connection.collection('food_stores').updateOne({ _id: new mongoose.Types.ObjectId(A.storeId) }, { $set: { latitude: lat, longitude: lng } });
+}
+
 describe('a delivery bulk order runs on the rider system', () => {
-    let o; let orderDoc; let rider; let FoodOrder;
+    let o; let orderDoc; let rider; let FoodOrder; let farRider;
     const delivery = (extra = {}) => place({ fulfilment: 'delivery', address: { street: '12 MG Road', city: 'Indore', state: 'MP', pincode: '452001', lat: 22.72, lng: 75.86 }, ...extra });
     const mine = async (id) => ok(await fx.call('GET', `/v1/food/user/bulk-orders/${id}`, A.customerToken)).order;
     const setOrder = (patch) => FoodOrder.updateOne({ _id: orderDoc._id }, { $set: patch });
@@ -193,9 +199,16 @@ describe('a delivery bulk order runs on the rider system', () => {
     before(async () => {
         ({ FoodOrder } = await import('../src/modules/food/orders/models/order.model.js'));
         const { default: mongoose } = await import('mongoose');
+        await placeStoreAt(22.72, 75.86);
         const _id = new mongoose.Types.ObjectId();
+        const far = new mongoose.Types.ObjectId(); const off = new mongoose.Types.ObjectId();
+        await mongoose.connection.collection('food_delivery_partners').insertMany([
+            { _id: far, name: 'Far Rider', phone: '9811100098', status: 'approved', availabilityStatus: 'online', lastLocation: LOC(28.6, 77.2), storeId: new mongoose.Types.ObjectId(A.storeId), createdAt: new Date(), updatedAt: new Date() },
+            { _id: off, name: 'Offline Rider', phone: '9811100097', status: 'approved', availabilityStatus: 'offline', lastLocation: LOC(22.721, 75.861), storeId: new mongoose.Types.ObjectId(A.storeId), createdAt: new Date(), updatedAt: new Date() },
+        ]);
+        farRider = String(far);
         await mongoose.connection.collection('food_delivery_partners').insertOne({
-            _id, name: 'Test Rider', phone: '9811100099', status: 'approved', availabilityStatus: 'online', storeId: new mongoose.Types.ObjectId(A.storeId), createdAt: new Date(), updatedAt: new Date(),
+            _id, name: 'Test Rider', phone: '9811100099', status: 'approved', availabilityStatus: 'online', lastLocation: LOC(22.721, 75.861), storeId: new mongoose.Types.ObjectId(A.storeId), createdAt: new Date(), updatedAt: new Date(),
         });
         rider = String(_id);
         o = ok(await delivery(), 201);
@@ -225,6 +238,8 @@ describe('a delivery bulk order runs on the rider system', () => {
     test('the store sees its riders, assigns one, and the customer sees the rider', async () => {
         const riders = ok(await store(`/${o.id}/riders`)).riders;
         assert.ok(riders.some((x) => x._id === rider));
+        assert.deepEqual(riders.map((x) => x.name), ['Test Rider'], 'only online riders near the store');
+        assert.equal((await store(`/${o.id}/assign-rider`, 'POST', { riderId: farRider })).status, 400, 'a far rider cannot be assigned');
         assert.equal((await store(`/${o.id}/riders`, 'GET', undefined, B.managerToken)).status, 404, 'another store');
         const a = ok(await store(`/${o.id}/assign-rider`, 'POST', { riderId: rider })).order;
         assert.equal(a.rider.name, 'Test Rider');
@@ -352,7 +367,7 @@ describe('the delivery partner delivers a bulk order with the real rider steps',
     test('accept, pick up, reach the customer, OTP and photo: the bulk order completes and the cash is recorded', async () => {
         const rider = await fx.partner();
         const { default: mongoose } = await import('mongoose');
-        await mongoose.connection.collection('food_delivery_partners').updateOne({ _id: new mongoose.Types.ObjectId(rider.id) }, { $set: { storeId: new mongoose.Types.ObjectId(A.storeId), name: 'Rider Real' } });
+        await mongoose.connection.collection('food_delivery_partners').updateOne({ _id: new mongoose.Types.ObjectId(rider.id) }, { $set: { storeId: new mongoose.Types.ObjectId(A.storeId), name: 'Rider Real', lastLocation: LOC(22.721, 75.861), availabilityStatus: 'online' } });
         const o = ok(await place({ fulfilment: 'delivery', query: 'real rider', address: { street: '5 Palasia', city: 'Indore', state: 'MP', pincode: '452001' } }), 201);
         const c = ok(await store(`/${o.id}/confirm`, 'POST', { quotedAmount: 9000 })).order;
         ok(await store(`/${o.id}/status`, 'POST', { status: 'preparing' }));

@@ -524,17 +524,27 @@ export async function storeCancel(user, id, reason) {
 }
 
 /** Delivery partners the store can assign to this bulk order's delivery. */
+// Only delivery partners who are online and within the super admin's nearby radius (Order Methods > nearby radius) of the store.
+async function nearbyOnlineRiders(user) {
+  const { availableRiders } = await import('../../store/services/storeDelivery.service.js');
+  const { loadNearbyRadiusKm } = await import('../../settings/services/orderMethods.service.js');
+  const radiusKm = await loadNearbyRadiusKm();
+  const all = await availableRiders(user, {});
+  return all.filter((r) => r.status === 'online' && r.lastSeen !== undefined && r.distanceFromStore > 0 && r.distanceFromStore <= radiusKm);
+}
+
 export async function ridersForBulk(user, id) {
   const { row } = await ownRow(user, id);
   if (row.fulfilment !== 'delivery' || !row.orderId) throw new ValidationError('This order has no delivery to assign.');
-  const { availableRiders } = await import('../../store/services/storeDelivery.service.js');
-  return availableRiders(user, {});
+  return nearbyOnlineRiders(user);
 }
 
 export async function assignRiderToBulk(user, id, riderId) {
   const { row } = await ownRow(user, id);
   if (row.fulfilment !== 'delivery' || !row.orderId) throw new ValidationError('This order has no delivery to assign.');
   if (!['confirmed', 'preparing', 'ready'].includes(row.status)) throw new ValidationError('A rider can only be assigned before the order is picked up.');
+  const nearby = await nearbyOnlineRiders(user);
+  if (!nearby.some((r) => String(r._id) === String(riderId))) throw new ValidationError('Choose a delivery partner who is online and near the store.');
   const { assignRider } = await import('../../store/services/storeDelivery.service.js');
   await assignRider(user, { orderId: String(row.orderId), riderId: String(riderId || '') }, {});
   return getForStore(user, id);
