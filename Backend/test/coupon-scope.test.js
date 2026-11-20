@@ -90,3 +90,37 @@ describe('no scope ids in the response', () => {
         for (const leak of [A.storeId, B.storeId, A.franchiseId, String(ZONE), String(REGION), String(TERRITORY), 'storeIds', 'franchiseIds', 'zoneIds', 'regionIds', 'territoryIds', 'createdBy', 'usageCount']) assert.ok(!text.includes(leak), `leaked ${leak}`);
     });
 });
+
+describe('the reason a coupon is locked names what is missing', () => {
+    let cheese; let veg; let inCheese; let inVeg;
+    before(async () => {
+        const { CategoryProduct } = await import('../src/modules/food/admin/models/categoryProduct.model.js');
+        const { Product } = await import('../src/modules/food/admin/models/product.model.js');
+        const { FoodCoupon } = await import('../src/modules/food/settings/models/foodCoupon.model.js');
+        cheese = await CategoryProduct.create({ label: 'Cheese Laava Pizza', type: 'Category', status: 'Active' });
+        veg = await CategoryProduct.create({ label: 'Veg Supreme', type: 'Category', status: 'Active' });
+        inCheese = await Product.create({ name: 'Smoky Paper', categoryId: cheese._id, status: 'Active', price: 300, sizes: [{ size: 'Medium', price: 300 }, { size: 'Large', price: 400 }] });
+        inVeg = await Product.create({ name: 'Veggie Feast', categoryId: veg._id, status: 'Active', price: 300, sizes: [{ size: 'Medium', price: 300 }, { size: 'Large', price: 400 }] });
+        const day = 86400000;
+        await FoodCoupon.insertMany([
+            { code: 'CHEESEMED', title: 'x', couponType: 'Flat Amount', value: 20, usagePerCustomer: 0, status: 'active', isActive: true, startDate: new Date(Date.now() - day), endDate: new Date(Date.now() + day), applicableOn: 'Category', categoryIds: [String(cheese._id)], applicableSizes: ['Medium'] },
+            { code: 'CHEESE', title: 'x', couponType: 'Flat Amount', value: 20, usagePerCustomer: 0, status: 'active', isActive: true, startDate: new Date(Date.now() - day), endDate: new Date(Date.now() + day), applicableOn: 'Category', categoryIds: [String(cheese._id)] },
+        ]);
+    });
+    const verdicts = async (product, size) => {
+        const r = ok(await fx.call('POST', '/v1/food/orders/coupon-eligibility', A.customerToken, { storeId: A.storeId, items: [{ itemId: String(product._id), name: product.name, price: 300, quantity: 1, size, kind: 'product' }] }));
+        return Object.fromEntries(r.coupons.map((c) => [c.couponCode, c]));
+    };
+    test('the wrong category is named, with the size when the coupon also needs one', async () => {
+        const v = await verdicts(inVeg, 'Medium');
+        assert.deepEqual([v.CHEESEMED.eligible, v.CHEESEMED.reason], [false, 'Only on Medium size pizzas from Cheese Laava Pizza']);
+        assert.deepEqual([v.CHEESE.eligible, v.CHEESE.reason], [false, 'Only on Cheese Laava Pizza']);
+    });
+    test('the right category in the wrong size says the size; the right category and size is accepted', async () => {
+        const large = await verdicts(inCheese, 'Large');
+        assert.deepEqual([large.CHEESEMED.eligible, large.CHEESEMED.reason], [false, 'Only on Medium size pizzas']);
+        assert.equal(large.CHEESE.eligible, true, JSON.stringify(large.CHEESE));
+        const medium = await verdicts(inCheese, 'Medium');
+        assert.equal(medium.CHEESEMED.eligible, true, JSON.stringify(medium.CHEESEMED));
+    });
+});

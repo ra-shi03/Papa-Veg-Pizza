@@ -5,6 +5,7 @@ import { FoodOrder } from '../../orders/models/order.model.js';
 import { Product } from '../../admin/models/product.model.js';
 import { FoodStore } from '../../store/models/store.model.js';
 import { FoodFranchise } from '../../franchise/models/franchise.model.js';
+import { CategoryProduct } from '../../admin/models/categoryProduct.model.js';
 
 const ids = (list) => (list || []).map(String);
 
@@ -57,6 +58,15 @@ export function couponToOffer(c) {
 export async function findCouponOfferByCode(code) {
   const coupon = await FoodCoupon.findOne({ code }).lean();
   return coupon ? couponToOffer(coupon) : null;
+}
+
+/** The names of the categories a coupon is limited to, for the "Only on ..." message (at most three). */
+async function categoryNames(categoryIds) {
+  const idList = ids(categoryIds).filter((x) => mongoose.isValidObjectId(x));
+  if (!idList.length) return '';
+  const rows = await CategoryProduct.find({ _id: { $in: idList } }).select('label').lean();
+  const names = rows.map((r) => r.label).filter(Boolean);
+  return names.length > 3 ? `${names.slice(0, 3).join(', ')} and more` : names.join(', ');
 }
 
 async function placeOf(store) {
@@ -144,8 +154,14 @@ export async function evaluateCoupon(offer, { userId, store, items, subtotal }) 
     const inSize = (i) => !sizes.length || sizes.includes(String(i.size || '').trim().toLowerCase());
     eligibleSubtotal = lines.filter((i) => inScope(i) && inSize(i)).reduce((n, i) => n + i.price * i.quantity, 0);
     if (eligibleSubtotal <= 0) {
-      if (sizes.length) return no(`Only on ${offer.applicableSizes.join(' / ')} size pizzas`);
-      return no(scope === 'product' ? 'Only on selected items' : 'Only on selected categories');
+      // Say what is actually missing: the right items, the right size, or both
+      const sizeText = `${offer.applicableSizes.join(' / ')} size pizzas`;
+      const wrongItems = (scope === 'category' || scope === 'product') && !lines.some(inScope);
+      if (wrongItems) {
+        const where = scope === 'product' ? 'the selected items' : (await categoryNames(offer.categoryIds)) || 'the selected categories';
+        return no(sizes.length ? `Only on ${sizeText} from ${where}` : `Only on ${where}`);
+      }
+      return no(sizes.length ? `Only on ${sizeText}` : 'Only on selected items');
     }
   }
 
