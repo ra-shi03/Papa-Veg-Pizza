@@ -265,36 +265,27 @@ export function HomeHeader({
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
-              className="mx-4 mb-2.5 rounded-2xl bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border border-red-200/80 dark:border-red-900/40 p-3.5 shadow-lg flex items-start gap-3"
+              className="mx-4 mb-2.5 rounded-2xl bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border border-red-200/80 dark:border-red-900/40 px-3 py-2.5 shadow-lg flex items-center gap-3"
               style={{ fontFamily: 'Poppins, sans-serif' }}
               role="alert"
             >
-              <div className="w-9 h-9 rounded-xl bg-red-100 dark:bg-red-950/50 text-[#C62828] dark:text-red-400 flex items-center justify-center shrink-0 shadow-xs mt-0.5">
-                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>storefront</span>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-100 to-red-50 dark:from-red-950/60 dark:to-red-950/30 text-[#C62828] dark:text-red-400 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined" style={{ fontSize: 22 }}>storefront</span>
               </div>
-              <div className="flex-1 min-w-0 flex flex-col leading-tight">
+              <div className="flex-1 min-w-0 flex flex-col gap-0.5 leading-tight">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[13px] font-bold text-[#C62828] dark:text-red-400">
+                  <span className="text-[13.5px] font-bold text-[#C62828] dark:text-red-400 truncate">
                     Store Currently Closed
                   </span>
-                  <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
                 </div>
-                <p className="text-[11.5px] font-medium text-zinc-600 dark:text-zinc-300 mt-1 m-0 leading-snug">
-                  We are currently not accepting delivery orders at this time. Please check back during operating hours.
-                </p>
-
-                {/* Dynamic Store Operating Hours Display */}
-                <div className="mt-2.5 inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-red-50/80 dark:bg-red-950/30 border border-red-200/60 dark:border-red-900/40 text-[11px] font-semibold text-red-700 dark:text-red-300 w-fit">
-                  <span className="material-symbols-outlined shrink-0" style={{ fontSize: 15, color: '#C62828' }}>schedule</span>
-                  <span>
-                    Store Hours: <strong className="font-bold text-[#B71C1C] dark:text-red-200">{storeTiming}</strong>
+                <p className="m-0 flex items-center gap-1 text-[11.5px] font-medium text-zinc-600 dark:text-zinc-300 truncate">
+                  <span className="material-symbols-outlined shrink-0" style={{ fontSize: 14, color: '#C62828' }}>schedule</span>
+                  <span className="truncate">
+                    {openTime ? `Opens at ${openTime}` : 'Please check back soon'}
+                    {storeTiming ? ` · ${storeTiming}` : ''}
                   </span>
-                  {openTime && (
-                    <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 ml-0.5">
-                      (Opens at {openTime})
-                    </span>
-                  )}
-                </div>
+                </p>
               </div>
             </motion.div>
           )}
