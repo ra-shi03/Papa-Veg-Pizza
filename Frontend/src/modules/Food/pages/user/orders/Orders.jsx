@@ -727,16 +727,16 @@ export default function Orders() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#FFF4F3_0%,#F8F6F2_40%,#F5F3EF_80%,#F8F6F2_100%)] dark:bg-none dark:bg-[#0a0a0a] pb-10 font-sans flex flex-col">
       {/* Header - Matches Image 2 */}
       <div className="bg-white dark:bg-[#121212] sticky top-0 z-20 border-b border-gray-100 dark:border-gray-800 shadow-xs">
-        <div className="px-4 py-3.5 flex items-center bg-[var(--primary,#E53935)] text-white shadow-md mb-2.5">
+        <div className="px-4 py-3.5 flex items-center">
           <button
             type="button"
             onClick={handleBack}
-            className="p-1.5 -ml-1.5 text-white hover:bg-white/15 rounded-full transition-colors cursor-pointer bg-transparent border-0 flex items-center justify-center"
+            className="p-1.5 -ml-1.5 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer bg-transparent border-0 flex items-center justify-center"
             aria-label="Back"
           >
             <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
           </button>
-          <h1 className="ml-3 text-[18px] sm:text-[19px] font-bold text-white m-0 tracking-tight">
+          <h1 className="ml-3 text-[18px] sm:text-[19px] font-bold text-gray-900 dark:text-white m-0 tracking-tight">
             Reorder
           </h1>
         </div>
