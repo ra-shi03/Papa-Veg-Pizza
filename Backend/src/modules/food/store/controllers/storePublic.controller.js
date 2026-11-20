@@ -63,7 +63,27 @@ export async function getDeliverySlots(req, res, next) {
   }
 }
 
-/** GET /v1/food/offers/public[?storeId=] : coupons a customer can see right now. */
+/** What a customer may see of a coupon: display fields only (no store / franchise ids, usage counts or audit fields). */
+const publicOffer = (o) => ({
+  id: o.id,
+  _id: o._id,
+  couponCode: o.couponCode,
+  title: o.title || '',
+  description: o.description || '',
+  discountType: o.discountType,
+  discountValue: o.discountValue,
+  maxDiscount: o.maxDiscount,
+  minOrderValue: o.minOrderValue,
+  startDate: o.startDate || null,
+  endDate: o.endDate || null,
+  customerScope: o.customerScope,
+  status: o.status,
+});
+
+/**
+ * GET /v1/food/offers/public[?storeId=] : coupons a customer can see right now.
+ * Without a store: global coupons only (no place restriction). With a store: global plus that store's own coupons.
+ */
 export async function getPublicOffers(req, res, next) {
   try {
     const now = new Date();
@@ -73,12 +93,14 @@ export async function getPublicOffers(req, res, next) {
       status: { $nin: ['disabled', 'Disabled', 'inactive', 'Inactive', 'expired', 'Expired'] },
       $or: [{ endDate: null }, { endDate: { $exists: false } }, { endDate: { $gte: now } }],
     }).sort({ createdAt: -1 }).limit(100).lean();
+    const isGlobal = (o) => ![o.storeIds, o.franchiseIds, o.regionIds, o.zoneIds, o.territoryIds].some((l) => l?.length);
     const couponOffers = coupons
       .map(couponToOffer)
       .filter((o) => o.discountType !== 'unsupported')
       .filter((o) => !o.startDate || new Date(o.startDate) <= now)
       .filter((o) => !(o.usageLimit > 0 && o.usedCount >= o.usageLimit))
-      .filter((o) => !storeId || o.storeIds.length === 0 || o.storeIds.includes(storeId));
+      .filter((o) => isGlobal(o) || (storeId && o.storeIds.includes(storeId) && !o.franchiseIds.length && !o.regionIds.length && !o.zoneIds.length && !o.territoryIds.length))
+      .map(publicOffer);
     return sendResponse(res, 200, 'OK', { allOffers: couponOffers });
   } catch (err) {
     next(err);

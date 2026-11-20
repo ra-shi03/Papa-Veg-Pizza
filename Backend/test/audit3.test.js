@@ -142,13 +142,16 @@ describe('public store and offers (customer app)', () => {
         const { FoodCoupon } = await import('../src/modules/food/settings/models/foodCoupon.model.js');
         await FoodCoupon.insertMany(rows);
         const codes = async (q = '') => ok(await fx.call('GET', `/v1/food/offers/public${q}`)).allOffers.map((o) => o.couponCode).sort();
-        // with a store: its own and all-store coupons only; without one the store filter is not applied (current rule)
+        // without a store: global coupons only; with one: global plus that store's own coupons
+        assert.deepEqual(await codes(), ['LIVE10']);
         assert.deepEqual(await codes(`?storeId=${A.storeId}`), ['LIVE10']);
         assert.deepEqual(await codes(`?storeId=${B.storeId}`), ['LIVE10', 'ONLYB']);
-        assert.deepEqual(await codes(), ['LIVE10', 'ONLYB']);
+        // display fields only: no franchise / store ids, usage counts, createdBy or audit fields
         const [live] = ok(await fx.call('GET', '/v1/food/offers/public')).allOffers;
-        for (const k of ['_id', 'id', 'couponCode', 'customerScope', 'description', 'discountType', 'discountValue', 'endDate', 'maxDiscount', 'minOrderValue', 'offerType', 'showInCart', 'startDate', 'status', 'title']) assert.ok(k in live, k);
+        assert.deepEqual(Object.keys(live).sort(), ['_id', 'couponCode', 'customerScope', 'description', 'discountType', 'discountValue', 'endDate', 'id', 'maxDiscount', 'minOrderValue', 'startDate', 'status', 'title']);
         assert.deepEqual([live.title, live.discountType, live.discountValue, live.status, live.customerScope], ['10% OFF', 'percentage', 10, 'active', 'all']);
+        const text = JSON.stringify(ok(await fx.call('GET', `/v1/food/offers/public?storeId=${B.storeId}`)));
+        for (const leak of [B.storeId, A.franchiseId, 'createdBy', 'usageCount', 'usedCount', 'createdAt', 'updatedAt', 'storeIds', 'franchiseIds', 'Super Admin']) assert.ok(!text.includes(leak), `leaked ${leak}`);
     });
 });
 

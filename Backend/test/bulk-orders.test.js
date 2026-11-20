@@ -9,6 +9,18 @@ let fx; let A; let B; let BulkOrderInquiry; let emails; let pizza; let items;
 const PUBLIC = '/v1/food/bulk-order/inquiry';
 const ok = (res, status = 200) => { assert.equal(res.status, status, JSON.stringify(res.body)); return res.body.data; };
 const form = (extra = {}) => ({ items, name: 'Ravi Kumar', phone: '98123 45678', email: 'ravi@example.com', type: 'virtual_party', fulfilment: 'takeaway', storeId: A.storeId, eventDate: '2026-12-20', partySize: 'Corporate Gathering (20-50 people)', query: '40 pizzas please', ...extra });
+/** The customer's view of a bulk order once it reaches `status` (polled up to 5 s; fails with the last status seen). */
+const waitForStatus = async (id, status, timeoutMs = 5000) => {
+    const until = Date.now() + timeoutMs;
+    let order;
+    for (;;) {
+        order = ok(await fx.call('GET', `/v1/food/user/bulk-orders/${id}`, A.customerToken)).order;
+        if (order.status === status || Date.now() > until) break;
+        await new Promise((r) => setTimeout(r, 25));
+    }
+    assert.equal(order.status, status);
+    return order;
+};
 const place = (extra, token = A.customerToken) => fx.call('POST', PUBLIC, token, form(extra));
 const store = (path, method = 'GET', body, token = A.managerToken) => fx.call(method, `/v1/food/store/bulk-orders${path}`, token, body);
 
@@ -386,7 +398,8 @@ describe('the delivery partner delivers a bulk order with the real rider steps',
         const { FoodOrder: FO } = await import('../src/modules/food/orders/models/order.model.js');
         const pick = await fx.call('PATCH', R('confirm-pickup'), rider.token, { confirmedOrderId: c.orderId });
         assert.equal(pick.status, 200, JSON.stringify(pick.body));
-        assert.equal(ok(await fx.call('GET', `/v1/food/user/bulk-orders/${o.id}`, A.customerToken)).order.status, 'out_for_delivery');
+        // the bulk order follows the delivery in the background: wait for it, not a fixed sleep
+        await waitForStatus(o.id, 'out_for_delivery');
         assert.equal(ok(await fx.call('GET', `/v1/food/user/bulk-orders/${o.id}`, A.customerToken)).order.deliveryOtp, undefined, 'no code before the rider is at the door');
         assert.equal((await fx.call('PATCH', R('reached-drop'), rider.token, {})).status, 200);
         const otp = (await FO.findById(c.orderId).select('+deliveryOtp').lean()).deliveryOtp;
@@ -394,8 +407,7 @@ describe('the delivery partner delivers a bulk order with the real rider steps',
         assert.equal(ok(await store(`/${o.id}`)).order.deliveryOtp, undefined, 'the store never sees it');
         const done = await fx.call('PATCH', R('complete'), rider.token, { otp, paymentMethod: 'cash', handoverPhotoUrl: 'https://example.com/proof.jpg' });
         assert.equal(done.status, 200, JSON.stringify(done.body));
-        await new Promise((r) => setTimeout(r, 300));
-        const finalOrder = ok(await fx.call('GET', `/v1/food/user/bulk-orders/${o.id}`, A.customerToken)).order;
+        const finalOrder = await waitForStatus(o.id, 'completed');
         assert.equal(finalOrder.status, 'completed');
         assert.equal(finalOrder.paymentStatus, 'paid');
         assert.equal(finalOrder.rider.name, 'Rider Real');
