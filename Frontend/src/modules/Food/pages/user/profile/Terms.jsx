@@ -33,12 +33,6 @@ function RichText({ text, query }) {
 
 const plain = (s) => String(s).replace(/\*\*/g, "");
 
-function formatDate(value) {
-  const d = value ? new Date(value) : null;
-  if (!d || Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
-}
-
 function Skeleton() {
   return (
     <div className="space-y-2.5 animate-pulse" aria-hidden>
@@ -54,7 +48,6 @@ export default function Terms() {
   const reduceMotion = useReducedMotion();
   const [loading, setLoading] = useState(true);
   const [pageTitle, setPageTitle] = useState("Terms & Conditions");
-  const [updatedAt, setUpdatedAt] = useState("");
   const [sections, setSections] = useState([]);
   // "error": the server could not be reached; "empty": it answered but no terms have been published
   const [problem, setProblem] = useState("");
@@ -69,7 +62,6 @@ export default function Terms() {
       const response = await api.get(API_ENDPOINTS.ADMIN.TERMS_PUBLIC);
       const data = response?.data?.success ? response?.data?.data : null;
       if (data?.title) setPageTitle(data.title);
-      setUpdatedAt(data?.updatedAt || "");
       const parsed = data?.content ? parseTermsSections(data.content) : [];
       if (parsed && parsed.length > 0) setSections(parsed);
       else setProblem("empty");
@@ -114,7 +106,6 @@ export default function Terms() {
 
   const handleBack = () => (window.history.state?.idx > 0 ? navigate(-1) : navigate("/food/user/account", { replace: true }));
   const handlePrint = () => { setAll(true); setTimeout(() => window.print(), 150); };
-  const updated = formatDate(updatedAt);
 
   return (
     <AnimatedPage className="user-app-theme min-h-screen bg-[#F8F6F2] dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans pb-16">
@@ -153,7 +144,7 @@ export default function Terms() {
             <div className="min-w-0">
               <h2 className="text-xl font-extrabold tracking-tight m-0 leading-snug">{pageTitle}</h2>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 m-0">
-                {updated ? <>Last updated {updated}</> : "Please read before you order"}
+                Please read before you order
                 {sections.length > 0 && <> · {sections.length} sections · about {minutes} min read</>}
               </p>
             </div>
