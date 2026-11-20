@@ -345,9 +345,12 @@ export async function createOrder(userId, dto) {
         amount: rzOrder.amount,
         currency: rzOrder.currency || "INR",
       };
-      // Store Razorpay order id in local payment snapshot (ledger will store it)
+      // Store the Razorpay order id on the order itself (payment verification checks the proof against it). `order` was
+      // built from a copy of `payment`, so changing `payment` alone never reached the saved order.
       payment.razorpay = { orderId: rzOrder.id, paymentId: "", signature: "" };
       payment.status = "created";
+      order.payment.razorpay = { orderId: rzOrder.id, paymentId: "", signature: "" };
+      order.payment.status = "created";
     } catch (err) {
       throw new ValidationError(err?.message || "Payment gateway error");
     }
