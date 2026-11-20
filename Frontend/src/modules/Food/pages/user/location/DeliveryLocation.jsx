@@ -183,12 +183,12 @@ export default function DeliveryLocation() {
       // same background as the home page
       style={{ background: 'radial-gradient(circle at top left, #FFF4F3 0%, #F8F6F2 40%, #F5F3EF 80%, #F8F6F2 100%)' }}
     >
-      {/* Header: same white bar as the Coupons page */}
-      <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-4 border-b shadow-sm bg-white" style={{ borderColor: 'rgba(0,0,0,0.10)' }}>
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full hover:bg-zinc-100">
-          <ArrowLeft className="w-6 h-6 text-zinc-700" />
+      {/* Header: same red bar as the Coupons page */}
+      <div className="sticky top-0 z-40 flex items-center gap-3 px-4 py-4 bg-[var(--primary,#E53935)] text-white shadow-md">
+        <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-full hover:bg-white/15 border-0 bg-transparent cursor-pointer">
+          <ArrowLeft className="w-6 h-6 text-white" />
         </button>
-        <h1 className="text-xl font-bold text-zinc-900 tracking-tight">Delivery Location</h1>
+        <h1 className="text-xl font-bold text-white tracking-tight m-0">Delivery Location</h1>
       </div>
 
       <div className="p-4 flex flex-col gap-6">
