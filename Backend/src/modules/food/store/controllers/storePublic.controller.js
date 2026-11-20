@@ -5,7 +5,7 @@ import { sendResponse } from '../../../../utils/response.js';
 import { NotFoundError } from '../../../../core/auth/errors.js';
 import { FoodAppConfig } from '../../settings/models/appConfig.model.js';
 import { FoodCoupon } from '../../settings/models/foodCoupon.model.js';
-import { couponToOffer } from '../../settings/services/couponOffer.service.js';
+import { couponToOffer, isGlobalCoupon, couponAppliesAtPlace, placeOfStore } from '../../settings/services/couponOffer.service.js';
 import { resolveStoreForLocation, resolveTrainStore, findOrderableStore } from '../../orders/services/order-store.service.js';
 import { buildSlots, SCHEDULE } from '../../orders/services/order-schedule.service.js';
 
@@ -82,7 +82,8 @@ const publicOffer = (o) => ({
 
 /**
  * GET /v1/food/offers/public[?storeId=] : coupons a customer can see right now.
- * Without a store: global coupons only (no place restriction). With a store: global plus that store's own coupons.
+ * Without a store: global coupons only. With a store: every coupon checkout accepts for that store (global, or
+ * store / franchise / region / zone / territory that include it) - one shared rule.
  */
 export async function getPublicOffers(req, res, next) {
   try {
@@ -93,13 +94,14 @@ export async function getPublicOffers(req, res, next) {
       status: { $nin: ['disabled', 'Disabled', 'inactive', 'Inactive', 'expired', 'Expired'] },
       $or: [{ endDate: null }, { endDate: { $exists: false } }, { endDate: { $gte: now } }],
     }).sort({ createdAt: -1 }).limit(100).lean();
-    const isGlobal = (o) => ![o.storeIds, o.franchiseIds, o.regionIds, o.zoneIds, o.territoryIds].some((l) => l?.length);
+    // The same place rule checkout uses (couponOffer.service): with a store, every coupon it accepts for that store; without, global only
+    const where = storeId ? await placeOfStore(storeId) : null;
     const couponOffers = coupons
       .map(couponToOffer)
       .filter((o) => o.discountType !== 'unsupported')
       .filter((o) => !o.startDate || new Date(o.startDate) <= now)
       .filter((o) => !(o.usageLimit > 0 && o.usedCount >= o.usageLimit))
-      .filter((o) => isGlobal(o) || (storeId && o.storeIds.includes(storeId) && !o.franchiseIds.length && !o.regionIds.length && !o.zoneIds.length && !o.territoryIds.length))
+      .filter((o) => (where ? couponAppliesAtPlace(o, where) : isGlobalCoupon(o)))
       .map(publicOffer);
     return sendResponse(res, 200, 'OK', { allOffers: couponOffers });
   } catch (err) {

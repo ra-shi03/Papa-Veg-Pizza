@@ -71,6 +71,27 @@ async function placeOf(store) {
   };
 }
 
+const PLACE_FIELDS = [['storeIds', 'storeId'], ['franchiseIds', 'franchiseId'], ['regionIds', 'regionId'], ['zoneIds', 'zoneId'], ['territoryIds', 'territoryId']];
+
+/** A coupon with no place list at all is global. */
+export const isGlobalCoupon = (offer) => !PLACE_FIELDS.some(([field]) => offer[field]?.length);
+
+/**
+ * THE place rule, used by checkout and by the public coupon list: every place list the coupon sets (store, franchise,
+ * region, zone, territory) must include the store's own value. `where` is the store's place from `placeOf`.
+ */
+export const couponAppliesAtPlace = (offer, where = {}) =>
+  PLACE_FIELDS.every(([field, key]) => !offer[field]?.length || ids(offer[field]).includes(String(where[key] || '')));
+
+/** The rule for one store (loads its place only when the coupon has a place list). A coupon with no place list is global. */
+export async function couponAppliesAtStore(offer, store) {
+  if (isGlobalCoupon(offer)) return true;
+  return couponAppliesAtPlace(offer, await placeOf(store));   // a store carries its franchise; region / zone / territory fall back to it
+}
+
+/** The place of a store, loaded once, for filtering many coupons with `couponAppliesAtPlace`. */
+export const placeOfStore = (storeId) => placeOf({ _id: storeId });
+
 // Decides whether a coupon works for this cart and what it takes off. These are the rules the super admin sets on
 // Marketing > Coupons: validity, first-order-only, usage limits, minimum order, place (store / franchise / region /
 // zone / territory) and what it applies to (everything, chosen categories, or chosen products).
@@ -84,20 +105,7 @@ export async function evaluateCoupon(offer, { userId, store, items, subtotal }) 
   if (offer.endDate && now >= new Date(offer.endDate)) return no('This coupon has expired');
   if (offer.usageLimit > 0 && offer.usedCount >= offer.usageLimit) return no('This coupon has been fully redeemed');
 
-  // A store carries its franchise; region and zone usually live on the franchise, so fall back to it.
-  const where = offer.storeIds?.length || offer.franchiseIds?.length || offer.regionIds?.length || offer.zoneIds?.length || offer.territoryIds?.length
-    ? await placeOf(store)
-    : {};
-  const place = [
-    ['storeIds', where.storeId],
-    ['franchiseIds', where.franchiseId],
-    ['regionIds', where.regionId],
-    ['zoneIds', where.zoneId],
-    ['territoryIds', where.territoryId],
-  ];
-  for (const [field, value] of place) {
-    if (offer[field]?.length && !ids(offer[field]).includes(String(value || ''))) return no('Not available at your store');
-  }
+  if (!(await couponAppliesAtStore(offer, store))) return no('Not available at your store');
 
   const minOrder = Number(offer.minOrderValue) || 0;
   if (subtotal < minOrder) return no(`Add items worth ₹${Math.ceil(minOrder - subtotal)} more`);
