@@ -23,7 +23,8 @@ export function couponToOffer(c) {
   const segments = (doc.customerSegments || []).map((s) => String(s).toLowerCase());
   const legacyFirstTime = segments.length > 0 && segments.every((s) => s.includes('new'));
   // userType is what the admin form writes; coupons saved before it existed fall back to their old segments.
-  const userType = ['new', 'old'].includes(doc.userType) ? doc.userType : legacyFirstTime ? 'new' : 'all';
+  // An explicit userType (including 'all') always wins over leftover segments.
+  const userType = ['all', 'new', 'old'].includes(doc.userType) ? doc.userType : legacyFirstTime ? 'new' : 'all';
   const usageLimit = Number(doc.usageLimit) || null;
   const perUserLimit = Number(doc.usagePerCustomer) || null;
   const off = doc.isActive === false || DISABLED_STATUSES.includes(String(doc.status || '').toLowerCase());

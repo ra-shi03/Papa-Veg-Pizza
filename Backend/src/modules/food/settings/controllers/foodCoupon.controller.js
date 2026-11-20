@@ -4,7 +4,7 @@ import { couponToOffer } from '../services/couponOffer.service.js';
 
 export const getAllCoupons = async (req, res) => {
     try {
-        const coupons = await FoodCoupon.find().sort({ createdAt: -1 });
+        const coupons = await FoodCoupon.find().sort({ createdAt: -1 }).lean();   // as stored: a schema default must not invent an audience
         res.status(200).json({ success: true, data: coupons });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -42,7 +42,7 @@ export const getActivePublicCoupons = async (req, res) => {
 
 export const getCouponById = async (req, res) => {
     try {
-        const coupon = await FoodCoupon.findById(req.params.id);
+        const coupon = await FoodCoupon.findById(req.params.id).lean();
         if (!coupon) return res.status(404).json({ success: false, message: 'Coupon not found' });
         res.status(200).json({ success: true, data: coupon });
     } catch (error) {

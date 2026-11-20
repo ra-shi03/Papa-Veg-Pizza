@@ -124,3 +124,15 @@ describe('the reason a coupon is locked names what is missing', () => {
         assert.equal(medium.CHEESEMED.eligible, true, JSON.stringify(medium.CHEESEMED));
     });
 });
+
+describe('the audience an admin saved wins over leftover segments', () => {
+    test('userType "all" with an old "New Customers" segment is for everyone; "new" still means first order only', async () => {
+        const { FoodCoupon } = await import('../src/modules/food/settings/models/foodCoupon.model.js');
+        const { couponToOffer } = await import('../src/modules/food/settings/services/couponOffer.service.js');
+        const base = { title: 'x', couponType: 'Percentage', value: 10, endDate: new Date(Date.now() + 86400000), customerSegments: ['New Customers'] };
+        const all = couponToOffer((await FoodCoupon.create({ code: 'AUDALL', ...base, userType: 'all' })).toObject());
+        const fresh = couponToOffer((await FoodCoupon.create({ code: 'AUDNEW', ...base, userType: 'new' })).toObject());
+        const legacy = couponToOffer({ code: 'LEGACY', ...base, userType: undefined });
+        assert.deepEqual([all.customerScope, fresh.customerScope, legacy.customerScope], ['all', 'first-time', 'first-time']);
+    });
+});

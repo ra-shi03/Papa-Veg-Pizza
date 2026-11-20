@@ -10,6 +10,10 @@ import {
 import { toast } from 'sonner';
 import CouponAudienceFields from './CouponAudienceFields';
 
+// The saved audience. An explicit userType (including 'all') always wins: old coupons without one fall back to their
+// customerSegments, and a leftover "New Users" segment must not turn an 'All users' coupon back into 'New users'.
+const audienceOf = (c) => (['all', 'new', 'old'].includes(c?.userType) ? c.userType : (c?.customerSegments || []).some((x) => /new/i.test(x)) ? 'new' : 'all');
+
 export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
   const [activeTab, setActiveTab] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -153,7 +157,7 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
       setApplicableOn(coupon.applicableOn || 'All');
       setProductIds(coupon.productIds || []);
       setCategoryIds(coupon.categoryIds || []);
-      setUserType(['new', 'old'].includes(coupon.userType) ? coupon.userType : (coupon.customerSegments || []).some((x) => /new/i.test(x)) ? 'new' : 'all');
+      setUserType(audienceOf(coupon));
       setApplicableSizes(coupon.applicableSizes || []);
 
       setRegionIds(coupon.regionIds || []);
@@ -348,7 +352,7 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
     if (!arrayEquals(productIds, coupon.productIds || [])) return true;
     if (!arrayEquals(categoryIds, coupon.categoryIds || [])) return true;
     if (!arrayEquals(applicableSizes, coupon.applicableSizes || [])) return true;
-    if (userType !== (['new', 'old'].includes(coupon.userType) ? coupon.userType : (coupon.customerSegments || []).some((x) => /new/i.test(x)) ? 'new' : 'all')) return true;
+    if (userType !== audienceOf(coupon)) return true;
     
     if (!arrayEquals(regionIds, coupon.regionIds || [])) return true;
     if (!arrayEquals(zoneIds, coupon.zoneIds || [])) return true;
