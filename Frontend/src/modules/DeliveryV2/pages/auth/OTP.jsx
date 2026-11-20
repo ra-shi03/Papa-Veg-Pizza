@@ -4,6 +4,8 @@ import { ArrowLeft, Loader2, ShieldCheck, CheckCircle2 } from "lucide-react"
 import AnimatedPage from "@food/components/user/AnimatedPage"
 import { Input } from "@food/components/ui/input"
 import { Button } from "@food/components/ui/button"
+import { deliveryClient } from "@/services/api/axios"
+import { useSystemTheme } from "@/shared/utils/themeSync"
 import { deliveryAPI } from "@food/api"
 import { setAuthData as storeAuthData } from "@food/utils/auth"
 const debugLog = (...args) => {}
@@ -16,6 +18,20 @@ const OTP_LENGTH = 6
 
 export default function DeliveryOTP() {
   const navigate = useNavigate()
+  // The delivery app's own colours (Settings > Delivery login): the same ones the sign-in screen uses
+  const { primaryColor } = useSystemTheme()
+  const [brand, setBrand] = useState({
+    primary: primaryColor && primaryColor !== "#a43c12" ? primaryColor : "#EE3A43",
+    secondary: "#FF5722",
+  })
+  useEffect(() => {
+    let alive = true
+    deliveryClient.get("/settings/delivery-login").then(({ data }) => {
+      const cfg = data?.data
+      if (alive && cfg) setBrand((b) => ({ primary: cfg.primaryColor || b.primary, secondary: cfg.secondaryColor || b.secondary }))
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [])
   const [otp, setOtp] = useState(Array(OTP_LENGTH).fill(""))
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
@@ -481,29 +497,36 @@ export default function DeliveryOTP() {
   }
 
   return (
-    <AnimatedPage className="min-h-screen bg-[radial-gradient(circle_at_top_left,#FFF4F3_0%,#F8F6F2_40%,#F5F3EF_80%,#F8F6F2_100%)] flex flex-col">
-      {/* Header */}
-      <div className="relative flex items-center justify-center py-4 px-4 bg-[var(--primary,#E53935)] text-white shadow-md">
-        <button
-          onClick={() => navigate("/food/delivery/login")}
-          className="absolute left-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-white/15 transition-colors"
-          aria-label="Go back"
-        >
-          <ArrowLeft className="h-5 w-5 text-white" />
-        </button>
-        <h1 className="text-lg font-bold text-white m-0">OTP Verification</h1>
+    <AnimatedPage className="min-h-screen bg-white text-gray-900 flex flex-col font-['Poppins',sans-serif]">
+      {/* Curved brand banner, like the delivery sign-in screen */}
+      <div
+        className="relative w-full pt-5 pb-16 px-4 overflow-hidden rounded-b-[40px] shadow-md"
+        style={{ background: `linear-gradient(145deg, ${brand.primary} 0%, ${brand.secondary} 100%)` }}
+      >
+        <div className="absolute -top-10 -right-10 w-44 h-44 rounded-full bg-white/15 blur-lg pointer-events-none" />
+        <div className="absolute -bottom-8 -left-8 w-36 h-36 rounded-full bg-white/10 blur-md pointer-events-none" />
+        <div className="relative flex items-center justify-center">
+          <button
+            onClick={() => navigate("/food/delivery/login")}
+            className="absolute left-0 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md transition-colors"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="h-5 w-5 text-white" />
+          </button>
+          <h1 className="text-lg font-bold text-white m-0">OTP Verification</h1>
+        </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex flex-col justify-center px-5 pt-8 pb-12">
-        <div className="max-w-md mx-auto w-full bg-white rounded-3xl border border-black/5 shadow-[0_10px_30px_rgba(0,0,0,0.08)] px-5 py-8 space-y-7">
+      <div className="flex flex-col px-5 -mt-8 pb-12 relative z-10">
+        <div className="max-w-md mx-auto w-full bg-white rounded-[28px] border border-gray-100 shadow-[0_10px_35px_rgba(0,0,0,0.08)] px-5 py-8 space-y-7">
           {/* Message */}
           <div className="text-center space-y-3">
-            <div className="mx-auto h-14 w-14 rounded-full bg-[var(--primary,#E53935)]/10 flex items-center justify-center">
+            <div className="mx-auto h-14 w-14 rounded-full flex items-center justify-center" style={{ backgroundColor: `${brand.primary}1A` }}>
               {success ? (
                 <CheckCircle2 className="h-7 w-7 text-green-600" />
               ) : (
-                <ShieldCheck className="h-7 w-7 text-[var(--primary,#E53935)]" />
+                <ShieldCheck className="h-7 w-7" style={{ color: brand.primary }} />
               )}
             </div>
             <p className="text-[15px] text-gray-600 leading-snug">
@@ -596,7 +619,8 @@ export default function DeliveryOTP() {
                     disabled={isLoading}
                     autoComplete="off"
                     autoFocus={false}
-                    className={`w-11 h-12 sm:w-12 sm:h-14 text-center text-xl font-bold p-0 rounded-xl border-2 shadow-sm outline-none transition-all focus-visible:ring-0 focus-visible:border-[var(--primary,#E53935)] focus-visible:shadow-[0_0_0_3px_rgba(229,57,53,0.15)] ${digit ? "border-[var(--primary,#E53935)] bg-[var(--primary,#E53935)]/5 text-gray-900" : "border-gray-200 bg-white text-gray-900"}`}
+                    style={digit ? { borderColor: brand.primary, backgroundColor: `${brand.primary}0D` } : undefined}
+                    className={`w-11 h-12 sm:w-12 sm:h-14 text-center text-xl font-bold p-0 rounded-2xl border-2 outline-none transition-all focus-visible:ring-4 focus-visible:ring-black/5 text-gray-900 ${digit ? "" : "border-gray-200 bg-gray-50 focus-visible:bg-white"}`}
                   />
                 ))}
               </div>
@@ -608,14 +632,15 @@ export default function DeliveryOTP() {
                 </p>
                 {resendTimer > 0 ? (
                   <p className="text-sm font-semibold text-gray-700">
-                    Resend SMS in <span className="text-[var(--primary,#E53935)] tabular-nums">{resendTimer}s</span>
+                    Resend SMS in <span className="tabular-nums" style={{ color: brand.primary }}>{resendTimer}s</span>
                   </p>
                 ) : (
                   <button
                     type="button"
                     onClick={handleResend}
                     disabled={isLoading}
-                    className="text-sm font-bold text-[var(--primary,#E53935)] hover:underline disabled:opacity-50"
+                    style={{ color: brand.primary }}
+                    className="text-sm font-bold hover:underline disabled:opacity-50"
                   >
                     Resend SMS
                   </button>
@@ -640,7 +665,7 @@ export default function DeliveryOTP() {
                   }}
                   disabled={isLoading}
                   placeholder="Enter your name"
-                  className={`h-12 rounded-xl border-2 ${nameError ? "border-red-500" : "border-gray-200 focus-visible:border-[var(--primary,#E53935)]"}`}
+                  className={`h-12 rounded-2xl border-2 bg-gray-50 ${nameError ? "border-red-500" : "border-gray-200"}`}
                 />
                 {nameError && (
                   <p className="text-xs text-red-500 text-left">
@@ -652,7 +677,8 @@ export default function DeliveryOTP() {
               <Button
                 onClick={handleSubmitName}
                 disabled={isLoading}
-                className="w-full h-12 rounded-xl bg-[var(--primary,#E53935)] hover:bg-[var(--primary-hover,#d92d36)] text-white font-bold shadow-md shadow-red-500/20"
+                style={{ backgroundColor: brand.primary, boxShadow: `0 10px 24px -4px ${brand.primary}55` }}
+                className="w-full h-12 rounded-full text-white font-bold shadow-lg hover:opacity-95 active:scale-[0.98] transition-all"
               >
                 {isLoading ? "Continuing..." : "Continue"}
               </Button>
@@ -662,7 +688,7 @@ export default function DeliveryOTP() {
           {/* Loading Spinner */}
           {isLoading && !showNameInput && (
             <div className="flex justify-center pt-4">
-              <Loader2 className="h-6 w-6 text-[var(--primary,#E53935)] animate-spin" />
+              <Loader2 className="h-6 w-6 animate-spin" style={{ color: brand.primary }} />
             </div>
           )}
         </div>
