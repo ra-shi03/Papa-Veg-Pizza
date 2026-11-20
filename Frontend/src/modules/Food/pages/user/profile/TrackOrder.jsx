@@ -143,18 +143,18 @@ export default function TrackOrder() {
   return (
     <AnimatedPage className="min-h-screen bg-[radial-gradient(circle_at_top_left,#FFF4F3_0%,#F8F6F2_40%,#F5F3EF_80%,#F8F6F2_100%)] dark:bg-none dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans select-none pb-24">
       {/* Top Header matching Image 2 with project theme */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur dark:bg-zinc-900 border-b border-zinc-200/60 dark:border-zinc-800">
+      <header className="sticky top-0 z-40 bg-[var(--primary,#E53935)] text-white shadow-md">
         <div className="max-w-xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={handleBack}
-              className="p-1.5 -ml-1.5 text-zinc-800 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer border-0 bg-transparent flex items-center justify-center"
+              className="p-1.5 -ml-1.5 text-white hover:bg-white/15 rounded-full transition-colors cursor-pointer border-0 bg-transparent flex items-center justify-center"
               aria-label="Go back"
             >
               <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
             </button>
-            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-zinc-900 dark:text-white m-0">
+            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white m-0">
               Track Current Order
             </h1>
           </div>
@@ -165,9 +165,9 @@ export default function TrackOrder() {
               onClick={handleTrackOrder}
               disabled={loading}
               title="Refresh status"
-              className="p-2 text-zinc-400 hover:text-[#E53935] rounded-full transition-colors cursor-pointer border-0 bg-transparent"
+              className="p-2 text-white/80 hover:text-white hover:bg-white/15 rounded-full transition-colors cursor-pointer border-0 bg-transparent"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-[#E53935]" : ""}`} />
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             </button>
           )}
         </div>
