@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft, Loader2 } from "lucide-react"
+import { ArrowLeft, Loader2, ShieldCheck, CheckCircle2 } from "lucide-react"
 import AnimatedPage from "@food/components/user/AnimatedPage"
 import { Input } from "@food/components/ui/input"
 import { Button } from "@food/components/ui/button"
@@ -481,31 +481,40 @@ export default function DeliveryOTP() {
   }
 
   return (
-    <AnimatedPage className="min-h-screen bg-white flex flex-col">
+    <AnimatedPage className="min-h-screen bg-[radial-gradient(circle_at_top_left,#FFF4F3_0%,#F8F6F2_40%,#F5F3EF_80%,#F8F6F2_100%)] flex flex-col">
       {/* Header */}
-      <div className="relative flex items-center justify-center py-4 px-4 border-b border-gray-200">
+      <div className="relative flex items-center justify-center py-4 px-4 bg-[var(--primary,#E53935)] text-white shadow-md">
         <button
           onClick={() => navigate("/food/delivery/login")}
-          className="absolute left-4 top-1/2 -translate-y-1/2"
+          className="absolute left-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-white/15 transition-colors"
           aria-label="Go back"
         >
-          <ArrowLeft className="h-5 w-5 text-black" />
+          <ArrowLeft className="h-5 w-5 text-white" />
         </button>
-        <h1 className="text-lg font-bold text-black">OTP Verification</h1>
+        <h1 className="text-lg font-bold text-white m-0">OTP Verification</h1>
       </div>
 
       {/* Main Content */}
-      <div className="flex flex-col justify-center px-6 pt-8 pb-12">
-        <div className="max-w-md mx-auto w-full space-y-8">
+      <div className="flex flex-col justify-center px-5 pt-8 pb-12">
+        <div className="max-w-md mx-auto w-full bg-white rounded-3xl border border-black/5 shadow-[0_10px_30px_rgba(0,0,0,0.08)] px-5 py-8 space-y-7">
           {/* Message */}
-          <div className="text-center space-y-2">
-            <p className="text-base text-black">
+          <div className="text-center space-y-3">
+            <div className="mx-auto h-14 w-14 rounded-full bg-[var(--primary,#E53935)]/10 flex items-center justify-center">
+              {success ? (
+                <CheckCircle2 className="h-7 w-7 text-green-600" />
+              ) : (
+                <ShieldCheck className="h-7 w-7 text-[var(--primary,#E53935)]" />
+              )}
+            </div>
+            <p className="text-[15px] text-gray-600 leading-snug">
               {showNameInput
                 ? "You're almost done! Please tell us your name to complete registration."
-                : "We have sent a verification code to"}
+                : success
+                  ? "Verified. Taking you to your deliveries..."
+                  : "We have sent a 6-digit verification code to"}
             </p>
-            {!showNameInput && (
-              <p className="text-base text-black font-medium">
+            {!showNameInput && !success && (
+              <p className="text-lg text-gray-900 font-extrabold tracking-wide">
                 {getPhoneNumber()}
               </p>
             )}
@@ -564,7 +573,7 @@ export default function DeliveryOTP() {
 
           {/* Error message */}
           {error && (
-            <p className="text-sm text-red-500 text-center">
+            <p role="alert" className="text-sm font-medium text-red-600 text-center bg-red-50 border border-red-100 rounded-xl px-3 py-2">
               {error}
             </p>
           )}
@@ -572,7 +581,7 @@ export default function DeliveryOTP() {
           {/* OTP Input Fields */}
           {!showNameInput && !pendingMessage && (
             <>
-              <div className="flex justify-center gap-2">
+              <div className="flex justify-center gap-2 sm:gap-2.5">
                 {otp.map((digit, index) => (
                   <Input
                     key={index}
@@ -587,26 +596,26 @@ export default function DeliveryOTP() {
                     disabled={isLoading}
                     autoComplete="off"
                     autoFocus={false}
-                    className="w-12 h-12 text-center text-lg font-semibold p-0 border border-black rounded-md focus-visible:ring-0 focus-visible:border-black bg-white"
+                    className={`w-11 h-12 sm:w-12 sm:h-14 text-center text-xl font-bold p-0 rounded-xl border-2 shadow-sm outline-none transition-all focus-visible:ring-0 focus-visible:border-[var(--primary,#E53935)] focus-visible:shadow-[0_0_0_3px_rgba(229,57,53,0.15)] ${digit ? "border-[var(--primary,#E53935)] bg-[var(--primary,#E53935)]/5 text-gray-900" : "border-gray-200 bg-white text-gray-900"}`}
                   />
                 ))}
               </div>
 
               {/* Resend Section */}
               <div className="text-center space-y-1">
-                <p className="text-sm text-black">
+                <p className="text-sm text-gray-500">
                   Didn't get the OTP?
                 </p>
                 {resendTimer > 0 ? (
-                  <p className="text-sm text-gray-500">
-                    Resend SMS in {resendTimer}s
+                  <p className="text-sm font-semibold text-gray-700">
+                    Resend SMS in <span className="text-[var(--primary,#E53935)] tabular-nums">{resendTimer}s</span>
                   </p>
                 ) : (
                   <button
                     type="button"
                     onClick={handleResend}
                     disabled={isLoading}
-                    className="text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                    className="text-sm font-bold text-[var(--primary,#E53935)] hover:underline disabled:opacity-50"
                   >
                     Resend SMS
                   </button>
@@ -619,7 +628,7 @@ export default function DeliveryOTP() {
           {showNameInput && (
             <div className="space-y-3">
               <div className="space-y-1">
-                <label className="block text-sm font-medium text-black text-left">
+                <label className="block text-sm font-semibold text-gray-800 text-left">
                   Full name
                 </label>
                 <Input
@@ -631,8 +640,7 @@ export default function DeliveryOTP() {
                   }}
                   disabled={isLoading}
                   placeholder="Enter your name"
-                  className={`h-11 border ${nameError ? "border-red-500" : "border-gray-300"
-                    }`}
+                  className={`h-12 rounded-xl border-2 ${nameError ? "border-red-500" : "border-gray-200 focus-visible:border-[var(--primary,#E53935)]"}`}
                 />
                 {nameError && (
                   <p className="text-xs text-red-500 text-left">
@@ -644,7 +652,7 @@ export default function DeliveryOTP() {
               <Button
                 onClick={handleSubmitName}
                 disabled={isLoading}
-                className="w-full h-11 bg-[#00B761] hover:bg-[#00A055] text-white font-semibold"
+                className="w-full h-12 rounded-xl bg-[var(--primary,#E53935)] hover:bg-[var(--primary-hover,#d92d36)] text-white font-bold shadow-md shadow-red-500/20"
               >
                 {isLoading ? "Continuing..." : "Continue"}
               </Button>
@@ -654,7 +662,7 @@ export default function DeliveryOTP() {
           {/* Loading Spinner */}
           {isLoading && !showNameInput && (
             <div className="flex justify-center pt-4">
-              <Loader2 className="h-6 w-6 text-green-500 animate-spin" />
+              <Loader2 className="h-6 w-6 text-[var(--primary,#E53935)] animate-spin" />
             </div>
           )}
         </div>
