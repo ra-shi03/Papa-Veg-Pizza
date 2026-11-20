@@ -36,6 +36,7 @@ import { bulkOrderLimiters } from '../middleware/rateLimit.js';
 import storeRewardsRoutes from '../modules/food/store/routes/storeRewards.routes.js';
 import franchiseRefundsRoutes from '../modules/food/franchise/routes/franchiseRefunds.routes.js';
 import storeOrderRoutes from '../modules/food/store/routes/storeOrders.routes.js';
+import storeOpenStatusRoutes from '../modules/food/store/routes/storeOpenStatus.routes.js';
 import kitchenTaskRoutes from '../modules/food/store/routes/kitchenTasks.routes.js';
 import kitchenOpsRoutes from '../modules/food/store/routes/kitchenOps.routes.js';
 import inventoryRoutes from '../modules/food/store/routes/inventory.routes.js';
@@ -43,7 +44,7 @@ import { customersRouter as storeCustomersRoutes, complaintsRouter as storeCompl
 import { storeDashboardRouter, adminDashboardRouter } from '../modules/food/dashboard/routes/dashboard.routes.js';
 import { storeAttendanceRouter } from '../modules/food/store/routes/attendance.routes.js';
 import { storeProfileRouter } from '../modules/food/store/routes/storeProfile.routes.js';
-import { getPublicStore, getPublicOffers, getDeliverySlots } from '../modules/food/store/controllers/storePublic.controller.js';
+import { getPublicStore, getPublicOffers, getDeliverySlots, getStoreStatus } from '../modules/food/store/controllers/storePublic.controller.js';
 import { storeDeliveryRouter, zonesRouter } from '../modules/food/store/routes/storeDelivery.routes.js';
 import { storePerformanceRouter, operatingHoursRouter, storeExtrasRouter, storePricingRouter, storeDetailsRouter } from '../modules/food/franchise/routes/storeOps.routes.js';
 import { listFranchiseOrders } from '../modules/food/store/controllers/storeOrders.controller.js';
@@ -84,6 +85,7 @@ router.use('/v1/store-approvals', franchiseStoreApprovalRoutes);
 router.use('/v1/staff-approvals', franchiseStaffApprovalRoutes);
 router.use('/v1/food/store/staff', kitchenStaffRoutes);
 router.use('/v1/food/store/orders', storeOrderRoutes);
+router.use('/v1/food/store/open-status', storeOpenStatusRoutes);
 router.use('/v1/food/store/kitchen', kitchenOpsRoutes);
 router.use('/v1/food/store/inventory', inventoryRoutes);
 router.use('/v1/food/store/customers', storeCustomersRoutes);
@@ -138,6 +140,7 @@ router.get('/v1/food/stores/resolve', async (req, res, next) => {
 
 // Public, read-only: a store's public details and the coupons a customer can use (customer app)
 router.get('/v1/food/stores/slots', getDeliverySlots);
+router.get('/v1/food/stores/status', getStoreStatus);
 router.get('/v1/food/stores/:id', getPublicStore);
 router.get('/v1/food/offers/public', getPublicOffers);
 

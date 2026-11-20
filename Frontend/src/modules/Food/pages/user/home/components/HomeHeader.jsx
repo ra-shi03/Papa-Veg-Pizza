@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowLeft } from 'lucide-react';
 import { useMethodOffered } from '@food/hooks/useOrderMethods';
+import { useStoreOpenStatus } from '@food/hooks/useStoreOpenStatus';
 
 export function HomeHeader({ 
   deliveryAddress, 
@@ -16,6 +17,10 @@ export function HomeHeader({
 }) {
   const navigate = useNavigate();
   const trainOffered = useMethodOffered('train');
+  const storeStatus = useStoreOpenStatus();
+  const storeOpen = typeof storeStatus === 'boolean' ? storeStatus : (storeStatus?.isOpen ?? true);
+  const storeTiming = storeStatus?.storeTiming || '10:00 AM - 11:00 PM';
+  const openTime = storeStatus?.openTime || '10:00 AM';
 
   const [currentCatIndex, setCurrentCatIndex] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
@@ -252,6 +257,46 @@ export function HomeHeader({
                 LOGIN
               </button>
             </div>
+          )}
+
+          {/* ── STORE CLOSED BANNER: JUST ABOVE THE SEARCH BAR AND DELIVERY ON TRAIN SECTION ── */}
+          {!storeOpen && (
+            <motion.div 
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="mx-4 mb-2.5 rounded-2xl bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border border-red-200/80 dark:border-red-900/40 p-3.5 shadow-lg flex items-start gap-3"
+              style={{ fontFamily: 'Poppins, sans-serif' }}
+              role="alert"
+            >
+              <div className="w-9 h-9 rounded-xl bg-red-100 dark:bg-red-950/50 text-[#C62828] dark:text-red-400 flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>storefront</span>
+              </div>
+              <div className="flex-1 min-w-0 flex flex-col leading-tight">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[13px] font-bold text-[#C62828] dark:text-red-400">
+                    Store Currently Closed
+                  </span>
+                  <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                </div>
+                <p className="text-[11.5px] font-medium text-zinc-600 dark:text-zinc-300 mt-1 m-0 leading-snug">
+                  We are currently not accepting delivery orders at this time. Please check back during operating hours.
+                </p>
+
+                {/* Dynamic Store Operating Hours Display */}
+                <div className="mt-2.5 inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-red-50/80 dark:bg-red-950/30 border border-red-200/60 dark:border-red-900/40 text-[11px] font-semibold text-red-700 dark:text-red-300 w-fit">
+                  <span className="material-symbols-outlined shrink-0" style={{ fontSize: 15, color: '#C62828' }}>schedule</span>
+                  <span>
+                    Store Hours: <strong className="font-bold text-[#B71C1C] dark:text-red-200">{storeTiming}</strong>
+                  </span>
+                  {openTime && (
+                    <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 ml-0.5">
+                      (Opens at {openTime})
+                    </span>
+                  )}
+                </div>
+              </div>
+            </motion.div>
           )}
 
           {/* ── SEARCH BAR + TRAIN BUTTON ── */}

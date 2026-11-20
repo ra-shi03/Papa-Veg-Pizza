@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { FoodStore } from '../models/store.model.js';
-import { openStoreIds } from '../../franchise/services/storeHours.js';
+import { openStoreIds, windowOn, to12 } from '../../franchise/services/storeHours.js';
+import { StoreHours } from '../../franchise/models/storeHours.model.js';
 import { sendResponse } from '../../../../utils/response.js';
 import { NotFoundError } from '../../../../core/auth/errors.js';
 import { FoodAppConfig } from '../../settings/models/appConfig.model.js';
@@ -13,6 +14,57 @@ import { buildSlots, SCHEDULE } from '../../orders/services/order-schedule.servi
 // already sees in the app: no franchise, owner, documents, approval or internal data.
 
 const ORDERABLE = { approvalStatus: 'Approved', isActive: { $ne: false } };
+
+/**
+ * GET /v1/food/stores/status?lat=&lng= (or ?storeId=) : is the store serving this customer taking orders right now?
+ * Open means inside its operating hours, no temporary closure, and not switched to Closed by the store manager.
+ * The store is found whether or not it is open. When no store serves the point, serviceable is false (the app shows
+ * its own "not available here" messages), and nothing is said about opening hours.
+ */
+export async function getStoreStatus(req, res, next) {
+  try {
+    let store = null;
+    try {
+      if (req.query.storeId) store = await findOrderableStore(req.query.storeId);
+      else if (req.query.lat !== undefined && req.query.lng !== undefined && req.query.lat !== '' && req.query.lng !== '') {
+        store = (await resolveStoreForLocation(parseFloat(req.query.lat), parseFloat(req.query.lng), { anyHours: true }))?.store || null;
+      } else if (req.query.fallback === '1' || req.query.auto === '1') {
+        store = (await resolveStoreForLocation(NaN, NaN, { anyHours: true }))?.store || null;
+      }
+    } catch { store = null; }
+    res.set('Cache-Control', 'no-store');
+    if (!store) return sendResponse(res, 200, 'OK', { serviceable: false, isOpen: true });
+    const open = await openStoreIds([store._id]);
+    const isOpen = open.has(String(store._id));
+
+    // Dynamic operating hours for store
+    const hoursDoc = await StoreHours.findOne({ storeId: store._id }).lean();
+    const todayWindow = windowOn(hoursDoc, new Date());
+    let openTime = '10:00 AM';
+    let closeTime = '11:00 PM';
+    if (todayWindow?.open && todayWindow?.close && (todayWindow.open !== todayWindow.close || todayWindow.isClosed)) {
+      openTime = to12(todayWindow.open);
+      closeTime = to12(todayWindow.close);
+    }
+    const storeTiming = `${openTime} - ${closeTime}`;
+
+    const baseData = { serviceable: true, storeId: String(store._id), storeName: store.storeName, isOpen };
+
+    if (req.query.includeHours === '1' || req.query.fallback === '1') {
+      return sendResponse(res, 200, 'OK', {
+        ...baseData,
+        openTime,
+        closeTime,
+        storeTiming,
+        opensAt: openTime,
+      });
+    }
+
+    return sendResponse(res, 200, 'OK', baseData);
+  } catch (err) {
+    next(err);
+  }
+}
 
 /** GET /v1/food/stores/:id */
 export async function getPublicStore(req, res, next) {

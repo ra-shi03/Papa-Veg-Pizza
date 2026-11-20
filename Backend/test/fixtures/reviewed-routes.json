@@ -28,6 +28,7 @@
     "GET /api/v1/food/fee-config",
     "GET /api/v1/food/landing/settings/public",
     "GET /api/v1/food/offers/public",
+    "GET /api/v1/food/stores/status",
     "GET /api/v1/food/order-methods",
     "GET /api/v1/food/orders/history",
     "GET /api/v1/food/orders/history-lookup",

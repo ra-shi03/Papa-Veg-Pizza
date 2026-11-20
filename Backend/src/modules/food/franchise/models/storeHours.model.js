@@ -41,6 +41,17 @@ const closureSchema = new mongoose.Schema(
     { _id: false }
 );
 
+// The store manager's Open / Closed switch: while active the store takes no orders right now, whatever its hours say.
+// It does not touch the weekly hours, holidays or the franchise admin's temporary closure.
+const manualClosureSchema = new mongoose.Schema(
+    {
+        active: { type: Boolean, default: false },
+        by: { type: String, default: '' },
+        at: { type: Date, default: null }
+    },
+    { _id: false }
+);
+
 const auditSchema = new mongoose.Schema(
     {
         updatedBy: { type: String, default: '' },
@@ -58,6 +69,7 @@ const storeHoursSchema = new mongoose.Schema(
         week: { type: new mongoose.Schema(weekFields, { _id: false }), default: () => ({}) },
         holidays: { type: [holidaySchema], default: [] },
         closure: { type: closureSchema, default: () => ({}) },
+        manualClosure: { type: manualClosureSchema, default: () => ({}) },
         auditLogs: { type: [auditSchema], default: [] },
         updatedBy: { type: String, default: '' }
     },

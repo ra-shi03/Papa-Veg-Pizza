@@ -7,6 +7,7 @@ import {
   AlertTriangle, ArrowRight, ClipboardList, ShieldAlert, Star
 } from "lucide-react"
 import { toast } from "sonner"
+import StoreOpenToggle from "./StoreOpenToggle"
 import { useSystemTheme } from "@/shared/utils/themeSync"
 import { adminAPI } from "@food/api"
 import { myTasksService } from "@/services/api/myTasksService"
@@ -284,6 +285,11 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
         {/* RIGHT SECTION: Quick Actions, Role Switcher, Alerts & User Profile */}
         <div className="flex items-center gap-3 shrink-0 text-xs font-bold text-zinc-650 dark:text-zinc-300">
           
+          {/* Store time: the store manager opens / closes the store for customer orders */}
+          {(!role || ["store_manager", "store-manager", "STORE_MANAGER"].includes(role)) && (
+            <StoreOpenToggle variant="compact" storeName={storeData?.name || storeData?.storeName || ""} />
+          )}
+
           {/* PREMIUM DEMO ROLE SWITCHER REMOVED */}
 
           {/* Quick Actions & Theme Toggle Removed */}

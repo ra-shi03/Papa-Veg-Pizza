@@ -92,8 +92,11 @@ export async function hoursByStore(storeIds) {
   return new Map(docs.map((d) => [String(d.storeId), d]));
 }
 
-/** The ids (strings) of the stores that are open right now. */
+/** Has the store manager switched the store to Closed? (applies to right now only, never to a scheduled slot) */
+export const isManuallyClosed = (doc) => Boolean(doc?.manualClosure?.active);
+
+/** The ids (strings) of the stores that are open right now: inside their hours and not switched to Closed. */
 export async function openStoreIds(storeIds, now = new Date()) {
   const docs = await hoursByStore(storeIds);
-  return new Set(storeIds.map(String).filter((id) => isOpenAt(docs.get(id), now)));
+  return new Set(storeIds.map(String).filter((id) => !isManuallyClosed(docs.get(id)) && isOpenAt(docs.get(id), now)));
 }

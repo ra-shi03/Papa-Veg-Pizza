@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { useOrderEvents } from "../api/storeOrdersApi"
+import StoreOpenToggle from "../layouts/StoreOpenToggle"
 
 // Import modular components
 import KpiCards from "./components/KpiCards"
@@ -42,6 +43,9 @@ export default function StoreOperationsDashboard() {
       {/* Main dashboard content area - compact layout */}
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
         
+        {/* Dynamic Store Time & Operational Status Banner */}
+        <StoreOpenToggle variant="banner" />
+
         {/* SECTION 1: 8 KPI Cards Grid */}
         <KpiCards storeId={selectedStoreId} refreshKey={refreshKey} />
 
