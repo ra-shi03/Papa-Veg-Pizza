@@ -23,10 +23,10 @@ export default function OrderCard({
   onOpenDetails,
   onMarkPreparing
 }) {
-  // Accepting, starting prep, assigning a chef and rejecting an item are for the store manager and the order's
-  // supervisor (the server refuses everyone else); kitchen staff only look at the card.
+  // Accepting, starting prep, assigning a chef and rejecting an item are for the store manager (the server
+  // refuses everyone else); kitchen staff only look at the card.
   const { role } = useOutletContext() || {};
-  const canManage = !role || role === "store_manager" || role === "kitchen_supervisor";
+  const canManage = !role || role === "store_manager";
 
   const isOverdue = new Date(order.expectedReadyTime) < new Date() && order.status !== "ready_for_pickup";
 
@@ -215,7 +215,7 @@ export default function OrderCard({
 
         {!canManage && ["confirmed", "queued"].includes(order.status) && (
           <p className="flex-1 py-1.5 text-center text-[10px] font-semibold text-slate-400 dark:text-zinc-500 leading-tight">
-            {order.status === "confirmed" ? "Your supervisor will accept this order" : "Waiting for your supervisor to start preparation"}
+            {order.status === "confirmed" ? "Your store manager will accept this order" : "Waiting for your store manager to start preparation"}
           </p>
         )}
       </div>

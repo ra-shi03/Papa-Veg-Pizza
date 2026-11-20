@@ -72,7 +72,7 @@ export default function PermissionsTab() {
             Read-Only Authorization Matrix
           </p>
           <p className="text-[9px] font-medium text-slate-450 dark:text-zinc-500 leading-normal">
-            Your permissions are determined by your assigned store role (Store Manager, Kitchen Supervisor, or Kitchen Staff). If you require access to locked features, please submit a request to your Franchise Admin.
+            Your permissions are determined by your assigned store role (Store Manager or Kitchen Staff). If you require access to locked features, please submit a request to your Franchise Admin.
           </p>
         </div>
       </div>

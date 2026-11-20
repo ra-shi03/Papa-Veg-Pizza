@@ -338,7 +338,6 @@ export default function KitchenStaff() {
               <option value="Pizza Maker">Pizza Maker</option>
               <option value="Baker">Baker</option>
               <option value="Packager">Packager</option>
-              <option value="Kitchen Supervisor">Kitchen Supervisor</option>
             </select>
           </div>
 

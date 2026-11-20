@@ -5,7 +5,7 @@ import { CalendarPlus, CalendarOff, X, Loader2, Clock, CheckCircle2, XCircle, Ba
 import apiClient from "@/services/api/axios"
 import { localToday } from "../staffManagement/localToday"
 
-// Kitchen supervisors and staff ask for leave here; the store manager accepts or rejects it (with a reason).
+// Kitchen staff ask for leave here; the store manager accepts or rejects it (with a reason).
 
 export const LEAVE_CATEGORIES = ["Sick", "Personal", "Emergency", "Vacation", "Other"]
 

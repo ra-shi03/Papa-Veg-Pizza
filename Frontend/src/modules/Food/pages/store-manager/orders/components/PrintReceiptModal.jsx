@@ -253,9 +253,9 @@ export default function PrintReceiptModal({ visible, onClose, order }) {
           <div className="text-center text-[9px] space-y-1 text-zinc-550 leading-relaxed font-semibold">
             <p>100% Pure Vegetarian Pizza</p>
             <p>Thank you for choosing Papa Veg Pizza!</p>
-            <p>Prepared under kitchen supervisor</p>
+            <p>Prepared by our kitchen team</p>
             <p className="border border-black px-1.5 py-0.5 inline-block font-bold mt-1 uppercase tracking-wider">
-              {order.kitchenSupervisorId ? "Assigned in System" : "Pending Supervisor"}
+              {order.assignedStaff?.packaging_staff?.name ? `Packed by ${order.assignedStaff.packaging_staff.name}` : "Kitchen Team"}
             </p>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
+import { canMarkReady } from "./utils/kitchenRights";
 import {
   Wifi,
   RefreshCw,
@@ -351,7 +352,7 @@ export default function ActiveOrders() {
             />
           </Tooltip>
 
-          {(role === "store_manager" || role === "kitchen_supervisor") && (
+          {role === "store_manager" && (
             <>
               <Tooltip title="Assign Staff">
                 <Button
@@ -372,7 +373,7 @@ export default function ActiveOrders() {
             </>
           )}
 
-          {(role === "store_manager" || role === "kitchen_supervisor" || role === "packaging_staff") && (
+          {canMarkReady(role, record) && (
             <Tooltip title="Mark Ready">
               <Button
                 size="small"
@@ -513,7 +514,7 @@ export default function ActiveOrders() {
             />
           </Tooltip>
 
-          {(role === "store_manager" || role === "kitchen_supervisor") && (
+          {role === "store_manager" && (
             <Tooltip title="Assign Staff">
               <Button
                 size="small"
@@ -524,8 +525,8 @@ export default function ActiveOrders() {
             </Tooltip>
           )}
 
-          {(role === "store_manager" || role === "kitchen_supervisor" || role === "packaging_staff") && 
-           (orderObj.status === "packaging" || role === "store_manager" || role === "kitchen_supervisor") && (
+          {canMarkReady(role, orderObj) &&
+           (orderObj.status === "packaging" || role === "store_manager") && (
             <Tooltip title="Mark Ready">
               <Button
                 size="small"

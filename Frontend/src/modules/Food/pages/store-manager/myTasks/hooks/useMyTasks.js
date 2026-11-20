@@ -44,7 +44,7 @@ export function useMyTaskStats() {
   });
 }
 
-// 3. Hook to fetch team tasks (Supervisor only)
+// 3. Hook to fetch team tasks (store manager only)
 export function useTeamTasksQuery() {
   return useQuery({
     queryKey: [QUERY_KEYS.teamTasks],
@@ -139,7 +139,7 @@ export function useReassignRequestMutation() {
   });
 }
 
-// 10. Reassign task directly (Supervisor only)
+// 10. Reassign task directly (store manager only)
 export function useReassignTaskMutation() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -152,7 +152,7 @@ export function useReassignTaskMutation() {
   });
 }
 
-// 11. Submit quality check (Supervisor only)
+// 11. Submit quality check (store manager, or the order's packaging-station staff member)
 export function useQualityCheckMutation() {
   return useMutation({
     mutationFn: (payload) => myTasksService.submitQualityCheck(payload),

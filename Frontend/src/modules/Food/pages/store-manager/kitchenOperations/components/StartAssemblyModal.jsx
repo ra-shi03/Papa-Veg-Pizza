@@ -74,7 +74,7 @@ export default function StartAssemblyModal({ visible, onClose, item, chefs = [],
         </div>
 
         <p className="text-[10px] font-medium text-slate-450 dark:text-zinc-500 text-center leading-relaxed pt-1.5 border-t border-slate-50 dark:border-zinc-850">
-          This will trigger a live preparation timer and alert the supervisor that assembly has commenced.
+          This will trigger a live preparation timer and alert the store manager that assembly has commenced.
         </p>
       </div>
     </Modal>

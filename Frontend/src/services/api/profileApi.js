@@ -44,7 +44,7 @@ const defaultMockData = {
     address: "B-402, Shalimar Township, AB Road, Indore, MP - 452010",
     employeeId: "PVP-EM-409",
     designation: "Store Operations Manager",
-    role: "store_manager", // 'store_manager', 'kitchen_supervisor', 'kitchen_staff'
+    role: "store_manager", // 'store_manager', 'kitchen_staff'
     storeName: "Vijay Nagar Store, Indore",
     joiningDate: "2023-03-15",
     status: "Active",
@@ -137,12 +137,10 @@ export const profileApi = {
       const data = getLocalData();
       // Ensure the mock role matches any changes made in the demo environment if needed
       const savedRole = localStorage.getItem("demo_user_role");
-      if (savedRole && ["store_manager", "kitchen_supervisor", "kitchen_staff"].includes(savedRole)) {
+      if (savedRole && ["store_manager", "kitchen_staff"].includes(savedRole)) {
         data.user.role = savedRole;
         if (savedRole === "kitchen_staff") {
           data.user.designation = "Pizza Station Chef";
-        } else if (savedRole === "kitchen_supervisor") {
-          data.user.designation = "Kitchen Operations Supervisor";
         } else {
           data.user.designation = "Store Operations Manager";
         }

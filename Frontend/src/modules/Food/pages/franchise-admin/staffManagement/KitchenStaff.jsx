@@ -5,7 +5,7 @@ import { Link } from "react-router-dom"
 import { adminAPI } from "@food/api"
 import { adminClient } from "@/services/api/axios"
 
-// The franchise's approved kitchen supervisors and kitchen staff, store by store. View only: people are added by the store
+// The franchise's approved kitchen staff, store by store. View only: people are added by the store
 // manager and approved on the Kitchen Staff Approvals page.
 
 const STATUS_STYLE = {
@@ -58,7 +58,7 @@ export default function KitchenStaff() {
           <Users className="text-[var(--primary)]" />
           <div>
             <h1 className="text-xl font-black tracking-tight">Kitchen staff</h1>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">Approved kitchen supervisors and staff across your stores.</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Approved kitchen staff across your stores.</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -88,7 +88,7 @@ export default function KitchenStaff() {
         </select>
         <select value={role} onChange={(e) => setRole(e.target.value)} className={input}>
           <option value="All">All roles</option>
-          {["Kitchen Supervisor", "Pizza Maker", "Baker", "Packager", "Kitchen Staff", ...roles.filter((r) => !["Kitchen Supervisor", "Pizza Maker", "Baker", "Packager", "Kitchen Staff"].includes(r))].map((r) => <option key={r} value={r}>{r}</option>)}
+          {["Pizza Maker", "Baker", "Packager", "Kitchen Staff", ...roles.filter((r) => !["Pizza Maker", "Baker", "Packager", "Kitchen Staff"].includes(r))].map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
         <select value={status} onChange={(e) => setStatus(e.target.value)} className={input}>
           <option value="All">All statuses</option>

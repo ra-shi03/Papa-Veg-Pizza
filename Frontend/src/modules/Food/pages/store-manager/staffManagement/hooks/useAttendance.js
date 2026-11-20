@@ -361,7 +361,7 @@ export function useDeleteAttendance() {
   });
 }
 
-// 7. The caller's own attendance today (kitchen supervisor and kitchen staff): GET /store/attendance/today
+// 7. The caller's own attendance today (kitchen staff): GET /store/attendance/today
 export function useMyAttendanceToday(enabled = true) {
   return useQuery({
     queryKey: ["myAttendanceToday"],

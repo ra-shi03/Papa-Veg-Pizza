@@ -333,7 +333,7 @@ export function useChefs() {
     queryKey: ["kitchenChefs"],
     queryFn: async () => {
       try {
-        // Kitchen staff of this store (supervisors + station staff), from the store-orders API
+        // Kitchen staff of this store, from the store-orders API
         const response = await apiClient.get("/food/store/orders/team");
         if (Array.isArray(response.data)) return response.data;
         if (Array.isArray(response.data?.data)) return response.data.data;

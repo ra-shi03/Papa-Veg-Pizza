@@ -41,7 +41,7 @@ export default function CreateIssueModal({ visible, onClose }) {
     "Store Manager",
     "Customer",
     "Rider",
-    "Kitchen Supervisor"
+    "Kitchen Staff"
   ];
 
   const handleSubmit = () => {

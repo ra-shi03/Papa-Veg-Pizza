@@ -13,15 +13,7 @@ export function useIncomingOrders(filters = {}) {
   return { ...query, data: query.data || [], socketConnected: useLiveIndicator(query) };
 }
 
-// Kitchen supervisors of this store, for the "assign to supervisor" step.
-export function useActiveSupervisors(searchQuery = "") {
-  return useQuery({
-    queryKey: ["activeSupervisors", searchQuery],
-    queryFn: () => storeOrdersApi.team("kitchen_supervisor", searchQuery),
-  });
-}
-
-// Accept an order and hand it to a kitchen supervisor.
+// Accept an order into the kitchen; the store manager then assigns kitchen staff to its stations (Active Orders).
 export function useAcceptOrder() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -29,9 +21,8 @@ export function useAcceptOrder() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["incomingOrders"] });
       queryClient.invalidateQueries({ queryKey: ["activeOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["activeSupervisors"] });
       toast.success("Order accepted successfully", {
-        description: `Order ${data?.orderNumber || ""} has been sent to ${data?.kitchenSupervisor?.name || "the kitchen"}.`,
+        description: `Order ${data?.orderNumber || ""} has been sent to the kitchen. Assign kitchen staff to its stations.`,
       });
     },
     onError: (err) => toast.error("Failed to accept order: " + apiErrorMessage(err)),

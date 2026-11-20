@@ -47,7 +47,9 @@ export default function CompletedTasksTable({ tasks = [], role = "kitchen_staff"
     return date.toLocaleDateString("en-IN", { month: "short", day: "numeric" }) + " " + date.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
   };
 
-  const isSupervisor = role === "kitchen_supervisor" || role === "store_manager";
+  // Quality check: the store manager, or the kitchen staff member whose task was the packaging station of that order
+  const canQc = (task) => role === "store_manager" || (role === "kitchen_staff" && task?.taskType === "pack");
+  const showQc = role === "store_manager" || tasks.some(canQc);   // shows the QC column
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-2xl p-5 shadow-sm space-y-4">
@@ -88,7 +90,7 @@ export default function CompletedTasksTable({ tasks = [], role = "kitchen_staff"
               <th className="py-2.5 px-3">Target vs Actual</th>
               <th className="py-2.5 px-3">Performance Status</th>
               <th className="py-2.5 px-3">Notes & Photo</th>
-              {isSupervisor && <th className="py-2.5 px-3 text-right">QC Check</th>}
+              {showQc && <th className="py-2.5 px-3 text-right">QC Check</th>}
             </tr>
           </thead>
           <tbody>
@@ -145,21 +147,23 @@ export default function CompletedTasksTable({ tasks = [], role = "kitchen_staff"
                       )}
                     </div>
                   </td>
-                  {isSupervisor && (
+                  {showQc && (
                     <td className="py-2.5 px-3 text-right">
-                      <button
-                        onClick={() => onQualityCheck(task)}
-                        className="text-[9px] font-bold py-1 px-2.5 rounded-md bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm active:scale-[0.98] transition-all cursor-pointer inline-flex items-center gap-1"
-                      >
-                        <span>Run QC</span>
-                      </button>
+                      {canQc(task) && (
+                        <button
+                          onClick={() => onQualityCheck(task)}
+                          className="text-[9px] font-bold py-1 px-2.5 rounded-md bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm active:scale-[0.98] transition-all cursor-pointer inline-flex items-center gap-1"
+                        >
+                          <span>Run QC</span>
+                        </button>
+                      )}
                     </td>
                   )}
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={isSupervisor ? 7 : 6} className="py-8 text-center text-xs font-semibold text-slate-455 dark:text-zinc-550">
+                <td colSpan={showQc ? 7 : 6} className="py-8 text-center text-xs font-semibold text-slate-455 dark:text-zinc-550">
                   No completed tasks found matching searches.
                 </td>
               </tr>

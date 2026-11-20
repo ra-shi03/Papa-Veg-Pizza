@@ -57,7 +57,7 @@ export default function StoreLogin() {
         throw new Error("Invalid response from server")
       }
       const role = String(rawUser.role || "").replace(/_/g, "-")
-      if (!["store-manager", "kitchen-supervisor", "kitchen-staff"].includes(role)) {
+      if (!["store-manager", "kitchen-staff"].includes(role)) {
         throw new Error("Access Denied: This login is only for store roles")
       }
       const storeUser = { ...rawUser, role: role.replace(/-/g, "_") }
@@ -74,7 +74,8 @@ export default function StoreLogin() {
       // Role-based routing
       navigate(storeUser.role === "kitchen_staff" ? "/store-operations/tasks" : "/store-operations/dashboard", { replace: true })
     } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || "Login failed. Check your credentials."
+      // the server explains a refused sign-in (e.g. a deactivated kitchen supervisor account) in `message` or `error`
+      const msg = err?.response?.data?.message || err?.response?.data?.error || err?.message || "Login failed. Check your credentials."
       toast.error(msg)
     } finally {
       setLoading(false)

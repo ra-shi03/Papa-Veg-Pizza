@@ -83,8 +83,6 @@ export default function Sidebar({ isOpen, onClose, role, isCollapsed = false, on
     switch (r) {
       case "store_manager":
         return "Store Manager"
-      case "kitchen_supervisor":
-        return "Kitchen Supervisor"
       case "kitchen_staff":
         return "Kitchen Staff"
       case "assistant_manager":

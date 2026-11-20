@@ -178,7 +178,6 @@ export default function IncomingOrders() {
 
   // Role verification helper flags
   const isManager = role === "store_manager";
-  const isSupervisor = role === "kitchen_supervisor";
 
   // Table Column Definitions
   const tableColumns = [
@@ -293,7 +292,7 @@ export default function IncomingOrders() {
             />
           </Tooltip>
           
-          {(isManager || isSupervisor) && (
+          {isManager && (
             <Tooltip title="Quick Print">
               <Button
                 type="text"
@@ -304,7 +303,7 @@ export default function IncomingOrders() {
             </Tooltip>
           )}
 
-          {(isManager || isSupervisor) && (
+          {isManager && (
             <Tooltip title="Accept Order">
               <Button
                 type="primary"
@@ -630,7 +629,7 @@ export default function IncomingOrders() {
                 {/* Action Buttons */}
                 <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-border">
                   <div className="flex items-center gap-1.5">
-                    {(isManager || isSupervisor) && (
+                    {isManager && (
                       <Tooltip title="Quick Print Receipt">
                         <Button
                           shape="circle"
@@ -660,7 +659,7 @@ export default function IncomingOrders() {
                         />
                       </Tooltip>
                     )}
-                    {(isManager || isSupervisor) && (
+                    {isManager && (
                       <Tooltip title="Accept Order">
                         <Button
                           type="primary"

@@ -4,7 +4,7 @@ import { toast } from "sonner"
 import { CalendarCheck2, Check, X, Search, Clock, Loader2, ShieldCheck, ShieldX, Inbox } from "lucide-react"
 import apiClient from "@/services/api/axios"
 
-// The store manager accepts or rejects leave asked for by kitchen supervisors and staff. A rejection needs a reason.
+// The store manager accepts or rejects leave asked for by kitchen staff. A rejection needs a reason.
 
 const TABS = [
   { key: "pending", label: "Pending", icon: Clock, tone: "text-amber-600 bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/40" },
@@ -61,7 +61,7 @@ export default function LeaveRequests() {
         <CalendarCheck2 className="text-primary" />
         <div>
           <h1 className="text-xl font-black tracking-tight">Leave requests</h1>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">Accept or reject the leave your kitchen supervisors and staff ask for. Accepted leave appears in Attendance.</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">Accept or reject the leave your kitchen staff ask for. Accepted leave appears in Attendance.</p>
         </div>
       </div>
 

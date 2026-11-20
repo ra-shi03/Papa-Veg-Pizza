@@ -1,29 +1,14 @@
-import React, { useState, useEffect } from "react";
-import { Modal, Radio, Input, Select, Button, Form, Alert, Badge } from "antd";
-import { Clock, ShieldCheck, Flame, UserCheck, Keyboard } from "lucide-react";
-import { useActiveSupervisors } from "../hooks/useIncomingOrders";
+import React, { useState } from "react";
+import { Modal, Radio, Input, Button, Form, Alert } from "antd";
+import { Clock, ShieldCheck, Flame, Keyboard } from "lucide-react";
 
 export default function AcceptOrderModal({ visible, onClose, order, onConfirm, loading }) {
   const [prepTimeType, setPrepTimeType] = useState("20"); // "10", "15", "20", "30", "45", "custom"
   const [customPrepTime, setCustomPrepTime] = useState(25);
   const [priority, setPriority] = useState("normal"); // "normal", "urgent"
-  const [supervisorId, setSupervisorId] = useState(null);
   const [notes, setNotes] = useState("");
-  const [searchSupervisor, setSearchSupervisor] = useState("");
 
   const [form] = Form.useForm();
-
-  // Fetch active supervisors
-  const { data: supervisors = [], isLoading: loadingSupervisors } = useActiveSupervisors(searchSupervisor);
-
-  // Set default supervisor once loaded
-  useEffect(() => {
-    if (supervisors.length > 0 && !supervisorId) {
-      // Auto-select supervisor with lowest load
-      const sorted = [...supervisors].sort((a, b) => (a.currentActiveOrders || 0) - (b.currentActiveOrders || 0));
-      setSupervisorId(sorted[0]._id);
-    }
-  }, [supervisors, supervisorId]);
 
   if (!order) return null;
 
@@ -59,7 +44,6 @@ export default function AcceptOrderModal({ visible, onClose, order, onConfirm, l
     onConfirm({
       estimatedPreparationTime: finalPrepTime,
       priority,
-      kitchenSupervisorId: supervisorId,
       notes
     });
   };
@@ -203,58 +187,11 @@ export default function AcceptOrderModal({ visible, onClose, order, onConfirm, l
           </Radio.Group>
         </div>
 
-        {/* 3. Assign Kitchen Supervisor */}
-        <div className="space-y-2">
-          <label className="text-[11px] font-black text-slate-700 dark:text-zinc-300 uppercase tracking-wider flex items-center gap-1">
-            <UserCheck size={12} className="text-slate-400" />
-            3. Kitchen Supervisor Assignment
-          </label>
-          <Select
-            showSearch
-            placeholder="Search kitchen supervisor..."
-            value={supervisorId}
-            onSearch={setSearchSupervisor}
-            onChange={setSupervisorId}
-            filterOption={false}
-            loading={loadingSupervisors}
-            className="w-full custom-staff-select"
-            popupClassName="custom-staff-dropdown"
-          >
-            {supervisors.map((staff) => (
-              <Select.Option key={staff._id} value={staff._id} label={staff.name}>
-                <div className="flex justify-between items-center py-1 text-xs">
-                  <div className="flex items-center gap-2">
-                    <img
-                      src={staff.avatar}
-                      alt={staff.name}
-                      className="w-6 h-6 rounded-full object-cover shrink-0"
-                    />
-                    <div>
-                      <p className="font-extrabold text-slate-800 dark:text-zinc-250 leading-tight">{staff.name}</p>
-                      <p className="text-[9px] text-zinc-400 font-semibold">{staff.employeeId}</p>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <Badge
-                      status={staff.currentActiveOrders >= 3 ? "warning" : "success"}
-                      text={
-                        <span className="text-[10px] font-bold text-zinc-500">
-                          {staff.currentActiveOrders || 0} active orders
-                        </span>
-                      }
-                    />
-                  </div>
-                </div>
-              </Select.Option>
-            ))}
-          </Select>
-        </div>
-
-        {/* 4. Notes Section */}
+        {/* 3. Notes Section */}
         <div className="space-y-2">
           <label className="text-[11px] font-black text-slate-700 dark:text-zinc-300 uppercase tracking-wider flex items-center gap-1">
             <Keyboard size={12} className="text-slate-400" />
-            4. Preparation Notes
+            3. Preparation Notes
           </label>
           <Input.TextArea
             placeholder="Enter custom instructions (e.g. Prepare without onion, extra seasoning)"
@@ -265,7 +202,7 @@ export default function AcceptOrderModal({ visible, onClose, order, onConfirm, l
           />
         </div>
 
-        {/* 5. Completion Time Preview */}
+        {/* 4. Completion Time Preview */}
         <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl flex items-center justify-between">
           <div>
             <p className="text-emerald-800 dark:text-emerald-400 font-extrabold text-xs">Estimated Completion Time</p>

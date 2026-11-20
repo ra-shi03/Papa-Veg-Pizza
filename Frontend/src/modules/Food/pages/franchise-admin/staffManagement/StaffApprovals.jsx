@@ -5,7 +5,7 @@ import { UserCheck, Check, X, Search, Store, Clock, Loader2, ShieldCheck, Shield
 import { adminAPI } from "@food/api"
 import { adminClient } from "@/services/api/axios"
 
-// Kitchen supervisors and kitchen staff that store managers add wait here. Approve: they become Active and can sign in.
+// Kitchen staff that store managers add wait here. Approve: they become Active and can sign in.
 // Reject: a reason is required and the store manager sees it.
 
 const TABS = [
@@ -73,7 +73,7 @@ export default function StaffApprovals() {
         <UserCheck className="text-[var(--primary)]" />
         <div>
           <h1 className="text-xl font-black tracking-tight">Kitchen staff approvals</h1>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">Approve or reject the supervisors and staff your store managers add. Nobody can sign in or work until you approve.</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">Approve or reject the kitchen staff your store managers add. Nobody can sign in or work until you approve.</p>
         </div>
       </div>
 

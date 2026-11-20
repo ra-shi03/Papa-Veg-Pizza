@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react"
-import { useOutletContext } from "react-router-dom"
 import { useOrderEvents } from "../api/storeOrdersApi"
 
 // Import modular components
@@ -17,9 +16,7 @@ import ActivityTimeline from "./components/ActivityTimeline"
 import NotificationsDrawer from "./components/NotificationsDrawer"
 
 export default function StoreOperationsDashboard() {
-  // A kitchen supervisor gets the kitchen view of their own orders; sales, stock, staff, products and complaints are the manager's
-  const { role } = useOutletContext() || {}
-  const isManager = role !== "kitchen_supervisor"
+  // The store dashboard is the store manager's (kitchen staff land on My Tasks; the kitchen supervisor role is no longer used)
   // Primary States
   // A store manager's own store comes from their login on the server; a store is named here only when an admin
   // opens a specific one.
@@ -46,18 +43,16 @@ export default function StoreOperationsDashboard() {
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
         
         {/* SECTION 1: 8 KPI Cards Grid */}
-        <KpiCards storeId={selectedStoreId} refreshKey={refreshKey} role={isManager ? "store_manager" : role} />
+        <KpiCards storeId={selectedStoreId} refreshKey={refreshKey} />
 
         {/* Column layout for sales & statuses */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* SECTION 2: Sales Analytics (2 columns) */}
-          {isManager && (
-            <div className="lg:col-span-2">
-              <SalesAnalytics storeId={selectedStoreId} refreshKey={refreshKey} />
-            </div>
-          )}
+          <div className="lg:col-span-2">
+            <SalesAnalytics storeId={selectedStoreId} refreshKey={refreshKey} />
+          </div>
           {/* SECTION 3: Order Status Donut (1 column) */}
-          <div className={isManager ? "lg:col-span-1" : "lg:col-span-3"}>
+          <div className="lg:col-span-1">
             <OrderStatusDonut storeId={selectedStoreId} refreshKey={refreshKey} />
           </div>
         </div>
@@ -77,8 +72,7 @@ export default function StoreOperationsDashboard() {
           <DeliveryOverview storeId={selectedStoreId} refreshKey={refreshKey} />
         </div>
 
-        {isManager && (
-          <>
+        <>
             {/* Column layout for Inventory & Attendance */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* SECTION 7: Inventory Alerts */}
@@ -102,8 +96,7 @@ export default function StoreOperationsDashboard() {
               storeId={selectedStoreId} 
               refreshKey={refreshKey} 
             />
-          </>
-        )}
+        </>
 
       </div>
 

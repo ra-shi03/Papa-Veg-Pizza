@@ -4,7 +4,7 @@ import { CalendarCheck, Search, Store, Download, CheckCircle2, AlarmClock, Calen
 import { adminAPI } from "@food/api"
 import { adminClient } from "@/services/api/axios"
 
-// Read-only. Check in / check out are marked by kitchen supervisors and staff themselves; leave is marked by the store
+// Read-only. Check in / check out are marked by kitchen staff themselves; leave is marked by the store
 // manager. The franchise admin looks at one store at a time and cannot change anything here.
 
 const pad = (n) => String(n).padStart(2, "0")

@@ -314,7 +314,7 @@ export default function LiveOrders({ orders, onRefresh, loading }) {
                       <User size={16} />
                     </div>
                     <div>
-                      <p className="text-[9px] uppercase text-zinc-400 font-bold">Kitchen Supervisor</p>
+                      <p className="text-[9px] uppercase text-zinc-400 font-bold">Kitchen Staff</p>
                       <p className="font-extrabold text-zinc-900 dark:text-white mt-0.5">{selectedOrder.assignedStaff?.kitchen || "Chef Anil"}</p>
                     </div>
                   </div>

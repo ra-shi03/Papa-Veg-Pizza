@@ -36,7 +36,7 @@ export default function ReassignTaskModal({
         <div className="flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800 pb-3">
           <div className="flex items-center gap-1.5 text-slate-900 dark:text-white">
             <UserCheck size={14} className="text-[var(--primary)]" />
-            <span className="text-xs font-black uppercase tracking-wider">Reassign Task (Supervisor)</span>
+            <span className="text-xs font-black uppercase tracking-wider">Reassign Task (Manager)</span>
           </div>
           <button
             onClick={onClose}

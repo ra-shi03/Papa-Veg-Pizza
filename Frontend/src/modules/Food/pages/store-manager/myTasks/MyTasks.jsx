@@ -41,7 +41,7 @@ import { useQueryClient } from "@tanstack/react-query";
 export default function MyTasks() {
   // 1. Get role from layout context
   const { role = "kitchen_staff" } = useOutletContext();
-  const isSupervisor = role === "kitchen_supervisor" || role === "store_manager";
+  const isManager = role === "store_manager";
 
   // 2. Fetch Tasks Data
   const { data: tasks = [], isLoading: tasksLoading } = useMyTasksQuery();
@@ -115,7 +115,7 @@ export default function MyTasks() {
       { id: taskId, payload },
       {
         onSuccess: () => {
-          toast.success("Delay reported to supervisor.");
+          toast.success("Delay reported to the store manager.");
           closeModal();
           setActiveTab("delayed");
         },
@@ -212,8 +212,8 @@ export default function MyTasks() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Kitchen supervisors and kitchen staff clock themselves in and out here */}
-          {(role === "kitchen_supervisor" || role === "kitchen_staff") && <ClockInOutButton />}
+          {/* Kitchen staff clock themselves in and out here */}
+          {role === "kitchen_staff" && <ClockInOutButton />}
           {/* Quick action: request ingredient replenishment */}
           <button
             onClick={() => openModal("ingredient")}
@@ -330,8 +330,8 @@ export default function MyTasks() {
           </div>
         </div>
 
-        {/* 3. Conditional Supervisor Team Widget Sidebar */}
-        {isSupervisor && (
+        {/* 3. Team Widget Sidebar (store manager) */}
+        {isManager && (
           <div className="lg:col-span-1">
             <TeamTasksWidget
               teamStats={teamStats}
@@ -344,7 +344,7 @@ export default function MyTasks() {
 
       {/* 4. MODALS REGISTER */}
       
-      {/* Assign Kitchen Staff (step 1 of a supervisor task; the picker lists only people who are present) */}
+      {/* Assign Kitchen Staff (the picker lists only people who are present) */}
       <AssignStaffModal
         visible={activeModal === "assign"}
         order={selectedTask ? { _id: selectedTask.orderRef, orderNumber: selectedTask.orderId, assignedStaff: selectedTask.assignedStaff || {} } : null}
@@ -398,7 +398,7 @@ export default function MyTasks() {
         loading={reassignRequestMutation.isPending}
       />
 
-      {/* Reassign Direct Modal (Supervisor only) */}
+      {/* Reassign Direct Modal (store manager only) */}
       <ReassignTaskModal
         isOpen={activeModal === "reassignTask"}
         task={selectedTask}
@@ -407,7 +407,7 @@ export default function MyTasks() {
         loading={reassignTaskMutation.isPending}
       />
 
-      {/* Quality Check Modal (Supervisor only) */}
+      {/* Quality Check Modal (store manager, or the packaging-station staff member) */}
       <QualityCheckModal
         isOpen={activeModal === "qualityCheck"}
         task={selectedTask}

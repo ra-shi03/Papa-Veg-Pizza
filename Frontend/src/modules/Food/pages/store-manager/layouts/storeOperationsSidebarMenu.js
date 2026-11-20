@@ -4,12 +4,12 @@ export const storeOperationsSidebarMenu = [
     label: "Dashboard",
     path: "/store-operations/dashboard",
     icon: "LayoutDashboard",
-    allowedRoles: ["store_manager", "kitchen_supervisor"]
+    allowedRoles: ["store_manager"]
   },
   {
     type: "section",
     label: "Orders",
-    allowedRoles: ["store_manager", "kitchen_supervisor", "kitchen_staff"],
+    allowedRoles: ["store_manager", "kitchen_staff"],
     items: [
       {
         type: "link",
@@ -23,21 +23,21 @@ export const storeOperationsSidebarMenu = [
         label: "Active Orders",
         path: "/store-operations/orders/active",
         icon: "PlayCircle",
-        allowedRoles: ["store_manager", "kitchen_supervisor"]
+        allowedRoles: ["store_manager"]
       },
       {
         type: "link",
         label: "Ready Orders",
         path: "/store-operations/orders/ready",
         icon: "CheckCircle2",
-        allowedRoles: ["store_manager", "kitchen_supervisor", "kitchen_staff"]
+        allowedRoles: ["store_manager", "kitchen_staff"]
       },
       {
         type: "link",
         label: "Completed Orders",
         path: "/store-operations/orders/completed",
         icon: "CheckCircle",
-        allowedRoles: ["store_manager", "kitchen_supervisor", "kitchen_staff"]
+        allowedRoles: ["store_manager", "kitchen_staff"]
       },
       {
         type: "link",
@@ -51,56 +51,56 @@ export const storeOperationsSidebarMenu = [
         label: "Cancelled Orders",
         path: "/store-operations/orders/cancelled",
         icon: "XCircle",
-        allowedRoles: ["store_manager", "kitchen_supervisor"]
+        allowedRoles: ["store_manager"]
       }
     ]
   },
   {
     type: "section",
     label: "Kitchen Operations",
-    allowedRoles: ["store_manager", "kitchen_supervisor", "kitchen_staff"],
+    allowedRoles: ["store_manager", "kitchen_staff"],
     items: [
       {
         type: "link",
         label: "Kitchen Queue",
         path: "/store-operations/kitchen/queue",
         icon: "ListOrdered",
-        allowedRoles: ["store_manager", "kitchen_supervisor", "kitchen_staff"]
+        allowedRoles: ["store_manager", "kitchen_staff"]
       },
       {
         type: "link",
         label: "Preparation Board",
         path: "/store-operations/kitchen/preparation",
         icon: "KanbanSquare",
-        allowedRoles: ["store_manager", "kitchen_supervisor", "kitchen_staff"]
+        allowedRoles: ["store_manager", "kitchen_staff"]
       },
       {
         type: "link",
         label: "Pizza Station",
         path: "/store-operations/kitchen/pizza-station",
         icon: "Pizza",
-        allowedRoles: ["store_manager", "kitchen_supervisor", "kitchen_staff"]
+        allowedRoles: ["store_manager", "kitchen_staff"]
       },
       {
         type: "link",
         label: "Baking Station",
         path: "/store-operations/kitchen/baking-station",
         icon: "CookingPot",
-        allowedRoles: ["store_manager", "kitchen_supervisor", "kitchen_staff"]
+        allowedRoles: ["store_manager", "kitchen_staff"]
       },
       {
         type: "link",
         label: "Packaging Station",
         path: "/store-operations/kitchen/packaging-station",
         icon: "Package",
-        allowedRoles: ["store_manager", "kitchen_supervisor", "kitchen_staff"]
+        allowedRoles: ["store_manager", "kitchen_staff"]
       },
       {
         type: "link",
         label: "Delayed Orders",
         path: "/store-operations/kitchen/delayed-orders",
         icon: "Hourglass",
-        allowedRoles: ["store_manager", "kitchen_supervisor"]
+        allowedRoles: ["store_manager"]
       }
     ]
   },
@@ -142,42 +142,42 @@ export const storeOperationsSidebarMenu = [
   {
     type: "section",
     label: "Inventory",
-    allowedRoles: ["store_manager", "kitchen_supervisor", "kitchen_staff"],
+    allowedRoles: ["store_manager", "kitchen_staff"],
     items: [
       {
         type: "link",
         label: "Ingredient Stock",
         path: "/store-operations/inventory/stock",
         icon: "ClipboardList",
-        allowedRoles: ["store_manager", "kitchen_supervisor"]
+        allowedRoles: ["store_manager"]
       },
       {
         type: "link",
         label: "Stock Requests",
         path: "/store-operations/inventory/requests",
         icon: "FileText",
-        allowedRoles: ["store_manager", "kitchen_supervisor", "kitchen_staff"]
+        allowedRoles: ["store_manager", "kitchen_staff"]
       },
       {
         type: "link",
         label: "Waste Management",
         path: "/store-operations/inventory/waste",
         icon: "Trash2",
-        allowedRoles: ["store_manager", "kitchen_supervisor", "kitchen_staff"]
+        allowedRoles: ["store_manager", "kitchen_staff"]
       },
       {
         type: "link",
         label: "Low Stock Alerts",
         path: "/store-operations/inventory/low-stock",
         icon: "AlertTriangle",
-        allowedRoles: ["store_manager", "kitchen_supervisor"]
+        allowedRoles: ["store_manager"]
       },
       {
         type: "link",
         label: "Ingredient Shortages",
         path: "/store-operations/inventory/shortages",
         icon: "TrendingDown",
-        allowedRoles: ["store_manager", "kitchen_supervisor"]
+        allowedRoles: ["store_manager"]
       }
     ]
   },
@@ -263,20 +263,20 @@ export const storeOperationsSidebarMenu = [
     label: "Attendance",
     path: "/store-operations/attendance",
     icon: "CalendarCheck",
-    allowedRoles: ["kitchen_supervisor", "kitchen_staff"]
+    allowedRoles: ["kitchen_staff"]
   },
   {
     type: "link",
     label: "My Tasks",
     path: "/store-operations/tasks",
     icon: "ListTodo",
-    allowedRoles: ["kitchen_supervisor", "kitchen_staff"]
+    allowedRoles: ["kitchen_staff"]
   },
   {
     type: "link",
     label: "Profile",
     path: "/store-operations/profile",
     icon: "User",
-    allowedRoles: ["store_manager", "kitchen_supervisor", "kitchen_staff"]
+    allowedRoles: ["store_manager", "kitchen_staff"]
   }
 ];

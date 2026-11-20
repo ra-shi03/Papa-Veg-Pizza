@@ -26,8 +26,8 @@ export default function OrderDetailsModal({
   onCancelOrder
 }) {
   const { role } = useOutletContext() || {};
-  // Accept / assign / start / cancel belong to the store manager and the order supervisor, never to kitchen staff
-  const canManage = !role || role === "store_manager" || role === "kitchen_supervisor";
+  // Accept / assign / start / cancel belong to the store manager, never to kitchen staff
+  const canManage = !role || role === "store_manager";
   if (!order) return null;
 
   const formatCurrency = (val) => {

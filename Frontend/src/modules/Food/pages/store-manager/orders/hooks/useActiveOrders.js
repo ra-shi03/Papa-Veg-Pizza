@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { storeOrdersApi, apiErrorMessage, LIVE_POLL_MS, useLiveIndicator } from "../../api/storeOrdersApi";
 
-// Orders in the kitchen. Managers see all, supervisors their own, kitchen staff what is assigned to them.
+// Orders in the kitchen. Managers see all, kitchen staff the orders where they hold a station.
 export function useActiveOrders(filters = {}) {
   const query = useQuery({
     queryKey: ["activeOrders", filters],
@@ -40,7 +40,7 @@ export function useUpdateKitchenStage() {
   });
 }
 
-// Supervisor (or manager) assigns kitchen staff to a station.
+// The store manager assigns kitchen staff to a station.
 export function useAssignStaff() {
   const queryClient = useQueryClient();
   return useMutation({

@@ -43,7 +43,7 @@ const staffSchema = z.object({
   phone: z.string().regex(/^(?:\+91)?(?:[6-9]\d{9})$/, "Enter a valid 10-digit mobile number starting with 6, 7, 8 or 9."),
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string().min(1, "Please confirm the password"),
-  role: z.enum(["Kitchen Supervisor", "Pizza Maker", "Baker", "Packager"], {
+  role: z.enum(["Pizza Maker", "Baker", "Packager"], {
     errorMap: () => ({ message: "Please select a valid role" })
   }),
   experience: z.preprocess((val) => (val === "" ? undefined : Number(val)), z.number().min(0, "Experience cannot be negative")),
@@ -515,7 +515,6 @@ export default function AddStaffModal({ isOpen, onClose }) {
                     <option value="Pizza Maker">Pizza Maker</option>
                     <option value="Baker">Baker</option>
                     <option value="Packager">Packager</option>
-                    <option value="Kitchen Supervisor">Kitchen Supervisor</option>
                   </select>
                   {errors.role && (
                     <span className="text-[10px] font-bold text-red-650 flex items-center gap-0.5 mt-0.5">

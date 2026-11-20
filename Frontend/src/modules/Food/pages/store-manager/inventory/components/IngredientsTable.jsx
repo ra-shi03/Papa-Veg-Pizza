@@ -202,8 +202,8 @@ export function IngredientsTable({
                   </DropdownMenuItem>
                 ) : null}
 
-                {/* 3. History (Store Manager & Kitchen Supervisor) */}
-                {role === "store_manager" || role === "kitchen_supervisor" ? (
+                {/* 3. History (Store Manager) */}
+                {role === "store_manager" ? (
                   <DropdownMenuItem 
                     onClick={() => onViewHistory(item._id)}
                     className="text-xs font-semibold py-2 px-2.5 flex items-center gap-2 cursor-pointer focus:bg-slate-50 dark:focus:bg-zinc-850"

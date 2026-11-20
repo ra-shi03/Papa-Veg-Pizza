@@ -54,8 +54,6 @@ export default function IngredientShortages() {
     switch (role) {
       case "kitchen_staff":
         return "Aman Verma";
-      case "kitchen_supervisor":
-        return "Vijay Saxena";
       case "store_manager":
       default:
         return "Shubham Jamliya";

@@ -178,8 +178,8 @@ export default function CompletedOrders() {
     });
   };
 
-  // Invoices, reorder and exports are store-manager tools: hidden for supervisors and kitchen staff
-  const isKitchenSupervisor = role === "kitchen_supervisor" || role === "kitchen_staff";
+  // Invoices, reorder and exports are store-manager tools: hidden for kitchen staff
+  const isKitchenStaffView = role === "kitchen_staff";
 
   // Table Columns config with sticky action column
   const columns = [
@@ -327,7 +327,7 @@ export default function CompletedOrders() {
             />
           </Tooltip>
 
-          {!isKitchenSupervisor && (
+          {!isKitchenStaffView && (
             <Tooltip title="Download Invoice">
               <Button
                 size="small"
@@ -338,7 +338,7 @@ export default function CompletedOrders() {
             </Tooltip>
           )}
 
-          {!isKitchenSupervisor && (
+          {!isKitchenStaffView && (
             <Tooltip title="Reorder">
               <Button
                 size="small"
@@ -433,7 +433,7 @@ export default function CompletedOrders() {
             />
           </Tooltip>
 
-          {!isKitchenSupervisor && (
+          {!isKitchenStaffView && (
             <Tooltip title="Download Invoice">
               <Button
                 size="small"
@@ -444,7 +444,7 @@ export default function CompletedOrders() {
             </Tooltip>
           )}
 
-          {!isKitchenSupervisor && (
+          {!isKitchenStaffView && (
             <Tooltip title="Reorder">
               <Button
                 size="small"
@@ -789,7 +789,7 @@ export default function CompletedOrders() {
                   Reset Filters
                 </Button>
                 
-                {!isKitchenSupervisor && (
+                {!isKitchenStaffView && (
                   <Button
                     onClick={() => openModal("export", null)}
                     className="text-xs font-bold !border-primary/45 !text-primary bg-white dark:bg-zinc-900 hover:!bg-primary/5 hover:!border-primary hover:!text-primary-hover active:scale-95 transition-all cursor-pointer rounded-full h-10 flex items-center justify-center gap-1.5"

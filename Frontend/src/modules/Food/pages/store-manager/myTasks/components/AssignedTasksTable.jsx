@@ -2,7 +2,7 @@ import React from "react";
 import { ShieldAlert, Play, MapPin, User, Clock, ArrowRight, UserPlus, CheckCircle2, Lock } from "lucide-react";
 
 export default function AssignedTasksTable({ tasks = [], onStartTask = () => {}, onAssignStaff = () => {} }) {
-  // A supervisor task is flow-wise: 1) assign present kitchen staff to every station, 2) start overseeing.
+  // A task with a flow (a station task, or a legacy supervisor task on an older order) shows its steps.
   const isFlowTask = (task) => Array.isArray(task.flow);
 
   const FlowSteps = ({ task }) => {

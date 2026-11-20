@@ -51,8 +51,6 @@ export default function StockRequests() {
     switch (role) {
       case "kitchen_staff":
         return "Aman Verma";
-      case "kitchen_supervisor":
-        return "Vijay Saxena";
       case "store_manager":
       default:
         return "Shubham Jamliya";
@@ -193,8 +191,8 @@ export default function StockRequests() {
             Sync
           </button>
 
-          {/* Export CSV (Store Manager & Kitchen Supervisor) */}
-          {(role === "store_manager" || role === "kitchen_supervisor") && (
+          {/* Export CSV (Store Manager) */}
+          {(role === "store_manager") && (
             <button
               onClick={handleExportCSV}
               className="h-8 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-355 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all flex items-center gap-1 bg-white dark:bg-zinc-900 cursor-pointer"
@@ -204,8 +202,8 @@ export default function StockRequests() {
             </button>
           )}
 
-          {/* Raise New Request (Kitchen Supervisor & Staff, and Manager for testing) */}
-          {(role === "kitchen_staff" || role === "kitchen_supervisor" || role === "store_manager") && (
+          {/* Raise New Request (Kitchen Staff, and Manager) */}
+          {(role === "kitchen_staff" || role === "store_manager") && (
             <button
               onClick={() => setIsNewModalOpen(true)}
               className="h-8 px-3 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-sm shadow-[var(--primary)]/10 cursor-pointer"

@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   HelpCircle
 } from "lucide-react";
+import { canMarkReady } from "../utils/kitchenRights";
 
 export default function ActiveOrderDetailsModal({
   visible,
@@ -83,10 +84,11 @@ export default function ActiveOrderDetailsModal({
     }
   };
 
-  // Check role-based permission
-  const isManagerOrSupervisor = role === "store_manager" || role === "kitchen_supervisor";
+  // Check role-based permission: the store manager assigns staff and runs the order; Mark Ready is also
+  // open to the kitchen staff member at this order's packaging station
+  const isManager = role === "store_manager";
   const isKitchenStaff = role === "kitchen_staff";
-  const isPackagingStaff = role === "packaging_staff";
+  const mayMarkReady = canMarkReady(role, order);
 
   // Tab items definition
   const tabItems = [
@@ -353,7 +355,7 @@ export default function ActiveOrderDetailsModal({
                   {order.assignedStaff?.pizza_chef?.name || "Not Assigned"}
                 </p>
               </div>
-              {isManagerOrSupervisor && (
+              {isManager && (
                 <Button
                   onClick={() => onAssignStaff(order)}
                   size="small"
@@ -372,7 +374,7 @@ export default function ActiveOrderDetailsModal({
                   {order.assignedStaff?.baking_chef?.name || "Not Assigned"}
                 </p>
               </div>
-              {isManagerOrSupervisor && (
+              {isManager && (
                 <Button
                   onClick={() => onAssignStaff(order)}
                   size="small"
@@ -391,7 +393,7 @@ export default function ActiveOrderDetailsModal({
                   {order.assignedStaff?.packaging_staff?.name || "Not Assigned"}
                 </p>
               </div>
-              {isManagerOrSupervisor && (
+              {isManager && (
                 <Button
                   onClick={() => onAssignStaff(order)}
                   size="small"
@@ -477,7 +479,7 @@ export default function ActiveOrderDetailsModal({
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 dark:border-zinc-800 pt-3">
           <div className="flex gap-2">
             {/* Action buttons based on Role & Permissions */}
-            {isManagerOrSupervisor && (
+            {isManager && (
               <>
                 <Button
                   onClick={() => onPause(order)}
@@ -518,8 +520,8 @@ export default function ActiveOrderDetailsModal({
               Close
             </Button>
             
-            {/* Mark Ready: Supervisors, Managers, and Packaging staff can mark ready */}
-            {(isManagerOrSupervisor || isPackagingStaff) && (
+            {/* Mark Ready: the store manager, or the staff member at this order's packaging station */}
+            {mayMarkReady && (
               <Button
                 type="primary"
                 onClick={() => onMarkReady(order)}

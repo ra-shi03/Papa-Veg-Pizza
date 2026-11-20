@@ -28,8 +28,6 @@ export default function ProfileHeader({
     switch (normalizedRole) {
       case "store_manager":
         return "bg-rose-50 text-rose-700 border-rose-250 dark:bg-rose-950/20 dark:text-rose-450 dark:border-rose-900/30";
-      case "kitchen_supervisor":
-        return "bg-amber-50 text-amber-700 border-amber-250 dark:bg-amber-950/20 dark:text-amber-450 dark:border-amber-900/30";
       case "kitchen_staff":
       default:
         return "bg-emerald-50 text-emerald-700 border-emerald-250 dark:bg-emerald-950/20 dark:text-emerald-450 dark:border-emerald-900/30";
@@ -41,8 +39,6 @@ export default function ProfileHeader({
     switch (normalizedRole) {
       case "store_manager":
         return "Store Manager";
-      case "kitchen_supervisor":
-        return "Kitchen Supervisor";
       case "kitchen_staff":
         return "Kitchen Staff";
       default:

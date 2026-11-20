@@ -24,7 +24,7 @@ export default function DelayedTasksTable({
     );
   }
 
-  const isSupervisor = role === "kitchen_supervisor";
+  const isManager = role === "store_manager";   // the store manager reassigns; staff ask for a handoff
 
   return (
     <div className="overflow-x-auto bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-2xl shadow-sm">
@@ -82,7 +82,7 @@ export default function DelayedTasksTable({
                   </button>
 
                   {/* REASSIGN BUTTON */}
-                  {isSupervisor ? (
+                  {isManager ? (
                     <button
                       onClick={() => onReassign(task)}
                       className="text-[9px] font-bold py-1.5 px-2.5 rounded-lg border border-zinc-250 dark:border-zinc-700 text-slate-650 dark:text-zinc-350 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-[0.98] transition-all flex items-center gap-1 cursor-pointer"

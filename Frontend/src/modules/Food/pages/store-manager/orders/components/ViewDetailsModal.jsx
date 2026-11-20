@@ -463,7 +463,6 @@ export default function ViewDetailsModal({
 
   // Role permissions
   const isManager = role === "store_manager";
-  const isSupervisor = role === "kitchen_supervisor";
   const isAwaitingAction = order.status === "payment_verified" || order.status === "awaiting_confirmation";
 
   return (
@@ -488,8 +487,8 @@ export default function ViewDetailsModal({
       destroyOnClose
       footer={
         <div className="flex items-center justify-between border-t border-border pt-3.5 mt-2 gap-2 flex-wrap">
-          {/* Left: Print receipt (allowed for Managers & Supervisors) */}
-          {(isManager || isSupervisor) ? (
+          {/* Left: Print receipt (store manager) */}
+          {isManager ? (
             <Button
               icon={<Printer size={13} />}
               onClick={() => onPrint(order)}
@@ -522,8 +521,8 @@ export default function ViewDetailsModal({
               </Button>
             )}
 
-            {/* Accept Button (Managers and Kitchen Supervisors can confirm orders) */}
-            {(isManager || isSupervisor) && isAwaitingAction && (
+            {/* Accept Button (the store manager confirms orders) */}
+            {isManager && isAwaitingAction && (
               <Button
                 type="primary"
                 icon={<Check size={13} />}

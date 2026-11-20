@@ -10,7 +10,7 @@ import { useMyAttendanceToday, useClockInOut } from "../staffManagement/hooks/us
 import { localToday } from "../staffManagement/localToday"
 import LeaveRequestSection from "./LeaveRequestSection"
 
-// Kitchen supervisors and kitchen staff: check in / check out, and their own attendance day by day or for a date range.
+// Kitchen staff: check in / check out, and their own attendance day by day or for a date range.
 
 const pad = (n) => String(n).padStart(2, "0")
 const keyOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`

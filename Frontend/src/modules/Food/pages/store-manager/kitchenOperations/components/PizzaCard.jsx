@@ -24,8 +24,8 @@ export default function PizzaCard({
   onOpenIssue
 }) {
   const { role } = useOutletContext() || {};
-  // Reassigning a pizza is a store manager / order supervisor action; staff only work their own pizzas
-  const canReassign = !role || role === "store_manager" || role === "kitchen_supervisor";
+  // Reassigning a pizza is a store manager action; staff only work their own pizzas
+  const canReassign = !role || role === "store_manager";
   const [elapsed, setElapsed] = useState(0);
 
   // Compute elapsed time dynamically

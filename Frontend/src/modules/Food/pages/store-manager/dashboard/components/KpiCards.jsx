@@ -6,16 +6,12 @@ import {
 } from "lucide-react"
 import apiClient from "@/services/api/axios"
 
-// A kitchen supervisor sees the kitchen numbers of their own orders. Sales, stock, staff and ratings are the store
-// manager's: the server refuses them to a supervisor, so they are not asked for and not shown.
-const MANAGER_ONLY_CARDS = ["Today's Sales", "Low Stock Items", "Staff On Duty", "Customer Rating"]
 
-export default function KpiCards({ storeId, refreshKey, role = "store_manager" }) {
-  const isManager = role === "store_manager"
+// The store manager's KPI cards (the dashboard is the store manager's only).
+export default function KpiCards({ storeId, refreshKey }) {
   // Today's Sales Query
   const { data: salesData, isLoading: salesLoading } = useQuery({
     queryKey: ["today-sales", storeId, refreshKey],
-    enabled: isManager,
     queryFn: async () => {
       try {
         const response = await apiClient.get("/store/dashboard/today-sales", { params: { storeId } })
@@ -81,7 +77,6 @@ export default function KpiCards({ storeId, refreshKey, role = "store_manager" }
   // Low Stock Query
   const { data: stockData, isLoading: stockLoading } = useQuery({
     queryKey: ["low-stock", storeId, refreshKey],
-    enabled: isManager,
     queryFn: async () => {
       try {
         const response = await apiClient.get("/store/dashboard/low-stock", { params: { storeId } })
@@ -95,7 +90,6 @@ export default function KpiCards({ storeId, refreshKey, role = "store_manager" }
   // Staff Query
   const { data: staffData, isLoading: staffLoading } = useQuery({
     queryKey: ["staff-duty", storeId, refreshKey],
-    enabled: isManager,
     queryFn: async () => {
       try {
         const response = await apiClient.get("/store/dashboard/staff-duty", { params: { storeId } })
@@ -109,7 +103,6 @@ export default function KpiCards({ storeId, refreshKey, role = "store_manager" }
   // Rating Query
   const { data: ratingData, isLoading: ratingLoading } = useQuery({
     queryKey: ["customer-rating", storeId, refreshKey],
-    enabled: isManager,
     queryFn: async () => {
       try {
         const response = await apiClient.get("/store/dashboard/customer-rating", { params: { storeId } })
@@ -206,7 +199,7 @@ export default function KpiCards({ storeId, refreshKey, role = "store_manager" }
     }
   ]
 
-  const visibleCards = isManager ? cards : cards.filter((card) => !MANAGER_ONLY_CARDS.includes(card.title))
+  const visibleCards = cards
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">

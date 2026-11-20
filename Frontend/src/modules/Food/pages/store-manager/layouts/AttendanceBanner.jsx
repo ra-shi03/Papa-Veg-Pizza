@@ -3,9 +3,9 @@ import { Clock } from "lucide-react"
 import { useMyAttendanceToday } from "../staffManagement/hooks/useAttendance"
 import ClockInOutButton from "../myTasks/components/ClockInOutButton"
 
-const KITCHEN_ROLES = ["kitchen_supervisor", "kitchen_staff"]
+const KITCHEN_ROLES = ["kitchen_staff"]
 
-// Kitchen supervisors and staff mark attendance first; the server refuses kitchen work until they have (and after they clock out).
+// Kitchen staff mark attendance first; the server refuses kitchen work until they have (and after they clock out).
 export default function AttendanceBanner({ role }) {
   const isKitchen = KITCHEN_ROLES.includes(role)
   const { data: today, isLoading } = useMyAttendanceToday(isKitchen)

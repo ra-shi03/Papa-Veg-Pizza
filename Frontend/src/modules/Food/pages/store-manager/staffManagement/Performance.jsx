@@ -200,7 +200,6 @@ export default function Performance() {
                 className="h-9 px-2.5 border border-zinc-200 dark:border-zinc-850 rounded-xl text-xs font-semibold bg-zinc-50/50 dark:bg-zinc-950 text-slate-800 dark:text-zinc-250 focus:outline-none"
               >
                 <option value="All">All Roles</option>
-                <option value="Kitchen Supervisor">Kitchen Supervisor</option>
                 <option value="Pizza Maker">Pizza Maker</option>
                 <option value="Baker">Baker</option>
                 <option value="Packager">Packager</option>

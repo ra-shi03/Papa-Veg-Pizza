@@ -68,7 +68,6 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
 
   const roleLabels = {
     store_manager: "Store Manager",
-    kitchen_supervisor: "Kitchen Supervisor",
     kitchen_staff: "Kitchen Staff",
     assistant_manager: "Assistant Manager",
     store_owner: "Store Owner"
@@ -218,18 +217,18 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
           </button>
           
           <div className="flex items-center gap-3">
-            {/* Brand / Store Name — RBAC: staff manager & kitchen supervisor see only store name */}
+            {/* Brand / Store Name — RBAC: store manager & kitchen staff see only store name */}
             <span
               onClick={() => navigate("/store-operations/dashboard")}
               className="text-xs font-black tracking-wider text-zinc-900 dark:text-white uppercase cursor-pointer select-none hover:text-[var(--primary)] transition-colors hidden sm:inline"
             >
-              {(role === "kitchen_staff" || role === "kitchen_supervisor" || role === "store_manager")
+              {(role === "kitchen_staff" || role === "store_manager")
                 ? (storeData?.name || "")
                 : (franchiseData?.name || "PAPA VEG OPS")}
             </span>
 
-            {/* Separator + Store Switcher — hidden for store_manager & kitchen_supervisor */}
-            {role !== "kitchen_staff" && role !== "kitchen_supervisor" && (
+            {/* Separator + Store Switcher — hidden for kitchen staff */}
+            {role !== "kitchen_staff" && (
               <>
                 <span className="text-zinc-300 dark:text-zinc-700 hidden sm:inline">|</span>
                 

@@ -42,7 +42,7 @@ export default function EscalationModal({ visible, onClose, order, onConfirm }) 
           <div>
             <h3 className="text-base font-black text-slate-900 dark:text-white">Escalate Order #{order.orderNumber}</h3>
             <p className="text-[10px] font-bold text-slate-400 dark:text-zinc-555 mt-0.5">
-              Escalate operational bottleneck to supervisor/management staff
+              Escalate operational bottleneck to the store manager
             </p>
           </div>
         </div>
@@ -99,7 +99,7 @@ export default function EscalationModal({ visible, onClose, order, onConfirm }) 
             Assign To
           </label>
           <Select
-            placeholder="Select manager/supervisor..."
+            placeholder="Select manager..."
             className="w-full h-9"
             value={assignedTo || undefined}
             onChange={(val) => setAssignedTo(val)}

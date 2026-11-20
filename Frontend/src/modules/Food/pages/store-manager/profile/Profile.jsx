@@ -85,7 +85,7 @@ export default function Profile({ forcedRole }) {
     if (onRoleChange) {
       onRoleChange(role);
     }
-    toast.info(`Switched view to: ${role === "store_manager" ? "Store Manager" : role === "kitchen_supervisor" ? "Kitchen Supervisor" : "Kitchen Staff"}`);
+    toast.info(`Switched view to: ${role === "store_manager" ? "Store Manager" : "Kitchen Staff"}`);
     
     // Safety check: if active tab gets hidden for kitchen staff, reset to personal info
     if (role === "kitchen_staff" && (activeTab === "permissions" || activeTab === "activity")) {

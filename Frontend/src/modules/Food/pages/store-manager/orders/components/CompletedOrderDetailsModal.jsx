@@ -37,7 +37,8 @@ export default function CompletedOrderDetailsModal({
 }) {
   if (!order) return null;
 
-  const isKitchenSupervisor = role === "kitchen_supervisor";
+  // Reorder and invoices are store-manager tools (as on the Completed Orders list): kitchen staff only look
+  const isKitchenStaffView = role === "kitchen_staff";
 
   const formatCurrency = (val) => {
     return new Intl.NumberFormat("en-IN", {
@@ -613,8 +614,8 @@ export default function CompletedOrderDetailsModal({
       footer={
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 dark:border-zinc-800 pt-3">
           <div className="flex gap-2">
-            {/* Disabled or hidden for kitchen supervisor role */}
-            {!isKitchenSupervisor && (
+            {/* Hidden for kitchen staff */}
+            {!isKitchenStaffView && (
               <Button
                 onClick={() => onReorder(order)}
                 className="text-xs font-bold !bg-primary hover:!bg-primary-hover border-0 !text-white rounded-full px-5 py-2 shadow-md hover:shadow-lg active:scale-95 transition-all cursor-pointer flex items-center gap-1"
@@ -624,7 +625,7 @@ export default function CompletedOrderDetailsModal({
               </Button>
             )}
 
-            {!isKitchenSupervisor && (
+            {!isKitchenStaffView && (
               <Button
                 onClick={() => onDownloadInvoice(order)}
                 className="text-xs font-bold !border-primary/45 !text-primary bg-white dark:bg-zinc-900 hover:!bg-primary/5 hover:!border-primary hover:!text-primary-hover active:scale-95 transition-all cursor-pointer rounded-full px-4 py-2 shadow-sm flex items-center gap-1.5"

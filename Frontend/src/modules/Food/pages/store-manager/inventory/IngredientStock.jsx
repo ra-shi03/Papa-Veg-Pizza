@@ -191,8 +191,8 @@ export default function IngredientStock() {
             Sync
           </button>
 
-          {/* Export CSV (Store Manager & Kitchen Supervisor) */}
-          {(role === "store_manager" || role === "kitchen_supervisor") && (
+          {/* Export CSV (Store Manager) */}
+          {(role === "store_manager") && (
             <button
               onClick={handleExportCSV}
               className="h-8 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-355 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all flex items-center gap-1 bg-white dark:bg-zinc-900 cursor-pointer"

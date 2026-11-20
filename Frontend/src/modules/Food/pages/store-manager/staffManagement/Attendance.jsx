@@ -216,7 +216,6 @@ export default function Attendance() {
                 className="appearance-none pl-3 pr-8 py-1.5 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50/50 dark:bg-zinc-950 text-slate-800 dark:text-zinc-250 focus:outline-none text-xs font-semibold cursor-pointer"
               >
                 <option value="All">All Roles</option>
-                <option value="Kitchen Supervisor">Kitchen Supervisor</option>
                 <option value="Pizza Maker">Pizza Maker</option>
                 <option value="Baker">Baker</option>
                 <option value="Packager">Packager</option>

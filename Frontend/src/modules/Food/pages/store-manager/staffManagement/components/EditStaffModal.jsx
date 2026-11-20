@@ -39,7 +39,7 @@ const staffSchema = z.object({
   fullName: z.string().min(1, "Full name is required"),
   email: z.string().email("Invalid email address"),
   phone: z.string().regex(/^(?:\+91)?(?:[6-9]\d{9})$/, "Invalid Indian phone number. Enter 10 digits."),
-  role: z.enum(["Kitchen Supervisor", "Pizza Maker", "Baker", "Packager"], {
+  role: z.enum(["Pizza Maker", "Baker", "Packager"], {
     errorMap: () => ({ message: "Please select a valid role" })
   }),
   experience: z.preprocess((val) => (val === "" ? undefined : Number(val)), z.number().min(0, "Experience cannot be negative")),
@@ -290,7 +290,6 @@ export default function EditStaffModal({ isOpen, onClose, staffId }) {
                     <option value="Pizza Maker">Pizza Maker</option>
                     <option value="Baker">Baker</option>
                     <option value="Packager">Packager</option>
-                    <option value="Kitchen Supervisor">Kitchen Supervisor</option>
                   </select>
                   {errors.role && (
                     <span className="text-[10px] font-bold text-red-600 flex items-center gap-0.5 mt-0.5">
