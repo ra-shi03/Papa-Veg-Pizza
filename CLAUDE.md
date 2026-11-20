@@ -12,12 +12,24 @@ Indian pizza franchise platform. MERN. Flutter dev will wrap user + delivery app
 - Delivery app: Frontend/src/modules/DeliveryV2
 
 ## Roles
-super_admin > franchise_admin > store_manager > kitchen_supervisor / kitchen_staff
+super_admin > franchise_admin > store_manager > kitchen_staff
 Also: customer, delivery_partner.
 - Super admin creates franchise admins (email + temp password; they change password/profile later).
-- Franchise admin creates store managers. Store manager creates kitchen supervisor/staff.
+- Franchise admin creates store managers. Store manager creates kitchen staff only (franchise admin approves them).
 - Everyone except super admin is scoped to franchiseId/storeId.
-- Kitchen supervisor sees only the store orders the store manager assigned to them, and assigns staff on those. Kitchen staff sees only assigned tasks.
+- Kitchen staff see only the orders where they hold a station (pizza_chef / baking_chef / packaging_staff), and their own tasks.
+- The kitchen supervisor role is REMOVED (client decision, docs/supervisor-removal.md). It is deactivated, not deleted:
+  existing accounts are switched off by Backend/scripts/deactivate-supervisors.js (dry run by default, --apply writes),
+  sign-in tells them the role is no longer used, every route refuses the role (403), and nobody can create or approve
+  one. `order.kitchen.supervisor` on older orders is information only, never a permission.
+
+## Kitchen rules (backend enforces them)
+- Accept: store manager only; no supervisor is picked.
+- Assign staff to stations (assign-staff, reassign, pizza reassign): store manager only. The person must be active,
+  kitchen staff of that store and clocked in (requireOnDuty / requirePresent).
+- Quality check and mark ready: the staff member holding that order's packaging station, or the store manager. Nobody else.
+- Priority, pause, delay (and delay escalate / notify / resolve): the store manager, or a staff member holding a station of that order.
+- Another store's or franchise's order is 404; a role outside the route is 403.
 
 ## Status
 DONE: auth; super admin control of user-app content.
@@ -26,7 +38,7 @@ handles them on the Customer Complaints desk (/food/admin/stores/complaints/desk
 DONE: combos end to end (Combo Builder + meal combos). The server prices a builder combo from the combo-page settings and records what is
 inside every combo line (`components`); the kitchen gets one card per pizza (`kitchenUnits`, KitchenItem.lineIndex); the store, packer and
 rider payloads carry the contents. Tests: Backend/test/combos.test.js, combo-flow.test.js, the combos block in kitchen-ops.test.js.
-DONE (store ops order flow, see docs/rider-flow.md section 5): store manager > supervisor > staff tasks gated by attendance
+DONE (store ops order flow, see docs/rider-flow.md section 5): store manager > kitchen staff tasks gated by attendance
 and stations; real data in Completed Order details; manual rider assignment (`dispatch.manual`) is never undone by
 auto-dispatch, its timeout job or the startup watchdog; Confirm Pickup accepts the rider at handover; handover photo
 required to complete a delivery (`deliveryVerification.handoverPhotoUrl`).
