@@ -835,6 +835,7 @@ export default function OrderTracking() {
 
       toast.success("Thanks for your feedback!")
       setShowRatingModal(false)
+      navigate("/user")   // feedback given: back to the home page
     } catch (error) {
       debugError("Error submitting order ratings:", error)
       toast.error(error?.response?.data?.message || "Failed to submit ratings")
@@ -2055,7 +2056,7 @@ export default function OrderTracking() {
                 <div className="flex flex-col">
                   <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Food & Store</span>
                   {(order?.ratings?.store ?? order?.ratings?.restaurant)?.comment && (
-                    <span className="text-[10px] text-gray-500 dark:text-gray-400 italic mt-0.5 line-clamp-1">"{order.ratings.restaurant.comment}"</span>
+                    <span className="text-[10px] text-gray-500 dark:text-gray-400 italic mt-0.5 line-clamp-1">"{(order.ratings.store ?? order.ratings.restaurant).comment}"</span>
                   )}
                 </div>
                 <div className="flex gap-0.5">
