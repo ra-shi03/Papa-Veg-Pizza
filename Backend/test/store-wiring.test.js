@@ -8,18 +8,15 @@ import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createFixture, mongoose, PASSWORD } from './helpers/fixture.js';
 
-let fx; let A; let B; let sup; let chef; let riderWaiting; let riderLate; let riderFree;
+let fx; let A; let B; let packer; let chef; let riderWaiting; let riderLate; let riderFree;
 let phoneSeq = 0; let seq = 0;
 const oid = (v) => new mongoose.Types.ObjectId(String(v));
 const minsAgo = (m) => new Date(Date.now() - m * 60000);
 const ok = (res, status = 200) => { assert.equal(res.status, status, JSON.stringify(res.body)); return res.body.data; };
 const login = async (email) => (await fx.call('POST', '/v1/auth/store/login', null, { email, password: PASSWORD })).body.data.accessToken;
-const makeStaff = async (role, tag) => {
-    const email = `${tag}${fx.ts}@example.invalid`;
-    const res = await fx.call('POST', '/v1/food/store/staff', A.managerToken, { fullName: `Name ${tag}`, email, phone: `8${String(++phoneSeq).padStart(2, '0')}${String(fx.ts).slice(-7)}`, password: PASSWORD, role });
-    assert.equal(res.status, 201, JSON.stringify(res.body));
-    return { id: res.body.data.userId, token: await login(email) };
-};
+// created by the store manager and approved by the franchise admin (fx.staff); a 'Kitchen Supervisor' is a legacy
+// account (the role is no longer used and cannot be created). Clocking in is left to the tests.
+const makeStaff = (role, tag) => (/supervisor/i.test(role) ? fx.legacySupervisor('A', tag) : fx.staff('A', role, tag, { clockIn: false }));
 /** an order of store `f`, inserted as the customer app would leave it */
 async function order(f, { status, rider, history = [], payment = { method: 'cash', status: 'cod_pending' }, stage, at = minsAgo(1), customerName = 'Asha' }) {
     const ref = `SW${fx.ts}${seq++}`;
@@ -37,7 +34,7 @@ async function order(f, { status, rider, history = [], payment = { method: 'cash
 
 before(async () => {
     fx = await createFixture(); A = fx.F.A; B = fx.F.B;
-    sup = await makeStaff('Kitchen Supervisor', 'swsup');
+    packer = await makeStaff('Packager', 'swpack');   // kitchen staff (the supervisor role is no longer used)
     chef = await makeStaff('Pizza Maker', 'swchef');
     riderWaiting = await fx.partner('approved');
     riderLate = await fx.partner('approved');
@@ -90,17 +87,19 @@ describe('dashboard lists behind the cards', () => {
         assert.equal(rows.filter((r) => r.status === 'Idle').length, card.availableRiders);
     });
     test('staff-roster: the kitchen team with today\'s real attendance', async () => {
-        ok(await fx.call('POST', '/v1/store/attendance/clock-in', sup.token), 201);
+        ok(await fx.call('POST', '/v1/store/attendance/clock-in', packer.token), 201);
         const rows = ok(await get(A.managerToken, 'staff-roster'));
         assert.deepEqual(Object.keys(rows[0]).sort(), ['employee', 'role', 'shift', 'status']);
-        assert.equal(rows.find((r) => r.employee === 'Name swsup').status, 'Present');
+        assert.equal(rows.find((r) => r.employee === 'Name swpack').status, 'Present');
         assert.equal(rows.find((r) => r.employee === 'Name swchef').status, 'Not clocked in');
         assert.ok(!rows.some((r) => r.employee === 'Manager A'), 'the manager is not in the kitchen roster');
     });
-    test('who may see them: supervisor the order and rider lists, not the staff roster; kitchen staff none; other stores 404', async () => {
-        assert.equal((await get(sup.token, 'order-list')).status, 200);
-        assert.equal((await get(sup.token, 'rider-roster')).status, 200);
-        assert.equal((await get(sup.token, 'staff-roster')).status, 403);
+    test('who may see them: the manager only; kitchen staff and a (removed) kitchen supervisor none; other stores 404', async () => {
+        const legacy = await fx.legacySupervisor('A', 'swlegacy');
+        for (const w of ['order-list', 'rider-roster', 'staff-roster']) {
+            assert.equal((await get(packer.token, w)).status, 403, w);
+            assert.equal((await get(legacy.token, w)).status, 403, w);
+        }
         for (const w of ['order-list', 'rider-roster', 'staff-roster']) {
             assert.equal((await get(chef.token, w)).status, 403, w);
             assert.equal((await get(B.managerToken, w, `?storeId=${A.storeId}`)).status, 404, w);
@@ -126,13 +125,13 @@ describe('Ready Orders: the store confirms the pickup', () => {
         assert.match(last.note, /Handed over at the counter/);
         assert.equal((await pickup(A.managerToken, o.id)).status, 400, 'already picked up');
     });
-    test('refused: no rider, not ready yet, supervisor or kitchen staff, another store', async () => {
+    test('refused: no rider, not ready yet, kitchen staff, another store', async () => {
         const noRider = await order(A, { status: 'ready_for_pickup' });
         assert.equal((await pickup(A.managerToken, noRider.id)).status, 400);
         const cooking = await order(A, { status: 'preparing', rider: riderWaiting.id });
         assert.equal((await pickup(A.managerToken, cooking.id)).status, 400);
         const ready = await order(A, { status: 'ready_for_pickup', rider: riderWaiting.id });
-        assert.equal((await pickup(sup.token, ready.id)).status, 403);
+        assert.equal((await pickup(packer.token, ready.id)).status, 403);
         assert.equal((await pickup(chef.token, ready.id)).status, 403);
         assert.equal((await pickup(B.managerToken, ready.id)).status, 404);
         assert.equal((await pickup(A.customerToken, ready.id)).status, 403);
@@ -167,7 +166,7 @@ describe('Cancelled Orders: reopen and refund history', () => {
         const refundOnOrder = await cancelledByStore(1, { payment: { method: 'cash', status: 'cod_pending', refund: { status: 'pending', amount: 100 } } });
         assert.equal((await reopen(A.managerToken, refundOnOrder.id)).status, 400, 'a refund recorded on the order itself');
         const fresh = await cancelledByStore(1);
-        assert.equal((await reopen(sup.token, fresh.id)).status, 403);
+        assert.equal((await reopen(packer.token, fresh.id)).status, 403);
         assert.equal((await reopen(B.managerToken, fresh.id)).status, 404);
         assert.equal((await fx.models.FoodOrder.findById(fresh.id).lean()).orderStatus, 'cancelled_by_store');
     });
@@ -200,6 +199,6 @@ describe('profile: the store\'s real hours (never a made-up "11 AM - 11 PM")', (
         assert.deepEqual([s.openingTime, s.closingTime], ['10:00 AM', '10:00 PM']);
         const closed = Object.fromEntries(Object.keys(week).map((d) => [d, { ...day, isClosed: true }]));
         await StoreHours.updateOne({ storeId: oid(A.storeId) }, { $set: { week: closed } });
-        assert.deepEqual(Object.values((({ openingTime, closingTime }) => ({ openingTime, closingTime }))(ok(await fx.call('GET', '/v1/profile', sup.token)).store)), ['Closed', 'today']);
+        assert.deepEqual(Object.values((({ openingTime, closingTime }) => ({ openingTime, closingTime }))(ok(await fx.call('GET', '/v1/profile', packer.token)).store)), ['Closed', 'today']);
     });
 });

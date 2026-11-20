@@ -108,6 +108,7 @@ async function build(ctx) {
     // ---- roles + super admin (no API can create the first super admin)
     const roles = {};
     for (const [code, name] of [['SUPER_ADMIN', 'Super Admin'], ['FRANCHISE_ADMIN', 'Franchise Admin'], ['STORE_MANAGER', 'Store Manager'],
+        // KITCHEN_SUPERVISOR exists only so legacy (deactivated) supervisor accounts can be modelled: the role is no longer used
         ['KITCHEN_SUPERVISOR', 'Kitchen Supervisor'], ['KITCHEN_STAFF', 'Kitchen Staff'], ['CUSTOMER', 'Customer']]) {
         roles[code] = await Role.create({ code, name });
     }
@@ -172,8 +173,48 @@ async function build(ctx) {
         };
     }
 
+    let staffSeq = 0;
+    /**
+     * A kitchen staff member of franchise `k`'s store, the way the app makes one: created by the store manager, approved
+     * by the franchise admin (new staff wait in 'Pending Approval' until then), signed in, and clocked in unless
+     * `clockIn: false` (kitchen work is refused before attendance). -> { id (userId), staffId, email, name, token }
+     */
+    const staff = async (k, role = 'Pizza Maker', tag = 'staff', { clockIn = true } = {}) => {
+        const f = F[k];
+        const seq = ++staffSeq;
+        const email = `${tag}-${seq}-${ts}@example.invalid`;
+        const name = `Name ${tag}`;   // tags are unique within a test file
+        const phone = `7${String(seq).padStart(3, '0')}${String(ts).slice(-6)}`;
+        const res = await call('POST', '/v1/food/store/staff', f.managerToken, { fullName: name, email, phone, password: PASSWORD, role });
+        if (res.status !== 201) throw new Error(`fixture: create staff ${tag} -> ${res.status} ${JSON.stringify(res.body)}`);
+        const ok = await call('PATCH', `/v1/staff-approvals/${res.body.data._id}/approve`, f.adminToken, {});
+        if (ok.status !== 200) throw new Error(`fixture: approve staff ${tag} -> ${ok.status} ${JSON.stringify(ok.body)}`);
+        const signIn = await call('POST', '/v1/auth/store/login', null, { email, password: PASSWORD });
+        if (signIn.status !== 200) throw new Error(`fixture: staff ${tag} login -> ${signIn.status} ${JSON.stringify(signIn.body)}`);
+        const token = signIn.body.data.accessToken;
+        if (clockIn) {
+            const ci = await call('POST', '/v1/store/attendance/clock-in', token);
+            if (ci.status !== 200 && ci.status !== 201) throw new Error(`fixture: staff ${tag} clock-in -> ${ci.status} ${JSON.stringify(ci.body)}`);
+        }
+        return { id: String(res.body.data.userId), staffId: String(res.body.data._id), email, phone, name, token };
+    };
+
+    /**
+     * A kitchen supervisor account as it was before the role was removed (the app can no longer create one): an approved
+     * staff member whose role is switched to KITCHEN_SUPERVISOR in the database. `token` is a signed supervisor token, like
+     * one issued before the change. -> { id, staffId, email, name, token }
+     */
+    const legacySupervisor = async (k, tag = 'legacysup') => {
+        const s = await staff(k, 'Pizza Maker', tag, { clockIn: false });
+        const userId = new mongoose.Types.ObjectId(s.id);
+        await User.updateOne({ _id: userId }, { $set: { primaryRole: roles.KITCHEN_SUPERVISOR._id } });
+        await UserRole.updateMany({ userId }, { $set: { roleId: roles.KITCHEN_SUPERVISOR._id } });
+        await StoreManager.updateOne({ _id: new mongoose.Types.ObjectId(s.staffId) }, { $set: { role: 'Kitchen Supervisor' } });
+        return { ...s, token: tokenFor(userId, 'KITCHEN_SUPERVISOR', { storeId: F[k].storeId, franchiseId: F[k].franchiseId }) };
+    };
+
     return {
-        api, baseUrl: `http://127.0.0.1:${ctx.server.address().port}`, call, bearer, tokenFor, models, ts, F, SA, superUser, roles,
+        api, baseUrl: `http://127.0.0.1:${ctx.server.address().port}`, call, bearer, tokenFor, models, ts, F, SA, superUser, roles, staff, legacySupervisor,
         /** A real delivery partner record (status: approved | suspended | rejected | pending) and a token for it. */
         partner: async (status = 'approved') => {
             const _id = new mongoose.Types.ObjectId();

@@ -3,7 +3,7 @@
 //
 //   store manager      -> own store; replies to reviews, responds to and resolves complaints; full phone (the
 //                         Customers screens mask the email, complaints and reviews show it)
-//   kitchen supervisor -> only the orders assigned to them (supervisor-assigned-only.test.js), read only, phone and email masked
+//   kitchen supervisor -> the role is no longer used: a (legacy) supervisor token is refused everywhere (403)
 //   franchise admin, super admin -> Customers screens read only via ?storeId= (nearby-people.test.js)
 //   kitchen staff, customers -> 403 on the store screens; franchise / super admin -> 403 on complaints and reviews
 //   another store / franchise -> 404
@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { createFixture, mongoose, PASSWORD } from './helpers/fixture.js';
 
 let fx; let A; let B;
-let sup; let chef; let bSup;          // { id, token }
+let sup; let chef; let bStaff;        // { id, token }; sup = a legacy (removed) kitchen supervisor
 let both;                             // a customer who ordered at A and at B: { id, token, mobile, email }
 let phoneSeq = 0; let orderSeq = 0;
 const orders = {};                    // name -> { id, ref }
@@ -51,9 +51,9 @@ const MGR_B = () => B.managerToken;
 
 before(async () => {
     fx = await createFixture(); A = fx.F.A; B = fx.F.B;
-    sup = await makeStaff(A.managerToken, 'Kitchen Supervisor', 'ccsup');
+    sup = await fx.legacySupervisor('A', 'ccsup');
     chef = await makeStaff(A.managerToken, 'Pizza Maker', 'ccchef');
-    bSup = await makeStaff(B.managerToken, 'Kitchen Supervisor', 'ccbsup');
+    bStaff = await makeStaff(B.managerToken, 'Pizza Maker', 'ccbstaff');
 
     const user = await fx.models.User.create({ mobile: `8${String(fx.ts).slice(-9)}`, email: `both${fx.ts}@example.invalid`, loginType: 'OTP', primaryRole: fx.roles.CUSTOMER._id, isActive: true });
     both = { id: String(user._id), token: fx.tokenFor(user, 'CUSTOMER'), mobile: user.mobile, email: user.email };
@@ -67,7 +67,7 @@ before(async () => {
     orders.ab2 = await order(A, both.id, { total: 200, rating: 3, name: 'Both Kumar', phone: both.mobile, daysAgo: 4 });
     orders.b1 = await order(B, B.customerId, { total: 999, rating: 4, comment: 'Good', name: 'Bob Das', phone: '9123456780', daysAgo: 1 });
     orders.bb1 = await order(B, both.id, { total: 7000, name: 'Both Kumar', phone: both.mobile, daysAgo: 1 });
-    // The store manager assigned all of store A's orders to this supervisor
+    // Orders accepted before the role was removed still name a supervisor: information only, it opens nothing
     await fx.models.FoodOrder.collection.updateMany(
         { storeId: new mongoose.Types.ObjectId(A.storeId) },
         { $set: { 'kitchen.supervisor.userId': new mongoose.Types.ObjectId(sup.id) } },
@@ -81,12 +81,12 @@ const raiseComplaint = (customerToken, orderId, issueType = 'Missing Items', des
 describe('who may open the store screens', () => {
     const paths = ['/customers/orders', '/complaints', '/reviews'];
     for (const path of paths) {
-        test(`GET ${S}${path}: anonymous 401; kitchen staff, customers (and admins outside Customers) 403; manager and supervisor 200`, async () => {
+        test(`GET ${S}${path}: anonymous 401; kitchen staff, customers (and admins outside Customers) 403; manager 200; a legacy supervisor 403`, async () => {
             assert.equal((await fx.call('GET', `${S}${path}`)).status, 401);
             const refused = path === '/customers/orders' ? [chef.token, A.customerToken] : [chef.token, A.customerToken, A.adminToken, fx.SA];
             for (const token of refused) assert.equal((await get(token, path)).status, 403, path);
             assert.equal((await get(MGR_A(), path)).status, 200);
-            assert.equal((await get(sup.token, path)).status, 200);
+            assert.equal((await get(sup.token, path)).status, 403, 'the supervisor role is no longer used');
         });
     }
 });
@@ -113,14 +113,11 @@ describe('customers', () => {
         assert.deepEqual(b.customers.map((c) => c._id).sort(), [B.customerId, both.id].sort());
         assert.equal(b.customers.find((c) => c._id === both.id).totalSpent, 7000);
     });
-    test('the manager sees the full phone and a masked email; the supervisor sees both masked', async () => {
+    test('the manager sees the full phone and a masked email', async () => {
         const full = (await list(MGR_A())).customers.find((c) => c._id === A.customerId);
         assert.equal(full.email, 'a***@example.invalid');
         assert.match(full.mobile, /^\d{10,11}$/);
-        const masked = (await list(sup.token)).customers.find((c) => c._id === A.customerId);
-        assert.match(masked.mobile, /^\d{2}\*{6,7}\d{2}$/);
-        assert.equal(masked.email, 'a***@example.invalid');
-        assert.equal(masked.name, 'Alice Rao');
+        assert.equal(full.name, 'Alice Rao');
     });
     test('filters, sorting and pagination', async () => {
         assert.deepEqual((await list(MGR_A(), '&search=alice')).customers.map((c) => c._id), [A.customerId]);
@@ -132,7 +129,7 @@ describe('customers', () => {
         assert.equal(page.customers.length, 1);
         assert.equal(page.pagination.pages, 2);
     });
-    test('profile: only a customer of this store; supervisor masked; bad ids 404', async () => {
+    test('profile: only a customer of this store; bad ids 404', async () => {
         const res = await get(MGR_A(), `/customers/${A.customerId}`);
         assert.equal(res.status, 200);
         const d = res.body.data;
@@ -145,7 +142,7 @@ describe('customers', () => {
         assert.equal((await get(MGR_A(), '/customers/not-an-id')).status, 404);
         const viaB = (await get(MGR_B(), `/customers/${both.id}`)).body.data;
         assert.equal(viaB.recentOrders.length, 1, 'B only sees its own orders of a shared customer');
-        assert.match((await get(sup.token, `/customers/${A.customerId}`)).body.data.customerProfile.mobile, /\*/);
+        assert.equal((await get(sup.token, `/customers/${A.customerId}`)).status, 403);
     });
     test('order details: own store only, in the screen\'s shape', async () => {
         const res = await get(MGR_A(), `/customers/orders/${orders.a1.id}`);
@@ -159,8 +156,8 @@ describe('customers', () => {
         assert.equal(d.items[0].subtotal, 3000);
         assert.equal(d.payments[0].amount, 3000);
         assert.ok(Array.isArray(d.deliveryTracking) && Array.isArray(d.refunds));
-        assert.equal((await get(sup.token, `/customers/orders/${orders.a1.id}`)).body.data.order.customerMobile, '98******10');
-        for (const [token, id] of [[MGR_A(), orders.b1.id], [MGR_B(), orders.a1.id], [sup.token, orders.bb1.id]]) assert.equal((await get(token, `/customers/orders/${id}`)).status, 404);
+        assert.equal((await get(sup.token, `/customers/orders/${orders.a1.id}`)).status, 403);
+        for (const [token, id] of [[MGR_A(), orders.b1.id], [MGR_B(), orders.a1.id]]) assert.equal((await get(token, `/customers/orders/${id}`)).status, 404);
     });
 });
 
@@ -189,9 +186,7 @@ describe('complaints', () => {
         assert.equal(c.customerEmail, `alice${fx.ts}@example.invalid`);
         assert.deepEqual(Object.keys(a.pagination).sort(), ['limit', 'page', 'pages', 'total']);
         assert.deepEqual((await list(MGR_B())).complaints.map((x) => x._id), [bComplaint]);
-        const masked = (await list(sup.token)).complaints[0];
-        assert.equal(masked.customerEmail, 'a***@example.invalid');
-        assert.match(masked.customerMobile, /\*/);
+        assert.equal((await get(sup.token, '/complaints')).status, 403);
     });
     test('filters', async () => {
         assert.equal((await list(MGR_A(), '&complaintType=missing_items')).complaints.length, 1);
@@ -207,8 +202,9 @@ describe('complaints', () => {
         assert.equal(res.body.data.customer._id, A.customerId);
         assert.equal(res.body.data.order.orderNumber, orders.a2.ref);
         assert.equal(res.body.data.order.items[0].name, 'Margherita');
-        assert.equal((await get(sup.token, `/complaints/${aComplaint}`)).status, 200);
-        for (const [token, id] of [[MGR_B(), aComplaint], [bSup.token, aComplaint], [MGR_A(), bComplaint], [MGR_A(), 'junk'], [MGR_A(), '64b000000000000000000001']]) {
+        assert.equal((await get(sup.token, `/complaints/${aComplaint}`)).status, 403);
+        assert.equal((await get(bStaff.token, `/complaints/${aComplaint}`)).status, 403, 'kitchen staff');
+        for (const [token, id] of [[MGR_B(), aComplaint], [MGR_A(), bComplaint], [MGR_A(), 'junk'], [MGR_A(), '64b000000000000000000001']]) {
             assert.equal((await get(token, `/complaints/${id}`)).status, 404, `${id}`);
         }
     });
@@ -268,7 +264,7 @@ describe('reviews', () => {
         assert.equal(a.reviews.find((r) => r._id === orders.ab2.id).sentiment, 'Neutral');
         assert.equal(r1.orderNumber, orders.a1.ref);
         assert.deepEqual((await list(MGR_B())).reviews.map((r) => r._id), [orders.b1.id]);
-        assert.match((await list(sup.token)).reviews.find((r) => r._id === orders.a1.id).customerMobile, /\*/);
+        assert.equal((await get(sup.token, '/reviews')).status, 403);
     });
     test('filters', async () => {
         assert.equal((await list(MGR_A(), '&rating=5 Stars')).reviews.length, 1);
@@ -301,7 +297,7 @@ describe('reviews', () => {
         assert.match(res.body.data.reply.repliedBy, /^Store Manager \(/);
         assert.doesNotMatch(res.body.data.reply.repliedBy, /Someone Else/);
         assert.equal((await list(MGR_A(), '&replyStatus=replied')).reviews.length, 1);
-        assert.equal((await get(sup.token, `/reviews/${orders.a2.id}`)).body.data.review.reply.text, 'Sorry it arrived cold. Your next order is on us.');
+        assert.equal((await get(MGR_A(), `/reviews/${orders.a2.id}`)).body.data.review.reply.text, 'Sorry it arrived cold. Your next order is on us.');
     });
 });
 

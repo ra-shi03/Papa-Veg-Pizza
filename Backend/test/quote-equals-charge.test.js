@@ -14,11 +14,12 @@ const PRICING_KEYS = ['subtotal', 'tax', 'packagingFee', 'deliveryFee', 'platfor
 before(async () => {
     fx = await createFixture(); A = fx.F.A;
     const { Product } = await import('../src/modules/food/admin/models/product.model.js');
-    const { FoodOffer } = await import('../src/modules/food/admin/models/offer.model.js');
+    // coupons are the super admin's FoodCoupon records (settings/models/foodCoupon.model.js); pricing reads those
+    const { FoodCoupon } = await import('../src/modules/food/settings/models/foodCoupon.model.js');
     const { FoodFeeSettings } = await import('../src/modules/food/admin/models/feeSettings.model.js');
     ({ StoreHours } = await import('../src/modules/food/franchise/models/storeHours.model.js'));
     pizza = await Product.create({ name: 'Margherita', categoryId: new mongoose.Types.ObjectId(), status: 'Active', price: 250 });
-    await FoodOffer.create({ couponCode: 'SAVE20', discountType: 'percentage', discountValue: 20, maxDiscount: 80, minOrderValue: 400, status: 'active' });
+    await FoodCoupon.create({ code: 'SAVE20', title: '20% OFF', couponType: 'Percentage', value: 20, maximumDiscount: 80, minimumOrderAmount: 400, usagePerCustomer: 0 /* unlimited: the orders placed above use it too */, status: 'active', isActive: true, startDate: new Date(Date.now() - 86400000), endDate: new Date(Date.now() + 30 * 86400000) });
     await FoodFeeSettings.create({ platformFee: 5, packagingFee: 10, handlingFee: 7, deliveryFee: 30, gstRate: 5, isActive: true });
     const week = Object.fromEntries(DAYS.map((d) => [d, { open: '00:00', close: '23:59', isClosed: false }]));
     for (const s of [fx.F.A, fx.F.B]) await StoreHours.findOneAndUpdate({ storeId: s.storeId }, { $set: { week, holidays: [] } }, { upsert: true });

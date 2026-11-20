@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { createFixture, mongoose, PASSWORD } from './helpers/fixture.js';
 
 let fx; let A; let B;
-let sup; let chef;
+let sup; let chef; let cook;   // sup: a legacy (removed) kitchen supervisor account
 const O = {};
 const RIDER_BUSY = new mongoose.Types.ObjectId();
 const RIDER_FREE = new mongoose.Types.ObjectId();
@@ -24,12 +24,9 @@ let phoneSeq = 0; let seq = 0;
 
 const minsAgo = (m) => new Date(Date.now() - m * 60000);
 const login = async (email) => (await fx.call('POST', '/v1/auth/store/login', null, { email, password: PASSWORD })).body.data.accessToken;
-const makeStaff = async (role, tag) => {
-    const email = `${tag}${fx.ts}@example.invalid`;
-    const res = await fx.call('POST', '/v1/food/store/staff', A.managerToken, { fullName: `Name ${tag}`, email, phone: `7${String(++phoneSeq).padStart(2, '0')}${String(fx.ts).slice(-7)}`, password: PASSWORD, role });
-    assert.equal(res.status, 201, JSON.stringify(res.body));
-    return { id: res.body.data.userId, token: await login(email) };
-};
+// created by the store manager and approved by the franchise admin (fx.staff); a 'Kitchen Supervisor' is a legacy
+// account (the role is no longer used and cannot be created). Clocking in is left to the tests.
+const makeStaff = (role, tag) => (/supervisor/i.test(role) ? fx.legacySupervisor('A', tag) : fx.staff('A', role, tag, { clockIn: false }));
 async function seed(f, { status, total, method = 'cash', paid, at = minsAgo(0.05), user, items, rating, kitchen, history = [], rider }) {
     const ref = `DB${fx.ts}${seq++}`;
     const doc = {
@@ -50,6 +47,7 @@ before(async () => {
     fx = await createFixture(); A = fx.F.A; B = fx.F.B;
     await fx.models.FoodOrder.deleteMany({}); // start from the seeded set only (the fixture adds one order per store)
     sup = await makeStaff('Kitchen Supervisor', 'dsup');
+    cook = await makeStaff('Baker', 'dcook');
     chef = await makeStaff('Pizza Maker', 'dchef');
     const onLeave = await makeStaff('Pizza Maker', 'dleave');
     await fx.models.StoreManager.updateOne({ userId: new mongoose.Types.ObjectId(onLeave.id) }, { $set: { status: 'On Leave' } });
@@ -106,7 +104,6 @@ const aget = async (token, path = '', qs = '') => {
 const STORE_WIDGETS = ['today-sales', 'today-orders', 'active-orders', 'prep-time', 'pending-deliveries', 'low-stock', 'staff-duty', 'customer-rating',
     'hourly-sales', 'order-status', 'top-products', 'live-orders', 'kitchen-performance', 'delivery-overview', 'inventory-alerts', 'staff-overview',
     'recent-complaints', 'activity-logs'];
-const SUPERVISOR_OK = ['today-orders', 'active-orders', 'prep-time', 'pending-deliveries', 'live-orders', 'order-status', 'kitchen-performance', 'delivery-overview'];
 
 describe('store dashboard: who sees what', () => {
     test('anonymous 401; kitchen staff and customers 403 on every widget; the manager 200 on every widget', async () => {
@@ -117,12 +114,12 @@ describe('store dashboard: who sees what', () => {
             assert.equal((await sget(A.managerToken, w)).status, 200, w);
         }
     });
-    test('the kitchen supervisor gets kitchen and order widgets only', async () => {
-        for (const w of STORE_WIDGETS) assert.equal((await sget(sup.token, w)).status, SUPERVISOR_OK.includes(w) ? 200 : 403, w);
+    test('a (removed) kitchen supervisor gets no widget at all (403); the supervisor-only widget set is gone', async () => {
+        for (const w of STORE_WIDGETS) assert.equal((await sget(sup.token, w)).status, 403, w);
     });
     test('a store role always gets its own store; another store\'s id is 404; the screen\'s placeholder id means "my store"', async () => {
         assert.equal((await sget(B.managerToken, 'today-orders', `?storeId=${A.storeId}`)).status, 404);
-        assert.equal((await sget(sup.token, 'today-orders', `?storeId=${B.storeId}`)).status, 404);
+        assert.equal((await sget(A.managerToken, 'today-orders', `?storeId=${B.storeId}`)).status, 404);
         assert.equal((await sdata(A.managerToken, 'today-orders', '?storeId=st-indore-01')).totalOrders, 6);
         assert.equal((await sdata(A.managerToken, 'today-orders', `?storeId=${A.storeId}`)).totalOrders, 6);
         assert.equal((await sdata(B.managerToken, 'today-orders')).totalOrders, 1);
@@ -168,8 +165,15 @@ describe('store dashboard: numbers', () => {
     });
     test('top products (last 30 days, sales only)', async () => {
         const top = await sdata(M(), 'top-products');
-        assert.deepEqual(top[0], { productName: 'Margherita', sold: 6, revenue: 2150 }); // o1 2x200, o2 300, o4 200, o6 250, y1 1000
-        assert.deepEqual(top[1], { productName: 'Garlic Bread', sold: 1, revenue: 100 });
+        const totals = ({ trend, ...rest }) => rest;
+        assert.deepEqual(totals(top[0]), { productName: 'Margherita', sold: 6, revenue: 2150 }); // o1 2x200, o2 300, o4 200, o6 250, y1 1000
+        assert.deepEqual(totals(top[1]), { productName: 'Garlic Bread', sold: 1, revenue: 100 });
+        // each row carries units sold per day for the last 7 days (oldest first) for the row's chart
+        const weekday = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toLocaleDateString('en-US', { weekday: 'short' }); };
+        assert.deepEqual(top[0].trend.map((t) => t.name), [6, 5, 4, 3, 2, 1, 0].map(weekday));
+        assert.deepEqual(top[0].trend.map((t) => t.sales), [0, 0, 0, 0, 0, 1, 5], 'y1 yesterday; o1 (2), o2, o4, o6 today');
+        assert.deepEqual(top[1].trend.map((t) => t.sales), [0, 0, 0, 0, 0, 0, 1]);
+        assert.equal(top[0].trend.reduce((n, t) => n + t.sales, 0), top[0].sold, 'all of it within the week');
     });
     test('live order board', async () => {
         const live = await sdata(M(), 'live-orders');
@@ -191,7 +195,7 @@ describe('store dashboard: numbers', () => {
         assert.deepEqual(await sdata(M(), 'staff-overview'), { present: 0, late: 0, absent: 1 }); // nobody clocked in; one person is On Leave
     });
     test('staff widgets follow real clock-ins (not the count of active staff)', async () => {
-        // a shift that started two hours ago, with the chef on it: the chef is late, the supervisor (no shift) is not
+        // a shift that started two hours ago, with the chef on it: the chef is late, the cook (no shift) is not
         const { formatClock } = await import('../src/modules/food/store/services/attendanceTime.js');
         const now = new Date();
         const start = formatClock((now.getHours() * 60 + now.getMinutes() - 120 + 1440) % 1440);
@@ -200,7 +204,7 @@ describe('store dashboard: numbers', () => {
         const staffRec = await fx.models.StoreManager.findOne({ userId: new mongoose.Types.ObjectId(chef.id) }).lean();
         assert.equal((await fx.call('POST', `/v1/store/shifts/${shift.body.data._id}/assign`, A.managerToken, { staffIds: [String(staffRec._id)] })).status, 200);
 
-        assert.equal((await fx.call('POST', '/v1/store/attendance/clock-in', sup.token)).status, 201);
+        assert.equal((await fx.call('POST', '/v1/store/attendance/clock-in', cook.token)).status, 201);
         assert.deepEqual(await sdata(M(), 'staff-duty'), { staffOnDuty: 1 });
         assert.equal((await fx.call('POST', '/v1/store/attendance/clock-in', chef.token)).status, 201);
         assert.deepEqual(await sdata(M(), 'staff-duty'), { staffOnDuty: 2 });
@@ -209,8 +213,8 @@ describe('store dashboard: numbers', () => {
         assert.equal((await fx.call('POST', '/v1/store/attendance/clock-out', chef.token)).status, 200);   // finished: worked today, no longer on duty
         assert.deepEqual(await sdata(M(), 'staff-duty'), { staffOnDuty: 1 });
         assert.deepEqual(await sdata(M(), 'staff-overview'), { present: 2, late: 1, absent: 1 });
-        // the supervisor sees staff-duty only as the manager does: the widget is manager-only for them
-        assert.equal((await sget(sup.token, 'staff-duty')).status, 403);
+        // staff-duty is the manager's: kitchen staff are refused
+        assert.equal((await sget(cook.token, 'staff-duty')).status, 403);
         // store B has nobody clocked in
         assert.deepEqual(await sdata(B.managerToken, 'staff-duty'), { staffOnDuty: 0 });
     });
@@ -248,7 +252,7 @@ describe('store dashboard: numbers', () => {
 
 describe('franchise dashboard: who sees what', () => {
     const PATHS = ['', '/revenue', '/live-orders', '/store-performance', '/inventory-alerts', '/delivery-performance', '/customer-activity'];
-    test('anonymous 401; store manager, supervisor, staff and customers 403; franchise and super admins 200 on every endpoint', async () => {
+    test('anonymous 401; store manager, a (removed) supervisor, staff and customers 403; franchise and super admins 200 on every endpoint', async () => {
         for (const p of PATHS) {
             assert.equal((await fx.call('GET', `${AD}${p}`)).status, 401, p);
             for (const token of [A.managerToken, sup.token, chef.token, A.customerToken]) assert.equal((await fx.call('GET', `${AD}${p}`, token)).status, 403, p);

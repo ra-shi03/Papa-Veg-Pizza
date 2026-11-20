@@ -1,5 +1,5 @@
 // N-H1 / N-M1 (audit4): the rider leg of an order, end to end with real tokens.
-// customer places a cash order -> manager accepts (with a kitchen supervisor) -> kitchen stages -> store assigns a rider
+// customer places a cash order -> manager accepts (no supervisor) -> kitchen stages -> store assigns a rider
 // -> rider accepts -> reached pickup -> pickup -> reached drop -> customer OTP -> delivered.
 // Every rider step must come in order, only from the assigned rider, and a refused step changes nothing.
 import { test, before, after, describe } from 'node:test';
@@ -11,12 +11,9 @@ let sup; let rider; let otherRider; let pizza; let FoodTransaction;
 let phoneSeq = 0;
 
 const login = async (email) => (await fx.call('POST', '/v1/auth/store/login', null, { email, password: PASSWORD })).body.data.accessToken;
-const makeStaff = async (role, tag) => {
-    const email = `${tag}${fx.ts}@example.invalid`;
-    const res = await fx.call('POST', '/v1/food/store/staff', A.managerToken, { fullName: `Name ${tag}`, email, phone: `6${String(++phoneSeq).padStart(2, '0')}${String(fx.ts).slice(-7)}`, password: PASSWORD, role });
-    assert.equal(res.status, 201, `create ${tag}: ${JSON.stringify(res.body)}`);
-    return { id: res.body.data.userId, token: await login(email) };
-};
+// created by the store manager and approved by the franchise admin (fx.staff); a 'Kitchen Supervisor' is a legacy
+// account (the role is no longer used and cannot be created). Clocking in is left to the tests.
+const makeStaff = (role, tag) => (/supervisor/i.test(role) ? fx.legacySupervisor('A', tag) : fx.staff('A', role, tag, { clockIn: false }));
 
 const ADDRESS = { street: '1 Test Street', city: 'Indore', state: 'MP' };
 const placeOrder = async () => {
@@ -35,10 +32,11 @@ const step = {
     pickup: (id, who = rider) => fx.call('PATCH', R(`${id}/confirm-pickup`), who.token, { confirmedOrderId: id }),
     reachedDrop: (id, who = rider) => fx.call('PATCH', R(`${id}/reached-drop`), who.token, {}),
     verifyOtp: (id, otp, who = rider) => fx.call('POST', R(`${id}/verify-drop-otp`), who.token, { otp }),
-    complete: (id, body = {}, who = rider) => fx.call('PATCH', R(`${id}/complete`), who.token, body),
+    // a handover photo is required to complete a delivery (deliveryVerification.handoverPhotoUrl)
+    complete: (id, body = {}, who = rider) => fx.call('PATCH', R(`${id}/complete`), who.token, { handoverPhotoUrl: 'https://example.com/proof.jpg', ...body }),
 };
-const storeAccept = (id) => fx.call('PATCH', `/v1/food/store/orders/${id}/accept`, A.managerToken, { kitchenSupervisorId: sup.id, estimatedPreparationTime: 15 });
-const stage = (id, s) => fx.call('PATCH', `/v1/food/store/orders/${id}/stage`, sup.token, { stage: s });
+const storeAccept = (id) => fx.call('PATCH', `/v1/food/store/orders/${id}/accept`, A.managerToken, { estimatedPreparationTime: 15 });
+const stage = (id, s) => fx.call('PATCH', `/v1/food/store/orders/${id}/stage`, A.managerToken, { stage: s });   // the manager runs the kitchen here
 const assignRider = (id, who = rider) => fx.call('POST', '/v1/store/delivery/assign', A.managerToken, { orderId: id, riderId: who.id });
 
 /** What the customer sees (GET /food/orders/:id with their own token). */
@@ -80,7 +78,7 @@ before(async () => {
     const { Product } = await import('../src/modules/food/admin/models/product.model.js');
     ({ FoodTransaction } = await import('../src/modules/food/orders/models/foodTransaction.model.js'));
     pizza = await Product.create({ name: 'Margherita', categoryId: new mongoose.Types.ObjectId(), status: 'Active', sizes: [{ size: 'Regular', price: 200 }], price: 200 });
-    sup = await makeStaff('Kitchen Supervisor', 'rfsup');
+    sup = await makeStaff('Kitchen Supervisor', 'rfsup');   // a legacy (removed) supervisor account: refused everywhere
     rider = await fx.partner();
     otherRider = await fx.partner();
     // store A's own riders, so the store can assign them wherever they are (who is near whom: nearby-people.test.js)

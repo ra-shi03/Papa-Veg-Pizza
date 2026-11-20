@@ -198,6 +198,7 @@ describe('order events reach only the right rooms', () => {
         const scopeA = { franchiseId: A.franchiseId, storeId: A.storeId };
         who = {
             managerA: await client(as.managerA()),
+            // a (removed) kitchen supervisor's token no longer joins the store room
             supervisorA: await client(fx.tokenFor(new mongoose.Types.ObjectId(), 'KITCHEN_SUPERVISOR', scopeA)),
             adminA: await client(as.adminA()),
             managerB: await client(as.managerB()),
@@ -214,10 +215,10 @@ describe('order events reach only the right rooms', () => {
         return Object.fromEntries(await Promise.all(pending));
     }
     const got = (r) => Object.keys(r).filter((k) => r[k]).sort();
-    const insideA = ['adminA', 'managerA', 'supervisorA'];
+    const insideA = ['adminA', 'managerA'];
     const order = async (over) => { const o = await makeOrder(over); await new Promise((r) => setTimeout(r, 400)); return o; };
 
-    test('a new order goes to its store (manager, supervisor) and its franchise admin, nobody else', async () => {
+    test('a new order goes to its store (manager) and its franchise admin, nobody else (not a removed supervisor role)', async () => {
         let created;
         const r = await watch(async () => { created = await makeOrder({ orderStatus: 'created', dispatch: { status: 'unassigned' } }); });
         assert.deepEqual(got(r), insideA);

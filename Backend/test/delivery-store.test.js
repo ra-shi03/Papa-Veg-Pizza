@@ -75,10 +75,10 @@ describe('who sees what', () => {
             for (const token of [staff, A.customerToken]) assert.equal((await fx.call(m, `${S}${p}`, token, {})).status, 403, `${m} ${p}`);
         }
     });
-    test('store manager and kitchen supervisor read their own store; franchise and super admin need a store of their own scope', async () => {
+    test('the store manager reads their own store; a (removed) kitchen supervisor 403; franchise and super admin need a store of their own scope', async () => {
         for (const p of GETS) {
             ok(await fx.call('GET', `${S}${p}`, A.managerToken));
-            ok(await fx.call('GET', `${S}${p}`, sup));
+            assert.equal((await fx.call('GET', `${S}${p}`, sup)).status, 403, `${p}: the supervisor role is no longer used`);
             assert.equal((await fx.call('GET', `${S}${p}`, A.adminToken)).status, 400, `${p} needs a storeId`);
             const sep = p.includes('?') ? '&' : '?';
             ok(await fx.call('GET', `${S}${p}${sep}storeId=${A.storeId}`, A.adminToken));
@@ -215,10 +215,10 @@ describe('delivery issues', () => {
         }), 201);
         issueId = i._id;
         assert.deepEqual([i.orderId, i.riderName, i.issueType, i.severity, i.status, i.refundAmount], [O.road.ref, 'Rider 1', 'Rider Not Responding', 'critical', 'open', 0]);
-        // the supervisor reads it only once the order is assigned to them
-        assert.deepEqual(ok(await fx.call('GET', `${S}/delivery/issues`, sup)), []);
+        // a supervisor stored on the order (accepted before the role was removed) opens nothing
         await fx.models.FoodOrder.collection.updateOne({ order_id: O.road.ref }, { $set: { 'kitchen.supervisor.userId': new mongoose.Types.ObjectId(A.adminUserId) } });
-        assert.deepEqual(ok(await fx.call('GET', `${S}/delivery/issues`, sup)).map((x) => x._id), [issueId]);
+        assert.equal((await fx.call('GET', `${S}/delivery/issues`, sup)).status, 403);
+        assert.deepEqual(ok(await fx.call('GET', `${S}/delivery/issues`, A.managerToken)).map((x) => x._id), [issueId]);
         assert.deepEqual(ok(await fx.call('GET', `${S}/delivery/issues`, B.managerToken)), []);
         assert.equal((await fx.call('PATCH', `${S}/delivery/issues/${issueId}`, B.managerToken, { status: 'resolved' })).status, 404);
         assert.equal((await fx.call('POST', `${S}/delivery/issues`, A.managerToken, { orderId: O.bready.ref, riderId: String(R[1]), issueType: 'Late' })).status, 404);

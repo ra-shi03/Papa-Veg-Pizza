@@ -1,33 +1,22 @@
 // Kitchen operations (queue, preparation board, pizza / baking / packaging stations, ovens, issues, delayed orders)
 // and the My Tasks ingredient request + quality check, driven through the real order flow.
 //
-// Who may do what, always decided from the token:
-//   store manager  -> everything in their store          kitchen supervisor -> only the orders assigned to them
-//   kitchen staff  -> only their own station / pizzas    other store, other franchise, customers -> nothing
+// Who may do what, always decided from the token (there is no kitchen supervisor any more):
+//   store manager  -> everything in their store; the only one who assigns staff, reassigns and rejects items
+//   kitchen staff  -> only the orders where they hold a station; the packer checks quality and marks ready
+//   other store, other franchise, customers -> nothing
 // Anything outside a caller's reach answers 404 (existence not revealed) or 403 (visible but not theirs).
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createFixture, mongoose, PASSWORD } from './helpers/fixture.js';
 
 let fx; let A; let B;
-let sup; let sup2; let chef; let chef2; let baker; let packer; let bSup; let bStaff;   // { id, token }
+let mgrA; let chef; let chef2; let baker; let packer; let bStaff;   // { id, token }
 let orderNo = 0; let phoneSeq = 0;
 
 const K = '/v1/food/store/kitchen';
-const login = async (email) => (await fx.call('POST', '/v1/auth/store/login', null, { email, password: PASSWORD })).body.data.accessToken;
-const makeStaff = async (managerToken, role, tag) => {
-    const email = `${tag}${fx.ts}@example.invalid`;
-    const res = await fx.call('POST', '/v1/food/store/staff', managerToken, { fullName: `Name ${tag}`, email, phone: `7${String(++phoneSeq).padStart(2, '0')}${String(fx.ts).slice(-7)}`, password: PASSWORD, role });
-    assert.equal(res.status, 201, `create ${tag}: ${JSON.stringify(res.body)}`);
-    // New staff sign in only after their franchise admin approves them
-    const adminToken = managerToken === fx.F.A.managerToken ? fx.F.A.adminToken : fx.F.B.adminToken;
-    const ok = await fx.call('PATCH', `/v1/staff-approvals/${res.body.data._id}/approve`, adminToken, {});
-    assert.equal(ok.status, 200, `approve ${tag}: ${JSON.stringify(ok.body)}`);
-    const token = await login(email);
-    // Staff can be given work only when clocked in (attendance gating)
-    await fx.call('POST', '/v1/store/attendance/clock-in', token);
-    return { id: res.body.data.userId, name: `Name ${tag}`, token };
-};
+// created by the store manager, approved by the franchise admin, signed in and clocked in (fixture helper)
+const makeStaff = (k, role, tag) => fx.staff(k, role, tag);
 const newOrder = async (f, items) => {
     const ref = `KO${fx.ts}${orderNo++}`;
     const r = await fx.models.FoodOrder.collection.insertOne({
@@ -39,15 +28,15 @@ const newOrder = async (f, items) => {
     });
     return { id: String(r.insertedId), ref };
 };
-const accept = (f, order, supervisor) => fx.call('PATCH', `/v1/food/store/orders/${order.id}/accept`, f.managerToken, { kitchenSupervisorId: supervisor.id, estimatedPreparationTime: 15, priority: 'urgent' });
+const accept = (f, order) => fx.call('PATCH', `/v1/food/store/orders/${order.id}/accept`, f.managerToken, { estimatedPreparationTime: 15, priority: 'urgent' });
 const assign = (token, order, staff, slot) => fx.call('PATCH', `/v1/food/store/orders/${order.id}/assign-staff`, token, { staffId: staff.id, role: slot });
 const dbOrder = (o) => fx.models.FoodOrder.findById(o.id).lean();
 
-/** An order accepted by A's manager for `sup`, with chef / baker / packer assigned. */
+/** An order accepted by A's manager, with chef / baker / packer assigned by the manager. */
 const kitchenOrder = async (items) => {
     const o = await newOrder(A, items);
-    assert.equal((await accept(A, o, sup)).status, 200);
-    for (const [who, slot] of [[chef, 'pizza_chef'], [baker, 'baking_chef'], [packer, 'packaging_staff']]) assert.equal((await assign(sup.token, o, who, slot)).status, 200);
+    assert.equal((await accept(A, o)).status, 200);
+    for (const [who, slot] of [[chef, 'pizza_chef'], [baker, 'baking_chef'], [packer, 'packaging_staff']]) assert.equal((await assign(A.managerToken, o, who, slot)).status, 200);
     return o;
 };
 const board = async (who) => (await fx.call('GET', `${K}/preparation-board`, who.token)).body.data;
@@ -69,14 +58,12 @@ const ovenId = async (n = 0) => (await get({ token: A.managerToken }, '/ovens'))
 
 before(async () => {
     fx = await createFixture(); A = fx.F.A; B = fx.F.B; mgr.token = A.managerToken;
-    sup = await makeStaff(A.managerToken, 'Kitchen Supervisor', 'sup1');
-    sup2 = await makeStaff(A.managerToken, 'Kitchen Supervisor', 'sup2');
-    chef = await makeStaff(A.managerToken, 'Pizza Maker', 'chef');
-    chef2 = await makeStaff(A.managerToken, 'Pizza Maker', 'chef2');
-    baker = await makeStaff(A.managerToken, 'Baker', 'baker');
-    packer = await makeStaff(A.managerToken, 'Packaging Staff', 'packer');
-    bSup = await makeStaff(B.managerToken, 'Kitchen Supervisor', 'bsup');
-    bStaff = await makeStaff(B.managerToken, 'Pizza Maker', 'bstaff');
+    mgrA = { id: A.managerUserId, token: A.managerToken };
+    chef = await makeStaff('A', 'Pizza Maker', 'chef');
+    chef2 = await makeStaff('A', 'Pizza Maker', 'chef2');
+    baker = await makeStaff('A', 'Baker', 'baker');
+    packer = await makeStaff('A', 'Packager', 'packer');
+    bStaff = await makeStaff('B', 'Pizza Maker', 'bstaff');
 });
 after(async () => { await fx?.teardown(); });
 
@@ -89,35 +76,34 @@ describe('authentication and roles', () => {
             for (const token of [A.customerToken, A.adminToken, fx.SA]) assert.equal((await fx.call('GET', `${K}${path}`, token)).status, 403, path);
         });
     }
-    test('every station read works for the manager, a supervisor and staff (staff get lists, never a 500)', async () => {
-        for (const who of [{ token: A.managerToken }, sup, chef]) {
+    test('every station read works for the manager and staff (staff get lists, never a 500)', async () => {
+        for (const who of [mgrA, chef]) {
             for (const path of ['/queue', '/preparation-board', '/pizza-station', '/baking-station', '/ovens', '/kitchen-issues', '/packaging']) {
                 assert.equal((await get(who, path)).status, 200, path);
             }
         }
     });
-    test('delayed orders are for the manager and supervisors only: staff get 403', async () => {
-        assert.equal((await get(chef, '/delayed-orders')).status, 403);
-        assert.equal((await get(sup, '/delayed-orders')).status, 200);
+    test('delayed orders: the manager and kitchen staff (staff only see the orders where they hold a station)', async () => {
+        assert.equal((await get(chef, '/delayed-orders')).status, 200);
+        assert.equal((await get(mgrA, '/delayed-orders')).status, 200);
     });
-    test('quality checks list is for leads only', async () => {
-        assert.equal((await get(chef, '/quality-checks')).status, 403);
-        assert.equal((await get(sup, '/quality-checks')).status, 200);
+    test('quality checks list: the manager (all) and kitchen staff (their own)', async () => {
+        assert.equal((await get(chef, '/quality-checks')).status, 200);
+        assert.equal((await get(mgrA, '/quality-checks')).status, 200);
     });
 });
 
 describe('kitchen queue', () => {
     let o;
-    before(async () => { o = await newOrder(A); await accept(A, o, sup); });
+    before(async () => { o = await newOrder(A); await accept(A, o); });
     const queueOf = async (who) => (await get(who, '/queue')).body.data.orders.find((x) => x.orderNumber === o.ref);
 
-    test('the manager and the order\'s supervisor see it; another supervisor, the other store and unrelated staff do not', async () => {
+    test('the manager sees it; the other store and staff without a station on it do not', async () => {
         assert.ok(await queueOf({ token: A.managerToken }));
-        assert.ok(await queueOf(sup));
-        for (const who of [sup2, chef, bSup, bStaff, { token: B.managerToken }]) assert.equal(await queueOf(who), undefined, who.id || 'B manager');
+        for (const who of [chef, bStaff, { token: B.managerToken }]) assert.equal(await queueOf(who), undefined, who.id || 'B manager');
     });
     test('the order has the shape the queue screen renders', async () => {
-        const q = await queueOf(sup);
+        const q = await queueOf(mgrA);
         assert.equal(q.status, 'confirmed');
         assert.equal(q.priority, 'EXPRESS');
         assert.equal(q.paymentMethod, 'COD');
@@ -126,36 +112,36 @@ describe('kitchen queue', () => {
         assert.equal(q.items[0].name, 'Margherita');
         assert.match(q.items[0].orderItemId, /^[a-f0-9]{24}$/);
         assert.equal(q.assigned_chef, null);
-        const page = (await get(sup, '/queue?limit=1')).body.data.pagination;
+        const page = (await get(mgrA, '/queue?limit=1')).body.data.pagination;
         assert.deepEqual(Object.keys(page).sort(), ['limit', 'page', 'total', 'totalPages']);
     });
     test('filters: unassigned, priority, search', async () => {
-        assert.ok((await get(sup, '/queue?unassigned=true')).body.data.orders.some((x) => x.orderNumber === o.ref));
-        assert.ok((await get(sup, '/queue?priority=EXPRESS')).body.data.orders.some((x) => x.orderNumber === o.ref));
-        assert.equal((await get(sup, '/queue?priority=NORMAL')).body.data.orders.some((x) => x.orderNumber === o.ref), false);
-        assert.equal((await get(sup, `/queue?search=${o.ref}`)).body.data.orders.length, 1);
+        assert.ok((await get(mgrA, '/queue?unassigned=true')).body.data.orders.some((x) => x.orderNumber === o.ref));
+        assert.ok((await get(mgrA, '/queue?priority=EXPRESS')).body.data.orders.some((x) => x.orderNumber === o.ref));
+        assert.equal((await get(mgrA, '/queue?priority=NORMAL')).body.data.orders.some((x) => x.orderNumber === o.ref), false);
+        assert.equal((await get(mgrA, `/queue?search=${o.ref}`)).body.data.orders.length, 1);
     });
-    test('accept into the queue: staff 403, another supervisor 404, other store 404, the supervisor 200, twice 400', async () => {
-        assert.equal((await put(sup2, `/orders/${o.id}/accept`, {})).status, 404);
-        assert.equal((await put(bSup, `/orders/${o.id}/accept`, {})).status, 404);
+    test('accept into the queue: staff without a station 404, other store 404, the manager 200, twice 400', async () => {
+        assert.equal((await put(chef2, `/orders/${o.id}/accept`, {})).status, 404);
+        assert.equal((await put(bStaff, `/orders/${o.id}/accept`, {})).status, 404);
         assert.equal((await put({ token: B.managerToken }, `/orders/${o.id}/accept`, {})).status, 404);
-        const res = await put(sup, `/orders/${o.id}/accept`, { status: 'queued' });
+        const res = await put(mgrA, `/orders/${o.id}/accept`, { status: 'queued' });
         assert.equal(res.status, 200, JSON.stringify(res.body));
         assert.equal(res.body.data.status, 'queued');
-        assert.equal((await put(sup, `/orders/${o.id}/accept`, {})).status, 400);
+        assert.equal((await put(mgrA, `/orders/${o.id}/accept`, {})).status, 400);
     });
-    test('assign chef: another supervisor 404, staff 403, the supervisor 200; someone from another store 400', async () => {
-        assert.equal((await put(sup2, `/orders/${o.id}/assign-chef`, { chefId: chef.id })).status, 404);
-        assert.equal((await put(sup, `/orders/${o.id}/assign-chef`, { chefId: bStaff.id })).status, 400);
-        const res = await put(sup, `/orders/${o.id}/assign-chef`, { chefId: chef.id });
+    test('assign chef: staff without a station 404, staff on the order 403, the manager 200; someone from another store 400', async () => {
+        assert.equal((await put(chef2, `/orders/${o.id}/assign-chef`, { chefId: chef.id })).status, 404);
+        assert.equal((await put(mgrA, `/orders/${o.id}/assign-chef`, { chefId: bStaff.id })).status, 400);
+        const res = await put(mgrA, `/orders/${o.id}/assign-chef`, { chefId: chef.id });
         assert.equal(res.status, 200, JSON.stringify(res.body));
         assert.equal(res.body.data.assigned_chef, chef.id);
         assert.equal((await put(chef, `/orders/${o.id}/assign-chef`, { chefId: chef2.id })).status, 403);
     });
     test('the order moves to "preparing" through the existing stage flow and the queue follows', async () => {
-        const res = await fx.call('PATCH', `/v1/food/store/orders/${o.id}/stage`, sup.token, { stage: 'preparing' });
+        const res = await fx.call('PATCH', `/v1/food/store/orders/${o.id}/stage`, mgrA.token, { stage: 'preparing' });
         assert.equal(res.status, 200, JSON.stringify(res.body));
-        assert.equal((await queueOf(sup)).status, 'preparing');
+        assert.equal((await queueOf(mgrA)).status, 'preparing');
     });
 });
 
@@ -163,28 +149,28 @@ describe('rejecting items from the queue', () => {
     let o; let ids;
     before(async () => {
         o = await newOrder(A, [{ itemId: 'a', name: 'Margherita', quantity: 1, size: 'Medium', price: 200 }, { itemId: 'b', name: 'Garlic Bread', quantity: 1, price: 100 }]);
-        await accept(A, o, sup);
-        ids = (await get(sup, '/queue')).body.data.orders.find((x) => x.orderNumber === o.ref).items.map((i) => i.orderItemId);
+        await accept(A, o);
+        ids = (await get(mgrA, '/queue')).body.data.orders.find((x) => x.orderNumber === o.ref).items.map((i) => i.orderItemId);
     });
     const reject = (who, body) => post(who, '/orders/item-reject', { orderId: o.id, reason: 'Out of dough', ...body });
 
-    test('staff 403, another supervisor 404, other store 404', async () => {
+    test('staff without a station 404, other store 404', async () => {
         assert.equal((await reject(chef, { itemIds: [ids[0]] })).status, 404, 'staff without a station on this order');
-        assert.equal((await reject(sup2, { itemIds: [ids[0]] })).status, 404);
-        assert.equal((await reject(bSup, { itemIds: [ids[0]] })).status, 404);
+        assert.equal((await reject(bStaff, { itemIds: [ids[0]] })).status, 404);
+        assert.equal((await reject({ token: B.managerToken }, { itemIds: [ids[0]] })).status, 404);
     });
     test('needs ids and a reason; cannot reject every item; ids of other orders are refused', async () => {
-        assert.equal((await reject(sup, { itemIds: [] })).status, 400);
-        assert.equal((await reject(sup, { itemIds: [ids[0]], reason: '' })).status, 400);
-        assert.equal((await reject(sup, { itemIds: ids })).status, 400, 'all items');
+        assert.equal((await reject(mgrA, { itemIds: [] })).status, 400);
+        assert.equal((await reject(mgrA, { itemIds: [ids[0]], reason: '' })).status, 400);
+        assert.equal((await reject(mgrA, { itemIds: ids })).status, 400, 'all items');
         const other = await kitchenOrder();
         const foreign = (await itemsOf(other))[0]._id;
-        assert.equal((await reject(sup, { itemIds: [foreign] })).status, 400);
+        assert.equal((await reject(mgrA, { itemIds: [foreign] })).status, 400);
     });
-    test('the supervisor rejects one item; it is flagged and drops off the stations', async () => {
-        const res = await reject(sup, { itemIds: [ids[1]], notifyCustomer: true });
+    test('the manager rejects one item; it is flagged and drops off the stations', async () => {
+        const res = await reject(mgrA, { itemIds: [ids[1]], notifyCustomer: true });
         assert.equal(res.status, 200, JSON.stringify(res.body));
-        const q = (await get(sup, '/queue')).body.data.orders.find((x) => x.orderNumber === o.ref);
+        const q = (await get(mgrA, '/queue')).body.data.orders.find((x) => x.orderNumber === o.ref);
         assert.equal(q.items.find((i) => i.orderItemId === ids[1]).rejected, true);
         assert.equal((await itemsOf(o, { token: A.managerToken })).some((i) => i._id === ids[1]), false);
     });
@@ -194,12 +180,11 @@ describe('preparation board and pizza station', () => {
     let o; let id;
     before(async () => { o = await kitchenOrder(); id = (await itemsOf(o))[0]._id; });
 
-    test('each pizza is visible to the manager, its supervisor and its chef only', async () => {
+    test('each pizza is visible to the manager and its chef only', async () => {
         const seen = async (who) => (await itemsOf(o, who)).length;
         assert.equal(await seen({ token: A.managerToken }), 1);
-        assert.equal(await seen(sup), 1);
         assert.equal(await seen(chef), 1);
-        for (const who of [chef2, baker, packer, sup2, bSup, bStaff, { token: B.managerToken }]) assert.equal(await seen(who), 0, who.id || 'B manager');
+        for (const who of [chef2, baker, packer, bStaff, { token: B.managerToken }]) assert.equal(await seen(who), 0, who.id || 'B manager');
     });
     test('the row has the shape the board renders', async () => {
         const [it] = await itemsOf(o);
@@ -209,10 +194,9 @@ describe('preparation board and pizza station', () => {
         assert.equal(it.paused, false);
         assert.equal(it.size, 'Medium');
     });
-    test('moving a stage: someone else\'s station 403, other supervisor / other store 404, unknown id 404', async () => {
+    test('moving a stage: someone else\'s station 403, other store 404, unknown id 404', async () => {
         assert.equal((await put(chef2, `/order-item/${id}/stage`, { stage: 'dough_prep' })).status, 404, 'staff with no link to the order');
         assert.equal((await put(baker, `/order-item/${id}/stage`, { stage: 'dough_prep' })).status, 403, 'baker is on the order but not this station');
-        assert.equal((await put(sup2, `/order-item/${id}/stage`, { stage: 'dough_prep' })).status, 404);
         assert.equal((await put(bStaff, `/order-item/${id}/stage`, { stage: 'dough_prep' })).status, 404);
         assert.equal((await put({ token: B.managerToken }, `/order-item/${id}/stage`, { stage: 'dough_prep' })).status, 404);
         assert.equal((await put(chef, `/order-item/000000000000000000000001/stage`, { stage: 'dough_prep' })).status, 404);
@@ -239,12 +223,13 @@ describe('preparation board and pizza station', () => {
         const r = await put(chef, `/order-item/${id}/pause`, {});
         assert.equal(r.body.data.paused, false);
     });
-    test('reassign: only the manager or the order\'s supervisor; the new chef must be in this store', async () => {
+    test('reassign: only the manager; the new chef must be kitchen staff of this store', async () => {
         assert.equal((await put(chef, `/order-item/${id}/reassign`, { chefId: chef2.id })).status, 403);
-        assert.equal((await put(sup2, `/order-item/${id}/reassign`, { chefId: chef2.id })).status, 404);
-        assert.equal((await put(sup, `/order-item/${id}/reassign`, { chefId: bStaff.id })).status, 400);
-        assert.equal((await put(sup, `/order-item/${id}/reassign`, { chefId: 'junk' })).status, 400);
-        const res = await put(sup, `/order-item/${id}/reassign`, { chefId: chef2.id });
+        assert.equal((await put(chef2, `/order-item/${id}/reassign`, { chefId: chef2.id })).status, 404, 'no link to the order');
+        assert.equal((await put(mgrA, `/order-item/${id}/reassign`, { chefId: A.managerUserId })).status, 400, 'not kitchen staff');
+        assert.equal((await put(mgrA, `/order-item/${id}/reassign`, { chefId: bStaff.id })).status, 400);
+        assert.equal((await put(mgrA, `/order-item/${id}/reassign`, { chefId: 'junk' })).status, 400);
+        const res = await put(mgrA, `/order-item/${id}/reassign`, { chefId: chef2.id });
         assert.equal(res.status, 200, JSON.stringify(res.body));
         assert.equal((await itemsOf(o, chef2)).length, 1, 'the new chef now sees it');
         assert.equal((await put(chef, `/order-item/${id}/stage`, { stage: 'toppings' })).status, 403, 'the old chef lost it');
@@ -298,9 +283,8 @@ describe('baking station and ovens', () => {
         await put(chef, '/pizza-station/start', { orderItemId: it._id });
         await put(chef, '/pizza-station/complete', { orderItemId: it._id });
         assert.equal(await inBaking({ token: A.managerToken }), true);
-        assert.equal(await inBaking(sup), true);
         assert.equal(await inBaking(baker), true);
-        for (const who of [chef, chef2, packer, sup2, bStaff, { token: B.managerToken }]) assert.equal(await inBaking(who), false, who.id || 'B manager');
+        for (const who of [chef, chef2, packer, bStaff, { token: B.managerToken }]) assert.equal(await inBaking(who), false, who.id || 'B manager');
     });
 
     test('start baking: needs an oven in this store, a free oven, and the right person', async () => {
@@ -309,7 +293,6 @@ describe('baking station and ovens', () => {
         const bOven = (await get({ token: B.managerToken }, '/ovens')).body.data[0]._id;
         assert.equal((await put(chef, '/baking/start', { orderItemId: id, ovenId: oven })).status, 403, 'the chef is not the baker');
         assert.equal((await put(chef2, '/baking/start', { orderItemId: id, ovenId: oven })).status, 404);
-        assert.equal((await put(sup2, '/baking/start', { orderItemId: id, ovenId: oven })).status, 404);
         assert.equal((await put(bStaff, '/baking/start', { orderItemId: id, ovenId: oven })).status, 404);
         assert.equal((await put(baker, '/baking/start', { orderItemId: id, ovenId: bOven })).status, 400, 'oven of another store');
         assert.equal((await put(baker, '/baking/start', { orderItemId: id })).status, 400, 'no oven');
@@ -379,7 +362,6 @@ describe('kitchen issues', () => {
         assert.equal((await post(chef, '/kitchen-issues', {})).status, 400, 'type required');
         assert.equal((await post(chef2, '/kitchen-issues', { orderItemId: it._id, issueType: 'Overcooked' })).status, 404);
         assert.equal((await post(bStaff, '/kitchen-issues', { orderItemId: it._id, issueType: 'Overcooked' })).status, 404);
-        assert.equal((await post(sup2, '/kitchen-issues', { orderItemId: it._id, issueType: 'Overcooked' })).status, 404);
         const res = await post(chef, '/kitchen-issues', { orderItemId: it._id, issueType: 'Wrong topping', severity: 'High', remarks: 'olives', image: 'https://evil.example/x.png', notifyManager: true });
         assert.equal(res.status, 201, JSON.stringify(res.body));
         assert.equal(res.body.data.severity, 'High');
@@ -390,12 +372,11 @@ describe('kitchen issues', () => {
         const notes = (await fx.call('GET', '/v1/tasks/notifications', A.managerToken)).body.data;
         assert.ok(notes.some((n) => /Kitchen issue: Wrong topping/.test(n.title)));
     });
-    test('visibility: manager sees the store\'s issues, the chef their own, a supervisor those on their orders, others none', async () => {
+    test('visibility: manager sees the store\'s issues, the chef their own, others none', async () => {
         const has = async (who) => (await get(who, '/kitchen-issues')).body.data.some((i) => i.issueType === 'Wrong topping');
         assert.equal(await has({ token: A.managerToken }), true);
         assert.equal(await has(chef), true);
-        assert.equal(await has(sup), true);
-        for (const who of [chef2, baker, sup2, bStaff, { token: B.managerToken }]) assert.equal(await has(who), false, who.id || 'B manager');
+        for (const who of [chef2, baker, bStaff, { token: B.managerToken }]) assert.equal(await has(who), false, who.id || 'B manager');
     });
 });
 
@@ -410,23 +391,22 @@ describe('packaging station', () => {
     const row = async (who) => (await get(who, '/packaging')).body.data.find((x) => x.orderNumber === o.ref);
     const allChecked = { pizzaCountVerified: true, saucesIncluded: true, cutleryIncluded: true, billAttached: true, qualityVerified: true, packagingSealed: true, notes: 'double sauce' };
 
-    test('only the manager, the supervisor and the packer see it', async () => {
+    test('only the manager and the packer see it', async () => {
         assert.ok(await row({ token: A.managerToken }));
-        assert.ok(await row(sup));
         const r = await row(packer);
         assert.equal(r.packaging_status, 'ready_for_packaging');
         assert.equal(r.deliveryType, 'Delivery');
         assert.ok(r.customer.deliveryAddress);
-        for (const who of [chef, baker, sup2, bStaff, { token: B.managerToken }]) assert.equal(await row(who), undefined, who.id || 'B manager');
+        for (const who of [chef, baker, bStaff, { token: B.managerToken }]) assert.equal(await row(who), undefined, who.id || 'B manager');
     });
     test('steps in the wrong order are refused', async () => {
         assert.equal((await post(packer, '/packaging/checklist', { orderId: o.id, ...allChecked })).status, 400, 'checklist before start');
         assert.equal((await put(packer, '/packaging/seal', { orderId: o.id })).status, 400, 'seal before checklist');
         assert.equal((await put(packer, `/orders/${o.id}/ready`, {})).status, 400, 'ready before seal');
     });
-    test('only the packer / supervisor / manager may start: other staff 403, others 404', async () => {
+    test('only the packer / manager may start: other staff 403, others 404', async () => {
         assert.equal((await put(chef, '/packaging/start', { orderId: o.id })).status, 403, 'on the order but not at packaging');
-        assert.equal((await put(sup2, '/packaging/start', { orderId: o.id })).status, 404);
+        assert.equal((await put(chef2, '/packaging/start', { orderId: o.id })).status, 404, 'not on the order');
         assert.equal((await put(bStaff, '/packaging/start', { orderId: o.id })).status, 404);
         assert.equal((await put({ token: B.managerToken }, '/packaging/start', { orderId: o.id })).status, 404);
         const res = await put(packer, '/packaging/start', { orderId: o.id });
@@ -469,53 +449,52 @@ describe('delayed orders', () => {
     });
     const find = async (who, qs = '') => (await get(who, `/delayed-orders${qs}`)).body.data.find((x) => x.orderNumber === o.ref);
 
-    test('the manager and the order\'s supervisor see it, with how late it is; others do not', async () => {
+    test('the manager and the order\'s station staff see it, with how late it is; others do not', async () => {
         const d = await find({ token: A.managerToken });
         assert.equal(d.isDelayed, true);
         assert.ok(d.delay_duration >= 29);
         assert.equal(d.customer.name, 'Test Customer');
         assert.equal(d.items[0].name, 'Margherita');
-        assert.ok(await find(sup));
-        for (const who of [sup2, bSup, { token: B.managerToken }]) assert.equal(await find(who), undefined, who.id || 'B manager');
+        assert.ok(await find(chef), 'the chef holds a station of it');
+        for (const who of [chef2, bStaff, { token: B.managerToken }]) assert.equal(await find(who), undefined, who.id || 'B manager');
     });
     test('filters: critical only, stage, priority, staff', async () => {
-        assert.ok(await find(sup, '?criticalOnly=true'));
-        assert.ok(await find(sup, '?stage=preparing') || await find(sup, '?stage=queued'));
-        assert.equal(await find(sup, '?priority=NORMAL'), undefined);
-        assert.ok(await find(sup, '?priority=EXPRESS'));
+        assert.ok(await find(mgrA, '?criticalOnly=true'));
+        assert.ok(await find(mgrA, '?stage=preparing') || await find(mgrA, '?stage=queued'));
+        assert.equal(await find(mgrA, '?priority=NORMAL'), undefined);
+        assert.ok(await find(mgrA, '?priority=EXPRESS'));
     });
-    test('escalate: staff 403, another supervisor 404; the target must be in this store', async () => {
-        assert.equal((await post(chef, `/orders/${o.id}/escalate`, { reason: 'Oven fault', assignedTo: sup.id })).status, 403);
-        assert.equal((await post(sup2, `/orders/${o.id}/escalate`, { reason: 'Oven fault', assignedTo: sup.id })).status, 404);
-        assert.equal((await post(sup, `/orders/${o.id}/escalate`, { reason: '', assignedTo: sup.id })).status, 400);
-        assert.equal((await post(sup, `/orders/${o.id}/escalate`, { reason: 'Oven fault', assignedTo: bSup.id })).status, 400);
-        const res = await post(sup, `/orders/${o.id}/escalate`, { severity: 'High', reason: 'Oven fault', assignedTo: A.managerUserId, notes: 'please check' });
+    test('escalate: staff without a station 404; the target must be in this store; a station holder may escalate', async () => {
+        assert.equal((await post(chef2, `/orders/${o.id}/escalate`, { reason: 'Oven fault', assignedTo: A.managerUserId })).status, 404);
+        assert.equal((await post(mgrA, `/orders/${o.id}/escalate`, { reason: '', assignedTo: A.managerUserId })).status, 400);
+        assert.equal((await post(mgrA, `/orders/${o.id}/escalate`, { reason: 'Oven fault', assignedTo: bStaff.id })).status, 400);
+        const res = await post(chef, `/orders/${o.id}/escalate`, { severity: 'High', reason: 'Oven fault', assignedTo: A.managerUserId, notes: 'please check' });
         assert.equal(res.status, 201, JSON.stringify(res.body));
         assert.equal(res.body.data.severity, 'High');
         assert.ok((await fx.call('GET', '/v1/tasks/notifications', A.managerToken)).body.data.some((n) => /Escalation/.test(n.title)));
-        assert.equal((await find(sup)).reason, 'Oven fault', 'the delay reason is recorded');
+        assert.equal((await find(mgrA)).reason, 'Oven fault', 'the delay reason is recorded');
     });
-    test('reassign: lead only; staff from another store refused', async () => {
-        assert.equal((await put(chef, `/orders/${o.id}/reassign`, { staffId: chef2.id })).status, 403);
-        assert.equal((await put(sup2, `/orders/${o.id}/reassign`, { staffId: chef2.id })).status, 404);
-        assert.equal((await put(sup, `/orders/${o.id}/reassign`, { staffId: bStaff.id })).status, 400);
-        assert.equal((await put(sup, `/orders/${o.id}/reassign`, { staffId: chef2.id })).status, 200);
+    test('reassign: the manager only; staff from another store refused', async () => {
+        assert.equal((await put(chef, `/orders/${o.id}/reassign`, { staffId: chef2.id })).status, 403, 'a station holder cannot assign people');
+        assert.equal((await put(chef2, `/orders/${o.id}/reassign`, { staffId: chef2.id })).status, 404);
+        assert.equal((await put(mgrA, `/orders/${o.id}/reassign`, { staffId: bStaff.id })).status, 400);
+        assert.equal((await put(mgrA, `/orders/${o.id}/reassign`, { staffId: chef2.id })).status, 200);
         assert.equal((await dbOrder(o)).kitchen.staff.pizza_chef.userId.toString(), chef2.id);
     });
-    test('notify customer: lead only; a message is required', async () => {
-        assert.equal((await post(baker, `/orders/${o.id}/notify-customer`, { channels: ['sms'], message: 'Sorry' })).status, 403);
-        assert.equal((await post(sup2, `/orders/${o.id}/notify-customer`, { channels: ['sms'], message: 'Sorry' })).status, 404);
-        assert.equal((await post(sup, `/orders/${o.id}/notify-customer`, { channels: ['sms'], message: '' })).status, 400);
-        const res = await post(sup, `/orders/${o.id}/notify-customer`, { channels: ['sms', 'push'], message: 'Running 10 minutes late, sorry!' });
+    test('notify customer: the manager or a station holder; a message is required', async () => {
+        assert.equal((await post(bStaff, `/orders/${o.id}/notify-customer`, { channels: ['sms'], message: 'Sorry' })).status, 404);
+        assert.equal((await post(baker, `/orders/${o.id}/notify-customer`, { channels: ['sms'], message: 'Baking now' })).status, 200, 'the baker holds a station');
+        assert.equal((await post(mgrA, `/orders/${o.id}/notify-customer`, { channels: ['sms'], message: '' })).status, 400);
+        const res = await post(mgrA, `/orders/${o.id}/notify-customer`, { channels: ['sms', 'push'], message: 'Running 10 minutes late, sorry!' });
         assert.equal(res.status, 200, JSON.stringify(res.body));
     });
-    test('resolve: lead only; it leaves the active list and shows in the resolved one; twice is refused', async () => {
-        assert.equal((await put(baker, `/orders/${o.id}/resolve-delay`, {})).status, 403);
-        assert.equal((await put(sup2, `/orders/${o.id}/resolve-delay`, {})).status, 404);
-        assert.equal((await put(sup, `/orders/${o.id}/resolve-delay`, { resolutionNotes: 'Oven repaired' })).status, 200);
-        assert.equal(await find(sup), undefined);
-        assert.ok(await find(sup, '?resolved=true'));
-        assert.equal((await put(sup, `/orders/${o.id}/resolve-delay`, {})).status, 400);
+    test('resolve: the manager or a station holder; it leaves the active list and shows in the resolved one; twice is refused', async () => {
+        assert.equal((await put(bStaff, `/orders/${o.id}/resolve-delay`, {})).status, 404);
+        assert.equal((await put(chef, `/orders/${o.id}/resolve-delay`, {})).status, 404, 'reassigned away from the chef above');
+        assert.equal((await put(mgrA, `/orders/${o.id}/resolve-delay`, { resolutionNotes: 'Oven repaired' })).status, 200);
+        assert.equal(await find(mgrA), undefined);
+        assert.ok(await find(mgrA, '?resolved=true'));
+        assert.equal((await put(mgrA, `/orders/${o.id}/resolve-delay`, {})).status, 400);
     });
 });
 
@@ -532,7 +511,7 @@ describe('My Tasks: ingredient request', () => {
     test('any kitchen role can ask; anonymous, customer, franchise admin cannot', async () => {
         assert.equal((await fx.call('POST', `${K}/inventory-requests`, null, body())).status, 401);
         for (const token of [A.customerToken, A.adminToken, fx.SA]) assert.equal((await fx.call('POST', `${K}/inventory-requests`, token, body())).status, 403);
-        for (const who of [chef, sup, { token: A.managerToken }]) {
+        for (const who of [chef, baker, { token: A.managerToken }]) {
             const res = await post(who, '/inventory-requests', body());
             assert.equal(res.status, 201, JSON.stringify(res.body));
             assert.equal(res.body.data.status, 'Pending');
@@ -543,11 +522,11 @@ describe('My Tasks: ingredient request', () => {
             assert.equal((await post(chef, '/inventory-requests', body(bad))).status, 400, JSON.stringify(bad));
         }
     });
-    test('tied to a task: staff may only use their own task; other staff, supervisors without it and other stores get 404', async () => {
+    test('tied to a task: staff may only use their own task; other staff and other stores get 404', async () => {
         assert.equal((await post(chef, '/inventory-requests', body({ taskId: task._id }))).status, 201);
         assert.equal((await post(chef, '/inventory-requests', body({ taskId: otherTask._id }))).status, 404, 'someone else\'s task');
         assert.equal((await post(bStaff, '/inventory-requests', body({ taskId: task._id }))).status, 404, 'other store');
-        assert.equal((await post(sup2, '/inventory-requests', body({ taskId: task._id }))).status, 404, 'supervisor of another order');
+        assert.equal((await post(chef2, '/inventory-requests', body({ taskId: task._id }))).status, 404, 'staff not on the task');
         assert.equal((await post(chef, '/inventory-requests', body({ taskId: 'junk' }))).status, 404);
     });
     test('the manager is notified and sees every request of the store; staff only their own; other stores none', async () => {
@@ -555,46 +534,47 @@ describe('My Tasks: ingredient request', () => {
         assert.ok(mine.length >= 2);
         assert.ok(mine.every((r) => r.requestedBy === chef.id));
         const all = (await get({ token: A.managerToken }, '/inventory-requests')).body.data;
-        assert.ok(all.some((r) => r.requestedBy === chef.id) && all.some((r) => r.requestedBy === sup.id));
+        assert.ok(all.some((r) => r.requestedBy === chef.id) && all.some((r) => r.requestedBy === baker.id));
         assert.equal((await get({ token: B.managerToken }, '/inventory-requests')).body.data.length, 0);
         assert.ok((await fx.call('GET', '/v1/tasks/notifications', A.managerToken)).body.data.some((n) => n.title === 'Ingredient request'));
     });
 });
 
 describe('My Tasks: quality check', () => {
-    let o; let supTask;
+    let o; let packTask;
     before(async () => {
         o = await kitchenOrder();
-        supTask = (await fx.call('GET', '/v1/tasks', sup.token)).body.data.find((t) => t.orderId === o.ref);
-        assert.ok(supTask);
+        packTask = (await fx.call('GET', '/v1/tasks', packer.token)).body.data.find((t) => t.orderId === o.ref);
+        assert.ok(packTask);
     });
-    const body = (extra = {}) => ({ taskId: supTask._id, orderId: o.ref, rating: 5, temperature: '72', toppingsCorrect: true, crustCorrect: true, remarks: 'Great', ...extra });
+    const body = (extra = {}) => ({ taskId: packTask._id, orderId: o.ref, rating: 5, temperature: '72', toppingsCorrect: true, crustCorrect: true, remarks: 'Great', ...extra });
 
-    test('staff, customers and admins cannot submit one', async () => {
+    test('customers and admins cannot submit one (403); staff on the order but not at packaging cannot either (403)', async () => {
         assert.equal((await fx.call('POST', `${K}/quality-checks`, null, body())).status, 401);
         for (const token of [A.customerToken, A.adminToken, fx.SA, chef.token, baker.token]) {
-            assert.equal((await fx.call('POST', `${K}/quality-checks`, token, body())).status, 403);
+            assert.equal((await fx.call('POST', `${K}/quality-checks`, token, body({ taskId: undefined }))).status, 403);
         }
     });
-    test('another supervisor, and anyone from another store, cannot check this order (404)', async () => {
-        assert.equal((await post(sup2, '/quality-checks', body())).status, 404);
-        assert.equal((await post(bSup, '/quality-checks', body())).status, 404);
+    test('staff not on the order, and anyone from another store, cannot check this order (404)', async () => {
+        assert.equal((await post(chef2, '/quality-checks', body({ taskId: undefined }))).status, 404);
+        assert.equal((await post(bStaff, '/quality-checks', body())).status, 404);
         assert.equal((await post({ token: B.managerToken }, '/quality-checks', body())).status, 404);
         assert.equal((await post({ token: B.managerToken }, '/quality-checks', { orderId: o.ref, rating: 4 })).status, 404, 'by order number from another store');
     });
     test('rating must be a whole number from 1 to 5; temperature must be sane; a task can only vouch for its own order', async () => {
         for (const bad of [{ rating: 0 }, { rating: 6 }, { rating: 4.5 }, { rating: 'x' }, { temperature: 9999 }, { temperature: 'hot' }]) {
-            assert.equal((await post(sup, '/quality-checks', body(bad))).status, 400, JSON.stringify(bad));
+            assert.equal((await post(packer, '/quality-checks', body(bad))).status, 400, JSON.stringify(bad));
         }
         const other = await kitchenOrder();
-        assert.equal((await post(sup, '/quality-checks', body({ orderId: other.ref }))).status, 400);
+        assert.equal((await post(packer, '/quality-checks', body({ orderId: other.ref }))).status, 400);
     });
-    test('the supervisor of the order saves it; the manager may too; leads see them, staff do not', async () => {
-        const res = await post(sup, '/quality-checks', body());
+    test('the packer of the order saves it; the manager may too; the manager sees all, the packer their own', async () => {
+        const res = await post(packer, '/quality-checks', body());
         assert.equal(res.status, 201, JSON.stringify(res.body));
         assert.equal(res.body.data.rating, 5);
-        assert.equal((await post({ token: A.managerToken }, '/quality-checks', body({ rating: 3 }))).status, 201);
-        assert.equal((await get(sup, '/quality-checks')).body.data.length, 1, 'a supervisor sees only their own checks');
+        assert.equal((await post({ token: A.managerToken }, '/quality-checks', body({ taskId: undefined, rating: 3 }))).status, 201);
+        assert.equal((await get(packer, '/quality-checks')).body.data.length, 1, 'the packer sees only their own checks');
+        assert.equal((await get(chef, '/quality-checks')).body.data.length, 0, 'other staff see none');
         assert.equal((await get({ token: A.managerToken }, '/quality-checks')).body.data.length, 2);
         assert.equal((await get({ token: B.managerToken }, '/quality-checks')).body.data.length, 0);
         const doc = await dbOrder(o);
@@ -610,28 +590,29 @@ describe('staff management scope', () => {
         const b = await emailsOf(B.adminToken);
         assert.ok(a.includes(A.managerEmail) && !a.includes(B.managerEmail));
         assert.ok(b.includes(B.managerEmail) && !b.includes(A.managerEmail));
-        assert.ok(a.some((e) => e.startsWith('sup1')), 'including the supervisors created in A');
-        assert.equal(a.some((e) => e.startsWith('bsup')), false);
+        // store managers only: kitchen staff are handled in Kitchen Staff, never in this list
+        assert.equal(a.some((e) => e.startsWith('chef-')), false, 'kitchen staff are not in the managers list');
+        assert.equal(b.some((e) => e.startsWith('bstaff-')), false);
     });
     test('/v1/store-managers: anonymous 401; customers, store staff and managers 403', async () => {
         assert.equal((await fx.call('GET', '/v1/store-managers')).status, 401);
-        for (const token of [A.customerToken, A.managerToken, sup.token, chef.token]) assert.equal((await fx.call('GET', '/v1/store-managers', token)).status, 403);
+        for (const token of [A.customerToken, A.managerToken, chef.token]) assert.equal((await fx.call('GET', '/v1/store-managers', token)).status, 403);
     });
     test('the kitchen hooks\' team list (/food/store/orders/team) is the caller\'s own store only', async () => {
-        for (const who of [{ token: A.managerToken }, sup, chef]) {
+        for (const who of [{ token: A.managerToken }, chef]) {
             const res = await fx.call('GET', '/v1/food/store/orders/team', who.token);
             assert.equal(res.status, 200);
             const ids = res.body.data.map((m) => m._id);
             assert.ok(ids.includes(chef.id) && ids.includes(baker.id) && ids.includes(packer.id));
-            assert.equal(ids.includes(bStaff.id) || ids.includes(bSup.id), false);
+            assert.equal(ids.includes(bStaff.id), false);
         }
         const baking = (await fx.call('GET', '/v1/food/store/orders/team?role=baking_chef', A.managerToken)).body.data;
         assert.deepEqual(baking.map((m) => m._id), [baker.id]);
         assert.equal((await fx.call('GET', '/v1/food/store/orders/team', A.customerToken)).status, 403);
     });
-    test('only the store manager creates supervisors / staff: supervisors, staff and the other store\'s manager cannot add to this store', async () => {
+    test('only the store manager creates staff: staff and the other store\'s manager cannot add to this store', async () => {
         const payload = (tag) => ({ fullName: `X ${tag}`, email: `x${tag}${fx.ts}@example.invalid`, phone: `6${String(++phoneSeq).padStart(2, '0')}${String(fx.ts).slice(-7)}`, password: PASSWORD, role: 'Pizza Maker' });
-        for (const who of [sup, chef, { token: A.adminToken }, { token: A.customerToken }]) {
+        for (const who of [chef, { token: A.adminToken }, { token: A.customerToken }]) {
             assert.equal((await fx.call('POST', '/v1/food/store/staff', who.token, payload('no'))).status, 403, who.id);
         }
         const res = await fx.call('POST', '/v1/food/store/staff', B.managerToken, payload('b'));
@@ -677,7 +658,7 @@ describe('combos in the kitchen', () => {
         const rows = await KitchenItem.find({ orderId: o.id }).lean();
         assert.deepEqual(rows.map((r) => r.name), ['Corn Paneer'], 'only the pizza has a card');
         // the store sees the whole combo, drinks and dips included
-        const queue = (await get(sup, '/queue')).body.data.orders.find((x) => x.orderNumber === o.ref);
+        const queue = (await get(mgrA, '/queue')).body.data.orders.find((x) => x.orderNumber === o.ref);
         const line = queue.items[0];
         assert.equal(line.comboType, 'meal');
         assert.deepEqual(line.components.map((c) => [c.label, c.name, c.kitchen]), [['Wow Pizza', 'Corn Paneer', true], ['', 'Chatpati Chilli Dip', false], ['Drink', 'Coke', false]]);
@@ -695,21 +676,21 @@ describe('combos in the kitchen', () => {
 
     test('rejecting one pizza of a combo takes the whole combo off the bill, once', async () => {
         const o = await kitchenOrder([comboLine(), bread]);
-        const queue = (await get(sup, '/queue')).body.data.orders.find((x) => x.orderNumber === o.ref);
+        const queue = (await get(mgrA, '/queue')).body.data.orders.find((x) => x.orderNumber === o.ref);
         const [comboRow, breadRow] = queue.items;
         const cards = await KitchenItem.find({ orderId: o.id }).sort({ index: 1 }).lean();
         // reject only the second pizza's card
-        const res = await post(sup, '/orders/item-reject', { orderId: o.id, reason: 'Out of paneer', itemIds: [String(cards[1]._id)] });
+        const res = await post(mgrA, '/orders/item-reject', { orderId: o.id, reason: 'Out of paneer', itemIds: [String(cards[1]._id)] });
         assert.equal(res.status, 200, JSON.stringify(res.body));
         assert.equal(res.body.data.billReducedBy, 300, 'the combo line (150 x 2) comes off once, not per pizza');
         const after = await KitchenItem.find({ orderId: o.id }).sort({ index: 1 }).lean();
         assert.deepEqual(after.map((r) => r.rejected), [true, true, false], 'both pizzas of the combo are rejected, the bread is not');
         assert.equal(res.body.data.total, 100);
         // the queue marks the combo line rejected and the bread not
-        const q2 = (await get(sup, '/queue')).body.data.orders.find((x) => x.orderNumber === o.ref);
+        const q2 = (await get(mgrA, '/queue')).body.data.orders.find((x) => x.orderNumber === o.ref);
         assert.deepEqual(q2.items.map((i) => i.rejected), [true, false]);
         // and the combo cannot be rejected together with everything else
-        assert.equal((await post(sup, '/orders/item-reject', { orderId: o.id, reason: 'x', itemIds: [String(after[2]._id)] })).status, 400, 'nothing would be left');
+        assert.equal((await post(mgrA, '/orders/item-reject', { orderId: o.id, reason: 'x', itemIds: [String(after[2]._id)] })).status, 400, 'nothing would be left');
         assert.ok(comboRow && breadRow);
     });
 });

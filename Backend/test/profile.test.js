@@ -1,4 +1,4 @@
-// Feature 7: /v1/profile/* for the store manager, kitchen supervisor and kitchen staff. Everything is about the caller's own
+// Feature 7: /v1/profile/* for the store manager and kitchen staff (the kitchen supervisor role is no longer used). Everything is about the caller's own
 // account (taken from the token): view, edit a whitelist of fields, change password (and sign the other logins out), photo
 // upload (images only), permissions, performance, attendance, notification settings, activity and sessions.
 import { test, before, after, describe } from 'node:test';
@@ -11,12 +11,11 @@ let phoneSeq = 0;
 const objectId = (v) => new mongoose.Types.ObjectId(String(v));
 const NEW_PASSWORD = 'Brand#New-Pass9';
 
-const makeStaff = async (manager, role, tag) => {
-    const email = `${tag}${fx.ts}@example.invalid`;
-    const res = await fx.call('POST', '/v1/food/store/staff', manager, { fullName: `Name ${tag}`, email, phone: `6${String(++phoneSeq).padStart(2, '0')}${String(fx.ts).slice(-7)}`, password: PASSWORD, role });
-    assert.equal(res.status, 201, `create ${tag}: ${JSON.stringify(res.body)}`);
-    const rec = await fx.models.StoreManager.findOne({ userId: objectId(res.body.data.userId) }).lean();
-    return { id: res.body.data.userId, staffId: String(rec._id), email, phone: rec.phone, token: (await login(email)).accessToken };
+// created by the store manager and approved by the franchise admin (fx.staff); a 'Kitchen Supervisor' is a legacy
+// account (the role is no longer used and cannot be created). Clocking in is left to the tests.
+const makeStaff = (manager, role, tag) => {
+    const k = manager === fx.F.B.managerToken ? 'B' : 'A';
+    return /supervisor/i.test(role) ? fx.legacySupervisor(k, tag) : fx.staff(k, role, tag, { clockIn: false });
 };
 const login = async (email, password = PASSWORD) => {
     const res = await fx.call('POST', '/v1/auth/store/login', null, { email, password });
@@ -31,7 +30,7 @@ before(async () => {
     fx = await createFixture(); A = fx.F.A; B = fx.F.B;
     // after the fixture: importing the service earlier would load the app config before the test database is set
     ({ uploadPhoto } = await import('../src/modules/food/store/services/storeProfile.service.js'));
-    sup = await makeStaff(A.managerToken, 'Kitchen Supervisor', 'psup');
+    sup = await makeStaff(A.managerToken, 'Packager', 'psup');   // a second kitchen staff member
     chef = await makeStaff(A.managerToken, 'Pizza Maker', 'pchef');
     bChef = await makeStaff(B.managerToken, 'Pizza Maker', 'pbchef');
 });
@@ -51,8 +50,11 @@ describe('authentication and roles', () => {
             for (const [m, p] of endpoints) assert.equal((await call(m, p, token, {})).status, 403, `${m} ${p}`);
         }
     });
-    test('all three store roles are allowed', async () => {
+    test('both store roles are allowed; a (removed) kitchen supervisor is refused (403)', async () => {
         for (const token of [A.managerToken, sup.token, chef.token]) assert.equal((await call('GET', '/', token)).status, 200);
+        const legacy = await fx.legacySupervisor('A', 'plegacy');
+        assert.equal((await call('GET', '/', legacy.token)).status, 403);
+        assert.equal((await call('GET', '/permissions', legacy.token)).status, 403);
     });
 });
 
@@ -72,11 +74,11 @@ describe('view profile', () => {
         assert.deepEqual(d.notifications, { orderAlerts: true, inventoryAlerts: true, shiftAlerts: false, complaintAlerts: true, dailyReports: true, smsAlerts: false, pushNotifications: true });
         assert.equal(JSON.stringify(d).includes('password'), false, 'no password material anywhere');
     });
-    test('supervisor and kitchen staff see their own', async () => {
+    test('kitchen staff see their own', async () => {
         const s = ok(await call('GET', '/', sup.token));
         assert.equal(s.user.fullName, 'Name psup');
-        assert.equal(s.user.role, 'kitchen_supervisor');
-        assert.equal(s.user.designation, 'Kitchen Operations Supervisor');
+        assert.equal(s.user.role, 'kitchen_staff');
+        assert.equal(s.user.designation, 'Packager');
         const c = ok(await call('GET', '/', chef.token));
         assert.equal(c.user.fullName, 'Name pchef');
         assert.equal(c.user.role, 'kitchen_staff');
@@ -215,35 +217,47 @@ describe('permissions', () => {
         assert.equal(m.StaffManagement, true);
         assert.equal(m.DeliveryOperations, true);
         assert.equal(s.StaffManagement, false);
-        assert.equal(s.IncomingOrders, true);
+        assert.deepEqual(s, c, 'every kitchen staff member has the same permissions');
         assert.equal(c.IncomingOrders, false);
-        assert.equal(c.Inventory, false);
+        assert.equal(c.Inventory, true, 'kitchen staff read stock and file stock requests and waste (their own)');
+        assert.equal(c.Dashboard, false);
         assert.equal(c.PizzaStation, true);
     });
 });
 
 describe('attendance, performance and activity (own data only)', () => {
     before(async () => {
-        const make = (staff, date, checkIn, checkOut, status = 'present') => fx.call('POST', '/v1/store/attendance', A.managerToken, { staffId: staff.staffId, date, checkIn, checkOut, status });
+        // Worked days are the staff's own clock-ins and clock-outs (the manager cannot write them), so the history is put in
+        // place as clock-ins of earlier days left it; a leave day is what an approved leave request leaves.
+        const { parseClock, atClock } = await import('../src/modules/food/store/services/attendanceTime.js');
         const day = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
         const shift = (await fx.call('POST', '/v1/store/shifts', A.managerToken, { shiftName: 'Profile shift', startTime: '09:00 AM', endTime: '05:00 PM' })).body.data;
         await fx.call('POST', `/v1/store/shifts/${shift._id}/assign`, A.managerToken, { staffIds: [chef.staffId] });
-        ok(await make(chef, day(1), '09:00 AM', '05:00 PM'), 201);
-        ok(await make(chef, day(2), '09:30 AM', '05:00 PM'), 201);     // 30 minutes late
-        ok(await make(chef, day(3), undefined, undefined, 'absent'), 201);
-        ok(await make(sup, day(1), '08:00 AM', '04:00 PM'), 201);
+        const seed = (staff, date, { checkIn, checkOut, totalHours = 0, lateMinutes = 0, status = 'present', shiftId = shift._id } = {}) =>
+            mongoose.connection.collection('food_store_attendance').insertOne({
+                storeId: objectId(A.storeId), franchiseId: objectId(A.franchiseId), staffId: objectId(staff.staffId), userId: objectId(staff.id),
+                shiftId: status === 'leave' ? null : objectId(shiftId), date,
+                checkInAt: checkIn ? atClock(date, parseClock(checkIn)) : null, checkOutAt: checkOut ? atClock(date, parseClock(checkOut)) : null,
+                totalHours, overtimeHours: 0, status, late: lateMinutes > 0, lateMinutes, source: status === 'leave' ? 'manager' : 'self',
+                markedByName: status === 'leave' ? 'Manager A' : staff.email, notes: '', createdAt: new Date(), updatedAt: new Date(),
+            });
+        await seed(chef, day(1), { checkIn: '09:00 AM', checkOut: '05:00 PM', totalHours: 8 });
+        await seed(chef, day(2), { checkIn: '09:30 AM', checkOut: '05:00 PM', totalHours: 7.5, lateMinutes: 30 });   // 30 minutes late
+        await seed(chef, day(3), { status: 'leave' });
+        await seed(sup, day(1), { checkIn: '08:00 AM', checkOut: '04:00 PM', totalHours: 8 });
     });
     test('GET /attendance: the caller\'s summary and log, in the shape the tab renders', async () => {
         const d = ok(await call('GET', '/attendance', chef.token));
-        assert.deepEqual(d.summary, { attendanceRate: 66.67, presentDays: 2, absentDays: 1, totalHours: 15.5, lateEntries: 1 });
+        // a leave day is not an absence: 2 worked days of 2 counted
         assert.equal(d.logs.length, 3);
         assert.deepEqual(Object.keys(d.logs[0]).sort(), ['checkIn', 'checkOut', 'date', 'hours', 'id', 'shift', 'status']);
-        assert.deepEqual(d.logs.map((l) => l.status), ['Present', 'Late', 'Absent']);
+        assert.deepEqual(d.summary, { attendanceRate: 100, presentDays: 2, absentDays: 0, totalHours: 15.5, lateEntries: 1 });
+        assert.deepEqual(d.logs.map((l) => l.status), ['Present', 'Late', 'On Leave']);
         assert.equal(d.logs[0].shift, 'Profile shift (09:00 AM - 05:00 PM)');
         assert.equal(d.logs[0].checkIn, '09:00 AM');
         assert.equal(d.logs[0].hours, '8 hrs');
         assert.equal(d.logs[2].checkIn, '-');
-        assert.equal(ok(await call('GET', '/attendance', sup.token)).logs.length, 1, 'only the supervisor\'s own');
+        assert.equal(ok(await call('GET', '/attendance', sup.token)).logs.length, 1, 'only the caller\'s own');
         assert.equal(ok(await call('GET', '/attendance', bChef.token)).logs.length, 0);
         const m = ok(await call('GET', '/attendance', A.managerToken));
         assert.deepEqual([m.summary.presentDays, m.logs.length], [0, 0], 'the manager does not clock in');

@@ -108,7 +108,7 @@ describe('riders near the store', () => {
         assert.equal(by['Rider zoned'].distanceFromStore, null);
         assert.ok(by['Rider near'].lastSeen);
     });
-    test('manager: full phone and contact in lists and details, never documents, ID numbers or bank; supervisor and franchise admin masked. Detail view has the full contact and vehicle but still no documents or bank', async () => {
+    test('manager: full phone and contact in lists and details, never documents, ID numbers or bank; franchise admin masked; a (removed) kitchen supervisor 403. Detail view has the full contact and vehicle but still no documents or bank', async () => {
         const list = ok(await riders(A.managerToken));
         const detail = ok(await fx.call('GET', `/v1/store/rider/${R.near}`, A.managerToken));
         const avail = ok(await fx.call('GET', '/v1/store/delivery/available-riders', A.managerToken));
@@ -122,16 +122,13 @@ describe('riders near the store', () => {
         }
         // the store manager's lists show the full phone (to call the rider) but never the vehicle number
         for (const body of [list, avail]) assert.ok(JSON.stringify(body).includes(near.phone) && !JSON.stringify(body).includes('MP09-'));
-        // a kitchen supervisor, a franchise admin and the lists they open stay masked
-        for (const token of [supA]) assert.ok(!JSON.stringify(ok(await riders(token))).includes(near.phone));
+        // a kitchen supervisor token is refused (the role is no longer used); a franchise admin's lists stay masked
+        assert.equal((await riders(supA)).status, 403);
         assert.ok(!JSON.stringify(ok(await riders(A.adminToken, `?storeId=${A.storeId}`))).includes(near.phone));
         // the store manager's detail view: full phone, email, address, vehicle name and number
         assert.deepEqual([detail.mobile, detail.email, detail.vehicleNumber, detail.city], [near.phone, near.email || '', near.vehicleNumber, near.city]);
         assert.ok(detail.vehicleName !== undefined && detail.address !== undefined);
-        for (const role of [supA, A.adminToken]) {
-            const qs = role === supA ? '' : `?storeId=${A.storeId}`;
-            assert.match(ok(await riders(role, qs)).find((r) => r.name === 'Rider near').mobile, /^93\*+\d{2}$/);
-        }
+        assert.match(ok(await riders(A.adminToken, `?storeId=${A.storeId}`)).find((r) => r.name === 'Rider near').mobile, /^93\*+\d{2}$/);
         assert.equal(ok(await riders(fx.SA, `?storeId=${A.storeId}`)).find((r) => r.name === 'Rider near').mobile, near.phone, 'the super admin sees the full phone');
     });
     test('available riders: approved, online and near only (pending riders cannot be assigned)', async () => {
@@ -194,16 +191,16 @@ describe('customers near the store', () => {
         assert.equal((await fx.call('GET', `/v1/food/store/customers/${C.Near.id}`, B.managerToken)).status, 404);
         assert.equal((await fx.call('GET', `/v1/food/store/customers/${C.Nowhere.id}`, A.managerToken)).status, 404);
     });
-    test('masking: manager full phone, masked email; franchise admin both masked; super admin full phone; a supervisor does not get people who never ordered', async () => {
+    test('masking: manager full phone, masked email; franchise admin both masked; super admin full phone; a (removed) kitchen supervisor 403', async () => {
         const of = async (token, qs = '') => (await custs(token, qs)).find((c) => c._id === C.Near.id);
         const mgr = await of(A.managerToken);
         assert.deepEqual([mgr.mobile, mgr.email], [C.Near.mobile, `n***@example.invalid`]);
-        assert.equal(await of(supA), undefined);
         const fa = await of(A.adminToken, `&storeId=${A.storeId}`);
         assert.match(fa.mobile, /^94\*+\d{2}$/);
         const sa = await of(fx.SA, `&storeId=${A.storeId}`);
         assert.deepEqual([sa.mobile, sa.email], [C.Near.mobile, 'n***@example.invalid']);
-        assert.equal((await fx.call('GET', `/v1/food/store/customers/${C.Near.id}`, supA)).status, 404);
+        assert.equal((await fx.call('GET', `/v1/food/store/customers/${C.Near.id}`, supA)).status, 403);
+        assert.equal((await fx.call('GET', '/v1/food/store/customers/orders', supA)).status, 403);
     });
 });
 

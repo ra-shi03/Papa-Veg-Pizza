@@ -47,6 +47,9 @@ describe('H: a store manager cannot touch their own manager account through the 
             fullName: 'Kit Chen', email: `kit${fx.ts}@example.invalid`, phone: `7${String(fx.ts).slice(-9)}`, password: 'Passw0rd!Strong9', role: 'Pizza Maker',
         });
         assert.equal(k.status, 201, JSON.stringify(k.body));
+        // new kitchen staff wait for the franchise admin's approval before they can be managed
+        const ap = await fx.call('PATCH', `/v1/staff-approvals/${k.body.data._id}/approve`, A.adminToken, {});
+        assert.equal(ap.status, 200, JSON.stringify(ap.body));
         kitchen = { id: k.body.data._id, userId: String(k.body.data.userId) };
     });
     const S = '/v1/food/store/staff';
@@ -123,25 +126,29 @@ describe('public store and offers (customer app)', () => {
         assert.equal((await fx.call('GET', '/v1/food/stores/resolve?lat=1&lng=1')).status, 200, 'resolve is still reachable (not shadowed by :id)');
     });
     test('offers: only coupons a customer may use now', async () => {
+        // /v1/food/offers/public reads the super admin's coupons (FoodCoupon, settings/models/foodCoupon.model.js)
         const day = 86400000;
-        const base = { discountType: 'percentage', discountValue: 10, status: 'active', storeScope: 'all', createdAt: new Date(), updatedAt: new Date() };
+        const base = { couponType: 'Percentage', value: 10, status: 'active', isActive: true, startDate: new Date(Date.now() - day), endDate: new Date(Date.now() + 30 * day) };
         const rows = [
-            { couponCode: 'LIVE10', ...base },
-            { couponCode: 'HIDDEN', ...base, showInCart: false },
-            { couponCode: 'PAUSED', ...base, status: 'paused' },
-            { couponCode: 'OLD', ...base, endDate: new Date(Date.now() - day) },
-            { couponCode: 'SOON', ...base, startDate: new Date(Date.now() + day) },
-            { couponCode: 'USEDUP', ...base, usageLimit: 1, usedCount: 1 },
-            { couponCode: 'ONLYB', ...base, storeScope: 'selected', storeId: new mongoose.Types.ObjectId(B.storeId) },
+            { code: 'LIVE10', title: '10% OFF', ...base },
+            { code: 'OFF', title: 'Switched off', ...base, isActive: false },
+            { code: 'PAUSED', title: 'Disabled', ...base, status: 'disabled' },
+            { code: 'OLD', title: 'Expired', ...base, endDate: new Date(Date.now() - day) },
+            { code: 'SOON', title: 'Not yet', ...base, startDate: new Date(Date.now() + day) },
+            { code: 'USEDUP', title: 'Used up', ...base, usageLimit: 1, usageCount: 1 },
+            { code: 'ONLYB', title: 'Store B only', ...base, storeIds: [B.storeId] },
+            { code: 'BOGO', title: 'Not a discount the cart can price', ...base, couponType: 'Buy One Get One' },
         ];
-        const { FoodOffer } = await import('../src/modules/food/admin/models/offer.model.js');
-        await FoodOffer.insertMany(rows);
+        const { FoodCoupon } = await import('../src/modules/food/settings/models/foodCoupon.model.js');
+        await FoodCoupon.insertMany(rows);
         const codes = async (q = '') => ok(await fx.call('GET', `/v1/food/offers/public${q}`)).allOffers.map((o) => o.couponCode).sort();
-        assert.deepEqual(await codes(), ['LIVE10']);
+        // with a store: its own and all-store coupons only; without one the store filter is not applied (current rule)
+        assert.deepEqual(await codes(`?storeId=${A.storeId}`), ['LIVE10']);
         assert.deepEqual(await codes(`?storeId=${B.storeId}`), ['LIVE10', 'ONLYB']);
+        assert.deepEqual(await codes(), ['LIVE10', 'ONLYB']);
         const [live] = ok(await fx.call('GET', '/v1/food/offers/public')).allOffers;
-        assert.deepEqual(Object.keys(live).sort(), ['_id', 'couponCode', 'customerScope', 'description', 'discountType', 'discountValue', 'endDate', 'id', 'maxDiscount', 'minOrderValue', 'offerType', 'showInCart', 'startDate', 'status', 'title']);
-        assert.equal(live.title, '10% OFF');
+        for (const k of ['_id', 'id', 'couponCode', 'customerScope', 'description', 'discountType', 'discountValue', 'endDate', 'maxDiscount', 'minOrderValue', 'offerType', 'showInCart', 'startDate', 'status', 'title']) assert.ok(k in live, k);
+        assert.deepEqual([live.title, live.discountType, live.discountValue, live.status, live.customerScope], ['10% OFF', 'percentage', 10, 'active', 'all']);
     });
 });
 

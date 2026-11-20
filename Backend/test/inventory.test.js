@@ -1,6 +1,6 @@
 // Store inventory (/v1/food/store/inventory): stock levels, alerts, stock requests, waste, shortages, recipes, transfers.
 //
-//   store manager  -> whole store          kitchen supervisor / staff -> read stock + shortages, file waste / shortage
+//   store manager  -> whole store          kitchen staff -> read stock + shortages, file waste / shortage
 //   franchise admin-> read only, own store  reports and stock requests (staff see only their own waste + requests)
 //   another store / franchise              -> 404 for records, 403 for actions they have no role for
 import { test, before, after, describe } from 'node:test';
@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { createFixture, mongoose, PASSWORD } from './helpers/fixture.js';
 
 let fx; let A; let B;
-let sup; let chef; let chef2; let bSup; let bStaff; let a2Manager;   // { id, token }
+let packer; let chef; let chef2; let bPacker; let bStaff; let a2Manager;   // { id, token }
 let a2StoreId;
 let phoneSeq = 0;
 const uploaded = [];
@@ -17,11 +17,11 @@ let restoreCloudinary;
 const INV = '/v1/food/store/inventory';
 const KITCHEN = '/v1/food/store/kitchen';
 const login = async (email) => (await fx.call('POST', '/v1/auth/store/login', null, { email, password: PASSWORD })).body.data.accessToken;
-const makeStaff = async (managerToken, role, tag) => {
-    const email = `${tag}${fx.ts}@example.invalid`;
-    const res = await fx.call('POST', '/v1/food/store/staff', managerToken, { fullName: `Name ${tag}`, email, phone: `7${String(++phoneSeq).padStart(2, '0')}${String(fx.ts).slice(-7)}`, password: PASSWORD, role });
-    assert.equal(res.status, 201, `create ${tag}: ${JSON.stringify(res.body)}`);
-    return { id: res.body.data.userId, name: `Name ${tag}`, token: await login(email) };
+// created by the store manager and approved by the franchise admin (fx.staff); a 'Kitchen Supervisor' is a legacy
+// account (the role is no longer used and cannot be created). Clocking in is left to the tests.
+const makeStaff = (managerToken, role, tag) => {
+    const k = managerToken === fx.F.B.managerToken ? 'B' : 'A';
+    return /supervisor/i.test(role) ? fx.legacySupervisor(k, tag) : fx.staff(k, role, tag);   // clocked in: kitchen writes need attendance
 };
 const asManager = (f) => ({ token: f.managerToken, id: f.managerUserId });
 const call = (who, method, path, body) => fx.call(method, `${INV}${path}`, who.token, body);
@@ -55,10 +55,10 @@ const fresh = async (who, name) => byName(who, name);
 
 before(async () => {
     fx = await createFixture(); A = fx.F.A; B = fx.F.B;
-    sup = await makeStaff(A.managerToken, 'Kitchen Supervisor', 'isup');
+    packer = await makeStaff(A.managerToken, 'Packager', 'ipack');   // kitchen staff (the supervisor role is no longer used)
     chef = await makeStaff(A.managerToken, 'Pizza Maker', 'ichef');
     chef2 = await makeStaff(A.managerToken, 'Pizza Maker', 'ichef2');
-    bSup = await makeStaff(B.managerToken, 'Kitchen Supervisor', 'ibsup');
+    bPacker = await makeStaff(B.managerToken, 'Packager', 'ibpack');
     bStaff = await makeStaff(B.managerToken, 'Pizza Maker', 'ibstaff');
     ({ storeId: a2StoreId, manager: a2Manager } = await makeSisterStore());
 
@@ -83,7 +83,7 @@ describe('authentication and roles', () => {
         });
     }
     test('every store role can read every list', async () => {
-        for (const who of [MGR_A(), sup, chef]) {
+        for (const who of [MGR_A(), packer, chef]) {
             for (const path of READS) assert.equal((await get(who, path)).status, 200, `${path}`);
         }
     });
@@ -166,7 +166,7 @@ describe('ingredient list and details', () => {
         assert.equal(d.body.ingredient.ingredientName, 'Capsicum');
         assert.deepEqual(Object.keys(d.body.consumption).sort(), ['averageDaily', 'month', 'today', 'week']);
         assert.deepEqual(d.body.recentTransactions, []);
-        for (const who of [MGR_B(), bSup, bStaff]) assert.equal((await get(who, `/${ing._id}`)).status, 404);
+        for (const who of [MGR_B(), bPacker, bStaff]) assert.equal((await get(who, `/${ing._id}`)).status, 404);
         assert.equal((await fx.call('GET', `${INV}/${ing._id}?storeId=${A.storeId}`, B.adminToken)).status, 404);
         assert.equal((await get(MGR_A(), '/64b000000000000000000001')).status, 404);
         assert.equal((await get(MGR_A(), '/not-an-id')).status, 404);
@@ -180,8 +180,8 @@ describe('changing stock', () => {
     const body = (extra = {}) => ({ ingredientId: cheese._id, type: 'stock_in', quantity: 50, reason: 'Fresh delivery', ...extra });
 
     test('only the store manager: supervisor and staff 403, another store 404', async () => {
-        for (const who of [sup, chef]) assert.equal((await call(who, 'POST', '/update-stock', body())).status, 403);
-        for (const who of [MGR_B(), bSup]) assert.equal((await call(who, 'POST', '/update-stock', body())).status, who === bSup ? 403 : 404);
+        for (const who of [packer, chef]) assert.equal((await call(who, 'POST', '/update-stock', body())).status, 403);
+        for (const who of [MGR_B(), bPacker]) assert.equal((await call(who, 'POST', '/update-stock', body())).status, who === bPacker ? 403 : 404);
         assert.equal((await fresh(MGR_A(), 'Premium Mozzarella Cheese')).currentStock, 0, 'nothing changed');
     });
     test('validation: reason, type, quantity, unknown ingredient', async () => {
@@ -228,7 +228,7 @@ describe('changing stock', () => {
         assert.equal((await fresh(MGR_A(), 'Fresh Paneer Cubes')).currentStock, 2);
     });
     test('the manager can add an ingredient and change its settings; others cannot', async () => {
-        assert.equal((await call(sup, 'POST', '/', { ingredientName: 'Pineapple' })).status, 403);
+        assert.equal((await call(packer, 'POST', '/', { ingredientName: 'Pineapple' })).status, 403);
         const res = await call(MGR_A(), 'POST', '/', { ingredientName: 'Pineapple', category: 'Veggie & Toppings', unit: 'KG', minimumStock: 2, reorderLevel: 4, costPerUnit: 90, supplierName: 'Local Mandi' });
         assert.equal(res.status, 201, JSON.stringify(res.body));
         assert.equal((await call(MGR_A(), 'POST', '/', { ingredientName: ' pineapple ' })).status, 400, 'duplicate (any case)');
@@ -274,9 +274,9 @@ describe('low-stock alerts and automatic shortages', () => {
         assert.equal(s.status, 'active');
     });
     test('alerts are readable by every store role, and only by their own store', async () => {
-        for (const who of [sup, chef, MGR_A()]) assert.equal((await alertsFor(who)).length, 1);
-        for (const who of [MGR_B(), bSup, bStaff]) assert.equal((await alertsFor(who)).length, 0);
-        const d = (await get(sup, '/alerts/dashboard')).body;
+        for (const who of [packer, chef, MGR_A()]) assert.equal((await alertsFor(who)).length, 1);
+        for (const who of [MGR_B(), bPacker, bStaff]) assert.equal((await alertsFor(who)).length, 0);
+        const d = (await get(packer, '/alerts/dashboard')).body;
         assert.deepEqual(Object.keys(d).filter((k) => k !== 'success').sort(), ['activeAlerts', 'criticalAlerts', 'ingredientsAffected', 'resolvedAlerts']);
         assert.ok(d.activeAlerts >= 1 && d.criticalAlerts >= 1);
         assert.equal((await get(MGR_B(), '/alerts/dashboard')).body.activeAlerts, 0);
@@ -310,7 +310,7 @@ describe('low-stock alerts and automatic shortages', () => {
         const garlic = await byName(MGR_A(), 'Garlic Mayo Dip');
         await stockIn(MGR_A(), garlic, 3);   // below its minimum 5
         const [a] = (await get(MGR_A(), '/alerts?limit=50')).body.data.filter((x) => x.ingredientName === 'Garlic Mayo Dip');
-        for (const who of [sup, chef]) assert.equal((await call(who, 'PATCH', '/alerts/resolve', { alertId: a._id, resolutionNote: 'ok' })).status, 403);
+        for (const who of [packer, chef]) assert.equal((await call(who, 'PATCH', '/alerts/resolve', { alertId: a._id, resolutionNote: 'ok' })).status, 403);
         assert.equal((await call(MGR_B(), 'PATCH', '/alerts/resolve', { alertId: a._id, resolutionNote: 'ok' })).status, 404);
         assert.equal((await call(MGR_A(), 'PATCH', '/alerts/resolve', { alertId: a._id, resolutionNote: '' })).status, 400);
         assert.equal((await call(MGR_A(), 'PATCH', '/alerts/resolve', { alertId: a._id, resolutionNote: 'Ordered more' })).status, 200);
@@ -335,7 +335,7 @@ describe('stock requests', () => {
         assert.equal(r1.status, 'pending');
         assert.equal(r1.approvedQty, 0);
         assert.equal(r1.requestedBy, 'Name ichef');
-        r2 = (await create(sup, { requestedQty: 40, urgency: 'low' })).body.data;
+        r2 = (await create(packer, { requestedQty: 40, urgency: 'low' })).body.data;
         assert.notEqual(r1.requestNo, r2.requestNo);
         assert.equal((await create(MGR_A())).status, 201);
     });
@@ -343,12 +343,12 @@ describe('stock requests', () => {
         for (const bad of [{ requestedQty: 0 }, { requestedQty: -1 }, { requestedQty: 'x' }, { reason: '' }, { ingredientId: 'junk' }]) assert.equal((await create(chef, bad)).status, 400, JSON.stringify(bad));
         assert.equal((await create(chef, { ingredientId: (await byName(MGR_B(), 'Onion'))._id })).status, 400, 'an ingredient of another store');
     });
-    test('visibility: staff see only their own; supervisor and manager see the store\'s; other store and others none', async () => {
+    test('visibility: staff see only their own; the manager sees the store\'s; other store and others none', async () => {
         assert.deepEqual((await list(chef)).map((r) => r._id), [r1._id]);
         assert.equal((await list(chef2)).length, 0);
-        assert.equal((await list(sup)).length, 3);
+        assert.deepEqual((await list(packer)).map((r) => r._id), [r2._id], 'kitchen staff: their own only');
         assert.equal((await list(MGR_A())).length, 3);
-        for (const who of [MGR_B(), bSup, bStaff]) assert.equal((await list(who)).length, 0);
+        for (const who of [MGR_B(), bPacker, bStaff]) assert.equal((await list(who)).length, 0);
         assert.equal((await list(MGR_A(), '&status=pending')).length, 3);
         assert.equal((await list(MGR_A(), '&urgency=low')).length, 1);
         assert.equal((await list(MGR_A(), `&search=${r1.requestNo}`)).length, 1);
@@ -356,7 +356,7 @@ describe('stock requests', () => {
         assert.deepEqual({ p: d.pendingRequests, a: d.approvedRequests, r: d.rejectedRequests, u: d.urgentRequests }, { p: 3, a: 0, r: 0, u: 2 });
         assert.equal((await get(chef, '/stock-requests/dashboard')).body.pendingRequests, 1);
     });
-    test('details: your own, or any as a lead; another person\'s request is 404 for staff, and any request of another store', async () => {
+    test('details: your own, or any as the manager; another person\'s request is 404 for staff, and any request of another store', async () => {
         const d = await get(chef, `/stock-requests/${r1._id}`);
         assert.equal(d.status, 200);
         assert.equal(d.body.request.requestNo, r1.requestNo);
@@ -365,12 +365,13 @@ describe('stock requests', () => {
         assert.equal(d.body.approvedBy, null);
         assert.equal(d.body.timeline[0].title, 'Requested');
         assert.equal((await get(chef2, `/stock-requests/${r1._id}`)).status, 404);
-        assert.equal((await get(chef, `/stock-requests/${r2._id}`)).status, 404, 'staff cannot open a supervisor\'s request');
-        assert.equal((await get(sup, `/stock-requests/${r1._id}`)).status, 200);
-        for (const who of [MGR_B(), bSup]) assert.equal((await get(who, `/stock-requests/${r1._id}`)).status, 404);
+        assert.equal((await get(chef, `/stock-requests/${r2._id}`)).status, 404, 'staff cannot open a colleague\'s request');
+        assert.equal((await get(packer, `/stock-requests/${r1._id}`)).status, 404);
+        assert.equal((await get(MGR_A(), `/stock-requests/${r1._id}`)).status, 200);
+        for (const who of [MGR_B(), bPacker]) assert.equal((await get(who, `/stock-requests/${r1._id}`)).status, 404);
     });
     test('approve / reject / fulfil: manager only', async () => {
-        for (const who of [sup, chef]) {
+        for (const who of [packer, chef]) {
             for (const [verb, extra] of [['approve', { approvedQty: 5 }], ['reject', { remarks: 'no' }], ['fulfill', { deliveredQty: 5 }]]) {
                 assert.equal((await call(who, 'PATCH', `/stock-requests/${verb}`, { requestId: r1._id, ...extra })).status, 403, `${who.id} ${verb}`);
             }
@@ -396,7 +397,7 @@ describe('stock requests', () => {
     test('reject needs a reason', async () => {
         assert.equal((await call(MGR_A(), 'PATCH', '/stock-requests/reject', { requestId: r2._id, remarks: '' })).status, 400);
         assert.equal((await call(MGR_A(), 'PATCH', '/stock-requests/reject', { requestId: r2._id, remarks: 'Too much' })).status, 200);
-        const d = (await get(sup, `/stock-requests/${r2._id}`)).body;
+        const d = (await get(packer, `/stock-requests/${r2._id}`)).body;
         assert.equal(d.request.status, 'rejected');
         assert.equal(d.timeline[1].status, 'failed');
     });
@@ -414,12 +415,12 @@ describe('stock requests', () => {
         assert.equal((await get(chef, `/stock-requests/${r1._id}`)).body.request.status, 'fulfilled');
     });
     test('a fulfilment the stock cannot cover fails and leaves the request approved', async () => {
-        const big = (await create(sup, { requestedQty: 50 })).body.data;
+        const big = (await create(packer, { requestedQty: 50 })).body.data;
         await call(MGR_A(), 'PATCH', '/stock-requests/approve', { requestId: big._id, approvedQty: 50 });
         const res = await call(MGR_A(), 'PATCH', '/stock-requests/fulfill', { requestId: big._id, deliveredQty: 50 });
         assert.equal(res.status, 400);
         assert.match(res.body.error, /Insufficient stock/);
-        assert.equal((await get(sup, `/stock-requests/${big._id}`)).body.request.status, 'approved');
+        assert.equal((await get(packer, `/stock-requests/${big._id}`)).body.request.status, 'approved');
         assert.equal((await fresh(MGR_A(), 'Classic Tomato Pizza Sauce')).currentStock, 20);
     });
 
@@ -492,7 +493,7 @@ describe('waste', () => {
         const h = (await get(MGR_A(), `/${paneer._id}/history?limit=5`)).body.data[0];
         assert.equal(h.type, 'stock_out');
         assert.match(h.reason, /Ingredient Waste \(burnt\)/);
-        assert.equal((await report(sup)).status, 201);
+        assert.equal((await report(packer)).status, 201);
         assert.equal((await report(MGR_A())).status, 201);
     });
     test('validation: type, quantity, reason, more than is in stock, other store\'s ingredient, photos', async () => {
@@ -507,15 +508,15 @@ describe('waste', () => {
         assert.equal(notImage.status, 400);
         assert.equal((await fresh(MGR_A(), 'Fresh Paneer Cubes')).currentStock, 14, 'three accepted reports of 2 kg from 20 kg; the failed ones took nothing out');
     });
-    test('visibility: staff see only their own; supervisor and manager the whole store; other stores none', async () => {
+    test('visibility: staff see only their own; the manager the whole store; other stores none', async () => {
         assert.equal((await logs(chef)).length, 1);
         assert.equal((await logs(chef2)).length, 0);
-        assert.equal((await logs(sup)).length, 3);
+        assert.equal((await logs(packer)).length, 1, 'kitchen staff: their own only');
         assert.equal((await logs(MGR_A())).length, 3);
-        for (const who of [MGR_B(), bSup, bStaff]) assert.equal((await logs(who)).length, 0);
+        for (const who of [MGR_B(), bPacker, bStaff]) assert.equal((await logs(who)).length, 0);
         assert.equal((await logs(MGR_A(), '&wasteType=burnt')).length, 3);
         assert.equal((await logs(MGR_A(), '&wasteType=expired')).length, 0);
-        assert.equal((await logs(MGR_A(), '&reportedBy=Name%20isup')).length, 1);
+        assert.equal((await logs(MGR_A(), '&reportedBy=Name%20ipack')).length, 1);
         assert.equal((await logs(MGR_A(), '&search=calibration')).length, 3);
         assert.equal((await get(MGR_A(), '/waste?limit=2')).body.pagination.totalPages, 2);
     });
@@ -535,27 +536,27 @@ describe('waste', () => {
         assert.equal(d.body.approvedBy, null);
         assert.equal(d.body.images.length, 2);
         assert.equal(d.body.timeline[0].action, 'reported');
-        const supLog = (await logs(sup)).find((l) => l.reportedBy === 'Name isup');
-        assert.equal((await get(chef, `/waste/${supLog._id}`)).status, 404);
-        assert.equal((await get(sup, `/waste/${supLog._id}`)).status, 200);
-        for (const who of [MGR_B(), bSup]) assert.equal((await get(who, `/waste/${mine._id}`)).status, 404);
+        const packerLog = (await logs(packer)).find((l) => l.reportedBy === 'Name ipack');
+        assert.equal((await get(chef, `/waste/${packerLog._id}`)).status, 404);
+        assert.equal((await get(packer, `/waste/${packerLog._id}`)).status, 200);
+        for (const who of [MGR_B(), bPacker]) assert.equal((await get(who, `/waste/${mine._id}`)).status, 404);
     });
     test('approve: manager only, once', async () => {
         const [mine] = await logs(chef);
-        for (const who of [sup, chef]) assert.equal((await call(who, 'PATCH', `/waste/${mine._id}/approve`, { remarks: 'ok' })).status, 403);
+        for (const who of [packer, chef]) assert.equal((await call(who, 'PATCH', `/waste/${mine._id}/approve`, { remarks: 'ok' })).status, 403);
         assert.equal((await call(MGR_B(), 'PATCH', `/waste/${mine._id}/approve`, {})).status, 404);
         assert.equal((await call(MGR_A(), 'PATCH', `/waste/${mine._id}/approve`, { remarks: 'Approved, retrain team' })).status, 200);
         assert.equal((await call(MGR_A(), 'PATCH', `/waste/${mine._id}/approve`, {})).status, 400);
-        const d = (await get(sup, `/waste/${mine._id}`)).body;
+        const d = (await get(MGR_A(), `/waste/${mine._id}`)).body;
         assert.equal(d.wasteLog.status, 'approved');
-        assert.equal(d.approvedBy.name, d.wasteLog.approvedBy);
+        assert.equal(d.approvedBy.name, d.wasteLog.approvedBy);   // (read by the manager: it is the chef's report)
         assert.deepEqual(d.timeline.map((t) => t.action), ['reported', 'approved']);
     });
     test('delete: manager only; a withdrawn (unapproved) report puts the stock back, an approved one does not', async () => {
         const all = await logs(MGR_A());
         const pending = all.find((l) => l.status === 'pending');
         const approved = all.find((l) => l.status === 'approved');
-        for (const who of [sup, chef]) assert.equal((await call(who, 'DELETE', `/waste/${pending._id}`)).status, 403);
+        for (const who of [packer, chef]) assert.equal((await call(who, 'DELETE', `/waste/${pending._id}`)).status, 403);
         assert.equal((await call(MGR_B(), 'DELETE', `/waste/${pending._id}`)).status, 404);
         const before = (await fresh(MGR_A(), 'Fresh Paneer Cubes')).currentStock;
         assert.equal((await call(MGR_A(), 'DELETE', `/waste/${pending._id}`)).status, 200);
@@ -577,7 +578,7 @@ describe('recipes and shortages', () => {
     });
 
     test('recipes: everyone reads; only the manager writes; own store only', async () => {
-        for (const who of [sup, chef]) assert.equal((await call(who, 'POST', '/recipes', recipeBody())).status, 403);
+        for (const who of [packer, chef]) assert.equal((await call(who, 'POST', '/recipes', recipeBody())).status, 403);
         const res = await call(MGR_A(), 'POST', '/recipes', recipeBody());
         assert.equal(res.status, 201, JSON.stringify(res.body));
         recipe = res.body.data;
@@ -606,15 +607,15 @@ describe('recipes and shortages', () => {
                 items: [{ itemId: 'x', name: 'Margherita (Medium)', quantity: 2, price: 200 }], createdAt: new Date(), updatedAt: new Date(),
             });
             liveOrder = { id: String(r.insertedId), ref };
-            // On this supervisor's and this chef's orders: kitchen roles see only the orders they are on
+            // The packer and the chef hold stations of this order: kitchen staff see only the orders they are on
             await fx.models.FoodOrder.collection.updateOne({ _id: r.insertedId }, { $set: {
-                'kitchen.supervisor.userId': new mongoose.Types.ObjectId(sup.id),
+                'kitchen.staff.packaging_staff.userId': new mongoose.Types.ObjectId(packer.id),
                 'kitchen.staff.pizza_chef.userId': new mongoose.Types.ObjectId(chef.id),
             } });
         });
         const report = (who, extra = {}) => call(who, 'POST', '/ingredient-shortages', { ingredientId: mozzarella._id, missingQuantity: 4, urgency: 'high', remarks: 'Bag ripped', notifyManager: true, ...extra });
 
-        test('staff and supervisors report; validation; only own-store ingredients and pizzas', async () => {
+        test('kitchen staff report; validation; only own-store ingredients and pizzas', async () => {
             const res = await report(chef);
             assert.equal(res.status, 201, JSON.stringify(res.body));
             shortage = res.body.data;
@@ -625,18 +626,18 @@ describe('recipes and shortages', () => {
             assert.ok((await fx.call('GET', '/v1/tasks/notifications', A.managerToken)).body.data.some((n) => /Shortage: Premium Mozzarella/.test(n.title)));
         });
         test('a second report for the same ingredient joins the open shortage and can only raise it', async () => {
-            const res = await report(sup, { missingQuantity: 9, urgency: 'critical' });
+            const res = await report(packer, { missingQuantity: 9, urgency: 'critical' });
             assert.equal(res.status, 201);
             assert.equal(res.body.data._id, shortage._id);
             const rows = (await get(MGR_A(), '/ingredient-shortages?limit=50&search=Mozzarella')).body.data;
             assert.equal(rows.length, 1);
             assert.equal(rows[0].shortageQty, 9);
             assert.equal(rows[0].severity, 'critical');
-            await report(sup, { missingQuantity: 1, urgency: 'low' });
+            await report(packer, { missingQuantity: 1, urgency: 'low' });
             assert.equal((await get(MGR_A(), '/ingredient-shortages?search=Mozzarella')).body.data[0].severity, 'critical', 'severity never goes down');
         });
         test('the list, dashboard and details show the orders it holds up (through recipes), only for this store', async () => {
-            const row = (await get(sup, '/ingredient-shortages?search=Mozzarella')).body.data[0];
+            const row = (await get(packer, '/ingredient-shortages?search=Mozzarella')).body.data[0];
             assert.equal(row.affectedOrders, 1);
             assert.equal(row.createdBy, 'Name ichef');
             const dash = (await get(chef, '/ingredient-shortages/dashboard')).body;
@@ -644,7 +645,7 @@ describe('recipes and shortages', () => {
             assert.equal(dash.affectedOrders, 1);
             assert.equal(dash.estimatedRevenueLoss, 400);
             assert.equal((await get(chef2, '/ingredient-shortages/dashboard')).body.affectedOrders, 0, 'not on this order');
-            const d = (await get(sup, `/ingredient-shortages/${shortage._id}`)).body;
+            const d = (await get(packer, `/ingredient-shortages/${shortage._id}`)).body;
             assert.equal(d.shortage.status, 'active');
             assert.equal(d.affectedOrders[0]._id, liveOrder.ref);
             assert.equal(d.affectedOrders[0].customer, 'Asha Rao');
@@ -652,7 +653,7 @@ describe('recipes and shortages', () => {
             assert.ok(Array.isArray(d.analytics.alternatives) && Array.isArray(d.analytics.stores));
             assert.equal(d.ingredient.ingredientName, 'Premium Mozzarella Cheese');
             assert.equal(d.timeline[0].action, 'reported');
-            for (const who of [MGR_B(), bSup, bStaff]) {
+            for (const who of [MGR_B(), bPacker, bStaff]) {
                 assert.equal((await get(who, `/ingredient-shortages/${shortage._id}`)).status, 404);
                 assert.equal((await get(who, '/ingredient-shortages?search=Mozzarella')).body.data.length, 0);
             }
@@ -666,12 +667,12 @@ describe('recipes and shortages', () => {
             assert.equal((await call(MGR_A(), 'POST', '/recipes', recipeBody())).status, 201, 'put it back for the next tests');
         });
         test('resolve: manager only, needs the action taken, once', async () => {
-            for (const who of [sup, chef]) assert.equal((await call(who, 'PATCH', `/ingredient-shortages/${shortage._id}/resolve`, { actionTaken: 'Ordered' })).status, 403);
+            for (const who of [packer, chef]) assert.equal((await call(who, 'PATCH', `/ingredient-shortages/${shortage._id}/resolve`, { actionTaken: 'Ordered' })).status, 403);
             assert.equal((await call(MGR_B(), 'PATCH', `/ingredient-shortages/${shortage._id}/resolve`, { actionTaken: 'Ordered' })).status, 404);
             assert.equal((await call(MGR_A(), 'PATCH', `/ingredient-shortages/${shortage._id}/resolve`, { actionTaken: '' })).status, 400);
             assert.equal((await call(MGR_A(), 'PATCH', `/ingredient-shortages/${shortage._id}/resolve`, { actionTaken: 'Emergency purchase', notes: 'From the market' })).status, 200);
             assert.equal((await call(MGR_A(), 'PATCH', `/ingredient-shortages/${shortage._id}/resolve`, { actionTaken: 'again' })).status, 400);
-            const d = (await get(sup, `/ingredient-shortages/${shortage._id}`)).body;
+            const d = (await get(packer, `/ingredient-shortages/${shortage._id}`)).body;
             assert.equal(d.shortage.status, 'resolved');
             assert.equal(d.shortage.actionTaken, 'Emergency purchase');
             assert.equal(d.timeline.at(-1).action, 'resolved');
@@ -681,7 +682,7 @@ describe('recipes and shortages', () => {
         });
         test('notify admin: manager only, records on the shortage', async () => {
             const b = { shortageId: shortage._id, type: 'urgent', message: 'Need cheese urgently', priority: 'high' };
-            for (const who of [sup, chef]) assert.equal((await call(who, 'POST', '/notifications/admin', b)).status, 403);
+            for (const who of [packer, chef]) assert.equal((await call(who, 'POST', '/notifications/admin', b)).status, 403);
             assert.equal((await call(MGR_B(), 'POST', '/notifications/admin', b)).status, 404);
             assert.equal((await call(MGR_A(), 'POST', '/notifications/admin', { ...b, message: '' })).status, 400);
             assert.equal((await call(MGR_A(), 'POST', '/notifications/admin', b)).status, 200);
@@ -714,13 +715,13 @@ describe('transfers between stores of one franchise', () => {
         assert.equal(res.body[0].storeId, a2StoreId);
         assert.equal(res.body[0].availableQty, 30);
         assert.equal(res.body[0].managerName, 'Manager A2');
-        assert.equal((await get(sup, `/available-stores?ingredientId=${mine._id}`)).body.length, 1);
+        assert.equal((await get(packer, `/available-stores?ingredientId=${mine._id}`)).body.length, 1);
         assert.equal((await get(MGR_B(), `/available-stores?ingredientId=${(await byName(MGR_B(), 'Sweet Corn'))._id}`)).body.length, 0, 'B has no sister store');
         assert.equal((await get(MGR_B(), `/available-stores?ingredientId=${mine._id}`)).status, 404, 'A\'s ingredient id from store B');
     });
     test('request a transfer: manager only; the destination is always the caller\'s store', async () => {
         const b = { fromStoreId: a2StoreId, toStoreId: B.storeId, ingredientId: mine._id, quantity: 10, reason: 'Weekend rush', remarks: 'please' };
-        for (const who of [sup, chef]) assert.equal((await call(who, 'POST', '/transfer', b)).status, 403);
+        for (const who of [packer, chef]) assert.equal((await call(who, 'POST', '/transfer', b)).status, 403);
         assert.equal((await call(MGR_B(), 'POST', '/transfer', b)).status, 404, 'not B\'s ingredient');
         const res = await call(MGR_A(), 'POST', '/transfer', b);
         assert.equal(res.status, 201, JSON.stringify(res.body));

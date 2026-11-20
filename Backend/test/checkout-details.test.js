@@ -149,7 +149,7 @@ describe('after the order', () => {
         assert.match(cart, /onOrderPlaced=\{\(\) => \{ orderJustPlaced\.current = true \}\}/);
         const modal = source('CheckoutModal.jsx');
         assert.ok(modal.indexOf('onOrderPlaced?.()') < modal.indexOf('replaceCart([])'), 'told before the cart is emptied');
-        assert.match(modal, /navigate\(`\/user\/orders\/\$\{orderId\}\?confirmed=true`\)/);
+        assert.match(modal, /navigate\(`\/user\/orders\/\$\{orderId\}\?confirmed=true[^`]*`\)/);   // (&paid=1 is added for an online payment)
     });
 });
 
@@ -175,7 +175,8 @@ describe('train orders', () => {
         assert.ok(!/with the IRCTC database/.test(read('components/user/DeliverOnTrainModal.jsx')), 'no claim that the PNR is verified');
     });
     test('the location store records the train service', () => {
-        assert.match(read('store/locationStore.js'), /serviceType === "train"[\s\S]{0,260}setItem\("activeService", "train"\)/);
+        // the address's service (train included) is stored as the active service on the delivery branch
+        assert.match(read('store/locationStore.js'), /service !== "train"[\s\S]{0,1200}Delivery on a train[\s\S]{0,200}setItem\("activeService", service\)/);
     });
 
     test('the cart: a train order with nothing set up shows the message and the order button is disabled', () => {
@@ -196,7 +197,7 @@ describe('train orders', () => {
         assert.match(modal, /toast\.error\(err\?\.response\?\.data\?\.error \|\| err\?\.response\?\.data\?\.message/, 'the server\'s reason');
         const failure = modal.slice(modal.indexOf('} catch (err) {'), modal.indexOf('setPlacingOrder(false)', modal.indexOf('} catch (err) {') + 40) + 400);
         assert.match(failure, /return false/);
-        assert.match(modal, /navigate\(`\/user\/orders\/\$\{orderId\}\?confirmed=true`\)\s*return true/);
+        assert.match(modal, /navigate\(`\/user\/orders\/\$\{orderId\}\?confirmed=true[^`]*`\)\s*return true/);
     });
     test('the franchise navbar shows the signed-in user\'s own email, or none', () => {
         const nav = read('pages/franchise-admin/layout/Navbar.jsx');

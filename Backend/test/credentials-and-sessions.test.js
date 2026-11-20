@@ -130,6 +130,9 @@ describe('staff accounts can log in (no default password)', () => {
         const ok = await mk(PASSWORD, '4600000002', 'k1@example.invalid');
         assert.equal(ok.status, 201);
         assert.ok(isHash((await rawUser(ok.body.data.userId)).password));
+        // they sign in once the franchise admin approves them
+        assert.equal((await login('/v1/auth/store/login', 'k1@example.invalid', PASSWORD)).status, 401, 'not before approval');
+        assert.equal((await fx.call('PATCH', `/v1/staff-approvals/${ok.body.data._id}/approve`, A.adminToken, {})).status, 200);
         const lg = await login('/v1/auth/store/login', 'k1@example.invalid', PASSWORD);
         assert.equal(lg.status, 200);
         assert.equal(decode(lg.body.data.accessToken).storeId, A.storeId);

@@ -1,29 +1,14 @@
-// Step 7: /v1/tasks (My Tasks) for kitchen supervisors and staff, driven through the real order flow:
-// manager accepts an order -> supervisor task; supervisor assigns stations -> staff tasks.
+// Step 7: /v1/tasks (My Tasks) for kitchen staff, driven through the real order flow:
+// the manager accepts an order (no supervisor), then assigns stations -> one staff task per station.
 // Scope (store, assignee) always comes from the token: other stores' and other people's tasks are 404.
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { createFixture, mongoose, PASSWORD } from './helpers/fixture.js';
+import { createFixture, mongoose } from './helpers/fixture.js';
 
 let fx; let A; let B;
-let sup; let sup2; let pizza; let baker; let bSup; let bStaff;   // { id, token }
+let pizza; let pizza2; let baker; let bStaff;   // { id, name, token }
 let orderNo = 0;
-let phoneSeq = 0;
-
-const login = async (email) => (await fx.call('POST', '/v1/auth/store/login', null, { email, password: PASSWORD })).body.data.accessToken;
-const makeStaff = async (managerToken, role, tag) => {
-    const email = `${tag}${fx.ts}@example.invalid`;
-    const res = await fx.call('POST', '/v1/food/store/staff', managerToken, { fullName: `Name ${tag}`, email, phone: `7${String(++phoneSeq).padStart(2, '0')}${String(fx.ts).slice(-7)}`, password: PASSWORD, role });
-    assert.equal(res.status, 201, `create ${tag}: ${JSON.stringify(res.body)}`);
-    // New staff sign in only after their franchise admin approves them
-    const adminToken = managerToken === fx.F.A.managerToken ? fx.F.A.adminToken : fx.F.B.adminToken;
-    const ok = await fx.call('PATCH', `/v1/staff-approvals/${res.body.data._id}/approve`, adminToken, {});
-    assert.equal(ok.status, 200, `approve ${tag}: ${JSON.stringify(ok.body)}`);
-    const token = await login(email);
-    // Staff can be given work only when clocked in (attendance gating)
-    await fx.call('POST', '/v1/store/attendance/clock-in', token);
-    return { id: res.body.data.userId, name: `Name ${tag}`, token };
-};
+const mgr = { token: null };
 const newOrder = async (f) => {
     const ref = `KT${fx.ts}${orderNo++}`;
     const r = await fx.models.FoodOrder.collection.insertOne({
@@ -34,19 +19,27 @@ const newOrder = async (f) => {
     });
     return { id: String(r.insertedId), ref };
 };
-const accept = (f, order, supervisor) => fx.call('PATCH', `/v1/food/store/orders/${order.id}/accept`, f.managerToken, { kitchenSupervisorId: supervisor.id, estimatedPreparationTime: 15, priority: 'urgent' });
+const accept = (f, order) => fx.call('PATCH', `/v1/food/store/orders/${order.id}/accept`, f.managerToken, { estimatedPreparationTime: 15, priority: 'urgent' });
 const assign = (token, order, staff, slot) => fx.call('PATCH', `/v1/food/store/orders/${order.id}/assign-staff`, token, { staffId: staff.id, role: slot });
 const mine = async (who) => (await fx.call('GET', '/v1/tasks', who.token)).body.data;
+/** Does the real work at the pizza station for every pizza of the order (a station task completes only when it is done). */
+const doPrep = async (who, o) => {
+    const KS = '/v1/food/store/kitchen';
+    const items = (await fx.call('GET', `${KS}/preparation-board`, A.managerToken)).body.data.filter((i) => i.orderNumber === o.ref);
+    assert.ok(items.length, 'the order has pizzas on the board');
+    for (const it of items) {
+        assert.equal((await fx.call('PUT', `${KS}/pizza-station/start`, who.token, { orderItemId: it._id })).status, 200);
+        assert.equal((await fx.call('PUT', `${KS}/pizza-station/complete`, who.token, { orderItemId: it._id })).status, 200);
+    }
+};
 const taskOf = async (who, ref) => (await mine(who)).find((t) => t.orderId === ref);
 
 before(async () => {
-    fx = await createFixture(); A = fx.F.A; B = fx.F.B;
-    sup = await makeStaff(A.managerToken, 'Kitchen Supervisor', 'sup1');
-    sup2 = await makeStaff(A.managerToken, 'Kitchen Supervisor', 'sup2');
-    pizza = await makeStaff(A.managerToken, 'Pizza Maker', 'pizza');
-    baker = await makeStaff(A.managerToken, 'Baker', 'baker');
-    bSup = await makeStaff(B.managerToken, 'Kitchen Supervisor', 'bsup');
-    bStaff = await makeStaff(B.managerToken, 'Pizza Maker', 'bstaff');
+    fx = await createFixture(); A = fx.F.A; B = fx.F.B; mgr.token = A.managerToken;
+    pizza = await fx.staff('A', 'Pizza Maker', 'pizza');
+    pizza2 = await fx.staff('A', 'Pizza Maker', 'pizza2');
+    baker = await fx.staff('A', 'Baker', 'baker');
+    bStaff = await fx.staff('B', 'Pizza Maker', 'bstaff');
 });
 after(async () => { await fx?.teardown(); });
 
@@ -60,31 +53,28 @@ describe('authentication and roles', () => {
 });
 
 describe('order flow creates tasks', () => {
-    test('accepting an order gives the supervisor an "Oversee" task and a notification', async () => {
+    test('accepting an order makes no supervisor task: nobody has work until the manager assigns a station', async () => {
         const o = await newOrder(A);
-        const res = await accept(A, o, sup);
+        const res = await accept(A, o);
         assert.equal(res.status, 200, JSON.stringify(res.body));
-        const t = await taskOf(sup, o.ref);
-        assert.ok(t, 'supervisor sees the task');
-        assert.equal(t.status, 'pending');
-        assert.equal(t.taskType, 'oversee');
-        assert.equal(t.station, 'Kitchen Supervision');
-        assert.equal(t.priority, 'high');
-        assert.match(t.title, /Margherita \(Medium\) x2/);
-        assert.equal(t.estimatedMinutes, 15);
-        const notes = (await fx.call('GET', '/v1/tasks/notifications', sup.token)).body.data;
-        assert.ok(notes.some((n) => n.type === 'task_assigned' && !n.isRead));
+        for (const who of [pizza, pizza2, baker]) assert.equal(await taskOf(who, o.ref), undefined);
+        assert.equal(await fx.models.FoodOrder.findById(o.id).lean().then((d) => d.kitchen.supervisor), undefined, 'no supervisor is stored');
+        const { KitchenTask } = await import('../src/modules/food/store/models/kitchenTask.model.js');
+        assert.equal(await KitchenTask.countDocuments({ orderId: new mongoose.Types.ObjectId(o.id) }), 0);
     });
 
     test('assigning a station gives that person a task for that station only', async () => {
         const o = await newOrder(A);
-        await accept(A, o, sup);
-        assert.equal((await assign(sup.token, o, pizza, 'pizza_chef')).status, 200);
+        await accept(A, o);
+        assert.equal((await assign(A.managerToken, o, pizza, 'pizza_chef')).status, 200);
         const t = await taskOf(pizza, o.ref);
         assert.equal(t.taskType, 'prep');
         assert.equal(t.station, 'Pizza Station');
         assert.match(t.title, /^Prepare /);
-        assert.equal(t.assignedBy, 'Name sup1');
+        assert.match(t.title, /Margherita \(Medium\) x2/);
+        assert.equal(t.priority, 'high');
+        assert.equal(t.estimatedMinutes, 15);
+        assert.equal(t.assignedBy, 'Manager A');
         assert.equal(await taskOf(baker, o.ref), undefined, 'others do not see it');
         assert.ok((await fx.call('GET', '/v1/tasks/notifications', pizza.token)).body.data.some((n) => n.type === 'task_assigned'));
     });
@@ -93,13 +83,13 @@ describe('order flow creates tasks', () => {
 describe('task actions (assignee only)', () => {
     let o; let task;
     before(async () => {
-        o = await newOrder(A); await accept(A, o, sup); await assign(sup.token, o, pizza, 'pizza_chef');
+        o = await newOrder(A); await accept(A, o); await assign(A.managerToken, o, pizza, 'pizza_chef');
         task = await taskOf(pizza, o.ref);
     });
     const act = (who, verb, body, id = task._id) => fx.call('PATCH', `/v1/tasks/${id}/${verb}`, who.token, body);
 
-    test('nobody but the assignee can act on it: other staff, the supervisor, and another store all get 404', async () => {
-        for (const who of [baker, sup, bStaff, bSup]) assert.equal((await act(who, 'start', {})).status, 404, who.id);
+    test('nobody but the assignee can act on it: other staff and another store all get 404', async () => {
+        for (const who of [baker, pizza2, bStaff]) assert.equal((await act(who, 'start', {})).status, 404, who.id);
         assert.equal((await act({ token: A.managerToken }, 'start', {})).status, 404);
     });
     test('a task cannot be completed before it is started (400)', async () => {
@@ -113,17 +103,15 @@ describe('task actions (assignee only)', () => {
         assert.equal(res.body.data.notes, 'on it');
         assert.equal((await act(pizza, 'start', {})).status, 400);
     });
-    test('a delay needs a reason; it marks the task delayed and tells the supervisor and the manager', async () => {
+    test('a delay needs a reason; it marks the task delayed and tells the manager', async () => {
         assert.equal((await act(pizza, 'delay', { delayMinutes: 5 })).status, 400);
         const res = await act(pizza, 'delay', { reason: 'Ingredient Shortage', delayMinutes: 7, remarks: 'out of basil' });
         assert.equal(res.status, 200);
         assert.equal(res.body.data.status, 'delayed');
         assert.equal(res.body.data.delayReason, 'Ingredient Shortage');
         assert.equal(res.body.data.delayMinutes, 7);
-        const supNotes = (await fx.call('GET', '/v1/tasks/notifications', sup.token)).body.data;
-        assert.ok(supNotes.some((n) => n.type === 'task_delayed' && /Ingredient Shortage/.test(n.message)));
         const mgrNotes = (await fx.call('GET', '/v1/tasks/notifications', A.managerToken)).body.data;
-        assert.ok(mgrNotes.some((n) => n.type === 'task_delayed'));
+        assert.ok(mgrNotes.some((n) => n.type === 'task_delayed' && /Ingredient Shortage/.test(n.message)));
     });
     test('stats reflect the delayed task', async () => {
         const s = (await fx.call('GET', '/v1/tasks/stats', pizza.token)).body.data;
@@ -131,14 +119,16 @@ describe('task actions (assignee only)', () => {
         assert.equal(s.avgCompletionTime, 'N/A');
         assert.equal(s.performanceScore, 'N/A');
     });
-    test('a handoff request is flagged and the supervisor is told', async () => {
-        const res = await act(pizza, 'request-reassign', { reason: 'Feeling unwell', preferredStaff: 'Name baker' });
+    test('a handoff request is flagged and the manager is told', async () => {
+        const res = await act(pizza, 'request-reassign', { reason: 'Feeling unwell', preferredStaff: baker.name });
         assert.equal(res.status, 200);
         assert.equal(res.body.data.reassignRequested, true);
-        assert.ok((await fx.call('GET', '/v1/tasks/notifications', sup.token)).body.data.some((n) => n.type === 'reassign_requested'));
+        assert.ok((await fx.call('GET', '/v1/tasks/notifications', A.managerToken)).body.data.some((n) => n.type === 'reassign_requested'));
     });
     test('resume from delayed, then complete: only https proof links are stored (never a base64 preview)', async () => {
         assert.equal((await act(pizza, 'start', {})).body.data.status, 'in_progress');
+        assert.equal((await act(pizza, 'complete', { notes: 'early' })).status, 400, 'not before the pizzas are made');
+        await doPrep(pizza, o);
         const bad = await act(pizza, 'complete', { notes: 'done', image: 'data:image/png;base64,AAAA' });
         assert.equal(bad.status, 200);
         assert.deepEqual(bad.body.data.attachments, []);
@@ -154,9 +144,10 @@ describe('task actions (assignee only)', () => {
     });
     // N3: proof images must be ours (Cloudinary, our own cloud); anything else is dropped, never fetched by a browser.
     const proofFor = async (image) => {
-        const o2 = await newOrder(A); await accept(A, o2, sup); await assign(sup.token, o2, pizza, 'pizza_chef');
+        const o2 = await newOrder(A); await accept(A, o2); await assign(A.managerToken, o2, pizza, 'pizza_chef');
         const t2 = await taskOf(pizza, o2.ref);
         await act(pizza, 'start', {}, t2._id);
+        await doPrep(pizza, o2);
         const res = await act(pizza, 'complete', { image }, t2._id);
         assert.equal(res.status, 200);
         return res.body.data.attachments;
@@ -185,7 +176,7 @@ describe('task actions (assignee only)', () => {
 describe('reassigning', () => {
     let o; let task;
     before(async () => {
-        o = await newOrder(A); await accept(A, o, sup); await assign(sup.token, o, pizza, 'pizza_chef');
+        o = await newOrder(A); await accept(A, o); await assign(A.managerToken, o, pizza, 'pizza_chef');
         task = await taskOf(pizza, o.ref);
     });
     const reassign = (who, body, id = task._id) => fx.call('PATCH', `/v1/tasks/${id}/reassign`, who.token, body);
@@ -193,18 +184,18 @@ describe('reassigning', () => {
     test('kitchen staff cannot reassign (403)', async () => {
         assert.equal((await reassign(pizza, { assignedTo: baker.id })).status, 403);
     });
-    test('a supervisor of another order, and any other store, cannot reassign (403 / 404)', async () => {
-        assert.equal((await reassign(sup2, { assignedTo: baker.id })).status, 403);
-        assert.equal((await reassign(bSup, { assignedTo: baker.id })).status, 404);
+    test('other kitchen staff, and another store\'s manager, cannot reassign (403 / 404)', async () => {
+        assert.equal((await reassign(pizza2, { assignedTo: baker.id })).status, 403);
+        assert.equal((await reassign({ token: B.managerToken }, { assignedTo: baker.id })).status, 404);
     });
     test('the target must be active kitchen staff of this store', async () => {
-        assert.equal((await reassign(sup, { assignedTo: sup2.id })).status, 400, 'not a supervisor');
-        assert.equal((await reassign(sup, { assignedTo: bStaff.id })).status, 400, 'not another store\'s staff');
-        assert.equal((await reassign(sup, { assignedTo: pizza.id })).status, 400, 'not the same person');
-        assert.equal((await reassign(sup, {})).status, 400);
+        assert.equal((await reassign(mgr, { assignedTo: A.managerUserId })).status, 400, 'not the manager');
+        assert.equal((await reassign(mgr, { assignedTo: bStaff.id })).status, 400, 'not another store\'s staff');
+        assert.equal((await reassign(mgr, { assignedTo: pizza.id })).status, 400, 'not the same person');
+        assert.equal((await reassign(mgr, {})).status, 400);
     });
-    test('the order\'s supervisor moves it by name; the order station slot follows and both people are told', async () => {
-        const res = await reassign(sup, { assignedTo: 'name baker', reason: 'cover' });
+    test('the manager moves it by name; the order station slot follows and both people are told', async () => {
+        const res = await reassign(mgr, { assignedTo: baker.name.toLowerCase(), reason: 'cover' });
         assert.equal(res.status, 200, JSON.stringify(res.body));
         assert.equal(res.body.data.assignedToId, baker.id);
         assert.equal(await taskOf(pizza, o.ref), undefined);
@@ -219,14 +210,15 @@ describe('reassigning', () => {
         assert.equal((await fx.call('PATCH', `/v1/food/store/orders/${o.id}/stage`, pizza.token, { stage: 'baking' })).status, 403);
     });
     test('the store manager can reassign any task in the store', async () => {
-        const o2 = await newOrder(A); await accept(A, o2, sup); await assign(sup.token, o2, pizza, 'pizza_chef');
+        const o2 = await newOrder(A); await accept(A, o2); await assign(A.managerToken, o2, pizza, 'pizza_chef');
         const t2 = await taskOf(pizza, o2.ref);
         assert.equal((await reassign({ token: A.managerToken }, { assignedTo: baker.id }, t2._id)).status, 200);
     });
-    test('a supervisor task cannot be reassigned here (400)', async () => {
-        const o3 = await newOrder(A); await accept(A, o3, sup);
-        const t = await taskOf(sup, o3.ref);
-        assert.equal((await reassign({ token: A.managerToken }, { assignedTo: baker.id }, t._id)).status, 400);
+    test('a legacy supervisor task (an order accepted before the role was removed) cannot be reassigned (400)', async () => {
+        const o3 = await newOrder(A); await accept(A, o3); await assign(A.managerToken, o3, pizza, 'pizza_chef');
+        const { KitchenTask } = await import('../src/modules/food/store/models/kitchenTask.model.js');
+        const legacy = await KitchenTask.create({ storeId: new mongoose.Types.ObjectId(A.storeId), orderId: new mongoose.Types.ObjectId(o3.id), kind: 'supervisor', slot: null, assignedTo: new mongoose.Types.ObjectId(pizza.id), status: 'pending' });
+        assert.equal((await reassign({ token: A.managerToken }, { assignedTo: baker.id }, String(legacy._id))).status, 400);
     });
 });
 
@@ -237,29 +229,28 @@ describe('team list used by the station screens (/v1/food/store/orders/team)', (
         assert.deepEqual(bakers.map((m) => m._id), [baker.id]);
         assert.deepEqual((await team(A.managerToken, 'packaging_staff')), []);
     });
-    test('without a role it lists the store\'s supervisors and staff (not the manager), only this store', async () => {
-        const all = await team(sup.token);
-        assert.deepEqual(all.map((m) => m._id).sort(), [sup.id, sup2.id, pizza.id, baker.id].sort());
-        assert.ok(!all.some((m) => [bSup.id, bStaff.id].includes(m._id)));
+    test('without a role it lists the store\'s kitchen staff (not the manager), only this store', async () => {
+        const all = await team(pizza.token);
+        assert.deepEqual(all.map((m) => m._id).sort(), [pizza.id, pizza2.id, baker.id].sort());
+        assert.ok(!all.some((m) => [bStaff.id, A.managerUserId].includes(m._id)));
     });
 });
 
 describe('team overview', () => {
-    test('kitchen staff cannot see it (403); a supervisor and the manager can', async () => {
+    test('kitchen staff cannot see it (403); the manager can', async () => {
         assert.equal((await fx.call('GET', '/v1/tasks/team', pizza.token)).status, 403);
-        const res = await fx.call('GET', '/v1/tasks/team', sup.token);
+        const res = await fx.call('GET', '/v1/tasks/team', A.managerToken);
         assert.equal(res.status, 200);
-        assert.equal((await fx.call('GET', '/v1/tasks/team', A.managerToken)).status, 200);
         const d = res.body.data;
         assert.ok(Array.isArray(d.staffList));
-        assert.equal(d.totalStaff, 4, 'two supervisors + two staff in store A');
+        assert.equal(d.totalStaff, 3, 'three kitchen staff in store A');
         assert.ok(d.staffList.every((m) => m.name.startsWith('Name ')), 'only store A people');
     });
     test('store B\'s overview contains only store B people and tasks', async () => {
         const d = (await fx.call('GET', '/v1/tasks/team', B.managerToken)).body.data;
-        assert.equal(d.totalStaff, 2);
+        assert.equal(d.totalStaff, 1);
         assert.equal(d.pendingTasks, 0);
-        assert.ok(d.staffList.every((m) => ['Name bsup', 'Name bstaff'].includes(m.name)));
+        assert.ok(d.staffList.every((m) => m.name === bStaff.name));
     });
 });
 
