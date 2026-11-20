@@ -10,7 +10,7 @@ import * as c from '../controllers/inventory.controller.js';
 const router = express.Router();
 
 router.use(authMiddleware);
-router.use(requireRoles('STORE_MANAGER', 'KITCHEN_SUPERVISOR', 'KITCHEN_STAFF', 'FRANCHISE_ADMIN'));
+router.use(requireRoles('STORE_MANAGER', 'KITCHEN_STAFF', 'FRANCHISE_ADMIN'));
 
 // Stock levels (static paths first, then /:id)
 router.get('/', c.listIngredients);

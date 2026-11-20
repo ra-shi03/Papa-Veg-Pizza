@@ -9,10 +9,10 @@ import { dateKeyOf } from '../../store/services/attendanceTime.js';
 import { scopedStoreIds } from '../../shared/franchiseScope.js';
 import { sendError, sendResponse } from '../../../../utils/response.js';
 
-// Kitchen supervisors and kitchen staff added by a store manager wait here for the franchise admin (or the super admin).
+// Kitchen staff added by a store manager wait here for the franchise admin (or the super admin).
 // The scope comes from the token: a franchise admin only ever sees and decides on the staff of its own franchise's stores.
 
-const KITCHEN_ROLE_CODES = ['KITCHEN_SUPERVISOR', 'KITCHEN_STAFF'];
+const KITCHEN_ROLE_CODES = ['KITCHEN_STAFF'];   // the kitchen supervisor role is no longer used: never approved
 const isId = (v) => mongoose.Types.ObjectId.isValid(String(v || ''));
 
 async function kitchenUserIds(storeIds) {
@@ -112,7 +112,7 @@ export const listStaffApprovals = async (req, res, next) => {
     }
 };
 
-/** GET /staff-approvals/staff : every approved kitchen supervisor / staff member of the franchise, with today's attendance. */
+/** GET /staff-approvals/staff : every approved kitchen staff member of the franchise, with today's attendance. */
 export const listKitchenStaff = async (req, res, next) => {
     try {
         const base = await baseFilter(req);

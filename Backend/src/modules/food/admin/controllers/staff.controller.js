@@ -21,13 +21,12 @@ const roleCodeOf = (role) => normalizeRole(role).toUpperCase().replace(/-/g, '_'
 const MANAGEABLE = {
     superadmin: { roles: ['franchise-admin'], scope: 'all', denyCreate: 'Super admin can only create franchise admins.' },
     'franchise-admin': { roles: ['store-manager'], scope: 'franchise', denyCreate: 'Franchise admin can only create store managers.' },
-    'store-manager': { roles: ['kitchen-staff', 'kitchen-supervisor'], scope: 'store', denyCreate: 'Store managers can only create kitchen staff or kitchen supervisors.' }
+    'store-manager': { roles: ['kitchen-staff'], scope: 'store', denyCreate: 'Store managers can only create kitchen staff.' }
 };
 
 const ROLE_LABELS = {
     'franchise-admin': 'Franchise Admin',
     'store-manager': 'Store Manager',
-    'kitchen-supervisor': 'Kitchen Supervisor',
     'kitchen-staff': 'Kitchen Staff'
 };
 

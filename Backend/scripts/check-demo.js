@@ -55,15 +55,16 @@ async function storeChecks() {
 
   const open = await openStoreIds(ids);
 
-  const supRole = await Role.findOne({ code: 'KITCHEN_SUPERVISOR' }).select('_id').lean();
-  const links = supRole ? await UserRole.find({ storeId: { $in: ids }, roleId: supRole._id }).select('userId storeId').lean() : [];
+  // An order needs active kitchen staff to be assigned to its stations (the kitchen supervisor role is no longer used).
+  const staffRole = await Role.findOne({ code: 'KITCHEN_STAFF' }).select('_id').lean();
+  const links = staffRole ? await UserRole.find({ storeId: { $in: ids }, roleId: staffRole._id }).select('userId storeId').lean() : [];
   const staff = links.length
     ? await StoreManager.find({ userId: { $in: links.map((l) => l.userId) }, status: 'Active' }).select('userId').lean()
     : [];
   const activeUsers = new Set(staff.map((s) => String(s.userId)));
-  const supervisors = new Map();
+  const kitchenStaff = new Map();
   for (const l of links) {
-    if (activeUsers.has(String(l.userId))) supervisors.set(String(l.storeId), (supervisors.get(String(l.storeId)) || 0) + 1);
+    if (activeUsers.has(String(l.userId))) kitchenStaff.set(String(l.storeId), (kitchenStaff.get(String(l.storeId)) || 0) + 1);
   }
 
   // Riders are not tied to a store: dispatch offers an order to any approved, online rider.
@@ -75,8 +76,8 @@ async function storeChecks() {
   const rows = stores.map((s) => {
     const approved = s.approvalStatus === 'Approved' && s.isActive !== false;
     const isOpen = open.has(String(s._id));
-    const sup = supervisors.get(String(s._id)) || 0;
-    return { name: s.storeName || s.code || String(s._id), approved, isOpen, sup, riders };
+    const crew = kitchenStaff.get(String(s._id)) || 0;
+    return { name: s.storeName || s.code || String(s._id), approved, isOpen, crew, riders };
   });
   return { rows, riders, ridersFresh: fresh };
 }
@@ -107,12 +108,12 @@ async function main() {
       failed = true;
     } else {
       const nw = Math.max(5, ...rows.map((r) => r.name.length));
-      const head = `  ${'Store'.padEnd(nw)}  Approved  Open now  Supervisor  Rider online  Result`;
+      const head = `  ${'Store'.padEnd(nw)}  Approved  Open now  Kitchen staff  Rider online  Result`;
       console.log(head);
       for (const r of rows) {
-        const ok = r.approved && r.isOpen && r.sup > 0 && r.riders > 0;
+        const ok = r.approved && r.isOpen && r.crew > 0 && r.riders > 0;
         if (!ok) failed = true;
-        console.log(`  ${r.name.padEnd(nw)}  ${mark(r.approved).padEnd(8)}  ${mark(r.isOpen).padEnd(8)}  ${(r.sup > 0 ? PASS : FAIL).padEnd(10)}  ${(r.riders > 0 ? PASS : FAIL).padEnd(12)}  ${ok ? PASS : FAIL}`);
+        console.log(`  ${r.name.padEnd(nw)}  ${mark(r.approved).padEnd(8)}  ${mark(r.isOpen).padEnd(8)}  ${(r.crew > 0 ? PASS : FAIL).padEnd(13)}  ${(r.riders > 0 ? PASS : FAIL).padEnd(12)}  ${ok ? PASS : FAIL}`);
       }
       console.log(`\n  Approved online riders on the platform: ${riders} (${ridersFresh} with a GPS fix in the last 10 minutes)`);
     }

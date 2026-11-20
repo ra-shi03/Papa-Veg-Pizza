@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-// A kitchen supervisor / kitchen staff member asks for leave; the store manager of their store accepts or rejects it.
+// A kitchen staff member asks for leave; the store manager of their store accepts or rejects it.
 // An accepted request becomes 'leave' attendance records, one per day (see leaveRequests.service.js).
 export const LEAVE_CATEGORIES = ['Sick', 'Personal', 'Emergency', 'Vacation', 'Other'];
 

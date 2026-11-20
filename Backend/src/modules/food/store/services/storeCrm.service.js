@@ -18,7 +18,6 @@ import { ticketNumberOf, emailsOf } from '../../admin/services/complaintDesk.ser
 // Store manager panel: Customers & Orders, Complaints, Reviews.
 //
 //   store manager      -> own store; can reply to reviews and respond to / resolve complaints
-//   kitchen supervisor -> own store, read only, with the customer's phone and email masked
 //   everyone else      -> 403 (routes);  another store's customer / order / complaint / review -> 404
 //
 // Customers are the people who ordered from this store (derived from orders), plus customers whose saved address is
@@ -35,38 +34,26 @@ const HIGH_VALUE = 5000;
 
 function context(user) {
   const role = normalize(user?.role);
-  if (role !== 'STORE_MANAGER' && role !== 'KITCHEN_SUPERVISOR') throw new ForbiddenError('You do not have access to customers.');
+  if (role !== 'STORE_MANAGER') throw new ForbiddenError('You do not have access to customers.');
   if (!isId(user.storeId)) throw new ForbiddenError('No store is linked to your account.');
-  return { user, storeId: toId(user.storeId), isManager: role === 'STORE_MANAGER', supervisorId: supervisorIdOf(role, user) };
+  return { user, storeId: toId(user.storeId), isManager: true };
 }
 
-/** A kitchen supervisor reads only the orders the store manager assigned to them; everyone else the whole store. */
-const supervisorIdOf = (role, user) => (role === 'KITCHEN_SUPERVISOR' ? toId(user.userId) : null);
-const ordersIn = (ctx, extra = {}) => ({
-  storeId: ctx.storeId,
-  ...(ctx.supervisorId ? { 'kitchen.supervisor.userId': ctx.supervisorId } : {}),
-  ...extra,
-});
-/** Complaints follow the order they are about, so a supervisor gets only those of their own orders. */
-const ticketsIn = async (ctx, extra = {}) => ({
-  storeId: ctx.storeId,
-  ...(ctx.supervisorId ? { orderId: { $in: await FoodOrder.distinct('_id', ordersIn(ctx)) } } : {}),
-  ...extra,
-});
+const ordersIn = (ctx, extra = {}) => ({ storeId: ctx.storeId, ...extra });
+const ticketsIn = async (ctx, extra = {}) => ({ storeId: ctx.storeId, ...extra });
 /**
  * Who may read the Customers screens (/food/store/customers/*), from the token:
  *   store manager      -> own store; full phone, masked email
- *   kitchen supervisor -> own store; phone and email masked
  *   franchise admin    -> one store of its own franchise (?storeId=); read only, phone and email masked
  *   super admin        -> any store (?storeId=); read only; full phone, masked email
  * Another store or franchise -> 404; anyone else -> 403.
  */
 async function customerContext(user, q = {}) {
   const role = normalize(user?.role);
-  if (role === 'STORE_MANAGER' || role === 'KITCHEN_SUPERVISOR') {
+  if (role === 'STORE_MANAGER') {
     if (!isId(user.storeId)) throw new ForbiddenError('No store is linked to your account.');
     if (q.storeId && String(q.storeId) !== String(user.storeId)) throw new NotFoundError('Store not found');
-    return { user, storeId: toId(user.storeId), isManager: role === 'STORE_MANAGER', supervisorId: supervisorIdOf(role, user), fullPhone: role === 'STORE_MANAGER' };
+    return { user, storeId: toId(user.storeId), isManager: true, fullPhone: true };
   }
   if (role === 'FRANCHISE_ADMIN' || role === 'SUPERADMIN' || role === 'SUPER_ADMIN') {
     if (!isId(q.storeId)) throw new ValidationError('Choose a store (storeId).');
@@ -239,8 +226,8 @@ const pendingRefundsOf = async (ctx) =>
 export async function listCustomers(user, q = {}) {
   const ctx = await customerContext(user, q);
   const ordered = await storeCustomers(ctx);
-  // people near the store who never ordered are not on any order, so a supervisor does not get them
-  const near = ctx.supervisorId ? [] : await nearbyCustomers(ctx, { exclude: ordered.map((c) => toId(c._id)) });
+  // plus people near the store who never ordered here
+  const near = await nearbyCustomers(ctx, { exclude: ordered.map((c) => toId(c._id)) });
   let list = [...ordered, ...near];
   const search = str(q.search, 80).toLowerCase();
   if (search) list = list.filter((c) => [c.name, c.email, c.mobile].some((v) => String(v).toLowerCase().includes(search)));
@@ -288,7 +275,7 @@ async function customerProfileBase(user, customerId, q = {}) {
   const orders = await FoodOrder.find(ordersIn(ctx, { userId: toId(customerId) })).sort({ createdAt: -1 }).limit(50).lean();
   if (!orders.length) {
     // Never ordered here: a customer of this store only when their saved address is near it
-    const [near] = ctx.supervisorId ? [] : await nearbyCustomers(ctx, { only: toId(customerId) });
+    const [near] = await nearbyCustomers(ctx, { only: toId(customerId) });
     if (!near) throw new NotFoundError('Customer not found');
     const { recentOrder, ...profile } = near;
     return { customerProfile: maskedCustomer(ctx, profile), recentOrders: [], complaints: await complaintsOf(ctx, { userId: toId(customerId) }), reviews: [] };

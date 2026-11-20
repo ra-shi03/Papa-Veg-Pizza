@@ -26,7 +26,7 @@ const kitchenTaskSchema = new mongoose.Schema(
             ref: 'User',
             default: null
         },
-        // 'supervisor' = oversees the whole order; 'staff' = one station (slot) of the order
+        // 'staff' = one station (slot) of the order; 'supervisor' = legacy, orders accepted before the role was removed
         kind: {
             type: String,
             enum: ['supervisor', 'staff'],

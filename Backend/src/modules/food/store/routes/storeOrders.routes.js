@@ -7,19 +7,19 @@ import * as c from '../controllers/storeOrders.controller.js';
 const router = express.Router();
 
 router.use(authMiddleware);
-router.use(requireRoles('STORE_MANAGER', 'KITCHEN_SUPERVISOR', 'KITCHEN_STAFF'));
+router.use(requireRoles('STORE_MANAGER', 'KITCHEN_STAFF'));   // the kitchen supervisor role is no longer used (403)
 router.use(requireOnDuty);   // kitchen roles: attendance first, then work (reads stay open)
 
 router.get('/', c.listOrders);                              // ?view=incoming|active|ready|completed|cancelled
-router.get('/team', c.listTeam);                            // supervisors + kitchen staff of this store
+router.get('/team', c.listTeam);                            // kitchen staff of this store
 router.get('/:orderId', c.getOrder);
-router.patch('/:orderId/accept', c.acceptOrder);            // manager -> picks the kitchen supervisor
+router.patch('/:orderId/accept', c.acceptOrder);            // manager (no supervisor)
 router.patch('/:orderId/reject', c.rejectOrder);            // manager
 router.patch('/:orderId/reopen', c.reopenOrder);            // manager, within 5 minutes of the store's own cancellation
-router.patch('/:orderId/assign-staff', c.assignStaff);      // manager / that order's supervisor
-router.patch('/:orderId/stage', c.updateStage);             // assigned staff / supervisor / manager
-router.patch('/:orderId/priority', c.setPriority);          // manager / supervisor
-router.patch('/:orderId/pause', c.pauseOrder);              // manager / that order's supervisor
-router.patch('/:orderId/delay', c.delayOrder);              // manager / that order's supervisor
+router.patch('/:orderId/assign-staff', c.assignStaff);      // manager only; the person must be active and clocked in
+router.patch('/:orderId/stage', c.updateStage);             // station holders / manager; 'ready' only the packer or the manager
+router.patch('/:orderId/priority', c.setPriority);          // manager / a station holder of the order
+router.patch('/:orderId/pause', c.pauseOrder);              // manager / a station holder of the order
+router.patch('/:orderId/delay', c.delayOrder);              // manager / a station holder of the order
 
 export default router;

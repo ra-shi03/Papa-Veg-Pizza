@@ -8,9 +8,10 @@ import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core
 import { config } from '../../../../config/env.js';
 import { requirePresent } from './attendancePresence.js';
 
-// My Tasks: the work items behind an order in the kitchen. A task is created when the store manager
-// hands an order to a supervisor (kind 'supervisor') and when a supervisor assigns a station
-// (kind 'staff', one per slot). Everything is scoped by the storeId and userId in the token.
+// My Tasks: the work items behind an order in the kitchen. A task (kind 'staff', one per slot) is created when
+// the store manager assigns a station. Everything is scoped by the storeId and userId in the token.
+// Orders accepted before the kitchen supervisor role was removed may still have a kind 'supervisor' task: it is
+// kept and closed with the order, but it is never counted as station work and nobody acts on it.
 
 const normalizeRole = (role) => String(role || '').trim().replace(/-/g, '_').toUpperCase();
 const STAFF_SLOTS = ['pizza_chef', 'baking_chef', 'packaging_staff'];
@@ -21,7 +22,7 @@ const SLOT_INFO = {
   baking_chef: { type: 'bake', verb: 'Bake', station: 'Baking Station' },
   packaging_staff: { type: 'pack', verb: 'Pack', station: 'Packaging Station' },
 };
-const SUPERVISOR_INFO = { type: 'oversee', verb: 'Oversee', station: 'Kitchen Supervision' };
+const SUPERVISOR_INFO = { type: 'oversee', verb: 'Oversee', station: 'Kitchen Supervision' };   // legacy tasks only
 
 // What each station actually does, so My Tasks shows the real job and not a generic "task".
 const stageIdx = (item) => ITEM_STAGES.indexOf(item.stage);
@@ -85,11 +86,8 @@ const requireStore = (user) => {
   return String(user.storeId);
 };
 const isManagerRole = (user) => normalizeRole(user.role) === 'STORE_MANAGER';
-const isSupervisorRole = (user) => normalizeRole(user.role) === 'KITCHEN_SUPERVISOR';
-const requireLead = (user) => {
-  if (!isManagerRole(user) && !isSupervisorRole(user)) {
-    throw new ForbiddenError('Only the store manager or a kitchen supervisor can do this.');
-  }
+const requireManagerRole = (user) => {
+  if (!isManagerRole(user)) throw new ForbiddenError('Only the store manager can do this.');
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -104,11 +102,12 @@ export const notifyUsers = async ({ userIds, storeId, taskId = null, type, title
   );
 };
 
-// The people who must hear about delays and handoff requests: the order's supervisor + the store's managers
+// The people who must hear about delays and handoff requests: the store's managers
+// (`order.kitchen.supervisor` on older orders is information only, so it is not notified)
 const leadsOf = async (storeId, order, exceptUserId) => {
   const managers = await StoreManager.find({ storeId: String(storeId), status: 'Active', role: /manager/i, userId: { $ne: null } })
     .select('userId').lean();
-  const ids = [order?.kitchen?.supervisor?.userId, ...managers.map((m) => m.userId)].filter(Boolean).map(String);
+  const ids = managers.map((m) => m.userId).filter(Boolean).map(String);
   return ids.filter((id) => id !== String(exceptUserId));
 };
 
@@ -127,7 +126,7 @@ const toUiTask = (t, order, names, items = []) => {
   const info = t.kind === 'supervisor' ? SUPERVISOR_INFO : SLOT_INFO[t.slot] || SLOT_INFO.pizza_chef;
   const orderNumber = order?.order_id || idStr(t.orderId);
   const minutes = t.startedAt && t.completedAt ? Math.round(((t.completedAt - t.startedAt) / 60000) * 10) / 10 : 0;
-  // A supervisor's work is flow-wise: staff first, then overseeing. The page shows the steps and who holds each station.
+  // Legacy: a task of a former kitchen supervisor (orders accepted before the role was removed), shown as it was.
   let supervisorFlow = {};
   if (t.kind === 'supervisor') {
     const assignedStaff = {};
@@ -305,15 +304,16 @@ export async function myTaskStats(user) {
 }
 
 export async function teamTasks(user) {
-  requireLead(user);
+  requireManagerRole(user);
   const storeId = requireStore(user);
   const week = new Date(Date.now() - 7 * 86400000);
   const [tasks, staff] = await Promise.all([
     KitchenTask.find({
       storeId: toId(storeId),
+      kind: { $ne: 'supervisor' },   // legacy supervisor tasks are not station work
       $or: [{ status: { $ne: 'completed' } }, { completedAt: { $gte: week } }],
     }).lean(),
-    StoreManager.find({ storeId, status: 'Active', userId: { $ne: null }, role: { $not: /manager/i } })
+    StoreManager.find({ storeId, status: 'Active', userId: { $ne: null }, role: { $not: /manager|supervisor/i } })
       .select('userId name').lean(),
   ]);
   const s = taskStats(tasks, startOfToday());
@@ -448,7 +448,7 @@ export async function requestReassign(user, id, payload = {}) {
   return view(task);
 }
 
-// A staff member of this store (never the manager or a supervisor), matched by id or by name
+// A kitchen staff member of this store (never the manager or a left-over supervisor record), matched by id or by name
 const findStaffTarget = async (storeId, who) => {
   const key = str(who, 120);
   if (!key) throw new ValidationError('Choose who the task goes to');
@@ -461,17 +461,14 @@ const findStaffTarget = async (storeId, who) => {
 };
 
 export async function reassignTask(user, id, payload = {}) {
-  requireLead(user);
+  requireManagerRole(user);   // only the store manager assigns people
   const storeId = requireStore(user);
   const task = await findTask(id, { storeId: toId(storeId) });
   if (task.status === 'completed') throw new ValidationError('A completed task cannot be reassigned');
-  if (task.kind === 'supervisor') throw new ValidationError('Supervisor tasks cannot be reassigned here');
+  if (task.kind === 'supervisor') throw new ValidationError('This is an old kitchen supervisor task and cannot be reassigned');
 
   const order = await FoodOrder.findOne({ _id: task.orderId, storeId: toId(storeId) }).select('order_id orderStatus kitchen').lean();
   if (!order) throw new NotFoundError('Task not found');
-  if (isSupervisorRole(user) && idStr(order.kitchen?.supervisor?.userId) !== String(user.userId)) {
-    throw new ForbiddenError('This order is assigned to another supervisor.');
-  }
 
   const target = await findStaffTarget(storeId, payload.assignedTo ?? payload.staffId);
   const previous = idStr(task.assignedTo);

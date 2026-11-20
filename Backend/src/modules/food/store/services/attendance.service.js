@@ -128,7 +128,7 @@ const MAX_LEAVE_DAYS = 31;
 const dayAdd = (key, n) => { const d = new Date(`${key}T00:00:00`); d.setDate(d.getDate() + n); return dateKeyOf(d); };
 
 /**
- * POST /store/attendance/leave { staffId, from, to, reason } : the store manager puts a supervisor / staff member on leave
+ * POST /store/attendance/leave { staffId, from, to, reason } : the store manager puts a staff member on leave
  * for a range of days, with a reason. Each day becomes a 'leave' record they and the franchise admin can see. A day the
  * person already worked is left alone.
  */
@@ -233,10 +233,10 @@ export async function deleteAttendance(user, id, query = {}) {
 
 // ---- self service: clock in / out, today, history ---------------------------------------------
 
-/** Kitchen supervisors and kitchen staff clock themselves; the staff record comes from the token, never from the request. */
+/** Kitchen staff clock themselves; the staff record comes from the token, never from the request. */
 async function kitchenSelf(user) {
     const scope = await attendanceScope(user, {});
-    if (!KITCHEN_ROLE_CODES.includes(scope.role)) throw new ForbiddenError('Only kitchen supervisors and kitchen staff clock in and out.');
+    if (!KITCHEN_ROLE_CODES.includes(scope.role)) throw new ForbiddenError('Only kitchen staff clock in and out.');
     return scope;
 }
 
@@ -298,7 +298,7 @@ export async function todayStatus(user) {
 /** GET /store/attendance/me?from=&to=&limit= : the caller's own history. */
 export async function myHistory(user, query = {}) {
     const scope = await kitchenSelf(user);
-    const filter = { storeId: scope.store._id, staffId: scope.me._id };   // always the caller's own, supervisors included
+    const filter = { storeId: scope.store._id, staffId: scope.me._id };   // always the caller's own
     if (query.date) filter.date = query.date;
     else if (query.from || query.to) filter.date = { ...(query.from ? { $gte: query.from } : {}), ...(query.to ? { $lte: query.to } : {}) };
     if (query.status) filter.status = query.status;
@@ -314,7 +314,7 @@ export async function myHistory(user, query = {}) {
  *   present      worked today (present or half day)
  *   late         of those, arrived after the shift start + grace period
  *   absent       marked absent or on leave today, plus staff whose account status is On Leave and who did not turn up
- * The people counted are the store's kitchen supervisors and kitchen staff.
+ * The people counted are the store's kitchen staff.
  */
 export async function todaySummary(storeId, now = new Date()) {
     const staff = await kitchenStaffRecords(storeId);

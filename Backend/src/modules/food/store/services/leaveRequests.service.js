@@ -21,7 +21,7 @@ const dto = (r) => ({
 
 async function kitchenSelf(user) {
     const scope = await attendanceScope(user, {});
-    if (!KITCHEN_ROLE_CODES.includes(scope.role)) throw new ForbiddenError('Only kitchen supervisors and kitchen staff request leave.');
+    if (!KITCHEN_ROLE_CODES.includes(scope.role)) throw new ForbiddenError('Only kitchen staff request leave.');
     return scope;
 }
 async function managerScope(user) {

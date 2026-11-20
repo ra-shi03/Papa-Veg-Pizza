@@ -35,13 +35,17 @@ const normalizeAdminRole = (role) => {
   return String(role || '').trim().replace(/_/g, '-').toLowerCase();
 };
 
+// The kitchen supervisor role was removed from the order flow: those accounts are deactivated (never deleted, see
+// scripts/deactivate-supervisors.js) and cannot sign in or refresh a token.
 const ADMIN_PANEL_ROLES = new Set([
   'superadmin',
   'franchise-admin',
   'store-manager',
-  'kitchen-supervisor',
   'kitchen-staff'
 ]);
+const RETIRED_ROLE = 'kitchen-supervisor';
+export const SUPERVISOR_RETIRED_MESSAGE =
+  'The kitchen supervisor role is no longer used, so this account has been deactivated. Ask your store manager to add you as kitchen staff.';
 
 const toSafeImageUrl = (value) => {
   if (!value) return "";
@@ -274,8 +278,8 @@ const resolveAdminScope = async (user, role) => {
   const normalizedLoginRole = role ? role.toUpperCase().replace(/-/g, '_') : '';
   const normalizedPrimaryCode = user.primaryRole?.code ? user.primaryRole.code.toUpperCase().replace(/-/g, '_') : '';
 
-  if (['STORE_MANAGER', 'KITCHEN_STAFF', 'KITCHEN_SUPERVISOR'].includes(normalizedLoginRole) ||
-      ['STORE_MANAGER', 'KITCHEN_STAFF', 'KITCHEN_SUPERVISOR'].includes(normalizedPrimaryCode)) {
+  if (['STORE_MANAGER', 'KITCHEN_STAFF'].includes(normalizedLoginRole) ||
+      ['STORE_MANAGER', 'KITCHEN_STAFF'].includes(normalizedPrimaryCode)) {
     // Try userId first, then email. Never query by a missing email: `{ email: undefined }`
     // is dropped by Mongoose and the filter would match an arbitrary staff record.
     const identity = [{ userId: user._id }];
@@ -310,9 +314,11 @@ export const adminLogin = async ({ email, mobile, password } = {}, allowedRoles 
 
   if (!user) throw new AuthError("Invalid credentials");
 
-  // Account state checks
+  // Account state checks. A former kitchen supervisor (deactivated by the migration) is told why, but only once the
+  // password is right, so the message does not reveal which emails belong to such accounts.
+  const retiredSupervisor = normalizeAdminRole(user.primaryRole?.code) === RETIRED_ROLE;
   if (user.isDeleted === true)                      throw new AuthError("Account not found");
-  if (user.isActive === false || user.isBlocked === true) throw new AuthError("Your account is inactive. Please contact support.");
+  if (!retiredSupervisor && (user.isActive === false || user.isBlocked === true)) throw new AuthError("Your account is inactive. Please contact support.");
   if (user.isLocked && user.isLocked())             throw new AuthError("Too many failed attempts. Account locked for 30 minutes.");
 
   const isMatch = await user.comparePassword(password);
@@ -324,6 +330,8 @@ export const adminLogin = async ({ email, mobile, password } = {}, allowedRoles 
 
   // Reset failed attempts on successful login
   await user.resetFailedLogin();
+
+  if (retiredSupervisor) throw new AuthError(SUPERVISOR_RETIRED_MESSAGE);
 
   if (!user.primaryRole) {
     throw new AuthError("This account has no roles assigned. Contact Super Admin.");
@@ -585,7 +593,7 @@ export const getProfile = async (userId, role, jwtStoreId = null) => {
 
       const normalizedRole = role ? role.toUpperCase().replace(/-/g, '_') : '';
       const normalizedPrimaryRole = user.primaryRole?.code ? user.primaryRole.code.toUpperCase().replace(/-/g, '_') : '';
-      const STORE_ROLES = ['STORE_MANAGER', 'KITCHEN_STAFF', 'KITCHEN_SUPERVISOR'];
+      const STORE_ROLES = ['STORE_MANAGER', 'KITCHEN_STAFF'];
 
       if (STORE_ROLES.includes(normalizedRole) || STORE_ROLES.includes(normalizedPrimaryRole)) {
           // Try by userId or email
@@ -1070,6 +1078,9 @@ export const refreshAccessToken = async (token) => {
     const u = await User.findById(payload.userId).populate("primaryRole").lean();
     if (!u || u.isActive === false || u.isBlocked === true || u.isDeleted === true) {
       await revoke("Account is deactivated. Please contact support.");
+    }
+    if (tokenKind === RETIRED_ROLE || normalizeAdminRole(u?.primaryRole?.code) === RETIRED_ROLE) {
+      await revoke(SUPERVISOR_RETIRED_MESSAGE);
     }
     if (ADMIN_PANEL_ROLES.has(tokenKind)) {
       const adminRole = adminRoleOf(u);

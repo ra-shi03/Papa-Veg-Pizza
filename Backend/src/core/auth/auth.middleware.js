@@ -9,7 +9,6 @@ const ADMIN_PANEL_ROLES = new Set([
     'SUPERADMIN',
     'FRANCHISE-ADMIN',
     'STORE-MANAGER',
-    'KITCHEN-SUPERVISOR',
     'KITCHEN-STAFF'
 ]);
 

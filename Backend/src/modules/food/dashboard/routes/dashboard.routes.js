@@ -6,9 +6,9 @@ import * as c from '../controllers/dashboard.controller.js';
 // Mounted at the paths the dashboards already call: /v1/store/dashboard/* and /v1/admin/dashboard/*.
 // Which store / franchise a call may see is decided in dashboardAccess.js from the token.
 
-// Store dashboard: store manager, kitchen supervisor (kitchen + order widgets), franchise / super admin (?storeId=)
+// Store dashboard: store manager, franchise / super admin (?storeId=)
 export const storeDashboardRouter = express.Router();
-storeDashboardRouter.use(authMiddleware, requireRoles('STORE_MANAGER', 'KITCHEN_SUPERVISOR', 'ADMIN'));
+storeDashboardRouter.use(authMiddleware, requireRoles('STORE_MANAGER', 'ADMIN'));
 for (const [widget, handler] of Object.entries(c.storeWidgets)) storeDashboardRouter.get(`/${widget}`, handler);
 
 // Franchise dashboard: franchise admin (own franchise) and super admin

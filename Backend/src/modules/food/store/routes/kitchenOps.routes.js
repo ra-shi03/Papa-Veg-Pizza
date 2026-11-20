@@ -10,7 +10,7 @@ import * as c from '../controllers/kitchenOps.controller.js';
 const router = express.Router();
 
 router.use(authMiddleware);
-router.use(requireRoles('STORE_MANAGER', 'KITCHEN_SUPERVISOR', 'KITCHEN_STAFF'));
+router.use(requireRoles('STORE_MANAGER', 'KITCHEN_STAFF'));
 router.use(requireOnDuty);   // kitchen roles: attendance first, then work (reads stay open)
 
 // Kitchen queue
@@ -20,7 +20,7 @@ router.put('/orders/:orderId/accept', c.queueOrder);                 // confirme
 router.put('/orders/:orderId/assign-chef', c.assignChef);
 router.put('/orders/:orderId/ready', c.markReady);                   // packaging: sealed -> ready for pickup
 
-// Delayed orders (manager / supervisor)
+// Delayed orders (manager; kitchen staff for the orders where they hold a station)
 router.get('/delayed-orders', c.delayedOrders);
 router.post('/orders/:orderId/escalate', c.escalateOrder);
 router.put('/orders/:orderId/reassign', c.reassignOrder);

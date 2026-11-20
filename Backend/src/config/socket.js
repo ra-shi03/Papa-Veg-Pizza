@@ -135,7 +135,7 @@ export const initSocket = async (server) => {
             if (role === 'STORE') socket.join(roomNames.store(userId));
             // Order events for store staff and franchise admins: the rooms come from their own signed token.
             const scopeRole = String(role).replace(/-/g, '_').toUpperCase();
-            if ((scopeRole === 'STORE_MANAGER' || scopeRole === 'KITCHEN_SUPERVISOR') && socket.user.storeId) {
+            if (scopeRole === 'STORE_MANAGER' && socket.user.storeId) {
                 socket.join(roomNames.store(socket.user.storeId));
             }
             if (scopeRole === 'FRANCHISE_ADMIN' && socket.user.franchiseId) {

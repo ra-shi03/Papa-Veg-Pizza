@@ -6,15 +6,13 @@ import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core
 
 // Who is calling, and which store they are looking at. Everything comes from the token:
 //   store manager      -> their store, full access
-//   kitchen supervisor -> their store: read stock / shortages, file waste + shortage reports + stock requests
-//   kitchen staff      -> same, but only their own waste reports and stock requests
+//   kitchen staff      -> their store: read stock / shortages, file waste + shortage reports + stock requests (only their own)
 //   franchise admin    -> read-only, for ONE store of their own franchise (?storeId=...)
 //   anyone else        -> 403.   A record of another store / franchise is simply not found (404).
 
 const normalize = (role) => String(role || '').trim().replace(/-/g, '_').toUpperCase();
 const ROLE = {
   STORE_MANAGER: 'manager',
-  KITCHEN_SUPERVISOR: 'supervisor',
   KITCHEN_STAFF: 'staff',
   FRANCHISE_ADMIN: 'franchise_admin',
 };
@@ -46,7 +44,7 @@ export const isManager = (ctx) => ctx.role === 'manager';
 export const mustManager = (ctx) => {
   if (!isManager(ctx)) throw new ForbiddenError('Only the store manager can do this.');
 };
-/** Manager, supervisor or staff of the store (not the read-only franchise admin). */
+/** Manager or staff of the store (not the read-only franchise admin). */
 export const mustBeStoreRole = (ctx) => {
   if (ctx.readOnly) throw new ForbiddenError('This account has read-only access to inventory.');
 };

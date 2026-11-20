@@ -97,7 +97,7 @@ export async function liveOrders(user, q) {
     amount: round2(o.pricing?.total),
     items: (o.items || []).map((i) => ({ name: i.name, quantity: i.quantity, price: i.price })),
     assignedStaff: {
-      chef: o.kitchen?.staff?.pizza_chef?.name || o.kitchen?.supervisor?.name || '',
+      chef: o.kitchen?.staff?.pizza_chef?.name || '',
       rider: riderName.get(String(o.dispatch?.deliveryPartnerId)) || '',
     },
   }));

@@ -7,7 +7,6 @@ import { isId, toId } from '../../dashboard/services/dashboardAccess.js';
 
 // Who may do what with shifts and attendance, decided from the token alone:
 //   store manager      -> own store: manage shifts, read and mark attendance
-//   kitchen supervisor -> own store: read shifts and attendance, clock in / out for themselves
 //   kitchen staff      -> clock in / out, and read only their own attendance and shifts
 //   franchise admin    -> read only, one store of their own franchise (?storeId=); another franchise's store is 404
 //   super admin        -> read only, ?storeId=
@@ -15,13 +14,13 @@ import { isId, toId } from '../../dashboard/services/dashboardAccess.js';
 
 const normalize = (role) => String(role || '').trim().replace(/-/g, '_').toUpperCase();
 const isSuper = (role) => role === 'SUPERADMIN' || role === 'SUPER_ADMIN';
-export const KITCHEN_ROLE_CODES = ['KITCHEN_SUPERVISOR', 'KITCHEN_STAFF'];
+export const KITCHEN_ROLE_CODES = ['KITCHEN_STAFF'];   // (the kitchen supervisor role is no longer used)
 const STORE_ROLES = ['STORE_MANAGER', ...KITCHEN_ROLE_CODES];
 
 /** Class-less 409 (errorHandler reads statusCode) */
 export const conflict = (message) => Object.assign(new Error(message), { name: 'ConflictError', statusCode: 409 });
 
-/** The kitchen supervisors and kitchen staff of one store (StoreManager records, lean), optionally narrowed by `extra`. */
+/** The kitchen staff of one store (StoreManager records, lean), optionally narrowed by `extra`. */
 export async function kitchenStaffRecords(storeId, extra = {}) {
     const roles = await Role.find({ code: { $in: KITCHEN_ROLE_CODES } }).select('_id').lean();
     const links = await UserRole.find({ storeId, roleId: { $in: roles.map((r) => r._id) } }).select('userId').lean();

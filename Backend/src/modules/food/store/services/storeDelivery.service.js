@@ -20,7 +20,6 @@ import {
 // Store manager's delivery screens (/v1/store/*): riders, assign / reassign, live deliveries, tracking, timeline,
 // delivery issues, and "record refund request". Who may call, from the token:
 //   store manager      -> own store; read and write
-//   kitchen supervisor -> own store; read only
 //   franchise admin    -> one store of its own franchise (?storeId=); read only
 //   super admin        -> any store (?storeId=); read only
 //   kitchen staff, customers, others -> 403.     A store or order of someone else is 404.
@@ -37,7 +36,7 @@ export async function deliveryContext(user, query = {}, { write = false } = {}) 
   const role = normalize(user?.role);
   let store;
   let canWrite = false;
-  if (role === 'STORE_MANAGER' || role === 'KITCHEN_SUPERVISOR') {
+  if (role === 'STORE_MANAGER') {
     if (!isId(user.storeId)) throw new ForbiddenError('No store is linked to your account.');
     store = await FoodStore.findById(toId(user.storeId)).select('_id franchiseId storeName latitude longitude address city state phone').lean();
     canWrite = role === 'STORE_MANAGER';
@@ -101,13 +100,11 @@ async function issueRider(ctx, order, riderId) {
   return findRider(ctx, riderId, { approvedOnly: true });
 }
 
-/** A kitchen supervisor reads only the orders the store manager assigned to them. */
-const assignedOnly = (ctx) => (ctx.role === 'KITCHEN_SUPERVISOR' ? { 'kitchen.supervisor.userId': toId(ctx.user.userId) } : {});
 
 async function findOrder(ctx, orderId, select) {
   const identity = buildOrderIdentityFilter(orderId);
   if (!identity) throw new NotFoundError('Order not found');
-  const order = await FoodOrder.findOne({ $and: [identity, { storeId: ctx.storeId, ...assignedOnly(ctx) }] }).select(select || '').lean();
+  const order = await FoodOrder.findOne({ $and: [identity, { storeId: ctx.storeId }] }).select(select || '').lean();
   if (!order) throw new NotFoundError('Order not found');
   return order;
 }
@@ -203,7 +200,7 @@ export async function listRiders(user, q = {}) {
 /**
  * One rider's details for the store: everything the store needs to work with the rider (contact, address, vehicle,
  * selfie, status, performance) except the documents: no ID card / licence / PAN images or numbers, no bank details.
- * The store manager and the super admin get the full phone; a supervisor or franchise admin a masked one.
+ * The store manager and the super admin get the full phone; a franchise admin a masked one.
  */
 export async function riderDetails(user, riderId, q = {}) {
   const ctx = await deliveryContext(user, q);
@@ -261,7 +258,7 @@ const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 export async function readyOrders(user, q = {}) {
   const ctx = await deliveryContext(user, q);
-  const filter = { storeId: ctx.storeId, ...assignedOnly(ctx), orderStatus: { $in: ['ready_for_pickup', 'reached_pickup'] } };
+  const filter = { storeId: ctx.storeId, orderStatus: { $in: ['ready_for_pickup', 'reached_pickup'] } };
   const search = String(q.search || '').trim().slice(0, 60);
   if (search) {
     const rx = new RegExp(escapeRegex(search), 'i');
@@ -293,7 +290,6 @@ export async function liveDeliveries(user, q = {}) {
   const ctx = await deliveryContext(user, q);
   const docs = await FoodOrder.find({
     storeId: ctx.storeId,
-    ...assignedOnly(ctx),
     'dispatch.deliveryPartnerId': { $ne: null },
     $or: [{ orderStatus: { $in: ON_ROAD } }, { orderStatus: 'delivered', updatedAt: { $gte: startOfDay() } }],
   }).select('order_id customerName deliveryAddress.name orderStatus dispatch statusHistory').sort({ updatedAt: -1 }).limit(200).lean();
@@ -589,7 +585,6 @@ const emitToStore = (ctx, event, payload) => getIO()?.to(rooms.store(ctx.storeId
 export async function listIssues(user, q = {}) {
   const ctx = await deliveryContext(user, q);
   const filter = { storeId: ctx.storeId };
-  if (ctx.role === 'KITCHEN_SUPERVISOR') filter.orderId = { $in: await FoodOrder.distinct('_id', { storeId: ctx.storeId, ...assignedOnly(ctx) }) };
   return (await DeliveryIssue.find(filter).sort({ createdAt: -1 }).limit(200).lean()).map(toIssue);
 }
 

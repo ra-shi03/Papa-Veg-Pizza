@@ -83,7 +83,7 @@ const storeManagerSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
-  // A kitchen supervisor / staff member the store manager adds waits as 'Pending Approval' until the franchise admin decides
+  // A kitchen staff member the store manager adds waits as 'Pending Approval' until the franchise admin decides
   approval: {
     decidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     decidedByName: { type: String, trim: true, default: '' },

@@ -3,12 +3,12 @@ import { StoreManager } from '../modules/food/franchise/models/storeManager.mode
 import { dateKeyOf } from '../modules/food/store/services/attendanceTime.js';
 import { isId, toId } from '../modules/food/dashboard/services/dashboardAccess.js';
 
-const KITCHEN_ROLES = new Set(['KITCHEN_SUPERVISOR', 'KITCHEN_STAFF']);
+const KITCHEN_ROLES = new Set(['KITCHEN_STAFF']);
 const ON_DUTY = ['present', 'half_day'];
 const OPEN_SESSION_HOURS = 20;
 
 /**
- * Kitchen supervisors and kitchen staff must have marked attendance (clocked in, or been marked present by the store
+ * Kitchen staff must have marked attendance (clocked in, or been marked present by the store
  * manager) and not yet clocked out before they do any kitchen work. The store manager is never blocked, and reads
  * (GET) stay open so a person can still see their tasks and the clock-in screen before they start.
  */

@@ -16,12 +16,12 @@ import { conflict } from './attendanceAccess.js';
 import { clockOf, dateKeyOf } from './attendanceTime.js';
 import { hoursByStore, windowOn, closureCovers, to12 } from '../../franchise/services/storeHours.js';
 
-// The profile screens of the store manager, kitchen supervisor and kitchen staff (/v1/profile/*). Every call is about the
+// The profile screens of the store manager and kitchen staff (/v1/profile/*). Every call is about the
 // caller's own account: the user id and store come from the token, never from the request.
 
 const normalize = (role) => String(role || '').trim().replace(/-/g, '_').toUpperCase();
-const ROLE_KEY = { STORE_MANAGER: 'store_manager', KITCHEN_SUPERVISOR: 'kitchen_supervisor', KITCHEN_STAFF: 'kitchen_staff' };
-const DESIGNATION = { STORE_MANAGER: 'Store Operations Manager', KITCHEN_SUPERVISOR: 'Kitchen Operations Supervisor', KITCHEN_STAFF: 'Kitchen Staff' };
+const ROLE_KEY = { STORE_MANAGER: 'store_manager', KITCHEN_STAFF: 'kitchen_staff' };
+const DESIGNATION = { STORE_MANAGER: 'Store Operations Manager', KITCHEN_STAFF: 'Kitchen Staff' };
 const PREF_DEFAULTS = { orderAlerts: true, inventoryAlerts: true, shiftAlerts: false, complaintAlerts: true, dailyReports: true, smsAlerts: false, pushNotifications: true };
 
 /** The caller's own staff record (a StoreManager document) in their own store. */

@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-// A supervisor's quality sign-off on a finished order (My Tasks -> Quality Check).
+// The quality sign-off on a finished order (My Tasks -> Quality Check), by the packaging-station staff member or the store manager.
 const qualityCheckSchema = new mongoose.Schema(
     {
         storeId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodStore', required: true, index: true },

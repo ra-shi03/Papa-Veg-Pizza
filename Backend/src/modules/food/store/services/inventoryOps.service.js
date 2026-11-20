@@ -18,7 +18,7 @@ import {
 import { NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 
 // Stock requests, waste, shortages and recipes. Same rules as inventory.service.js: the store comes from the token,
-// the manager changes things, supervisors / staff report and read, a franchise admin only reads one of its stores.
+// the manager changes things, kitchen staff report and read, a franchise admin only reads one of its stores.
 
 const URGENCIES = ['low', 'medium', 'high', 'critical'];
 const mine = (ctx, field) => (ctx.role === 'staff' ? { [field]: toId(ctx.user.userId) } : {});
@@ -491,7 +491,6 @@ async function affectedOrdersOf(ctx, ingredientIds) {
   if (!recipes.length) return new Map();
   const filter = { storeId: ctx.storeId, orderStatus: { $in: ['confirmed', 'preparing'] } };
   // Kitchen roles see only the orders they are on.
-  if (ctx.role === 'supervisor') filter['kitchen.supervisor.userId'] = toId(ctx.user.userId);
   if (ctx.role === 'staff') filter.$or = ['pizza_chef', 'baking_chef', 'packaging_staff'].map((slot) => ({ [`kitchen.staff.${slot}.userId`]: toId(ctx.user.userId) }));
   const orders = await FoodOrder.find(filter)
     .select('order_id customerName items orderStatus kitchen.expectedReadyAt').lean();

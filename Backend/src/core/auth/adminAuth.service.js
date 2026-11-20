@@ -13,7 +13,6 @@ const ADMIN_PANEL_ROLES = new Set([
   'superadmin',
   'franchise-admin',
   'store-manager',
-  'kitchen-supervisor',
   'kitchen-staff'
 ]);
 
@@ -68,7 +67,7 @@ export const adminLogin = async ({ email, mobile, password } = {}, allowedRoles 
     
     // For store login endpoint, check if role matches any store-level role
     if (normalizedAllowedRoles.includes('store-manager')) {
-      const storeRoles = ['store-manager', 'kitchen-supervisor', 'kitchen-staff'];
+      const storeRoles = ['store-manager', 'kitchen-staff'];
       if (!storeRoles.includes(adminRole)) {
         throw new AuthError("Access denied: Invalid role for store portal");
       }

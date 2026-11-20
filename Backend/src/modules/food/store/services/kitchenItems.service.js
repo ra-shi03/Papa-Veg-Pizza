@@ -5,11 +5,10 @@ import { KitchenItem, ITEM_STAGES } from '../models/kitchenItem.model.js';
 import { KitchenOven } from '../models/kitchenOven.model.js';
 import { KitchenIssue } from '../models/kitchenIssue.model.js';
 import {
-  STAGE_ORDER, normalizeRole, requireStore, requireManager, isOrderSupervisor, staffSlotsOf, findOrder, moveToStage,
+  STAGE_ORDER, normalizeRole, requireStore, requireManager, holdsStation, findKitchenStaff, findOrder, moveToStage,
   toObjectId, idStr,
 } from './storeOrders.service.js';
 import { notifyUsers } from './kitchenTasks.service.js';
-import { requirePresent } from './attendancePresence.js';
 import { recipeIndex } from './inventoryOps.service.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 
@@ -29,7 +28,6 @@ const DEFAULT_OVENS = 5;
 
 const asRole = (user) => normalizeRole(user?.role);
 const isManager = (user) => asRole(user) === 'STORE_MANAGER';
-const isSupervisor = (user) => asRole(user) === 'KITCHEN_SUPERVISOR';
 const isStaff = (user) => asRole(user) === 'KITCHEN_STAFF';
 const str = (v, max) => String(v ?? '').trim().slice(0, max);
 const isId = (v) => mongoose.Types.ObjectId.isValid(String(v || ''));
@@ -40,11 +38,10 @@ export const priorityLabel = (order) => (order?.kitchen?.priority === 'urgent' ?
 // Which orders / items the caller may see
 // ---------------------------------------------------------------------------------------------
 
-/** Orders in the kitchen that this person may see. Manager: the store. Supervisor: own orders. Staff: own stations. */
+/** Orders in the kitchen that this person may see. Manager: the store. Staff: own stations. */
 export async function visibleKitchenOrders(user, extra = {}) {
   const storeId = toObjectId(requireStore(user));
   const filter = { storeId, orderStatus: { $in: IN_KITCHEN }, ...extra };
-  if (isSupervisor(user)) filter['kitchen.supervisor.userId'] = toObjectId(user.userId);
   if (isStaff(user)) {
     const me = toObjectId(user.userId);
     const ownItems = await KitchenItem.distinct('orderId', { storeId, $or: [{ chefId: me }, { bakerId: me }] });
@@ -124,10 +121,9 @@ const ownerOf = (item, order, kind) => {
   return item.chefId ? { id: idStr(item.chefId), name: item.chefName } : slot?.userId ? { id: idStr(slot.userId), name: slot.name } : null;
 };
 
-/** Does this person own this pizza's current station? Leads always may; staff only their own. */
+/** Does this person own this pizza's current station? The manager always may; staff only their own. */
 function canWorkOnItem(user, item, order, station) {
   if (isManager(user)) return true;
-  if (isSupervisor(user)) return isOrderSupervisor(order, user.userId);
   if (isStaff(user)) {
     const owner = ownerOf(item, order, station === 'bake' ? 'baker' : 'chef');
     return !!owner && owner.id === String(user.userId);
@@ -325,8 +321,8 @@ async function loadItemForAction(user, itemId) {
   const order = await findOrder(item.orderId, storeId).catch(() => null);
   if (!order || !IN_KITCHEN.includes(order.orderStatus)) throw new ValidationError('This order is not in the kitchen');
   // A person who may not see the order cannot learn that the pizza exists.
-  const seen = isManager(user) || (isSupervisor(user) && isOrderSupervisor(order, user.userId)) ||
-    (isStaff(user) && (staffSlotsOf(order, user.userId).length > 0 || [idStr(item.chefId), idStr(item.bakerId)].includes(String(user.userId))));
+  const seen = isManager(user) ||
+    (isStaff(user) && (holdsStation(order, user.userId) || [idStr(item.chefId), idStr(item.bakerId)].includes(String(user.userId))));
   if (!seen) throw new NotFoundError('Pizza not found');
   if (item.rejected) throw new ValidationError('This item was rejected');
   return { item, order, storeId };
@@ -406,14 +402,10 @@ export async function pauseItem(user, itemId, { reason, notes } = {}, station = 
 
 export async function reassignItemChef(user, itemId, chefId) {
   const { item, order, storeId } = await loadItemForAction(user, itemId);
-  if (!isManager(user) && !(isSupervisor(user) && isOrderSupervisor(order, user.userId))) {
-    throw new ForbiddenError('Only the store manager or the order supervisor can reassign a pizza.');
-  }
+  if (!isManager(user)) throw new ForbiddenError('Only the store manager can reassign a pizza.');
   if (ITEM_STAGES.indexOf(item.stage) >= ITEM_STAGES.indexOf('baking')) throw new ValidationError('This pizza has already gone to baking');
   if (!isId(chefId)) throw new ValidationError('Choose a chef');
-  const chef = await StoreManager.findOne({ userId: toObjectId(chefId), storeId: String(storeId), status: 'Active' }).lean();
-  if (!chef) throw new ValidationError('That person is not an active member of this store');
-  await requirePresent(storeId, chef);
+  const { member: chef } = await findKitchenStaff(chefId, storeId);   // active, clocked in, kitchen staff
   item.chefId = chef.userId;
   item.chefName = chef.name;
   await item.save();
@@ -584,14 +576,11 @@ const toIssue = (i) => ({
   createdAt: i.createdAt,
 });
 
-// Manager: every issue of the store. Supervisor: their own and those on their orders. Staff: their own.
+// Manager: every issue of the store. Staff: their own.
 export async function listIssues(user) {
   const storeId = toObjectId(requireStore(user));
   const filter = { storeId };
-  if (isSupervisor(user)) {
-    const mine = await visibleKitchenOrders(user);
-    filter.$or = [{ reportedBy: toObjectId(user.userId) }, { orderId: { $in: mine.map((o) => o._id) } }];
-  } else if (!isManager(user)) {
+  if (!isManager(user)) {
     filter.reportedBy = toObjectId(user.userId);
   }
   const rows = await KitchenIssue.find(filter).sort({ createdAt: -1 }).limit(200).lean();

@@ -11,7 +11,7 @@ import { findScopedStore, isSuperAdmin, scopedStoreIds } from '../../shared/fran
 
 // Managers are linked to a store (storeId is stored as a string); a franchise admin only sees
 // managers of its own franchise's stores. Super admin: no restriction.
-// This module is for store managers only: the kitchen supervisors and kitchen staff sit in the same collection (and the
+// This module is for store managers only: the kitchen staff (and deactivated former supervisors) sit in the same collection (and the
 // same stores), but they are handled in Kitchen Staff, never here.
 const MANAGER_ROLE = /^store[\s_-]*manager$/i;
 

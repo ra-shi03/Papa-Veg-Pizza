@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-// A delayed order escalated to a manager / supervisor (Delayed Orders screen).
+// A delayed order escalated to the store manager (Delayed Orders screen).
 const kitchenEscalationSchema = new mongoose.Schema(
     {
         storeId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodStore', required: true, index: true },

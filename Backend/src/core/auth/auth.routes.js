@@ -38,7 +38,7 @@ router.post('/delivery/request-otp', authRateLimiter, requestDeliveryOtpControll
 router.post('/delivery/send-otp', authRateLimiter, requestDeliveryOtpController);
 router.post('/delivery/verify-otp', authRateLimiter, verifyDeliveryOtpController);
 
-// Unified login for all admin panel roles: superadmin, franchise-admin, store-manager, kitchen-supervisor, kitchen-staff
+// Unified login for all admin panel roles: superadmin, franchise-admin, store-manager, kitchen-staff
 router.post('/login', authRateLimiter, adminLoginController);
 
 // Role-restricted login endpoints

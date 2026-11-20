@@ -244,7 +244,8 @@ const packagingSchema = new mongoose.Schema(
     { _id: false }
 );
 
-/** Kitchen workflow: store manager -> kitchen supervisor -> kitchen staff (per station). */
+/** Kitchen workflow: store manager -> kitchen staff (per station). `supervisor` is kept on orders accepted before the
+ *  kitchen supervisor role was removed; it is information only, never a permission. */
 const kitchenSchema = new mongoose.Schema(
     {
         stage: {

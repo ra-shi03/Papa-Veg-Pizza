@@ -8,9 +8,10 @@ import mongoose from 'mongoose';
 import { assertPasswordStrength } from '../../../../utils/password.js';
 import { escapeRegex } from '../../../../utils/helpers.js';
 
-// Role code → DB role mapping for kitchen staff
+// Role code → DB role mapping for kitchen staff. The kitchen supervisor role is no longer used: asking for it is a 400.
+const SUPERVISOR_REFUSED = 'The kitchen supervisor role is no longer used. Add the person as kitchen staff (Pizza Maker, Baker or Packager).';
+const isSupervisorTitle = (title) => /supervisor/i.test(String(title || ''));
 const ALLOWED_STAFF_ROLES = {
-  'Kitchen Supervisor': 'KITCHEN_SUPERVISOR',
   'Kitchen Staff': 'KITCHEN_STAFF',
   'Pizza Maker': 'KITCHEN_STAFF',
   'Baker': 'KITCHEN_STAFF',
@@ -18,8 +19,8 @@ const ALLOWED_STAFF_ROLES = {
 };
 
 /**
- * The staff a store manager may look at and change: kitchen supervisors and kitchen staff of the manager's own
- * store, never the manager themselves and never another manager of the store (their records sit in the same store).
+ * The staff a store manager may look at and change: the kitchen staff of the manager's own store (and the
+ * deactivated records of former kitchen supervisors, which are kept, never deleted), never the manager themselves and never another manager of the store (their records sit in the same store).
  * Without this a manager could suspend or hard-delete themselves, a peer manager, or the account the franchise
  * admin created for the store.
  */
@@ -56,6 +57,10 @@ export const createKitchenStaff = async (req, res) => {
     if (!fullName || !email || !phone || !password) {
       await session.abortTransaction();
       return res.status(400).json({ success: false, message: 'Full name, email, phone, and password are required.' });
+    }
+    if (isSupervisorTitle(staffRole)) {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, message: SUPERVISOR_REFUSED });
     }
 
     try {
@@ -330,6 +335,12 @@ export const updateKitchenStaff = async (req, res) => {
 
     const { fullName, phone, role, joiningDate, salaryType, salary, experience, skills, emergencyContact, address, shiftType, status, profileImage } = req.body;
 
+    if (isSupervisorTitle(role)) return res.status(400).json({ success: false, message: SUPERVISOR_REFUSED });
+    // A former kitchen supervisor stays deactivated: the record is kept for history but never switched back on
+    if (isSupervisorTitle(staff.role) && status === 'Active') {
+      return res.status(400).json({ success: false, message: 'This former kitchen supervisor account is deactivated. Add the person again as kitchen staff.' });
+    }
+
     if (fullName) staff.name = fullName.trim();
     if (phone) staff.phone = phone.trim();
     if (role) staff.role = role.trim();
@@ -362,7 +373,6 @@ export const updateKitchenStaff = async (req, res) => {
       
       if (role) {
         const ALLOWED_STAFF_ROLES = {
-          'Kitchen Supervisor': 'KITCHEN_SUPERVISOR',
           'Pizza Maker': 'KITCHEN_STAFF',
           'Baker': 'KITCHEN_STAFF',
           'Packager': 'KITCHEN_STAFF',
@@ -410,13 +420,18 @@ export const updateStaffStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid staff ID.' });
     }
 
+    // A former kitchen supervisor stays deactivated: the record is kept for history but never switched back on
+    const notRetired = status === 'Active' ? { role: { $not: /supervisor/i } } : {};
     const staff = await StoreManager.findOneAndUpdate(
-      await manageableStaff(req, { _id: id, status: { $nin: ['DELETED', 'Pending Approval', 'Rejected'] } }),
+      await manageableStaff(req, { _id: id, status: { $nin: ['DELETED', 'Pending Approval', 'Rejected'] }, ...notRetired }),
       { $set: { status } },
       { new: true }
     );
 
     if (!staff) {
+      if (status === 'Active' && await StoreManager.exists(await manageableStaff(req, { _id: id, role: /supervisor/i }))) {
+        return res.status(400).json({ success: false, message: 'This former kitchen supervisor account is deactivated. Add the person again as kitchen staff.' });
+      }
       return res.status(404).json({ success: false, message: 'Staff member not found.' });
     }
 

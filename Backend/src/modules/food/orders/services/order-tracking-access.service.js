@@ -7,7 +7,7 @@ import { buildOrderIdentityFilter } from './order.helpers.js';
 const normalizeRole = (role) => String(role || '').trim().replace(/_/g, '-').toUpperCase();
 const SUPER_ADMIN_ROLES = new Set(['SUPERADMIN', 'SUPER-ADMIN']);
 const CUSTOMER_ROLES = new Set(['USER', 'CUSTOMER']);
-const STORE_STAFF_ROLES = new Set(['STORE-MANAGER', 'KITCHEN-SUPERVISOR']);
+const STORE_STAFF_ROLES = new Set(['STORE-MANAGER']);
 const FINISHED = /^(delivered|cancelled)/;
 
 const same = (a, b) => a != null && b != null && String(a) === String(b);
@@ -22,7 +22,7 @@ export async function findOrderForTracking(orderId) {
     .lean();
 }
 
-/** Customer who placed it, its assigned rider, its store (legacy STORE login, manager, supervisor), its franchise admin, or a super admin. */
+/** Customer who placed it, its assigned rider, its store (legacy STORE login, manager), its franchise admin, or a super admin. */
 export function canWatchOrder(user, order) {
   if (!user || !order) return false;
   const role = normalizeRole(user.role);

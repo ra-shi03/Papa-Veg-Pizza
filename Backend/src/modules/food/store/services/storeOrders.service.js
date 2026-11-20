@@ -37,6 +37,8 @@ const VIEW_STATUSES = {
 };
 
 // Staff titles are free text on the staff profile; map them onto the three kitchen stations.
+// 'kitchen_supervisor' is still recognised so a left-over supervisor record is refused as an assignee; the role itself is
+// no longer part of the flow (docs/supervisor-removal.md).
 export const uiRoleOf = (title) => {
   const t = String(title || '').toLowerCase();
   if (t.includes('supervisor')) return 'kitchen_supervisor';
@@ -46,7 +48,7 @@ export const uiRoleOf = (title) => {
   return 'pizza_chef';
 };
 
-// System role code per user (STORE_MANAGER / KITCHEN_SUPERVISOR / KITCHEN_STAFF) from the roles collections.
+// System role code per user (STORE_MANAGER / KITCHEN_STAFF; KITCHEN_SUPERVISOR for left-over records) from the roles collections.
 const systemRoleCodes = async (userIds) => {
   const links = await UserRole.find({ userId: { $in: userIds } }).select('userId roleId').lean();
   const roles = await Role.find({ _id: { $in: links.map((l) => l.roleId) } }).select('code').lean();
@@ -353,7 +355,28 @@ export const requireManager = (user) => {
 export const staffSlotsOf = (order, userId) =>
   STAFF_SLOTS.filter((slot) => idStr(order.kitchen?.staff?.[slot]?.userId) === String(userId));
 
-export const isOrderSupervisor = (order, userId) => idStr(order.kitchen?.supervisor?.userId) === String(userId);
+/** Does this person hold a station of the order (pizza chef, baker or packer)? */
+export const holdsStation = (order, userId) => staffSlotsOf(order, userId).length > 0;
+
+/** Does this person hold the packaging station of the order? Only they (or the manager) check quality and mark it ready. */
+export const holdsPackaging = (order, userId) => staffSlotsOf(order, userId).includes('packaging_staff');
+
+/**
+ * The store manager, or a person holding a station of this order. Used for priority, pause and delay.
+ * `kitchen.supervisor` on older orders is information only and never a permission.
+ */
+export const mustManagerOrStation = (user, order, what) => {
+  if (normalizeRole(user?.role) === 'STORE_MANAGER') return;
+  if (normalizeRole(user?.role) === 'KITCHEN_STAFF' && holdsStation(order, user.userId)) return;
+  throw new ForbiddenError(`Only the store manager or the staff working on this order can ${what}.`);
+};
+
+/** The store manager, or the person holding the packaging station of this order: quality check and mark ready. */
+export const mustManagerOrPacker = (user, order) => {
+  if (normalizeRole(user?.role) === 'STORE_MANAGER') return;
+  if (normalizeRole(user?.role) === 'KITCHEN_STAFF' && holdsPackaging(order, user.userId)) return;
+  throw new ForbiddenError('Only the store manager or the staff member at the packaging station of this order can do this.');
+};
 
 export const findOrder = async (orderId, storeId) => {
   const filter = mongoose.Types.ObjectId.isValid(orderId)
@@ -373,6 +396,13 @@ const findStaffMember = async (userId, storeId, expectRole) => {
   if (expectRole && uiRole !== expectRole) throw new ValidationError(`Selected person is not a ${expectRole.replace(/_/g, ' ')}`);
   await requirePresent(storeId, member); // attendance is mandatory: only people who have clocked in can be given work
   return { member, uiRole };
+};
+
+/** An active, clocked-in kitchen staff member of this store (never a manager or a left-over supervisor record). */
+export const findKitchenStaff = async (userId, storeId) => {
+  const found = await findStaffMember(userId, storeId);
+  if (found.uiRole === 'kitchen_supervisor' || found.uiRole === 'store_manager') throw new ValidationError('Choose a kitchen staff member');
+  return found;
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -408,7 +438,6 @@ export async function listStoreOrders(user, query = {}) {
     ];
   }
 
-  if (role === 'KITCHEN_SUPERVISOR') filter['kitchen.supervisor.userId'] = toObjectId(user.userId);
   if (role === 'KITCHEN_STAFF') {
     const me = toObjectId(user.userId);
     filter.$and = [...(filter.$and || []), {
@@ -459,7 +488,6 @@ export async function getStoreOrder(user, orderId) {
   const order = await findOrder(orderId, storeId);
   // Kitchen roles open only the orders they are on, the same rule as the lists.
   const role = normalizeRole(user.role);
-  if (role === 'KITCHEN_SUPERVISOR' && !isOrderSupervisor(order, user.userId)) throw new NotFoundError('Order not found');
   if (role === 'KITCHEN_STAFF' && staffSlotsOf(order, user.userId).length === 0) throw new NotFoundError('Order not found');
   const [enriched] = await enrichOpsOrders(user, [toOpsOrder(order)], [order.toObject ? order.toObject() : order]);
   return enriched;
@@ -482,7 +510,6 @@ export async function listTeam(user, { role, q } = {}) {
   const load = new Map();
   const bump = (id) => id && load.set(String(id), (load.get(String(id)) || 0) + 1);
   live.forEach((o) => {
-    bump(o.kitchen?.supervisor?.userId);
     STAFF_SLOTS.forEach((slot) => bump(o.kitchen?.staff?.[slot]?.userId));
   });
 
@@ -507,7 +534,8 @@ export async function listTeam(user, { role, q } = {}) {
       availability: !onDuty.has(String(m._id)) ? 'absent' : (load.get(String(m.userId)) || 0) >= MAX_WORKLOAD ? 'busy' : 'available',
       avatar: m.profileImage && !m.profileImage.startsWith('data:') ? m.profileImage : '',
     }))
-    .filter((m) => m.role !== 'store_manager')
+    // the store manager, and left-over kitchen supervisor records, are not kitchen staff to pick
+    .filter((m) => m.role !== 'store_manager' && m.role !== 'kitchen_supervisor')
     .filter((m) => !wanted || wanted === 'all' || m.role === wanted)
     // The pickers (a role is always asked for) list only people who are in; the unfiltered team still shows everyone, flagged
     .filter((m) => !wanted || wanted === 'all' || m.present)
@@ -515,7 +543,7 @@ export async function listTeam(user, { role, q } = {}) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Workflow: manager -> supervisor -> staff
+// Workflow: manager accepts -> manager assigns staff to stations -> staff prepare -> packer checks and marks ready
 // ---------------------------------------------------------------------------------------------
 
 export const logStep = (order, user, note) => {
@@ -540,7 +568,7 @@ export async function acceptOrder(user, orderId, payload = {}) {
   const order = await findOrder(orderId, storeId);
   if (order.orderStatus !== 'created') throw new ValidationError('This order has already been handled');
 
-  const { member } = await findStaffMember(payload.kitchenSupervisorId, storeId, 'kitchen_supervisor');
+  // No supervisor: the store manager runs the kitchen. A `kitchenSupervisorId` sent by an older app is ignored.
   const prepMinutes = Math.max(0, Number(payload.estimatedPreparationTime) || 20);
 
   // Notifies the customer and starts rider dispatch, exactly like any other status change.
@@ -551,28 +579,14 @@ export async function acceptOrder(user, orderId, payload = {}) {
   fresh.kitchen = {
     ...(fresh.kitchen?.toObject?.() || {}),
     stage: 'pending',
-    supervisor: { userId: member.userId, name: member.name, assignedAt: now },
     priority: payload.priority === 'urgent' ? 'urgent' : 'normal',
     notes: payload.notes || '',
     estimatedPrepMinutes: prepMinutes,
     acceptedAt: now,
     expectedReadyAt: new Date(now.getTime() + prepMinutes * 60000),
   };
-  logStep(fresh, user, `Assigned to kitchen supervisor ${member.name}`);
+  logStep(fresh, user, 'Accepted into the kitchen. The store manager assigns the stations.');
   await fresh.save();
-
-  const supervisorTask = await KitchenTask.create({
-    orderId: fresh._id,
-    storeId: toObjectId(storeId),
-    assignedTo: member.userId,
-    assignedBy: toObjectId(user.userId),
-    kind: 'supervisor',
-    notes: payload.notes || '',
-  });
-  await notifyUsers({
-    userIds: [member.userId], storeId, taskId: supervisorTask._id, type: 'task_assigned',
-    title: 'New Order To Supervise', message: `Order ${fresh.order_id || fresh._id} was assigned to you.`,
-  });
   return toOpsOrder(await reload(order._id, storeId));
 }
 
@@ -623,20 +637,15 @@ export async function reopenOrder(user, orderId, payload = {}) {
 
 export async function assignStaff(user, orderId, payload = {}) {
   const storeId = requireStore(user);
-  const role = normalizeRole(user.role);
-  if (role !== 'STORE_MANAGER' && role !== 'KITCHEN_SUPERVISOR') {
-    throw new ForbiddenError('Only the store manager or kitchen supervisor can assign staff.');
-  }
+  // Only the store manager puts people on stations (kitchen staff never assign, not even themselves).
+  requireManager(user);
   const order = await findOrder(orderId, storeId);
   if (!['confirmed', 'preparing'].includes(order.orderStatus)) {
     throw new ValidationError('Staff can only be assigned to orders in the kitchen');
   }
-  if (role === 'KITCHEN_SUPERVISOR' && !isOrderSupervisor(order, user.userId)) {
-    throw new ForbiddenError('This order is assigned to another supervisor.');
-  }
 
-  const { member, uiRole } = await findStaffMember(payload.staffId, storeId);
-  if (uiRole === 'kitchen_supervisor') throw new ValidationError('Choose a kitchen staff member');
+  // Active in this store and clocked in (findStaffMember -> requirePresent), and a kitchen staff member
+  const { member, uiRole } = await findKitchenStaff(payload.staffId, storeId);
   const slot = STAFF_SLOTS.includes(payload.role) ? payload.role : uiRole;
 
   order.kitchen.staff = order.kitchen.staff || {};
@@ -675,11 +684,10 @@ export async function updateKitchenStage(user, orderId, payload = {}) {
     throw new ValidationError('This order is not in the kitchen');
   }
 
-  const allowed =
-    role === 'STORE_MANAGER' ||
-    (role === 'KITCHEN_SUPERVISOR' && isOrderSupervisor(order, user.userId)) ||
-    (role === 'KITCHEN_STAFF' && staffSlotsOf(order, user.userId).length > 0);
+  const allowed = role === 'STORE_MANAGER' || (role === 'KITCHEN_STAFF' && holdsStation(order, user.userId));
   if (!allowed) throw new ForbiddenError('This order is not assigned to you.');
+  // Ready closes the kitchen: the quality check and hand-off belong to the packer of this order (or the manager)
+  if (stage === 'ready') mustManagerOrPacker(user, order);
 
   const current = order.kitchen?.stage || 'pending';
   if (STAGE_ORDER.indexOf(stage) <= STAGE_ORDER.indexOf(current)) {
@@ -735,12 +743,10 @@ export async function moveToStage(user, storeId, order, stage) {
   await fresh.save();
   emitKitchenStage(fresh, stage);
 
-  // The order being ready completes every task. Before that only the supervisor's task follows the order: each
-  // station's task moves with that station's own work (see syncStaffTasks in kitchenTasks.service.js).
+  // The order being ready completes every task (including a supervisor task left on an order accepted before the
+  // supervisor was removed). Before that each station's task moves with that station's own work (syncStaffTasks).
   if (stage === 'ready') {
     await KitchenTask.updateMany({ orderId: fresh._id, status: { $ne: 'completed' } }, { $set: { status: 'completed', completedAt: new Date() } });
-  } else {
-    await KitchenTask.updateMany({ orderId: fresh._id, kind: 'supervisor', status: 'pending' }, { $set: { status: 'in_progress', startedAt: new Date() } });
   }
   return fresh;
 }
@@ -748,8 +754,7 @@ export async function moveToStage(user, storeId, order, stage) {
 export async function setPriority(user, orderId, priority) {
   const storeId = requireStore(user);
   const order = await findOrder(orderId, storeId);
-  const allowed = normalizeRole(user.role) === 'STORE_MANAGER' || isOrderSupervisor(order, user.userId);
-  if (!allowed) throw new ForbiddenError('Only the store manager or the order supervisor can change the priority.');
+  mustManagerOrStation(user, order, 'change the priority');
   order.kitchen.priority = priority === 'urgent' ? 'urgent' : 'normal';
   logStep(order, user, `Priority set to ${order.kitchen.priority}`);
   await order.save();
@@ -759,8 +764,7 @@ export async function setPriority(user, orderId, priority) {
 export async function setPaused(user, orderId, { isPaused, reason } = {}) {
   const storeId = requireStore(user);
   const order = await findOrder(orderId, storeId);
-  const allowed = normalizeRole(user.role) === 'STORE_MANAGER' || isOrderSupervisor(order, user.userId);
-  if (!allowed) throw new ForbiddenError('Only the store manager or the order supervisor can pause an order.');
+  mustManagerOrStation(user, order, 'pause this order');
   order.kitchen.isPaused = !!isPaused;
   order.kitchen.pauseReason = isPaused ? String(reason || '') : '';
   logStep(order, user, isPaused ? `Order paused. Reason: ${reason || 'N/A'}` : 'Order resumed');
@@ -771,8 +775,7 @@ export async function setPaused(user, orderId, { isPaused, reason } = {}) {
 export async function logDelay(user, orderId, { minutes, reason } = {}) {
   const storeId = requireStore(user);
   const order = await findOrder(orderId, storeId);
-  const allowed = normalizeRole(user.role) === 'STORE_MANAGER' || isOrderSupervisor(order, user.userId);
-  if (!allowed) throw new ForbiddenError('Only the store manager or the order supervisor can log a delay.');
+  mustManagerOrStation(user, order, 'log a delay');
   const extra = Math.max(1, Math.min(240, parseInt(minutes, 10) || 0));
   const base = order.kitchen.expectedReadyAt || order.createdAt;
   order.kitchen.expectedReadyAt = new Date(new Date(base).getTime() + extra * 60000);

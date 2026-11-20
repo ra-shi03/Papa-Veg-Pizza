@@ -6,7 +6,7 @@ import * as c from '../controllers/storeDelivery.controller.js';
 // Store manager delivery screens, at the paths they already call (/v1/store/...). Which store, and who may write,
 // is decided in storeDelivery.service.js from the token.
 export const storeDeliveryRouter = express.Router();
-storeDeliveryRouter.use(authMiddleware, requireRoles('STORE_MANAGER', 'KITCHEN_SUPERVISOR', 'ADMIN'));
+storeDeliveryRouter.use(authMiddleware, requireRoles('STORE_MANAGER', 'ADMIN'));
 storeDeliveryRouter.get('/riders', c.riders);
 storeDeliveryRouter.get('/rider/:id', c.rider);
 storeDeliveryRouter.get('/orders/ready', c.readyOrders);

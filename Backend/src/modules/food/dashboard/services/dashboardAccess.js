@@ -4,7 +4,6 @@ import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core
 
 // Who may see which dashboard, decided from the token:
 //   store manager      -> own store (a ?storeId of another store is 404)
-//   kitchen supervisor -> own store, kitchen and order widgets only (others 403)
 //   kitchen staff      -> no access (403)
 //   franchise admin    -> own franchise; may drill into ONE of its stores with ?storeId (another franchise's store 404)
 //   super admin        -> everything; ?storeId / ?franchiseId to narrow
@@ -14,25 +13,14 @@ export const toId = (v) => new mongoose.Types.ObjectId(String(v));
 export const isId = (v) => mongoose.Types.ObjectId.isValid(String(v || '')) && /^[a-f0-9]{24}$/i.test(String(v));
 const isSuper = (role) => role === 'SUPERADMIN' || role === 'SUPER_ADMIN';
 
-/** Widgets a kitchen supervisor may open on the store dashboard. */
-export const SUPERVISOR_WIDGETS = new Set([
-  'today-orders', 'active-orders', 'prep-time', 'pending-deliveries', 'live-orders', 'order-status', 'kitchen-performance', 'delivery-overview',
-  'order-list', 'rider-roster', 'delayed-orders',
-]);
-
-/** The orders a widget counts: the store's; a kitchen supervisor only those the store manager assigned to them. */
-export const ordersOf = (user, store) => (
-  normalize(user?.role) === 'KITCHEN_SUPERVISOR'
-    ? { storeId: store._id, 'kitchen.supervisor.userId': toId(user.userId) }
-    : { storeId: store._id }
-);
+/** The orders a widget counts: the store's. */
+export const ordersOf = (user, store) => ({ storeId: store._id });
 
 /** The one store a store-dashboard call is about. */
 export async function storeScope(user, query = {}, widget) {
   const role = normalize(user?.role);
-  if (role === 'STORE_MANAGER' || role === 'KITCHEN_SUPERVISOR') {
+  if (role === 'STORE_MANAGER') {
     if (!isId(user.storeId)) throw new ForbiddenError('No store is linked to your account.');
-    if (role === 'KITCHEN_SUPERVISOR' && !SUPERVISOR_WIDGETS.has(widget)) throw new ForbiddenError('This widget is for the store manager.');
     // The screen sends the store it remembers; anything that is not a real id means "my store".
     if (isId(query.storeId) && String(query.storeId) !== String(user.storeId)) throw new NotFoundError('Store not found');
     const store = await FoodStore.findById(toId(user.storeId)).select('_id franchiseId storeName').lean();

@@ -9,9 +9,9 @@ import * as c from '../controllers/attendance.controller.js';
 // Which store, and who may write, is decided in attendanceAccess.js from the token.
 export const storeAttendanceRouter = express.Router();
 
-const readers = [authMiddleware, requireRoles('STORE_MANAGER', 'KITCHEN_SUPERVISOR', 'KITCHEN_STAFF', 'ADMIN')];
+const readers = [authMiddleware, requireRoles('STORE_MANAGER', 'KITCHEN_STAFF', 'ADMIN')];
 const manager = [authMiddleware, requireRoles('STORE_MANAGER')];
-const kitchen = [authMiddleware, requireRoles('KITCHEN_SUPERVISOR', 'KITCHEN_STAFF')];
+const kitchen = [authMiddleware, requireRoles('KITCHEN_STAFF')];
 
 // shifts: everyone in the store reads (kitchen staff only the shift they are on), the store manager writes
 storeAttendanceRouter.get('/shifts', ...readers, c.listShifts);
@@ -21,7 +21,7 @@ storeAttendanceRouter.put('/shifts/:id', ...manager, c.updateShift);
 storeAttendanceRouter.delete('/shifts/:id', ...manager, c.deleteShift);
 storeAttendanceRouter.post('/shifts/:id/assign', ...manager, c.assignStaff);
 
-// leave requests: kitchen staff / supervisors ask, the store manager accepts or rejects (with a reason)
+// leave requests: kitchen staff ask, the store manager accepts or rejects (with a reason)
 storeAttendanceRouter.post('/leave-requests', ...kitchen, c.requestLeave);
 storeAttendanceRouter.get('/leave-requests/mine', ...kitchen, c.myLeaveRequests);
 storeAttendanceRouter.patch('/leave-requests/:id/cancel', ...kitchen, c.cancelLeaveRequest);
