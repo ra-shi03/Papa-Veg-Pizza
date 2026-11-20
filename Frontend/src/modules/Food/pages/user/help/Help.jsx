@@ -149,7 +149,7 @@ export default function Help() {
   }
 
   return (
-    <AnimatedPage className="min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] flex flex-col font-sans pb-16">
+    <AnimatedPage className="min-h-screen bg-[radial-gradient(circle_at_top_left,#FFF4F3_0%,#F8F6F2_40%,#F5F3EF_80%,#F8F6F2_100%)] dark:bg-none dark:bg-[#0a0a0a] flex flex-col font-sans pb-16">
       {/* Sticky Header with Back Button */}
       <div className="bg-white dark:bg-[#121212] px-4 py-3.5 flex items-center justify-between shadow-xs sticky top-0 z-20 border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center gap-2">
