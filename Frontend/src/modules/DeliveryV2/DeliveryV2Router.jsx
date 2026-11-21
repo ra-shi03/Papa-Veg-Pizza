@@ -10,6 +10,8 @@ const SignIn = lazy(() => import("./pages/auth/SignIn"))
 const OTP = lazy(() => import("./pages/auth/OTP"))
 const SignupStep1 = lazy(() => import("./pages/auth/SignupStep1"))
 const SignupStep2 = lazy(() => import("./pages/auth/SignupStep2"))
+const SignupBank = lazy(() => import("./pages/auth/SignupBank"))
+const WalletRechargeV2 = lazy(() => import("./pages/pocket/WalletRechargeV2"))
 
 // V2 Pages
 import DeliveryHomeV2 from './pages/DeliveryHomeV2';
@@ -50,6 +52,7 @@ const DeliveryV2Router = () => {
         <Route path="otp" element={<OTP />} />
         <Route path="signup" element={<Navigate to="/food/delivery/login" replace />} />
         <Route path="signup/details" element={<SignupStep1 />} />
+        <Route path="signup/bank" element={<SignupBank />} />
         <Route path="signup/documents" element={<SignupStep2 />} />
         <Route path="terms" element={<TermsAndConditionsV2 />} />
         <Route path="profile/privacy" element={<PrivacyPolicyV2 />} />
@@ -81,6 +84,7 @@ const DeliveryV2Router = () => {
         <Route path="pocket/deductions" element={<ProtectedRoute><DeductionStatementV2 /></ProtectedRoute>} />
         <Route path="pocket/limit-settlement" element={<ProtectedRoute><LimitSettlementV2 /></ProtectedRoute>} />
         <Route path="pocket/balance" element={<ProtectedRoute><PocketBalanceV2 /></ProtectedRoute>} />
+        <Route path="pocket/recharge" element={<ProtectedRoute><WalletRechargeV2 /></ProtectedRoute>} />
         <Route path="pocket/cash-limit" element={<ProtectedRoute><CashLimitInfoV2 /></ProtectedRoute>} />
         <Route path="pocket/details" element={<ProtectedRoute><PocketDetailsV2 /></ProtectedRoute>} />
 

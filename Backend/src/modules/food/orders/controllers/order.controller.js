@@ -254,6 +254,15 @@ export async function confirmPickupDeliveryController(req, res, next) {
     }
 }
 
+export async function saveBillPhotoDeliveryController(req, res, next) {
+    try {
+        const result = await orderService.saveBillPhotoDelivery(req.params.orderId, req.user?.userId, req.body?.billImageUrl);
+        return sendResponse(res, 200, 'Bill photo saved', result);
+    } catch (err) {
+        next(err);
+    }
+}
+
 export async function confirmReachedDropDeliveryController(req, res, next) {
     try {
         const deliveryPartnerId = req.user?.userId;

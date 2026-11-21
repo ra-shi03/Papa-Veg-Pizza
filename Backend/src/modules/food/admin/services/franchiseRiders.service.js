@@ -7,6 +7,10 @@ import { riderScope, riderAreaOf } from '../../store/services/storeDelivery.serv
 import { maskPhone } from '../../store/services/storeCrm.service.js';
 import { storeArea, nearbyFilter } from '../../store/services/nearby.js';
 import { approveDeliveryPartner, rejectDeliveryPartner } from './admin.service.js';
+import { FoodFranchise } from '../../franchise/models/franchise.model.js';
+import { walletBalances, missingPayoutDetails, PAYOUT_SELECT } from '../../delivery/services/riderReadiness.service.js';
+import * as dispatchService from '../../orders/services/order-dispatch.service.js';
+import { logger } from '../../../../utils/logger.js';
 
 // GET /food/admin/delivery/partners for a franchise admin: the riders near, or working for, its own stores, read only.
 // Near = the store panel's rule (store/services/nearby.js via riderScope, NEARBY_RADIUS_KM). Working for = riders who
@@ -14,7 +18,7 @@ import { approveDeliveryPartner, rejectDeliveryPartner } from './admin.service.j
 // (another franchise's store is 404). Only the fields below leave the server: never documents, bank details,
 // Aadhaar / PAN, the email or the full phone. Full ID numbers exist only in the one-rider verification view below.
 
-const FIELDS = 'name phone profilePhoto vehicleType status availabilityStatus city state lastLocationAt rating totalDeliveries createdAt updatedAt franchiseId';
+const FIELDS = `name phone profilePhoto vehicleType status availabilityStatus city state lastLocationAt rating totalDeliveries createdAt updatedAt franchiseId ${PAYOUT_SELECT}`;
 const MANAGEABLE = ['pending', 'approved', 'suspended'];
 const conflict = (message) => Object.assign(new Error(message), { name: 'ConflictError', statusCode: 409 });
 
@@ -81,6 +85,7 @@ export async function franchiseDeliveryPartners(scope, query = {}) {
     FoodOrder.aggregate([{ $match: { 'dispatch.deliveryPartnerId': { $in: ids }, storeId: { $in: stores.map((s) => s._id) }, orderStatus: 'delivered', updatedAt: { $gte: startOfToday } } }, { $group: { _id: '$dispatch.deliveryPartnerId', n: { $sum: 1 } } }]),
     FoodOrder.aggregate([{ $match: { 'dispatch.deliveryPartnerId': { $in: ids }, orderStatus: { $in: ['confirmed', 'preparing', 'ready_for_pickup', 'reached_pickup', 'picked_up', 'reached_drop'] } } }, { $group: { _id: '$dispatch.deliveryPartnerId', n: { $sum: 1 } } }]),
   ]);
+  const balances = await walletBalances(ids);
   const deliveredBy = new Map(delivered.map((d) => [String(d._id), d.n]));
   const todayBy = new Map(today.map((d) => [String(d._id), d.n]));
   const activeBy = new Map(active.map((d) => [String(d._id), d.n]));
@@ -105,6 +110,9 @@ export async function franchiseDeliveryPartners(scope, query = {}) {
       storeNames: [...storeIds].map((id) => storeName.get(id)).filter(Boolean),
       claimedByYou: String(doc.franchiseId || '') === String(scope.franchiseId),
       profilePhoto: doc.profilePhoto || null,
+      // can take this franchise's orders: bank / payment details given, and the delivery wallet balance
+      payoutDetailsComplete: missingPayoutDetails(doc).length === 0,
+      walletBalance: balances.get(String(doc._id))?.balance ?? 0,
     };
   });
 
@@ -194,7 +202,7 @@ export async function franchiseRiderDetails(scope, riderId) {
 }
 
 const historyEntry = (user, scope, action, reason = '') => ({
-  action, byUserId: isId(user?.userId) ? oid(user.userId) : null, byRole: 'FRANCHISE_ADMIN', franchiseId: scope.franchiseId, reason, at: new Date(),
+  action, byUserId: isId(user?.userId) ? oid(user.userId) : null, byRole: scope.all ? 'SUPER_ADMIN' : 'FRANCHISE_ADMIN', franchiseId: scope.franchiseId || null, reason, at: new Date(),
 });
 
 /**
@@ -234,10 +242,51 @@ export async function rejectRider(scope, user, riderId, reason) {
   return { _id: rider._id, status: 'rejected', rejectionReason: why.slice(0, 500) };
 }
 
-/** Suspend an approved rider (they are signed out of the app at once: a non-approved token is refused). */
+/** The rider to block / unblock: a franchise admin only within its scope (404 otherwise); the super admin any rider. */
+async function findToBlock(scope, riderId) {
+  if (!scope.all) return findManaged(scope.franchiseId, riderId, 'status');
+  if (!isId(riderId)) throw new NotFoundError('Delivery partner not found');
+  const rider = await FoodDeliveryPartner.findById(oid(riderId)).select('status').lean();
+  if (!rider) throw new NotFoundError('Delivery partner not found');
+  return rider;
+}
+
+/**
+ * A blocked rider can no longer act, so an order handed to them that has not been picked up yet goes back to dispatch
+ * (to another rider, or to the store manager to assign). An order already picked up stays with them: it is counted so
+ * the store can follow it up.
+ */
+async function releaseBlockedRiderOrders(riderId) {
+  const open = await FoodOrder.find({
+    'dispatch.deliveryPartnerId': riderId,
+    orderStatus: { $in: ['confirmed', 'preparing', 'ready_for_pickup', 'reached_pickup', 'picked_up', 'reached_drop'] },
+  }).select('_id orderStatus').lean();
+  const beforePickup = open.filter((o) => ['confirmed', 'preparing', 'ready_for_pickup', 'reached_pickup'].includes(o.orderStatus));
+  for (const o of beforePickup) {
+    await FoodOrder.updateOne(
+      { _id: o._id, 'dispatch.deliveryPartnerId': riderId },
+      {
+        $set: { 'dispatch.status': 'unassigned', 'dispatch.manual': false },
+        $unset: { 'dispatch.deliveryPartnerId': '', 'dispatch.assignedAt': '', 'dispatch.acceptedAt': '' },
+        $push: { statusHistory: { byRole: 'ADMIN', from: 'assigned', to: 'unassigned', note: 'Delivery partner blocked', at: new Date() } },
+      },
+    );
+    void dispatchService.tryAutoAssign(o._id).catch((e) => logger.error(`Dispatch after rider block failed: ${e.message}`));
+  }
+  return { releasedOrders: beforePickup.length, ordersInProgress: open.length - beforePickup.length };
+}
+
+const afterBlockChange = async (scope, rider, extra = {}) => {
+  const base = scope.all
+    ? { _id: rider._id, ...(await FoodDeliveryPartner.findById(rider._id).select('status suspendedAt suspensionReason').lean()) }
+    : await franchiseRiderDetails(scope, rider._id);
+  return { ...base, ...extra };
+};
+
+/** Block (suspend) an approved rider: franchise admin or super admin. They are signed out of the app at once (a non-approved token is refused). */
 export async function suspendRider(scope, user, riderId, reason = '') {
-  const rider = await findManaged(scope.franchiseId, riderId, 'status');
-  if (rider.status !== 'approved') throw conflict(`Only an approved delivery partner can be suspended; this one is ${rider.status}.`);
+  const rider = await findToBlock(scope, riderId);
+  if (rider.status !== 'approved') throw conflict(`Only an approved delivery partner can be blocked; this one is ${rider.status}.`);
   const why = String(reason || '').trim().slice(0, 500);
   const res = await FoodDeliveryPartner.updateOne(
     { _id: rider._id, status: 'approved' },
@@ -247,21 +296,45 @@ export async function suspendRider(scope, user, riderId, reason = '') {
     },
   );
   if (res.modifiedCount !== 1) throw conflict('This delivery partner changed meanwhile. Refresh and try again.');
-  return franchiseRiderDetails(scope, rider._id);
+  return afterBlockChange(scope, rider, await releaseBlockedRiderOrders(rider._id));
 }
 
-/** Activate a suspended rider again. */
+/** Unblock (activate) a blocked rider again. */
 export async function activateRider(scope, user, riderId) {
-  const rider = await findManaged(scope.franchiseId, riderId, 'status');
-  if (rider.status !== 'suspended') throw conflict(`Only a suspended delivery partner can be activated; this one is ${rider.status}.`);
+  const rider = await findToBlock(scope, riderId);
+  if (rider.status !== 'suspended') throw conflict(`Only a blocked delivery partner can be unblocked; this one is ${rider.status}.`);
   const res = await FoodDeliveryPartner.updateOne(
     { _id: rider._id, status: 'suspended' },
     { $set: { status: 'approved', suspendedAt: null, suspendedBy: null, suspensionReason: '' }, $push: { approvalHistory: historyEntry(user, scope, 'activated') } },
   );
   if (res.modifiedCount !== 1) throw conflict('This delivery partner changed meanwhile. Refresh and try again.');
-  return franchiseRiderDetails(scope, rider._id);
+  return afterBlockChange(scope, rider);
 }
 
 export const superAdminReadOnly = () => {
-  throw new ForbiddenError('Delivery partners are approved, rejected and suspended by the franchise admin. The super admin can view them only.');
+  throw new ForbiddenError('Delivery partners are approved and rejected by the franchise admin. The super admin can block and unblock them.');
 };
+
+// ---------------------------------------------------------------------------------------------
+// Delivery wallet minimum: set by the franchise admin for its own franchise; the super admin sees every franchise's
+// ---------------------------------------------------------------------------------------------
+
+export async function getWalletSettings(scope) {
+  if (scope.all) {
+    const list = await FoodFranchise.find({}).select('name city riderWalletMinBalance').sort({ name: 1 }).lean();
+    return { franchises: list.map((f) => ({ _id: f._id, name: f.name || '', city: f.city || '', riderWalletMinBalance: Number(f.riderWalletMinBalance) || 0 })) };
+  }
+  const f = await FoodFranchise.findById(scope.franchiseId).select('name riderWalletMinBalance').lean();
+  if (!f) throw new NotFoundError('Franchise not found');
+  return { franchiseId: f._id, name: f.name || '', riderWalletMinBalance: Number(f.riderWalletMinBalance) || 0 };
+}
+
+export async function updateWalletSettings(scope, body = {}) {
+  if (scope.all) throw new ForbiddenError('The delivery wallet minimum is set by each franchise admin. The super admin can view it.');
+  const n = Number(body.riderWalletMinBalance);
+  if (!Number.isFinite(n) || n < 0 || n > 100000) throw new ValidationError('Enter a minimum wallet balance between ₹0 and ₹1,00,000.');
+  const value = Math.round(n * 100) / 100;
+  const f = await FoodFranchise.findByIdAndUpdate(scope.franchiseId, { $set: { riderWalletMinBalance: value } }, { new: true }).select('name riderWalletMinBalance').lean();
+  if (!f) throw new NotFoundError('Franchise not found');
+  return { franchiseId: f._id, name: f.name || '', riderWalletMinBalance: f.riderWalletMinBalance };
+}

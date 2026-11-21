@@ -114,7 +114,7 @@ describe('a combo order, leg by leg', () => {
         assert.match(body, /Classic Margherita/);
         assert.match(body, /Lahori Jeera/);
         assert.equal((await fx.call('PATCH', R(`${id}/reached-pickup`), rider.token, {})).status, 200);
-        assert.equal((await fx.call('PATCH', R(`${id}/confirm-pickup`), rider.token, { confirmedOrderId: id })).status, 200);
+        assert.equal((await fx.call('PATCH', R(`${id}/confirm-pickup`), rider.token, { confirmedOrderId: id, billImageUrl: 'https://img.test/bill.jpg' })).status, 200);
         assert.equal((await fx.call('PATCH', R(`${id}/reached-drop`), rider.token, {})).status, 200);
         const otp = String((await fx.call('GET', `/v1/food/orders/${id}`, A.customerToken)).body.data.order.handoverOtp);
         const done = await fx.call('PATCH', R(`${id}/complete`), rider.token, { otp, paymentMethod: 'cash', handoverPhotoUrl: 'https://example.com/proof.jpg' });

@@ -24,6 +24,7 @@ export const franchiseAdminSidebarMenu = [
       { type: "link", label: "Kitchen Staff Approvals", path: "/franchise-admin/kitchen-staff-approvals", icon: "UserCheck" },
       { type: "link", label: "Staff Attendance", path: "/franchise-admin/staff-attendance", icon: "CalendarCheck" },
       { type: "link", label: "Delivery Partners", path: "/franchise-admin/delivery-partners", icon: "Truck" },
+      { type: "link", label: "Rider Tickets", path: "/franchise-admin/rider-tickets", icon: "LifeBuoy" },
     ],
   },
   {
@@ -67,6 +68,12 @@ export const franchiseAdminSidebarMenu = [
       { type: "link", label: "Reviews & Ratings", path: "/franchise-admin/reviews-ratings", icon: "Star" },
       { type: "link", label: "Loyalty Members", path: "/franchise-admin/loyalty-members", icon: "Trophy" },
     ],
+  },
+  {
+    type: "link",
+    label: "Terms & Conditions",
+    path: "/franchise-admin/terms",
+    icon: "Scale",
   },
   {
     type: "link",

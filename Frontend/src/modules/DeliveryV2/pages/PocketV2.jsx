@@ -27,6 +27,7 @@ export const PocketV2 = () => {
   const [walletState, setWalletState] = useState({
     totalBalance: 0,
     cashInHand: 0,
+    deliveryWalletBalance: 0,
     availableCashLimit: 0,
     totalCashLimit: 0,
     weeklyEarnings: 0,
@@ -69,11 +70,13 @@ export const PocketV2 = () => {
           null;
         
         const bankDetails = profile?.documents?.bankDetails;
-        const isFilled = !!(bankDetails?.accountNumber);
+        // the same rule as going online: account holder, number, IFSC and UPI id
+        const isFilled = !!(bankDetails?.accountHolderName && bankDetails?.accountNumber && bankDetails?.ifscCode && bankDetails?.upiId);
 
         setWalletState({
           totalBalance: Number(wallet.pocketBalance) || 0,
           cashInHand: Number(wallet.cashInHand) || 0,
+          deliveryWalletBalance: Number(wallet.deliveryWallet?.balance) || 0,
           availableCashLimit: Number(wallet.availableCashLimit) || 0,
           totalCashLimit: Number(wallet.totalCashLimit) || 0,
           weeklyEarnings: Number(summary.totalEarnings) || 0,
@@ -213,7 +216,7 @@ export const PocketV2 = () => {
                <p className="text-xs text-black/80 font-medium">PAN & bank details required for payouts</p>
             </div>
             <button 
-              onClick={() => navigate('/food/delivery/profile/details')}
+              onClick={() => navigate('/food/delivery/profile/details?open=bank')}
               className="bg-yellow-300 text-black px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm"
             >
                Submit
@@ -302,17 +305,36 @@ export const PocketV2 = () => {
                 onClick={() => navigate('/food/delivery/pocket/balance')}
                 className="w-full p-5 border-b border-gray-50 flex items-center justify-between active:bg-gray-50"
              >
-                <div className="flex items-center gap-4">
-                   <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center text-black border border-gray-100">
+                <div className="flex items-center gap-4 flex-1 min-w-0 text-left">
+                   <div className="w-12 h-12 shrink-0 bg-gray-50 rounded-xl flex items-center justify-center text-black border border-gray-100">
                       <Wallet className="w-6 h-6" />
                    </div>
-                   <div>
+                   <div className="min-w-0">
                       <span className="text-sm font-bold text-gray-800 block">Pocket balance</span>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Withdrawal Hub</p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Your earnings · withdraw</p>
                    </div>
                 </div>
                 <div className="flex items-center gap-2">
-                   <span className="text-base font-black text-black">₹{walletState.totalBalance.toFixed(2)}</span>
+                   <span className="text-base font-black text-black whitespace-nowrap">₹{walletState.totalBalance.toFixed(2)}</span>
+                   <ChevronRight className="w-4 h-4 text-gray-300" />
+                </div>
+             </button>
+
+             <button 
+                onClick={() => navigate('/food/delivery/pocket/recharge')}
+                className="w-full p-5 border-b border-gray-50 flex items-center justify-between active:bg-gray-50"
+             >
+                <div className="flex items-center gap-4 flex-1 min-w-0 text-left">
+                   <div className="w-12 h-12 shrink-0 bg-gray-50 rounded-xl flex items-center justify-center text-black border border-gray-100">
+                      <Wallet className="w-6 h-6" />
+                   </div>
+                   <div className="min-w-0">
+                      <span className="text-sm font-bold text-gray-800 block">Delivery wallet</span>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Your deposit · recharge to accept orders</p>
+                   </div>
+                </div>
+                <div className="flex items-center gap-2">
+                   <span className={`text-base font-black whitespace-nowrap ${walletState.deliveryWalletBalance < 0 ? 'text-red-600' : 'text-black'}`}>₹{walletState.deliveryWalletBalance.toFixed(2)}</span>
                    <ChevronRight className="w-4 h-4 text-gray-300" />
                 </div>
              </button>
@@ -321,17 +343,17 @@ export const PocketV2 = () => {
                 onClick={() => navigate('/food/delivery/pocket/cash-limit')}
                 className="w-full p-5 border-b border-gray-50 flex items-center justify-between active:bg-gray-50"
              >
-                <div className="flex items-center gap-4">
-                   <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center text-black border border-gray-100">
+                <div className="flex items-center gap-4 flex-1 min-w-0 text-left">
+                   <div className="w-12 h-12 shrink-0 bg-gray-50 rounded-xl flex items-center justify-center text-black border border-gray-100">
                       <ShieldCheck className="w-6 h-6" />
                    </div>
-                   <div>
-                      <span className="text-sm font-bold text-gray-800 block">Available cash limit</span>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Spend Control</p>
+                   <div className="min-w-0">
+                      <span className="text-sm font-bold text-gray-800 block">Cash you can hold</span>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">COD cash limit · Deposit Cash to free it</p>
                    </div>
                 </div>
                 <div className="flex items-center gap-2">
-                   <span className="text-base font-black text-black">₹{walletState.availableCashLimit.toFixed(2)}</span>
+                   <span className="text-base font-black text-black whitespace-nowrap">₹{walletState.availableCashLimit.toFixed(2)}</span>
                    <ChevronRight className="w-4 h-4 text-gray-300" />
                 </div>
              </button>

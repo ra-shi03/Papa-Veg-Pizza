@@ -72,6 +72,9 @@ import mongoose from 'mongoose';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 
+/** Complete bank and payment details for a test rider (riders need them to go online and accept orders). */
+export const PAYOUT = { bankAccountHolderName: 'Test Rider', bankAccountNumber: '123456789012', bankIfscCode: 'HDFC0001234', bankName: 'HDFC', upiId: 'rider@upi' };
+
 export const PASSWORD = 'Reg#Test-Pass1';
 
 async function build(ctx) {
@@ -216,11 +219,13 @@ async function build(ctx) {
     return {
         api, baseUrl: `http://127.0.0.1:${ctx.server.address().port}`, call, bearer, tokenFor, models, ts, F, SA, superUser, roles, staff, legacySupervisor,
         /** A real delivery partner record (status: approved | suspended | rejected | pending) and a token for it. */
-        partner: async (status = 'approved') => {
+        // with bank and payment details (needed to go online and accept); pass { payout: false } for a rider without them
+        partner: async (status = 'approved', { payout = true, ...extra } = {}) => {
             const _id = new mongoose.Types.ObjectId();
             await mongoose.connection.collection('food_delivery_partners').insertOne({
                 _id, name: 'Test Rider', phone: `9${String(Date.now()).slice(-9)}${Math.floor(Math.random() * 90 + 10)}`.slice(0, 12), status,
                 availabilityStatus: 'online', createdAt: new Date(), updatedAt: new Date(),
+                ...(payout ? PAYOUT : {}), ...extra,
             });
             return { id: String(_id), token: tokenFor(_id, 'DELIVERY_PARTNER') };
         },

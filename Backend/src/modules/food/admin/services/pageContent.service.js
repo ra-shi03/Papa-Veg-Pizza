@@ -175,7 +175,46 @@ export const DEFAULT_TERMS_CONTENT = `
 - Questions about these terms or an order? Open **Help and Support** in the app and we will get back to you.
 `.trim();
 
+export const RIDER_LIABILITY_HEADING = 'Delivery Rider Safety and Liability';
+
+/**
+ * Fixed clause the client requires in every Terms & Conditions page (customer, delivery, store, franchise).
+ * It is added when a terms page is read, so it cannot be left out by editing the page.
+ */
+export const RIDER_LIABILITY_CLAUSE = `
+# ${RIDER_LIABILITY_HEADING}
+- If a delivery rider has an accident, the cost of the rider's recovery and treatment is borne by the franchisee outlet the rider delivers for.
+- In case of any mishap, the store / outlet owner is responsible. The company is not responsible.
+`.trim();
+
+const TERMS_KEYS = ['terms', 'terms_user', 'terms_store', 'terms_delivery', 'terms_franchise'];
+
+const clauseHtml = () => `<h1><span class="bg-amber-100/70 px-2 py-1 rounded-md inline-block">${RIDER_LIABILITY_HEADING}</span></h1><ul>`
+    + RIDER_LIABILITY_CLAUSE.split('\n').slice(1).map((l) => `<li>${l.replace(/^-\s+/, '').replace(/&/g, '&amp;').replace(/</g, '&lt;')}</li>`).join('')
+    + '</ul>';
+
+/** Adds the rider-liability clause to a terms page's content when it is not already there (HTML or plain text). */
+export const withRiderLiabilityClause = (content) => {
+    const text = String(content || '');
+    if (text.toLowerCase().includes(RIDER_LIABILITY_HEADING.toLowerCase())) return text;
+    const isHtml = /<\/?[a-z][^>]*>/i.test(text);
+    if (!text.trim()) return isHtml ? clauseHtml() : RIDER_LIABILITY_CLAUSE;
+    return isHtml ? `${text}${clauseHtml()}` : `${text}\n\n${RIDER_LIABILITY_CLAUSE}`;
+};
+
 export const getPublicPageByKey = async (key) => {
+    const page = await readPageByKey(key);
+    const k = normalizeKey(key);
+    if (TERMS_KEYS.includes(k)) {
+        const data = page.data || {};
+        // No page of its own yet: delivery / store readers fall back to the general terms, which carry the clause
+        if (!String(data.content || '').trim() && (k === 'terms_delivery' || k === 'terms_store')) return page;
+        return { key: k, data: { title: data.title || 'Terms & Conditions', ...data, content: withRiderLiabilityClause(data.content) } };
+    }
+    return page;
+};
+
+const readPageByKey = async (key) => {
     const k = normalizeKey(key);
     let doc = await FoodPageContent.findOne({ key: k }).lean();
 
@@ -234,7 +273,7 @@ export const getAdminPageByKey = async (key) => getPublicPageByKey(key);
 export const upsertLegalPage = async (key, payload, updatedBy) => {
     const k = normalizeKey(key);
     const allowedKeys = [
-        'terms', 'terms_user', 'terms_store', 'terms_delivery',
+        'terms', 'terms_user', 'terms_store', 'terms_delivery', 'terms_franchise',
         'privacy', 'privacy_user', 'privacy_store', 'privacy_delivery',
         'refund', 'shipping', 'cancellation'
     ];

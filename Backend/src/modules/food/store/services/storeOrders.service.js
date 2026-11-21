@@ -69,6 +69,10 @@ const resolveUiRole = (code, title) => {
 
 export const toObjectId = (id) => new mongoose.Types.ObjectId(String(id));
 export const idStr = (v) => (v ? String(v._id || v) : '');
+const maskPhone = (p) => {
+  const d = String(p || '').replace(/\s+/g, '');
+  return !d ? '' : d.length <= 4 ? '*'.repeat(d.length) : `${d.slice(0, 2)}${'*'.repeat(d.length - 4)}${d.slice(-2)}`;
+};
 
 // ---------------------------------------------------------------------------------------------
 // Serialiser: FoodOrder -> the shape the store-operations screens already render
@@ -118,6 +122,24 @@ const gstOf = (pricing = {}) => {
 const ratingOf = (r) => (r?.rating ? { rating: r.rating, comment: r.comment || '', ratedAt: r.ratedAt || null } : null);
 
 const minutesBetween = (a, b) => (a && b ? Math.max(0, Math.round((new Date(b) - new Date(a)) / 60000)) : null);
+
+/** What the rider recorded on the way: the bill photo, the handover photo and the times. Never the OTP itself. */
+export const deliveryProof = (o) => {
+  const s = o.deliveryState || {};
+  const v = o.deliveryVerification || {};
+  return {
+    billImageUrl: s.billImageUrl || '',
+    billImageAt: s.billImageAt || null,
+    handoverPhotoUrl: v.handoverPhotoUrl || '',
+    handoverPhotoAt: v.handoverPhotoAt || null,
+    dropOtpVerified: v.dropOtp?.verified === true,
+    pickupConfirmedBy: s.pickupConfirmedBy || '',
+    reachedPickupAt: s.reachedPickupAt || null,
+    pickedUpAt: s.pickedUpAt || null,
+    reachedDropAt: s.reachedDropAt || null,
+    deliveredAt: s.deliveredAt || null,
+  };
+};
 
 export const toOpsOrder = (order) => {
   const o = order.toObject ? order.toObject() : order;
@@ -238,6 +260,7 @@ export const toOpsOrder = (order) => {
       : '',
     refundStatus: payment.refund?.status || 'none',
     deliveryPartnerId: o.dispatch?.deliveryPartnerId ? String(o.dispatch.deliveryPartnerId) : '',
+    delivery: deliveryProof(o),
     train: o.train?.trainNo ? { trainNo: o.train.trainNo, coach: o.train.coach || '', seat: o.train.seat || '', station: o.train.stationName || o.train.stationCode || '' } : null,
   };
 };
@@ -798,5 +821,16 @@ export async function listFranchiseOrders(user, query = {}) {
     .lean();
   const stores = await FoodStore.find({ franchiseId: toObjectId(franchiseId) }).select('storeName').lean();
   const names = new Map(stores.map((st) => [String(st._id), st.storeName]));
-  return docs.map((d) => ({ ...toOpsOrder(d), storeName: names.get(String(d.storeId)) || '' }));
+  // the rider of each order: name, vehicle and a masked phone (the franchise admin sees the same as in its rider list)
+  const riderIds = [...new Set(docs.map((d) => idStr(d.dispatch?.deliveryPartnerId)).filter(Boolean))];
+  const riders = riderIds.length ? await FoodDeliveryPartner.find({ _id: { $in: riderIds.map(toObjectId) } }).select('name phone vehicleType vehicleName').lean() : [];
+  const riderBy = new Map(riders.map((r) => [String(r._id), r]));
+  return docs.map((d) => {
+    const r = riderBy.get(idStr(d.dispatch?.deliveryPartnerId));
+    return {
+      ...toOpsOrder(d),
+      storeName: names.get(String(d.storeId)) || '',
+      deliveryPartner: r ? { _id: String(r._id), name: r.name || '', phone: maskPhone(r.phone), vehicleType: r.vehicleType || '', vehicleName: r.vehicleName || '' } : null,
+    };
+  });
 }

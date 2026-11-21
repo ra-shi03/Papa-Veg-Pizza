@@ -114,6 +114,10 @@ describe('Ready Orders: the store confirms the pickup', () => {
     const pickup = (token, id, body = {}) => fx.call('PATCH', `/v1/store/orders/${id}/pickup`, token, body);
     test('manager: a ready order with its rider goes out for delivery; the history names the store', async () => {
         const o = await order(A, { status: 'ready_for_pickup', rider: riderWaiting.id });
+        const noBill = await pickup(A.managerToken, o.id, {});
+        assert.equal(noBill.status, 400, 'no bill photo from the rider, no handover');
+        assert.match(noBill.body.message || noBill.body.error, /bill photo/i);
+        await fx.models.FoodOrder.updateOne({ _id: o.id }, { $set: { 'deliveryState.billImageUrl': 'https://img.test/bill.jpg' } });
         const r = ok(await pickup(A.managerToken, o.id, { notes: 'Handed over at the counter', orderStatus: 'delivered' }));
         assert.equal(r.orderStatus, 'picked_up');
         const saved = await fx.models.FoodOrder.findById(o.id).lean();

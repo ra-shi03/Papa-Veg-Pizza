@@ -7,6 +7,8 @@ import Loader from "@food/components/Loader";
 
 // Lazy Loaded Pages
 const AdminHome = lazy(() => import("@food/pages/franchise-admin/dashboard/FranchiseAdminDashboard"));
+const RiderTickets = lazy(() => import("@food/pages/franchise-admin/staffManagement/RiderTickets"));
+const TermsAndConditions = lazy(() => import("@food/pages/franchise-admin/terms/TermsAndConditions"));
 const AdminProfile = lazy(() => import("@food/pages/franchise-admin/AdminProfile"));
 const BulkOrders = lazy(() => import("@food/pages/franchise-admin/bulkOrders/BulkOrders"));
 const RefundRequests = lazy(() => import("@food/pages/franchise-admin/orders/RefundRequests"));
@@ -84,6 +86,7 @@ export default function FranchiseAdminRouter() {
           <Route path="staff-attendance" element={<StaffAttendance />} />
           <Route path="kitchen-staff-approvals" element={<StaffApprovals />} />
           <Route path="delivery-partners" element={<DeliveryPartners />} />
+          <Route path="rider-tickets" element={<RiderTickets />} />
           <Route path="store-approvals" element={<StoreApprovals />} />
           <Route path="store-performance" element={<StorePerformance />} />
           <Route path="operating-hours" element={<OperatingHours />} />
@@ -101,6 +104,7 @@ export default function FranchiseAdminRouter() {
           <Route path="stock-levels" element={<StockLevels />} />
           <Route path="low-stock-alerts" element={<LowStockAlerts />} />
           <Route path="purchase-requests" element={<PurchaseRequests />} />
+          <Route path="terms" element={<TermsAndConditions />} />
           <Route path="profile" element={<AdminProfile />} />
 
           {/* FOOD ADMIN - All food related routes nested here */}

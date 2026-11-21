@@ -207,7 +207,7 @@ export const createCashDepositOrderController = async (req, res, next) => {
     try {
         const deliveryPartnerId = req.user?.userId;
         const amount = req.body?.amount;
-        const data = await createDeliveryCashDepositOrder(deliveryPartnerId, amount);
+        const data = await createDeliveryCashDepositOrder(deliveryPartnerId, amount, req.body?.purpose);
         return sendResponse(res, 201, 'Cash deposit order created successfully', data);
     } catch (error) {
         next(error);
@@ -221,7 +221,8 @@ export const verifyCashDepositPaymentController = async (req, res, next) => {
             razorpayOrderId: req.body?.razorpay_order_id,
             razorpayPaymentId: req.body?.razorpay_payment_id,
             razorpaySignature: req.body?.razorpay_signature,
-            amount: req.body?.amount
+            amount: req.body?.amount,
+            purpose: req.body?.purpose
         });
         return sendResponse(res, 200, 'Cash deposit verified successfully', data);
     } catch (error) {

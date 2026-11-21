@@ -23,6 +23,14 @@ const foodDeliveryCashDepositSchema = new mongoose.Schema({
         default: 'Pending',
         index: true
     },
+    // cod_settlement: paying back COD cash collected; wallet_recharge: the rider adding money to the delivery wallet.
+    // Both are money in: the wallet balance is every completed deposit minus the COD cash collected.
+    purpose: {
+        type: String,
+        enum: ['cod_settlement', 'wallet_recharge'],
+        default: 'cod_settlement',
+        index: true
+    },
     razorpayOrderId: {
         type: String,
         default: ''

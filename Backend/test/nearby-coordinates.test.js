@@ -3,7 +3,7 @@
 // Store A is in Indore, store B in Delhi (different franchises).
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { createFixture, mongoose } from './helpers/fixture.js';
+import { createFixture, mongoose, PAYOUT } from './helpers/fixture.js';
 
 let fx; let A; let B;
 const A_AT = { lat: 22.7196, lng: 75.8577 };
@@ -17,7 +17,7 @@ const partners = () => mongoose.connection.collection('food_delivery_partners');
 let seq = 0;
 async function rider(set = {}) {
     const _id = new mongoose.Types.ObjectId();
-    await partners().insertOne({
+    await partners().insertOne({ ...PAYOUT,
         _id, name: 'Rider', phone: `95${String(fx.ts).slice(-6)}${String(++seq).padStart(2, '0')}`, status: 'approved', availabilityStatus: 'online',
         createdAt: new Date(), updatedAt: new Date(), ...set,
     });

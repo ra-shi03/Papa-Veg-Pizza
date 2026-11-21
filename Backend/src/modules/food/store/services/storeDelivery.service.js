@@ -1,3 +1,4 @@
+import { readyRiderIds } from '../../delivery/services/riderReadiness.service.js';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { FoodStore } from '../models/store.model.js';
 import { DeliveryIssue } from '../models/deliveryIssue.model.js';
@@ -225,7 +226,10 @@ export async function riderDetails(user, riderId, q = {}) {
 export async function availableRiders(user, q = {}) {
   const ctx = await deliveryContext(user, q);
   const { area, filter } = await riderScope(ctx.store, { approvedOnly: true });
-  const partners = await FoodDeliveryPartner.find({ ...filter, availabilityStatus: 'online' }).select(RIDER_FIELDS).lean();
+  const online = await FoodDeliveryPartner.find({ ...filter, availabilityStatus: 'online' }).select(RIDER_FIELDS).lean();
+  // only riders who can accept now: bank / payment details and the franchise's delivery wallet minimum
+  const ready = await readyRiderIds(online.map((p) => p._id), ctx.store.franchiseId || null);
+  const partners = online.filter((p) => ready.has(String(p._id)));
   const stats = await riderStats(partners.map((p) => p._id));
   const out = partners.map((p) => {
     const active = stats.get(String(p._id))?.active || 0;
@@ -407,7 +411,11 @@ export async function assignRider(user, body = {}, q = {}) {
   const dto = validateAssignDto(body);
   const order = await findOrder(ctx, dto.orderId, 'order_id orderStatus dispatch items pricing payment deliveryAddress customerName customerPhone note storeId userId isPickup');
   if (order.isPickup) throw new ValidationError('This order is collected at the store, no rider is needed. Hand it over to the customer.');
-  return assign(ctx, order, await findRider(ctx, dto.riderId, { approvedOnly: true }));
+  const rider = await findRider(ctx, dto.riderId, { approvedOnly: true });
+  if (!(await readyRiderIds([rider._id], ctx.store.franchiseId || null)).has(String(rider._id))) {
+    throw new ValidationError(`${rider.name || 'This rider'} cannot take orders yet: the bank / payment details are missing or the delivery wallet is below your franchise minimum.`);
+  }
+  return assign(ctx, order, rider);
 }
 
 /**
@@ -428,6 +436,9 @@ export async function confirmPickup(user, orderId, body = {}, q = {}) {
   if (order.isPickup) return handOverToCustomer(ctx, order, notes);
   const riderId = order.dispatch?.deliveryPartnerId;
   if (!riderId) throw new ValidationError('Assign a rider before confirming the pickup.');
+  // The rider's bill photo is the proof that the right order left the store: no photo, no handover
+  const billImageUrl = String(order.deliveryState?.billImageUrl || '').trim();
+  if (!billImageUrl) throw new ValidationError('The rider has not uploaded the bill photo yet. Ask the rider to take the bill photo in the delivery app, then confirm the pickup.');
   const from = order.orderStatus;
   const pickedUpAt = new Date();
   // The rider's app only treats an ACCEPTED order as their current trip. The handover itself proves the rider took the
@@ -440,7 +451,7 @@ export async function confirmPickup(user, orderId, body = {}, q = {}) {
     pushStatusHistory(order, { byRole: 'STORE_MANAGER', byId: ctx.user.userId, from: 'assigned', to: 'accepted', note: 'Accepted at handover (pickup confirmed by the store)' });
   }
   order.orderStatus = 'picked_up';
-  order.deliveryState = { ...(order.deliveryState?.toObject?.() || order.deliveryState || {}), currentPhase: 'en_route_to_delivery', status: 'picked_up', pickedUpAt };
+  order.deliveryState = { ...(order.deliveryState?.toObject?.() || order.deliveryState || {}), currentPhase: 'en_route_to_delivery', status: 'picked_up', pickedUpAt, pickupConfirmedBy: 'store' };
   pushStatusHistory(order, { byRole: 'STORE_MANAGER', byId: ctx.user.userId, from, to: 'picked_up', note: `Pickup confirmed by the store${notes ? `: ${notes}` : ''}` });
   await order.save();
   if (!wasAccepted) getIO()?.to(rooms.delivery(String(riderId))).emit('order_accepted', { orderMongoId: String(order._id), orderId: String(order._id) });

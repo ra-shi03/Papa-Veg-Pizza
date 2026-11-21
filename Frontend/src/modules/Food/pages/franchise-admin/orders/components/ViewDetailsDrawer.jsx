@@ -1,3 +1,4 @@
+import DeliveryProof from "@food/components/DeliveryProof"
 import React, { useState } from "react";
 import { 
   X, ShoppingBag, Truck, Clock, Star, 
@@ -237,6 +238,7 @@ export default function ViewDetailsDrawer({ isOpen, onClose, order }) {
                   ) : (
                     <p className="text-xs text-zinc-450 italic">No rider details found.</p>
                   )}
+                  {order.deliveryPartner && order.deliveryProof ? <DeliveryProof proof={order.deliveryProof} /> : null}
                 </div>
 
                 {/* Delivery performance logs */}

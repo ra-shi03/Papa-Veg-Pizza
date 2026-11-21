@@ -229,6 +229,10 @@ export default function SignupStep2() {
     }
     if (details.panNumber) formData.append("panNumber", details.panNumber)
     if (details.aadharNumber) formData.append("aadharNumber", details.aadharNumber)
+    // bank and payment details from the previous step (empty when the rider skipped it)
+    for (const key of ["bankAccountHolderName", "bankAccountNumber", "bankIfscCode", "bankName", "upiId"]) {
+      if (String(details[key] || "").trim()) formData.append(key, String(details[key]).trim())
+    }
     formData.append("profilePhoto", documents.profilePhoto)
     formData.append("aadharPhoto", documents.aadharPhoto)
     formData.append("panPhoto", documents.panPhoto)

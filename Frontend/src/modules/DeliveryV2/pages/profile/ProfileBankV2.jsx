@@ -3,6 +3,7 @@ import { ArrowLeft, Edit2, Loader2, Save } from 'lucide-react';
 import { deliveryAPI } from '@food/api';
 import { toast } from 'sonner';
 import useDeliveryBackNavigation from '../../hooks/useDeliveryBackNavigation';
+import { validatePayout } from '../auth/SignupBank';
 
 /**
  * ProfileBankV2 - Restored Old UI for Bank Details.
@@ -16,6 +17,7 @@ export const ProfileBankV2 = () => {
     accountNumber: "",
     ifscCode: "",
     bankName: "",
+    upiId: "",
     panNumber: ""
   });
   const [isSaving, setIsSaving] = useState(false);
@@ -31,6 +33,7 @@ export const ProfileBankV2 = () => {
               accountNumber: profile?.documents?.bankDetails?.accountNumber || "",
               ifscCode: profile?.documents?.bankDetails?.ifscCode || "",
               bankName: profile?.documents?.bankDetails?.bankName || "",
+              upiId: profile?.documents?.bankDetails?.upiId || "",
               panNumber: profile?.documents?.pan?.number || ""
            });
         }
@@ -41,7 +44,9 @@ export const ProfileBankV2 = () => {
   }, []);
 
   const handleSave = async () => {
-     if (!form.accountNumber || !form.ifscCode) return toast.error("Missing mandatory fields");
+     // the same checks as signup: these details are needed to go online and to be paid
+     const error = validatePayout({ bankAccountHolderName: form.accountHolderName, bankAccountNumber: form.accountNumber, bankIfscCode: form.ifscCode, upiId: form.upiId });
+     if (error) return toast.error(error);
      setIsSaving(true);
      try {
         const payload = {
@@ -49,18 +54,19 @@ export const ProfileBankV2 = () => {
               bankDetails: {
                  accountHolderName: form.accountHolderName,
                  accountNumber: form.accountNumber,
-                 ifscCode: form.ifscCode,
-                 bankName: form.bankName
+                 ifscCode: form.ifscCode.trim().toUpperCase(),
+                 bankName: form.bankName,
+                 upiId: form.upiId.trim()
               },
               pan: { number: form.panNumber }
            }
         };
-        const response = await deliveryAPI.updateProfileDetails(payload);
+        const response = await deliveryAPI.updateProfile(payload);
         if (response?.data?.success) {
            toast.success("Bank details updated");
            setIsEditing(false);
         }
-     } catch (e) { toast.error("Update failed"); }
+     } catch (e) { toast.error(e?.response?.data?.error || e?.response?.data?.message || "Update failed"); }
      finally { setIsSaving(false); }
   };
 
@@ -83,6 +89,7 @@ export const ProfileBankV2 = () => {
                 "Account Number": "accountNumber",
                 "IFSC Code": "ifscCode",
                 "Bank Name": "bankName",
+                "UPI ID": "upiId",
                 "PAN Number": "panNumber"
              }).map(([label, key]) => (
                 <div key={key} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">

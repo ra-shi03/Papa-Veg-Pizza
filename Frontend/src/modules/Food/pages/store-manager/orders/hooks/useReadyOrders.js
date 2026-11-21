@@ -209,14 +209,9 @@ export function useConfirmPickup() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ orderId, riderOTP, pickedUpAt, notes, pickup = false }) => {
+    mutationFn: async ({ orderId, pickedUpAt, notes, pickup = false }) => {
       // An order the customer collects has no rider and no code: the store just hands it over
-      // OTP Verification Check (Any 4-digit code works, but let's check it is filled)
-      if (!pickup && (!riderOTP || riderOTP.length !== 4)) {
-        throw new Error("Invalid OTP code. Must be a 4-digit number.");
-      }
-      // The server does not check this code: the system has no pickup code yet, so the store manager's confirmation is
-      // what hands the order over (PATCH /store/orders/:id/pickup, the same step the rider confirms in the delivery app).
+      // The store manager's confirmation hands the order over (PATCH /store/orders/:id/pickup); the server needs the rider's bill photo first.
       try {
         return await storeOrdersApi.confirmPickup(orderId, { notes });
       } catch (err) {

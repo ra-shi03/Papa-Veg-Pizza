@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Modal, Input, Button, DatePicker } from "antd";
-import { CheckCircle2, ShieldCheck, KeyRound, Clock, AlertTriangle } from "lucide-react";
+import { CheckCircle2, ShieldCheck, Clock, AlertTriangle } from "lucide-react";
 import { useConfirmPickup } from "../hooks/useReadyOrders";
-import { toast } from "sonner";
 import dayjs from "dayjs";
 
 export default function ConfirmPickupModal({ visible, onClose, order }) {
-  const [otp, setOtp] = useState("");
   const [pickupTime, setPickupTime] = useState(null);
   const [notes, setNotes] = useState("");
 
@@ -14,7 +12,6 @@ export default function ConfirmPickupModal({ visible, onClose, order }) {
 
   useEffect(() => {
     if (order) {
-      setOtp("");
       setPickupTime(dayjs());
       setNotes("");
     }
@@ -32,15 +29,9 @@ export default function ConfirmPickupModal({ visible, onClose, order }) {
   const isPickup = order.orderType === "pickup" || order.isPickup === true;
 
   const handleConfirm = async () => {
-    if (!isPickup && (!otp || otp.length !== 4)) {
-      toast.error("Please enter a valid 4-digit OTP code");
-      return;
-    }
-
     try {
       await confirmPickupMutation.mutateAsync({
         orderId: order._id,
-        riderOTP: otp,
         pickup: isPickup,
         pickedUpAt: pickupTime ? pickupTime.toISOString() : new Date().toISOString(),
         notes
@@ -58,7 +49,7 @@ export default function ConfirmPickupModal({ visible, onClose, order }) {
           <ShieldCheck size={18} className="text-primary" />
           <div>
             <h3 className="text-sm font-black text-slate-900 dark:text-white">{isPickup ? "Hand Over to Customer" : "Confirm Order Pickup"}</h3>
-            <p className="text-[10px] text-zinc-400 font-semibold">{isPickup ? "The customer collects this order at the store" : "Verify rider credentials and OTP before dispatch"}</p>
+            <p className="text-[10px] text-zinc-400 font-semibold">{isPickup ? "The customer collects this order at the store" : "Check the rider and the bill photo before the order leaves"}</p>
           </div>
         </div>
       }
@@ -80,7 +71,6 @@ export default function ConfirmPickupModal({ visible, onClose, order }) {
           type="primary"
           loading={confirmPickupMutation.isPending}
           onClick={handleConfirm}
-          disabled={!isPickup && otp.length !== 4}
           className="!bg-primary hover:!bg-primary-hover border-0 !text-white rounded-full font-bold px-5 py-2 shadow-md hover:shadow-lg active:scale-95 transition-all cursor-pointer text-xs"
         >
           {isPickup ? "Hand Over" : "Confirm Pickup"}
@@ -96,7 +86,7 @@ export default function ConfirmPickupModal({ visible, onClose, order }) {
           <div>
             <p className="text-xs font-bold text-amber-800 dark:text-amber-400">Rider Handover Verification</p>
             <p className="text-[10px] text-amber-700/80 dark:text-amber-500 font-semibold mt-0.5">
-              Ensure that you physically handover the order package only after validating the OTP code.
+              Hand the order over only to the rider shown below. The rider must have uploaded the bill photo in the delivery app first.
             </p>
           </div>
         </div>
@@ -129,21 +119,6 @@ export default function ConfirmPickupModal({ visible, onClose, order }) {
             No rider assigned to this order yet. Please assign a rider first.
           </div>
         )}
-
-        {/* OTP Input */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-            <KeyRound size={14} className="text-primary" />
-            Enter Rider OTP (4 Digits)
-          </label>
-          <Input
-            placeholder="Enter 4-digit code"
-            maxLength={4}
-            value={otp}
-            onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-            className="rounded-xl h-10 text-center tracking-widest font-black text-lg border-zinc-200 dark:border-zinc-800"
-          />
-        </div>
 
         </>)}
         {/* Pickup Time DatePicker */}

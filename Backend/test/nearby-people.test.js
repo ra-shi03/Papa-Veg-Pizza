@@ -17,7 +17,7 @@
 // city), cDelhi (address near B); and B's fixture customer, who ordered at B, saves an address near A.
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { createFixture, mongoose } from './helpers/fixture.js';
+import { createFixture, mongoose, PAYOUT } from './helpers/fixture.js';
 
 let fx; let A; let B;
 let supA; let staffA;
@@ -35,7 +35,7 @@ const ok = (res) => {
 let seq = 0;
 async function rider(key, set) {
     const _id = new mongoose.Types.ObjectId();
-    await mongoose.connection.collection('food_delivery_partners').insertOne({
+    await mongoose.connection.collection('food_delivery_partners').insertOne({ ...PAYOUT,
         _id, name: `Rider ${key}`, phone: `93${String(fx.ts).slice(-6)}${String(++seq).padStart(2, '0')}`, vehicleType: 'Bike', vehicleNumber: `MP09-${seq}`,
         status: 'approved', availabilityStatus: 'online', rating: 4, createdAt: new Date(), updatedAt: new Date(), ...set,
     });

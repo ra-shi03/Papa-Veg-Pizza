@@ -31,7 +31,24 @@ const supportTicketSchema = new mongoose.Schema(
             default: 'open'
         },
         adminResponse: { type: String },
-        respondedAt: { type: Date }
+        respondedAt: { type: Date },
+        // Who handles it: the rider's store and franchise when the ticket is raised (riderTickets.service.js)
+        storeId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodStore', default: null, index: true },
+        franchiseId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodFranchise', default: null, index: true },
+        handledBy: {
+            role: { type: String, default: '' },
+            userId: { type: mongoose.Schema.Types.ObjectId, default: null },
+            name: { type: String, default: '' },
+            at: { type: Date, default: null }
+        },
+        activity: [{
+            _id: false,
+            at: { type: Date, default: Date.now },
+            byRole: { type: String, default: '' },
+            byName: { type: String, default: '' },
+            status: { type: String, default: '' },
+            note: { type: String, default: '' }
+        }]
     },
     { collection: 'food_delivery_support_tickets', timestamps: true }
 );

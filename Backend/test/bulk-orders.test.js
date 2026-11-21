@@ -3,7 +3,7 @@
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { createFixture } from './helpers/fixture.js';
+import { createFixture, PAYOUT } from './helpers/fixture.js';
 
 let fx; let A; let B; let BulkOrderInquiry; let emails; let pizza; let items;
 const PUBLIC = '/v1/food/bulk-order/inquiry';
@@ -216,11 +216,11 @@ describe('a delivery bulk order runs on the rider system', () => {
         const _id = new mongoose.Types.ObjectId();
         const far = new mongoose.Types.ObjectId(); const off = new mongoose.Types.ObjectId();
         await mongoose.connection.collection('food_delivery_partners').insertMany([
-            { _id: far, name: 'Far Rider', phone: '9811100098', status: 'approved', availabilityStatus: 'online', lastLocation: LOC(28.6, 77.2), storeId: new mongoose.Types.ObjectId(A.storeId), createdAt: new Date(), updatedAt: new Date() },
-            { _id: off, name: 'Offline Rider', phone: '9811100097', status: 'approved', availabilityStatus: 'offline', lastLocation: LOC(22.721, 75.861), storeId: new mongoose.Types.ObjectId(A.storeId), createdAt: new Date(), updatedAt: new Date() },
+            { ...PAYOUT, _id: far, name: 'Far Rider', phone: '9811100098', status: 'approved', availabilityStatus: 'online', lastLocation: LOC(28.6, 77.2), storeId: new mongoose.Types.ObjectId(A.storeId), createdAt: new Date(), updatedAt: new Date() },
+            { ...PAYOUT, _id: off, name: 'Offline Rider', phone: '9811100097', status: 'approved', availabilityStatus: 'offline', lastLocation: LOC(22.721, 75.861), storeId: new mongoose.Types.ObjectId(A.storeId), createdAt: new Date(), updatedAt: new Date() },
         ]);
         farRider = String(far);
-        await mongoose.connection.collection('food_delivery_partners').insertOne({
+        await mongoose.connection.collection('food_delivery_partners').insertOne({ ...PAYOUT,
             _id, name: 'Test Rider', phone: '9811100099', status: 'approved', availabilityStatus: 'online', lastLocation: LOC(22.721, 75.861), storeId: new mongoose.Types.ObjectId(A.storeId), createdAt: new Date(), updatedAt: new Date(),
         });
         rider = String(_id);
@@ -396,7 +396,7 @@ describe('the delivery partner delivers a bulk order with the real rider steps',
         const R = (path) => `/v1/food/delivery/orders/${c.orderId}/${path}`;
         assert.equal((await fx.call('PATCH', R('accept'), rider.token, {})).status, 200);
         const { FoodOrder: FO } = await import('../src/modules/food/orders/models/order.model.js');
-        const pick = await fx.call('PATCH', R('confirm-pickup'), rider.token, { confirmedOrderId: c.orderId });
+        const pick = await fx.call('PATCH', R('confirm-pickup'), rider.token, { confirmedOrderId: c.orderId, billImageUrl: 'https://img.test/bill.jpg' });
         assert.equal(pick.status, 200, JSON.stringify(pick.body));
         // the bulk order follows the delivery in the background: wait for it, not a fixed sleep
         await waitForStatus(o.id, 'out_for_delivery');

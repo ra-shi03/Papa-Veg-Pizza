@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { 
   ArrowLeft, Plus, Edit2, Eye, X, Loader2, User, Camera, 
   QrCode, Smartphone, Banknote, Shield, CheckCircle, 
@@ -22,6 +22,7 @@ const debugError = (...args) => {}
  */
 export const ProfileDetailsV2 = () => {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const goBack = useDeliveryBackNavigation()
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -342,6 +343,15 @@ export const ProfileDetailsV2 = () => {
     toast.success("UPI QR selected")
   }
 
+  // Opened with ?open=bank (going online / accepting without bank details): show the Bank & Payments sheet straight away
+  useEffect(() => {
+    if (loading || searchParams.get("open") !== "bank") return
+    setShowBankDetailsPopup(true)
+    const next = new URLSearchParams(searchParams)
+    next.delete("open")
+    setSearchParams(next, { replace: true })
+  }, [loading, searchParams, setSearchParams])
+
   const submitBankDetails = async () => {
     setIsUpdatingBankDetails(true)
     try {
@@ -387,7 +397,7 @@ export const ProfileDetailsV2 = () => {
       setUpiQrPreview(null)
       await refreshProfile()
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Update failed")
+      toast.error(error?.response?.data?.error || error?.response?.data?.message || "Update failed")
     } finally {
       setIsUpdatingBankDetails(false)
     }

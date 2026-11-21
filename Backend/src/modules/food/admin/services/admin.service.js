@@ -37,6 +37,7 @@ import { FoodOrder } from '../../orders/models/order.model.js';
 import { FoodTransaction } from '../../orders/models/foodTransaction.model.js';
 import { FoodDeliveryWallet } from '../../delivery/models/deliveryWallet.model.js';
 import { FoodDeliveryCashDeposit } from '../../delivery/models/foodDeliveryCashDeposit.model.js';
+import { walletBalances, riderWalletStatus, missingPayoutDetails } from '../../delivery/services/riderReadiness.service.js';
 import {
     backfillLegacyCategoryWorkflow,
     categoryAllowsFoodType,
@@ -3847,6 +3848,8 @@ export async function updateDeliverySupportTicket(id, body = {}) {
         ticket.adminResponse = typeof adminResponse === 'string' ? adminResponse.trim() : '';
         if (ticket.adminResponse) ticket.respondedAt = new Date();
     }
+    ticket.handledBy = { role: 'SUPER_ADMIN', userId: null, name: '', at: new Date() };
+    ticket.activity.push({ at: new Date(), byRole: 'SUPER_ADMIN', status: ticket.status, note: ticket.adminResponse || '' });
     await ticket.save();
     return ticket.toObject();
 }
@@ -3905,8 +3908,11 @@ export async function getDeliveryPartners(query) {
         { $group: { _id: '$dispatch.deliveryPartnerId', count: { $sum: 1 } } }
     ]);
     const activeMap = new Map((activeCounts || []).map((c) => [String(c._id), c.count]));
+    const balances = await walletBalances(partnerIds);
 
     const deliveryPartners = list.map((doc, index) => ({
+        walletBalance: balances.get(String(doc._id))?.balance ?? 0,
+        payoutDetailsComplete: missingPayoutDetails(doc).length === 0,
         _id: doc._id,
         sl: skip + index + 1,
         name: doc.name || '',
@@ -4515,8 +4521,17 @@ export async function getDeliveryPartnerById(id) {
         partner.franchiseId ? mongoose.model('FoodFranchise').findById(partner.franchiseId).select('name').lean() : null,
         partner.approvedBy ? mongoose.model('User').findById(partner.approvedBy).select('email').lean() : null,
     ]);
+    // The delivery wallet (recharges + COD deposits minus COD cash collected) and the recent money in
+    const [deliveryWallet, walletDeposits] = await Promise.all([
+        riderWalletStatus(partner._id, partner.franchiseId || null),
+        FoodDeliveryCashDeposit.find({ deliveryPartnerId: partner._id }).sort({ createdAt: -1 }).limit(20)
+            .select('amount purpose status paymentMethod razorpayPaymentId createdAt').lean(),
+    ]);
     return {
         ...partner,
+        deliveryWallet,
+        walletDeposits,
+        payoutDetailsMissing: missingPayoutDetails(partner),
         approvalStatus: partner.status,
         franchiseName: claimedBy?.name || '',
         approvedByEmail: approver?.email || '',
@@ -4533,12 +4548,14 @@ export async function getDeliveryPartnerById(id) {
                 : null,
             drivingLicense: partner.drivingLicensePhoto ? { document: partner.drivingLicensePhoto } : null,
             bankDetails:
-                partner.bankAccountHolderName || partner.bankAccountNumber || partner.bankIfscCode || partner.bankName
+                partner.bankAccountHolderName || partner.bankAccountNumber || partner.bankIfscCode || partner.bankName || partner.upiId
                     ? {
                         accountHolderName: partner.bankAccountHolderName || null,
                         accountNumber: partner.bankAccountNumber || null,
                         ifscCode: partner.bankIfscCode || null,
-                        bankName: partner.bankName || null
+                        bankName: partner.bankName || null,
+                        upiId: partner.upiId || null,
+                        upiQrCode: partner.upiQrCode || null
                     }
                     : null
         },

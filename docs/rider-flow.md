@@ -119,6 +119,42 @@ Order status: `ready_for_pickup` -> `picked_up` -> `delivered`. Rider side: `dis
 - **Out for delivery, nothing in the rider app.** The rider's current trip needs `dispatch.status: accepted`; Confirm Pickup now accepts at handover.
 - **Ready Orders showed "No rider assigned".** It looked the rider up in a mock `pvp_riders` list in localStorage; it now uses the order's `deliveryPartner`.
 
-### Open
-- Store Confirm Pickup bypasses the bill photo. Option: it only records the store's handover and the rider finishes pickup with the bill photo.
-- The handover photo is not yet shown in the store panel's Completed Order details.
+### Bill photo and handover photo (updated 2026-11-21)
+- The rider's bill photo is saved on the order as soon as it is uploaded (`PATCH /food/delivery/orders/:id/bill-photo`,
+  `deliveryState.billImageUrl`). The rider's own pickup (`confirm-pickup`) needs a bill photo too (sent or already saved).
+- The store's **Confirm Pickup** now needs the rider's bill photo: without it the server answers 400 ("The rider has not uploaded the
+  bill photo yet..."). `deliveryState.pickupConfirmedBy` says whether the rider or the store confirmed the pickup.
+- Store, franchise admin and super admin all see the same delivery proof: the store and franchise order lists carry `delivery`
+  (bill photo, handover photo, times, `dropOtpVerified`; never the OTP), the super admin order detail carries `deliveryState` and
+  `deliveryVerification`. The franchise order list also names the rider (masked phone).
+
+### Blocking a delivery partner (updated 2026-11-21)
+- **Franchise admin** (riders in its scope) and **super admin** (any rider) can block (`PATCH /food/admin/delivery/:id/suspend { reason }`)
+  and unblock (`/activate`). Approve and reject stay with the franchise admin.
+- A blocked rider is refused on the very next request (token needs an `approved` record), cannot sign in (the sign-in message
+  carries the reason), is set offline, and gets no offers. Orders they had **not picked up** go back to dispatch; orders already on
+  the road stay with them and are counted in the response (`releasedOrders`, `ordersInProgress`).
+- The history on the rider records who blocked (`byRole` FRANCHISE_ADMIN or SUPER_ADMIN).
+
+### Client rule: rider accident cost
+- The cost of a rider's accident recovery and treatment is borne by the franchisee outlet; for any mishap the store / outlet owner
+  is responsible, not the company. It is a fixed clause in every Terms & Conditions page (customer, delivery, franchise), added
+  by the server (`withRiderLiabilityClause`) so it cannot be edited away. Shown in the super admin panel (Policies > Terms) and in the franchise panel (Terms & Conditions).
+
+### Bank details and the delivery wallet (updated 2026-11-21)
+- **Signup**: a "Bank & Payment Details" step (account holder, number, IFSC, bank name, UPI id) comes after the personal details.
+  It has **Skip**; the details go with the registration (`POST /delivery/register`, validated: 9-18 digit account, IFSC, UPI format).
+- **Going online** (`PATCH /delivery/availability { status: 'online' }`) needs account holder, number, IFSC and UPI id, else 400
+  `code: PAYOUT_DETAILS_REQUIRED` (the app opens Profile > Bank details). Profile > Bank details now really saves
+  (it used to call `/profile/details`, which ignored bank fields) and includes the UPI id.
+- **Delivery wallet** = every completed deposit (rider recharges `purpose: wallet_recharge`, and the older COD settlements)
+  minus the COD cash collected on delivered orders. It goes below zero after cash orders; the rider recharges
+  (Pocket > Delivery wallet, Razorpay, `POST /delivery/wallet/deposit/order { amount, purpose: 'wallet_recharge' }`, not capped by cash in hand).
+- **Minimum**: each franchise admin sets `FoodFranchise.riderWalletMinBalance` (`GET/PATCH /food/admin/delivery/wallet-settings`,
+  Delivery Partners page). The super admin reads every franchise's (cannot set). Default ₹0 (balance must not be negative).
+- **Accept** needs payout details and a balance at least the order's franchise minimum, else 400 `WALLET_RECHARGE_REQUIRED`
+  (the app offers Recharge). Offers, auto-dispatch and the store's Assign Rider list skip riders who cannot accept;
+  assigning one is refused. Orders already accepted continue.
+- **Super admin** sees per rider: wallet balance, recharges, COD collected, minimum, deposit history, bank + UPI and what is missing;
+  the list carries `walletBalance` and `payoutDetailsComplete`. The franchise list carries the same two fields.
+- Without a payment gateway configured, recharges are refused in production (dev servers accept them unsigned).

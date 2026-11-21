@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { FoodOrder } from '../models/order.model.js';
 import { FoodStore as FoodStore } from '../../store/models/store.model.js';
+import { FoodFranchise } from '../../franchise/models/franchise.model.js';
 import { FoodTransaction } from '../models/foodTransaction.model.js';
 import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
 import { FoodDeliveryCashDeposit } from '../../delivery/models/foodDeliveryCashDeposit.model.js';
@@ -21,6 +22,7 @@ import {
 import { fetchPolyline } from '../utils/googleMaps.js';
 import * as foodTransactionService from './foodTransaction.service.js';
 import * as dispatchService from './order-dispatch.service.js';
+import { assertCanTakeOrder, riderWalletStatus, missingPayoutDetails, PAYOUT_SELECT } from '../../delivery/services/riderReadiness.service.js';
 import { dispatchDueFilter } from './order-schedule.service.js';
 import { awardOrderPointsSafely } from '../../user/services/rewards.service.js';
 import {
@@ -399,11 +401,26 @@ export async function listOrdersAvailableDelivery(deliveryPartnerId, query) {
   // a scheduled order is not offered until its slot is near (the same rule as auto-dispatch)
   // ($and, because the offer filter below has its own $or)
   const openOrders = { 'dispatch.status': 'unassigned', orderStatus: { $in: OFFER_STATUSES }, isPickup: { $ne: true }, $and: [dispatchDueFilter()] };
-  const servedStores = partnerCapacity.hasCapacity
+  // No offers without bank and payment details; and none from a franchise whose wallet minimum the rider is below
+  const riderDoc = await FoodDeliveryPartner.findById(partnerId).select(`${PAYOUT_SELECT} franchiseId`).lean();
+  const payoutMissing = missingPayoutDetails(riderDoc);
+  const wallet = await riderWalletStatus(partnerId, riderDoc?.franchiseId || null);
+  const blockedFranchises = await FoodFranchise.find({ riderWalletMinBalance: { $gt: wallet.balance } }).select('_id').lean();
+  if (blockedFranchises.length) openOrders.franchiseId = { $nin: blockedFranchises.map((f) => f._id) };
+  const readiness = {
+    payoutMissing,
+    wallet,
+    blockedFranchises: blockedFranchises.length,
+    message: payoutMissing.length
+      ? 'Add your bank and payment details to get orders.'
+      : blockedFranchises.length ? `Recharge your wallet to get orders from every store (balance ₹${wallet.balance.toFixed(2)}).` : '',
+  };
+  const canGetOffers = partnerCapacity.hasCapacity && !payoutMissing.length;
+  const servedStores = canGetOffers
     ? await dispatchService.storesServedByRider(partnerId, await FoodOrder.distinct('storeId', openOrders))
     : [];
 
-  const filter = partnerCapacity.hasCapacity
+  const filter = canGetOffers
     ? {
         $or: [
           {
@@ -464,6 +481,7 @@ export async function listOrdersAvailableDelivery(deliveryPartnerId, query) {
   return {
     ...buildPaginatedResult({ docs: enriched, total, page, limit }),
     cashLimit,
+    readiness,
   };
 }
 
@@ -474,7 +492,7 @@ export async function acceptOrderDelivery(orderId, deliveryPartnerId) {
   const partnerId = new mongoose.Types.ObjectId(deliveryPartnerId);
 
   const existingOrder = await FoodOrder.findOne(identity)
-    .select('pricing payment dispatch orderStatus storeId')
+    .select('pricing payment dispatch orderStatus storeId franchiseId')
     .lean();
   if (!existingOrder) throw new NotFoundError('Order not found');
 
@@ -496,6 +514,12 @@ export async function acceptOrderDelivery(orderId, deliveryPartnerId) {
       throw new ForbiddenError('This order is not available to you.');
     }
   }
+
+  // Bank and payment details, and a delivery wallet balance at least this order's franchise minimum
+  const orderFranchiseId = existingOrder.franchiseId
+    || (await FoodStore.findById(existingOrder.storeId).select('franchiseId').lean())?.franchiseId
+    || null;
+  await assertCanTakeOrder(deliveryPartnerId, orderFranchiseId);
 
   const paymentMethod = String(existingOrder?.payment?.method || 'cash').toLowerCase();
   const isCashOrder = paymentMethod === 'cash';
@@ -835,12 +859,30 @@ export async function confirmReachedPickupDelivery(orderId, deliveryPartnerId) {
   return order.toObject();
 }
 
+const BILL_URL = /^https?:\/\/\S{4,1000}$/i;
+
+/** The rider saves the bill photo as soon as it is taken, so the store can see it before handing the order over. */
+export async function saveBillPhotoDelivery(orderId, deliveryPartnerId, billImageUrl) {
+  const identity = buildOrderIdentityFilter(orderId);
+  if (!identity) throw new ValidationError('Order id required');
+  const url = String(billImageUrl || '').trim();
+  if (!BILL_URL.test(url)) throw new ValidationError('Upload the bill photo first.');
+  const order = await FoodOrder.findOne(identity);
+  if (!order) throw new NotFoundError('Order not found');
+  assertOwnLiveOrder(order, deliveryPartnerId);
+  if (!BEFORE_PICKUP.includes(order.orderStatus)) throw stepConflict('This order is already picked up.');
+  await FoodOrder.updateOne({ _id: order._id }, { $set: { 'deliveryState.billImageUrl': url, 'deliveryState.billImageAt': new Date() } });
+  return { orderId: String(order._id), billImageUrl: url };
+}
+
 export async function confirmPickupDelivery(orderId, deliveryPartnerId, billImageUrl) {
   const identity = buildOrderIdentityFilter(orderId);
   if (!identity) throw new ValidationError('Order id required');
   const order = await FoodOrder.findOne(identity).select('+deliveryOtp');
   if (!order) throw new NotFoundError('Order not found');
   assertOwnLiveOrder(order, deliveryPartnerId);
+  const bill = String(billImageUrl || order.deliveryState?.billImageUrl || '').trim();
+  if (!BILL_URL.test(bill)) throw new ValidationError('Upload the bill photo before picking up the order.');
 
   // Only an order the kitchen has finished (ready for pickup) can leave the store.
   const from = order.orderStatus;
@@ -856,7 +898,9 @@ export async function confirmPickupDelivery(orderId, deliveryPartnerId, billImag
     currentPhase: 'en_route_to_delivery',
     status: 'picked_up',
     pickedUpAt: new Date(),
-    billImageUrl,
+    billImageUrl: bill,
+    billImageAt: order.deliveryState?.billImageUrl === bill ? order.deliveryState?.billImageAt || new Date() : new Date(),
+    pickupConfirmedBy: 'rider',
   };
 
   // OTP should be generated/sent only when rider explicitly requests it at drop.
@@ -875,7 +919,7 @@ export async function confirmPickupDelivery(orderId, deliveryPartnerId, billImag
     orderMongoId: order._id?.toString?.(),
     orderId: order._id.toString(),
     deliveryPartnerId,
-    billImageUrl: billImageUrl || null,
+    billImageUrl: bill,
   });
   return order.toObject();
 }

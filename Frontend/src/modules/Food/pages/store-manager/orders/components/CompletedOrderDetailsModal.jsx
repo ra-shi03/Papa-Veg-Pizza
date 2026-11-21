@@ -1,3 +1,4 @@
+import DeliveryProof from "@food/components/DeliveryProof";
 import ComboComponents from "./ComboComponents";
 import React from "react";
 import { Drawer, Tabs, Collapse, Tag, Divider, Button, Timeline, Rate } from "antd";
@@ -187,6 +188,7 @@ export default function CompletedOrderDetailsModal({
                   <span className="text-zinc-400 block mb-0.5">Vehicle Details</span>
                   <span className="text-slate-700 dark:text-zinc-300 font-bold uppercase">{[assignedRider.vehicleType, assignedRider.vehicleName, assignedRider.vehicleNumber].filter(Boolean).join(" | ") || "Not provided"}</span>
                 </div>
+                <DeliveryProof proof={order.delivery} />
               </div>
             ) : (
               <div className="py-6 text-center text-red-500">

@@ -93,6 +93,11 @@ router.get('/delivery/partners', adminController.getDeliveryPartners);
 // reads only (writes are 403). Only real ids match, so /delivery/wallets etc. below still reach their own routes.
 const RIDER = '/delivery/:id([0-9a-fA-F]{24})';
 router.get('/delivery/join-requests', riderApproval.joinRequests);
+router.get('/delivery/rider-tickets', riderApproval.riderTickets);
+router.get('/delivery/rider-tickets/:id', riderApproval.riderTicket);
+router.patch('/delivery/rider-tickets/:id', riderApproval.updateRiderTicket);
+router.get('/delivery/wallet-settings', riderApproval.walletSettings);
+router.patch('/delivery/wallet-settings', riderApproval.updateWalletSettings);
 router.get(RIDER, riderApproval.details);
 router.patch(`${RIDER}/approve`, riderApproval.approve);
 router.patch(`${RIDER}/reject`, riderApproval.reject);

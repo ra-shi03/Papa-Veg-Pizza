@@ -11,7 +11,7 @@
 // Stock at A: Mozzarella (400/kg) 4 kg used + 1 kg wasted -> 20% waste; out of stock, one active alert.
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { createFixture, mongoose } from './helpers/fixture.js';
+import { createFixture, mongoose, PAYOUT } from './helpers/fixture.js';
 
 let fx; let A; let B; let A2; let sup; let staff; let farmhouse;
 const O = {};
@@ -71,7 +71,7 @@ before(async () => {
     O.a2 = await seed(A2, { status: 'delivered', total: 800 });
     O.b1 = await seed(B, { status: 'delivered', total: 9999 });
 
-    await mongoose.connection.collection('food_delivery_partners').insertOne({ _id: RIDER, name: 'Rider One', phone: '9111111111', status: 'approved' });
+    await mongoose.connection.collection('food_delivery_partners').insertOne({ ...PAYOUT, _id: RIDER, name: 'Rider One', phone: '9111111111', status: 'approved' });
     const ing = await mongoose.connection.collection('food_store_ingredients').insertOne({
         storeId: oid(A.storeId), ingredientName: 'Mozzarella', nameKey: 'mozzarella', category: 'Cheese', unit: 'KG',
         currentStock: 0, minimumStock: 5, reorderLevel: 10, costPerUnit: 400, tracked: true, createdAt: new Date(), updatedAt: new Date(),

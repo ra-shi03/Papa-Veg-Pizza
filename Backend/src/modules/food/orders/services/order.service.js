@@ -1587,6 +1587,10 @@ export async function confirmPickupDelivery(
   );
 }
 
+export async function saveBillPhotoDelivery(orderId, deliveryPartnerId, billImageUrl) {
+  return deliveryService.saveBillPhotoDelivery(orderId, deliveryPartnerId, billImageUrl);
+}
+
 export async function confirmReachedDropDelivery(orderId, deliveryPartnerId) {
   return deliveryService.confirmReachedDropDelivery(orderId, deliveryPartnerId);
 }

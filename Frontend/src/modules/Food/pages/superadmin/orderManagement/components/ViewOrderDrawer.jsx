@@ -1,4 +1,5 @@
 // ViewOrderDrawer.jsx
+import DeliveryProof from '@food/components/DeliveryProof';
 import React, { useState, useEffect } from 'react';
 import { 
   X, Info, User, Pizza, CreditCard, Store, Truck, Clock, 
@@ -460,16 +461,10 @@ export default function ViewOrderDrawer({
                           </div>
                         </div>
 
-                        {order.deliveryPartner.name && (
-                          <div className="text-right">
-                            <span className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[10px] font-mono font-bold">
-                              OTP Pin: 9028
-                            </span>
-                          </div>
-                        )}
                       </div>
 
                       {order.deliveryPartner.name ? (
+                        <>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs font-semibold">
                           <div className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl space-y-1">
                             <span className="text-[10px] text-zinc-400 block uppercase tracking-wider">Contact Number</span>
@@ -481,21 +476,23 @@ export default function ViewOrderDrawer({
                           </div>
                           <div className="p-3 bg-zinc-50 dark:bg-zinc-955 rounded-xl space-y-1">
                             <span className="text-[10px] text-zinc-400 block uppercase tracking-wider">Fleet Job Status</span>
-                            <span className="text-emerald-500 font-bold">Active Delivery Run</span>
+                            <span className="text-emerald-500 font-bold">{order.orderStatus}</span>
                           </div>
                           <div className="p-3 bg-zinc-50 dark:bg-zinc-955 rounded-xl space-y-1">
-                            <span className="text-[10px] text-zinc-400 block uppercase tracking-wider">Delivery Distance</span>
-                            <span>2.4 km (Hub to customer)</span>
+                            <span className="text-[10px] text-zinc-400 block uppercase tracking-wider">Picked Up At</span>
+                            <span>{order.delivery?.pickedUpAt ? new Date(order.delivery.pickedUpAt).toLocaleString() : 'Not yet'}</span>
                           </div>
                           <div className="p-3 bg-zinc-50 dark:bg-zinc-955 rounded-xl space-y-1">
-                            <span className="text-[10px] text-zinc-400 block uppercase tracking-wider">Estimated Transit Duration</span>
-                            <span>14 mins</span>
+                            <span className="text-[10px] text-zinc-400 block uppercase tracking-wider">Delivered At</span>
+                            <span>{order.delivery?.deliveredAt ? new Date(order.delivery.deliveredAt).toLocaleString() : 'Not yet'}</span>
                           </div>
                           <div className="p-3 bg-zinc-50 dark:bg-zinc-955 rounded-xl space-y-1">
                             <span className="text-[10px] text-zinc-400 block uppercase tracking-wider">Assigned At</span>
                             <span>{new Date(order.createdAt).toLocaleTimeString()}</span>
                           </div>
                         </div>
+                        <DeliveryProof proof={order.delivery} />
+                        </>
                       ) : (
                         <div className="p-4 text-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2 bg-zinc-50/50 dark:bg-zinc-950/20">
                           <p className="text-xs font-bold text-zinc-500">Delivery Fleet Allocation Pending</p>

@@ -279,6 +279,9 @@ export const deliveryAPI = {
         billImageUrl: data.billImageUrl,
       }
     ),
+  /** Save the bill photo on the order as soon as it is uploaded (the store needs it before confirming the pickup). */
+  saveBillPhoto: (orderId, billImageUrl) =>
+    deliveryClient.patch(`/food/delivery/orders/${String(orderId)}/bill-photo`, { billImageUrl }),
   confirmReachedDrop: (orderId) =>
     deliveryClient.patch(
       `/food/delivery/orders/${String(orderId)}/reached-drop`,
@@ -351,8 +354,9 @@ export const deliveryAPI = {
     deliveryClient.get("/food/delivery/cash-limit"),
   createWithdrawalRequest: (body) =>
     deliveryClient.post("/food/delivery/wallet/withdraw", body ?? {}),
-  createDepositOrder: (amount) =>
-    deliveryClient.post("/food/delivery/wallet/deposit/order", { amount }),
+  /** purpose: "cod_settlement" (pay back COD cash, the default) or "wallet_recharge" (add money to the delivery wallet) */
+  createDepositOrder: (amount, purpose) =>
+    deliveryClient.post("/food/delivery/wallet/deposit/order", { amount, ...(purpose ? { purpose } : {}) }),
   verifyDepositPayment: (body) =>
     deliveryClient.post("/food/delivery/wallet/deposit/verify", body ?? {}),
   /** Wallet transactions - from wallet response (no separate backend endpoint) */

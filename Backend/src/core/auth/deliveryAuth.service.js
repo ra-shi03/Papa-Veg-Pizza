@@ -116,16 +116,22 @@ export const verifyDeliveryOtpAndLogin = async (phone, otp, fcmToken, platform) 
 
   if (deliveryPartner.status && deliveryPartner.status !== "approved") {
     const isRejected = deliveryPartner.status === "rejected";
+    const isSuspended = deliveryPartner.status === "suspended";
     return {
       pendingApproval: true,
       isRejected,
+      isSuspended,
       rejectionReason: isRejected ? deliveryPartner.rejectionReason : null,
       message:
         isRejected
           ? (deliveryPartner.rejectionReason 
               ? `Your account was rejected: ${deliveryPartner.rejectionReason}`
               : "Your delivery account was not approved. Please contact support.")
-          : "Your account is pending admin verification. You will be notified once approved.",
+          : isSuspended
+            ? (deliveryPartner.suspensionReason
+                ? `Your delivery account has been blocked: ${deliveryPartner.suspensionReason}`
+                : "Your delivery account has been blocked. Please contact support.")
+            : "Your account is pending admin verification. You will be notified once approved.",
     };
   }
 

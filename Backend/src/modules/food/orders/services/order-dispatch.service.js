@@ -1,3 +1,4 @@
+import { readyRiderIds } from "../../delivery/services/riderReadiness.service.js";
 import mongoose from 'mongoose';
 import { FoodOrder, FoodSettings } from '../models/order.model.js';
 import { FoodStore as FoodStore } from '../../store/models/store.model.js';
@@ -166,7 +167,9 @@ export async function listNearbyOnlineDeliveryPartners(
     if (Number.isFinite(d) && d <= maxKm) scored.push({ partnerId: p._id, distanceKm: d, status: p.status });
   }
   scored.sort((a, b) => a.distanceKm - b.distanceKm);
-  const picked = scored.slice(0, Math.max(1, limit));
+  // only riders with bank / payment details and enough delivery wallet balance for this store's franchise
+  const ready = await readyRiderIds(scored.map((s) => s.partnerId), store.franchiseId || null);
+  const picked = scored.filter((s) => ready.has(String(s.partnerId))).slice(0, Math.max(1, limit));
 
   const partners = await filterPartnersByCashLimit(picked, { requiredAmount, allowOverLimitFallback });
   return { partners };

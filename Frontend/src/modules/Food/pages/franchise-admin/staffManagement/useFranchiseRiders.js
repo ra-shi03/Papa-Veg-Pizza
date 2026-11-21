@@ -36,6 +36,8 @@ export function toFranchiseRiderRow(p) {
     ordersToday: p.ordersToday || 0,
     totalOrders: p.totalOrders || 0,
     lastSeen: p.lastSeen || null,
+    walletBalance: Number(p.walletBalance) || 0,
+    payoutDetailsComplete: p.payoutDetailsComplete !== false,
   }
 }
 

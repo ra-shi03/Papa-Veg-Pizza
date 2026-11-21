@@ -6,7 +6,7 @@
 // Store A (franchise A) is in Indore, store B (franchise B) in Delhi. See nearby-people.test.js for the nearby rule.
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { createFixture, mongoose } from './helpers/fixture.js';
+import { createFixture, mongoose, PAYOUT } from './helpers/fixture.js';
 
 let fx; let A; let B; let staffA;
 const R = {};
@@ -24,7 +24,7 @@ const names = (data) => data.deliveryPartners.map((r) => r.name).sort();
 let seq = 0;
 async function rider(key, set) {
     const _id = new mongoose.Types.ObjectId();
-    await mongoose.connection.collection('food_delivery_partners').insertOne({
+    await mongoose.connection.collection('food_delivery_partners').insertOne({ ...PAYOUT,
         _id, name: `Rider ${key}`, phone: `97${String(fx.ts).slice(-6)}${String(++seq).padStart(2, '0')}`, email: `${key}${fx.ts}@rider.example.invalid`,
         vehicleType: 'Bike', vehicleNumber: `MP09-${seq}`, status: 'approved', availabilityStatus: 'online', rating: 4.5,
         createdAt: new Date(), updatedAt: new Date(), lastLocationAt: new Date(), ...set,

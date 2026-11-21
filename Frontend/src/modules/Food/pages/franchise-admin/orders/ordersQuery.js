@@ -125,7 +125,10 @@ const toFranchiseOrder = (o) => {
     paymentStatus: o.paymentStatus === "paid" ? "Paid" : o.paymentStatus === "refunded" ? "Refunded" : "Pending",
     transactionId: "",
     couponApplied: null,
-    deliveryPartner: o.deliveryPartnerId ? { riderId: o.deliveryPartnerId, name: "Assigned rider", vehicleType: "", phone: "" } : null,
+    deliveryPartner: o.deliveryPartnerId
+      ? { riderId: o.deliveryPartnerId, name: o.deliveryPartner?.name || "Assigned rider", vehicleType: [o.deliveryPartner?.vehicleType, o.deliveryPartner?.vehicleName].filter(Boolean).join(" · "), phone: o.deliveryPartner?.phone || "" }
+      : null,
+    deliveryProof: o.delivery || null,
     items: (o.items || []).map((i) => ({
       productId: i.productId,
       productName: i.name,

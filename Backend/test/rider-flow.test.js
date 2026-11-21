@@ -29,7 +29,7 @@ const R = (path) => `/v1/food/delivery/orders/${path}`;
 const step = {
     accept: (id, who = rider) => fx.call('PATCH', R(`${id}/accept`), who.token, {}),
     reachedPickup: (id, who = rider) => fx.call('PATCH', R(`${id}/reached-pickup`), who.token, {}),
-    pickup: (id, who = rider) => fx.call('PATCH', R(`${id}/confirm-pickup`), who.token, { confirmedOrderId: id }),
+    pickup: (id, who = rider) => fx.call('PATCH', R(`${id}/confirm-pickup`), who.token, { confirmedOrderId: id, billImageUrl: 'https://img.test/bill.jpg' }),
     reachedDrop: (id, who = rider) => fx.call('PATCH', R(`${id}/reached-drop`), who.token, {}),
     verifyOtp: (id, otp, who = rider) => fx.call('POST', R(`${id}/verify-drop-otp`), who.token, { otp }),
     // a handover photo is required to complete a delivery (deliveryVerification.handoverPhotoUrl)
@@ -84,6 +84,10 @@ before(async () => {
     // store A's own riders, so the store can assign them wherever they are (who is near whom: nearby-people.test.js)
     const own = { storeId: new mongoose.Types.ObjectId(A.storeId), franchiseId: new mongoose.Types.ObjectId(A.franchiseId) };
     await mongoose.connection.collection('food_delivery_partners').updateMany({ _id: { $in: [rider.id, otherRider.id].map((id) => new mongoose.Types.ObjectId(id)) } }, { $set: own });
+    // the riders deliver many cash orders here: a recharged delivery wallet keeps them able to accept (rider-readiness.test.js)
+    await mongoose.connection.collection('food_delivery_cash_deposits').insertMany([rider.id, otherRider.id].map((id) => ({
+        deliveryPartnerId: new mongoose.Types.ObjectId(String(id)), amount: 100000, purpose: 'wallet_recharge', status: 'Completed', createdAt: new Date(), updatedAt: new Date(),
+    })));
 });
 after(async () => { await fx?.teardown(); });
 

@@ -38,7 +38,13 @@ const deliveryRegisterSchema = z.object({
         .optional()
         .or(z.literal('')),
     fcmToken: z.string().optional().nullable(),
-    platform: z.enum(['web', 'mobile']).optional().default('web')
+    platform: z.enum(['web', 'mobile']).optional().default('web'),
+    // Bank and payment details: optional at signup (the rider may skip), needed later to go online
+    bankAccountHolderName: z.string().trim().max(100).optional().or(z.literal('')),
+    bankAccountNumber: z.string().trim().regex(/^[0-9]{9,18}$/, 'Account number must be 9 to 18 digits').optional().or(z.literal('')),
+    bankIfscCode: z.string().trim().toUpperCase().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'Invalid IFSC code').optional().or(z.literal('')),
+    bankName: z.string().trim().max(100).optional().or(z.literal('')),
+    upiId: z.string().trim().regex(/^[\w.\-]{2,256}@[a-zA-Z]{2,64}$/, 'Invalid UPI id').optional().or(z.literal(''))
 });
 
 export const validateDeliveryRegisterDto = (body) => {
@@ -77,10 +83,10 @@ export const validateDeliveryProfileUpdateDto = (body) => {
 
 const bankDetailsSchema = z.object({
     accountHolderName: z.string().min(1, 'Account holder name is required').optional().or(z.literal('')),
-    accountNumber: z.string().min(1, 'Account number is required').optional().or(z.literal('')),
-    ifscCode: z.string().min(1, 'IFSC code is required').optional().or(z.literal('')),
+    accountNumber: z.string().trim().regex(/^[0-9]{9,18}$/, 'Account number must be 9 to 18 digits').optional().or(z.literal('')),
+    ifscCode: z.string().trim().toUpperCase().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'Invalid IFSC code').optional().or(z.literal('')),
     bankName: z.string().min(1, 'Bank name is required').optional().or(z.literal('')),
-    upiId: z.string().optional().or(z.literal('')),
+    upiId: z.string().trim().regex(/^[\w.\-]{2,256}@[a-zA-Z]{2,64}$/, 'Invalid UPI id').optional().or(z.literal('')),
     upiQrCode: z.string().optional().or(z.literal(''))
 });
 

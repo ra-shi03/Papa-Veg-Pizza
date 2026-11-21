@@ -1,3 +1,5 @@
+import { STANDALONE_MOCK } from '@/services/api/mockPolicy';
+import * as real from './realOrders';
 // AllOrdersData.jsx
 // Mock Database and simulated REST APIs for Papa Veg Pizza Super Admin Panel
 import { useState, useEffect } from 'react';
@@ -329,6 +331,7 @@ const joinOrderData = (order) => {
 // --- SIMULATED APIS (With latency promise wrappers) ---
 
 export const getKpiData = () => {
+  if (!STANDALONE_MOCK) return real.fetchAdminKpis();
   return new Promise((resolve) => {
     setTimeout(() => {
       const totalOrders = dbOrders.length;
@@ -366,6 +369,17 @@ export const getKpiData = () => {
 };
 
 export const getOrders = (filters = {}, page = 1, limit = 5, sortBy = 'createdAt', sortOrder = 'desc') => {
+  if (!STANDALONE_MOCK) {
+    return real.fetchAdminOrders(filters, page, limit, sortBy, sortOrder).then(async (result) => {
+      // the franchise / store filters list the real ones (the arrays the screen already reads are refilled in place)
+      const options = await real.fetchFilterOptions().catch(() => null);
+      if (options) {
+        mockFranchises.splice(0, mockFranchises.length, ...options.franchises);
+        mockStores.splice(0, mockStores.length, ...options.stores);
+      }
+      return result;
+    });
+  }
   return new Promise((resolve) => {
     setTimeout(() => {
       let filtered = [...dbOrders];
@@ -467,6 +481,7 @@ export const getOrders = (filters = {}, page = 1, limit = 5, sortBy = 'createdAt
 };
 
 export const getOrderDetails = (orderId) => {
+  if (!STANDALONE_MOCK) return real.fetchAdminOrder(orderId);
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       const order = dbOrders.find(o => o._id === orderId || o.orderNumber === orderId);
@@ -480,6 +495,7 @@ export const getOrderDetails = (orderId) => {
 };
 
 export const getOrderStatusLogs = (orderId) => {
+  if (!STANDALONE_MOCK) return real.fetchAdminOrderLogs(orderId);
   return new Promise((resolve) => {
     setTimeout(() => {
       const actualOrderId = dbOrders.find(o => o._id === orderId || o.orderNumber === orderId)?._id || orderId;
@@ -493,6 +509,7 @@ export const getOrderStatusLogs = (orderId) => {
 };
 
 export const getOrderTracking = (orderId) => {
+  if (!STANDALONE_MOCK) return real.fetchAdminTracking(orderId);
   return new Promise((resolve) => {
     setTimeout(() => {
       const order = dbOrders.find(o => o._id === orderId || o.orderNumber === orderId);

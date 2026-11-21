@@ -12,7 +12,7 @@
 // Store B (franchise B): b1 delivered cash 9999 today.
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { createFixture, mongoose, PASSWORD } from './helpers/fixture.js';
+import { createFixture, mongoose, PASSWORD, PAYOUT } from './helpers/fixture.js';
 
 let fx; let A; let B;
 let sup; let chef; let cook;   // sup: a legacy (removed) kitchen supervisor account
@@ -70,8 +70,8 @@ before(async () => {
     // riders: one busy on o6, one free and online; both are store A's own riders (who is near whom: nearby-people.test.js)
     const own = { storeId: new mongoose.Types.ObjectId(A.storeId), franchiseId: new mongoose.Types.ObjectId(A.franchiseId) };
     await mongoose.connection.collection('food_delivery_partners').insertMany([
-        { _id: RIDER_BUSY, name: 'Rider Busy', phone: '9111111111', status: 'approved', availabilityStatus: 'online', ...own },
-        { _id: RIDER_FREE, name: 'Rider Free', phone: '9222222222', status: 'approved', availabilityStatus: 'online', ...own },
+        { ...PAYOUT, _id: RIDER_BUSY, name: 'Rider Busy', phone: '9111111111', status: 'approved', availabilityStatus: 'online', ...own },
+        { ...PAYOUT, _id: RIDER_FREE, name: 'Rider Free', phone: '9222222222', status: 'approved', availabilityStatus: 'online', ...own },
     ]);
     // stock: one counted ingredient below its reorder level, with an active critical alert
     const ing = await mongoose.connection.collection('food_store_ingredients').insertOne({

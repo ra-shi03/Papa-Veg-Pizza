@@ -6,7 +6,7 @@ import {
   Navigation, CheckCircle2, Camera, Loader2, Image as ImageIcon
 } from 'lucide-react';
 import { ActionSlider } from '@/modules/DeliveryV2/components/ui/ActionSlider';
-import { uploadAPI } from '@food/api';
+import { uploadAPI, deliveryAPI } from '@food/api';
 import { toast } from 'sonner';
 import { openCamera } from "@food/utils/imageUploadUtils";
 
@@ -44,8 +44,11 @@ export const PickupActionModal = ({
     try {
       const res = await uploadAPI.uploadMedia(file, { folder: 'appzeto/delivery/bills', client: 'delivery' });
       if (res?.data?.success && res?.data?.data) {
-        setBillImageUrl(res.data.data.url || res.data.data.secure_url);
+        const uploadedUrl = res.data.data.url || res.data.data.secure_url;
+        setBillImageUrl(uploadedUrl);
         setBillImageUploaded(true);
+        // Save it on the order now, so the store can see the bill photo before it hands the order over
+        deliveryAPI.saveBillPhoto(order.orderId || order._id, uploadedUrl).catch(() => {});
         // toast.success('Bill image uploaded!');
       } else {
         throw new Error('Upload failed');

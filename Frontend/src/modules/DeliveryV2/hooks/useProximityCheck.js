@@ -51,9 +51,8 @@ export const useProximityCheck = () => {
   }, [riderLocation, targetLocation]);
 
   // Dev mode bypass
-  const isDevMode = import.meta.env.VITE_APP_MODE === 'developer' || 
-                    import.meta.env.VITE_ENABLE_RANGE_BYPASS === 'true' ||
-                    import.meta.env.DEV;
+  // Only the local dev server (npm run dev) skips the range check; no setting can switch it on in a production build.
+  const isDevMode = import.meta.env.DEV;
 
   const isWithinRange = isDevMode ? true : (distanceToTarget <= actionLimit);
 

@@ -89,6 +89,8 @@ const franchiseSchema = new mongoose.Schema(
             default: true,
             index: true
         },
+        // Set by the franchise admin: the delivery wallet balance a rider must hold to accept this franchise's orders
+        riderWalletMinBalance: { type: Number, default: 0, min: 0 },
         // References the User who owns/manages this franchise.
         // This is the auth identity link — populated after user account creation.
         ownerUserId: {

@@ -1,13 +1,13 @@
-// Delivery partner approval by the franchise admin; the super admin only reads.
+// Delivery partner approval by the franchise admin; the super admin reads and may block / unblock any rider.
 //   franchise admin: join requests, verification details, approve, reject, suspend, activate for riders in its scope
 //                    (claimed by it, or unclaimed and near one of its stores); anyone else's rider -> 404
 //   first claim: the first franchise to approve a pending rider claims it (franchiseId, approvedBy, approvedAt);
 //                then only that franchise (and the super admin, read only) sees it, and dispatch keeps it to that franchise
-//   super admin: full detail and documents; approve / reject / suspend / activate -> 403
+//   super admin: full detail and documents; approve / reject -> 403; suspend (block) / activate (unblock) any rider
 // Store A (franchise A) and store B2 (franchise B) are both in Indore; store B (franchise B) is in Delhi.
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { createFixture, mongoose } from './helpers/fixture.js';
+import { createFixture, mongoose, PAYOUT } from './helpers/fixture.js';
 
 let fx; let A; let B; let B2; let mgrB2; let staffA;
 const R = {};
@@ -30,7 +30,7 @@ const DOCS = { profilePhoto: 'https://img.example/selfie.jpg', aadharPhoto: 'htt
 let seq = 0;
 async function rider(key, set) {
     const _id = new mongoose.Types.ObjectId();
-    await riders().insertOne({
+    await riders().insertOne({ ...PAYOUT,
         _id, name: `Rider ${key}`, phone: `96${String(fx.ts).slice(-6)}${String(++seq).padStart(2, '0')}`, email: `${key}${fx.ts}@rider.example.invalid`,
         address: '12 MG Road', city: 'Indore', state: 'MP', vehicleType: 'bike', vehicleName: 'Activa', vehicleNumber: `MP09AB${1000 + seq}`,
         status: 'pending', availabilityStatus: 'offline', createdAt: new Date(), updatedAt: new Date(), ...set,
@@ -81,16 +81,18 @@ describe('before anyone approves', () => {
         }
         assert.ok(!/bank|upi|fcm/i.test(text));
     });
-    test('super admin: full detail and documents (bank included), but approve / reject / suspend / activate are 403', async () => {
+    test('super admin: full detail and documents (bank included); approve and reject stay with the franchise admin (403)', async () => {
         const d = ok(await fx.call('GET', `${D}/${R.near}`, fx.SA)).delivery;
         assert.equal(d.aadharPhoto, DOCS.aadharPhoto);
         assert.equal(d.documents.bankDetails.accountNumber, SECRET.bankAccountNumber);
-        for (const [path, body] of [['approve', {}], ['reject', { reason: 'x' }], ['suspend', {}], ['activate', {}]]) {
+        for (const [path, body] of [['approve', {}], ['reject', { reason: 'x' }]]) {
             const res = await fx.call('PATCH', `${D}/${R.near}/${path}`, fx.SA, body);
             assert.equal(res.status, 403, path);
             assert.match(res.body.message || res.body.error, /franchise admin/i);
         }
-        assert.equal((await fx.call('PATCH', `${D}/${R.near}`, fx.SA, { status: 'suspended' })).status, 403);
+        // blocking a rider that is not approved is a state conflict, not a permission problem
+        assert.equal((await fx.call('PATCH', `${D}/${R.near}/suspend`, fx.SA, {})).status, 409);
+        assert.equal((await fx.call('PATCH', `${D}/${R.near}`, fx.SA, { status: 'suspended' })).status, 409);
         assert.equal((await riders().findOne({ _id: oid(R.near) })).status, 'pending');
     });
     test('store manager, kitchen staff, rider and customer tokens: 403', async () => {
@@ -221,5 +223,53 @@ describe('ID numbers and the reach of a franchise', () => {
         assert.equal((await fx.call('PATCH', `/v1/store-approvals/${draft._id}/approve`, fx.SA, {})).status, 200);
         assert.equal((await fx.call('GET', `${D}/${R.surat}`, A.adminToken)).status, 200);
         assert.ok(await inList());
+    });
+});
+
+describe('blocking a delivery partner (franchise admin and super admin)', () => {
+    let tokenOf;
+    test('the super admin blocks any approved rider with a reason, and unblocks it; the trail says SUPER_ADMIN', async () => {
+        const res = ok(await fx.call('PATCH', `${D}/${R.shared}/suspend`, fx.SA, { reason: 'Rude to customers' }));
+        assert.equal(res.status, 'suspended');
+        let row = await riders().findOne({ _id: oid(R.shared) });
+        assert.deepEqual([row.status, row.availabilityStatus, row.suspensionReason], ['suspended', 'offline', 'Rude to customers']);
+        assert.equal(row.approvalHistory.at(-1).byRole, 'SUPER_ADMIN');
+        assert.equal((await fx.call('PATCH', `${D}/${R.shared}/suspend`, fx.SA, {})).status, 409, 'already blocked');
+        ok(await fx.call('PATCH', `${D}/${R.shared}/activate`, fx.SA, {}));
+        row = await riders().findOne({ _id: oid(R.shared) });
+        assert.equal(row.status, 'approved');
+        assert.equal((await fx.call('PATCH', `${D}/${R.shared}/activate`, fx.SA, {})).status, 409, 'not blocked');
+    });
+    test('a blocked rider is refused on the very next request, and told why at sign-in', async () => {
+        const { signAccessToken } = await import('../src/core/auth/token.util.js');
+        tokenOf = signAccessToken({ userId: R.shared, role: 'DELIVERY_PARTNER' });
+        assert.equal((await fx.call('GET', '/v1/food/delivery/wallet', tokenOf)).status, 200);
+        ok(await fx.call('PATCH', `${D}/${R.shared}/suspend`, A.adminToken, { reason: 'Documents expired' }));
+        assert.equal((await fx.call('GET', '/v1/food/delivery/wallet', tokenOf)).status, 401);
+        ok(await fx.call('PATCH', `${D}/${R.shared}/activate`, A.adminToken, {}));
+    });
+    test('blocking releases an order the rider had not picked up yet and reports one already on the road', async () => {
+        const mk = (status, extra = {}) => fx.models.FoodOrder.collection.insertOne({
+            order_id: `BLK${fx.ts}${++seq}`, userId: oid(A.customerId || A.adminId), storeId: oid(A.storeId), franchiseId: oid(A.franchiseId),
+            orderStatus: status, items: [], pricing: { total: 100 }, payment: { method: 'cash', status: 'cod_pending' }, createdAt: new Date(), updatedAt: new Date(),
+            dispatch: { status: 'accepted', deliveryPartnerId: oid(R.shared), manual: true, acceptedAt: new Date() }, ...extra,
+        });
+        const waiting = (await mk('ready_for_pickup')).insertedId;
+        const onRoad = (await mk('picked_up')).insertedId;
+        const res = ok(await fx.call('PATCH', `${D}/${R.shared}/suspend`, fx.SA, { reason: 'Accident reported' }));
+        assert.equal(res.releasedOrders, 1);
+        assert.equal(res.ordersInProgress, 1);
+        const w = await fx.models.FoodOrder.collection.findOne({ _id: waiting });
+        assert.equal(w.dispatch.status === 'unassigned' || !w.dispatch.deliveryPartnerId || String(w.dispatch.deliveryPartnerId) !== R.shared, true);
+        assert.notEqual(w.dispatch.manual, true);
+        const r = await fx.models.FoodOrder.collection.findOne({ _id: onRoad });
+        assert.equal(String(r.dispatch.deliveryPartnerId), R.shared, 'the order on the road stays with the rider');
+        ok(await fx.call('PATCH', `${D}/${R.shared}/activate`, fx.SA, {}));
+    });
+    test('a franchise admin still cannot block a rider outside its scope; store manager, kitchen staff and customer are 403', async () => {
+        assert.equal((await fx.call('PATCH', `${D}/${R.far}/suspend`, A.adminToken, {})).status, 404);
+        for (const token of [A.managerToken, staffA, A.customerToken]) {
+            assert.equal((await fx.call('PATCH', `${D}/${R.shared}/suspend`, token, {})).status, 403);
+        }
     });
 });

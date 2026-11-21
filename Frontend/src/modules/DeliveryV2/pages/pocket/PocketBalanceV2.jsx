@@ -63,7 +63,7 @@ export const PocketBalanceV2 = () => {
            totalBonus: Number(wallet.totalBonus) || 0,
            totalWithdrawn: Number(wallet.totalWithdrawn) || 0,
            cashCollected: Number(wallet.cashInHand) || 0,
-           deductions: 0, // Mocked
+           deductions: Number(wallet.pendingWithdrawals) || 0, // held back for withdrawal requests still in process
            withdrawalLimit,
            withdrawableAmount,
            canWithdraw: withdrawableAmount >= withdrawalLimit

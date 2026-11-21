@@ -84,6 +84,8 @@ export default function PolicyManagement() {
   });
 
   useEffect(() => {
+    // Only the Terms page has a franchise audience
+    if (selectedPolicy !== 'terms' && activeRole === 'franchise') { setActiveRole('user'); return; }
     fetchPolicyContent();
   }, [selectedPolicy, activeRole]);
 
@@ -168,7 +170,7 @@ export default function PolicyManagement() {
   const getDefaultTitle = () => {
     switch (selectedPolicy) {
       case 'terms':
-        return activeRole === 'user' ? 'Terms and Conditions' : 'Terms and Conditions - Delivery';
+        return activeRole === 'user' ? 'Terms and Conditions' : activeRole === 'franchise' ? 'Terms and Conditions - Franchise' : 'Terms and Conditions - Delivery';
       case 'privacy':
         return activeRole === 'user' ? 'Privacy Policy' : 'Privacy Policy - Delivery';
       case 'refund':
@@ -368,7 +370,8 @@ export default function PolicyManagement() {
               <div className="inline-flex p-0.5 bg-zinc-100 dark:bg-zinc-950 border border-zinc-250 dark:border-zinc-750 rounded-lg text-[10px] font-bold">
                 {[
                   { key: 'user', label: 'CUSTOMER' },
-                  { key: 'delivery', label: 'DELIVERY' }
+                  { key: 'delivery', label: 'DELIVERY' },
+                  ...(selectedPolicy === 'terms' ? [{ key: 'franchise', label: 'FRANCHISE' }] : [])
                 ].map((item) => (
                   <button
                     key={item.key}
@@ -384,6 +387,12 @@ export default function PolicyManagement() {
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {selectedPolicy === 'terms' && (
+            <div className="px-4 py-2 border-b border-amber-200 bg-amber-50 text-[11px] font-semibold text-amber-800 shrink-0">
+              Fixed clause in every Terms &amp; Conditions (customer, delivery, franchise): the cost of a delivery rider's accident recovery and treatment is borne by the franchisee outlet, and the store / outlet owner (not the company) is responsible for any mishap. It is added automatically and cannot be removed.
             </div>
           )}
 

@@ -193,7 +193,11 @@ const deliveryStateSchema = new mongoose.Schema(
         reachedPickupAt: { type: Date, default: null },
         reachedDropAt: { type: Date, default: null },
         pickedUpAt: { type: Date, default: null },
-        deliveredAt: { type: Date, default: null }
+        deliveredAt: { type: Date, default: null },
+        // Photo of the bill / order at the store, taken by the rider before pickup; required to take the order out of the store
+        billImageUrl: { type: String, default: '' },
+        billImageAt: { type: Date, default: null },
+        pickupConfirmedBy: { type: String, enum: ['', 'rider', 'store'], default: '' }
     },
     { _id: false }
 );

@@ -2,12 +2,14 @@ import { useRef } from 'react';
 import { useDeliveryStore } from '@/modules/DeliveryV2/store/useDeliveryStore';
 import { deliveryAPI } from '@food/api';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * useOrderManager - Professional hook for real-world trip lifecycle actions.
  * Connects directly to the backend API services.
  */
 export const useOrderManager = () => {
+  const navigate = useNavigate();
   const { 
     activeOrder, tripStatus, updateTripStatus, clearActiveOrder, setActiveOrder, riderLocation 
   } = useDeliveryStore();
@@ -85,8 +87,13 @@ export const useOrderManager = () => {
     } catch (error) {
       console.error('Accept Order Error:', error);
       const msg = error?.response?.data?.error || error?.response?.data?.message || 'Network error. Please try again.';
-      // If the backend says already accepted by another — show friendly message
-      if (error?.response?.status === 403 || msg.toLowerCase().includes('another partner')) {
+      const code = error?.response?.data?.code;
+      // Not allowed to take orders yet: open the screen that fixes it
+      if (code === 'WALLET_RECHARGE_REQUIRED') {
+        toast.error(msg, { duration: 6000, action: { label: 'Recharge', onClick: () => navigate('/food/delivery/pocket/recharge') } });
+      } else if (code === 'PAYOUT_DETAILS_REQUIRED') {
+        toast.error(msg, { duration: 6000, action: { label: 'Add details', onClick: () => navigate('/food/delivery/profile/details?open=bank') } });
+      } else if (error?.response?.status === 403 || msg.toLowerCase().includes('another partner')) {
         toast.error('This order was just taken by another delivery partner.', { duration: 4000 });
       } else {
         toast.error(msg);

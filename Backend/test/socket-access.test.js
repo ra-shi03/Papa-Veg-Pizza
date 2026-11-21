@@ -7,7 +7,7 @@ import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { io as connect } from 'socket.io-client';
-import { createFixture, mongoose } from './helpers/fixture.js';
+import { createFixture, mongoose, PAYOUT } from './helpers/fixture.js';
 
 let fx; let A; let B; let server; let url; let startOrderEventStream; let stopOrderEventStream;
 const sockets = [];
@@ -191,7 +191,7 @@ describe('order events reach only the right rooms', () => {
     const EVENT_KEYS = ['at', 'deliveryPartnerId', 'franchiseId', 'orderId', 'orderMongoId', 'orderStatus', 'stage', 'storeId', 'type'];
     before(async () => {
         // store A's own rider, so the store can assign it (who is near whom: nearby-people.test.js)
-        await mongoose.connection.collection('food_delivery_partners').insertOne({
+        await mongoose.connection.collection('food_delivery_partners').insertOne({ ...PAYOUT,
             _id: new mongoose.Types.ObjectId(RIDER), name: 'Rider One', phone: '9100000001', status: 'approved', availabilityStatus: 'online',
             storeId: new mongoose.Types.ObjectId(A.storeId), franchiseId: new mongoose.Types.ObjectId(A.franchiseId), createdAt: new Date(), updatedAt: new Date(),
         });

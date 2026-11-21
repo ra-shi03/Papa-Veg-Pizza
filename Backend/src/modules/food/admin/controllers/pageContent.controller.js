@@ -44,7 +44,7 @@ export const upsertAdminPageController = async (req, res, next) => {
             return sendResponse(res, 200, 'Page updated successfully', result.data);
         }
         const allowedLegalKeys = [
-            'terms', 'terms_user', 'terms_store', 'terms_delivery',
+            'terms', 'terms_user', 'terms_store', 'terms_delivery', 'terms_franchise',
             'privacy', 'privacy_user', 'privacy_store', 'privacy_delivery',
             'refund', 'shipping', 'cancellation'
         ];

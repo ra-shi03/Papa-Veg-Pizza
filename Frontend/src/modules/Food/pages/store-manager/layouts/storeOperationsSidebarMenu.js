@@ -136,6 +136,13 @@ export const storeOperationsSidebarMenu = [
         path: "/store-operations/delivery/issues",
         icon: "AlertOctagon",
         allowedRoles: ["store_manager"]
+      },
+      {
+        type: "link",
+        label: "Rider Tickets",
+        path: "/store-operations/delivery/rider-tickets",
+        icon: "LifeBuoy",
+        allowedRoles: ["store_manager"]
       }
     ]
   },

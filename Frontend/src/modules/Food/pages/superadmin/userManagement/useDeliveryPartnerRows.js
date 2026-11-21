@@ -40,6 +40,8 @@ export function toRiderRow(p, { storeNames = new Map(), franchiseNames = new Map
     storeManager: "",
     priorityRouting: false,
     recentDeliveries: [],
+    walletBalance: Number(p.walletBalance) || 0,
+    payoutDetailsComplete: p.payoutDetailsComplete !== false,
   }
 }
 

@@ -23,6 +23,7 @@ import { initialDeliveryPartners, initialStores, getDeliveryPartnerDashboardStat
 import useFranchiseRiders, { riderKpis } from "./useFranchiseRiders"
 import { adminAPI } from "@food/api"
 import RiderVerificationDrawer from "./components/RiderVerificationDrawer"
+import RiderWalletMinimumCard from "./components/RiderWalletMinimumCard"
 import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 export default function DeliveryPartners() {
@@ -569,6 +570,7 @@ export default function DeliveryPartners() {
       </div>
 
       <>
+          {!STANDALONE_MOCK && <RiderWalletMinimumCard riders={riders} onToast={showToast} />}
           {/* KPI CARDS SECTION */}
           <div className="grid grid-cols-2 lg:grid-cols-8 gap-2.5">
             {[

@@ -16,7 +16,9 @@ const errorHandler = (err, req, res, next) => {
 
     res.status(statusCode).json({
         success: false,
-        error: message
+        error: message,
+        // an error the app can act on (e.g. open the bank details or the wallet recharge screen)
+        ...(err.publicCode ? { message, code: err.publicCode, data: err.publicData || {} } : {})
     });
 };
 

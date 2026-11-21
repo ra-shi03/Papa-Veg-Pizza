@@ -16,7 +16,8 @@ import {
   Radio,
   PowerOff,
   Truck,
-  ShieldAlert
+  ShieldAlert,
+  Ban
 } from "lucide-react"
 
 // Import custom subcomponents
@@ -24,7 +25,9 @@ import DeliveryPartnersFilters from "./DeliveryPartnersFilters"
 import DeliveryPartnerDetailsDrawer from "./DeliveryPartnerDetailsDrawer"
 import EditDeliveryPartnerModal from "./EditDeliveryPartnerModal"
 import useDeliveryPartnerRows from "./useDeliveryPartnerRows"
+import FranchiseWalletMinimums from "./FranchiseWalletMinimums"
 import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
+import { adminAPI } from "@food/api"
 
 const INITIAL_RIDERS = [
   {
@@ -145,6 +148,38 @@ export default function DeliveryPartnersManagement() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [activeMenuId, setActiveMenuId] = useState(null)
 
+  // Block / unblock a rider: a blocked rider is signed out of the delivery app at once and gets no orders
+  const [blockTarget, setBlockTarget] = useState(null)
+  const [blockReason, setBlockReason] = useState("")
+  const [blocking, setBlocking] = useState(false)
+  const confirmBlock = async () => {
+    if (!blockTarget) return
+    const unblock = blockTarget.status === "Suspended"
+    setBlocking(true)
+    try {
+      if (STANDALONE_MOCK) {
+        setRiders((prev) => prev.map((r) => (r.id === blockTarget.id ? { ...r, status: unblock ? "Offline" : "Suspended" } : r)))
+      } else {
+        const res = unblock
+          ? await adminAPI.activateDeliveryPartner(blockTarget.id)
+          : await adminAPI.suspendDeliveryPartner(blockTarget.id, blockReason)
+        const d = res?.data?.data || {}
+        if (!unblock && (d.releasedOrders || d.ordersInProgress)) {
+          showToast(`${blockTarget.name} is blocked. ${d.releasedOrders || 0} order(s) went back to dispatch; ${d.ordersInProgress || 0} already on the road.`, "warning")
+        } else {
+          showToast(unblock ? `${blockTarget.name} is unblocked` : `${blockTarget.name} is blocked`, unblock ? "success" : "warning")
+        }
+        reload()
+      }
+      setBlockTarget(null)
+      setBlockReason("")
+    } catch (err) {
+      showToast(err?.response?.data?.message || err?.response?.data?.error || err?.message || "That did not work", "error")
+    } finally {
+      setBlocking(false)
+    }
+  }
+
   // Toast notifications state
   const [toast, setToast] = useState(null)
   const showToast = (message, type = "success") => {
@@ -157,8 +192,8 @@ export default function DeliveryPartnersManagement() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [error])
 
-  // The super admin only views delivery partners: approval, rejection and suspension are the franchise admin's
-  const READ_ONLY = "Delivery partners are approved, rejected and suspended by the franchise admin of their area. The super admin can view them only."
+  // Approval and rejection are the franchise admin's; the super admin (like the franchise admin) can block and unblock a rider
+  const READ_ONLY = "Delivery partners are approved and rejected by the franchise admin of their area. The super admin can view them, block and unblock them."
 
   // Calculate stats dynamically
   const kpiStats = useMemo(() => {
@@ -366,6 +401,8 @@ export default function DeliveryPartnersManagement() {
       </section>
 
       {/* Delivery Partners Filters Component */}
+      {!STANDALONE_MOCK && <FranchiseWalletMinimums />}
+
       <DeliveryPartnersFilters
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
@@ -505,6 +542,17 @@ export default function DeliveryPartnersManagement() {
                         >
                           <Eye size={13} />
                         </button>
+                        {rider.status !== "Pending" && (
+                          <button
+                            onClick={() => { setBlockTarget(rider); setBlockReason("") }}
+                            className={`p-1 rounded-lg border transition-all cursor-pointer ${rider.status === "Suspended"
+                              ? "border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+                              : "border-red-200 text-red-500 hover:bg-red-50"}`}
+                            title={rider.status === "Suspended" ? "Unblock delivery partner" : "Block delivery partner"}
+                          >
+                            {rider.status === "Suspended" ? <CheckCircle size={13} /> : <Ban size={13} />}
+                          </button>
+                        )}
                         {/* <button
                           onClick={() => {
                             setSelectedRider(rider)
@@ -609,6 +657,41 @@ export default function DeliveryPartnersManagement() {
         rider={selectedRider}
         onSave={handleSaveRider}
       />
+
+      {/* Block / unblock confirmation */}
+      {blockTarget && (
+        <div className="fixed inset-0 z-[300] bg-black/40 flex items-center justify-center p-4" onClick={() => !blocking && setBlockTarget(null)}>
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-extrabold text-black dark:text-white">
+              {blockTarget.status === "Suspended" ? `Unblock ${blockTarget.name}?` : `Block ${blockTarget.name}?`}
+            </h3>
+            <p className="text-[11px] text-black/60 dark:text-white/60 font-semibold">
+              {blockTarget.status === "Suspended"
+                ? "The delivery partner can sign in and receive orders again."
+                : "The delivery partner is signed out of the delivery app at once and gets no new orders. Orders not yet picked up go back to dispatch."}
+            </p>
+            {blockTarget.status !== "Suspended" && (
+              <textarea
+                value={blockReason}
+                onChange={(e) => setBlockReason(e.target.value)}
+                placeholder="Reason (shown to the delivery partner)"
+                rows={3}
+                className="w-full border border-zinc-200 dark:border-zinc-700 rounded-lg p-2 text-xs bg-transparent text-black dark:text-white outline-none"
+              />
+            )}
+            <div className="flex justify-end gap-2">
+              <button disabled={blocking} onClick={() => setBlockTarget(null)} className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-black dark:text-white cursor-pointer">Cancel</button>
+              <button
+                disabled={blocking || (blockTarget.status !== "Suspended" && !blockReason.trim())}
+                onClick={confirmBlock}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer disabled:opacity-50 ${blockTarget.status === "Suspended" ? "bg-emerald-600" : "bg-red-600"}`}
+              >
+                {blocking ? "Please wait..." : blockTarget.status === "Suspended" ? "Unblock" : "Block"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )

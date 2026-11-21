@@ -21,6 +21,7 @@ import AssignRider from "../deliveryOperations/AssignRider"
 import RiderAvailability from "../deliveryOperations/RiderAvailability"
 import DeliveryTracking from "../deliveryOperations/DeliveryTracking"
 import DeliveryIssue from "../deliveryOperations/DeliveryIssue"
+import RiderTickets from "../deliveryOperations/RiderTickets"
 import IngredientStock from "../inventory/IngredientStock"
 import StockRequests from "../inventory/StockRequests"
 import WasteManagement from "../inventory/WasteManagement"
@@ -273,6 +274,14 @@ export default function StoreManagerRouter() {
             element={
               <RoleProtectedRoute allowedRoles={["store_manager"]}>
                 <DeliveryIssue />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="delivery/rider-tickets"
+            element={
+              <RoleProtectedRoute allowedRoles={["store_manager"]}>
+                <RiderTickets />
               </RoleProtectedRoute>
             }
           />

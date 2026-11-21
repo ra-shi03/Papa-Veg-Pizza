@@ -279,7 +279,7 @@ export default function DeliveryPartnerDetailsDrawer({ isOpen, onClose, rider, o
                 </div>
                 {bank || d.upiId ? (
                   <div className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 space-y-1.5 text-[10px]">
-                    {[["Account holder", bank?.accountHolderName], ["Bank", bank?.bankName], ["Account number", maskAccount(bank?.accountNumber)], ["IFSC", bank?.ifscCode], ["UPI id", d.upiId]].map(([k, v]) => (
+                    {[["Account holder", bank?.accountHolderName], ["Bank", bank?.bankName], ["Account number", maskAccount(bank?.accountNumber)], ["IFSC", bank?.ifscCode], ["UPI id", bank?.upiId || d.upiId]].map(([k, v]) => (
                       <div key={k} className="flex justify-between">
                         <span className="text-zinc-500 font-medium">{k}</span>
                         <span className="font-bold font-mono text-zinc-850 dark:text-zinc-150">{v || "—"}</span>
@@ -287,9 +287,49 @@ export default function DeliveryPartnerDetailsDrawer({ isOpen, onClose, rider, o
                     ))}
                   </div>
                 ) : (
-                  <p className="text-[10px] text-zinc-400 font-semibold">No bank details yet. Riders add them in the app after approval.</p>
+                  <p className="text-[10px] text-zinc-400 font-semibold">No bank details yet. Riders add them at signup or later in the app.</p>
+                )}
+                {Array.isArray(d.payoutDetailsMissing) && d.payoutDetailsMissing.length > 0 && (
+                  <p className="text-[10px] font-bold text-red-600">Cannot go online yet. Missing: {d.payoutDetailsMissing.join(", ")}</p>
                 )}
               </section>
+
+              {/* Delivery wallet: recharges + COD deposits minus COD cash collected */}
+              {d.deliveryWallet && (
+                <section className="space-y-3">
+                  <div className="flex items-center gap-2 text-[var(--primary)]">
+                    <Landmark size={16} />
+                    <h4 className="font-bold text-xs text-zinc-900 dark:text-zinc-50">Delivery Wallet</h4>
+                  </div>
+                  <div className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 space-y-1.5 text-[10px]">
+                    {[
+                      ["Balance", d.deliveryWallet.balance],
+                      ["Recharged by rider", d.deliveryWallet.recharged],
+                      ["All money in (recharges + COD deposits)", d.deliveryWallet.paidIn],
+                      ["COD cash collected", d.deliveryWallet.codCollected],
+                      ["Own franchise minimum", d.deliveryWallet.minBalance],
+                    ].map(([k, v]) => (
+                      <div key={k} className="flex justify-between">
+                        <span className="text-zinc-500 font-medium">{k}</span>
+                        <span className={`font-bold font-mono ${k === "Balance" && v < 0 ? "text-red-600" : "text-zinc-850 dark:text-zinc-150"}`}>₹{(Number(v) || 0).toFixed(2)}</span>
+                      </div>
+                    ))}
+                    <p className={`font-bold pt-1 ${d.deliveryWallet.canAccept ? "text-emerald-600" : "text-red-600"}`}>
+                      {d.deliveryWallet.canAccept ? "Can accept orders" : `Needs ₹${(Number(d.deliveryWallet.shortBy) || 0).toFixed(2)} more to accept orders`}
+                    </p>
+                  </div>
+                  {Array.isArray(d.walletDeposits) && d.walletDeposits.length > 0 && (
+                    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 divide-y divide-zinc-150 dark:divide-zinc-850 text-[10px]">
+                      {d.walletDeposits.map((x) => (
+                        <div key={x._id} className="flex justify-between px-3 py-1.5">
+                          <span className="text-zinc-500">{x.purpose === "wallet_recharge" ? "Recharge" : "COD deposit"} · {new Date(x.createdAt).toLocaleString("en-IN")}</span>
+                          <span className={`font-bold ${x.status === "Completed" ? "text-emerald-600" : "text-zinc-400"}`}>₹{(Number(x.amount) || 0).toFixed(2)} {x.status !== "Completed" ? `(${x.status})` : ""}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
 
               {/* Recent Deliveries */}
               <section className="space-y-3">

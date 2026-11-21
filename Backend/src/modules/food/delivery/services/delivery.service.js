@@ -7,6 +7,8 @@ import { FoodOrder } from '../../orders/models/order.model.js';
 import { uploadImageBuffer } from '../../../../services/cloudinary.service.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { getDeliveryCashLimitSettings } from '../../admin/services/admin.service.js';
+import { assertPayoutDetails } from './riderReadiness.service.js';
+import { routeForRider } from './riderTickets.service.js';
 
 export const registerDeliveryPartner = async (payload, files) => {
     const { 
@@ -57,6 +59,10 @@ export const registerDeliveryPartner = async (payload, files) => {
         drivingLicenseNumber,
         panNumber,
         aadharNumber,
+        // bank and payment details if the rider filled them in at signup (they may skip and add them later)
+        ...Object.fromEntries(['bankAccountHolderName', 'bankAccountNumber', 'bankIfscCode', 'bankName', 'upiId']
+            .filter((k) => String(payload?.[k] || '').trim())
+            .map((k) => [k, String(payload[k]).trim()])),
         status: 'pending',
         ...images
     });
@@ -271,8 +277,11 @@ export const createSupportTicket = async (deliveryPartnerId, payload) => {
         ticketId = generateTicketId();
         exists = await DeliverySupportTicket.findOne({ ticketId }).lean();
     }
+    const { storeId, franchiseId } = await routeForRider(deliveryPartnerId);
     const ticket = await DeliverySupportTicket.create({
         deliveryPartnerId,
+        storeId,
+        franchiseId,
         ticketId,
         subject: subject.trim(),
         description: description.trim(),
@@ -302,6 +311,8 @@ export const updateDeliveryAvailability = async (userId, payload) => {
         let validStatus = 'offline';
         if (status === 'online' || status === true) validStatus = 'online';
         else if (status === 'offline' || status === false) validStatus = 'offline';
+        // No going online (so no orders) without bank and payment details
+        if (validStatus === 'online') assertPayoutDetails(partner);
         partner.availabilityStatus = validStatus;
     }
     const validFix = typeof latitude === 'number' && typeof longitude === 'number'

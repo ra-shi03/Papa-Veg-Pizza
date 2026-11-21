@@ -40,7 +40,7 @@ import storeOpenStatusRoutes from '../modules/food/store/routes/storeOpenStatus.
 import kitchenTaskRoutes from '../modules/food/store/routes/kitchenTasks.routes.js';
 import kitchenOpsRoutes from '../modules/food/store/routes/kitchenOps.routes.js';
 import inventoryRoutes from '../modules/food/store/routes/inventory.routes.js';
-import { customersRouter as storeCustomersRoutes, complaintsRouter as storeComplaintsRoutes, reviewsRouter as storeReviewsRoutes, dashboardComplaintsRouter } from '../modules/food/store/routes/storeCrm.routes.js';
+import { customersRouter as storeCustomersRoutes, complaintsRouter as storeComplaintsRoutes, riderTicketsRouter as storeRiderTicketsRoutes, reviewsRouter as storeReviewsRoutes, dashboardComplaintsRouter } from '../modules/food/store/routes/storeCrm.routes.js';
 import { storeDashboardRouter, adminDashboardRouter } from '../modules/food/dashboard/routes/dashboard.routes.js';
 import { storeAttendanceRouter } from '../modules/food/store/routes/attendance.routes.js';
 import { storeProfileRouter } from '../modules/food/store/routes/storeProfile.routes.js';
@@ -94,6 +94,7 @@ router.use('/v1/food/store/bulk-orders', storeBulkOrdersRoutes);
 router.use('/v1/food/franchise/bulk-orders', franchiseBulkOrdersRoutes);
 router.use('/v1/food/franchise/refunds', franchiseRefundsRoutes);
 router.use('/v1/food/store/complaints', storeComplaintsRoutes);
+router.use('/v1/food/store/rider-tickets', storeRiderTicketsRoutes);
 router.use('/v1/food/store/reviews', storeReviewsRoutes);
 router.use('/v1/complaints', dashboardComplaintsRouter);
 router.use('/v1/store/dashboard', storeDashboardRouter);

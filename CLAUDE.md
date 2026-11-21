@@ -42,8 +42,12 @@ DONE (store ops order flow, see docs/rider-flow.md section 5): store manager > k
 and stations; real data in Completed Order details; manual rider assignment (`dispatch.manual`) is never undone by
 auto-dispatch, its timeout job or the startup watchdog; Confirm Pickup accepts the rider at handover; handover photo
 required to complete a delivery (`deliveryVerification.handoverPhotoUrl`).
-PENDING: staff management, inventory, customers/menu APIs, dashboards, sockets, delivery/orders
-verification (open: store Confirm Pickup skips the rider's bill photo; handover photo not shown in the store panel yet).
+PENDING: staff management, inventory, customers/menu APIs, dashboards, sockets, delivery/orders verification.
+DONE (delivery, docs/rider-flow.md): bill photo is required for any pickup (rider or store) and the bill and handover photos show in the store,
+franchise and super admin order views; franchise admin AND super admin can block / unblock riders (blocked = signed out at once, pre-pickup orders
+released); super admin All Orders runs on real data; the rider-accident-cost clause (franchise outlet pays, not the company) is fixed in every Terms page.
+DONE (rider readiness, docs/rider-flow.md): bank + UPI details at signup (skippable) and required to go online / accept; delivery wallet
+(recharges minus COD cash collected) must be >= the franchise admin's minimum to accept; super admin sees every rider's wallet and payout details.
 Defer: finance, marketing, reports, rewards.
 
 ## Rules

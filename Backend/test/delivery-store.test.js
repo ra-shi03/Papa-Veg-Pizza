@@ -7,7 +7,7 @@
 // R4 belongs to store A + offline. Who is near whom is covered in nearby-people.test.js.
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { createFixture, mongoose } from './helpers/fixture.js';
+import { createFixture, mongoose, PAYOUT } from './helpers/fixture.js';
 
 let fx; let A; let B; let sup; let staff; let zoneId;
 const O = {};
@@ -29,7 +29,7 @@ async function seed(f, { status, total = 300, dispatch, history = [], extra = {}
     });
     return { id: String(r.insertedId), ref };
 }
-const partner = (id, over) => ({ _id: id, name: `Rider ${over.n}`, phone: `91000000${over.n}0`, vehicleType: 'Bike', vehicleNumber: `MP09-${over.n}`, status: 'approved', availabilityStatus: 'online', rating: 4.5, createdAt: new Date(), updatedAt: new Date(), ...over.set });
+const partner = (id, over) => ({ ...PAYOUT, _id: id, name: `Rider ${over.n}`, phone: `91000000${over.n}0`, vehicleType: 'Bike', vehicleNumber: `MP09-${over.n}`, status: 'approved', availabilityStatus: 'online', rating: 4.5, createdAt: new Date(), updatedAt: new Date(), ...over.set });
 
 before(async () => {
     fx = await createFixture(); A = fx.F.A; B = fx.F.B;
@@ -42,6 +42,10 @@ before(async () => {
         partner(R[3], { n: 3, set: { status: 'pending' } }),
         partner(R[4], { n: 4, set: { storeId: oid(A.storeId), franchiseId: oid(A.franchiseId), availabilityStatus: 'offline' } }),
     ]);
+    // the riders deliver many cash orders here: a recharged delivery wallet keeps them able to accept (rider-readiness.test.js)
+    await mongoose.connection.collection('food_delivery_cash_deposits').insertMany([R[1], R[2], R[3], R[4]].map((id) => ({
+        deliveryPartnerId: new mongoose.Types.ObjectId(String(id)), amount: 100000, purpose: 'wallet_recharge', status: 'Completed', createdAt: new Date(), updatedAt: new Date(),
+    })));
     await fx.models.FoodOrder.deleteMany({});
     O.ready = await seed(A, { status: 'ready_for_pickup' });
     O.prep = await seed(A, { status: 'preparing' });

@@ -8,6 +8,12 @@ import { DeliveryBonusTransaction } from '../../admin/models/deliveryBonusTransa
 import { getDeliveryCashLimitSettings } from '../../admin/services/admin.service.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { createRazorpayOrder, getRazorpayKeyId, isRazorpayConfigured, verifyPaymentSignature } from '../../orders/helpers/razorpay.helper.js';
+import { riderWalletStatus } from './riderReadiness.service.js';
+
+const PURPOSES = ['cod_settlement', 'wallet_recharge'];
+const purposeOf = (p) => (PURPOSES.includes(p) ? p : 'cod_settlement');
+// Without a payment gateway a payment cannot be checked: only a dev server accepts it then (never production)
+const canSkipSignature = () => !isRazorpayConfigured() && process.env.NODE_ENV !== 'production';
 
 /**
  * Enhanced wallet fetch for delivery partners.
@@ -130,14 +136,20 @@ export const getDeliveryPartnerWalletEnhanced = async (deliveryPartnerId) => {
             amount: d.amount,
             status: d.status || 'Pending',
             date: d.createdAt,
-            description: 'Cash limit settlement',
+            description: d.purpose === 'wallet_recharge' ? 'Wallet recharge' : 'Cash limit settlement',
+            purpose: d.purpose || 'cod_settlement',
             paymentMethod: d.paymentMethod || 'cash',
             razorpayPaymentId: d.razorpayPaymentId || '',
             razorpayOrderId: d.razorpayOrderId || ''
         }))
     ].sort((a, b) => new Date(b.date) - new Date(a.date));
 
+    // The delivery wallet: recharges + COD deposits minus COD cash collected (below zero after cash orders),
+    // against the minimum of the rider's own franchise (each order checks its own franchise's minimum on accept)
+    const deliveryWallet = await riderWalletStatus(partnerId, partner.franchiseId || null);
+
     return {
+        deliveryWallet,
         totalBalance: totalEarned + totalBonus, // Gross lifetime earnings
         pocketBalance, // Available to withdraw
         cashInHand, // COD to be deposited/deducted
@@ -189,7 +201,8 @@ export const requestDeliveryWithdrawal = async (deliveryPartnerId, payload) => {
     return withdrawal;
 };
 
-export const createDeliveryCashDepositOrder = async (deliveryPartnerId, amountInr) => {
+export const createDeliveryCashDepositOrder = async (deliveryPartnerId, amountInr, purposeRaw) => {
+    const purpose = purposeOf(purposeRaw);
     const amount = Number(amountInr);
     if (!Number.isFinite(amount) || amount < 1) {
         throw new ValidationError('Amount must be at least ₹1');
@@ -198,16 +211,21 @@ export const createDeliveryCashDepositOrder = async (deliveryPartnerId, amountIn
         throw new ValidationError('Maximum deposit is ₹5,00,000');
     }
 
-    const wallet = await getDeliveryPartnerWalletEnhanced(deliveryPartnerId);
-    if (amount > wallet.cashInHand) {
-        throw new ValidationError('Deposit amount cannot exceed cash in hand');
+    // A COD settlement cannot be more than the cash the rider holds; a wallet recharge can be any amount
+    if (purpose === 'cod_settlement') {
+        const wallet = await getDeliveryPartnerWalletEnhanced(deliveryPartnerId);
+        if (amount > wallet.cashInHand) {
+            throw new ValidationError('Deposit amount cannot exceed cash in hand');
+        }
     }
 
     const amountPaise = Math.round(amount * 100);
     const receipt = `cash_deposit_${String(deliveryPartnerId).slice(-8)}_${Date.now()}`;
 
     if (!isRazorpayConfigured()) {
+        if (!canSkipSignature()) throw new ValidationError('Online payment is not available right now. Please try again later.');
         return {
+            purpose,
             razorpay: {
                 key: getRazorpayKeyId() || 'rzp_test_dummy',
                 orderId: `order_dev_${Date.now()}`,
@@ -219,6 +237,7 @@ export const createDeliveryCashDepositOrder = async (deliveryPartnerId, amountIn
 
     const order = await createRazorpayOrder(amountPaise, 'INR', receipt);
     return {
+        purpose,
         razorpay: {
             key: getRazorpayKeyId(),
             orderId: String(order.id),
@@ -233,6 +252,7 @@ export const verifyDeliveryCashDepositPayment = async (deliveryPartnerId, payloa
     const paymentId = String(payload?.razorpayPaymentId || '').trim();
     const signature = String(payload?.razorpaySignature || '').trim();
     const amount = Number(payload?.amount);
+    const purpose = purposeOf(payload?.purpose);
 
     if (!orderId) throw new ValidationError('razorpayOrderId is required');
     if (!paymentId) throw new ValidationError('razorpayPaymentId is required');
@@ -251,14 +271,16 @@ export const verifyDeliveryCashDepositPayment = async (deliveryPartnerId, payloa
         return { deposit: existing, wallet: await getDeliveryPartnerWalletEnhanced(deliveryPartnerId) };
     }
 
-    const wallet = await getDeliveryPartnerWalletEnhanced(deliveryPartnerId);
-    if (amount > wallet.cashInHand) {
-        throw new ValidationError('Deposit amount cannot exceed cash in hand');
+    if (purpose === 'cod_settlement') {
+        const wallet = await getDeliveryPartnerWalletEnhanced(deliveryPartnerId);
+        if (amount > wallet.cashInHand) {
+            throw new ValidationError('Deposit amount cannot exceed cash in hand');
+        }
     }
 
     const isValid = isRazorpayConfigured()
         ? verifyPaymentSignature(orderId, paymentId, signature)
-        : true;
+        : canSkipSignature();
 
     if (!isValid) {
         throw new ValidationError('Payment verification failed');
@@ -272,6 +294,7 @@ export const verifyDeliveryCashDepositPayment = async (deliveryPartnerId, payloa
                     amount,
                     paymentMethod: isRazorpayConfigured() ? 'razorpay' : 'cash',
                     status: 'Completed',
+                    purpose,
                     razorpayOrderId: orderId,
                     razorpayPaymentId: paymentId
                 }
@@ -283,6 +306,7 @@ export const verifyDeliveryCashDepositPayment = async (deliveryPartnerId, payloa
             amount,
             paymentMethod: isRazorpayConfigured() ? 'razorpay' : 'cash',
             status: 'Completed',
+            purpose,
             razorpayOrderId: orderId,
             razorpayPaymentId: paymentId
         });
