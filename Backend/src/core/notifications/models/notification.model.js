@@ -42,7 +42,8 @@ const notificationSchema = new mongoose.Schema(
         broadcastId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'BroadcastNotification',
-            default: null,
+            // No default: a notice that is not from a broadcast (ticket reply, FSSAI expiry) has no broadcastId at all, so the
+            // sparse unique (broadcastId, owner) index skips it. A null default made every owner hold only one such notice.
             index: true
         },
         metadata: {
@@ -72,6 +73,22 @@ const notificationSchema = new mongoose.Schema(
 
 notificationSchema.index({ ownerType: 1, ownerId: 1, createdAt: -1 });
 notificationSchema.index({ ownerType: 1, ownerId: 1, isRead: 1, dismissedAt: 1 });
-notificationSchema.index({ broadcastId: 1, ownerType: 1, ownerId: 1 }, { unique: true, sparse: true });
+// One copy of a broadcast per recipient. Partial, not sparse: a compound sparse index still covers every row that has
+// ownerType / ownerId, which let each person hold only one notice that is not from a broadcast.
+notificationSchema.index(
+    { broadcastId: 1, ownerType: 1, ownerId: 1 },
+    { name: 'broadcast_owner_unique', unique: true, partialFilterExpression: { broadcastId: { $exists: true } } }
+);
 
 export const FoodNotification = mongoose.model('FoodNotification', notificationSchema);
+
+/** Older databases have the sparse version of that index under its default name; drop it once at start-up. */
+export async function dropLegacyNotificationIndex() {
+    try {
+        await FoodNotification.collection.dropIndex('broadcastId_1_ownerType_1_ownerId_1');
+    } catch {
+        // not there (new database, or already dropped)
+    }
+    // the automatic index build may have been refused while the old index still held the same keys
+    await FoodNotification.createIndexes().catch(() => {});
+}

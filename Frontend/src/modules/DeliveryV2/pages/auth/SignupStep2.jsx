@@ -9,12 +9,28 @@ const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 
-const createEmptyUploadedDocs = () => ({
-  profilePhoto: null,
-  aadharPhoto: null,
-  panPhoto: null,
-  drivingLicensePhoto: null
-})
+const DOC_TYPES = [
+  "profilePhoto",
+  "aadharPhoto",
+  "panPhoto",
+  "drivingLicensePhoto",
+  "vehicleRcPhoto",
+  "vehicleInsurancePhoto",
+  "addressProofPhoto",
+]
+const emptyDocs = () => Object.fromEntries(DOC_TYPES.map((t) => [t, null]))
+const createEmptyUploadedDocs = emptyDocs
+
+// A bicycle has no registration certificate or insurance; every other vehicle needs both.
+const readSignupVehicleType = () => {
+  try {
+    return String(JSON.parse(sessionStorage.getItem("deliverySignupDetails") || "{}")?.vehicleType || "").toLowerCase()
+  } catch {
+    return ""
+  }
+}
+const requiredDocTypes = (vehicleType) =>
+  vehicleType === "bicycle" ? DOC_TYPES.filter((t) => t !== "vehicleRcPhoto" && t !== "vehicleInsurancePhoto") : DOC_TYPES
 
 const sanitizeUploadedDocValue = (value) => {
   if (!value) return null
@@ -34,12 +50,7 @@ const sanitizeUploadedDocValue = (value) => {
   return null
 }
 
-const sanitizeUploadedDocs = (docs) => ({
-  profilePhoto: sanitizeUploadedDocValue(docs?.profilePhoto),
-  aadharPhoto: sanitizeUploadedDocValue(docs?.aadharPhoto),
-  panPhoto: sanitizeUploadedDocValue(docs?.panPhoto),
-  drivingLicensePhoto: sanitizeUploadedDocValue(docs?.drivingLicensePhoto)
-})
+const sanitizeUploadedDocs = (docs) => Object.fromEntries(DOC_TYPES.map((t) => [t, sanitizeUploadedDocValue(docs?.[t])]))
 
 const getFriendlyRegistrationError = (error) => {
   const rawMessage =
@@ -78,18 +89,12 @@ export default function SignupStep2() {
   const isMobileDevice =
     typeof navigator !== "undefined" &&
     /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent || "")
-  const fileInputRefs = useRef({
-    profilePhoto: null,
-    aadharPhoto: null,
-    panPhoto: null,
-    drivingLicensePhoto: null
-  })
-  const [documents, setDocuments] = useState({
-    profilePhoto: null,
-    aadharPhoto: null,
-    panPhoto: null,
-    drivingLicensePhoto: null
-  })
+  const fileInputRefs = useRef(emptyDocs())
+  const [documents, setDocuments] = useState(emptyDocs)
+  const [vehicleType] = useState(readSignupVehicleType)
+  const needsVehicleDocs = vehicleType !== "bicycle"
+  const required = requiredDocTypes(vehicleType)
+
   const [uploadedDocs, setUploadedDocs] = useState(() => {
     const saved = sessionStorage.getItem("deliverySignupDocs")
     if (saved) {
@@ -101,6 +106,7 @@ export default function SignupStep2() {
     }
     return createEmptyUploadedDocs()
   })
+  const allRequiredUploaded = required.every((t) => uploadedDocs[t])
   const [activePicker, setActivePicker] = useState(null) // { docType: string, title: string, ref: any }
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [uploading, setUploading] = useState({})
@@ -190,7 +196,7 @@ export default function SignupStep2() {
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    if (!documents.profilePhoto || !documents.aadharPhoto || !documents.panPhoto || !documents.drivingLicensePhoto) {
+    if (required.some((t) => !documents[t])) {
       toast.error("Please upload all required documents")
       return
     }
@@ -237,6 +243,9 @@ export default function SignupStep2() {
     formData.append("aadharPhoto", documents.aadharPhoto)
     formData.append("panPhoto", documents.panPhoto)
     formData.append("drivingLicensePhoto", documents.drivingLicensePhoto)
+    for (const t of ["vehicleRcPhoto", "vehicleInsurancePhoto", "addressProofPhoto"]) {
+      if (documents[t]) formData.append(t, documents[t])
+    }
 
     // Try to get FCM token before registering
     let fcmToken = null;
@@ -417,12 +426,15 @@ export default function SignupStep2() {
           <DocumentUpload docType="aadharPhoto" label="Aadhar Card Photo" required={true} />
           <DocumentUpload docType="panPhoto" label="PAN Card Photo" required={true} />
           <DocumentUpload docType="drivingLicensePhoto" label="Driving License Photo" required={true} />
+          {needsVehicleDocs && <DocumentUpload docType="vehicleRcPhoto" label="Vehicle RC Photo" required={true} />}
+          {needsVehicleDocs && <DocumentUpload docType="vehicleInsurancePhoto" label="Vehicle Insurance Photo" required={true} />}
+          <DocumentUpload docType="addressProofPhoto" label="Address Proof Photo" required={true} />
 
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={isSubmitting || !uploadedDocs.profilePhoto || !uploadedDocs.aadharPhoto || !uploadedDocs.panPhoto || !uploadedDocs.drivingLicensePhoto}
-            className={`w-full py-4 rounded-lg font-bold text-white text-base transition-colors mt-6 ${isSubmitting || !uploadedDocs.profilePhoto || !uploadedDocs.aadharPhoto || !uploadedDocs.panPhoto || !uploadedDocs.drivingLicensePhoto
+            disabled={isSubmitting || !allRequiredUploaded}
+            className={`w-full py-4 rounded-lg font-bold text-white text-base transition-colors mt-6 ${isSubmitting || !allRequiredUploaded
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-[#00B761] hover:bg-[#00A055]"
               }`}

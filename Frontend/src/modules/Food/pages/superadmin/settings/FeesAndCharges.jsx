@@ -21,6 +21,8 @@ const blank = Object.fromEntries(FIELDS.map((f) => [f.key, '']));
 export default function FeesAndCharges() {
   const [values, setValues] = useState(blank);
   const [ranges, setRanges] = useState([]);
+  // Riders this close to a store get its order offers (empty = the server default, 10 km)
+  const [riderRadius, setRiderRadius] = useState('');
   // true = shown to the customer in the cart and bill (and charged); missing counts as on
   const [toggles, setToggles] = useState({});
   const [loading, setLoading] = useState(true);
@@ -34,6 +36,7 @@ export default function FeesAndCharges() {
           setValues(Object.fromEntries(FIELDS.map((f) => [f.key, doc[f.key] ?? ''])));
           setRanges(doc.deliveryFeeRanges || []);
           setToggles(doc.feeToggles || {});
+          setRiderRadius(doc.riderSearchRadiusKm ?? '');
         }
       })
       .catch(() => toast.error('Could not load fee settings'))
@@ -48,6 +51,7 @@ export default function FeesAndCharges() {
       const body = Object.fromEntries(FIELDS.map((f) => [f.key, values[f.key] === '' ? null : Number(values[f.key])]));
       body.feeToggles = Object.fromEntries(FIELDS.map((f) => [f.key, toggles[f.key] !== false]));
       body.deliveryFeeRanges = ranges.map((r) => ({ min: Number(r.min), max: Number(r.max), fee: Number(r.fee) }));
+      body.riderSearchRadiusKm = riderRadius === '' ? null : Number(riderRadius);
       await adminAPI.createOrUpdateFeeSettings(body);
       toast.success('Fees saved. New orders use them immediately.');
     } catch (err) {
@@ -102,6 +106,13 @@ export default function FeesAndCharges() {
             <button type="button" className="text-xs text-rose-600" onClick={() => setRanges((rows) => rows.filter((_, idx) => idx !== i))}>Remove</button>
           </div>
         ))}
+      </div>
+
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 space-y-1">
+        <label htmlFor="fee-riderSearchRadiusKm" className="text-xs font-semibold text-black dark:text-zinc-100">Rider search radius (km)</label>
+        <input id="fee-riderSearchRadiusKm" type="number" min="1" max="200" step="any" placeholder="10" disabled={loading} className={input}
+          value={riderRadius} onChange={(e) => setRiderRadius(e.target.value)} />
+        <span className="block text-[11px] text-zinc-500">Delivery partners within this distance of a store get its new order offers and show in its rider lists (1 to 200 km). Empty uses 10 km.</span>
       </div>
 
       <button type="button" onClick={save} disabled={saving || loading}

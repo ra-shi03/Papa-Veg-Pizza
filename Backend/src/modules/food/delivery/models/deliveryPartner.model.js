@@ -87,6 +87,17 @@ const deliveryPartnerSchema = new mongoose.Schema(
         drivingLicensePhoto: {
             type: String
         },
+        // Collected at signup for the franchise admin to verify: the vehicle's registration certificate and insurance
+        // (not asked for a bicycle) and a proof of address.
+        vehicleRcPhoto: {
+            type: String
+        },
+        vehicleInsurancePhoto: {
+            type: String
+        },
+        addressProofPhoto: {
+            type: String
+        },
         status: {
             type: String,
             enum: ['pending', 'approved', 'rejected', 'suspended'],

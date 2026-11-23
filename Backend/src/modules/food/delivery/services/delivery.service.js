@@ -10,6 +10,25 @@ import { getDeliveryCashLimitSettings } from '../../admin/services/admin.service
 import { assertPayoutDetails } from './riderReadiness.service.js';
 import { routeForRider } from './riderTickets.service.js';
 
+// Signup document photos: form field -> Cloudinary folder.
+const SIGNUP_DOCS = [
+    ['aadharPhoto', 'food/delivery/aadhar'],
+    ['panPhoto', 'food/delivery/pan'],
+    ['drivingLicensePhoto', 'food/delivery/license'],
+    ['vehicleRcPhoto', 'food/delivery/vehicle-rc'],
+    ['vehicleInsurancePhoto', 'food/delivery/vehicle-insurance'],
+    ['addressProofPhoto', 'food/delivery/address-proof'],
+];
+
+/** Uploads the signup documents present in `files`; returns { field: url }. */
+async function uploadSignupDocs(files) {
+    const out = {};
+    for (const [field, folder] of SIGNUP_DOCS) {
+        if (files?.[field]?.[0]) out[field] = await uploadImageBuffer(files[field][0].buffer, folder);
+    }
+    return out;
+}
+
 export const registerDeliveryPartner = async (payload, files) => {
     const { 
         name, phone, email, countryCode, address, city, state, 
@@ -32,18 +51,7 @@ export const registerDeliveryPartner = async (payload, files) => {
     if (files?.profilePhoto?.[0]) {
         images.profilePhoto = await uploadImageBuffer(files.profilePhoto[0].buffer, 'food/delivery/profile');
     }
-    if (files?.aadharPhoto?.[0]) {
-        images.aadharPhoto = await uploadImageBuffer(files.aadharPhoto[0].buffer, 'food/delivery/aadhar');
-    }
-    if (files?.panPhoto?.[0]) {
-        images.panPhoto = await uploadImageBuffer(files.panPhoto[0].buffer, 'food/delivery/pan');
-    }
-    if (files?.drivingLicensePhoto?.[0]) {
-        images.drivingLicensePhoto = await uploadImageBuffer(
-            files.drivingLicensePhoto[0].buffer,
-            'food/delivery/license'
-        );
-    }
+    Object.assign(images, await uploadSignupDocs(files));
 
     const partner = await FoodDeliveryPartner.create({
         name,
@@ -150,6 +158,11 @@ export const updateDeliveryPartnerProfile = async (userId, payload, files) => {
 
     if (files?.profilePhoto?.[0]) {
         partner.profilePhoto = await uploadImageBuffer(files.profilePhoto[0].buffer, 'food/delivery/profile');
+    }
+    // Finishing signup (an existing, not yet approved record): keep the documents sent with it. An approved rider
+    // cannot swap verified documents here; that goes through the franchise admin.
+    if (partner.status !== 'approved') {
+        Object.assign(partner, await uploadSignupDocs(files));
     }
 
     await partner.save();

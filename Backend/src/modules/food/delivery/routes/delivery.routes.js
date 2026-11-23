@@ -14,6 +14,9 @@ const uploadFields = safeUpload('image', [
     { name: 'aadharPhoto', maxCount: 1 },
     { name: 'panPhoto', maxCount: 1 },
     { name: 'drivingLicensePhoto', maxCount: 1 },
+    { name: 'vehicleRcPhoto', maxCount: 1 },
+    { name: 'vehicleInsurancePhoto', maxCount: 1 },
+    { name: 'addressProofPhoto', maxCount: 1 },
     { name: 'upiQrCode', maxCount: 1 }
 ]);
 

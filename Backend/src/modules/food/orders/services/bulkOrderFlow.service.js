@@ -527,11 +527,12 @@ export async function storeCancel(user, id, reason) {
 }
 
 /** Delivery partners the store can assign to this bulk order's delivery. */
-// Only delivery partners who are online and within the super admin's nearby radius (Order Methods > nearby radius) of the store.
+// Only delivery partners who are online and within the super admin's rider search radius (Fees & Charges) of the store:
+// the same radius normal order offers use.
 async function nearbyOnlineRiders(user) {
   const { availableRiders } = await import('../../store/services/storeDelivery.service.js');
-  const { loadNearbyRadiusKm } = await import('../../settings/services/orderMethods.service.js');
-  const radiusKm = await loadNearbyRadiusKm();
+  const { riderSearchRadiusKm } = await import('../../store/services/nearby.js');
+  const radiusKm = await riderSearchRadiusKm();
   const all = await availableRiders(user, {});
   return all.filter((r) => r.status === 'online' && r.lastSeen !== undefined && r.distanceFromStore > 0 && r.distanceFromStore <= radiusKm);
 }

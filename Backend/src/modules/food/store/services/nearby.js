@@ -1,9 +1,11 @@
 import { FoodStore } from '../models/store.model.js';
 import { FoodZone } from '../../admin/models/zone.model.js';
 import { FoodTerritory } from '../../admin/models/territory.model.js';
+import { FoodFeeSettings } from '../../admin/models/feeSettings.model.js';
 
 // Who counts as "near" a store, for the store panel's rider and customer lists. One rule for both:
-//   1. a person with saved coordinates is near when they are within NEARBY_RADIUS_KM (default 10) of the store's
+//   1. a person with saved coordinates is near when they are within the rider search radius (super admin > Fees &
+//      Charges; not set: NEARBY_RADIUS_KM, default 10) of the store's
 //      coordinates; a store without coordinates uses its zone polygon instead;
 //   2. a person without coordinates is near when their saved city equals the store's city or state field (the store form
 //      saves the region and zone names there), its zone's name /
@@ -15,10 +17,17 @@ import { FoodTerritory } from '../../admin/models/territory.model.js';
 const EARTH_KM = 6378.1;
 const DEFAULT_RADIUS_KM = 10;
 
-/** Radius in km, read at call time so a changed env applies without a restart of the module. */
+/** Fallback radius in km when the super admin has not set one: the NEARBY_RADIUS_KM env value, else 10. */
 export function nearbyRadiusKm() {
   const n = Number(process.env.NEARBY_RADIUS_KM);
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_RADIUS_KM;
+}
+
+/** The radius in force: super admin > Fees & Charges > Rider search radius, read on every call (no restart needed). */
+export async function riderSearchRadiusKm() {
+  const doc = await FoodFeeSettings.findOne({ isActive: true }).sort({ createdAt: -1 }).select('riderSearchRadiusKm').lean();
+  const n = Number(doc?.riderSearchRadiusKm);
+  return Number.isFinite(n) && n >= 1 && n <= 200 ? n : nearbyRadiusKm();
 }
 
 const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -39,7 +48,8 @@ const hasPoint = (lat, lng) => Number.isFinite(lat) && Number.isFinite(lng) && !
 export async function storeArea(storeOrId) {
   const id = storeOrId?._id || storeOrId;
   const store = await FoodStore.findById(id).select('latitude longitude city state zoneId territoryId').lean();
-  if (!store) return { center: null, polygon: null, labels: [] };
+  const radiusKm = await riderSearchRadiusKm();
+  if (!store) return { center: null, polygon: null, labels: [], radiusKm };
   // the store's zone, or its territory's zone (stores created from the franchise panel only carry a territory)
   let zoneId = store.zoneId;
   if (!zoneId && store.territoryId) zoneId = (await FoodTerritory.findById(store.territoryId).select('zoneId').lean())?.zoneId || null;
@@ -53,6 +63,7 @@ export async function storeArea(storeOrId) {
     center: hasPoint(store.latitude, store.longitude) ? [store.longitude, store.latitude] : null,
     polygon: ring.length >= 4 ? { type: 'Polygon', coordinates: [ring] } : null,
     labels,
+    radiusKm,
   };
 }
 
@@ -67,7 +78,7 @@ export function distanceKm(area, coords) {
 }
 
 const within = (area) => (area.center
-  ? { $geoWithin: { $centerSphere: [area.center, nearbyRadiusKm() / EARTH_KM] } }
+  ? { $geoWithin: { $centerSphere: [area.center, (area.radiusKm || nearbyRadiusKm()) / EARTH_KM] } }
   : area.polygon ? { $geoWithin: { $geometry: area.polygon } } : null);
 
 const noCoords = (path) => ({ $or: [{ [`${path}.coordinates`]: { $exists: false } }, { [`${path}.coordinates`]: { $size: 0 } }, { [`${path}.coordinates`]: [0, 0] }] });

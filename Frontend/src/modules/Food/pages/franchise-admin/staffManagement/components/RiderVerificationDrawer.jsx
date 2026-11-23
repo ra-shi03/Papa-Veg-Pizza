@@ -68,6 +68,9 @@ export default function RiderVerificationDrawer({ isOpen, riderId, initialMode =
         { label: "Aadhaar card", url: rider.aadharPhoto, number: rider.aadharNumber },
         { label: "PAN card", url: rider.panPhoto, number: rider.panNumber },
         { label: "Driving licence", url: rider.drivingLicensePhoto, number: rider.drivingLicenseNumber },
+        { label: "Vehicle RC", url: rider.vehicleRcPhoto, number: rider.vehicleNumber },
+        { label: "Vehicle insurance", url: rider.vehicleInsurancePhoto },
+        { label: "Address proof", url: rider.addressProofPhoto },
       ]
     : []
 

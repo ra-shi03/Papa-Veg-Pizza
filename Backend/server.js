@@ -56,6 +56,7 @@ const startServer = async () => {
 
         // 1. Connect to Database (MongoDB)
         await connectDB();
+        await (await import('./src/core/notifications/models/notification.model.js')).dropLegacyNotificationIndex();
 
         // Saved gateway secrets need PAYMENT_SECRETS_KEY in production (exits if missing)
         await validatePaymentSecrets(() => FoodPaymentGateway.countDocuments({}));

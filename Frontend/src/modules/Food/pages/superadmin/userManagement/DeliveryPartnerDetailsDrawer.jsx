@@ -31,8 +31,9 @@ export default function DeliveryPartnerDetailsDrawer({ isOpen, onClose, rider, o
     { label: "ID card (Aadhaar)", url: d.aadharPhoto, number: maskId(d.aadharNumber) },
     { label: "PAN card", url: d.panPhoto, number: d.panNumber ? maskId(d.panNumber) : "" },
     { label: "Driving licence", url: d.drivingLicensePhoto, number: d.drivingLicenseNumber || "" },
-    { label: "Vehicle RC", url: null, notCollected: true },
-    { label: "Address proof", url: null, notCollected: true },
+    { label: "Vehicle RC", url: d.vehicleRcPhoto, number: d.vehicleNumber || "" },
+    { label: "Vehicle insurance", url: d.vehicleInsurancePhoto },
+    { label: "Address proof", url: d.addressProofPhoto },
   ]
 
   // Helper for status badge styling

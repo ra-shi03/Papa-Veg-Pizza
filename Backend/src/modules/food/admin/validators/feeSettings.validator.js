@@ -18,6 +18,8 @@ const feeSettingsUpsertSchema = z.object({
     handlingFee: z.number().min(0).nullable().optional(),
     cancellationFee: z.number().min(0).nullable().optional(),
     cancellationFreeMinutes: z.number().min(0).nullable().optional(),
+    riderSearchRadiusKm: z.number({ invalid_type_error: 'Rider search radius must be a number of km' })
+        .min(1, 'Rider search radius must be at least 1 km').max(200, 'Rider search radius can be at most 200 km').nullable().optional(),
     feeToggles: z.record(z.boolean()).optional(),
     isActive: z.boolean().optional()
 });
@@ -60,7 +62,7 @@ export const validateFeeSettingsUpsertDto = (body) => {
             : undefined,
         isActive: body?.isActive !== undefined ? Boolean(body.isActive) : undefined
     };
-    for (const key of ['handlingFee', 'cancellationFee', 'cancellationFreeMinutes']) {
+    for (const key of ['handlingFee', 'cancellationFee', 'cancellationFreeMinutes', 'riderSearchRadiusKm']) {
         normalized[key] = body?.[key] === null ? null : body?.[key] !== undefined ? Number(body[key]) : undefined;
     }
 

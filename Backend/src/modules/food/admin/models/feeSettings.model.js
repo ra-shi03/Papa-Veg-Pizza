@@ -28,6 +28,9 @@ const feeSettingsSchema = new mongoose.Schema(
         // Per-field switch: false hides that charge from the customer's cart and bill and it is not applied.
         // A key that is missing counts as on.
         feeToggles: { type: mongoose.Schema.Types.Mixed, default: {} },
+        // How far (km) from a store a rider may be to get its order offers and appear in its rider lists.
+        // Not set = the NEARBY_RADIUS_KM env value, else 10 km (store/services/nearby.js).
+        riderSearchRadiusKm: { type: Number, min: 1, max: 200 },
         isActive: { type: Boolean, default: true, index: true }
     },
     { collection: 'food_fee_settings', timestamps: true }

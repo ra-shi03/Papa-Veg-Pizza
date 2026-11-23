@@ -8,6 +8,7 @@ import { FoodDeliveryCashLimit } from '../../admin/models/deliveryCashLimit.mode
 import { ValidationError, NotFoundError } from '../../../../core/auth/errors.js';
 import { logger } from '../../../../utils/logger.js';
 import { riderScope } from '../../store/services/storeDelivery.service.js';
+import { riderSearchRadiusKm } from '../../store/services/nearby.js';
 import { config } from '../../../../config/env.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 import { addOrderJob } from '../../../../queues/producers/order.producer.js';
@@ -154,6 +155,8 @@ export async function listNearbyOnlineDeliveryPartners(
     .lean();
 
   const hasStore = Number.isFinite(store.latitude) && Number.isFinite(store.longitude);
+  // Never beyond the super admin's rider search radius (Fees & Charges); the widening attempts stop there.
+  const limitKm = Math.min(maxKm, await riderSearchRadiusKm());
   const STALE_GPS_MS = 10 * 60 * 1000;
   const scored = [];
   for (const p of online) {
@@ -164,7 +167,7 @@ export async function listNearbyOnlineDeliveryPartners(
       continue;
     }
     const d = haversineKm(store.latitude, store.longitude, p.lastLat, p.lastLng);
-    if (Number.isFinite(d) && d <= maxKm) scored.push({ partnerId: p._id, distanceKm: d, status: p.status });
+    if (Number.isFinite(d) && d <= limitKm) scored.push({ partnerId: p._id, distanceKm: d, status: p.status });
   }
   scored.sort((a, b) => a.distanceKm - b.distanceKm);
   // only riders with bank / payment details and enough delivery wallet balance for this store's franchise

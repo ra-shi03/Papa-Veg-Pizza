@@ -4,6 +4,9 @@ import { FoodDeliveryPartner } from '../models/deliveryPartner.model.js';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { FoodStore } from '../../store/models/store.model.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
+import { notifyOwnersSafely } from '../../../../core/notifications/firebase.service.js';
+import { createInboxNotifications } from '../../../../core/notifications/notification.service.js';
+import { logger } from '../../../../utils/logger.js';
 
 // Tickets riders raise in the delivery app, handled by the people who run the rider:
 //   store manager   -> tickets of riders working for its own store
@@ -116,6 +119,37 @@ export async function getRiderTicket(scope, id) {
   return shape(t);
 }
 
+const WHO = { STORE_MANAGER: 'Store', FRANCHISE_ADMIN: 'Franchise', SUPER_ADMIN: 'Support' };
+const STATUS_TEXT = { open: 'reopened', in_progress: 'being worked on', resolved: 'resolved', closed: 'closed' };
+
+/**
+ * Tells the rider their ticket was answered or moved: a push to their phone and an entry in the delivery app's
+ * Notifications, both opening the ticket. Never throws (a failed notification must not undo the reply).
+ */
+export async function notifyRiderOfTicketUpdate(ticket, { role, reply = '', statusChanged = false } = {}) {
+  try {
+    if (!ticket?.deliveryPartnerId || (!reply && !statusChanged)) return;
+    const riderId = String(ticket.deliveryPartnerId?._id || ticket.deliveryPartnerId);
+    const who = WHO[role] || 'Support';
+    const ref = ticket.ticketId ? `#${ticket.ticketId}` : `"${String(ticket.subject || '').slice(0, 40)}"`;
+    const title = reply ? `${who} replied to your ticket ${ref}` : `Your ticket ${ref} is ${STATUS_TEXT[ticket.status] || ticket.status}`;
+    const message = reply ? reply.slice(0, 180) : `${who} marked it ${STATUS_TEXT[ticket.status] || ticket.status}.`;
+    const link = `/food/delivery/help/tickets/${ticket._id}`;
+    await Promise.all([
+      notifyOwnersSafely([{ ownerType: 'DELIVERY_PARTNER', ownerId: riderId }], {
+        title,
+        body: message,
+        data: { type: 'support_ticket_update', ticketId: String(ticket._id), status: String(ticket.status), link, targetUrl: link },
+      }),
+      createInboxNotifications({
+        notifications: [{ ownerType: 'DELIVERY_PARTNER', ownerId: riderId, title, message, link, category: 'support_ticket', metadata: { ticketId: String(ticket._id), status: String(ticket.status) } }],
+      }),
+    ]);
+  } catch (err) {
+    logger.warn(`Rider ticket notification failed: ${err.message}`);
+  }
+}
+
 /** Reply to the rider and / or move the status. `actor` = { role: 'STORE_MANAGER' | 'FRANCHISE_ADMIN' | 'SUPER_ADMIN', userId, name }. */
 export async function updateRiderTicket(scope, actor, id, body = {}) {
   const t = await findInScope(scope, id);
@@ -129,11 +163,13 @@ export async function updateRiderTicket(scope, actor, id, body = {}) {
   if (reply === '' && status === undefined) throw new ValidationError('Write a reply first.');
 
   const now = new Date();
+  const statusBefore = t.status;
   if (reply) { t.adminResponse = reply; t.respondedAt = now; }
   if (status !== undefined) t.status = status;
   else if (reply && t.status === 'open') t.status = 'in_progress';
   t.handledBy = { role: actor.role, userId: isId(actor.userId) ? oid(actor.userId) : null, name: actor.name || '', at: now };
   t.activity.push({ at: now, byRole: actor.role, byName: actor.name || '', status: t.status, note: reply || '' });
   await t.save();
+  await notifyRiderOfTicketUpdate(t, { role: actor.role, reply: reply || '', statusChanged: t.status !== statusBefore });
   return getRiderTicket(scope, t._id);
 }

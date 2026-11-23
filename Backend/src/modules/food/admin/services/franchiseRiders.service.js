@@ -146,7 +146,7 @@ export async function franchiseDeliveryPartners(scope, query = {}) {
 // ---------------------------------------------------------------------------------------------
 
 const VERIFY_FIELDS = 'name phone email address city state vehicleType vehicleName vehicleNumber drivingLicenseNumber panNumber aadharNumber ' +
-  'profilePhoto aadharPhoto panPhoto drivingLicensePhoto status availabilityStatus lastLocationAt rating franchiseId storeId ' +
+  'profilePhoto aadharPhoto panPhoto drivingLicensePhoto vehicleRcPhoto vehicleInsurancePhoto addressProofPhoto status availabilityStatus lastLocationAt rating franchiseId storeId ' +
   'approvedAt approvedBy rejectionReason rejectedAt suspendedAt suspensionReason approvalHistory createdAt updatedAt';
 
 /** The rider, if this franchise may manage it; 404 otherwise (another franchise's or a far rider). */
@@ -182,6 +182,9 @@ export async function franchiseRiderDetails(scope, riderId) {
     pan: { number: r.panNumber || '', document: r.panPhoto || null },
     drivingLicense: { number: r.drivingLicenseNumber || '', document: r.drivingLicensePhoto || null },
     selfie: { document: r.profilePhoto || null },
+    vehicleRc: { document: r.vehicleRcPhoto || null },
+    vehicleInsurance: { document: r.vehicleInsurancePhoto || null },
+    addressProof: { document: r.addressProofPhoto || null },
   };
   return {
     _id: r._id,
@@ -191,6 +194,7 @@ export async function franchiseRiderDetails(scope, riderId) {
     vehicleType: r.vehicleType || '', vehicleName: r.vehicleName || '', vehicleNumber: r.vehicleNumber || '',
     drivingLicenseNumber: r.drivingLicenseNumber || '', aadharNumber: r.aadharNumber || '', panNumber: r.panNumber || '',
     profilePhoto: r.profilePhoto || null, aadharPhoto: r.aadharPhoto || null, panPhoto: r.panPhoto || null, drivingLicensePhoto: r.drivingLicensePhoto || null,
+    vehicleRcPhoto: r.vehicleRcPhoto || null, vehicleInsurancePhoto: r.vehicleInsurancePhoto || null, addressProofPhoto: r.addressProofPhoto || null,
     documents: docs,
     status: r.status, approvalStatus: r.status, availabilityStatus: r.availabilityStatus || 'offline',
     lastLocationAt: r.lastLocationAt || null, rating: r.rating || 0,

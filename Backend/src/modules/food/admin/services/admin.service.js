@@ -1892,7 +1892,7 @@ export async function getFeeSettings() {
     return { feeSettings: doc || null };
 }
 
-const EXTRA_FEE_FIELDS = ['handlingFee', 'cancellationFee', 'cancellationFreeMinutes'];
+const EXTRA_FEE_FIELDS = ['handlingFee', 'cancellationFee', 'cancellationFreeMinutes', 'riderSearchRadiusKm'];
 
 export async function upsertFeeSettings(body) {
     // Single active doc pattern: keep only one active record.
@@ -3715,6 +3715,8 @@ export async function updateDeliverySupportTicket(id, body = {}) {
     const ticket = await DeliverySupportTicket.findById(id);
     if (!ticket) return null;
     const { status, adminResponse } = body || {};
+    const statusBefore = ticket.status;
+    const replyBefore = ticket.adminResponse || '';
     if (status !== undefined) {
         const allowed = ['open', 'in_progress', 'resolved', 'closed'];
         if (allowed.includes(String(status))) ticket.status = String(status);
@@ -3726,6 +3728,9 @@ export async function updateDeliverySupportTicket(id, body = {}) {
     ticket.handledBy = { role: 'SUPER_ADMIN', userId: null, name: '', at: new Date() };
     ticket.activity.push({ at: new Date(), byRole: 'SUPER_ADMIN', status: ticket.status, note: ticket.adminResponse || '' });
     await ticket.save();
+    const { notifyRiderOfTicketUpdate } = await import('../../delivery/services/riderTickets.service.js');
+    const newReply = ticket.adminResponse && ticket.adminResponse !== replyBefore ? ticket.adminResponse : '';
+    await notifyRiderOfTicketUpdate(ticket, { role: 'SUPER_ADMIN', reply: newReply, statusChanged: ticket.status !== statusBefore });
     return ticket.toObject();
 }
 
@@ -4422,6 +4427,9 @@ export async function getDeliveryPartnerById(id) {
                 ? { number: partner.panNumber || null, document: partner.panPhoto || null }
                 : null,
             drivingLicense: partner.drivingLicensePhoto ? { document: partner.drivingLicensePhoto } : null,
+            vehicleRc: partner.vehicleRcPhoto ? { document: partner.vehicleRcPhoto } : null,
+            vehicleInsurance: partner.vehicleInsurancePhoto ? { document: partner.vehicleInsurancePhoto } : null,
+            addressProof: partner.addressProofPhoto ? { document: partner.addressProofPhoto } : null,
             bankDetails:
                 partner.bankAccountHolderName || partner.bankAccountNumber || partner.bankIfscCode || partner.bankName || partner.upiId
                     ? {
