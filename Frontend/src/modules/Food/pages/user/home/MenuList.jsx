@@ -14,14 +14,7 @@ import MenuSearchOverlay from "@food/components/user/MenuSearchOverlay"
 import { CartBottomBar, InlineUpsell } from "../cart/upsell/CartUpsell"
 
 
-const CRUST_OPTIONS = [
-  {
-    name: "New Hand Tossed",
-    description: "Fresh Dough, Flavourful Edges",
-    price: 0,
-    image: "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=120&auto=format&fit=crop&q=80"
-  }
-];
+const CRUST_OPTIONS = [];
 
 export default function MenuList() {
   const navigate = useNavigate()

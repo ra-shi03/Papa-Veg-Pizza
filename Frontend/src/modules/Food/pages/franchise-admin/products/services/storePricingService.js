@@ -1,24 +1,27 @@
 // Store Pricing Service Layer
 // Persists and retrieves data from LocalStorage for store_products and product_price_history collections.
 
-import { initialStores } from "../../storeManagement/mockStoresData.js";
-import { mockCategories, initialProducts, initialStoreProducts, initialPriceHistory } from "../mockProducts.js";
+
+
+const categories = [];
+const storeProducts = [];
+const priceHistory = [];
 
 // Load from LocalStorage or seed defaults
 let storeProductsDb = JSON.parse(localStorage.getItem("pvp_store_products_db"));
-let priceHistoryDb = JSON.parse(localStorage.getItem("pvp_price_history_db")) || [...initialPriceHistory];
+let priceHistoryDb = JSON.parse(localStorage.getItem("pvp_price_history_db")) || [...priceHistory];
 
 const getProducts = () => {
-  return JSON.parse(localStorage.getItem("pvp_products_db")) || [...initialProducts];
+  return JSON.parse(localStorage.getItem("pvp_products_db")) || [...products];
 };
 
 const getStores = () => {
-  return JSON.parse(localStorage.getItem("mock_db_stores")) || [...initialStores];
+  return JSON.parse(localStorage.getItem("pvp_local_stores")) || [...stores];
 };
 
 // Initialize DB with seed data and default overrides
 if (!storeProductsDb) {
-  storeProductsDb = [...initialStoreProducts];
+  storeProductsDb = [...storeProducts];
   
   const activeStores = getStores().filter(s => s.status === "Active" || s.status === "Closed");
   const products = getProducts();
@@ -81,7 +84,7 @@ export const storePricingService = {
     let result = storeProductsDb.map((sp) => {
       const storeObj = stores.find((s) => s._id === sp.storeId);
       const productObj = products.find((p) => p._id === sp.productId);
-      const categoryObj = productObj ? mockCategories.find((c) => c._id === productObj.categoryId) : null;
+      const categoryObj = productObj ? categories.find((c) => c._id === productObj.categoryId) : null;
 
       return {
         ...sp,

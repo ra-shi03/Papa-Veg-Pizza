@@ -1,30 +1,28 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-import {
-  mockUsers,
-  mockCustomers,
-  mockOrders,
-  mockCustomerAddresses,
-  mockReviews,
-  mockLoyaltyTransactions,
-  mockComplaints,
-  mockCustomerBlocks,
-  mockActivityLogs,
-  mockStores
-} from "../mockData";
 
-// Initialize Local Mock DB in localStorage if it doesn't exist
-const initMockDB = () => {
+const emptyUsers = [];
+const emptyCustomers = [];
+const emptyOrders = [];
+const emptyCustomerAddresses = [];
+const emptyReviews = [];
+const loyaltyTransactions = [];
+const emptyComplaints = [];
+const customerBlocks = [];
+const activityLogs = [];
+
+// Initialize Local DB in localStorage if it doesn't exist
+const initLocalStore = () => {
   if (!localStorage.getItem("pv_db_initialized")) {
-    localStorage.setItem("pv_users", JSON.stringify(mockUsers));
-    localStorage.setItem("pv_customers", JSON.stringify(mockCustomers));
-    localStorage.setItem("pv_orders", JSON.stringify(mockOrders));
-    localStorage.setItem("pv_addresses", JSON.stringify(mockCustomerAddresses));
-    localStorage.setItem("pv_reviews", JSON.stringify(mockReviews));
-    localStorage.setItem("pv_loyalty_transactions", JSON.stringify(mockLoyaltyTransactions));
-    localStorage.setItem("pv_complaints", JSON.stringify(mockComplaints));
-    localStorage.setItem("pv_blocks", JSON.stringify(mockCustomerBlocks));
-    localStorage.setItem("pv_activity_logs", JSON.stringify(mockActivityLogs));
+    localStorage.setItem("pv_users", JSON.stringify(emptyUsers));
+    localStorage.setItem("pv_customers", JSON.stringify(emptyCustomers));
+    localStorage.setItem("pv_orders", JSON.stringify(emptyOrders));
+    localStorage.setItem("pv_addresses", JSON.stringify(emptyCustomerAddresses));
+    localStorage.setItem("pv_reviews", JSON.stringify(emptyReviews));
+    localStorage.setItem("pv_loyalty_transactions", JSON.stringify(loyaltyTransactions));
+    localStorage.setItem("pv_complaints", JSON.stringify(emptyComplaints));
+    localStorage.setItem("pv_blocks", JSON.stringify(customerBlocks));
+    localStorage.setItem("pv_activity_logs", JSON.stringify(activityLogs));
     localStorage.setItem("pv_db_initialized", "true");
   }
 };
@@ -66,14 +64,14 @@ export function useCustomers() {
 
   // Initialize DB
   useEffect(() => {
-    initMockDB();
+    initLocalStore();
     fetchStats();
     fetchCustomersList();
   }, []);
 
-  // Fetch stats from Local Mock DB
+  // Fetch stats from Local DB
   const fetchStats = useCallback(() => {
-    initMockDB();
+    initLocalStore();
     const users = getDB("pv_users");
     const custs = getDB("pv_customers");
 
@@ -109,7 +107,7 @@ export function useCustomers() {
   // Fetch list of customers based on search & filters (simulates server-side query)
   const fetchCustomersList = useCallback(() => {
     setLoading(true);
-    initMockDB();
+    initLocalStore();
     
     // Simulate slight network delay
     setTimeout(() => {
@@ -225,7 +223,7 @@ export function useCustomers() {
   // Fetch full details of a customer for the Drawer (fully populated)
   const fetchCustomerDetails = useCallback((id) => {
     setLoadingDetails(true);
-    initMockDB();
+    initLocalStore();
 
     setTimeout(() => {
       const users = getDB("pv_users");
@@ -273,7 +271,7 @@ export function useCustomers() {
 
   // Update Customer profile details
   const updateCustomer = useCallback((id, updatedFields) => {
-    initMockDB();
+    initLocalStore();
     const users = getDB("pv_users");
     const custs = getDB("pv_customers");
 
@@ -316,7 +314,7 @@ export function useCustomers() {
       customerId: id,
       activityType: "Admin Notes",
       description: "Profile information updated by Admin",
-      createdBy: "Admin Shubham",
+      createdBy: "You",
       createdAt: new Date().toISOString()
     });
     setDB("pv_activity_logs", activities);
@@ -333,7 +331,7 @@ export function useCustomers() {
 
   // Block Customer
   const blockCustomer = useCallback((id, blockDetails) => {
-    initMockDB();
+    initLocalStore();
     const users = getDB("pv_users");
     const custs = getDB("pv_customers");
     const blocks = getDB("pv_blocks");
@@ -355,7 +353,7 @@ export function useCustomers() {
       _id: `blk-${Date.now()}`,
       customerId: id,
       reason: blockDetails.reason,
-      blockedBy: "Admin Shubham",
+      blockedBy: "You",
       blockUntil: blockDetails.blockUntil || "",
       permanent: blockDetails.permanent,
       remarks: blockDetails.remarks || ""
@@ -369,7 +367,7 @@ export function useCustomers() {
       customerId: id,
       activityType: "Blocked/Unblocked",
       description: `Blocked: ${blockDetails.reason}. remarks: ${blockDetails.remarks || "none"}`,
-      createdBy: "Admin Shubham",
+      createdBy: "You",
       createdAt: new Date().toISOString()
     });
     setDB("pv_activity_logs", activities);
@@ -384,7 +382,7 @@ export function useCustomers() {
 
   // Unblock Customer
   const unblockCustomer = useCallback((id, unblockDetails) => {
-    initMockDB();
+    initLocalStore();
     const users = getDB("pv_users");
     const custs = getDB("pv_customers");
     const activities = getDB("pv_activity_logs");
@@ -406,7 +404,7 @@ export function useCustomers() {
       customerId: id,
       activityType: "Blocked/Unblocked",
       description: `Unblocked. Remarks: ${unblockDetails.remarks || "Account reactivated"}`,
-      createdBy: "Admin Shubham",
+      createdBy: "You",
       createdAt: new Date().toISOString()
     });
     setDB("pv_activity_logs", activities);
@@ -421,7 +419,7 @@ export function useCustomers() {
 
   // Adjust Loyalty Points
   const adjustPoints = useCallback((id, pointsDetails) => {
-    initMockDB();
+    initLocalStore();
     const custs = getDB("pv_customers");
     const loyTxns = getDB("pv_loyalty_transactions");
     const activities = getDB("pv_activity_logs");
@@ -462,7 +460,7 @@ export function useCustomers() {
       customerId: id,
       activityType: "Points Redeemed",
       description: `${pointsDetails.type}ed ${adjustedAmount} points. Balance: ${newPoints}`,
-      createdBy: "Admin Shubham",
+      createdBy: "You",
       createdAt: new Date().toISOString()
     });
     setDB("pv_activity_logs", activities);
@@ -476,7 +474,7 @@ export function useCustomers() {
 
   // Add Internal Admin Note
   const addNote = useCallback((id, noteText) => {
-    initMockDB();
+    initLocalStore();
     const custs = getDB("pv_customers");
     const activities = getDB("pv_activity_logs");
 
@@ -487,7 +485,7 @@ export function useCustomers() {
     const newNoteObj = {
       id: `note-${Date.now()}`,
       note: noteText,
-      createdBy: "Admin Shubham",
+      createdBy: "You",
       createdAt: new Date().toISOString()
     };
     
@@ -500,7 +498,7 @@ export function useCustomers() {
       customerId: id,
       activityType: "Admin Notes",
       description: `Added internal note: "${noteText.substring(0, 30)}..."`,
-      createdBy: "Admin Shubham",
+      createdBy: "You",
       createdAt: new Date().toISOString()
     });
     setDB("pv_activity_logs", activities);
@@ -514,7 +512,7 @@ export function useCustomers() {
 
   // Delete Internal Note
   const deleteNote = useCallback((id, noteId) => {
-    initMockDB();
+    initLocalStore();
     const custs = getDB("pv_customers");
     const customerIndex = custs.findIndex(c => c._id === id);
     if (customerIndex === -1) return false;
@@ -532,7 +530,7 @@ export function useCustomers() {
 
   // Add Address
   const addAddress = useCallback((id, addressDetails) => {
-    initMockDB();
+    initLocalStore();
     const addresses = getDB("pv_addresses");
     const activities = getDB("pv_activity_logs");
 
@@ -569,7 +567,7 @@ export function useCustomers() {
       customerId: id,
       activityType: "Orders Placed", // using existing type for logs
       description: `Added new ${addressDetails.addressType} address`,
-      createdBy: "Admin Shubham",
+      createdBy: "You",
       createdAt: new Date().toISOString()
     });
     setDB("pv_activity_logs", activities);
@@ -581,7 +579,7 @@ export function useCustomers() {
 
   // Set Default Address
   const setDefaultAddress = useCallback((id, addressId) => {
-    initMockDB();
+    initLocalStore();
     let addresses = getDB("pv_addresses");
 
     addresses = addresses.map(addr => {
@@ -599,7 +597,7 @@ export function useCustomers() {
 
   // Delete Address
   const deleteAddress = useCallback((id, addressId) => {
-    initMockDB();
+    initLocalStore();
     const addresses = getDB("pv_addresses");
     const filtered = addresses.filter(addr => !(addr.customerId === id && addr._id === addressId));
     setDB("pv_addresses", filtered);
@@ -611,7 +609,7 @@ export function useCustomers() {
 
   // Delete Customer
   const deleteCustomer = useCallback((id) => {
-    initMockDB();
+    initLocalStore();
     const users = getDB("pv_users");
     const custs = getDB("pv_customers");
 

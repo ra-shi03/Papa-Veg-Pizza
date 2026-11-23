@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { X, Download, FileSpreadsheet, FileText, File } from 'lucide-react';
 import { toast } from 'sonner';
+import { getOrders } from '../AllOrdersData';
 
 export default function ExportModal({ isOpen, onClose, activeFilters }) {
   const [format, setFormat] = useState('csv');
@@ -9,25 +10,28 @@ export default function ExportModal({ isOpen, onClose, activeFilters }) {
 
   if (!isOpen) return null;
 
-  const handleExport = () => {
+  const handleExport = async () => {
     setExporting(true);
-    setTimeout(() => {
-      setExporting(false);
-      
-      // Simulated browser download trigger
-      const dataStr = "Mock CSV Data for Orders Management";
-      const dataUri = 'data:application/txt;charset=utf-8,'+ encodeURIComponent(dataStr);
-      const exportFileDefaultName = `PapaVegPizza_Orders_Export_${new Date().toISOString().substring(0,10)}.${format}`;
-      
+    try {
+      // The real orders matching the screen's filters
+      const result = await getOrders(activeFilters || {}, 1, 100000);
+      const rows = result.orders || [];
+      const cols = [['Order', 'orderNumber'], ['Placed', 'createdAt'], ['Customer', (o) => o.customer?.name], ['Store', (o) => o.store?.name], ['Status', 'orderStatus'], ['Payment', 'paymentMethod'], ['Payment status', 'paymentStatus'], ['Total', 'grandTotal']];
+      const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const csv = [cols.map((c) => c[0]).join(','), ...rows.map((o) => cols.map(([, k]) => cell(typeof k === 'function' ? k(o) : o[k])).join(','))].join('\n');
       const linkElement = document.createElement('a');
-      linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.setAttribute('href', URL.createObjectURL(new Blob([csv], { type: 'text/csv' })));
+      linkElement.setAttribute('download', `PapaVegPizza_Orders_Export_${new Date().toISOString().substring(0, 10)}.csv`);
       linkElement.click();
-
-      toast.success(`Report exported successfully as ${format.toUpperCase()}`);
+      toast.success(`${rows.length} orders exported as CSV`);
       onClose();
-    }, 1200);
+    } catch (err) {
+      toast.error(err?.message || 'Could not export the orders');
+    } finally {
+      setExporting(false);
+    }
   };
+
 
   const getActiveFiltersCount = () => {
     let count = 0;

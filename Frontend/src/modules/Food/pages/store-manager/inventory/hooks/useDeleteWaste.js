@@ -1,8 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
-import { INV, failOrMock } from "./inventoryApi";
-import { getLocalWasteLogs, setLocalWasteLogs } from "../mockData";
+import { INV, throwApiError } from "./inventoryApi";
 
 export function useDeleteWaste() {
   const queryClient = useQueryClient();
@@ -24,30 +23,8 @@ export function useDeleteWaste() {
         }
         throw new Error(response.data?.message || "Failed to delete waste log on backend");
       } catch (err) {
-        failOrMock(err);
-        console.warn("Backend API unavailable. Deleting waste log from local storage database.");
-
-        // Simulate network delay
-        await new Promise((resolve) => setTimeout(resolve, 300));
-
-        const wasteLogs = getLocalWasteLogs();
-        const logIndex = wasteLogs.findIndex(w => w._id === wasteId);
-
-        if (logIndex === -1) {
-          throw new Error("Waste log not found in local database");
-        }
-
-        // We mark status as "deleted" to soft-delete it
-        wasteLogs[logIndex] = {
-          ...wasteLogs[logIndex],
-          status: "deleted"
-        };
-        setLocalWasteLogs(wasteLogs);
-
-        return {
-          success: true,
-          message: "Waste record deleted successfully from local database"
-        };
+        throwApiError(err);
+        
       }
     },
     onSuccess: (data) => {

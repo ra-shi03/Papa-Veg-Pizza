@@ -4,33 +4,10 @@ import AnimatedPage from "@food/components/user/AnimatedPage"
 import Header from "@food/components/user/Header"
 import useNotificationInbox from "@food/hooks/useNotificationInbox"
 
-// Initial mock notification data (fallback if localStorage is empty)
-const DEFAULT_NOTIFICATIONS = [
-  {
-    id: "1",
-    type: "order",
-    title: "Order Confirmed",
-    message: "Your order #12345 has been confirmed and is being prepared",
-    time: "2 minutes ago",
-    timestamp: Date.now() - 120000,
-    read: false,
-    icon: "CheckCircle2",
-    iconColor: "text-green-500"
-  },
-  {
-    id: "2",
-    type: "offer",
-    title: "Special Offer",
-    message: "Get 50% off on your next order above ₹500",
-    time: "1 hour ago",
-    timestamp: Date.now() - 3600000,
-    read: false,
-    icon: "Tag",
-    iconColor: "text-orange-500"
-  }
-]
+// Initial notification data (fallback if localStorage is empty)
+const DEFAULT_NOTIFICATIONS = []
 
-// Mappings from Lucide / mock data names to Google Material Symbols
+// Mappings from Lucide / data names to Google Material Symbols
 const getMaterialIcon = (iconName) => {
   switch (iconName) {
     case "CheckCircle2":

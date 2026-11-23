@@ -4,59 +4,19 @@ import { toast } from "sonner";
 import io from "socket.io-client";
 import apiClient from "@/services/api/axios";
 
-// The real endpoints are the source of truth. The localStorage mock below only runs when VITE_STANDALONE_MOCK=true.
-const STANDALONE_MOCK = import.meta.env?.VITE_STANDALONE_MOCK === "true";
+
+
 const KITCHEN = "/food/store/kitchen";
-import {
-  mockPackagingStaff,
-  initialMockPackagingOrders,
-  initialMockPackagingLogs
-} from "../mockData";
+
 
 // LocalStorage Keys
-const PACKAGING_ORDERS_KEY = "pvp_packaging_orders";
-const PACKAGING_LOGS_KEY = "pvp_packaging_logs";
-const PACKAGING_STAFF_KEY = "pvp_packaging_staff";
 
-// Initialize mock DB in LocalStorage
-const initializeMockDb = () => {
-  if (!localStorage.getItem(PACKAGING_ORDERS_KEY)) {
-    localStorage.setItem(PACKAGING_ORDERS_KEY, JSON.stringify(initialMockPackagingOrders));
-  }
-  if (!localStorage.getItem(PACKAGING_LOGS_KEY)) {
-    localStorage.setItem(PACKAGING_LOGS_KEY, JSON.stringify(initialMockPackagingLogs));
-  }
-  if (!localStorage.getItem(PACKAGING_STAFF_KEY)) {
-    localStorage.setItem(PACKAGING_STAFF_KEY, JSON.stringify(mockPackagingStaff));
-  }
-};
 
-initializeMockDb();
 
 // Helper functions for LocalStorage access
-const getLocalOrders = () => {
-  try {
-    return JSON.parse(localStorage.getItem(PACKAGING_ORDERS_KEY)) || [];
-  } catch (e) {
-    return [];
-  }
-};
 
-const setLocalOrders = (orders) => {
-  localStorage.setItem(PACKAGING_ORDERS_KEY, JSON.stringify(orders));
-};
 
-const getLocalLogs = () => {
-  try {
-    return JSON.parse(localStorage.getItem(PACKAGING_LOGS_KEY)) || [];
-  } catch (e) {
-    return [];
-  }
-};
 
-const setLocalLogs = (logs) => {
-  localStorage.setItem(PACKAGING_LOGS_KEY, JSON.stringify(logs));
-};
 
 export function usePackagingStation(filters = {}) {
   const queryClient = useQueryClient();
@@ -100,38 +60,9 @@ export function usePackagingStation(filters = {}) {
       queryClient.invalidateQueries({ queryKey: ["packagingStation"] });
     });
 
-    // Standalone Simulation mode for demo
-    let simulationTimer;
-    if (import.meta.env?.VITE_STANDALONE_MOCK === "true") {
-      setSocketConnected(true);
-
-      // Random simulator to change state
-      simulationTimer = setInterval(() => {
-        const local = getLocalOrders();
-        
-        // Find a ready_for_packaging order
-        const readyOrder = local.find(o => o.packaging_status === "ready_for_packaging");
-        if (readyOrder) {
-          // Auto start packaging
-          const updated = local.map(o =>
-            o._id === readyOrder._id
-              ? {
-                  ...o,
-                  packaging_status: "packaging_started",
-                  assigned_staff: "staff-pack-001",
-                  packaging_start_time: new Date().toISOString()
-                }
-              : o
-          );
-          setLocalOrders(updated);
-          queryClient.invalidateQueries({ queryKey: ["packagingStation"] });
-          toast.info(`Simulated: Started packaging for Order #${readyOrder.orderNumber}`);
-        }
-      }, 60000);
-    }
+    
 
     return () => {
-      if (simulationTimer) clearInterval(simulationTimer);
       socket.disconnect();
     };
   }, [queryClient]);
@@ -157,51 +88,12 @@ export function usePackagingStation(filters = {}) {
         if (apiItems && apiItems.length > 0) {
           return apiItems;
         }
-        if (!STANDALONE_MOCK) return apiItems;
-        throw new Error("No packaging orders returned");
+        return apiItems;
+        
       } catch (err) {
-        if (!STANDALONE_MOCK) throw err;
+        throw err;
         // Fallback simulated list
-        let list = getLocalOrders();
-
-        // Search filter
-        if (filters.search) {
-          const q = filters.search.toLowerCase();
-          list = list.filter(
-            (o) =>
-              o._id.toLowerCase().includes(q) ||
-              o.orderNumber.toLowerCase().includes(q) ||
-              o.customer.name.toLowerCase().includes(q) ||
-              (o.assigned_staff &&
-                (JSON.parse(localStorage.getItem(PACKAGING_STAFF_KEY)) || mockPackagingStaff)
-                  .find((s) => s._id === o.assigned_staff)
-                  ?.name.toLowerCase()
-                  .includes(q))
-          );
-        }
-
-        // Dropdown filters
-        if (filters.status && filters.status !== "All") {
-          list = list.filter((o) => o.packaging_status === filters.status);
-        }
-
-        if (filters.deliveryType && filters.deliveryType !== "All") {
-          list = list.filter((o) => o.deliveryType === filters.deliveryType);
-        }
-
-        if (filters.staff && filters.staff !== "All") {
-          list = list.filter((o) => o.assigned_staff === filters.staff);
-        }
-
-        if (filters.readyForPickup === "true") {
-          list = list.filter((o) => o.status === "ready_for_pickup");
-        }
-
-        if (filters.pendingPackaging === "true") {
-          list = list.filter((o) => o.packaging_status === "ready_for_packaging");
-        }
-
-        return list;
+        
       }
     },
     refetchInterval: 15000,
@@ -231,11 +123,11 @@ export function usePackagingStaff() {
         if (list && list.length > 0) {
           return list;
         }
-        if (!STANDALONE_MOCK) return list;
-        throw new Error("No staff returned");
+        return list;
+        
       } catch (err) {
-        if (!STANDALONE_MOCK) throw err;
-        return JSON.parse(localStorage.getItem(PACKAGING_STAFF_KEY)) || mockPackagingStaff;
+        throw err;
+        
       }
     }
   });
@@ -250,20 +142,8 @@ export function useStartPackaging() {
         const response = await apiClient.put(`${KITCHEN}/packaging/start`, { orderId });
         return response.data;
       } catch (err) {
-        if (!STANDALONE_MOCK) throw err;
-        const local = getLocalOrders();
-        const updated = local.map((o) =>
-          o._id === orderId
-            ? {
-                ...o,
-                packaging_status: "packaging_started",
-                assigned_staff: "staff-pack-001", // Default logged-in staff simulation
-                packaging_start_time: new Date().toISOString()
-              }
-            : o
-        );
-        setLocalOrders(updated);
-        return { success: true, orderId };
+        throw err;
+        
       }
     },
     onSuccess: () => {
@@ -285,35 +165,8 @@ export function usePackagingChecklist() {
         const response = await apiClient.post(`${KITCHEN}/packaging/checklist`, payload);
         return response.data;
       } catch (err) {
-        if (!STANDALONE_MOCK) throw err;
-        const local = getLocalOrders();
-        const localLogs = getLocalLogs();
-
-        // 1. Create Log
-        const newLog = {
-          _id: `log-${Date.now()}`,
-          orderId: payload.orderId,
-          pizzaCountVerified: payload.pizzaCountVerified,
-          saucesIncluded: payload.saucesIncluded,
-          cutleryIncluded: payload.cutleryIncluded,
-          billAttached: payload.billAttached,
-          qualityVerified: payload.qualityVerified,
-          packagingSealed: payload.packagingSealed,
-          notes: payload.notes || "",
-          packaging_staff: "staff-pack-001",
-          createdAt: new Date().toISOString()
-        };
-
-        // 2. Update Order
-        const updatedOrders = local.map((o) =>
-          o._id === payload.orderId
-            ? { ...o, packaging_status: "quality_checked" }
-            : o
-        );
-
-        setLocalOrders(updatedOrders);
-        setLocalLogs([newLog, ...localLogs]);
-        return { success: true };
+        throw err;
+        
       }
     },
     onSuccess: () => {
@@ -335,19 +188,8 @@ export function useSealPackage() {
         const response = await apiClient.put(`${KITCHEN}/packaging/seal`, { orderId, remarks });
         return response.data;
       } catch (err) {
-        if (!STANDALONE_MOCK) throw err;
-        const local = getLocalOrders();
-        const updated = local.map((o) =>
-          o._id === orderId
-            ? {
-                ...o,
-                packaging_status: "sealed",
-                packaging_end_time: new Date().toISOString()
-              }
-            : o
-        );
-        setLocalOrders(updated);
-        return { success: true };
+        throw err;
+        
       }
     },
     onSuccess: () => {
@@ -371,19 +213,8 @@ export function useMarkReady() {
         });
         return response.data;
       } catch (err) {
-        if (!STANDALONE_MOCK) throw err;
-        const local = getLocalOrders();
-        const updated = local.map((o) =>
-          o._id === orderId
-            ? {
-                ...o,
-                status: "ready_for_pickup",
-                packaging_status: "ready_for_pickup"
-              }
-            : o
-        );
-        setLocalOrders(updated);
-        return { success: true };
+        throw err;
+        
       }
     },
     onSuccess: () => {

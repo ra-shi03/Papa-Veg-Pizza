@@ -2,41 +2,8 @@ import React, { useState, useEffect } from "react";
 import { X, Search, Check, AlertTriangle, ArrowRight, ArrowLeft, ShieldAlert } from "lucide-react";
 
 // Geographic Hierarchy Mapping dictionary
-const GEOGRAPHY_MAPPING = {
-  stores: {
-    "Vijay Nagar": { franchise: "Indore Central", territory: "Indore", zone: "Madhya Pradesh", region: "Central India" },
-    "Scheme 54": { franchise: "Indore Central", territory: "Indore", zone: "Madhya Pradesh", region: "Central India" },
-    "MP Nagar": { franchise: "Bhopal Zone", territory: "Bhopal", zone: "Madhya Pradesh", region: "Central India" },
-    "Arera Colony": { franchise: "Bhopal Zone", territory: "Bhopal", zone: "Madhya Pradesh", region: "Central India" },
-    "Bandra West": { franchise: "Mumbai Premium", territory: "Mumbai", zone: "Maharashtra", region: "West India" },
-    "CP Market": { franchise: "Delhi Express", territory: "Delhi", zone: "Delhi NCR", region: "North India" },
-    "SG Road": { franchise: "Ahmedabad Local", territory: "Ahmedabad", zone: "Gujarat", region: "West India" },
-    "Indiranagar": { franchise: "Bengaluru Central", territory: "Bengaluru", zone: "Karnataka", region: "South India" }
-  },
-  franchises: {
-    "Indore Central": { territory: "Indore", zone: "Madhya Pradesh", region: "Central India" },
-    "Bhopal Zone": { territory: "Bhopal", zone: "Madhya Pradesh", region: "Central India" },
-    "Mumbai Premium": { territory: "Mumbai", zone: "Maharashtra", region: "West India" },
-    "Delhi Express": { territory: "Delhi", zone: "Delhi NCR", region: "North India" },
-    "Ahmedabad Local": { territory: "Ahmedabad", zone: "Gujarat", region: "West India" },
-    "Bengaluru Central": { territory: "Bengaluru", zone: "Karnataka", region: "South India" }
-  },
-  territories: {
-    "Indore": { zone: "Madhya Pradesh", region: "Central India" },
-    "Bhopal": { zone: "Madhya Pradesh", region: "Central India" },
-    "Mumbai": { zone: "Maharashtra", region: "West India" },
-    "Delhi": { zone: "Delhi NCR", region: "North India" },
-    "Ahmedabad": { zone: "Gujarat", region: "West India" },
-    "Bengaluru": { zone: "Karnataka", region: "South India" }
-  },
-  zones: {
-    "Madhya Pradesh": { region: "Central India" },
-    "Maharashtra": { region: "West India" },
-    "Delhi NCR": { region: "North India" },
-    "Gujarat": { region: "West India" },
-    "Karnataka": { region: "South India" }
-  }
-};
+// Which franchise / territory / zone / region a store belongs to: not loaded from the server here yet
+const GEOGRAPHY_MAPPING = { stores: {}, franchises: {}, territories: {}, zones: {} };
 
 export default function CreateUpdatePricingModal({ isOpen, onClose, rule, productsList = [], onSave }) {
   const [currentStep, setCurrentStep] = useState(1);
@@ -259,11 +226,11 @@ export default function CreateUpdatePricingModal({ isOpen, onClose, rule, produc
   };
 
   // Geography options lists
-  const regionOptions = ["Central India", "West India", "North India", "South India", "East India"];
-  const zoneOptions = ["Madhya Pradesh", "Maharashtra", "Delhi NCR", "Gujarat", "Karnataka"];
-  const territoryOptions = ["Indore", "Bhopal", "Mumbai", "Delhi", "Ahmedabad", "Bengaluru"];
-  const franchiseOptions = ["Indore Central", "Bhopal Zone", "Mumbai Premium", "Delhi Express", "Ahmedabad Local", "Bengaluru Central"];
-  const storeOptions = ["Vijay Nagar", "Scheme 54", "MP Nagar", "Arera Colony", "Bandra West", "CP Market", "SG Road", "Indiranagar"];
+  const regionOptions = [];
+  const zoneOptions = [];
+  const territoryOptions = [];
+  const franchiseOptions = [];
+  const storeOptions = [];
 
   // Filtered dropdown lists for Step 1 Product Selector
   const filteredProducts = productsList.filter(p =>
@@ -606,7 +573,7 @@ export default function CreateUpdatePricingModal({ isOpen, onClose, rule, produc
                   {[
                     { key: "active", label: "Active Override", desc: "Live and applied on checkouts" },
                     { key: "scheduled", label: "Scheduled", desc: "Pending start date trigger" },
-                    { key: "draft", label: "Save Draft", desc: "Unpublished pricing rule mock" },
+                    { key: "draft", label: "Save Draft", desc: "Unpublished pricing rule" },
                     { key: "archived", label: "Archived", desc: "Soft-deleted historical reference" }
                   ].map(item => (
                     <button

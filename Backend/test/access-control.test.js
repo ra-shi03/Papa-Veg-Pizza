@@ -78,7 +78,6 @@ runMatrix('/v1/food/admin: platform-wide routes are super admin only', [
     ['GET', '/v1/food/admin/stores/:A/analytics', SUPER],
     ['POST', '/v1/food/admin/regions', SUPER],
     ['GET', '/v1/food/admin/delivery/partners', ADMINS],   // a franchise admin gets only its nearby riders (rider-lists.test.js)
-    ['GET', '/v1/food/admin/offers', SUPER],
     ['GET', '/v1/food/admin/withdrawals', SUPER],
     ['GET', '/v1/food/admin/sidebar-badges', SUPER],
     ['PATCH', '/v1/food/admin/customers/64b000000000000000000001/status', SUPER],

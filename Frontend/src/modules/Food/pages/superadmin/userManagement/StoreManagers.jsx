@@ -223,7 +223,7 @@ export default function StoreManagers() {
             <div className="flex items-baseline gap-1.5 flex-wrap">
               <h3 className="text-lg font-black text-black dark:text-white mt-0.5">{kpis.total}</h3>
               <span className="text-emerald-500 font-bold text-[8px] flex items-center gap-0.5">
-                <ArrowUpRight size={10} /> +12%
+                <ArrowUpRight size={10} /> —
               </span>
             </div>
             <div className="mt-1.5 h-4 w-16 bg-zinc-50 dark:bg-zinc-950 rounded overflow-hidden relative">
@@ -244,7 +244,7 @@ export default function StoreManagers() {
             <div className="flex items-baseline gap-1.5 flex-wrap">
               <h3 className="text-lg font-black text-black dark:text-white mt-0.5">{kpis.active}</h3>
               <span className="text-emerald-500 font-bold text-[8px] flex items-center gap-0.5">
-                <ArrowUpRight size={10} /> +3%
+                <ArrowUpRight size={10} /> —
               </span>
             </div>
             <div className="mt-1.5 h-4 w-16 bg-zinc-50 dark:bg-zinc-950 rounded overflow-hidden relative">
@@ -284,7 +284,7 @@ export default function StoreManagers() {
             <div className="flex items-baseline gap-1.5 flex-wrap">
               <h3 className="text-lg font-black text-black dark:text-white mt-0.5">{kpis.suspended}</h3>
               <span className="text-rose-500 font-bold text-[8px] flex items-center gap-0.5">
-                <TrendingDown size={10} /> -2%
+                <TrendingDown size={10} /> —
               </span>
             </div>
             <div className="mt-1.5 h-4 w-16 bg-zinc-50 dark:bg-zinc-950 rounded overflow-hidden relative">

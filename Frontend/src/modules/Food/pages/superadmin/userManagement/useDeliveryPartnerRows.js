@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
 import { adminAPI } from "@food/api"
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 const errorText = (err) =>
   err?.response?.data?.message || err?.response?.data?.error || err?.message || "Could not load delivery partners"
@@ -50,14 +49,14 @@ export function toRiderRow(p, { storeNames = new Map(), franchiseNames = new Map
  * signups (/food/admin/delivery/join-requests), with the real store and franchise lists for the filters.
  */
 export default function useDeliveryPartnerRows(initialRiders = []) {
-  const [riders, setRiders] = useState(STANDALONE_MOCK ? initialRiders : [])
+  const [riders, setRiders] = useState(([]))
   const [stores, setStores] = useState([])
   const [franchises, setFranchises] = useState([])
-  const [loading, setLoading] = useState(!STANDALONE_MOCK)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
   const reload = useCallback(async () => {
-    if (STANDALONE_MOCK) return
+    
     setLoading(true)
     setError("")
     try {

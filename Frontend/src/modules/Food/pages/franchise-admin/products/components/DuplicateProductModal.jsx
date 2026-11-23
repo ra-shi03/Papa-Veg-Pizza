@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { X, Copy, Check, AlertCircle } from "lucide-react";
-import { mockCategories } from "../mockProducts";
 import { toast } from "sonner";
+
+const categories = [];
 
 export default function DuplicateProductModal({ isOpen, onClose, product, onSubmit }) {
   const [name, setName] = useState("");
@@ -114,7 +115,7 @@ export default function DuplicateProductModal({ isOpen, onClose, product, onSubm
                 onChange={(e) => setCategoryId(e.target.value)}
                 className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-[var(--primary)] text-zinc-800 dark:text-zinc-250 cursor-pointer"
               >
-                {mockCategories.map((c) => (
+                {categories.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>

@@ -1,18 +1,17 @@
 // Product Service Layer
 // Mimics a backend API coupled with database collections in-memory.
 
-import { 
-  initialProducts, 
-  initialVariants, 
-  initialStorePricing, 
-  initialProductImages 
-} from "./mockProducts";
+
+const emptyProducts = [];
+const emptyVariants = [];
+const storePricing = [];
+const productImages = [];
 
 // Read from localStorage if existing, otherwise initialize
-let productsDb = JSON.parse(localStorage.getItem("pvp_products_db")) || [...initialProducts];
-let variantsDb = JSON.parse(localStorage.getItem("pvp_variants_db")) || [...initialVariants];
-let storePricingDb = JSON.parse(localStorage.getItem("pvp_store_pricing_db")) || [...initialStorePricing];
-let productImagesDb = JSON.parse(localStorage.getItem("pvp_product_images_db")) || [...initialProductImages];
+let productsDb = JSON.parse(localStorage.getItem("pvp_products_db")) || [...emptyProducts];
+let variantsDb = JSON.parse(localStorage.getItem("pvp_variants_db")) || [...emptyVariants];
+let storePricingDb = JSON.parse(localStorage.getItem("pvp_store_pricing_db")) || [...storePricing];
+let productImagesDb = JSON.parse(localStorage.getItem("pvp_product_images_db")) || [...productImages];
 
 const persistDb = () => {
   localStorage.setItem("pvp_products_db", JSON.stringify(productsDb));

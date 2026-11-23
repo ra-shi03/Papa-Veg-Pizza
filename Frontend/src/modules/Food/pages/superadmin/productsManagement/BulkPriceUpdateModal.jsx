@@ -58,7 +58,7 @@ export default function BulkPriceUpdateModal({ isOpen, onClose, productsList = [
     );
   };
 
-  // Helper to calculate the mock after-price
+  // Helper to calculate the after-price
   const calculateAfterPrice = (beforePrice) => {
     const val = parseFloat(value) || 0;
     let finalPrice = beforePrice;

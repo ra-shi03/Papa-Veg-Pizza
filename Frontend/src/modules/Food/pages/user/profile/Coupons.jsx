@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import AnimatedPage from "@food/components/user/AnimatedPage"
 import apiClient from "@/services/api/axios"
+import { couponStoreParams } from "@food/utils/savedLocation"
 import useAppBackNavigation from "@food/hooks/useAppBackNavigation"
 import { useAppConfig } from "@food/context/AppConfigContext"
 import { toast } from "sonner"
@@ -58,7 +59,7 @@ export default function Coupons() {
 
     // 1. Fetch from backend public endpoint
     try {
-      const res = await apiClient.get("/settings/coupons/public")
+      const res = await apiClient.get("/settings/coupons/public", { params: couponStoreParams() })
       const data = res?.data?.data || res?.data
       if (Array.isArray(data) && data.length > 0) {
         items = data
@@ -140,8 +141,9 @@ export default function Coupons() {
     if (!code) return
 
     const minOrder = coupon.minimumOrderAmount || coupon.minOrderValue || 0
-    const maxDiscount = coupon.maximumDiscount || coupon.maxDiscount || coupon.value || coupon.discountValue || 80
     const isPercentage = coupon.couponType === "Percentage" || coupon.discountType === "percentage"
+    const couponValue = Number(coupon.value || coupon.discountValue || 0)
+    const maxDiscount = Number(coupon.maximumDiscount || coupon.maxDiscount || 0) || (isPercentage ? null : couponValue)
 
     // If already applied, allow user to unapply or show notification
     if (appliedCode === code) {
@@ -157,9 +159,9 @@ export default function Coupons() {
       code,
       couponCode: code,
       title: coupon.title,
-      value: coupon.value || coupon.discountValue || maxDiscount,
-      discount: coupon.value || coupon.discountValue || maxDiscount,
-      discountValue: coupon.value || coupon.discountValue || maxDiscount,
+      value: couponValue,
+      discount: couponValue,
+      discountValue: couponValue,
       discountType: isPercentage ? "percentage" : "flat-price",
       minOrder,
       minimumOrderAmount: minOrder,

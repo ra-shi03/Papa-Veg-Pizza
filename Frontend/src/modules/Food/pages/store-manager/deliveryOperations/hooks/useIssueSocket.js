@@ -52,76 +52,8 @@ export default function useIssueSocket() {
     });
 
     // Standalone Simulation
-    const isMock = import.meta.env?.VITE_STANDALONE_MOCK === "true";
-    if (isMock) {
-      setSocketConnected(true);
-
-      // Setup simulation intervals to add issues periodically
-      let simulationTick = 0;
-      simulationIntervalRef.current = setInterval(() => {
-        simulationTick++;
-        const currentIssues = queryClient.getQueryData(["delivery-issues"]);
-        if (!currentIssues) return;
-
-        if (simulationTick === 1) {
-          // Simulate new issue report
-          const mockNewIssue = {
-            _id: `TKT-305`,
-            orderId: "ORD-1026",
-            riderId: "rider-2",
-            riderName: "Amit Patel",
-            issueType: "Customer Unreachable",
-            description: "Doorbell is not working, phone switched off. Standing outside building.",
-            reportedBy: "Rider",
-            severity: "medium",
-            status: "open",
-            resolution: "",
-            refundAmount: 0,
-            penaltyAmount: 0,
-            createdAt: new Date().toISOString()
-          };
-
-          queryClient.setQueryData(["delivery-issues"], (oldList) => {
-            if (!Array.isArray(oldList)) return oldList;
-            if (oldList.some(i => i._id === mockNewIssue._id)) return oldList;
-            return [mockNewIssue, ...oldList];
-          });
-
-          // Insert timeline node
-          queryClient.setQueryData(["delivery-timelines", "ORD-1026"], (oldTimeline = []) => {
-            return [
-              ...oldTimeline,
-              {
-                status: "issue_reported_customer_unreachable",
-                updatedBy: "Rider Amit",
-                timestamp: new Date().toISOString()
-              }
-            ];
-          });
-
-          toast.error("Simulated Event: New Exception Reported", {
-            description: "Customer Unreachable on Order ORD-1026 reported by Rider.",
-            duration: 6000
-          });
-        } else if (simulationTick === 2) {
-          // Escalate TKT-301
-          queryClient.setQueryData(["delivery-issues"], (oldList) => {
-            if (!Array.isArray(oldList)) return oldList;
-            return oldList.map(item => {
-              if (item._id === "TKT-301") {
-                return { ...item, status: "escalated", severity: "critical" };
-              }
-              return item;
-            });
-          });
-
-          toast.warning("Simulated Event: Ticket Escalated", {
-            description: "Ticket TKT-301 status changed to ESCALATED (Severity: Critical).",
-            duration: 5000
-          });
-        }
-      }, 15000); // Trigger simulation step every 15 seconds
-    }
+    
+    
 
     return () => {
       socket.disconnect();

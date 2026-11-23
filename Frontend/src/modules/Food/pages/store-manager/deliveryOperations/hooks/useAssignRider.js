@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
-import { failOrMock } from "@/services/api/mockPolicy";
+import { throwApiError } from "@/services/api/apiError";
 import { getLocalReadyOrders, setLocalReadyOrders } from "./useReadyOrders";
 import { getLocalRiders, setLocalRiders } from "./useAvailableRiders";
 
@@ -17,37 +17,9 @@ export default function useAssignRider() {
         });
         return response.data;
       } catch (err) {
-        failOrMock(err, "Could not assign rider. Please try again."); // real error unless VITE_STANDALONE_MOCK=true
+        throwApiError(err, "Could not assign rider. Please try again.");
         // Fallback LocalStorage updates
-        const orders = getLocalReadyOrders();
-        const updatedOrders = orders.map((o) => {
-          if (o._id === orderId) {
-            return {
-              ...o,
-              assignedRiderId: riderId,
-              deliveryPartnerId: riderId,
-              deliveryStatus: "assigned",
-              status: "assigned"
-            };
-          }
-          return o;
-        });
-        setLocalReadyOrders(updatedOrders);
-
-        const riders = getLocalRiders();
-        const updatedRiders = riders.map((r) => {
-          if (r._id === riderId) {
-            return {
-              ...r,
-              activeOrders: r.activeOrders + 1,
-              availability: "busy"
-            };
-          }
-          return r;
-        });
-        setLocalRiders(updatedRiders);
-
-        return { success: true, message: "Rider assigned successfully (Simulated)" };
+        
       }
     },
     onSuccess: (data) => {

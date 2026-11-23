@@ -1,11 +1,15 @@
-import { mockIngredients, mockLowStockAlerts } from "../mockData";
-import { initialStores, initialManagers } from "../../storeManagement/mockStoresData";
 
-const ALERTS_STORAGE_KEY = "mock_db_low_stock_alerts";
-const STOCKS_STORAGE_KEY = "mock_db_inventory_stock";
-const TXNS_STORAGE_KEY = "mock_db_inventory_transactions";
-const PURCHASE_REQS_STORAGE_KEY = "mock_db_purchase_requests";
-const ALERT_TIMELINE_STORAGE_KEY = "mock_db_alert_timeline";
+const emptyStores = [];
+const emptyManagers = [];
+
+const emptyIngredients = [];
+const lowStockAlerts = [];
+
+const ALERTS_STORAGE_KEY = "pvp_local_low_stock_alerts";
+const STOCKS_STORAGE_KEY = "pvp_local_inventory_stock";
+const TXNS_STORAGE_KEY = "pvp_local_inventory_transactions";
+const PURCHASE_REQS_STORAGE_KEY = "pvp_local_purchase_requests";
+const ALERT_TIMELINE_STORAGE_KEY = "pvp_local_alert_timeline";
 
 let alerts = [];
 let timelineEvents = [];
@@ -15,7 +19,7 @@ try {
   const cachedAlerts = localStorage.getItem(ALERTS_STORAGE_KEY);
   alerts = cachedAlerts ? JSON.parse(cachedAlerts) : [];
   if (alerts.length === 0) {
-    alerts = [...mockLowStockAlerts];
+    alerts = [...lowStockAlerts];
     localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(alerts));
   }
 
@@ -34,7 +38,7 @@ try {
         createdAt: alt.createdAt
       });
       if (alt.assignedTo) {
-        const mgr = initialManagers.find(m => m.id === alt.assignedTo);
+        const mgr = emptyManagers.find(m => m.id === alt.assignedTo);
         timelineEvents.push({
           _id: `tme-${alt._id}-2`,
           alertId: alt._id,
@@ -60,7 +64,7 @@ try {
     localStorage.setItem(ALERT_TIMELINE_STORAGE_KEY, JSON.stringify(timelineEvents));
   }
 } catch (e) {
-  alerts = [...mockLowStockAlerts];
+  alerts = [...lowStockAlerts];
 }
 
 const saveAlertsToStorage = () => {
@@ -86,7 +90,7 @@ function notifyListeners() {
 export const alertService = {
   getUsers: async () => {
     // Return managers as users
-    return { success: true, data: initialManagers };
+    return { success: true, data: emptyManagers };
   },
 
   getAlerts: async (params = {}) => {
@@ -107,11 +111,11 @@ export const alertService = {
       sortOrder = "desc"
     } = params;
 
-    const cachedStores = localStorage.getItem("mock_db_stores");
-    const storesList = cachedStores ? JSON.parse(cachedStores) : [...initialStores];
+    const cachedStores = localStorage.getItem("pvp_local_stores");
+    const storesList = cachedStores ? JSON.parse(cachedStores) : [...emptyStores];
 
-    const cachedIngredients = localStorage.getItem("mock_db_ingredients");
-    const ingredientsList = cachedIngredients ? JSON.parse(cachedIngredients) : [...mockIngredients];
+    const cachedIngredients = localStorage.getItem("pvp_local_ingredients");
+    const ingredientsList = cachedIngredients ? JSON.parse(cachedIngredients) : [...emptyIngredients];
 
     // Join alert data with stores, ingredients, and assigned users
     let result = alerts.map((alt) => {
@@ -128,7 +132,7 @@ export const alertService = {
         storeCode: "PVP-UNK"
       };
 
-      const userObj = initialManagers.find((m) => m.id === alt.assignedTo) || {
+      const userObj = emptyManagers.find((m) => m.id === alt.assignedTo) || {
         name: alt.assignedTo || "Unassigned",
         email: ""
       };
@@ -245,11 +249,11 @@ export const alertService = {
     const alert = alerts.find(a => a._id === id);
     if (!alert) throw new Error("Alert not found");
 
-    const cachedStores = localStorage.getItem("mock_db_stores");
-    const storesList = cachedStores ? JSON.parse(cachedStores) : [...initialStores];
+    const cachedStores = localStorage.getItem("pvp_local_stores");
+    const storesList = cachedStores ? JSON.parse(cachedStores) : [...emptyStores];
 
-    const cachedIngredients = localStorage.getItem("mock_db_ingredients");
-    const ingredientsList = cachedIngredients ? JSON.parse(cachedIngredients) : [...mockIngredients];
+    const cachedIngredients = localStorage.getItem("pvp_local_ingredients");
+    const ingredientsList = cachedIngredients ? JSON.parse(cachedIngredients) : [...emptyIngredients];
 
     const ingredient = ingredientsList.find((i) => i._id === alert.ingredientId) || {
       name: "Unknown Ingredient",
@@ -264,7 +268,7 @@ export const alertService = {
       storeCode: "PVP-UNK"
     };
 
-    const userObj = initialManagers.find((m) => m.id === alert.assignedTo) || {
+    const userObj = emptyManagers.find((m) => m.id === alert.assignedTo) || {
       name: alert.assignedTo || "Unassigned"
     };
 
@@ -300,7 +304,7 @@ export const alertService = {
 
     // Timeline event for update
     if (updates.assignedTo && updates.assignedTo !== oldAlert.assignedTo) {
-      const mgr = initialManagers.find(m => m.id === updates.assignedTo);
+      const mgr = emptyManagers.find(m => m.id === updates.assignedTo);
       timelineEvents.push({
         _id: `tme-${id}-${Date.now()}`,
         alertId: id,

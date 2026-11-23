@@ -70,7 +70,7 @@ export default function DelayAlertModal({ isOpen, onClose, order, onActionComple
             </div>
             <div className="flex justify-between border-t border-zinc-200 dark:border-zinc-800 pt-1.5">
               <span className="text-zinc-455">Rider Assigned:</span>
-              <span>{order.rider?.name || 'Rahul Dev'}</span>
+              <span>{order.rider?.name || '—'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-zinc-455">Outlet Store:</span>

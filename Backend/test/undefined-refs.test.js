@@ -80,8 +80,8 @@ describe('paths that used to throw "is not defined"', () => {
         const res = await fx.call('DELETE', `/v1/food/admin/stores/${st.body.data._id}`, fx.SA);
         assert.equal(res.status, 200, JSON.stringify(res.body));
     });
-    test('public dynamic-home offers work (UiOffer)', async () => {
-        assert.equal((await fx.call('GET', '/v1/dynamic-home/offers', null)).status, 200);
+    test('public dynamic-home layout works', async () => {
+        assert.equal((await fx.call('GET', '/v1/dynamic-home/home-layout', null)).status, 200);
     });
     test('pending food approvals list works and names the store (FoodStore)', async () => {
         const { FoodItem } = await import('../src/modules/food/admin/models/food.model.js');

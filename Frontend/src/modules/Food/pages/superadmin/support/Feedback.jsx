@@ -56,7 +56,7 @@ const Feedback = ({ onAssign }) => {
                         <p className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Total Feedback</p>
                         <div className="flex items-baseline gap-1.5 mt-0.5">
                             <span className="text-xl font-black text-zinc-900 dark:text-zinc-50">1,482</span>
-                            <span className="text-[8px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-1 rounded">+12%</span>
+                            <span className="text-[8px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-1 rounded">—</span>
                         </div>
                     </div>
                     <Inbox className="w-5 h-5 text-[var(--primary)] dark:text-blue-400 shrink-0" />
@@ -89,7 +89,7 @@ const Feedback = ({ onAssign }) => {
                         <div className="flex-grow">
                             <div className="flex justify-between text-[9px] font-bold mb-0.5">
                                 <span className="text-zinc-500 dark:text-zinc-400">Pos</span>
-                                <span className="text-zinc-900 dark:text-zinc-50">78%</span>
+                                <span className="text-zinc-900 dark:text-zinc-50">—</span>
                             </div>
                             <div className="w-full bg-zinc-100 dark:bg-zinc-850 h-1 rounded-full overflow-hidden">
                                 <div className="bg-[var(--primary)] h-full w-[78%]"></div>
@@ -98,7 +98,7 @@ const Feedback = ({ onAssign }) => {
                         <div className="flex-grow">
                             <div className="flex justify-between text-[9px] font-bold mb-0.5">
                                 <span className="text-zinc-500 dark:text-zinc-400">Neu</span>
-                                <span className="text-zinc-900 dark:text-zinc-50">15%</span>
+                                <span className="text-zinc-900 dark:text-zinc-50">—</span>
                             </div>
                             <div className="w-full bg-zinc-100 dark:bg-zinc-855 h-1 rounded-full overflow-hidden">
                                 <div className="bg-zinc-400 h-full w-[15%]"></div>
@@ -107,7 +107,7 @@ const Feedback = ({ onAssign }) => {
                         <div className="flex-grow">
                             <div className="flex justify-between text-[9px] font-bold mb-0.5">
                                 <span className="text-red-500">Neg</span>
-                                <span className="text-red-550">7%</span>
+                                <span className="text-red-550">—</span>
                             </div>
                             <div className="w-full bg-zinc-100 dark:bg-zinc-855 h-1 rounded-full overflow-hidden">
                                 <div className="bg-red-550 h-full w-[7%]"></div>

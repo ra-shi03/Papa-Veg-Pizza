@@ -2,29 +2,11 @@ import { useState, useEffect } from "react";
 import { storeOrdersApi, LIVE_POLL_MS, useLiveIndicator } from "../../api/storeOrdersApi";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { STANDALONE_MOCK, failOrMock } from "@/services/api/mockPolicy";
 import io from "socket.io-client";
-import { initialMockCompletedOrders } from "../mockData";
 
-const COMPLETED_ORDERS_STORAGE_KEY = "pvp_completed_orders";
 
-const getLocalCompletedOrders = () => {
-  try {
-    let list = JSON.parse(localStorage.getItem(COMPLETED_ORDERS_STORAGE_KEY));
-    if (!list || !Array.isArray(list) || list.length === 0) {
-      list = initialMockCompletedOrders;
-      localStorage.setItem(COMPLETED_ORDERS_STORAGE_KEY, JSON.stringify(list));
-    }
-    return list;
-  } catch (e) {
-    localStorage.setItem(COMPLETED_ORDERS_STORAGE_KEY, JSON.stringify(initialMockCompletedOrders));
-    return initialMockCompletedOrders;
-  }
-};
 
-const setLocalCompletedOrders = (orders) => {
-  localStorage.setItem(COMPLETED_ORDERS_STORAGE_KEY, JSON.stringify(orders));
-};
+
 
 const inDateRange = (o, f) => {
   const created = new Date(o.createdAt);
@@ -79,43 +61,9 @@ export function useReorderOrder() {
   return useMutation({
     mutationFn: async ({ previousOrderId, items }) => {
       // Placing an order on a customer's behalf needs pricing, payment and the customer's consent: not built yet.
-      // Say so instead of pretending a new order exists (the local copy below only runs when VITE_STANDALONE_MOCK=true).
-      if (!STANDALONE_MOCK) {
-        throw new Error("Reordering from the store is not available yet. Ask the customer to place the order again in the app.");
-      }
-      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      const completedOrders = getLocalCompletedOrders();
-      const order = completedOrders.find((o) => o._id === previousOrderId);
-      if (!order) throw new Error("Original order not found");
-
-      // Build items with adjusted quantities
-      const reorderItems = items || order.items;
-
-      // Seed a new active/incoming order into local storage PVP orders DB
-      const localActiveOrders = JSON.parse(localStorage.getItem("pvp_incoming_orders")) || [];
-      const newOrderId = `reorder-${Date.now()}`;
+      throw new Error("Reordering from the store is not available yet. Ask the customer to place the order again in the app.");
       
-      const newOrder = {
-        _id: newOrderId,
-        orderNumber: `PVP-R${Math.floor(10000 + Math.random() * 90000)}`,
-        customerId: order.customerId,
-        customer: order.customer,
-        status: "received",
-        createdAt: new Date().toISOString(),
-        orderType: order.orderType,
-        priority: "normal",
-        paymentStatus: "payment_pending",
-        paymentMethod: order.paymentMethod,
-        grandTotal: reorderItems.reduce((acc, it) => acc + (it.unitPrice * it.quantity), 0),
-        items: reorderItems,
-        deliveryAddress: order.deliveryAddress
-      };
-
-      localActiveOrders.unshift(newOrder);
-      localStorage.setItem("pvp_incoming_orders", JSON.stringify(localActiveOrders));
-
-      return { success: true, orderId: newOrderId, status: "payment_pending" };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["incomingOrders"] });

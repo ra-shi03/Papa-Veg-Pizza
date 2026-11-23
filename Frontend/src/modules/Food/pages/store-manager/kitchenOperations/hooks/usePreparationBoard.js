@@ -4,60 +4,18 @@ import { toast } from "sonner";
 import io from "socket.io-client";
 import apiClient from "@/services/api/axios";
 
-// The real endpoints are the source of truth. The localStorage mock below only runs when VITE_STANDALONE_MOCK=true.
-const STANDALONE_MOCK = import.meta.env?.VITE_STANDALONE_MOCK === "true";
+
+
 const KITCHEN = "/food/store/kitchen";
 const INVENTORY = "/food/store/inventory";
-import {
-  mockChefs,
-  mockIngredients,
-  mockRecipes,
-  initialMockPrepItems
-} from "../mockData";
+
 
 // Local storage key names for fallback DB
-const PREP_ITEMS_STORAGE_KEY = "pvp_preparation_items";
-const INGREDIENTS_STORAGE_KEY = "pvp_ingredients_stock";
-const SHORTAGES_STORAGE_KEY = "pvp_ingredient_shortages";
-const CHEFS_STORAGE_KEY = "pvp_kitchen_chefs";
 
-// Initialize mock DB in LocalStorage
-const initializeMockDb = () => {
-  if (!localStorage.getItem(PREP_ITEMS_STORAGE_KEY)) {
-    localStorage.setItem(PREP_ITEMS_STORAGE_KEY, JSON.stringify(initialMockPrepItems));
-  }
-  if (!localStorage.getItem(INGREDIENTS_STORAGE_KEY)) {
-    localStorage.setItem(INGREDIENTS_STORAGE_KEY, JSON.stringify(mockIngredients));
-  }
-  if (!localStorage.getItem(CHEFS_STORAGE_KEY)) {
-    localStorage.setItem(CHEFS_STORAGE_KEY, JSON.stringify(mockChefs));
-  }
-  if (!localStorage.getItem(SHORTAGES_STORAGE_KEY)) {
-    localStorage.setItem(SHORTAGES_STORAGE_KEY, JSON.stringify([]));
-  }
-};
 
-initializeMockDb();
 
-const getLocalPrepItems = () => {
-  try {
-    return JSON.parse(localStorage.getItem(PREP_ITEMS_STORAGE_KEY)) || [];
-  } catch (e) {
-    return [];
-  }
-};
 
-const setLocalPrepItems = (items) => {
-  localStorage.setItem(PREP_ITEMS_STORAGE_KEY, JSON.stringify(items));
-};
 
-const getLocalIngredients = () => {
-  try {
-    return JSON.parse(localStorage.getItem(INGREDIENTS_STORAGE_KEY)) || [];
-  } catch (e) {
-    return [];
-  }
-};
 
 export function usePreparationBoard(filters = {}) {
   const queryClient = useQueryClient();
@@ -98,56 +56,11 @@ export function usePreparationBoard(filters = {}) {
         description: `"${name}" moved to ${stageLabels[stage] || stage} stage`,
       });
       queryClient.invalidateQueries({ queryKey: ["preparationBoard"] });
-
-      // Sync mock DB
-      const local = getLocalPrepItems().map((item) =>
-        item._id === orderItemId ? { ...item, current_stage: stage } : item
-      );
-      setLocalPrepItems(local);
     });
 
-    // Standalone Simulation for standalone mode
-    let simulationTimer;
-    if (import.meta.env?.VITE_STANDALONE_MOCK === "true") {
-      setSocketConnected(true);
-
-      // Randomly advance stage of items for testing
-      simulationTimer = setInterval(() => {
-        const local = getLocalPrepItems();
-        // find a non-completed, non-paused item
-        const eligible = local.filter(item => item.current_stage !== "ready_for_baking" && !item.paused);
-        if (eligible.length > 0) {
-          const target = eligible[Math.floor(Math.random() * eligible.length)];
-          const nextStages = {
-            assigned: "dough_prep",
-            dough_prep: "sauce",
-            sauce: "toppings",
-            toppings: "ready_for_baking"
-          };
-          const next = nextStages[target.current_stage];
-          if (next) {
-            const updated = local.map((item) =>
-              item._id === target._id ? { ...item, current_stage: next } : item
-            );
-            setLocalPrepItems(updated);
-            queryClient.invalidateQueries({ queryKey: ["preparationBoard"] });
-
-            const stageLabels = {
-              dough_prep: "Dough Prep",
-              sauce: "Sauce",
-              toppings: "Toppings",
-              ready_for_baking: "Ready For Baking"
-            };
-            toast.info(`Simulated: ${target.name} advanced to ${stageLabels[next]}`, {
-              description: `Order: #${target.orderNumber}`,
-            });
-          }
-        }
-      }, 45000);
-    }
+    
 
     return () => {
-      if (simulationTimer) clearInterval(simulationTimer);
       socket.disconnect();
     };
   }, [queryClient]);
@@ -173,53 +86,11 @@ export function usePreparationBoard(filters = {}) {
         if (apiItems && apiItems.length > 0) {
           return apiItems;
         }
-        if (!STANDALONE_MOCK) return apiItems;
-        throw new Error("No items or empty array");
+        return apiItems;
+        
       } catch (err) {
-        if (!STANDALONE_MOCK) throw err;
-        console.warn("Backend API unavailable, falling back to simulated storage database.");
-
-        let list = getLocalPrepItems();
-
-        // Filters in memory
-        if (filters.search) {
-          const q = filters.search.toLowerCase();
-          list = list.filter(
-            (o) =>
-              o.orderNumber.toLowerCase().includes(q) ||
-              o.name.toLowerCase().includes(q) ||
-              (o.assigned_chef && mockChefs.find(c => c._id === o.assigned_chef)?.name.toLowerCase().includes(q))
-          );
-        }
-
-        if (filters.priority && filters.priority !== "All") {
-          list = list.filter((o) => o.priority === filters.priority);
-        }
-
-        if (filters.chef && filters.chef !== "All") {
-          if (filters.chef === "Unassigned") {
-            list = list.filter((o) => !o.assigned_chef);
-          } else {
-            list = list.filter((o) => o.assigned_chef === filters.chef);
-          }
-        }
-
-        if (filters.onlyUnassigned === "true") {
-          list = list.filter((o) => !o.assigned_chef);
-        }
-
-        if (filters.delayed === "true") {
-          list = list.filter((o) => {
-            const elapsed = Math.floor((new Date() - new Date(o.started_time)) / 60000);
-            return elapsed > (o.estimated_time || 12);
-          });
-        }
-
-        if (filters.size && filters.size !== "All") {
-          list = list.filter((o) => o.size === filters.size);
-        }
-
-        return list;
+        throw err;
+        
       }
     },
     refetchInterval: 15000,
@@ -242,14 +113,9 @@ export function useMoveStage() {
         });
         return response.data;
       } catch (err) {
-        if (!STANDALONE_MOCK) throw err;
+        throw err;
         // Fallback simulation
-        const local = getLocalPrepItems();
-        const updated = local.map((item) =>
-          item._id === orderItemId ? { ...item, current_stage: stage } : item
-        );
-        setLocalPrepItems(updated);
-        return { success: true, orderItemId, stage };
+        
       }
     },
     onSuccess: (data, variables) => {
@@ -280,16 +146,9 @@ export function usePausePreparation() {
         });
         return response.data;
       } catch (err) {
-        if (!STANDALONE_MOCK) throw err;
+        throw err;
         // Fallback simulation
-        const local = getLocalPrepItems();
-        const updated = local.map((item) =>
-          item._id === orderItemId
-            ? { ...item, paused: true, pauseReason: reason, pauseNotes: notes }
-            : item
-        );
-        setLocalPrepItems(updated);
-        return { success: true, orderItemId };
+        
       }
     },
     onSuccess: () => {
@@ -313,14 +172,9 @@ export function useReassignChef() {
         });
         return response.data;
       } catch (err) {
-        if (!STANDALONE_MOCK) throw err;
+        throw err;
         // Fallback simulation
-        const local = getLocalPrepItems();
-        const updated = local.map((item) =>
-          item._id === orderItemId ? { ...item, assigned_chef: chefId } : item
-        );
-        setLocalPrepItems(updated);
-        return { success: true, orderItemId, chefId };
+        
       }
     },
     onSuccess: () => {
@@ -342,17 +196,9 @@ export function useIngredientIssue() {
         const response = await apiClient.post(`${INVENTORY}/ingredient-shortages`, payload);
         return response.data;
       } catch (err) {
-        if (!STANDALONE_MOCK) throw err;
+        throw err;
         // Fallback simulation
-        const localShortages = JSON.parse(localStorage.getItem(SHORTAGES_STORAGE_KEY)) || [];
-        const newIssue = {
-          _id: `shortage-${Date.now()}`,
-          ...payload,
-          createdAt: new Date().toISOString(),
-          status: "pending"
-        };
-        localStorage.setItem(SHORTAGES_STORAGE_KEY, JSON.stringify([newIssue, ...localShortages]));
-        return { success: true };
+        
       }
     },
     onSuccess: () => {
@@ -375,8 +221,8 @@ export function useIngredients() {
         if (Array.isArray(response.data?.data)) return response.data.data;
         throw new Error("Format mismatch");
       } catch (err) {
-        if (!STANDALONE_MOCK) throw err;
-        return getLocalIngredients();
+        throw err;
+        
       }
     },
   });
@@ -393,8 +239,8 @@ export function useRecipes() {
         if (Array.isArray(response.data?.data)) return response.data.data;
         throw new Error("Format mismatch");
       } catch (err) {
-        if (!STANDALONE_MOCK) throw err;
-        return mockRecipes;
+        throw err;
+        
       }
     },
   });

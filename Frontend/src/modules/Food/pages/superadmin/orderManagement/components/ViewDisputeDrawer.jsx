@@ -509,7 +509,7 @@ export default function ViewDisputeDrawer({
                           ...prev,
                           messages: [
                             ...prev.messages,
-                            { _id: `MSG-${Date.now()}`, sender: 'Shubham Jamliya', role: 'Admin', message: val, timestamp: new Date().toISOString() }
+                            { _id: `MSG-${Date.now()}`, sender: 'You', role: 'Admin', message: val, timestamp: new Date().toISOString() }
                           ]
                         }));
                         e.currentTarget.value = '';

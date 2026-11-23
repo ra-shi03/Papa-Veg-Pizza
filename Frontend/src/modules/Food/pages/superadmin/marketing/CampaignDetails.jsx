@@ -4,7 +4,7 @@ import {
   Layers, Users, BarChart3, TrendingUp, DollarSign, Loader2, Info
 } from 'lucide-react';
 import { apiGetCampaignById, apiGetCoupons } from './CampaignData';
-import { mockRegions, mockFranchises, mockStores } from './CouponsData';
+import { regionOptions, franchiseOptions, storeOptions } from './CouponsData';
 
 export default function CampaignDetails({ campaignId, isOpen, onClose, onEdit }) {
   const [activeTab, setActiveTab] = useState('Overview');
@@ -54,21 +54,21 @@ export default function CampaignDetails({ campaignId, isOpen, onClose, onEdit })
 
   const regionNames = useMemo(() => {
     if (!campaign || !campaign.regionIds) return [];
-    return mockRegions
+    return regionOptions
       .filter(r => campaign.regionIds.includes(r.id))
       .map(r => r.name);
   }, [campaign]);
 
   const franchiseNames = useMemo(() => {
     if (!campaign || !campaign.franchiseIds) return [];
-    return mockFranchises
+    return franchiseOptions
       .filter(f => campaign.franchiseIds.includes(f.id))
       .map(f => f.name);
   }, [campaign]);
 
   const storeNames = useMemo(() => {
     if (!campaign || !campaign.storeIds) return [];
-    return mockStores
+    return storeOptions
       .filter(s => campaign.storeIds.includes(s.id))
       .map(s => s.name);
   }, [campaign]);

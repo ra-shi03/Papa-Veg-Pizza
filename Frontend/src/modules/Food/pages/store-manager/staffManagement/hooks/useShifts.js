@@ -1,35 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
-import { failOrMock } from "@/services/api/mockPolicy";
-import { initialMockShifts } from "../mockData";
+import { throwApiError } from "@/services/api/apiError";
 
-const SHIFTS_STORAGE_KEY = "pvp_kitchen_shifts";
-const STAFF_STORAGE_KEY = "pvp_kitchen_staff";
+
 
 // Initialize shifts DB in localStorage if empty
-const initializeShiftsDb = () => {
-  if (typeof window !== "undefined") {
-    const existing = localStorage.getItem(SHIFTS_STORAGE_KEY);
-    if (!existing) {
-      localStorage.setItem(SHIFTS_STORAGE_KEY, JSON.stringify(initialMockShifts));
-    }
-  }
-};
 
-initializeShiftsDb();
 
-const getLocalShifts = () => {
-  try {
-    return JSON.parse(localStorage.getItem(SHIFTS_STORAGE_KEY)) || [];
-  } catch (e) {
-    return [];
-  }
-};
 
-const setLocalShifts = (records) => {
-  localStorage.setItem(SHIFTS_STORAGE_KEY, JSON.stringify(records));
-};
 
 // 1. Fetch Shifts List
 export function useShiftList(filters = {}) {
@@ -55,20 +34,8 @@ export function useShiftList(filters = {}) {
         }
         throw new Error("API return format mismatch");
       } catch (err) {
-        failOrMock(err, "Could not load shifts"); // real error unless VITE_STANDALONE_MOCK=true
-        console.warn("Backend shifts API offline, pulling from local storage mock data");
-        let list = getLocalShifts();
-
-        if (filters.status && filters.status !== "All") {
-          list = list.filter((s) => s.status === filters.status);
-        }
-
-        if (filters.search) {
-          const q = filters.search.toLowerCase();
-          list = list.filter((s) => s.shiftName.toLowerCase().includes(q));
-        }
-
-        return list;
+        throwApiError(err, "Could not load shifts");
+        
       }
     },
     placeholderData: (previousData) => previousData,
@@ -98,11 +65,8 @@ export function useShiftDetails(id) {
         }
         throw new Error("API return format mismatch");
       } catch (err) {
-        failOrMock(err, "Could not load the shift"); // real error unless VITE_STANDALONE_MOCK=true
-        const list = getLocalShifts();
-        const found = list.find((s) => s._id === id);
-        if (found) return found;
-        throw new Error("Shift not found");
+        throwApiError(err, "Could not load the shift");
+        
       }
     },
     enabled: !!id,
@@ -124,26 +88,8 @@ export function useCreateShift() {
         }
         return response.data;
       } catch (err) {
-        failOrMock(err, "Failed to create shift"); // real error unless VITE_STANDALONE_MOCK=true
-        const list = getLocalShifts();
-        const newRecord = {
-          _id: payload.shiftName.replace(/ /g, "_") + "-" + Date.now(),
-          storeId: "store-indore-01",
-          shiftName: payload.shiftName,
-          startTime: payload.startTime,
-          endTime: payload.endTime,
-          breakMinutes: Number(payload.breakMinutes) || 0,
-          maxStaff: Number(payload.maxStaff) || 5,
-          assignedStaff: [],
-          status: "active",
-          description: payload.description || "",
-          createdBy: "Shubham Jamliya",
-          createdAt: new Date().toISOString(),
-        };
-
-        const updated = [...list, newRecord];
-        setLocalShifts(updated);
-        return { success: true, data: newRecord };
+        throwApiError(err, "Failed to create shift");
+        
       }
     },
     onSuccess: () => {
@@ -171,25 +117,8 @@ export function useUpdateShift() {
         }
         return response.data;
       } catch (err) {
-        failOrMock(err, "Failed to update shift"); // real error unless VITE_STANDALONE_MOCK=true
-        const list = getLocalShifts();
-        const updated = list.map((s) => {
-          if (s._id === id) {
-            return {
-              ...s,
-              shiftName: payload.shiftName ?? s.shiftName,
-              startTime: payload.startTime ?? s.startTime,
-              endTime: payload.endTime ?? s.endTime,
-              breakMinutes: payload.breakMinutes !== undefined ? Number(payload.breakMinutes) : s.breakMinutes,
-              maxStaff: payload.maxStaff !== undefined ? Number(payload.maxStaff) : s.maxStaff,
-              status: payload.status ?? s.status,
-              description: payload.description ?? s.description,
-            };
-          }
-          return s;
-        });
-        setLocalShifts(updated);
-        return { success: true, id };
+        throwApiError(err, "Failed to update shift");
+        
       }
     },
     onSuccess: (data, variables) => {
@@ -218,28 +147,9 @@ export function useDeleteShift() {
         }
         return response.data;
       } catch (err) {
-        failOrMock(err, "Failed to delete shift"); // real error unless VITE_STANDALONE_MOCK=true
+        throwApiError(err, "Failed to delete shift");
         // Localstorage updates
-        const list = getLocalShifts();
-        const filtered = list.filter((s) => s._id !== id);
-        setLocalShifts(filtered);
-
-        // Also clean up staff shift assignments
-        const staffStorage = localStorage.getItem(STAFF_STORAGE_KEY);
-        if (staffStorage) {
-          try {
-            const staffList = JSON.parse(staffStorage) || [];
-            const clearedStaff = staffList.map((s) => {
-              if (s.shiftId === id) {
-                return { ...s, shiftId: "" };
-              }
-              return s;
-            });
-            localStorage.setItem(STAFF_STORAGE_KEY, JSON.stringify(clearedStaff));
-          } catch (e) {}
-        }
-
-        return { success: true, id };
+        
       }
     },
     onSuccess: () => {
@@ -268,46 +178,9 @@ export function useAssignStaffToShift() {
         }
         return response.data;
       } catch (err) {
-        failOrMock(err, "Failed to assign staff to shift"); // real error unless VITE_STANDALONE_MOCK=true
+        throwApiError(err, "Failed to assign staff to shift");
         // Fallback implementation
-        const list = getLocalShifts();
-        const updatedShifts = list.map((s) => {
-          if (s._id === shiftId) {
-            return {
-              ...s,
-              assignedStaff: payload.staffIds, // Overwrite with new assignment list
-            };
-          }
-          // Remove these staff members from any other shifts they might have been assigned to
-          const filteredAssigned = s.assignedStaff.filter((id) => !payload.staffIds.includes(id));
-          return {
-            ...s,
-            assignedStaff: filteredAssigned,
-          };
-        });
-        setLocalShifts(updatedShifts);
-
-        // Update staff records in localStorage
-        const staffStorage = localStorage.getItem(STAFF_STORAGE_KEY);
-        if (staffStorage) {
-          try {
-            const staffList = JSON.parse(staffStorage) || [];
-            const updatedStaff = staffList.map((s) => {
-              // If employee is in the new staffIds, assign to this shift
-              if (payload.staffIds.includes(s._id)) {
-                return { ...s, shiftId };
-              }
-              // If employee was on this shift, but got deselected, remove their shiftId
-              if (s.shiftId === shiftId && !payload.staffIds.includes(s._id)) {
-                return { ...s, shiftId: "" };
-              }
-              return s;
-            });
-            localStorage.setItem(STAFF_STORAGE_KEY, JSON.stringify(updatedStaff));
-          } catch (e) {}
-        }
-
-        return { success: true, shiftId };
+        
       }
     },
     onSuccess: (data, variables) => {

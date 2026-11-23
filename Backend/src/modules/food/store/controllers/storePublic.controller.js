@@ -5,8 +5,7 @@ import { StoreHours } from '../../franchise/models/storeHours.model.js';
 import { sendResponse } from '../../../../utils/response.js';
 import { NotFoundError } from '../../../../core/auth/errors.js';
 import { FoodAppConfig } from '../../settings/models/appConfig.model.js';
-import { FoodCoupon } from '../../settings/models/foodCoupon.model.js';
-import { couponToOffer, isGlobalCoupon, couponAppliesAtPlace, placeOfStore } from '../../settings/services/couponOffer.service.js';
+import { couponStoreFromQuery, liveCouponsForStore, publicCouponView } from '../../settings/services/couponOffer.service.js';
 import { resolveStoreForLocation, resolveTrainStore, findOrderableStore } from '../../orders/services/order-store.service.js';
 import { buildSlots, SCHEDULE } from '../../orders/services/order-schedule.service.js';
 
@@ -115,47 +114,17 @@ export async function getDeliverySlots(req, res, next) {
   }
 }
 
-/** What a customer may see of a coupon: display fields only (no store / franchise ids, usage counts or audit fields). */
-const publicOffer = (o) => ({
-  id: o.id,
-  _id: o._id,
-  couponCode: o.couponCode,
-  title: o.title || '',
-  description: o.description || '',
-  discountType: o.discountType,
-  discountValue: o.discountValue,
-  maxDiscount: o.maxDiscount,
-  minOrderValue: o.minOrderValue,
-  startDate: o.startDate || null,
-  endDate: o.endDate || null,
-  customerScope: o.customerScope,
-  status: o.status,
-});
-
 /**
- * GET /v1/food/offers/public[?storeId=] : coupons a customer can see right now.
- * Without a store: global coupons only. With a store: every coupon checkout accepts for that store (global, or
- * store / franchise / region / zone / territory that include it) - one shared rule.
+ * GET /v1/food/offers/public[?storeId= | ?lat=&lng=] : coupons a customer can use right now.
+ * With a store (or a location that resolves to one): every coupon checkout accepts for that store. Without: global
+ * coupons only. Same list as /settings/coupons/public (couponOffer.service liveCouponsForStore).
  */
 export async function getPublicOffers(req, res, next) {
   try {
-    const now = new Date();
-    const storeId = mongoose.isValidObjectId(String(req.query.storeId || '')) ? String(req.query.storeId) : null;
-    const coupons = await FoodCoupon.find({
-      isActive: { $ne: false },
-      status: { $nin: ['disabled', 'Disabled', 'inactive', 'Inactive', 'expired', 'Expired'] },
-      $or: [{ endDate: null }, { endDate: { $exists: false } }, { endDate: { $gte: now } }],
-    }).sort({ createdAt: -1 }).limit(100).lean();
-    // The same place rule checkout uses (couponOffer.service): with a store, every coupon it accepts for that store; without, global only
-    const where = storeId ? await placeOfStore(storeId) : null;
-    const couponOffers = coupons
-      .map(couponToOffer)
-      .filter((o) => o.discountType !== 'unsupported')
-      .filter((o) => !o.startDate || new Date(o.startDate) <= now)
-      .filter((o) => !(o.usageLimit > 0 && o.usedCount >= o.usageLimit))
-      .filter((o) => (where ? couponAppliesAtPlace(o, where) : isGlobalCoupon(o)))
-      .map(publicOffer);
-    return sendResponse(res, 200, 'OK', { allOffers: couponOffers });
+    const storeId = await couponStoreFromQuery(req.query);
+    const allOffers = (await liveCouponsForStore(storeId)).map(publicCouponView);
+    res.set('Cache-Control', 'no-store');
+    return sendResponse(res, 200, 'OK', { allOffers });
   } catch (err) {
     next(err);
   }

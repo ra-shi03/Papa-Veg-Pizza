@@ -22,7 +22,7 @@ export default function HoursModal({ isOpen, onClose, onConfirm, store }) {
         try {
           setLoading(true)
           const response = await adminAPI.updateStoreHours(store._id, {}) // Trigger get/initialize logic or use fallback
-          // If we had custom endpoints, otherwise use mocked updateStoreHours getter or fallback
+          // If we had custom endpoints, otherwise use updateStoreHours getter or fallback
           if (response?.data?.data?.operatingHours) {
             setHours(response.data.data.operatingHours)
           } else {

@@ -1,5 +1,4 @@
 import { ShowcaseSection } from '../models/showcaseSection.model.js';
-import { Product } from '../../admin/models/product.model.js';
 import mongoose from 'mongoose';
 
 // Title Case Helper: First letter Uppercase, rest lowercase in each word
@@ -12,163 +11,12 @@ export function toTitleCase(str) {
         .replace(/'[A-Z]\b/g, char => char.toLowerCase());
 }
 
-// Initial seed sections matching Domino's style references (Paneer Maxxx, 6 in 1, Combo Bonanza)
-const DEFAULT_SECTIONS = [
-    {
-        name: 'Paneer Maxxx',
-        title: 'In 3 exciting flavours',
-        subtitle: 'The ultimate loaded Paneer feast!',
-        badgeText: 'Paneer Maxxx',
-        logoUrl: 'https://cdn-icons-png.flaticon.com/512/3132/3132693.png',
-        bgStyle: 'default',
-        isActive: true,
-        sortOrder: 1,
-        products: [
-            {
-                customTitle: 'Paneer Maxxx Makhani Fusion',
-                customDescription: 'Toppings (2): Paneer • Crisp Capsicum',
-                customPrice: 299,
-                customOriginalPrice: 349,
-                customSaveText: 'Save ₹50',
-                sizeCrustText: 'Regular | New Hand Tossed >',
-                buttonText: 'Add +',
-                badge: 'Hot Seller',
-                vegType: 'veg',
-                customImage: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=60'
-            },
-            {
-                customTitle: 'Paneer Maxxx Fiery Peri Peri',
-                customDescription: 'Toppings (2): Spicy Paneer • Red Paprika',
-                customPrice: 319,
-                customOriginalPrice: 369,
-                customSaveText: 'Save ₹50',
-                sizeCrustText: 'Regular | Cheese Burst >',
-                buttonText: 'Add +',
-                badge: 'Spicy',
-                vegType: 'veg',
-                customImage: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&auto=format&fit=crop&q=60'
-            },
-            {
-                customTitle: 'Paneer Maxxx Tandoori Delight',
-                customDescription: 'Toppings (3): Tandoori Paneer • Onion • Capsicum',
-                customPrice: 339,
-                customOriginalPrice: 389,
-                customSaveText: 'Save ₹50',
-                sizeCrustText: 'Regular | Wheat Thin Crust >',
-                buttonText: 'Add +',
-                badge: 'Chef Special',
-                vegType: 'veg',
-                customImage: 'https://images.unsplash.com/photo-1534308983496-4fabb1a015ee?w=800&auto=format&fit=crop&q=60'
-            }
-        ]
-    },
-    {
-        name: '6 in 1 Big Big Pizza',
-        title: 'Big Big Pizza',
-        subtitle: 'In 4 Exciting Flavours',
-        badgeText: '6 in 1',
-        logoUrl: 'https://cdn-icons-png.flaticon.com/512/1404/1404945.png',
-        bgStyle: 'warm_cream',
-        isActive: true,
-        sortOrder: 2,
-        products: [
-            {
-                customTitle: 'Big Big 6in1 Cheeseburst - Veg',
-                customDescription: 'Big Big Pizza meets iconic Cheeseburst crust, bursting with gooey molten cheese and 6 bestseller veg flavours.',
-                customPrice: 999,
-                customOriginalPrice: 2149,
-                customSaveText: 'Save ₹1,150',
-                sizeCrustText: 'Large Plus | Cheese Burst >',
-                buttonText: 'Add +',
-                badge: 'Bestseller',
-                vegType: 'veg',
-                customImage: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800&auto=format&fit=crop&q=60'
-            },
-            {
-                customTitle: 'Big Big 6in1 Gourmet Feast',
-                customDescription: 'Loaded with paneer, sweet corn, black olives, jalapenos, mushrooms, and golden bell peppers.',
-                customPrice: 1049,
-                customOriginalPrice: 2299,
-                customSaveText: 'Save ₹1,250',
-                sizeCrustText: 'Large Plus | Cheese Burst >',
-                buttonText: 'Add +',
-                badge: 'Mega Feast',
-                vegType: 'veg',
-                customImage: 'https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?w=800&auto=format&fit=crop&q=60'
-            }
-        ]
-    },
-    {
-        name: 'Combo Bonanza',
-        title: 'Super Savings Combos',
-        subtitle: 'Feast with your family & friends',
-        badgeText: 'Combo Bonanza',
-        logoUrl: 'https://cdn-icons-png.flaticon.com/512/3480/3480823.png',
-        bgStyle: 'festive_blue',
-        isActive: true,
-        sortOrder: 3,
-        products: [
-            {
-                customTitle: 'Ultimate Pizza Feast',
-                customDescription: '1 Regular Pizza • 1 Side • 1 Dip / Beverage / Dessert',
-                customPrice: 335,
-                customOriginalPrice: 419,
-                customSaveText: 'Save ₹84',
-                badge: 'Serves 1',
-                sizeCrustText: 'Serves 1 Person',
-                buttonText: 'Build your Combo >',
-                vegType: 'veg',
-                customImage: 'https://images.unsplash.com/photo-1590947132387-155cc02f3212?w=800&auto=format&fit=crop&q=60'
-            },
-            {
-                customTitle: 'Family Party Combo',
-                customDescription: '2 Medium Pizzas • Stuffed Garlic Bread • 2 Pepsi Cans',
-                customPrice: 699,
-                customOriginalPrice: 999,
-                customSaveText: 'Save ₹300',
-                badge: 'Serves 4',
-                sizeCrustText: 'Serves 3-4 People',
-                buttonText: 'Build your Combo >',
-                vegType: 'veg',
-                customImage: 'https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?w=800&auto=format&fit=crop&q=60'
-            }
-        ]
-    }
-];
+// No sample sections: the user app shows only what the super admin creates (Showcase Sections).
 
-// Helper to seed default sections if collection is empty
-async function seedDefaultSectionsIfNeeded() {
-    try {
-        const count = await ShowcaseSection.countDocuments();
-        if (count === 0) {
-            // Try to link real products from database if available
-            const realProducts = await Product.find({ status: 'Active' }).limit(6).lean();
-            const sectionsToSeed = JSON.parse(JSON.stringify(DEFAULT_SECTIONS));
-            
-            if (realProducts.length > 0) {
-                // Link real products where possible
-                sectionsToSeed.forEach((sec, sIdx) => {
-                    sec.products.forEach((p, pIdx) => {
-                        const matchedProduct = realProducts[(sIdx + pIdx) % realProducts.length];
-                        if (matchedProduct) {
-                            p.product = matchedProduct._id;
-                        }
-                    });
-                });
-            }
-            
-            await ShowcaseSection.insertMany(sectionsToSeed);
-        }
-    } catch (err) {
-        console.error('Error seeding default showcase sections:', err);
-    }
-}
 
 // GET /api/v1/settings/showcase-sections (Public for User App)
 export async function getPublicShowcaseSections(req, res) {
     try {
-        await seedDefaultSectionsIfNeeded();
-
         let sections = await ShowcaseSection.find({ isActive: true })
             .sort({ sortOrder: 1, createdAt: 1 })
             .populate({
@@ -187,9 +35,7 @@ export async function getPublicShowcaseSections(req, res) {
                 .lean();
         }
 
-        if (!sections || sections.length === 0) {
-            sections = JSON.parse(JSON.stringify(DEFAULT_SECTIONS));
-        }
+        if (!sections) sections = [];
 
         // Format and merge product details with custom overrides
         const formattedSections = sections.map(section => {
@@ -242,8 +88,6 @@ export async function getPublicShowcaseSections(req, res) {
 // GET /api/v1/settings/showcase-sections/admin (Protected for Superadmin)
 export async function getAllShowcaseSectionsAdmin(req, res) {
     try {
-        await seedDefaultSectionsIfNeeded();
-
         const sections = await ShowcaseSection.find()
             .sort({ sortOrder: 1, createdAt: 1 })
             .populate({

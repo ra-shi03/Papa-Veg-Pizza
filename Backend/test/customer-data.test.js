@@ -1,7 +1,7 @@
 // Customer app on real data (docs/audit7.md 2.3, 2.10):
 // - GET /food/products/public/:id: the product page (home banners link here), display fields only, store-priced.
 // - POST /food/orders/calculate returns one priced line per cart line, so cart rows show the server's prices.
-// - POST /food/admin/offers is retired (only Marketing coupons apply).
+// - The old offer systems are gone: /food/admin/offers and /dynamic-home/offers (only Marketing coupons exist).
 // - Pushes carry the business logo, never a hardcoded third-party image.
 // - The customer screens no longer read sample data or call paths the server does not have (source checks).
 import { test, before, after, describe } from 'node:test';
@@ -80,13 +80,18 @@ describe('POST /food/orders/calculate returns priced lines', () => {
 });
 
 describe('legacy offers', () => {
-    test('POST /food/admin/offers is refused (410) and creates nothing', async () => {
-        const { FoodOffer } = await import('../src/modules/food/admin/models/offer.model.js');
-        const before = await FoodOffer.countDocuments();
-        const res = await fx.call('POST', '/v1/food/admin/offers', fx.SA, { couponCode: 'NEWOFFER', discountType: 'percentage', discountValue: 10 });
-        assert.equal(res.status, 410, JSON.stringify(res.body));
-        assert.match(res.body.message, /Marketing > Coupons/);
-        assert.equal(await FoodOffer.countDocuments(), before);
+    test('the old offer endpoints no longer exist (one coupon system: Marketing > Coupons)', async () => {
+        for (const [method, path, token] of [
+            ['GET', '/v1/food/admin/offers', fx.SA],
+            ['POST', '/v1/food/admin/offers', fx.SA],
+            ['DELETE', '/v1/food/admin/offers/64b000000000000000000001', fx.SA],
+            ['GET', '/v1/dynamic-home/offers', fx.SA],
+            ['GET', '/v1/dynamic-home/offers-admin', fx.SA],
+            ['POST', '/v1/dynamic-home/offers', fx.SA],
+        ]) {
+            const res = await fx.call(method, path, token, method === 'POST' ? { couponCode: 'NEWOFFER' } : undefined);
+            assert.equal(res.status, 404, `${method} ${path}: ${JSON.stringify(res.body)}`);
+        }
     });
 });
 

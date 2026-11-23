@@ -26,108 +26,12 @@ import DeliveryPartnerDetailsDrawer from "./DeliveryPartnerDetailsDrawer"
 import EditDeliveryPartnerModal from "./EditDeliveryPartnerModal"
 import useDeliveryPartnerRows from "./useDeliveryPartnerRows"
 import FranchiseWalletMinimums from "./FranchiseWalletMinimums"
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 import { adminAPI } from "@food/api"
 
-const INITIAL_RIDERS = [
-  {
-    id: "RP-88421",
-    name: "Ravi Sharma",
-    email: "r.sharma@papaveg.com",
-    phone: "+91 98765 43210",
-    store: "Mumbai - Andheri West",
-    franchise: "Papa Veg Mumbai",
-    vehicle: "Electric Bike",
-    vehicleModel: "NIU N-Series",
-    licenseNumber: "MH-02-1234",
-    totalOrders: 450,
-    completedOrders: 450,
-    cancelledOrders: 5,
-    rating: 4.8,
-    status: "Online",
-    address: "722 Link Road, Andheri West, Mumbai",
-    storeManager: "Sanjay Gupta",
-    priorityRouting: true,
-    recentDeliveries: [
-      { id: "ORD-11498", date: "Today, 02:45 PM", status: "Delivered", earnings: 12.50 },
-      { id: "ORD-11495", date: "Today, 01:12 PM", status: "Delivered", earnings: 8.75 },
-      { id: "ORD-11490", date: "Today, 11:30 AM", status: "Failed", earnings: 0.00 },
-      { id: "ORD-11488", date: "Yesterday, 09:15 PM", status: "Delivered", earnings: 15.20 },
-      { id: "ORD-11482", date: "Yesterday, 08:30 PM", status: "Delivered", earnings: 9.40 }
-    ]
-  },
-  {
-    id: "RP-88422",
-    name: "Neha Singh",
-    email: "n.singh@papaveg.com",
-    phone: "+91 98765 43211",
-    store: "Pune - Koregaon Park",
-    franchise: "Papa Veg Pune",
-    vehicle: "Scooter",
-    vehicleModel: "Ather 450X",
-    licenseNumber: "MH-12-5678",
-    totalOrders: 328,
-    completedOrders: 328,
-    cancelledOrders: 2,
-    rating: 4.9,
-    status: "Busy",
-    address: "415 Main Street, Koregaon Park, Pune",
-    storeManager: "Rahul Verma",
-    priorityRouting: false,
-    recentDeliveries: [
-      { id: "ORD-11488", date: "Yesterday, 09:15 PM", status: "Delivered", earnings: 15.20 },
-      { id: "ORD-11482", date: "Yesterday, 08:30 PM", status: "Delivered", earnings: 9.40 }
-    ]
-  },
-  {
-    id: "RP-88423",
-    name: "Amit Patel",
-    email: "a.patel@papaveg.com",
-    phone: "+91 98765 43212",
-    store: "Delhi - Connaught Place",
-    franchise: "Papa Veg Delhi",
-    vehicle: "Car",
-    vehicleModel: "Tata Nexon EV",
-    licenseNumber: "DL-01-9012",
-    totalOrders: 1102,
-    completedOrders: 1102,
-    cancelledOrders: 18,
-    rating: 4.7,
-    status: "Offline",
-    address: "789 CP Inner Circle, Delhi",
-    storeManager: "Suresh Kumar",
-    priorityRouting: true,
-    recentDeliveries: [
-      { id: "ORD-11475", date: "2 days ago", status: "Delivered", earnings: 18.00 },
-      { id: "ORD-11471", date: "2 days ago", status: "Delivered", earnings: 11.25 }
-    ]
-  },
-  {
-    id: "RP-88424",
-    name: "Rahul Verma",
-    email: "r.verma_rider@papaveg.com",
-    phone: "+91 98765 43213",
-    store: "Bangalore - Indiranagar",
-    franchise: "Papa Veg Bangalore",
-    vehicle: "Electric Bike",
-    vehicleModel: "Ola S1 Pro",
-    licenseNumber: "KA-01-3456",
-    totalOrders: 84,
-    completedOrders: 84,
-    cancelledOrders: 12,
-    rating: 3.2,
-    status: "Suspended",
-    address: "101 100ft Road, Indiranagar, Bangalore",
-    storeManager: "Vikram Singh",
-    priorityRouting: false,
-    recentDeliveries: [
-      { id: "ORD-11425", date: "3 days ago", status: "Failed", earnings: 0.00 }
-    ]
-  }
-]
+const INITIAL_RIDERS = []
 
 export default function DeliveryPartnersManagement() {
-  // Real riders from the server; the sample list above only runs with VITE_STANDALONE_MOCK=true
+
   const { riders, setRiders, stores: storeOptions, franchises: franchiseOptions, loading, error, reload } = useDeliveryPartnerRows(INITIAL_RIDERS)
 
   // Filter States
@@ -157,10 +61,7 @@ export default function DeliveryPartnersManagement() {
     const unblock = blockTarget.status === "Suspended"
     setBlocking(true)
     try {
-      if (STANDALONE_MOCK) {
-        setRiders((prev) => prev.map((r) => (r.id === blockTarget.id ? { ...r, status: unblock ? "Offline" : "Suspended" } : r)))
-      } else {
-        const res = unblock
+      const res = unblock
           ? await adminAPI.activateDeliveryPartner(blockTarget.id)
           : await adminAPI.suspendDeliveryPartner(blockTarget.id, blockReason)
         const d = res?.data?.data || {}
@@ -170,7 +71,6 @@ export default function DeliveryPartnersManagement() {
           showToast(unblock ? `${blockTarget.name} is unblocked` : `${blockTarget.name} is blocked`, unblock ? "success" : "warning")
         }
         reload()
-      }
       setBlockTarget(null)
       setBlockReason("")
     } catch (err) {
@@ -243,10 +143,8 @@ export default function DeliveryPartnersManagement() {
   const totalPages = Math.ceil(filteredRiders.length / itemsPerPage)
 
   const handleSaveRider = async (savedData) => {
-    if (!STANDALONE_MOCK) {
-      showToast(READ_ONLY, "error")
+    showToast(READ_ONLY, "error")
       return
-    }
     const exists = riders.some((r) => r.id === savedData.id)
     if (exists) {
       // Edit mode
@@ -401,7 +299,7 @@ export default function DeliveryPartnersManagement() {
       </section>
 
       {/* Delivery Partners Filters Component */}
-      {!STANDALONE_MOCK && <FranchiseWalletMinimums />}
+      {(<FranchiseWalletMinimums />)}
 
       <DeliveryPartnersFilters
         searchQuery={searchQuery}
@@ -417,9 +315,9 @@ export default function DeliveryPartnersManagement() {
         sortOrder={sortOrder}
         setSortOrder={setSortOrder}
         onReset={handleResetFilters}
-        franchiseOptions={STANDALONE_MOCK ? undefined : franchiseOptions}
-        storeOptions={STANDALONE_MOCK ? undefined : storeOptions}
-        vehicleOptions={STANDALONE_MOCK ? undefined : [...new Set(riders.map((r) => r.vehicle).filter(Boolean))]}
+        franchiseOptions={(franchiseOptions)}
+        storeOptions={(storeOptions)}
+        vehicleOptions={([...new Set(riders.map((r) => r.vehicle).filter(Boolean))])}
       />
 
       {/* Main Responsive Table */}
@@ -464,7 +362,7 @@ export default function DeliveryPartnersManagement() {
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full overflow-hidden border border-zinc-100 dark:border-zinc-800 flex-shrink-0">
-                          {rider.photo || STANDALONE_MOCK ? (
+                          {(rider.photo) ? (
                             <img
                               src={rider.photo || getProfileImage(rider.name)}
                               alt={rider.name}

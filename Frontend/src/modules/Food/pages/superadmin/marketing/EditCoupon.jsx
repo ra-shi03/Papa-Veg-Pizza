@@ -205,7 +205,7 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
       const zId = f.zoneId?._id || f.zoneId;
       if (zId && zoneIds.includes(zId)) return true;
 
-      // Mock/relational link via territoryId
+      // /relational link via territoryId
       if (f.territoryId) {
         const ter = dbTerritories.find(t => (t.id || t._id) === f.territoryId);
         if (ter && zoneIds.includes(ter.zoneId?._id || ter.zoneId)) return true;

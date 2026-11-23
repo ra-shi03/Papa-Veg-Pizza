@@ -1,15 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
-import { INV, failOrMock } from "./inventoryApi";
-import { getLocalWasteLogs, setLocalWasteLogs } from "../mockData";
+import { INV, throwApiError } from "./inventoryApi";
 
 export function useApproveWaste() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (payload) => {
-      const { wasteId, remarks = "", approvedBy = "Shubham Jamliya" } = payload;
+      const { wasteId, remarks = "" } = payload;
       try {
         const response = await apiClient.patch(`${INV}/waste/${wasteId}/approve`, { remarks });
         if (
@@ -23,48 +22,8 @@ export function useApproveWaste() {
         }
         throw new Error(response.data?.message || "Waste approval failed on backend");
       } catch (err) {
-        failOrMock(err);
-        console.warn("Backend API unavailable. Approving waste log locally.");
-
-        // Simulate network delay
-        await new Promise((resolve) => setTimeout(resolve, 400));
-
-        const wasteLogs = getLocalWasteLogs();
-        const logIndex = wasteLogs.findIndex(w => w._id === wasteId);
-
-        if (logIndex === -1) {
-          throw new Error("Waste log not found in local database");
-        }
-
-        const log = wasteLogs[logIndex];
-        if (log.status === "approved") {
-          throw new Error("Waste record is already approved");
-        }
-
-        // Update properties
-        const updatedLog = {
-          ...log,
-          status: "approved",
-          approvedBy,
-          remarks: remarks || log.remarks,
-          timeline: [
-            ...log.timeline,
-            {
-              user: approvedBy,
-              action: "approved",
-              remarks: remarks || "Approved by store manager",
-              createdAt: new Date().toISOString()
-            }
-          ]
-        };
-
-        wasteLogs[logIndex] = updatedLog;
-        setLocalWasteLogs(wasteLogs);
-
-        return {
-          success: true,
-          message: "Waste record approved successfully in local database"
-        };
+        throwApiError(err);
+        
       }
     },
     onSuccess: (data, variables) => {

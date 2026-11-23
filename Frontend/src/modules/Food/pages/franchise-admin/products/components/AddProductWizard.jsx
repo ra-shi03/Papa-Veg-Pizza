@@ -3,9 +3,11 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { X, Sparkles, AlertCircle, Upload, Trash2, HelpCircle, Leaf, Flame, Pizza, Store, ArrowRight, ArrowLeft, Clock } from "lucide-react";
 import { productSchema } from "../productSchema";
-import { mockCategories, mockTaxCategories } from "../mockProducts";
 import { useStores } from "@food/pages/franchise-admin/orders/ordersQuery";
 import { toast } from "sonner";
+
+const categories = [];
+const taxCategories = [];
 
 export default function AddProductWizard({ isOpen, onClose, onSubmit, initialData = null }) {
   const [currentStep, setCurrentStep] = useState(1);
@@ -111,34 +113,13 @@ export default function AddProductWizard({ isOpen, onClose, onSubmit, initialDat
     setValue("slug", slug);
   };
 
-  // Mock uploader simulation
   const simulateUpload = (type, files) => {
-    if (!files || files.length === 0) return;
-    toast.info("Uploading image...", { description: "Compressing to WebP and uploading to CDN." });
-    
-    setTimeout(() => {
-      // Generate some pizza unsplash links for testing
-      const pizzaUnsplash = [
-        "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80&fm=webp",
-        "https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?auto=format&fit=crop&w=400&q=80&fm=webp",
-        "https://images.unsplash.com/photo-1571066811602-71683a3f680d?auto=format&fit=crop&w=400&q=80&fm=webp",
-        "https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?auto=format&fit=crop&w=400&q=80&fm=webp"
-      ];
-      const randomUrl = pizzaUnsplash[Math.floor(Math.random() * pizzaUnsplash.length)];
-
-      if (type === "thumbnail") {
-        setValue("image", randomUrl);
-        toast.success("Thumbnail updated successfully!");
-      } else {
-        const currentGallery = watch("galleryImages") || [];
-        setValue("galleryImages", [...currentGallery, randomUrl]);
-        toast.success("Gallery image added successfully!");
-      }
-    }, 1000);
+    // there is no image upload on this screen yet: never put a stock photo in its place
+    toast.info("Image upload is not available here yet.");
   };
 
   const getCategoryName = (catId) => {
-    return mockCategories.find((c) => c.id === catId)?.name || "Pizza";
+    return categories.find((c) => c.id === catId)?.name || "Pizza";
   };
 
   const handleNextStep = async () => {
@@ -263,7 +244,7 @@ export default function AddProductWizard({ isOpen, onClose, onSubmit, initialDat
                       className="w-full px-3 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-[var(--primary)] text-zinc-800 dark:text-zinc-250 cursor-pointer"
                     >
                       <option value="">Select Category</option>
-                      {mockCategories.map((c) => (
+                      {categories.map((c) => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>
@@ -523,7 +504,7 @@ export default function AddProductWizard({ isOpen, onClose, onSubmit, initialDat
                         {...register("taxCategory")}
                         className="w-full px-3 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-[var(--primary)] text-zinc-800 dark:text-zinc-250 cursor-pointer"
                       >
-                        {mockTaxCategories.map((t) => (
+                        {taxCategories.map((t) => (
                           <option key={t.id} value={t.id}>{t.name}</option>
                         ))}
                       </select>

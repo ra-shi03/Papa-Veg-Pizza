@@ -58,10 +58,8 @@ export default function ReadyOrderDetailsModal({
     return `${diffMins} Minutes`;
   };
 
-  // Lookup rider from local storage riders DB
-  const assignedRider = order.deliveryPartner || (order.deliveryPartnerId
-    ? (JSON.parse(localStorage.getItem("pvp_riders")) || []).find((r) => r._id === order.deliveryPartnerId)
-    : null);
+  // The rider the server sent with the order
+  const assignedRider = order.deliveryPartner || null;
 
   const isDelivery = order.orderType === "delivery";
   const isRiderAssigned = !!order.deliveryPartnerId;

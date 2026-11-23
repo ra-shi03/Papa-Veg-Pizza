@@ -116,7 +116,7 @@ Payment Status: ${order.paymentStatus} (Via ${order.paymentMethod})
           </button>
         </header>
 
-        {/* Invoice Body Canvas (Mock A4 sheet) */}
+        {/* Invoice Body Canvas (A4 sheet) */}
         <div className="flex-1 overflow-y-auto p-6 bg-zinc-100 dark:bg-zinc-900 flex justify-center scrollbar-thin">
           <div 
             ref={invoiceRef}

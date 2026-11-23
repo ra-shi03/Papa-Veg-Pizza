@@ -67,7 +67,7 @@ describe('a partner token is never satisfied by a User, and a customer token nev
 describe('a partner token cannot reach admin, store or customer-only routes', () => {
     const ROUTES = [
         ['GET', '/v1/stores'], ['POST', '/v1/stores'], ['GET', '/v1/store-managers'], ['GET', '/v1/store-approvals'],
-        ['GET', '/v1/food/admin/franchises'], ['POST', '/v1/food/admin/franchises'], ['GET', '/v1/food/admin/fee-settings'], ['GET', '/v1/food/admin/offers'],
+        ['GET', '/v1/food/admin/franchises'], ['POST', '/v1/food/admin/franchises'], ['GET', '/v1/food/admin/fee-settings'], ['GET', '/v1/food/admin/withdrawals'],
         ['GET', '/v1/admin/dashboard'], ['GET', '/v1/store/dashboard/today-sales'], ['GET', '/v1/store/riders'], ['POST', '/v1/store/delivery/assign'],
         ['GET', '/v1/store-pricing'], ['PUT', '/v1/store-pricing/x_y'], ['POST', '/v1/bulk-price-update'], ['GET', '/v1/operating-hours'], ['PATCH', '/v1/operating-hours/bulk-update'],
         ['GET', '/v1/store-performance'], ['GET', '/v1/orders?storeId=x'], ['GET', '/v1/inventory?storeId=x'],

@@ -60,8 +60,8 @@ export default function PrintInvoiceModal({ isOpen, onClose, order }) {
             </div>
             <div class="details-box" style="text-align: right;">
               <h3>Customer details</h3>
-              <strong>${order.customer?.name || 'Rahul Sharma'}</strong><br/>
-              ${order.customer?.phone || '+91 98765-43210'}<br/>
+              <strong>${order.customer?.name || '—'}</strong><br/>
+              ${order.customer?.phone || '—'}<br/>
               ${order.customer?.address || '123 Pizza Lane, Green Valley, Bangalore'}
             </div>
           </div>

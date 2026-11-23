@@ -489,7 +489,7 @@ export default function RefundRequests() {
                     </div>
                     <div>
                       <h4 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100">No Refund Requests Found</h4>
-                      <p className="text-[10px] text-zinc-400 font-semibold mt-1">Try modifying filter ranges, resetting date presets, or adding mock datasets.</p>
+                      <p className="text-[10px] text-zinc-400 font-semibold mt-1">Try modifying filter ranges, resetting date presets, or adding datasets.</p>
                     </div>
                   </td>
                 </tr>

@@ -6,13 +6,8 @@ export default function OrdersTransactionModal({ isOpen, onClose, customer }) {
   if (!isOpen || !customer) return null
 
   const ordersToDisplay = Array.isArray(customer.orders) && customer.orders.length > 0 
-    ? customer.orders 
-    : [
-        { id: "ORD-8821", restaurant: "Downtown Core", date: "Oct 24, 2023 • 14:32 PM", amount: 42.50, status: "Delivered" },
-        { id: "ORD-8799", restaurant: "West End", date: "Oct 24, 2023 • 15:05 PM", amount: 28.90, status: "In Progress" },
-        { id: "ORD-8755", restaurant: "Uptown Hub", date: "Oct 23, 2023 • 19:15 PM", amount: 56.00, status: "Cancelled" },
-        { id: "ORD-8612", restaurant: "Downtown Core", date: "Oct 23, 2023 • 12:10 PM", amount: 15.20, status: "Delivered" },
-      ]
+    ? customer.orders
+    : []
 
   return (
     <AnimatePresence>

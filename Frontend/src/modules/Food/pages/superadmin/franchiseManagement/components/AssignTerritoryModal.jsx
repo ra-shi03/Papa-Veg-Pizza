@@ -6,25 +6,12 @@ export default function AssignTerritoryModal({ isOpen, onClose, onSubmit, zone }
   const [selectedTerritories, setSelectedTerritories] = useState([]);
   const [notes, setNotes] = useState("");
 
-  // Mock available territories in India
-  const [allTerritories] = useState([
-    { id: "ter-001", name: "Bandra West", city: "Mumbai" },
-    { id: "ter-002", name: "Andheri East", city: "Mumbai" },
-    { id: "ter-003", name: "Koregaon Park", city: "Pune" },
-    { id: "ter-004", name: "FC Road", city: "Pune" },
-    { id: "ter-005", name: "Indiranagar", city: "Bengaluru" },
-    { id: "ter-006", name: "Connaught Place", city: "Delhi" },
-    { id: "ter-007", name: "Whitefield", city: "Bengaluru" },
-    { id: "ter-008", name: "Gachibowli", city: "Hyderabad" },
-    { id: "ter-009", name: "Salt Lake", city: "Kolkata" },
-    { id: "ter-010", name: "T Nagar", city: "Chennai" },
-    { id: "ter-011", name: "Vijay Nagar", city: "Indore" },
-    { id: "ter-012", name: "Arera Colony", city: "Bhopal" }
-  ]);
+  // available territories in India
+  const [allTerritories] = useState([]);
 
   useEffect(() => {
     if (zone && isOpen) {
-      // Simulate reading already assigned territories (e.g. 2 mock assigned ones based on name)
+      // Simulate reading already assigned territories (e.g. 2 assigned ones based on name)
       const assigned = allTerritories
         .slice(0, 3)
         .map((t) => t.id);

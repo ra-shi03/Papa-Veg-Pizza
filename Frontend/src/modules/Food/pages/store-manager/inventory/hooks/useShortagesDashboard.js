@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
-import { INV, failOrMock } from "./inventoryApi";
-import { getLocalShortages, mockAffectedOrders } from "../mockData";
+import { INV, throwApiError } from "./inventoryApi";
 
 export function useShortagesDashboard() {
   return useQuery({
@@ -20,39 +19,8 @@ export function useShortagesDashboard() {
         }
         throw new Error("Invalid response format");
       } catch (err) {
-        failOrMock(err);
-        console.warn("Backend API unavailable. Fetching shortages dashboard from local database.");
-
-        // Simulate network latency
-        await new Promise((resolve) => setTimeout(resolve, 300));
-
-        const shortages = getLocalShortages();
-        const activeList = shortages.filter((s) => s.status === "active");
-
-        const activeShortages = activeList.length;
-        const criticalShortages = activeList.filter((s) => s.severity === "critical").length;
-
-        // Sum affected orders count
-        const affectedOrders = activeList.reduce((sum, s) => sum + (s.affectedOrders || 0), 0);
-
-        // Sum revenue loss from affected orders
-        let estimatedRevenueLoss = 0;
-        activeList.forEach((s) => {
-          const orders = mockAffectedOrders[s.ingredientId] || [];
-          if (orders.length > 0) {
-            estimatedRevenueLoss += orders.reduce((sum, o) => sum + (o.revenue || 0), 0);
-          } else {
-            // Fallback estimation
-            estimatedRevenueLoss += (s.affectedOrders || 0) * 450;
-          }
-        });
-
-        return {
-          activeShortages,
-          criticalShortages,
-          affectedOrders,
-          estimatedRevenueLoss,
-        };
+        throwApiError(err);
+        
       }
     },
   });

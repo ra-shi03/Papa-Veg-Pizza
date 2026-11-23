@@ -85,7 +85,7 @@ export function AlertCreateRequestModal({ isOpen, onClose, alert, currentUser })
         urgency,
         reason: reason.trim(),
         notes: notes.trim(),
-        requestedBy: currentUser || localStorage.getItem("store_user_name") || "Aman Verma"
+        requestedBy: currentUser || localStorage.getItem("store_user_name") || "—"
       },
       {
         onSuccess: () => {

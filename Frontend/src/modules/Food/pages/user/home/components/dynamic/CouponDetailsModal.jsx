@@ -12,13 +12,15 @@ export function CouponDetailsModal({ offer, isOpen, onClose, onApply, isDarkMode
 
   if (!isOpen || !offer) return null;
 
-  const code = offer.couponCode || offer.code || "PVPDEAL";
-  const minOrder = offer.minOrderValue || offer.minimumOrderAmount || 0;
-  const maxDiscount = offer.maxDiscount || offer.maximumDiscount || 80;
+  // Every figure comes from the coupon the super admin set; a line with nothing real to say is left out.
+  const code = offer.couponCode || offer.code || "";
+  const minOrder = Number(offer.minOrderValue || offer.minimumOrderAmount || 0);
   const isPercentage = offer.isPercentage || offer.couponType === "Percentage" || offer.discountType === "percentage";
-  const discountText = offer.discountText || (isPercentage ? `${offer.value || 40}% (up to ₹${maxDiscount})` : `₹${offer.value || maxDiscount}`);
-  const validTill = offer.validTill || "Today 11:00 PM";
-  const isFirstOrderOnly = offer.isFirstOrderOnly || false;
+  const value = Number(offer.value ?? offer.discountValue ?? 0);
+  // A flat coupon saves exactly its value; a percentage coupon is capped only when the admin set a maximum.
+  const maxDiscount = Number(offer.maxDiscount || offer.maximumDiscount || 0) || (isPercentage ? 0 : value);
+  const savingText = isPercentage ? (maxDiscount ? `up to ₹${maxDiscount} off` : `${value}% off`) : `₹${value} off`;
+  const validTill = offer.validTill || "";
 
   const handleCopyCode = (e) => {
     e?.stopPropagation();
@@ -37,11 +39,11 @@ export function CouponDetailsModal({ offer, isOpen, onClose, onApply, isDarkMode
       iconColor: "text-[var(--accent-red,#EE3A43)] bg-red-50 dark:bg-red-950/40 border border-red-200/50 dark:border-red-900/40",
       text: (
         <span>
-          Use code <strong className="font-semibold text-zinc-900 dark:text-white font-mono">{code}</strong> and get up to <strong className="font-semibold text-zinc-900 dark:text-white">₹{maxDiscount} off</strong> on orders worth ₹{minOrder} or more.
+          Use code <strong className="font-semibold text-zinc-900 dark:text-white font-mono">{code}</strong> and get <strong className="font-semibold text-zinc-900 dark:text-white">{savingText}</strong>{minOrder > 0 ? ` on orders worth ₹${minOrder} or more` : ""}.
         </span>
       )
     },
-    {
+    minOrder > 0 && {
       id: "min-order",
       icon: "shopping_bag",
       iconColor: "text-amber-600 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/50 dark:border-amber-900/40",
@@ -51,7 +53,7 @@ export function CouponDetailsModal({ offer, isOpen, onClose, onApply, isDarkMode
         </span>
       )
     },
-    {
+    maxDiscount > 0 && {
       id: "max-savings",
       icon: "savings",
       iconColor: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/50 dark:border-emerald-900/40",
@@ -61,7 +63,7 @@ export function CouponDetailsModal({ offer, isOpen, onClose, onApply, isDarkMode
         </span>
       )
     },
-    {
+    validTill && {
       id: "validity",
       icon: "schedule",
       iconColor: "text-blue-600 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/50 dark:border-blue-900/40",
@@ -121,7 +123,7 @@ export function CouponDetailsModal({ offer, isOpen, onClose, onApply, isDarkMode
         </span>
       )
     }
-  ];
+  ].filter(Boolean);
 
   return (
     <AnimatePresence>

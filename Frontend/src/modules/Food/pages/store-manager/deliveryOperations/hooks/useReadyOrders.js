@@ -1,18 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
-import { STANDALONE_MOCK, failOrMock } from "@/services/api/mockPolicy";
-import { initialMockReadyOrders } from "../mockDeliveryData";
+import { throwApiError } from "@/services/api/apiError";
+
 
 const READY_ORDERS_KEY = "pvp_ready_orders";
 
 // Initialize localStorage fallback
-const initializeReadyOrdersDb = () => {
-  if (!localStorage.getItem(READY_ORDERS_KEY)) {
-    localStorage.setItem(READY_ORDERS_KEY, JSON.stringify(initialMockReadyOrders));
-  }
-};
 
-initializeReadyOrdersDb();
 
 export const getLocalReadyOrders = () => {
   try {
@@ -45,35 +39,12 @@ export default function useReadyOrders(filters = {}) {
         }
 
         // An empty list is a real answer ("no orders ready"), never a reason to show sample orders
-        if (!STANDALONE_MOCK || apiItems.length > 0) return apiItems;
-        throw new Error("No orders returned");
+        return apiItems;
+        
       } catch (err) {
-        failOrMock(err, "Could not load ready orders");
+        throwApiError(err, "Could not load ready orders");
         // Local fallback
-        let list = getLocalReadyOrders();
-
-        // Filter by search (order number or customer name)
-        if (filters.search) {
-          const q = filters.search.toLowerCase();
-          list = list.filter((o) => {
-            const orderNum = o.orderNumber || "";
-            const custName = o.customerName || o.customer?.name || "";
-            return (
-              orderNum.toLowerCase().includes(q) ||
-              custName.toLowerCase().includes(q)
-            );
-          });
-        }
-
-        // Filter by status (waiting, assigned, accepted)
-        if (filters.status && filters.status !== "All") {
-          list = list.filter((o) => {
-            const deliveryStatus = o.deliveryStatus || (o.assignedRiderId || o.deliveryPartnerId ? "assigned" : "waiting");
-            return deliveryStatus.toLowerCase() === filters.status.toLowerCase();
-          });
-        }
-
-        return list;
+        
       }
     }
   });

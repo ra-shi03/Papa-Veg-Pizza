@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { X, AlertCircle, CheckCircle, Truck, Calendar } from "lucide-react";
 import { useApprovePurchaseRequestMutation } from "../hooks/usePurchaseRequests";
-import { mockSuppliers } from "../mockData";
+
+const suppliers = [];
 
 export default function ApproveRequestModal({ isOpen, onClose, requestRecord }) {
   const approveMutation = useApprovePurchaseRequestMutation();
@@ -24,7 +25,7 @@ export default function ApproveRequestModal({ isOpen, onClose, requestRecord }) 
         approvedQty: item.requestedQty, // prefill with requested quantity
         unitPrice: item.unitPrice
       })));
-      setVendorId(requestRecord.vendorId || mockSuppliers[0]?._id || "");
+      setVendorId(requestRecord.vendorId || suppliers[0]?._id || "");
       setExpectedDeliveryDate(requestRecord.expectedDeliveryDate || new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
       setRemarks("");
       setValidationError("");
@@ -86,7 +87,7 @@ export default function ApproveRequestModal({ isOpen, onClose, requestRecord }) 
     });
   };
 
-  const selectedVendor = mockSuppliers.find(s => s._id === vendorId);
+  const selectedVendor = suppliers.find(s => s._id === vendorId);
 
   return (
     <>
@@ -206,7 +207,7 @@ export default function ApproveRequestModal({ isOpen, onClose, requestRecord }) 
                     className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800 rounded-xl font-bold text-zinc-855 dark:text-white focus:border-[var(--primary)] outline-none"
                   >
                     <option value="" disabled>Select Vendor...</option>
-                    {mockSuppliers.map(v => (
+                    {suppliers.map(v => (
                       <option key={v._id} value={v._id}>{v.name} ({v.contact})</option>
                     ))}
                   </select>

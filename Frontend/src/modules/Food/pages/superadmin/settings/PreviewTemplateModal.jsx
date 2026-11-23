@@ -7,11 +7,11 @@ export default function PreviewTemplateModal({ isOpen, onClose, template }) {
 
   useEffect(() => {
     if (template && isOpen) {
-      // Initialize mock sample values for each variable tag
+      // Initialize sample values for each variable tag
       const initialVars = {};
       const tags = template.variables || [];
       tags.forEach(tag => {
-        if (tag === '{{customerName}}') initialVars[tag] = 'Shubham Jamliya';
+        if (tag === '{{customerName}}') initialVars[tag] = '';
         else if (tag === '{{orderId}}') initialVars[tag] = 'PVP-ORD-8820';
         else if (tag === '{{amount}}') initialVars[tag] = '₹450.00';
         else if (tag === '{{otpCode}}') initialVars[tag] = '883012';

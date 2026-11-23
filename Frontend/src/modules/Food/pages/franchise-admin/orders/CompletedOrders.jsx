@@ -11,19 +11,20 @@ import {
   LineChart, Line, BarChart, Bar, Legend 
 } from "recharts";
 
-// Query Hooks & Mock Database references
+// Query Hooks & Database references
 import { 
   useCompletedOrders, useStores, useDeliveryPartners 
 } from "./ordersQuery";
-import { 
-  mockRevenueTrends, mockRatingsDistribution, mockTopStoresRevenue 
-} from "./mockOrders";
 
 // Overlays
 import ViewDetailsDrawer from "./components/ViewDetailsDrawer";
 import DownloadInvoiceModal from "./components/DownloadInvoiceModal";
 import ReorderAnalysisModal from "./components/ReorderAnalysisModal";
 import CustomerFeedbackModal from "./components/CustomerFeedbackModal";
+
+const revenueTrends = [];
+const ratingsDistribution = [];
+const topStoresRevenue = [];
 
 export default function CompletedOrders() {
   // Sticky advanced filters
@@ -354,7 +355,7 @@ export default function CompletedOrders() {
           </div>
           <div className="h-[250px] w-full text-[10px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={mockRevenueTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={revenueTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2}/>
@@ -387,7 +388,7 @@ export default function CompletedOrders() {
           </div>
           <div className="h-[250px] w-full text-[10px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={mockRevenueTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <LineChart data={revenueTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" />
                 <XAxis dataKey="date" tickLine={false} axisLine={false} stroke="#888888" />
                 <YAxis tickLine={false} axisLine={false} stroke="#888888" allowDecimals={false} />
@@ -414,7 +415,7 @@ export default function CompletedOrders() {
           </div>
           <div className="h-[250px] w-full text-[10px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={mockRatingsDistribution} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <BarChart data={ratingsDistribution} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" />
                 <XAxis dataKey="rating" tickLine={false} axisLine={false} stroke="#888888" />
                 <YAxis tickLine={false} axisLine={false} stroke="#888888" allowDecimals={false} />
@@ -442,7 +443,7 @@ export default function CompletedOrders() {
           <div className="h-[250px] w-full text-[10px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart 
-                data={mockTopStoresRevenue} 
+                data={topStoresRevenue} 
                 layout="vertical"
                 margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
               >

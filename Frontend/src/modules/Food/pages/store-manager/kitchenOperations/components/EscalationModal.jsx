@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Modal, Select, Input } from "antd";
 import { AlertOctagon, Info, ShieldAlert } from "lucide-react";
-import { mockManagementStaff } from "../mockData";
+
+const managementStaff = [];
 
 const { TextArea } = Input;
 
@@ -104,7 +105,7 @@ export default function EscalationModal({ visible, onClose, order, onConfirm }) 
             value={assignedTo || undefined}
             onChange={(val) => setAssignedTo(val)}
             classNames={{ popup: { root: "dark:bg-zinc-900" } }}
-            options={mockManagementStaff.map(s => ({
+            options={managementStaff.map(s => ({
               value: s._id,
               label: `${s.name} (${s.role})`
             }))}

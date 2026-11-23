@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { Clock, X, User, DollarSign, Upload, AlertCircle, Sparkles, Truck, Shield } from "lucide-react"
-import { initialStores } from "../mockManagersData"
+
+const stores = [];
 
 const VEHICLE_OPTIONS = ["Bike", "Scooter", "Cycle", "Car"];
 
@@ -316,7 +317,7 @@ export default function AddEditDeliveryPartnerModal({ isOpen, onClose, onConfirm
                     className="w-full text-xs font-semibold px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 focus:outline-none"
                   >
                     <option value="">Select store outlet...</option>
-                    {initialStores.map((store) => (
+                    {stores.map((store) => (
                       <option key={store._id} value={store._id}>
                         {store.storeName} ({store.city})
                       </option>

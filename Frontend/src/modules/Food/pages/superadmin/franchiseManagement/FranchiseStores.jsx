@@ -299,7 +299,7 @@ export default function FranchiseStores() {
             <span className="text-[9px] font-black text-black dark:text-zinc-200 uppercase tracking-wider truncate">Total Stores</span>
             <div className="flex items-baseline gap-1.5">
               <h3 className="text-base font-black text-zinc-900 dark:text-zinc-100">{totalStores}</h3>
-              <span className="text-emerald-500 font-bold text-[8px] flex items-center gap-0.5"><TrendingUp size={8} />+4.2%</span>
+              <span className="text-emerald-500 font-bold text-[8px] flex items-center gap-0.5"><TrendingUp size={8} />—</span>
             </div>
           </div>
           <div className="p-1.5 rounded-md bg-red-650/10 text-red-650 shrink-0 border border-red-500/20">
@@ -437,7 +437,7 @@ export default function FranchiseStores() {
                 <label className="text-[10px] font-bold text-black dark:text-zinc-200 uppercase tracking-wider block mb-1">Current Manager</label>
                 <input
                   type="text"
-                  value={selectedStore?.owner || "Rahul Sharma"}
+                  value={selectedStore?.owner || "—"}
                   disabled
                   className="w-full h-8.5 px-3 border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-black dark:text-zinc-300 rounded-lg outline-none cursor-not-allowed"
                 />
@@ -451,9 +451,6 @@ export default function FranchiseStores() {
                   className="w-full h-8.5 px-3 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-955 rounded-lg text-black dark:text-white outline-none cursor-pointer"
                 >
                   <option value="">Select Manager...</option>
-                  <option value="Sonia Gupta">Sonia Gupta (GUP-4432)</option>
-                  <option value="Rajiv Malhotra">Rajiv Malhotra (MAL-9012)</option>
-                  <option value="Aniket Deshpande">Aniket Deshpande (DES-7112)</option>
                 </select>
               </div>
               <div>

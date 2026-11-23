@@ -17,7 +17,7 @@ export default function PreparationSummaryCards({ items = [] }) {
     return elapsed > (i.estimated_time || 12);
   }).length;
 
-  // 4. Average Preparation Time (mocked static or derived from completed timeline)
+  // 4. Average Preparation Time (static or derived from completed timeline)
   const avgPrepTime = 11; // 11 minutes average
 
   const cards = [

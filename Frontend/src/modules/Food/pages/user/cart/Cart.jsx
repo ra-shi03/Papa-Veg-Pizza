@@ -1,4 +1,4 @@
-import { readPickupStore } from "@food/utils/savedLocation"
+import { readPickupStore, couponStoreParams } from "@food/utils/savedLocation"
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { ArrowLeft, ChevronRight, ChevronUp, ChevronDown, Plus, Sparkles, MapPin, Clock, CalendarClock, Bike, IndianRupee } from "lucide-react"
@@ -158,29 +158,15 @@ export default function Cart() {
     const loadCoupons = async () => {
       let found = []
 
-      // 1. Try public offers endpoint
+      // The coupons checkout accepts at the store this cart is for (Marketing > Coupons, one list for every screen)
       try {
-        const storeId = slotInfo?.storeId || localStorage.getItem("user_storeId") || ""
         const res = await apiClient.get("/food/offers/public", {
-          params: storeId ? { storeId } : {},
+          params: slotInfo?.storeId ? { storeId: slotInfo.storeId } : couponStoreParams(),
           _isFallback: true,
         })
         const list = res?.data?.data?.allOffers || res?.data?.allOffers
-        if (Array.isArray(list) && list.length > 0) {
-          found = list
-        }
+        if (Array.isArray(list)) found = list
       } catch (_) {}
-
-      // 2. Try settings coupons public endpoint
-      if (found.length === 0) {
-        try {
-          const res = await apiClient.get("/settings/coupons/public")
-          const list = res?.data?.data || res?.data
-          if (Array.isArray(list) && list.length > 0) {
-            found = list
-          }
-        } catch (_) {}
-      }
 
       // Only the coupons the super admin created (Marketing > Coupons); nothing is made up here.
       // Normalize all offers into standard shape

@@ -16,7 +16,7 @@ export default function ViewOrderDrawer({
   onRefundClick, 
   onTrackClick, 
   onPrintClick,
-  userRole = 'Super Admin' // Mock role for permission based buttons
+  userRole = 'Super Admin' // role for permission based buttons
 }) {
   const [activeTab, setActiveTab] = useState('basic');
   const [order, setOrder] = useState(null);

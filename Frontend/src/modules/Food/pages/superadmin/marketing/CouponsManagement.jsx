@@ -6,7 +6,7 @@ import {
   Check, Info, EyeOff, ShieldAlert, WifiOff, Columns
 } from 'lucide-react';
 import { 
-  mockRegions, mockZones, mockTerritories, mockFranchises, mockStores, 
+  regionOptions, zoneOptions, territoryOptions, franchiseOptions, storeOptions, 
   api, getAggregateStats, CouponList 
 } from './CouponsData';
 import CreateCoupon from './CreateCoupon';
@@ -174,17 +174,17 @@ export default function CouponsManagement() {
 
   // Dynamic cascading region options
   const filterZones = useMemo(() => {
-    if (filters.regionIds.length === 0) return mockZones;
-    return mockZones.filter(z => filters.regionIds.includes(z.regionId));
+    if (filters.regionIds.length === 0) return zoneOptions;
+    return zoneOptions.filter(z => filters.regionIds.includes(z.regionId));
   }, [filters.regionIds]);
 
   const filterStores = useMemo(() => {
-    if (filters.regionIds.length === 0) return mockStores;
+    if (filters.regionIds.length === 0) return storeOptions;
     // get zones
-    const zones = mockZones.filter(z => filters.regionIds.includes(z.regionId)).map(z => z.id);
-    const territories = mockTerritories.filter(t => zones.includes(t.zoneId)).map(t => t.id);
-    const franchises = mockFranchises.filter(f => territories.includes(f.territoryId)).map(f => f.id);
-    return mockStores.filter(s => franchises.includes(s.franchiseId));
+    const zones = zoneOptions.filter(z => filters.regionIds.includes(z.regionId)).map(z => z.id);
+    const territories = territoryOptions.filter(t => zones.includes(t.zoneId)).map(t => t.id);
+    const franchises = franchiseOptions.filter(f => territories.includes(f.territoryId)).map(f => f.id);
+    return storeOptions.filter(s => franchises.includes(s.franchiseId));
   }, [filters.regionIds]);
 
   // Handle Sort Change
@@ -684,7 +684,7 @@ export default function CouponsManagement() {
                 <div className="flex flex-col gap-1.5 md:col-span-2">
                   <label className="text-[10px] font-black text-zinc-450 uppercase tracking-widest">Regions Targeting</label>
                   <div className="p-2 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-950 flex flex-wrap gap-3 max-h-[85px] overflow-y-auto">
-                    {mockRegions.map(reg => {
+                    {regionOptions.map(reg => {
                       const isChecked = filters.regionIds.includes(reg.id);
                       return (
                         <label key={reg.id} className="flex items-center gap-1.5 text-[10px] cursor-pointer">

@@ -114,15 +114,13 @@ export default function ShiftDetailsModal({ isOpen, onClose, shiftId, onViewStaf
     return "bg-zinc-50 text-zinc-550 border-zinc-150 dark:bg-zinc-800 dark:text-zinc-350";
   };
 
-  // Mocked activities timeline for demonstration purposes
-  const mockActivities = useMemo(() => {
-    if (!shift) return [];
+  // What is known about the shift: when it was created and by whom (nothing else is recorded yet)
+  const shiftActivities = useMemo(() => {
+    if (!shift?.createdAt) return [];
     return [
-      { id: "act-1", type: "assignment", title: `Roster updated: ${assignedEmployees.length} staff active`, time: "Just Now", desc: "Updated via Manager Console." },
-      { id: "act-2", type: "audit", title: "Shift settings configured", time: "1 week ago", desc: "Break minutes adjusted to 30 mins." },
-      { id: "act-3", type: "system", title: "Shift created", time: "Created on " + new Date(shift.createdAt || Date.now()).toLocaleDateString("en-IN"), desc: `Created by ${shift.createdBy || "System"}` }
+      { id: "act-created", type: "system", title: "Shift created", time: "Created on " + new Date(shift.createdAt).toLocaleDateString("en-IN"), desc: shift.createdBy ? `Created by ${shift.createdBy}` : "" }
     ];
-  }, [shift, assignedEmployees]);
+  }, [shift]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -234,7 +232,7 @@ export default function ShiftDetailsModal({ isOpen, onClose, shiftId, onViewStaf
                   </div>
 
                   <div className="text-[9px] font-bold text-zinc-450 space-y-1.5 pl-1.5">
-                    <p>Created By: {shift?.createdBy || "Shubham Jamliya"}</p>
+                    <p>Created By: {shift?.createdBy || "—"}</p>
                     <p>Created At: {new Date(shift?.createdAt || Date.now()).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</p>
                   </div>
                 </div>
@@ -316,7 +314,7 @@ export default function ShiftDetailsModal({ isOpen, onClose, shiftId, onViewStaf
               {activeTab === "timeline" && (
                 <div className="space-y-3 pt-2 max-h-[300px] overflow-y-auto pl-2">
                   <div className="relative border-l border-zinc-200 dark:border-zinc-800 space-y-4 pb-4">
-                    {mockActivities.map((act) => (
+                    {shiftActivities.map((act) => (
                       <div key={act.id} className="relative pl-6">
                         {/* Dot */}
                         <span className="absolute -left-1.5 top-1.5 w-3 h-3 rounded-full bg-zinc-200 dark:bg-zinc-800 border-2 border-white dark:border-zinc-900 flex items-center justify-center">

@@ -3,7 +3,8 @@ import {
   X, Check, AlertTriangle, ShieldAlert, FileText, Send, 
   Download, Sparkles, Star, Users, DollarSign, Package 
 } from "lucide-react";
-import { mockStores } from "../mockData";
+
+const stores = [];
 
 // Helper to format date
 const formatDateTime = (value) => {
@@ -589,7 +590,7 @@ export function ExportReviewsModal({ isOpen, onClose, onExport }) {
             className="w-full px-3 py-2 bg-white dark:bg-zinc-950 border border-zinc-250 dark:border-zinc-800 rounded-lg text-xs focus:ring-1 focus:ring-[var(--primary)] outline-hidden text-zinc-850 dark:text-zinc-150"
           >
             <option value="All">All Store Branches</option>
-            {mockStores.map(s => (
+            {stores.map(s => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>

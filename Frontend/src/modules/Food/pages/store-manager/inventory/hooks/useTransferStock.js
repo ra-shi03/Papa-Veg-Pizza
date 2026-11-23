@@ -1,13 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
-import { INV, failOrMock } from "./inventoryApi";
-import { 
-  getLocalTransfers, 
-  setLocalTransfers, 
-  getLocalIngredients, 
-  mockShortageTimeline 
-} from "../mockData";
+import { INV, throwApiError } from "./inventoryApi";
 
 export function useTransferStock() {
   const queryClient = useQueryClient();
@@ -46,52 +40,8 @@ export function useTransferStock() {
         }
         throw new Error(response.data?.message || "Failed to submit stock transfer");
       } catch (err) {
-        failOrMock(err);
-        console.warn("Backend API unavailable. Saving transfer request to local storage database.");
-
-        // Simulate network delay
-        await new Promise((resolve) => setTimeout(resolve, 300));
-
-        const transfers = getLocalTransfers();
-        const ingredients = getLocalIngredients();
-        const ingredient = ingredients.find(i => i._id === ingredientId);
-
-        const newTransfer = {
-          _id: `tr-${Date.now()}`,
-          fromStore,
-          fromStoreId,
-          toStore,
-          toStoreId,
-          ingredientId,
-          ingredientName: ingredient?.ingredientName || "Unknown Ingredient",
-          quantity,
-          status: "pending", // Pending admin approval
-          approvedBy: "",
-          reason,
-          remarks,
-          createdAt: new Date().toISOString()
-        };
-
-        transfers.push(newTransfer);
-        setLocalTransfers(transfers);
-
-        // Update timeline in local mock memory
-        if (shortageId) {
-          if (!mockShortageTimeline[shortageId]) {
-            mockShortageTimeline[shortageId] = [];
-          }
-          mockShortageTimeline[shortageId].push({
-            user: localStorage.getItem("store_user_name") || "Shubham Jamliya",
-            action: "transfer_initiated",
-            remarks: `Initiated transfer of ${quantity} ${ingredient?.unit || "units"} from ${fromStore}`,
-            createdAt: new Date().toISOString()
-          });
-        }
-
-        return {
-          success: true,
-          message: "Transfer request submitted successfully. Awaiting administrator approval."
-        };
+        throwApiError(err);
+        
       }
     },
     onSuccess: (data) => {

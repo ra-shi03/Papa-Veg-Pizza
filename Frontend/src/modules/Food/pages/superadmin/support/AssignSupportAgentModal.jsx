@@ -9,13 +9,13 @@ export default function AssignSupportAgentModal({ isOpen, onClose, onAssign, req
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Mock Agent Database by Department
+  // Agents by department: not loaded from the server yet
   const agentsByDept = {
-    'Technical Team': ['Amit Patel', 'Neha Reddy', 'Sandeep Kumar', 'Priyanka Rao'],
-    'Operations Team': ['Rajesh Sharma', 'Vikram Singh', 'Meera Nair', 'Deepak Goel'],
-    'Delivery Team': ['Sanjay Verma', 'Anil Kadam', 'Sunil Yadav', 'Vijay Rathi'],
-    'HR Team': ['Shalini Gupta', 'Rohan Das', 'Kavita Mehta'],
-    'Support Team': ['Rohit Joshi', 'Swati Mishra', 'Pooja Bhatt']
+    'Technical Team': [],
+    'Operations Team': [],
+    'Delivery Team': [],
+    'HR Team': [],
+    'Support Team': []
   };
 
   useEffect(() => {

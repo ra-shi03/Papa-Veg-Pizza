@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { adminClient } from "@/services/api/axios";
 
-// `_isFallback` keeps the dev-only axios mock fallback from hiding real API errors.
+// `_isFallback` keeps the dev-only axios fallback from hiding real API errors.
 const REAL = { _isFallback: true };
 const BASE = "/food/store/orders";
 

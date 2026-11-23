@@ -1,21 +1,20 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-import { 
-  mockLoyaltyMembers, 
-  mockLoyaltyTransactionsExpanded, 
-  mockTierHistory, 
-  mockRewardRedemptions, 
-  mockLoyaltyLogs 
-} from "../mockData";
 
-// Initialize Local Mock DB in localStorage if it doesn't exist
+const loyaltyMembers = [];
+const loyaltyTransactionsExpanded = [];
+const emptyTierHistory = [];
+const emptyRewardRedemptions = [];
+const loyaltyLogs = [];
+
+// Initialize Local DB in localStorage if it doesn't exist
 const initLoyaltyDB = () => {
   if (!localStorage.getItem("pv_loyalty_initialized")) {
-    localStorage.setItem("pv_loyalty_members", JSON.stringify(mockLoyaltyMembers));
-    localStorage.setItem("pv_loyalty_transactions", JSON.stringify(mockLoyaltyTransactionsExpanded));
-    localStorage.setItem("pv_tier_history", JSON.stringify(mockTierHistory));
-    localStorage.setItem("pv_reward_redemptions", JSON.stringify(mockRewardRedemptions));
-    localStorage.setItem("pv_loyalty_logs", JSON.stringify(mockLoyaltyLogs));
+    localStorage.setItem("pv_loyalty_members", JSON.stringify(loyaltyMembers));
+    localStorage.setItem("pv_loyalty_transactions", JSON.stringify(loyaltyTransactionsExpanded));
+    localStorage.setItem("pv_tier_history", JSON.stringify(emptyTierHistory));
+    localStorage.setItem("pv_reward_redemptions", JSON.stringify(emptyRewardRedemptions));
+    localStorage.setItem("pv_loyalty_logs", JSON.stringify(loyaltyLogs));
     localStorage.setItem("pv_loyalty_initialized", "true");
   }
 };
@@ -337,7 +336,7 @@ export function useLoyalty() {
       _id: `llog-${Date.now()}`,
       memberId: newMemberId,
       action: "Membership Created",
-      performedBy: "Admin Shubham",
+      performedBy: "You",
       createdAt: new Date().toISOString()
     });
     setDB("pv_loyalty_logs", logs);
@@ -413,7 +412,7 @@ export function useLoyalty() {
       _id: `llog-${Date.now()}`,
       memberId: memberId,
       action: "Points Adjusted",
-      performedBy: "Admin Shubham",
+      performedBy: "You",
       createdAt: new Date().toISOString()
     });
     setDB("pv_loyalty_logs", logs);
@@ -455,7 +454,7 @@ export function useLoyalty() {
       oldTier,
       newTier,
       changedAt: new Date().toISOString(),
-      changedBy: "Admin Shubham",
+      changedBy: "You",
       reason: data.reason || "Manual tier update"
     });
     setDB("pv_tier_history", tierHist);
@@ -465,7 +464,7 @@ export function useLoyalty() {
       _id: `llog-${Date.now()}`,
       memberId: memberId,
       action: "Tier Upgraded",
-      performedBy: "Admin Shubham",
+      performedBy: "You",
       createdAt: new Date().toISOString()
     });
     setDB("pv_loyalty_logs", logs);
@@ -499,7 +498,7 @@ export function useLoyalty() {
       _id: `llog-${Date.now()}`,
       memberId: memberId,
       action: isSuspended ? "Reactivated" : "Suspended",
-      performedBy: "Admin Shubham",
+      performedBy: "You",
       createdAt: new Date().toISOString()
     });
     setDB("pv_loyalty_logs", logs);

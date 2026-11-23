@@ -6,13 +6,12 @@ import {
   Trash2, Play, Volume2, Store, Users, IndianRupee, Truck 
 } from "lucide-react";
 import { toast } from "sonner";
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy";
 import { formatDistanceToNow, isAfter, isBefore } from "date-fns";
 
-// Mock Query hooks & Realtime Simulator
+// Query hooks & Realtime Simulator
 import { 
   useLiveOrders, useOrder, useStores, 
-  useDeliveryPartners, simulateNewOrder 
+  useDeliveryPartners 
 } from "./ordersQuery";
 
 // Modals
@@ -117,15 +116,7 @@ export default function LiveOrders() {
     }
   };
 
-  // Trigger Mock Order Simulation
-  const handleSimulateNewOrder = () => {
-    const newOrder = simulateNewOrder();
-    playNotificationBeep();
-    toast.success(`New Live Order received: ${newOrder.orderNumber}`, {
-      description: `${newOrder.customer.name} ordered ${newOrder.items[0].productName}`,
-      duration: 5000,
-    });
-  };
+
 
   // Reset Filters
   const handleResetFilters = () => {
@@ -250,16 +241,8 @@ export default function LiveOrders() {
 
         {/* Action controls */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Simulation Trigger: standalone mock mode only */}
-          {STANDALONE_MOCK && (
-          <button
-            onClick={handleSimulateNewOrder}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg text-xs font-bold shadow-md shadow-emerald-500/10 active:scale-95 transition-all cursor-pointer"
-          >
-            <Play size={13} className="shrink-0" />
-            Simulate New Order
-          </button>
-          )}
+          {/* Simulation Trigger:  */}
+          
 
           {/* Manual Refresh */}
           <button

@@ -14,15 +14,9 @@ import {
   YAxis,
   Tooltip
 } from "recharts"
-import {
-  initialStores,
-  getDeliveryPartnerPerformance,
-  getDeliveryPartnerAttendance,
-  getDeliveryPartnerWallet,
-  getDeliveryPartnerLiveTracking,
-  getDeliveryPartnerSalary,
-  getDeliveryPartnerAuditLogs
-} from "../mockManagersData"
+import { getDeliveryPartnerPerformance, getDeliveryPartnerAttendance, getDeliveryPartnerWallet, getDeliveryPartnerLiveTracking, getDeliveryPartnerSalary, getDeliveryPartnerAuditLogs } from "../staffDetailPlaceholders";
+
+const stores = [];
 
 export default function ViewDeliveryPartnerDrawer({ isOpen, onClose, rider, defaultTab = "profile" }) {
   const [activeTab, setActiveTab] = useState(defaultTab)
@@ -44,7 +38,7 @@ export default function ViewDeliveryPartnerDrawer({ isOpen, onClose, rider, defa
 
   if (!isOpen || !rider) return null
 
-  const assignedStore = initialStores.find((s) => s._id === rider.storeId)
+  const assignedStore = stores.find((s) => s._id === rider.storeId)
 
   // Fetch sub-data sets
   const perf = getDeliveryPartnerPerformance(rider.id)
@@ -558,7 +552,7 @@ export default function ViewDeliveryPartnerDrawer({ isOpen, onClose, rider, defa
                 {/* Simulated SVG Interactive Map */}
                 <div className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl aspect-video relative overflow-hidden flex flex-col justify-between shadow-xs">
                   
-                  {/* Mock Map Vector graphics */}
+                  {/* Map Vector graphics */}
                   <svg className="absolute inset-0 w-full h-full text-zinc-300 dark:text-zinc-800 opacity-40" viewBox="0 0 100 100" preserveAspectRatio="none">
                     {/* Grid lines resembling streets */}
                     <line x1="0" y1="20" x2="100" y2="20" stroke="currentColor" strokeWidth="1" />

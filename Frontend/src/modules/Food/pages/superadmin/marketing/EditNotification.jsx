@@ -9,13 +9,7 @@ import {
   apiUpdateNotification, 
   apiSearchCustomers 
 } from './NotificationData';
-import { 
-  mockRegions, 
-  mockZones, 
-  mockTerritories, 
-  mockFranchises, 
-  mockStores 
-} from './CouponsData';
+import { regionOptions, zoneOptions, territoryOptions, franchiseOptions } from './CouponsData';
 
 export default function EditNotification({ notificationId, isOpen, onClose, onUpdated }) {
   const [currentStep, setCurrentStep] = useState(1);
@@ -158,10 +152,10 @@ export default function EditNotification({ notificationId, isOpen, onClose, onUp
 
   // Hierarchical Filter Calculations
   const filteredFranchises = useMemo(() => {
-    if (regionIds.length === 0) return mockFranchises;
-    const zoneIds = mockZones.filter(z => regionIds.includes(z.regionId)).map(z => z.id);
-    const territoryIds = mockTerritories.filter(t => zoneIds.includes(t.zoneId)).map(t => t.id);
-    return mockFranchises.filter(f => territoryIds.includes(f.territoryId));
+    if (regionIds.length === 0) return franchiseOptions;
+    const zoneIds = zoneOptions.filter(z => regionIds.includes(z.regionId)).map(z => z.id);
+    const territoryIds = territoryOptions.filter(t => zoneIds.includes(t.zoneId)).map(t => t.id);
+    return franchiseOptions.filter(f => territoryIds.includes(f.territoryId));
   }, [regionIds]);
 
   // Auto-deselect invalid children when parent selections change
@@ -421,7 +415,7 @@ export default function EditNotification({ notificationId, isOpen, onClose, onUp
 
                   {/* Device Preview */}
                   <div className="flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950/40 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-808 select-none">
-                    <span className="text-[9px] font-extrabold uppercase text-zinc-450 tracking-wider mb-3 block">Live Device Mock Preview</span>
+                    <span className="text-[9px] font-extrabold uppercase text-zinc-450 tracking-wider mb-3 block">Live Device Preview</span>
                     <div className="w-[280px] h-[450px] border-[6px] border-zinc-900 dark:border-zinc-800 rounded-[36px] bg-zinc-900 shadow-xl relative overflow-hidden flex flex-col justify-between p-3.5">
                       <div className="absolute top-0.5 left-1/2 -translate-x-1/2 w-24 h-4 bg-zinc-900 rounded-full z-10"></div>
                       <div className="flex justify-between items-center text-[8px] text-white/70 px-1 pt-1 z-10">
@@ -589,7 +583,7 @@ export default function EditNotification({ notificationId, isOpen, onClose, onUp
                       <div className="space-y-1.5 animate-in fade-in duration-200">
                         <label className="text-[10px] font-bold text-zinc-450 uppercase tracking-wider block">Regions Targeting *</label>
                         <div className="flex flex-wrap gap-2">
-                          {mockRegions.map(reg => {
+                          {regionOptions.map(reg => {
                             const isSel = regionIds.includes(reg.id);
                             return (
                               <button

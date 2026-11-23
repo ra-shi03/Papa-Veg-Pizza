@@ -12,8 +12,8 @@ export default function DocumentsModal({ isOpen, onClose, onConfirm, rider }) {
   })
 
   const [expiryDates, setExpiryDates] = useState({
-    licenseExpiry: "2031-12-31",
-    insuranceExpiry: "2026-09-15"
+    licenseExpiry: "",
+    insuranceExpiry: ""
   })
 
   const [activePreview, setActivePreview] = useState(null)
@@ -28,11 +28,10 @@ export default function DocumentsModal({ isOpen, onClose, onConfirm, rider }) {
         panCard: rider.documents?.panCard || "Pending",
         bankProof: rider.documents?.bankProof || "Pending"
       })
-      // Seed some dummy expiry dates
-      const seed = parseInt(rider.id.split("-")[1] || 1);
+      // Expiry dates come from the rider's documents only (none are invented)
       setExpiryDates({
-        licenseExpiry: `203${seed % 9}-08-12`,
-        insuranceExpiry: seed % 2 === 0 ? "2026-05-10" : "2026-11-20" // seed % 2 === 0 will show expired/near expiry
+        licenseExpiry: rider.documents?.licenseExpiry || "",
+        insuranceExpiry: rider.documents?.insuranceExpiry || ""
       })
       setActivePreview(null)
     }

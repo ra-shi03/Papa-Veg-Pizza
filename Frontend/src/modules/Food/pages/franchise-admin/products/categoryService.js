@@ -1,7 +1,9 @@
-import { mockCategories, initialProducts } from "./mockProducts";
+
+const emptyCategories = [];
+const emptyProducts = [];
 
 // Local storage key for persistent categories db
-const STORAGE_KEY = "mock_db_categories";
+const STORAGE_KEY = "pvp_local_categories";
 
 // Initialize in-memory categories
 let categories = [];
@@ -16,11 +18,11 @@ try {
     // Save migrated data back to storage
     localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
   } else {
-    categories = [...mockCategories];
+    categories = [...emptyCategories];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
   }
 } catch (_) {
-  categories = [...mockCategories];
+  categories = [...emptyCategories];
 }
 
 const saveToStorage = () => {
@@ -94,7 +96,7 @@ export const categoryService = {
     // Map stats (products count) dynamically
     const mapped = filtered.map((c) => {
       const cid = c._id || c.id;
-      const productsCount = initialProducts.filter((p) => p.categoryId === cid).length;
+      const productsCount = emptyProducts.filter((p) => p.categoryId === cid).length;
       return {
         ...c,
         productsCount
@@ -117,7 +119,7 @@ export const categoryService = {
     }
 
     // Get statistics
-    const products = initialProducts.filter((p) => p.categoryId === id);
+    const products = emptyProducts.filter((p) => p.categoryId === id);
     const subcategories = categories.filter((c) => c.parentCategory === id);
 
     // Calculate revenue & selling statistics dynamically (simulated)
@@ -129,14 +131,10 @@ export const categoryService = {
         _id: p._id,
         name: p.name,
         image: p.image,
-        salesCount: p.isBestSeller ? 120 : 35,
-        revenue: p.basePrice * (p.isBestSeller ? 120 : 35)
+        salesCount: 0,
+        revenue: 0
       })),
-      storeAvailability: [
-        { storeId: "ST-001", storeName: "Connaught Place Outlet", products: products.length, revenue: products.length * 350, available: true },
-        { storeId: "ST-002", storeName: "Indiranagar Outlet", products: products.length, revenue: products.length * 310, available: true },
-        { storeId: "ST-003", storeName: "Salt Lake Outlet", products: products.length, revenue: 0, available: false }
-      ]
+      storeAvailability: []
     };
 
     return {

@@ -31,12 +31,11 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, 
 import { adminAPI } from "@food/api"
 
 // Import Custom Hooks & Overlays
-import { useMockQuery } from "./components/useMockQuery"
+import { useApiQuery } from "./components/useApiQuery"
 import StorePerformanceDrawer from "./components/StorePerformanceDrawer"
 import CompareStoresModal from "./components/CompareStoresModal"
 import ExportReportModal from "./components/ExportReportModal"
 import RevenueReportModal from "./components/RevenueReportModal"
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 import OrdersAnalyticsModal from "./components/OrdersAnalyticsModal"
 
 export default function StorePerformance() {
@@ -99,28 +98,28 @@ export default function StorePerformance() {
     data: kpis,
     isLoading: loadingKpis,
     refetch: refetchKPIs
-  } = useMockQuery(["perf_kpis", rangeKey], () => adminAPI.getStorePerformanceDashboard(rangeParams), {
+  } = useApiQuery(["perf_kpis", rangeKey], () => adminAPI.getStorePerformanceDashboard(rangeParams), {
     refetchInterval: 12000
   })
 
   // 3. Fetch Trend Charts
-  const { data: revenueData, isLoading: loadingRevenue } = useMockQuery(
+  const { data: revenueData, isLoading: loadingRevenue } = useApiQuery(
     "perf_revenue_trends", 
     () => adminAPI.getStorePerformanceRevenue()
   )
-  const { data: ordersData, isLoading: loadingOrders } = useMockQuery(
+  const { data: ordersData, isLoading: loadingOrders } = useApiQuery(
     "perf_orders_trends", 
     () => adminAPI.getStorePerformanceOrders()
   )
-  const { data: ratingsData, isLoading: loadingRatings } = useMockQuery(
+  const { data: ratingsData, isLoading: loadingRatings } = useApiQuery(
     "perf_ratings_trends", 
     () => adminAPI.getStorePerformanceRatings()
   )
-  const { data: comparisonData, isLoading: loadingComparison } = useMockQuery(
+  const { data: comparisonData, isLoading: loadingComparison } = useApiQuery(
     ["perf_comparison", rangeKey],
     () => adminAPI.getStorePerformanceComparison(rangeParams)
   )
-  const { data: busyHoursData, isLoading: loadingBusyHours } = useMockQuery(
+  const { data: busyHoursData, isLoading: loadingBusyHours } = useApiQuery(
     "perf_busy_hours", 
     () => adminAPI.getStorePerformanceBusyHours()
   )
@@ -147,7 +146,7 @@ export default function StorePerformance() {
     isLoading: loadingStores,
     isError: hasStoresError,
     refetch: refetchStores
-  } = useMockQuery(
+  } = useApiQuery(
     ["perf_list", page, limit, debouncedSearch, storeFilter, statusFilter, typeFilter, cityFilter, sortKey, sortOrder, rangeKey],
     fetchStoresList,
     { refetchInterval: 15000 } // Re-poll list every 15 seconds
@@ -165,8 +164,8 @@ export default function StorePerformance() {
   }, [storesList])
 
   useEffect(() => {
-    // The drift below is a sample-data effect: standalone mock mode only. Real figures are shown as the server sent them.
-    if (!STANDALONE_MOCK) return undefined
+    // The drift below is a sample-data effect: . Real figures are shown as the server sent them.
+    return undefined
     const interval = setInterval(() => {
       setLiveStores(prev => 
         prev.map(s => {
@@ -229,20 +228,25 @@ export default function StorePerformance() {
     setPage(1)
   }
 
-  // PDF Generator Simulation
-  const handleDownloadPDF = () => {
-    showToast("Compiling performance PDF... Your download will begin shortly.")
-    setTimeout(() => {
-      const dummyPdfContent = "Papa Veg Pizza - Store Performance Report\nCompiled on: " + new Date().toLocaleString()
-      const blob = new Blob([dummyPdfContent], { type: "application/pdf" })
-      const url = window.URL.createObjectURL(blob)
+  // The server's performance report, saved as a CSV file
+  const handleDownloadPDF = async () => {
+    try {
+      const res = await adminAPI.exportStorePerformanceReport({ format: "csv" })
+      const report = res?.data?.data || {}
+      const columns = report.columns || []
+      const cell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`
+      const csv = [columns.join(","), ...(report.rows || []).map((r) => columns.map((c) => cell(r[c])).join(","))].join("\n")
+      const url = window.URL.createObjectURL(new Blob([csv], { type: "text/csv" }))
       const a = document.createElement("a")
       a.setAttribute("href", url)
-      a.setAttribute("download", `Store_Performance_Report_${Date.now()}.pdf`)
+      a.setAttribute("download", String(report.fileName || "Store_Performance_Report.csv").replace(/\.(xlsx|pdf)$/, ".csv"))
       a.click()
-      showToast("PDF report downloaded successfully.")
-    }, 1500)
+      showToast("Performance report downloaded.")
+    } catch (err) {
+      showToast(err?.response?.data?.error || err?.response?.data?.message || "Could not export the report.", "error")
+    }
   }
+
 
   // Currency Formatter
   const formatINR = (val) => {

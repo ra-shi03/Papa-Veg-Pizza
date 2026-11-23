@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { X, AlertCircle, Package, UploadCloud, FileText } from "lucide-react";
 import { useReceivePurchaseRequestMutation } from "../hooks/usePurchaseRequests";
-import { mockSuppliers } from "../mockData";
+
+const suppliers = [];
 
 export default function MarkReceivedModal({ isOpen, onClose, requestRecord }) {
   const receiveMutation = useReceivePurchaseRequestMutation();
@@ -17,7 +18,7 @@ export default function MarkReceivedModal({ isOpen, onClose, requestRecord }) {
   useEffect(() => {
     if (isOpen && requestRecord) {
       setDeliveryDate(new Date().toISOString().split("T")[0]);
-      setVendorId(requestRecord.vendorId || mockSuppliers[0]?._id || "");
+      setVendorId(requestRecord.vendorId || suppliers[0]?._id || "");
       setInvoiceNumber("");
       setRemarks("");
       setFile(null);
@@ -134,7 +135,7 @@ export default function MarkReceivedModal({ isOpen, onClose, requestRecord }) {
                   className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800 rounded-xl font-bold text-zinc-855 dark:text-white focus:border-[var(--primary)] outline-none"
                 >
                   <option value="" disabled>Select Vendor...</option>
-                  {mockSuppliers.map(v => (
+                  {suppliers.map(v => (
                     <option key={v._id} value={v._id}>{v.name}</option>
                   ))}
                 </select>

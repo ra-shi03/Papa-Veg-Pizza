@@ -61,7 +61,7 @@ export default function IssueRiderCard({ rider = {} }) {
           <div className="space-y-1 text-[9px] text-slate-500 dark:text-zinc-400 font-extrabold">
             <div className="flex items-center gap-1">
               <MapPin size={10} className="text-slate-455" />
-              <span>Coords: {rider.latitude?.toFixed(4) || "22.74"}, {rider.longitude?.toFixed(4) || "75.89"}</span>
+              <span>Coords: {rider.latitude?.toFixed(4) || "—"}, {rider.longitude?.toFixed(4) || "—"}</span>
             </div>
             <div className="flex items-center gap-1">
               <Clock size={10} className="text-slate-455" />

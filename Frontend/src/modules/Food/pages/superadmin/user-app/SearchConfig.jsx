@@ -78,14 +78,14 @@ export default function SearchConfig() {
           setPopularSearches([...cfg.popularSearches].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
         }
 
-        // Check if stored tabs still contain initial mock placeholder items
-        const isMockTabs = (cfg.searchByTabs || []).some(t => 
+        // Check if stored tabs still contain initial placeholder items
+        const hasPlaceholderTabs = (cfg.searchByTabs || []).some(t => 
           (t.items || []).some(i => i.title === 'Double Cheeseburst' || i.title === 'Cheese Volcano Crust')
         );
 
-        if (Array.isArray(data?.realSearchByTabs) && data.realSearchByTabs.length > 0 && isMockTabs) {
+        if (Array.isArray(data?.realSearchByTabs) && data.realSearchByTabs.length > 0 && hasPlaceholderTabs) {
           setSearchByTabs([...data.realSearchByTabs].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
-        } else if (Array.isArray(cfg.searchByTabs) && cfg.searchByTabs.length > 0 && !isMockTabs) {
+        } else if (Array.isArray(cfg.searchByTabs) && cfg.searchByTabs.length > 0 && !hasPlaceholderTabs) {
           setSearchByTabs([...cfg.searchByTabs].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
         } else {
           // Auto fetch real data of crust, toppings directly from API

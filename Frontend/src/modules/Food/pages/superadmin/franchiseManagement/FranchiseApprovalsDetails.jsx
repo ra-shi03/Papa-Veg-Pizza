@@ -20,7 +20,7 @@ export default function FranchiseApprovalsDetails({
     { id: "documents", label: "Uploaded Docs", icon: FileText },
   ];
 
-  // Removed mock data
+  // Removed data
 
   return (
     <div className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm z-50 flex justify-end" id="details-overlay">

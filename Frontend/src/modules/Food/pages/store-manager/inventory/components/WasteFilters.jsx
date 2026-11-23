@@ -19,12 +19,7 @@ export function WasteFilters({ filters, onFilterChange, onReset, role }) {
     { label: "Spillage", value: "spillage" }
   ];
 
-  const reportedOptions = [
-    { name: "Aman Verma" },
-    { name: "Vijay Saxena" },
-    { name: "Ramesh Singh" },
-    { name: "Shubham Jamliya" }
-  ];
+  const reportedOptions = [];
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-2xl p-4 shadow-sm space-y-3 select-none">

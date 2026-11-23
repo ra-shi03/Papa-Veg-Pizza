@@ -5,7 +5,6 @@
  */
 
 import axios from "axios";
-import { handleMockRequest } from "./mockService.js";
 import { readSavedCoords } from "../../modules/Food/utils/savedLocation.js";
 
 // Prefer explicit env. If not set, default to /api/v1 so the Vite proxy can forward to backend.
@@ -14,44 +13,6 @@ const baseURL =
     ? String(import.meta.env.VITE_API_BASE_URL).replace(/\/$/, "")
     : "/api/v1";
 
-// Sample data (mockService) answers requests only with VITE_STANDALONE_MOCK=true (no backend at all). With a backend,
-// a 404, a 5xx or a network failure is shown as the error it is, in dev as in production, so a missing endpoint is
-// never hidden behind invented data. (VITE_USE_MOCK no longer switches anything on.)
-const mockFallbackEnabled =
-  typeof import.meta !== "undefined" && import.meta.env?.VITE_STANDALONE_MOCK === "true";
-
-if (typeof import.meta !== "undefined" && import.meta.env?.DEV) {
-  console.info(`[API] sample data ${mockFallbackEnabled ? "ON (VITE_STANDALONE_MOCK=true)" : "OFF - real backend errors are shown"}`);
-}
-
-const mockAdapter = (config) => {
-  return new Promise((resolve, reject) => {
-    try {
-      const response = handleMockRequest(config);
-      if (response.success) {
-        resolve({
-          data: response.data,
-          status: response.status || 200,
-          statusText: "OK",
-          headers: response.headers || {},
-          config,
-        });
-      } else {
-        const error = new Error(response.data?.message || "Mock Request Failed");
-        error.response = {
-          data: response.data,
-          status: response.status || 400,
-          statusText: "Bad Request",
-          headers: response.headers || {},
-          config,
-        };
-        reject(error);
-      }
-    } catch (e) {
-      reject(e);
-    }
-  });
-};
 
 /** 
  * Common Helpers 
@@ -138,10 +99,6 @@ function createModuleClient(moduleName) {
     headers: { "Content-Type": "application/json" },
   });
 
-  if (typeof import.meta !== "undefined" && import.meta.env?.VITE_STANDALONE_MOCK === "true") {
-    client.defaults.adapter = mockAdapter;
-  }
-
   const onRefreshFailed = () => {
     clearModuleAuth(moduleName);
     if (typeof window !== "undefined") {
@@ -208,18 +165,6 @@ function createModuleClient(moduleName) {
     (response) => response,
     async (err) => {
       const original = err?.config;
-      
-      // Standalone mock fallback for network/404/5xx errors in dev mode
-      const isNetworkOr404 = !err.response || err.response.status === 404 || err.response.status === 502 || err.response.status === 504;
-      if (isNetworkOr404 && mockFallbackEnabled && original && !original._isFallback) {
-        original._isFallback = true;
-        console.warn(`[Axios Client: ${moduleName}] Failed: ${err.message}. Falling back to mock data...`);
-        try {
-          return await mockAdapter(original);
-        } catch (mockErr) {
-          return Promise.reject(mockErr);
-        }
-      }
 
       if (err?.response?.status === 429) return Promise.reject(err);
       
@@ -274,10 +219,6 @@ const apiClient = axios.create({
   timeout: 30000,
   headers: { "Content-Type": "application/json" },
 });
-
-if (typeof import.meta !== "undefined" && import.meta.env?.VITE_STANDALONE_MOCK === "true") {
-  apiClient.defaults.adapter = mockAdapter;
-}
 
 // Reuse the existing smart detection for the legacy client
 function getModuleFromUrl(url = "") {
@@ -360,18 +301,6 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (err) => {
     const original = err?.config;
-    
-    // Standalone mock fallback for network/404/5xx errors in dev mode
-    const isNetworkOr404 = !err.response || err.response.status === 404 || err.response.status === 502 || err.response.status === 504;
-    if (isNetworkOr404 && mockFallbackEnabled && original && !original._isFallback) {
-      original._isFallback = true;
-      console.warn(`[Axios Client: legacy] Failed: ${err.message}. Falling back to mock data...`);
-      try {
-        return await mockAdapter(original);
-      } catch (mockErr) {
-        return Promise.reject(mockErr);
-      }
-    }
     const status = err?.response?.status;
     // An expired login: refresh once and repeat the request (a signed-out visitor has no refresh token and skips this)
     if (status === 401 && original && !original._retry) {

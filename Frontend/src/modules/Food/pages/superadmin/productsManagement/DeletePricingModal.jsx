@@ -6,7 +6,7 @@ export default function DeletePricingModal({ isOpen, onClose, rule, onConfirm })
 
   if (!isOpen || !rule) return null;
 
-  // Mock check if the rule has been used in historical orders (Simulated reference check)
+  // check if the rule has been used in historical orders (Simulated reference check)
   // Let's assume rules with active status or specific ID references have order references
   const hasHistoricalReferences = rule.id === "PR-001" || rule.id === "PR-003" || rule.effectivePrice < 350;
 

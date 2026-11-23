@@ -18,156 +18,17 @@ import SavedFilterModal from './SavedFilterModal';
 import JsonViewerModal from './JsonViewerModal';
 import { ChangeSummaryTable } from './AuditHelper';
 
-// Mock Audit Logs Data (GET /api/audit-logs)
-const INITIAL_AUDITS = [
-  {
-    _id: "log_aud_001",
-    actorId: "usr_sa_101",
-    actorRole: "Super Admin",
-    userName: "Shubham Jamliya",
-    action: "Update Global Price",
-    module: "Settings",
-    entityId: "Global Pricing Configuration",
-    oldValue: { baseDeliveryFee: 40, minimumOrderValue: 200, freeDeliveryThreshold: 500 },
-    newValue: { baseDeliveryFee: 50, minimumOrderValue: 250, freeDeliveryThreshold: 600 },
-    ipAddress: "192.168.1.45",
-    device: "Desktop",
-    browser: "Chrome",
-    location: "Mumbai, India",
-    status: "Success",
-    createdAt: "2026-06-19T18:10:00Z"
-  },
-  {
-    _id: "log_aud_002",
-    actorId: "usr_adm_202",
-    actorRole: "Admin",
-    userName: "Priya Sharma",
-    action: "Modify Franchise Comm.",
-    module: "Franchise",
-    entityId: "Mumbai Franchise Store",
-    oldValue: { commissionPercentage: 10, payoutCycle: "weekly" },
-    newValue: { commissionPercentage: 12, payoutCycle: "weekly" },
-    ipAddress: "103.88.22.190",
-    device: "Desktop",
-    browser: "Safari",
-    location: "Pune, India",
-    status: "Success",
-    createdAt: "2026-06-19T17:45:00Z"
-  },
-  {
-    _id: "log_aud_003",
-    actorId: "usr_sm_304",
-    actorRole: "Store Manager",
-    userName: "Amit Kumar",
-    action: "Modify Product Stock",
-    module: "Products",
-    entityId: "Veg Supreme Pizza",
-    oldValue: { stockAvailable: 15, isAvailable: true },
-    newValue: { stockAvailable: 0, isAvailable: false },
-    ipAddress: "157.44.192.10",
-    device: "Mobile",
-    browser: "Firefox",
-    location: "Indore, India",
-    status: "Success",
-    createdAt: "2026-06-19T16:22:12Z"
-  },
-  {
-    _id: "log_aud_004",
-    actorId: "usr_adm_202",
-    actorRole: "Admin",
-    userName: "Priya Sharma",
-    action: "Add Combo Deal",
-    module: "Products",
-    entityId: "Triple Feast Combo",
-    oldValue: null,
-    newValue: { comboName: "Triple Feast Combo", price: 899, items: ["Tandoori Paneer Pizza", "Veg Supreme Pizza", "Choco Lava Cake"] },
-    ipAddress: "103.88.22.190",
-    device: "Desktop",
-    browser: "Chrome",
-    location: "Pune, India",
-    status: "Success",
-    createdAt: "2026-06-19T15:10:00Z"
-  },
-  {
-    _id: "log_aud_005",
-    actorId: "usr_sa_102",
-    actorRole: "Super Admin",
-    userName: "Ramesh Patel",
-    action: "Disable Payment Gateway",
-    module: "Payments",
-    entityId: "Paytm Payment Gateway",
-    oldValue: { status: "Active", defaultGateway: false },
-    newValue: { status: "Inactive", defaultGateway: false },
-    ipAddress: "115.244.90.18",
-    device: "Tablet",
-    browser: "Chrome",
-    location: "Delhi, India",
-    status: "Failed",
-    createdAt: "2026-06-19T14:32:00Z"
-  },
-  {
-    _id: "log_aud_006",
-    actorId: "usr_sm_308",
-    actorRole: "Store Manager",
-    userName: "Rahul Singh",
-    action: "Update Order Status",
-    module: "Orders",
-    entityId: "Order #29108",
-    oldValue: { orderStatus: "Prep", kitchenAssigned: "Staff A" },
-    newValue: { orderStatus: "Ready", kitchenAssigned: "Staff A" },
-    ipAddress: "157.44.12.88",
-    device: "Mobile",
-    browser: "Chrome",
-    location: "Bhopal, India",
-    status: "Success",
-    createdAt: "2026-06-19T13:05:19Z"
-  },
-  {
-    _id: "log_aud_007",
-    actorId: "usr_adm_203",
-    actorRole: "Admin",
-    userName: "Aisha Khan",
-    action: "Modify Campaign settings",
-    module: "Marketing",
-    entityId: "Tasty Monday Campaign",
-    oldValue: { discountPercentage: 15, active: true },
-    newValue: { discountPercentage: 20, active: true },
-    ipAddress: "122.161.44.9",
-    device: "Desktop",
-    browser: "Edge",
-    location: "Noida, India",
-    status: "Warning",
-    createdAt: "2026-06-19T11:40:00Z"
-  }
-];
+// Audit Logs Data (GET /api/audit-logs)
+const INITIAL_AUDITS = [];
 
-// Mock Login Events Data
-const INITIAL_LOGINS = [
-  { _id: "log_lin_001", actorId: "usr_sa_101", userName: "Shubham Jamliya", actorRole: "Super Admin", ipAddress: "192.168.1.45", device: "Desktop", browser: "Chrome", location: "Mumbai, India", status: "Success", createdAt: "2026-06-19T18:01:00Z" },
-  { _id: "log_lin_002", actorId: "usr_adm_202", userName: "Priya Sharma", actorRole: "Admin", ipAddress: "103.88.22.190", device: "Desktop", browser: "Safari", location: "Pune, India", status: "Success", createdAt: "2026-06-19T17:30:00Z" },
-  { _id: "log_lin_003", actorId: "usr_sm_304", userName: "Amit Kumar", actorRole: "Store Manager", ipAddress: "157.44.192.10", device: "Mobile", browser: "Firefox", location: "Indore, India", status: "Success", createdAt: "2026-06-19T16:15:00Z" },
-  { _id: "log_lin_004", actorId: "usr_sm_999", userName: "Unknown user", actorRole: "Store Manager", ipAddress: "45.122.9.200", device: "Mobile", browser: "Opera", location: "Lagos, Nigeria", status: "Blocked", createdAt: "2026-06-19T15:44:12Z" },
-  { _id: "log_lin_005", actorId: "usr_sa_102", userName: "Ramesh Patel", actorRole: "Super Admin", ipAddress: "115.244.90.18", device: "Tablet", browser: "Chrome", location: "Delhi, India", status: "Failed", createdAt: "2026-06-19T14:20:00Z" }
-];
+// Login Events Data
+const INITIAL_LOGINS = [];
 
-// Mock System Activities Data
-const INITIAL_SYSTEM = [
-  { _id: "log_sys_001", module: "Settings", action: "Daily Revenue Sync", entityId: "Daily Revenue Sync", status: "Success", triggeredBy: "Cron Job", duration: "12.4s", createdAt: "2026-06-19T18:00:00Z" },
-  { _id: "log_sys_002", module: "Marketing", action: "Push Expired Coupons", entityId: "Coupon Expiry Job", status: "Success", triggeredBy: "Cron Job", duration: "2.1s", createdAt: "2026-06-19T17:00:00Z" },
-  { _id: "log_sys_003", module: "Orders", action: "Rider Allocator Queue", entityId: "Rider Allocation Job", status: "Success", triggeredBy: "Background Task", duration: "0.8s", createdAt: "2026-06-19T16:55:00Z" },
-  { _id: "log_sys_004", module: "Payments", action: "Auto Settlement Sync", entityId: "Razorpay Settlement Sync", status: "Failed", triggeredBy: "Background Task", duration: "45.2s", createdAt: "2026-06-19T15:00:00Z" }
-];
+// System Activities Data
+const INITIAL_SYSTEM = [];
 
-// Mock Analytics Chart Data
-const DAILY_TREND_DATA = [
-  { name: 'Jun 13', Success: 180, Failed: 12 },
-  { name: 'Jun 14', Success: 210, Failed: 8 },
-  { name: 'Jun 15', Success: 195, Failed: 14 },
-  { name: 'Jun 16', Success: 240, Failed: 19 },
-  { name: 'Jun 17', Success: 280, Failed: 22 },
-  { name: 'Jun 18', Success: 320, Failed: 15 },
-  { name: 'Jun 19', Success: 380, Failed: 9 },
-];
+// Analytics Chart Data
+const DAILY_TREND_DATA = [];
 
 const MODULE_SHARE_DATA = [
   { name: 'Products', value: 35, color: '#6366F1' },
@@ -781,7 +642,7 @@ export default function AuditLogs() {
                 </table>
               </div>
 
-              {/* Server-side Pagination mock */}
+              {/* Server-side Pagination */}
               <div className="flex justify-between items-center text-xs font-semibold px-1">
                 <span className="text-zinc-500">Showing 1-{filteredAudits.length} of {filteredAudits.length} entries</span>
                 <div className="flex gap-1">

@@ -969,7 +969,7 @@ export default function LocationSetup() {
         )}
       </div>
 
-      {/* Mock Map Bottom Sheet for pin dragging could go here, for now confirm button */}
+      {/* Map Bottom Sheet for pin dragging could go here, for now confirm button */}
       {searchQuery && suggestions.length === 0 && (
         <div className="p-4 bg-white border-t border-zinc-100 mt-auto">
           <button onClick={handleManualSearchSelect} className="w-full h-14 bg-red-600 text-white font-bold rounded-xl shadow-lg">

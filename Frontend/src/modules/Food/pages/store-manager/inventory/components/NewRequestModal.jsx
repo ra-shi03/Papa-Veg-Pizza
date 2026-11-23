@@ -72,7 +72,7 @@ export function NewRequestModal({ isOpen, onClose, currentUser }) {
         urgency,
         reason: reason.trim(),
         notes: notes.trim(),
-        requestedBy: currentUser || "Aman Verma"
+        requestedBy: currentUser || "—"
       },
       {
         onSuccess: () => {

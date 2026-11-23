@@ -1,15 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
-import { INV, failOrMock } from "./inventoryApi";
-import { getLocalInventoryAlerts, setLocalInventoryAlerts } from "../mockData";
+import { INV, throwApiError } from "./inventoryApi";
 
 export function useResolveAlert() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (payload) => {
-      const { alertId, resolutionNote, resolvedBy = "Shubham Jamliya" } = payload;
+      const { alertId, resolutionNote, resolvedBy } = payload;
 
       try {
         const response = await apiClient.patch(`${INV}/alerts/resolve`, {
@@ -28,33 +27,8 @@ export function useResolveAlert() {
         }
         throw new Error(response.data?.message || "Failed to resolve alert on backend");
       } catch (err) {
-        failOrMock(err);
-        console.warn("Backend API unavailable. Resolving alert in local database.");
-
-        // Simulate network delay
-        await new Promise((resolve) => setTimeout(resolve, 300));
-
-        const alerts = getLocalInventoryAlerts();
-        const alertIndex = alerts.findIndex((a) => a._id === alertId);
-
-        if (alertIndex === -1) {
-          throw new Error("Alert not found in local database");
-        }
-
-        alerts[alertIndex] = {
-          ...alerts[alertIndex],
-          status: "resolved",
-          resolvedBy,
-          resolvedAt: new Date().toISOString(),
-          resolutionNote
-        };
-
-        setLocalInventoryAlerts(alerts);
-
-        return {
-          success: true,
-          message: "Alert resolved successfully in local database"
-        };
+        throwApiError(err);
+        
       }
     },
     onSuccess: (data) => {

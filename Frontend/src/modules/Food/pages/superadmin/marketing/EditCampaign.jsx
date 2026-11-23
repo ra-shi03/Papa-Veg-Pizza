@@ -10,11 +10,11 @@ import {
   apiUpdateCampaign 
 } from './CampaignData';
 import { 
-  mockRegions, 
-  mockZones, 
-  mockTerritories, 
-  mockFranchises, 
-  mockStores 
+  regionOptions, 
+  zoneOptions, 
+  territoryOptions, 
+  franchiseOptions, 
+  storeOptions 
 } from './CouponsData';
 
 export default function EditCampaign({ campaignId, isOpen, onClose, onCampaignUpdated }) {
@@ -143,18 +143,18 @@ export default function EditCampaign({ campaignId, isOpen, onClose, onCampaignUp
 
   // Hierarchical Filter Calculations
   const filteredFranchises = useMemo(() => {
-    if (regionIds.length === 0) return mockFranchises;
-    const zoneIds = mockZones.filter(z => regionIds.includes(z.regionId)).map(z => z.id);
-    const territoryIds = mockTerritories.filter(t => zoneIds.includes(t.zoneId)).map(t => t.id);
-    return mockFranchises.filter(f => territoryIds.includes(f.territoryId));
+    if (regionIds.length === 0) return franchiseOptions;
+    const zoneIds = zoneOptions.filter(z => regionIds.includes(z.regionId)).map(z => z.id);
+    const territoryIds = territoryOptions.filter(t => zoneIds.includes(t.zoneId)).map(t => t.id);
+    return franchiseOptions.filter(f => territoryIds.includes(f.territoryId));
   }, [regionIds]);
 
   const filteredStores = useMemo(() => {
     if (franchiseIds.length === 0) {
       const allowedFranIds = filteredFranchises.map(f => f.id);
-      return mockStores.filter(s => allowedFranIds.includes(s.franchiseId));
+      return storeOptions.filter(s => allowedFranIds.includes(s.franchiseId));
     }
-    return mockStores.filter(s => franchiseIds.includes(s.franchiseId));
+    return storeOptions.filter(s => franchiseIds.includes(s.franchiseId));
   }, [franchiseIds, filteredFranchises]);
 
   // Auto-deselect invalid children when parent selections change
@@ -484,7 +484,7 @@ export default function EditCampaign({ campaignId, isOpen, onClose, onCampaignUp
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Regions (Multi-select)</label>
                       <div className="flex flex-wrap gap-2">
-                        {mockRegions.map(reg => {
+                        {regionOptions.map(reg => {
                           const isSel = regionIds.includes(reg.id);
                           return (
                             <button

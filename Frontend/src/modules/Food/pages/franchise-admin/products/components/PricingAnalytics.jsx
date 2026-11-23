@@ -74,14 +74,7 @@ export default function PricingAnalytics({ pricingData = [], storesList = [], ca
   }).filter(Boolean);
 
   // Chart C: Simulated Price Trend over time (historical index)
-  const priceTrendData = [
-    { date: "01 Jun", index: 245 },
-    { date: "05 Jun", index: 252 },
-    { date: "10 Jun", index: 249 },
-    { date: "15 Jun", index: 261 },
-    { date: "20 Jun", index: 269 },
-    { date: "22 Jun", index: 274 }
-  ];
+  const priceTrendData = [];
 
   const primaryColor = getComputedStyle(document.documentElement).getPropertyValue("--primary").trim() || "#a43c12";
   const secondaryColor = getComputedStyle(document.documentElement).getPropertyValue("--secondary").trim() || "#ff7f50";

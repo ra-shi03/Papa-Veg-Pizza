@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
-  getRefundRequests, mockActivityLogs, useDebounce 
+  getRefundRequests, refundActivityLogs, useDebounce 
 } from './RefundRequestsData';
 import RefundDetailsDrawer from './components/RefundDetailsDrawer';
 import ApproveRefundModal from './components/ApproveRefundModal';
@@ -174,28 +174,11 @@ export default function RefundRequests() {
   const getProcessedRefunds = () => {
     // 1. Filtering
     let result = refunds.map(refund => {
-      // Find original customer & payment name for filters/search
-      // In real code these are populated or fetched from DB
-      const custName = refund.customerId === 'CUST-001' ? 'Rajesh Kumar' : 
-                       refund.customerId === 'CUST-002' ? 'Priya Patel' : 
-                       refund.customerId === 'CUST-003' ? 'Aarav Mehta' : 
-                       refund.customerId === 'CUST-004' ? 'Sunita Gupta' : 
-                       refund.customerId === 'CUST-005' ? 'Vikram Singh' : 
-                       refund.customerId === 'CUST-006' ? 'Anjali Sharma' : 
-                       refund.customerId === 'CUST-007' ? 'Rohan Deshmukh' : 'Kabir Sengupta';
+      const custName = refund.customerName || refund.customer?.name || '';
 
-      const gateName = refund.paymentId === 'PAY-001' ? 'Razorpay' : 
-                       refund.paymentId === 'PAY-002' ? 'Stripe' : 
-                       refund.paymentId === 'PAY-003' ? 'Paytm' : 
-                       refund.paymentId === 'PAY-004' ? 'Cashfree' : 'PhonePe';
+      const gateName = refund.gateway || refund.paymentMethod || '';
 
-      const ordNumber = refund.orderId === 'ORD-98421' ? 'PV-98421' : 
-                        refund.orderId === 'ORD-98422' ? 'PV-98422' : 
-                        refund.orderId === 'ORD-98423' ? 'PV-98423' : 
-                        refund.orderId === 'ORD-98424' ? 'PV-98424' : 
-                        refund.orderId === 'ORD-98425' ? 'PV-98425' : 
-                        refund.orderId === 'ORD-98426' ? 'PV-98426' : 
-                        refund.orderId === 'ORD-98427' ? 'PV-98427' : 'PV-98428';
+      const ordNumber = refund.orderNumber || refund.orderId || '';
 
       return {
         ...refund,
@@ -797,7 +780,7 @@ export default function RefundRequests() {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-850">
-              {mockActivityLogs.map((log, idx) => (
+              {refundActivityLogs.map((log, idx) => (
                 <tr key={idx} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-850/10">
                   <td className="py-2.5 font-bold font-mono tracking-tight text-[var(--primary)]">{log.action}</td>
                   <td className="py-2.5 text-zinc-800 dark:text-zinc-200 font-bold">{log.user} ({log.role})</td>

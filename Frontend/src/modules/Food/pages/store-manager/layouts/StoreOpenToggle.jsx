@@ -156,9 +156,7 @@ export default function StoreOpenToggle({ variant = "compact", storeName: propSt
       if (errMsg) {
         toast.error(errMsg)
       } else {
-        // Fallback for standalone/mock mode
-        toast.success(`Store time updated: ${storeTiming}`)
-        setShowTimeModal(false)
+        toast.error("Could not update the store time. Check your connection and try again.")
       }
     } finally {
       setSaving(false)

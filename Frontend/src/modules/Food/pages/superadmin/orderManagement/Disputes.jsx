@@ -6,10 +6,7 @@ import {
   History
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { 
-  getDisputes, mockDisputeActivityLogs, mockSupportAgents, 
-  mockStores, mockFranchises, useDebounce 
-} from './DisputesData';
+import { getDisputes, disputeActivityLogs, useDebounce } from './DisputesData';
 
 import ViewDisputeDrawer from './components/ViewDisputeDrawer';
 import AssignDisputeModal from './components/AssignDisputeModal';
@@ -184,12 +181,9 @@ export default function Disputes() {
   // Filtered and Sorted list
   const getProcessedDisputes = () => {
     let result = disputes.map(dispute => {
-      // Mock mappings to include customerNames, etc. for filters
-      const custName = dispute.raisedById === 'CUST-001' ? 'Rajesh Kumar' : 
-                       dispute.raisedById === 'CUST-002' ? 'Priya Patel' : 'Aarav Mehta';
+      const custName = dispute.customerName || dispute.raisedByName || '';
       
-      const ordNumber = dispute.orderId === 'ORD-101' ? 'PV-101' : 
-                        dispute.orderId === 'ORD-102' ? 'PV-102' : 'PV-103';
+      const ordNumber = dispute.orderNumber || dispute.orderId || '';
 
       return {
         ...dispute,
@@ -839,7 +833,7 @@ export default function Disputes() {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-850">
-              {mockDisputeActivityLogs.map((log, idx) => (
+              {disputeActivityLogs.map((log, idx) => (
                 <tr key={idx} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-850/10">
                   <td className="py-2.5 font-bold font-mono tracking-tight text-[var(--primary)]">{log.action}</td>
                   <td className="py-2.5 text-zinc-800 dark:text-zinc-200 font-bold">{log.user} ({log.role})</td>

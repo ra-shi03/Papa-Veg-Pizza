@@ -13,7 +13,7 @@ import {
   apiBulkUpdateNotificationStatus
 } from './NotificationData';
 
-import { mockRegions, mockFranchises } from './CouponsData';
+import { regionOptions, franchiseOptions } from './CouponsData';
 
 import CreateNotification from './CreateNotification';
 import EditNotification from './EditNotification';
@@ -595,7 +595,7 @@ export default function PushNotification() {
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Filter by Regions</label>
                   <div className="flex flex-wrap gap-1.5 p-2 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50 dark:bg-zinc-955 max-h-24 overflow-y-auto">
-                    {mockRegions.map(reg => {
+                    {regionOptions.map(reg => {
                       const isChecked = filters.regionIds.includes(reg.id);
                       return (
                         <button
@@ -618,7 +618,7 @@ export default function PushNotification() {
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Filter by Franchises</label>
                   <div className="flex flex-wrap gap-1.5 p-2 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50 dark:bg-zinc-955 max-h-24 overflow-y-auto">
-                    {mockFranchises.map(fran => {
+                    {franchiseOptions.map(fran => {
                       const isChecked = filters.franchiseIds.includes(fran.id);
                       return (
                         <button

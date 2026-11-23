@@ -11,7 +11,6 @@ import StoreOpenToggle from "./StoreOpenToggle"
 import { useSystemTheme } from "@/shared/utils/themeSync"
 import { adminAPI } from "@food/api"
 import { myTasksService } from "@/services/api/myTasksService"
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 import { formatDistanceToNow } from "date-fns"
 
 export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
@@ -51,14 +50,8 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
   const [notifications, setNotifications] = useState([])
 
   // A store team member works in the one store on their sign-in; the list holds only that store (sample stores are for
-  // standalone mock mode).
-  const storeList = STANDALONE_MOCK
-    ? [
-        { id: 104, name: "Vijay Nagar", location: "Indore" },
-        { id: 105, name: "Palasia Hub", location: "Indore" },
-        { id: 201, name: "Arera Colony", location: "Bhopal" }
-      ]
-    : (storeData ? [{ id: storeData.code || storeData._id, name: storeData.storeName || storeData.name || "", location: "" }] : [])
+  // standalone mode).
+  const storeList = (storeData ? [{ id: storeData.code || storeData._id, name: storeData.storeName || storeData.name || "", location: "" }] : [])
 
   const dateLabels = {
     today: "Today",
@@ -262,10 +255,7 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
                       key={store.id}
                       onClick={() => {
                         setShowStoreDropdown(false)
-                        if (STANDALONE_MOCK) {
-                          setSelectedStore(`Store #${store.id} (${store.name})`)
-                          toast.success(`Connected to Store #${store.id}`)
-                        }
+                        
                       }}
                       className="w-full text-left px-3 py-2 text-xs font-bold text-zinc-650 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                     >

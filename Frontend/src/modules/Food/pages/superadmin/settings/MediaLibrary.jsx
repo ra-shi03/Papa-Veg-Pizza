@@ -5,75 +5,7 @@ export default function MediaLibrary() {
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [previewAsset, setPreviewAsset] = useState(null);
 
-  const assets = [
-    {
-      id: 'asset1',
-      name: 'pepperoni_deluxe_promo.jpg',
-      size: '1.2 MB',
-      type: 'IMAGE',
-      src: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?q=80&w=1000&auto=format&fit=crop&fm=webp',
-      uploader: 'Admin (Marco Rossi)',
-      date: 'Oct 24, 2023, 11:20 AM',
-      dimensions: '1920 x 1080 px',
-      isVideo: false
-    },
-    {
-      id: 'asset2',
-      name: 'mediterranean_special.jpg',
-      size: '842 KB',
-      type: 'IMAGE',
-      src: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?q=80&w=1000&auto=format&fit=crop&fm=webp',
-      uploader: 'Admin (Marco Rossi)',
-      date: 'Oct 23, 2023, 09:15 AM',
-      dimensions: '1080 x 1080 px',
-      isVideo: false
-    },
-    {
-      id: 'asset3',
-      name: 'store_reveal_clip.mp4',
-      size: '14.5 MB',
-      type: 'VIDEO',
-      src: 'https://images.unsplash.com/photo-1590947132387-155cc02f3212?q=80&w=1000&auto=format&fit=crop&fm=webp',
-      uploader: 'Marketing Team',
-      date: 'Oct 22, 2023, 02:45 PM',
-      dimensions: '1920 x 1080 px',
-      isVideo: true,
-      duration: '0:15'
-    },
-    {
-      id: 'asset4',
-      name: 'margherita_raw.png',
-      size: '2.1 MB',
-      type: 'IMAGE',
-      src: 'https://images.unsplash.com/photo-1604068549290-dea0e4a30536?q=80&w=1000&auto=format&fit=crop&fm=webp',
-      uploader: 'Admin (Marco Rossi)',
-      date: 'Oct 20, 2023, 04:30 PM',
-      dimensions: '2400 x 1600 px',
-      isVideo: false
-    },
-    {
-      id: 'asset5',
-      name: 'franchise_brand_guide.pdf',
-      size: '4.8 MB',
-      type: 'DOCUMENT',
-      src: null,
-      uploader: 'Legal Team',
-      date: 'Oct 15, 2023, 10:00 AM',
-      dimensions: 'A4',
-      isVideo: false
-    },
-    {
-      id: 'asset6',
-      name: 'app_icon_v2.png',
-      size: '124 KB',
-      type: 'IMAGE',
-      src: 'https://images.unsplash.com/photo-1614680376593-902f74cf0d41?q=80&w=1000&auto=format&fit=crop&fm=webp',
-      uploader: 'Design Team',
-      date: 'Oct 10, 2023, 11:11 AM',
-      dimensions: '512 x 512 px',
-      isVideo: false
-    }
-  ];
+  const assets = [];
 
   const handleAssetClick = (asset) => {
     if (selectedItems.size > 0) {

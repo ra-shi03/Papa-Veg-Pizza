@@ -12,7 +12,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, Legend 
 } from "recharts";
 
-// Query Hooks & Mock References
+// Query Hooks & References
 import { 
   useCancelledOrders, 
   useStores, 

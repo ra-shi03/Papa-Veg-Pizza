@@ -1,12 +1,17 @@
-import { mockIngredients, mockPurchaseRequests, mockPurchaseRequestItems } from "../mockData";
-import { initialStores, initialManagers } from "../../storeManagement/mockStoresData";
 
-const PRS_STORAGE_KEY = "mock_db_purchase_requests";
-const PR_ITEMS_STORAGE_KEY = "mock_db_purchase_request_items";
-const PR_AUDIT_STORAGE_KEY = "mock_db_purchase_request_audit";
-const STOCKS_STORAGE_KEY = "mock_db_inventory_stock";
-const TXNS_STORAGE_KEY = "mock_db_inventory_transactions";
-const ALERTS_STORAGE_KEY = "mock_db_low_stock_alerts";
+const emptyStores = [];
+const managers = [];
+
+const ingredients = [];
+const purchaseRequests = [];
+const purchaseRequestItems = [];
+
+const PRS_STORAGE_KEY = "pvp_local_purchase_requests";
+const PR_ITEMS_STORAGE_KEY = "pvp_local_purchase_request_items";
+const PR_AUDIT_STORAGE_KEY = "pvp_local_purchase_request_audit";
+const STOCKS_STORAGE_KEY = "pvp_local_inventory_stock";
+const TXNS_STORAGE_KEY = "pvp_local_inventory_transactions";
+const ALERTS_STORAGE_KEY = "pvp_local_low_stock_alerts";
 
 let requests = [];
 let requestItems = [];
@@ -17,14 +22,14 @@ try {
   const cachedPRs = localStorage.getItem(PRS_STORAGE_KEY);
   requests = cachedPRs ? JSON.parse(cachedPRs) : [];
   if (requests.length === 0) {
-    requests = [...mockPurchaseRequests];
+    requests = [...purchaseRequests];
     localStorage.setItem(PRS_STORAGE_KEY, JSON.stringify(requests));
   }
 
   const cachedItems = localStorage.getItem(PR_ITEMS_STORAGE_KEY);
   requestItems = cachedItems ? JSON.parse(cachedItems) : [];
   if (requestItems.length === 0) {
-    requestItems = [...mockPurchaseRequestItems];
+    requestItems = [...purchaseRequestItems];
     localStorage.setItem(PR_ITEMS_STORAGE_KEY, JSON.stringify(requestItems));
   }
 
@@ -39,7 +44,7 @@ try {
         type: "STATUS_CHANGE",
         title: "Request Created",
         description: `Purchase request created in ${r.status.toUpperCase()} status.`,
-        performedBy: r.requestedBy === "mgr-1" ? "Subham Jamliya" : r.requestedBy === "mgr-2" ? "Rashid Khan" : "Aarav Sharma",
+        performedBy: r.requestedByName || "",
         createdAt: r.createdAt
       });
       if (r.status !== "Draft" && r.status !== "Pending") {
@@ -68,8 +73,8 @@ try {
     localStorage.setItem(PR_AUDIT_STORAGE_KEY, JSON.stringify(auditLogs));
   }
 } catch (e) {
-  requests = [...mockPurchaseRequests];
-  requestItems = [...mockPurchaseRequestItems];
+  requests = [...purchaseRequests];
+  requestItems = [...purchaseRequestItems];
 }
 
 const saveToStorage = () => {
@@ -110,11 +115,11 @@ export const purchaseRequestService = {
       sortOrder = "desc"
     } = params;
 
-    const cachedStores = localStorage.getItem("mock_db_stores");
-    const storesList = cachedStores ? JSON.parse(cachedStores) : [...initialStores];
+    const cachedStores = localStorage.getItem("pvp_local_stores");
+    const storesList = cachedStores ? JSON.parse(cachedStores) : [...emptyStores];
 
-    const cachedIngredients = localStorage.getItem("mock_db_ingredients");
-    const ingredientsList = cachedIngredients ? JSON.parse(cachedIngredients) : [...mockIngredients];
+    const cachedIngredients = localStorage.getItem("pvp_local_ingredients");
+    const ingredientsList = cachedIngredients ? JSON.parse(cachedIngredients) : [...ingredients];
 
     // Join requests with store, requestedBy, items list
     let result = requests.map(r => {
@@ -123,7 +128,7 @@ export const purchaseRequestService = {
         storeCode: "PVP-UNK"
       };
 
-      const requester = initialManagers.find(m => m.id === r.requestedBy) || {
+      const requester = managers.find(m => m.id === r.requestedBy) || {
         name: r.requestedBy || "Store Manager",
         email: ""
       };
@@ -241,18 +246,18 @@ export const purchaseRequestService = {
     const request = requests.find(r => r._id === id);
     if (!request) throw new Error("Purchase request not found");
 
-    const cachedStores = localStorage.getItem("mock_db_stores");
-    const storesList = cachedStores ? JSON.parse(cachedStores) : [...initialStores];
+    const cachedStores = localStorage.getItem("pvp_local_stores");
+    const storesList = cachedStores ? JSON.parse(cachedStores) : [...emptyStores];
 
-    const cachedIngredients = localStorage.getItem("mock_db_ingredients");
-    const ingredientsList = cachedIngredients ? JSON.parse(cachedIngredients) : [...mockIngredients];
+    const cachedIngredients = localStorage.getItem("pvp_local_ingredients");
+    const ingredientsList = cachedIngredients ? JSON.parse(cachedIngredients) : [...ingredients];
 
     const storeObj = storesList.find(s => s._id === request.storeId) || {
       storeName: "Unknown Store",
       storeCode: "PVP-UNK"
     };
 
-    const requester = initialManagers.find(m => m.id === request.requestedBy) || {
+    const requester = managers.find(m => m.id === request.requestedBy) || {
       name: request.requestedBy || "Store Manager"
     };
 
@@ -325,7 +330,7 @@ export const purchaseRequestService = {
     requests.unshift(newRequest);
     requestItems.push(...newItems);
 
-    const requester = initialManagers.find(m => m.id === requestedBy);
+    const requester = managers.find(m => m.id === requestedBy);
     auditLogs.push({
       _id: `aud-${prId}-${Date.now()}`,
       requestId: prId,
@@ -475,7 +480,7 @@ export const purchaseRequestService = {
     });
 
     // CRITICAL STEPS:
-    // 1. Replenish physical stock in mock_db_inventory_stock
+    // 1. Replenish physical stock in the local stock list
     try {
       const cachedStocks = localStorage.getItem(STOCKS_STORAGE_KEY);
       const stocksList = cachedStocks ? JSON.parse(cachedStocks) : [];

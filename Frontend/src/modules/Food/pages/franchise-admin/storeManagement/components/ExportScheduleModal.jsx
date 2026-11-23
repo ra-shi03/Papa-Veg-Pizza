@@ -31,16 +31,16 @@ export default function ExportScheduleModal({ isOpen, onClose }) {
       const res = await adminAPI.exportOperatingHoursReport(params)
       setSuccess(true)
 
-      // Simulate browser trigger download of a dummy CSV/Excel
-      const dummyData = "Store Code,Store Name,Status,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday\n" +
-        "store-1,Papa Veg Pizza - Vijay Nagar,Active,09:00 AM - 11:00 PM,09:00 AM - 11:00 PM,09:00 AM - 11:00 PM,09:00 AM - 11:00 PM,09:00 AM - 11:00 PM,09:00 AM - 11:00 PM,09:00 AM - 11:00 PM\n" +
-        "store-2,Papa Veg Pizza - Palasia,Active,10:00 AM - 10:00 PM,10:00 AM - 10:00 PM,10:00 AM - 10:00 PM,10:00 AM - 10:00 PM,10:00 AM - 11:00 PM,10:00 AM - 11:00 PM,10:00 AM - 10:00 PM"
-      
-      const blob = new Blob([dummyData], { type: format === "csv" ? "text/csv" : "application/vnd.ms-excel" })
+      // The server's report rows, saved as a CSV file
+      const report = res?.data?.data || {}
+      const columns = report.columns || []
+      const cell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`
+      const csv = [columns.join(","), ...(report.rows || []).map((r) => columns.map((c) => cell(r[c])).join(","))].join("\n")
+      const blob = new Blob([csv], { type: "text/csv" })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.setAttribute("href", url)
-      a.setAttribute("download", `Operating_Hours_Report.${format === "pdf" ? "pdf" : format === "csv" ? "csv" : "xlsx"}`)
+      a.setAttribute("download", String(report.fileName || "Operating_Hours_Report.csv").replace(/\.(xlsx|pdf)$/, ".csv"))
       a.click()
 
       setTimeout(() => {

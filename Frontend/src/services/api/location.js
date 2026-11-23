@@ -1,7 +1,7 @@
 import axiosInstance from "./axios";
 
 export const locationAPI = {
-  // Mock serviceability check
+  // serviceability check
   checkServiceability: async (lat, lng) => {
     try {
       const response = await axiosInstance.get(`/food/search/serviceability?lat=${lat}&lng=${lng}`);
@@ -34,7 +34,7 @@ export const locationAPI = {
     }
   },
 
-  // Mock Reverse Geocoding using free nominatim API
+  // Reverse Geocoding using free nominatim API
   reverseGeocode: async (lat, lng) => {
     try {
       const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);

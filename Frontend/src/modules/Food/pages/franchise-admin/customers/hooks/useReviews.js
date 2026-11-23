@@ -1,16 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-import { 
-  mockReviewsExpanded, 
-  mockReviewLogs, 
-  mockStores
-} from "../mockData";
 
-// Initialize Local Mock DB in localStorage if it doesn't exist
+const reviewsExpanded = [];
+const emptyReviewLogs = [];
+const emptyStores = [];
+
+// Initialize Local DB in localStorage if it doesn't exist
 const initReviewsDB = () => {
   if (!localStorage.getItem("pv_reviews_initialized")) {
-    localStorage.setItem("pv_reviews", JSON.stringify(mockReviewsExpanded));
-    localStorage.setItem("pv_review_logs", JSON.stringify(mockReviewLogs));
+    localStorage.setItem("pv_reviews", JSON.stringify(reviewsExpanded));
+    localStorage.setItem("pv_review_logs", JSON.stringify(emptyReviewLogs));
     localStorage.setItem("pv_reviews_initialized", "true");
   }
 };
@@ -67,7 +66,7 @@ export function useReviews() {
   const fetchStatsAndAnalytics = useCallback(() => {
     initReviewsDB();
     const list = getDB("pv_reviews");
-    const stores = mockStores;
+    const stores = emptyStores;
 
     // Core Metrics
     const totalReviews = list.length;
@@ -139,7 +138,7 @@ export function useReviews() {
 
       const dayAvg = dayReviews.length > 0
         ? parseFloat((dayReviews.reduce((sum, r) => sum + r.rating, 0) / dayReviews.length).toFixed(1))
-        : 4.2; // default fallback for trend continuity in mock
+        : 4.2; // default fallback for trend continuity in 
       
       ratingTrend.push({
         date: dateString,
@@ -162,7 +161,7 @@ export function useReviews() {
     setTimeout(() => {
       const list = getDB("pv_reviews");
       const users = getDB("pv_users");
-      const stores = mockStores;
+      const stores = emptyStores;
 
       // Join customer information
       let result = list.map(r => {
@@ -280,7 +279,7 @@ export function useReviews() {
       const list = getDB("pv_reviews");
       const users = getDB("pv_users");
       const orders = getDB("pv_orders");
-      const stores = mockStores;
+      const stores = emptyStores;
       const logs = getDB("pv_review_logs");
 
       const review = list.find(r => r._id === id);
@@ -335,7 +334,7 @@ export function useReviews() {
     list[index].adminReply = {
       message: data.replyMessage,
       date: new Date().toISOString(),
-      createdBy: "Admin Shubham"
+      createdBy: "You"
     };
     setDB("pv_reviews", list);
 
@@ -345,7 +344,7 @@ export function useReviews() {
       action: "Reply Added",
       oldValue: "",
       newValue: "Replied",
-      performedBy: "Admin Shubham",
+      performedBy: "You",
       createdAt: new Date().toISOString()
     });
     setDB("pv_review_logs", logs);
@@ -381,7 +380,7 @@ export function useReviews() {
       action: "Reply Edited",
       oldValue: oldMsg,
       newValue: data.replyMessage,
-      performedBy: "Admin Shubham",
+      performedBy: "You",
       createdAt: new Date().toISOString()
     });
     setDB("pv_review_logs", logs);
@@ -413,7 +412,7 @@ export function useReviews() {
       action: "Reply Deleted",
       oldValue: oldMsg,
       newValue: "",
-      performedBy: "Admin Shubham",
+      performedBy: "You",
       createdAt: new Date().toISOString()
     });
     setDB("pv_review_logs", logs);
@@ -445,7 +444,7 @@ export function useReviews() {
       action: "Review Hidden",
       oldValue: oldStatus,
       newValue: "Hidden",
-      performedBy: `Admin Shubham (${data.reason})`,
+      performedBy: `You (${data.reason})`,
       createdAt: new Date().toISOString()
     });
     setDB("pv_review_logs", logs);
@@ -477,7 +476,7 @@ export function useReviews() {
       action: "Review Published",
       oldValue: oldStatus,
       newValue: "Published",
-      performedBy: "Admin Shubham",
+      performedBy: "You",
       createdAt: new Date().toISOString()
     });
     setDB("pv_review_logs", logs);
@@ -505,7 +504,7 @@ export function useReviews() {
       action: "Review Deleted",
       oldValue: "Active",
       newValue: "Soft Deleted",
-      performedBy: `Admin Shubham (${data?.reason || 'System request'})`,
+      performedBy: `You (${data?.reason || 'System request'})`,
       createdAt: new Date().toISOString()
     });
     setDB("pv_review_logs", logs);
@@ -520,7 +519,7 @@ export function useReviews() {
   const exportReviews = useCallback((format, exportFilters) => {
     const list = getDB("pv_reviews");
     const users = getDB("pv_users");
-    const stores = mockStores;
+    const stores = emptyStores;
 
     let result = list.map(r => {
       const cust = getDB("pv_customers").find(cu => cu._id === r.customerId) || {};

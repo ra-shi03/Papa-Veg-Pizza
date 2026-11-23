@@ -12,10 +12,10 @@ import {
   apiDeleteCampaign,
   apiBulkUpdateStatus,
   apiBulkDelete,
-  activeCouponsMock 
+  activeCouponOptions 
 } from './CampaignData';
 
-import { mockRegions, mockFranchises, mockStores } from './CouponsData';
+import { regionOptions, franchiseOptions, storeOptions } from './CouponsData';
 
 import CreateCampaign from './CreateCampaign';
 import EditCampaign from './EditCampaign';
@@ -141,7 +141,7 @@ export default function Campaign() {
       setTotalPages(result.totalPages);
 
       // Aggregate statistics for KPI cards dynamically
-      // For a real app, these are fetched from aggregations, here we compute them from all mock data
+      // For a real app, these are fetched from aggregations, here we compute them from all data
       const allCamps = await apiGetCampaigns({ status: 'All' }, { page: 1, limit: 100 }, { field: 'createdAt', order: 'desc' });
       const runningCount = allCamps.campaigns.filter(c => c.status === 'Running').length;
       const scheduledCount = allCamps.campaigns.filter(c => c.status === 'Scheduled').length;
@@ -296,18 +296,18 @@ export default function Campaign() {
 
   // Cascading geo filters calculation for drop-downs
   const availableFranchises = useMemo(() => {
-    if (filters.regionIds.length === 0) return mockFranchises;
-    const zoneIds = mockZones.filter(z => filters.regionIds.includes(z.regionId)).map(z => z.id);
-    const territoryIds = mockTerritories.filter(t => zoneIds.includes(t.zoneId)).map(t => t.id);
-    return mockFranchises.filter(f => territoryIds.includes(f.territoryId));
+    if (filters.regionIds.length === 0) return franchiseOptions;
+    const zoneIds = zoneOptions.filter(z => filters.regionIds.includes(z.regionId)).map(z => z.id);
+    const territoryIds = territoryOptions.filter(t => zoneIds.includes(t.zoneId)).map(t => t.id);
+    return franchiseOptions.filter(f => territoryIds.includes(f.territoryId));
   }, [filters.regionIds]);
 
   const availableStores = useMemo(() => {
     if (filters.franchiseIds.length === 0) {
       const allowedFranIds = availableFranchises.map(f => f.id);
-      return mockStores.filter(s => allowedFranIds.includes(s.franchiseId));
+      return storeOptions.filter(s => allowedFranIds.includes(s.franchiseId));
     }
-    return mockStores.filter(s => filters.franchiseIds.includes(s.franchiseId));
+    return storeOptions.filter(s => filters.franchiseIds.includes(s.franchiseId));
   }, [filters.franchiseIds, availableFranchises]);
 
   return (
@@ -524,7 +524,7 @@ export default function Campaign() {
                 }}
                 className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-2.5 py-1 text-xs focus:ring-1 focus:ring-[var(--primary)] outline-none text-zinc-800 dark:text-zinc-200 font-semibold h-12"
               >
-                {mockRegions.map(r => (
+                {regionOptions.map(r => (
                   <option key={r.id} value={r.id}>{r.name}</option>
                 ))}
               </select>
@@ -765,7 +765,7 @@ export default function Campaign() {
                   const isMenuOpen = activeMenuRowId === c._id;
                   
                   // Helper to map coupon preview details
-                  const cpnMatch = activeCouponsMock.find(cop => cop._id === c.couponId);
+                  const cpnMatch = activeCouponOptions.find(cop => cop._id === c.couponId);
                   
                   return (
                     <tr 

@@ -5,6 +5,9 @@ import { FoodUser } from '../users/user.model.js';
 import { FoodStore } from '../../modules/food/store/models/store.model.js';
 import { FoodDeliveryPartner } from '../../modules/food/delivery/models/deliveryPartner.model.js';
 import { FoodAdmin } from '../admin/admin.model.js';
+import { Role } from '../roles/models/role.model.js';
+import { UserRole } from '../roles/models/userRole.model.js';
+import { StoreManager } from '../../modules/food/franchise/models/storeManager.model.js';
 import { config } from '../../config/env.js';
 import { logger } from '../../utils/logger.js';
 
@@ -17,8 +20,16 @@ const OWNER_MODELS = {
     CUSTOMER: FoodUser,
     STORE: FoodStore,
     DELIVERY_PARTNER: FoodDeliveryPartner,
-    ADMIN: FoodAdmin
+    ADMIN: FoodAdmin,
+    // Staff panel accounts are Users; /fcm-tokens/save passes the signed-in role as the owner type.
+    SUPERADMIN: FoodUser,
+    SUPER_ADMIN: FoodUser,
+    FRANCHISE_ADMIN: FoodUser,
+    STORE_MANAGER: FoodUser,
+    KITCHEN_STAFF: FoodUser
 };
+const TOKEN_FIELDS_SELECT = '+fcmTokens +fcmTokenMobile';
+const normalizeOwnerType = (ownerType) => String(ownerType || '').trim().toUpperCase().replace(/-/g, '_');
 const OWNER_TOKEN_FIELDS = {
     web: 'fcmTokens',
     mobile: 'fcmTokenMobile'
@@ -247,7 +258,11 @@ const shouldRemoveTokenFromError = (errorJson, response) => {
     return status === 404 || message.includes('UNREGISTERED') || message.includes('INVALID_ARGUMENT');
 };
 
-const getOwnerModel = (ownerType) => OWNER_MODELS[String(ownerType || '').toUpperCase()] || null;
+const getOwnerModel = (ownerType) => OWNER_MODELS[normalizeOwnerType(ownerType)] || null;
+
+// Token lists are written with updateOne so a save never runs unrelated document validation (old User or store
+// records missing a now-required field would otherwise make every token save fail).
+const writeOwnerTokens = (model, ownerId, set) => model.updateOne({ _id: ownerId }, { $set: set });
 
 const getTokenFieldForPlatform = (platform) => OWNER_TOKEN_FIELDS[platform === 'mobile' ? 'mobile' : 'web'];
 
@@ -271,7 +286,7 @@ export const listOwnerTokens = async ({ ownerType, ownerId, platform }) => {
     if (!ownerType || !ownerId) return [];
     const model = getOwnerModel(ownerType);
     if (!model) return [];
-    const doc = await model.findById(ownerId).select('fcmTokens fcmTokenMobile').lean();
+    const doc = await model.findById(ownerId).select(TOKEN_FIELDS_SELECT).lean();
     return readTokensFromDoc(doc, platform);
 };
 
@@ -291,7 +306,7 @@ export const upsertFirebaseDeviceToken = async ({ ownerType, ownerId, token, pla
         throw new Error(`Unsupported owner type: ${ownerType}`);
     }
 
-    const doc = await model.findById(ownerId);
+    const doc = await model.findById(ownerId).select(TOKEN_FIELDS_SELECT).lean();
     if (!doc) {
         console.error(`[FCM-DEBUG] upsert - Owner profile not found for id ${ownerId}`);
         throw new Error('Owner profile not found.');
@@ -302,9 +317,7 @@ export const upsertFirebaseDeviceToken = async ({ ownerType, ownerId, token, pla
     console.log(`[FCM-DEBUG] upsert - Current tokens in DB count: ${existingTokens.length}`);
 
     const tokens = normalizeTokenList([...existingTokens, normalizedToken]);
-    doc[field] = tokens;
-
-    await doc.save();
+    await writeOwnerTokens(model, doc._id, { [field]: tokens });
     console.log(`[FCM-DEBUG] upsert - Token list updated. New count: ${tokens.length}`);
     return { success: true };
 };
@@ -318,22 +331,17 @@ export const removeFirebaseDeviceToken = async ({ ownerType, ownerId, token, pla
     if (!model) {
         throw new Error(`Unsupported owner type: ${ownerType}`);
     }
-    const doc = await model.findById(ownerId);
+    const doc = await model.findById(ownerId).select(TOKEN_FIELDS_SELECT).lean();
     if (!doc) {
         return { success: false };
     }
 
-    if (platform) {
-        const field = getTokenFieldForPlatform(platform);
-        doc[field] = normalizeTokenList((Array.isArray(doc[field]) ? doc[field] : []).filter((t) => t !== normalizedToken));
-    } else {
-        doc.fcmTokens = normalizeTokenList((Array.isArray(doc.fcmTokens) ? doc.fcmTokens : []).filter((t) => t !== normalizedToken));
-        doc.fcmTokenMobile = normalizeTokenList(
-            (Array.isArray(doc.fcmTokenMobile) ? doc.fcmTokenMobile : []).filter((t) => t !== normalizedToken)
-        );
+    const fields = platform ? [getTokenFieldForPlatform(platform)] : [OWNER_TOKEN_FIELDS.web, OWNER_TOKEN_FIELDS.mobile];
+    const set = {};
+    for (const field of fields) {
+        set[field] = normalizeTokenList((Array.isArray(doc[field]) ? doc[field] : []).filter((t) => t !== normalizedToken));
     }
-
-    await doc.save();
+    await writeOwnerTokens(model, doc._id, set);
     return { success: true };
 };
 
@@ -430,15 +438,16 @@ export const sendNotificationToOwner = async ({ ownerType, ownerId, payload, pla
             .filter(Boolean);
         if (invalidTokens.length > 0) {
             const model = getOwnerModel(ownerType);
-            const doc = model ? await model.findById(ownerId) : null;
+            const doc = model ? await model.findById(ownerId).select(TOKEN_FIELDS_SELECT).lean() : null;
             if (doc) {
                 const fieldNames = platform
                     ? [getTokenFieldForPlatform(platform)]
                     : [OWNER_TOKEN_FIELDS.web, OWNER_TOKEN_FIELDS.mobile];
+                const set = {};
                 for (const field of fieldNames) {
-                    doc[field] = normalizeTokenList((Array.isArray(doc[field]) ? doc[field] : []).filter((t) => !invalidTokens.includes(t)));
+                    set[field] = normalizeTokenList((Array.isArray(doc[field]) ? doc[field] : []).filter((t) => !invalidTokens.includes(t)));
                 }
-                await doc.save();
+                await writeOwnerTokens(model, doc._id, set);
             }
         }
         logger.info(
@@ -451,12 +460,79 @@ export const sendNotificationToOwner = async ({ ownerType, ownerId, payload, pla
     }
 };
 
+const roleIdCache = new Map();
+const roleIdFor = async (code) => {
+    if (!roleIdCache.has(code)) {
+        const role = await Role.findOne({ code }).select('_id').lean();
+        if (!role) return null; // not cached: the role may be seeded later
+        roleIdCache.set(code, role._id);
+    }
+    return roleIdCache.get(code);
+};
+
+const isObjectIdLike = (value) => /^[a-f0-9]{24}$/i.test(String(value || ''));
+
+// Of these User ids, the ones that may still receive pushes (active, not blocked, not deleted).
+const activeUserIds = async (ids = []) => {
+    const unique = [...new Set(ids.map(String).filter(isObjectIdLike))];
+    if (!unique.length) return [];
+    const rows = await FoodUser.find({ _id: { $in: unique }, isActive: { $ne: false }, isBlocked: { $ne: true }, isDeleted: { $ne: true } })
+        .select('_id')
+        .lean();
+    return rows.map((row) => String(row._id));
+};
+
+// The store managers of a store: the userRoles link (what scopes their panel) and the StoreManager profile (what the
+// login prefers). A manager who switched off push notifications in Profile > Notifications is left out.
+export const storeManagerUserIds = async (storeId) => {
+    if (!isObjectIdLike(storeId)) return [];
+    const roleId = await roleIdFor('STORE_MANAGER');
+    const [links, profiles] = await Promise.all([
+        roleId ? UserRole.find({ storeId, roleId, status: 'ACTIVE' }).select('userId').lean() : [],
+        StoreManager.find({ storeId: String(storeId), status: { $nin: ['DELETED', 'Suspended', 'Rejected'] }, userId: { $ne: null } })
+            .select('userId notificationPrefs')
+            .lean()
+    ]);
+    const optedOut = new Set(profiles.filter((p) => p.notificationPrefs?.pushNotifications === false).map((p) => String(p.userId)));
+    const ids = [...links.map((l) => l.userId), ...profiles.map((p) => p.userId)].map(String).filter((id) => !optedOut.has(id));
+    return activeUserIds(ids);
+};
+
+export const superAdminUserIds = async () => {
+    const roleId = await roleIdFor('SUPER_ADMIN');
+    if (!roleId) return [];
+    const links = await UserRole.find({ roleId, status: 'ACTIVE' }).select('userId').lean();
+    return activeUserIds(links.map((l) => l.userId));
+};
+
+// Push targets name a store or "the admins"; the people who hold device tokens are Users. A STORE target also reaches
+// that store's managers, and an ADMIN target that is not a FoodAdmin record (e.g. 'GLOBAL') reaches the super admins.
+const expandTargets = async (targets = []) => {
+    const expanded = [];
+    for (const target of targets) {
+        const type = normalizeOwnerType(target.ownerType);
+        if (type === 'STORE') {
+            expanded.push(target);
+            for (const userId of await storeManagerUserIds(target.ownerId)) {
+                expanded.push({ ownerType: 'STORE_MANAGER', ownerId: userId, platform: target.platform });
+            }
+        } else if (type === 'ADMIN' && !isObjectIdLike(target.ownerId)) {
+            for (const userId of await superAdminUserIds()) {
+                expanded.push({ ownerType: 'SUPER_ADMIN', ownerId: userId, platform: target.platform });
+            }
+        } else {
+            expanded.push(target);
+        }
+    }
+    return expanded;
+};
+
 export const sendNotificationToOwners = async (targets = [], payload = {}) => {
-    // 🔍 Tip #6: Deduplicate targets by ownerType:ownerId before sending
-    // This prevents duplicate notifications if the same person is listed twice (e.g. as USER and partner)
-    const uniqueTargets = Array.isArray(targets)
-        ? [...new Map(targets.filter(t => t?.ownerType && t?.ownerId).map(t => [`${t.ownerType}:${t.ownerId}`, t])).values()]
-        : [];
+    // 🔍 Tip #6: Deduplicate targets before sending. Keyed by the record the tokens live on, so one person reached
+    // two ways (say as STORE_MANAGER and as SUPER_ADMIN) is notified once.
+    const valid = Array.isArray(targets) ? targets.filter(t => t?.ownerType && t?.ownerId) : [];
+    const recordKey = (t) => `${getOwnerModel(t.ownerType)?.modelName || normalizeOwnerType(t.ownerType)}:${t.ownerId}`;
+    const uniqueTargets = [...new Map((await expandTargets(valid)).map(t => [recordKey(t), t])).values()];
 
     const results = [];
     for (const target of uniqueTargets) {
@@ -474,13 +550,16 @@ export const sendNotificationToOwners = async (targets = [], payload = {}) => {
 
 export const notifyAdminsSafely = async (payload = {}) => {
     try {
-        const admins = await FoodAdmin.find({ isActive: true }).select('_id').lean();
-        if (!admins.length) return [];
-
-        const targets = admins.map(a => ({
-            ownerType: 'ADMIN',
-            ownerId: String(a._id)
-        }));
+        // Super admins are Users (userRoles SUPER_ADMIN); FoodAdmin records are kept for older installs.
+        const [admins, superAdmins] = await Promise.all([
+            FoodAdmin.find({ isActive: true }).select('_id').lean(),
+            superAdminUserIds()
+        ]);
+        const targets = [
+            ...admins.map(a => ({ ownerType: 'ADMIN', ownerId: String(a._id) })),
+            ...superAdmins.map(id => ({ ownerType: 'SUPER_ADMIN', ownerId: id }))
+        ];
+        if (!targets.length) return [];
 
         return await sendNotificationToOwners(targets, payload);
     } catch (e) {

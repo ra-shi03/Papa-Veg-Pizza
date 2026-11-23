@@ -115,7 +115,7 @@ export default function PrintReceiptPreviewModal({ visible, onClose, order }) {
       ]}
     >
       <div className="py-4 flex justify-center bg-zinc-50 dark:bg-zinc-950/40 rounded-2xl border border-zinc-100 dark:border-zinc-900 p-4 max-h-[450px] overflow-y-auto">
-        {/* Mock Receipt Container */}
+        {/* Receipt Container */}
         <div
           ref={receiptRef}
           className="bg-white text-black p-4 shadow-sm w-[72mm] border border-zinc-200 text-xs font-mono select-text"

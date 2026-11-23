@@ -1,24 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { X, Check, ShieldAlert, FileText, ShieldCheck } from "lucide-react";
-import { mockStores } from "../mockData";
+
+const stores = [];
 
 // Helper to format date nicely
-const formatDateTime = (value) => {
-  if (!value) return "-";
-  try {
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return String(value);
-    return d.toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
-    });
-  } catch {
-    return String(value);
-  }
-};
 
 // Modal Wrapper for premium design consistency
 function DialogWrapper({ isOpen, onClose, title, children, maxWidth = "max-w-lg" }) {
@@ -148,7 +133,7 @@ export function EditCustomerModal({ isOpen, onClose, customer, onSave }) {
               onChange={e => setFormData({ ...formData, favoriteStoreId: e.target.value })}
               className="w-full p-2.5 bg-zinc-55 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs outline-none text-zinc-800 dark:text-zinc-200"
             >
-              {mockStores.map(store => (
+              {stores.map(store => (
                 <option key={store.id} value={store.id}>{store.name}</option>
               ))}
             </select>

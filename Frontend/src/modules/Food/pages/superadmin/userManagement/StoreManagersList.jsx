@@ -91,8 +91,8 @@ export default function StoreManagersList() {
     name: "",
     email: "",
     phone: "",
-    store: "Mumbai - Andheri West",
-    group: "Papa Veg Mumbai",
+    store: "",
+    group: "",
     status: "Active"
   })
   const [formErrors, setFormErrors] = useState({})
@@ -171,8 +171,8 @@ export default function StoreManagersList() {
         name: "",
         email: "",
         phone: "",
-        store: "Mumbai - Andheri West",
-        group: "Papa Veg Mumbai",
+        store: "",
+        group: "",
         status: "Active"
       })
     }

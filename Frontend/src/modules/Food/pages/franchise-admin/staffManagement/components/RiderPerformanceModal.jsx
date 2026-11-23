@@ -10,7 +10,7 @@ import {
   LineChart,
   Line
 } from "recharts"
-import { getDeliveryPartnerPerformance } from "../mockManagersData"
+import { getDeliveryPartnerPerformance } from "../staffDetailPlaceholders"
 
 export default function RiderPerformanceModal({ isOpen, onClose, rider }) {
   const [timeframe, setTimeframe] = useState("daily")

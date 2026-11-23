@@ -1,12 +1,12 @@
-import {
-  mockIngredients,
-  mockInventoryStocks,
-  mockInventoryTransactions
-} from "../mockData";
-import { initialStores } from "../../storeManagement/mockStoresData";
 
-const STOCKS_STORAGE_KEY = "mock_db_inventory_stock";
-const TXNS_STORAGE_KEY = "mock_db_inventory_transactions";
+const emptyStores = [];
+
+const ingredients = [];
+const inventoryStocks = [];
+const inventoryTransactions = [];
+
+const STOCKS_STORAGE_KEY = "pvp_local_inventory_stock";
+const TXNS_STORAGE_KEY = "pvp_local_inventory_transactions";
 
 let stocks = [];
 let transactions = [];
@@ -21,18 +21,18 @@ try {
 
   // Seed default stocks if missing
   if (stocks.length === 0) {
-    stocks = [...mockInventoryStocks];
+    stocks = [...inventoryStocks];
     localStorage.setItem(STOCKS_STORAGE_KEY, JSON.stringify(stocks));
   }
 
   // Seed default transactions if missing
   if (transactions.length === 0) {
-    transactions = [...mockInventoryTransactions];
+    transactions = [...inventoryTransactions];
     localStorage.setItem(TXNS_STORAGE_KEY, JSON.stringify(transactions));
   }
 } catch (e) {
-  stocks = [...mockInventoryStocks];
-  transactions = [...mockInventoryTransactions];
+  stocks = [...inventoryStocks];
+  transactions = [...inventoryTransactions];
 }
 
 const saveToStorage = () => {
@@ -55,8 +55,8 @@ function notifyListeners() {
 
 export const stockService = {
   getStores: async () => {
-    const cachedStores = localStorage.getItem("mock_db_stores");
-    const storesList = cachedStores ? JSON.parse(cachedStores) : [...initialStores];
+    const cachedStores = localStorage.getItem("pvp_local_stores");
+    const storesList = cachedStores ? JSON.parse(cachedStores) : [...emptyStores];
     return { success: true, data: storesList.filter(s => s.status === "Active") };
   },
 
@@ -75,11 +75,11 @@ export const stockService = {
       sortOrder = "desc"
     } = params;
 
-    const cachedStores = localStorage.getItem("mock_db_stores");
-    const storesList = cachedStores ? JSON.parse(cachedStores) : [...initialStores];
+    const cachedStores = localStorage.getItem("pvp_local_stores");
+    const storesList = cachedStores ? JSON.parse(cachedStores) : [...emptyStores];
 
-    const cachedIngredients = localStorage.getItem("mock_db_ingredients");
-    const ingredientsList = cachedIngredients ? JSON.parse(cachedIngredients) : [...mockIngredients];
+    const cachedIngredients = localStorage.getItem("pvp_local_ingredients");
+    const ingredientsList = cachedIngredients ? JSON.parse(cachedIngredients) : [...ingredients];
 
     // Helper to calculate status dynamically
     const calculateStatus = (available, reorder) => {
@@ -213,11 +213,11 @@ export const stockService = {
       search = ""
     } = params;
 
-    const cachedStores = localStorage.getItem("mock_db_stores");
-    const storesList = cachedStores ? JSON.parse(cachedStores) : [...initialStores];
+    const cachedStores = localStorage.getItem("pvp_local_stores");
+    const storesList = cachedStores ? JSON.parse(cachedStores) : [...emptyStores];
 
-    const cachedIngredients = localStorage.getItem("mock_db_ingredients");
-    const ingredientsList = cachedIngredients ? JSON.parse(cachedIngredients) : [...mockIngredients];
+    const cachedIngredients = localStorage.getItem("pvp_local_ingredients");
+    const ingredientsList = cachedIngredients ? JSON.parse(cachedIngredients) : [...ingredients];
 
     let result = transactions.map((txn) => {
       const ingredient = ingredientsList.find((i) => i._id === txn.ingredientId) || {
@@ -351,49 +351,7 @@ export const stockService = {
   },
 
   getConsumptionTrend: async (ingredientId, storeId) => {
-    await new Promise((resolve) => setTimeout(resolve, 200));
-
-    // Calculate a seed mock for daily consumption over 7 days
-    const dailyTrend = [];
-    const today = new Date();
-    
-    // Settle dynamic variables based on ingredientId hash to make it look stable and realistic
-    const numericId = ingredientId ? parseInt(ingredientId.replace(/\D/g, "") || "5") : 5;
-    const baseVal = Math.max(1, Math.min(20, numericId * 1.5));
-    
-    let totalQty = 0;
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
-      const formattedDate = date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-      
-      // Pseudo-random but consistent daily variation
-      const variance = Math.sin(i + numericId) * (baseVal * 0.3);
-      const consumed = Math.max(0.5, parseFloat((baseVal + variance).toFixed(1)));
-      
-      dailyTrend.push({
-        date: formattedDate,
-        quantity: consumed
-      });
-      totalQty += consumed;
-    }
-
-    const averageUsage = parseFloat((totalQty / 7).toFixed(1));
-    // Calculate projected depletion based on stock level if we have it
-    const stockRecord = stocks.find(s => s.ingredientId === ingredientId && s.storeId === storeId);
-    const available = stockRecord ? stockRecord.availableStock : 15;
-    const projectedDepletionDays = averageUsage > 0 ? Math.ceil(available / averageUsage) : 99;
-
-    return {
-      success: true,
-      data: {
-        trend: dailyTrend,
-        metrics: {
-          consumedQuantity: totalQty,
-          averageUsage,
-          projectedDepletion: projectedDepletionDays
-        }
-      }
-    };
+    // no consumption history is recorded here: nothing is made up
+    return { success: true, data: { trend: [], metrics: { consumedQuantity: 0, averageUsage: 0, projectedDepletion: null } } };
   }
 };

@@ -177,7 +177,7 @@ export function ReportWasteModal({ isOpen, onClose, currentUser }) {
     formData.append("wasteType", wasteType);
     formData.append("reason", reason.trim());
     formData.append("remarks", remarks.trim());
-    formData.append("reportedBy", currentUser || "Aman Verma");
+    formData.append("reportedBy", currentUser || "—");
     
     images.forEach(img => {
       formData.append("images[]", img);

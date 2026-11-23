@@ -1,4 +1,4 @@
-import React from "react"
+import React, { useRef } from "react"
 import { useLocationStore } from "@food/store/locationStore"
 import { useScrollLock } from "@food/hooks/useScrollLock"
 
@@ -12,6 +12,8 @@ export default function DeliveryMapModal({
   isDarkMode
 }) {
   const { confirmLocation } = useLocationStore()
+  // The customer's real position, once the browser gives it (never a made-up one)
+  const gpsRef = useRef(null)
 
   // Lock background scroll when open
   useScrollLock(Boolean(show))
@@ -25,6 +27,7 @@ export default function DeliveryMapModal({
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords
+          gpsRef.current = { latitude, longitude }
           triggerToast("Location detected! Fetching address...")
           fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`)
             .then(res => res.json())
@@ -52,15 +55,19 @@ export default function DeliveryMapModal({
   }
 
   const handleStartOrder = () => {
-    const finalAddr = deliveryAddress.trim() || "Joshi Colony, Bk Sindhi Colony, Indore, Indore"
+    const finalAddr = deliveryAddress.trim()
+    if (!finalAddr) {
+      triggerToast("Enter your delivery address or use your current location.")
+      return
+    }
     setDeliveryAddress(finalAddr)
     
     // Confirm location globally
     confirmLocation({
       address: finalAddr,
       serviceType: "delivery",
-      latitude: 22.7196,
-      longitude: 75.8577
+      latitude: gpsRef.current?.latitude ?? null,
+      longitude: gpsRef.current?.longitude ?? null
     })
     
     onClose()
@@ -78,7 +85,7 @@ export default function DeliveryMapModal({
 
   return (
     <div className="fixed inset-0 z-55 overflow-hidden animate-fadeIn" style={{ backgroundColor: mapBg }}>
-      {/* Draggable Mock Map Area */}
+      {/* Draggable Map Area */}
       <div className="absolute inset-0 w-full h-full">
         {/* Grid of roads and blocks */}
         <svg className="absolute inset-0 w-full h-full opacity-90" xmlns="http://www.w3.org/2000/svg">

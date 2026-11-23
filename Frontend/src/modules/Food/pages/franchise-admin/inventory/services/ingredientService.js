@@ -1,20 +1,19 @@
-import {
-  mockIngredients,
-  mockSuppliers,
-  mockStoreStocks,
-  mockPurchaseOrders,
-  mockConsumptionHistory,
-  mockExpiryBatches,
-  mockStockTransactions
-} from "../mockData";
 
-const INGREDIENTS_STORAGE_KEY = "mock_db_ingredients";
-const SUPPLIERS_STORAGE_KEY = "mock_db_suppliers";
-const STOCKS_STORAGE_KEY = "mock_db_store_stocks";
-const POS_STORAGE_KEY = "mock_db_purchase_orders";
-const CONSUMPTION_STORAGE_KEY = "mock_db_consumption_history";
-const BATCHES_STORAGE_KEY = "mock_db_expiry_batches";
-const TRANSACTIONS_STORAGE_KEY = "mock_db_stock_transactions";
+const emptyIngredients = [];
+const emptySuppliers = [];
+const emptyStoreStocks = {};
+const emptyPurchaseOrders = {};
+const emptyConsumptionHistory = {};
+const emptyExpiryBatches = {};
+const emptyStockTransactions = {};
+
+const INGREDIENTS_STORAGE_KEY = "pvp_local_ingredients";
+const SUPPLIERS_STORAGE_KEY = "pvp_local_suppliers";
+const STOCKS_STORAGE_KEY = "pvp_local_store_stocks";
+const POS_STORAGE_KEY = "pvp_local_purchase_orders";
+const CONSUMPTION_STORAGE_KEY = "pvp_local_consumption_history";
+const BATCHES_STORAGE_KEY = "pvp_local_expiry_batches";
+const TRANSACTIONS_STORAGE_KEY = "pvp_local_stock_transactions";
 
 let ingredients = [];
 let suppliers = [];
@@ -27,35 +26,35 @@ let stockTransactions = {};
 // Initialize state
 try {
   const cachedIngredients = localStorage.getItem(INGREDIENTS_STORAGE_KEY);
-  ingredients = cachedIngredients ? JSON.parse(cachedIngredients) : [...mockIngredients];
+  ingredients = cachedIngredients ? JSON.parse(cachedIngredients) : [...emptyIngredients];
   if (!cachedIngredients) localStorage.setItem(INGREDIENTS_STORAGE_KEY, JSON.stringify(ingredients));
 
   const cachedSuppliers = localStorage.getItem(SUPPLIERS_STORAGE_KEY);
-  suppliers = cachedSuppliers ? JSON.parse(cachedSuppliers) : [...mockSuppliers];
+  suppliers = cachedSuppliers ? JSON.parse(cachedSuppliers) : [...emptySuppliers];
   if (!cachedSuppliers) localStorage.setItem(SUPPLIERS_STORAGE_KEY, JSON.stringify(suppliers));
 
   const cachedStocks = localStorage.getItem(STOCKS_STORAGE_KEY);
-  storeStocks = cachedStocks ? JSON.parse(cachedStocks) : { ...mockStoreStocks };
+  storeStocks = cachedStocks ? JSON.parse(cachedStocks) : { ...emptyStoreStocks };
   if (!cachedStocks) localStorage.setItem(STOCKS_STORAGE_KEY, JSON.stringify(storeStocks));
 
   const cachedPOs = localStorage.getItem(POS_STORAGE_KEY);
-  purchaseOrders = cachedPOs ? JSON.parse(cachedPOs) : { ...mockPurchaseOrders };
+  purchaseOrders = cachedPOs ? JSON.parse(cachedPOs) : { ...emptyPurchaseOrders };
   if (!cachedPOs) localStorage.setItem(POS_STORAGE_KEY, JSON.stringify(purchaseOrders));
 
   const cachedConsumption = localStorage.getItem(CONSUMPTION_STORAGE_KEY);
-  consumptionHistory = cachedConsumption ? JSON.parse(cachedConsumption) : { ...mockConsumptionHistory };
+  consumptionHistory = cachedConsumption ? JSON.parse(cachedConsumption) : { ...emptyConsumptionHistory };
   if (!cachedConsumption) localStorage.setItem(CONSUMPTION_STORAGE_KEY, JSON.stringify(consumptionHistory));
 
   const cachedBatches = localStorage.getItem(BATCHES_STORAGE_KEY);
-  expiryBatches = cachedBatches ? JSON.parse(cachedBatches) : { ...mockExpiryBatches };
+  expiryBatches = cachedBatches ? JSON.parse(cachedBatches) : { ...emptyExpiryBatches };
   if (!cachedBatches) localStorage.setItem(BATCHES_STORAGE_KEY, JSON.stringify(expiryBatches));
 
   const cachedTransactions = localStorage.getItem(TRANSACTIONS_STORAGE_KEY);
   stockTransactions = cachedTransactions ? JSON.parse(cachedTransactions) : {};
   
-  // Merge or ensure all mock transactions from mockData are present
+  // Merge saved transactions
   let hasMergedNew = false;
-  for (const [key, value] of Object.entries(mockStockTransactions)) {
+  for (const [key, value] of Object.entries(emptyStockTransactions)) {
     if (!stockTransactions[key] || stockTransactions[key].length === 0) {
       stockTransactions[key] = value;
       hasMergedNew = true;
@@ -66,13 +65,13 @@ try {
     localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(stockTransactions));
   }
 } catch (e) {
-  ingredients = [...mockIngredients];
-  suppliers = [...mockSuppliers];
-  storeStocks = { ...mockStoreStocks };
-  purchaseOrders = { ...mockPurchaseOrders };
-  consumptionHistory = { ...mockConsumptionHistory };
-  expiryBatches = { ...mockExpiryBatches };
-  stockTransactions = { ...mockStockTransactions };
+  ingredients = [...emptyIngredients];
+  suppliers = [...emptySuppliers];
+  storeStocks = { ...emptyStoreStocks };
+  purchaseOrders = { ...emptyPurchaseOrders };
+  consumptionHistory = { ...emptyConsumptionHistory };
+  expiryBatches = { ...emptyExpiryBatches };
+  stockTransactions = { ...emptyStockTransactions };
 }
 
 const saveToStorage = () => {
@@ -345,43 +344,8 @@ export const ingredientService = {
     await new Promise((resolve) => setTimeout(resolve, 200));
     let transactionsList = stockTransactions[id];
 
-    if (!transactionsList || transactionsList.length === 0) {
-      const item = ingredients.find((i) => i._id === id) || { name: "Raw Material", ingredientCode: "ING-TEMP", idealStock: 100, reorderLevel: 20, unit: "Kg" };
-      transactionsList = [
-        {
-          date: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString(),
-          store: "Indore Central",
-          type: "Purchase",
-          reference: `PO-2026-${Math.floor(8000 + Math.random() * 2000)}`,
-          quantity: item.idealStock || 100,
-          openingStock: 0,
-          closingStock: item.idealStock || 100,
-          performedBy: "Rohan Malhotra (Store Manager)"
-        },
-        {
-          date: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString(),
-          store: "Indore Central",
-          type: "Consumption",
-          reference: `ORD-${Math.floor(90000 + Math.random() * 10000)}`,
-          quantity: -Math.max(1, Math.floor((item.reorderLevel || 15) * 0.4)),
-          openingStock: item.idealStock || 100,
-          closingStock: (item.idealStock || 100) - Math.max(1, Math.floor((item.reorderLevel || 15) * 0.4)),
-          performedBy: "Isha Sharma (Kitchen)"
-        },
-        {
-          date: new Date(Date.now() - 1 * 24 * 3600 * 1000).toISOString(),
-          store: "Indore Central",
-          type: "Adjustment",
-          reference: "ADJ-0982",
-          quantity: -Math.max(1, Math.floor((item.reorderLevel || 15) * 0.1)),
-          openingStock: (item.idealStock || 100) - Math.max(1, Math.floor((item.reorderLevel || 15) * 0.4)),
-          closingStock: (item.idealStock || 100) - Math.max(1, Math.floor((item.reorderLevel || 15) * 0.4)) - Math.max(1, Math.floor((item.reorderLevel || 15) * 0.1)),
-          performedBy: "Rohan Malhotra (Store Manager)"
-        }
-      ];
-      stockTransactions[id] = transactionsList;
-      saveToStorage();
-    }
+    // no history is invented for an ingredient that has none
+    if (!transactionsList) transactionsList = [];
 
     const { type = "all", store = "all", startDate = "", endDate = "" } = filters;
     let filtered = [...transactionsList];

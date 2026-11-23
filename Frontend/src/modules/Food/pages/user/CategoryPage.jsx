@@ -32,7 +32,7 @@ const filterOptions = [
   { id: 'rating-4-plus', label: 'Rating 4.0+' },
 ]
 
-// Mock data removed - using backend data only
+// data removed - using backend data only
 
 const CATEGORY_PAGE_FILTERS_STORAGE_KEY = "food-category-page-filters-v1"
 
@@ -821,7 +821,7 @@ export default function CategoryPage() {
         if (response.data && response.data.success && response.data.data && response.data.data.restaurants) {
           const restaurantsArray = response.data.data.restaurants
 
-          // Helper function to check if value is a default/mock value
+          // Helper function to check if value is a default/value
           const isDefaultValue = (value, fieldName) => {
             if (!value) return false
 

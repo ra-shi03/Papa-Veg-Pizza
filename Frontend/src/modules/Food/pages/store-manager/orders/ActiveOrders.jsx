@@ -228,7 +228,7 @@ export default function ActiveOrders() {
     (o) => o.expectedReadyAt && new Date(o.expectedReadyAt) < currentTime && !o.isPaused
   ).length;
 
-  const averagePrepTimeText = "22 Mins"; // Mock static value or computed
+  const averagePrepTimeText = "—"; // no prep-time average is computed yet
 
   // Modal Open Handlers
   const openModal = (modalName, order) => {

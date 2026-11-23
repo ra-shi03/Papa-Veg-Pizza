@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { X, UserCheck, Loader2 } from 'lucide-react';
-import { assignDispute, mockSupportAgents } from '../DisputesData';
+import { assignDispute, supportAgents } from '../DisputesData';
 import { toast } from 'sonner';
 
 export default function AssignDisputeModal({ isOpen, onClose, dispute, onSuccess }) {
   const [isVisible, setIsVisible] = useState(false);
   const [isRendered, setIsRendered] = useState(isOpen);
-  const [agentId, setAgentId] = useState(mockSupportAgents[0]._id);
+  const [agentId, setAgentId] = useState(supportAgents[0]?._id || "");
   const [priority, setPriority] = useState('Medium');
   const [deadline, setDeadline] = useState('');
   const [notes, setNotes] = useState('');
@@ -16,7 +16,7 @@ export default function AssignDisputeModal({ isOpen, onClose, dispute, onSuccess
     if (isOpen) {
       setIsRendered(true);
       setTimeout(() => setIsVisible(true), 10);
-      setAgentId(mockSupportAgents[0]._id);
+      setAgentId(supportAgents[0]?._id || "");
       setPriority(dispute?.priority || 'Medium');
       
       // Default deadline to 4 hours from now
@@ -95,7 +95,7 @@ export default function AssignDisputeModal({ isOpen, onClose, dispute, onSuccess
                 onChange={(e) => setAgentId(e.target.value)}
                 className="w-full h-9 px-3 bg-white dark:bg-zinc-950 border border-zinc-250 dark:border-zinc-800 rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-[var(--primary)] text-zinc-850 dark:text-zinc-100"
               >
-                {mockSupportAgents.map(agent => (
+                {supportAgents.map(agent => (
                   <option key={agent._id} value={agent._id}>
                     {agent.name} ({agent.role})
                   </option>

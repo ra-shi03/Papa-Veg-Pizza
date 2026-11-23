@@ -8,13 +8,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-// Mock collections and APIs
+// collections and APIs
 import { 
   getKpiData, 
   getLiveOrders, 
-  mockFranchises, 
-  mockStores,
-  mockDeliveryPartners,
+  franchiseOptions, 
+  storeOptions,
+  riderOptions,
   useDebounce 
 } from './AllOrdersData';
 
@@ -104,14 +104,16 @@ export default function OrderTracking() {
     setKpisLoading(true);
     try {
       const data = await getKpiData();
-      // Calculate live preparation & delivery breakdown
+      // Live breakdown counted from the real orders in progress
+      const live = (await getLiveOrders({}, 1, 1000)).orders || [];
+      const count = (s) => live.filter((o) => o.orderStatus === s).length;
       setLiveKpis({
-        activeCount: data.pendingOrders, // Orders not completed/cancelled
-        preparingCount: 2, // Mock preparing + baking
-        packedCount: 1, // Mock packed count
-        assignedCount: 1, // Mock assigned count
-        transitCount: 1, // Mock out for delivery count
-        delayedCount: 1  // Mock delayed order (ord-1001)
+        activeCount: data.pendingOrders,
+        preparingCount: count('Preparing') + count('Confirmed'),
+        packedCount: count('Packed'),
+        assignedCount: count('Assigned'),
+        transitCount: count('Out For Delivery'),
+        delayedCount: 0 // no delay data on orders yet
       });
     } catch (err) {
       toast.error('Failed to load live tracking statistics');
@@ -356,7 +358,7 @@ export default function OrderTracking() {
                 className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg h-9 px-2.5 text-xs text-zinc-800 dark:text-zinc-200 focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none font-bold"
               >
                 <option value="All">All Franchises</option>
-                {mockFranchises.map(f => (
+                {franchiseOptions.map(f => (
                   <option key={f._id} value={f._id}>{f.name}</option>
                 ))}
               </select>
@@ -374,7 +376,7 @@ export default function OrderTracking() {
                 className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg h-9 px-2.5 text-xs text-zinc-800 dark:text-zinc-200 focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none font-bold"
               >
                 <option value="All">All Stores</option>
-                {mockStores
+                {storeOptions
                   .filter(s => filters.franchise === 'All' || s.franchiseId === filters.franchise)
                   .map(s => (
                     <option key={s._id} value={s._id}>{s.name}</option>
@@ -395,7 +397,7 @@ export default function OrderTracking() {
                 className="w-full bg-zinc-50 dark:bg-zinc-955 border border-zinc-200 dark:border-zinc-800 rounded-lg h-9 px-2.5 text-xs text-zinc-800 dark:text-zinc-200 focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none font-bold"
               >
                 <option value="All">All Riders</option>
-                {mockDeliveryPartners.map(r => (
+                {riderOptions.map(r => (
                   <option key={r._id} value={r._id}>{r.name}</option>
                 ))}
               </select>

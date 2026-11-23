@@ -9,7 +9,7 @@ import { connectRedis, closeRedis } from './src/config/redis.js';
 import { initSocket } from './src/config/socket.js';
 import { startOrderEventStream, stopOrderEventStream } from './src/modules/food/orders/services/order-events.service.js';
 import { initializeQueues, closeBullMQConnection } from './src/queues/index.js';
-import { expireExpiredOffers } from './src/modules/food/admin/services/admin.service.js';
+import mongoose from 'mongoose';
 import { dispatchDueScheduledOrders } from './src/modules/food/orders/services/order-dispatch.service.js';
 
 import { logger } from './src/utils/logger.js';
@@ -121,16 +121,16 @@ const startServer = async () => {
         };
         startListening();
 
-        const runExpire = async () => {
+        // Keep the MongoDB connection warm: a tiny ping every 3 minutes prevents NAT idle timeouts. (This timer used to
+        // expire the retired FoodOffer records; coupons now come only from Marketing > Coupons, which need no job.)
+        const keepDbAlive = async () => {
             try {
-                await expireExpiredOffers();
+                await mongoose.connection.db?.admin().ping();
             } catch (err) {
-                logger.error(`Expire offers error: ${err.message}`);
+                logger.error(`MongoDB keep-alive ping error: ${err.message}`);
             }
         };
-        runExpire();
-        // Run every 3 minutes (180,000 ms) instead of 5 to prevent MongoDB NAT idle timeouts
-        expireOffersInterval = setInterval(runExpire, 3 * 60 * 1000);
+        expireOffersInterval = setInterval(keepDbAlive, 3 * 60 * 1000);
 
         // Scheduled orders: start looking for a rider when the slot is near (once a minute)
         const runScheduledDispatch = async () => {

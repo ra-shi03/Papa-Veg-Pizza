@@ -78,7 +78,7 @@ export function FulfillRequestModal({ isOpen, onClose, requestId }) {
         requestId,
         deliveredQty: qty,
         remarks: remarks.trim(),
-        fulfilledBy: localStorage.getItem("store_user_name") || "Shubham Jamliya"
+        fulfilledBy: localStorage.getItem("store_user_name") || "—"
       },
       {
         onSuccess: () => {

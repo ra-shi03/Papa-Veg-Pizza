@@ -1,5 +1,5 @@
 // The super admin's order screens on real data: GET /food/admin/orders (list) and /food/admin/orders/:id (one order),
-// shaped into the rows and detail the screens were built for. Sample data only runs with VITE_STANDALONE_MOCK=true.
+
 import { adminAPI } from "@food/api"
 
 const STATUS = {
@@ -180,4 +180,47 @@ export async function fetchFilterOptions() {
     franchises: lk.franchiseList.map((f) => ({ _id: String(f._id), name: f.name, city: f.city || "" })),
     stores: lk.storeList.map((s) => ({ _id: String(s._id), name: s.storeName, franchiseId: String(s.franchiseId || "") })),
   }
+}
+
+/** Orders still in progress (not delivered, not cancelled), for the live tracking screen. */
+export async function fetchLiveOrders(filters = {}, page = 1, limit = 5, sortBy = "createdAt", sortOrder = "desc") {
+  const all = await fetchAdminOrders({ ...filters, orderStatus: "All" }, 1, 1000, sortBy, sortOrder)
+  let list = all.orders.filter((o) => o.orderStatus !== "Delivered" && o.orderStatus !== "Cancelled")
+  if (filters.orderStatus && filters.orderStatus !== "All") list = list.filter((o) => o.orderStatus === filters.orderStatus)
+  if (filters.rider && filters.rider !== "All") list = list.filter((o) => o.deliveryPartnerId === filters.rider)
+  list = list.map((o) => ({ ...o, delayMinutes: 0, delayText: "", gps: {}, expectedDeliveryTime: o.eta }))
+  const start = (page - 1) * limit
+  return { orders: list.slice(start, start + limit), total: list.length, page, pages: Math.ceil(list.length / limit) }
+}
+
+/** One live order with its rider's last known position (no position is invented). */
+export async function fetchLiveTracking(orderId) {
+  const o = await fetchAdminOrder(orderId)
+  const p = o.deliveryPartner || {}
+  return {
+    orderId: o._id, orderNumber: o.orderNumber, orderStatus: o.orderStatus, createdAt: o.createdAt,
+    expectedDeliveryTime: o.eta, delayMinutes: 0, grandTotal: o.grandTotal, paymentMethod: o.paymentMethod, orderType: o.orderType,
+    customer: o.customer, store: o.store, franchise: { name: o.franchise.name },
+    rider: p.name ? { _id: p._id, name: p.name, phone: p.phone, vehicleNumber: p.vehicleNumber || "", lat: p.currentLat, lng: p.currentLng, status: o.orderStatus } : null,
+  }
+}
+
+/** The order's real status history as timeline events. */
+export async function fetchOrderEvents(orderId) {
+  const logs = await fetchAdminOrderLogs(orderId)
+  return logs.map((l) => ({ id: l._id, event: l.status, time: l.createdAt ? new Date(l.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "", user: l.updatedBy, role: l.role }))
+}
+
+export async function fetchRiderDetails(riderId) {
+  const res = await adminAPI.getDeliveryPartnerById(riderId)
+  const d = res?.data?.data?.delivery
+  if (!d) throw new Error("Rider not found")
+  return { _id: d._id, name: d.name || "", phone: d.phone || "", vehicleNumber: d.vehicleNumber || "", status: d.availabilityStatus || "offline", averageRating: d.rating || 0, avatar: d.profilePhoto || "", lat: d.lastLat, lng: d.lastLng }
+}
+
+export async function fetchCustomerDetails(customerId) {
+  const res = await adminAPI.getCustomerById(customerId)
+  const c = res?.data?.data?.customer || res?.data?.data || {}
+  if (!c || !(c._id || c.id)) throw new Error("Customer not found")
+  return { _id: c._id || c.id, name: c.name || "", phone: c.phone || "", address: c.address || "", recentOrders: [], lifetimeOrders: c.totalOrders || 0, lifetimeSpend: c.totalSpent || 0, notes: "" }
 }

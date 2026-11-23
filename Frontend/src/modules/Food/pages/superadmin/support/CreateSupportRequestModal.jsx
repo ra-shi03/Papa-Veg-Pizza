@@ -25,29 +25,8 @@ export default function CreateSupportRequestModal({ isOpen, onClose, onCreateSuc
 
   if (!isOpen) return null;
 
-  // Mock Database for Requesters
-  const requesters = {
-    "Admin": [
-      { id: "req_1", name: "Neha Singh", phone: "+91 94012 34567", email: "neha.singh@papaveg.com", store: "All Nodes", franchise: "Global Corporate", employeeId: "EMP-ADM-02" },
-      { id: "req_2", name: "Gaurav Joshi", phone: "+91 82230 45678", email: "gaurav.j@papaveg.com", store: "All Nodes", franchise: "Global Corporate", employeeId: "EMP-ADM-09" }
-    ],
-    "Store Manager": [
-      { id: "req_3", name: "Amit Sharma", phone: "+91 94072 88402", email: "amit.sharma@papaveg.com", store: "Indore Vijay Nagar", franchise: "Indore Group", employeeId: "EMP-MGR-82" },
-      { id: "req_4", name: "Ramesh Kumar", phone: "+91 75529 11029", email: "ramesh.k@papaveg.com", store: "Bhopal MP Nagar", franchise: "Bhopal Foods", employeeId: "EMP-MGR-34" }
-    ],
-    "Kitchen Staff": [
-      { id: "req_5", name: "Vikram Singh", phone: "+91 91029 44859", email: "vikram.s@papaveg.com", store: "Indore Vijay Nagar", franchise: "Indore Group", employeeId: "EMP-KIT-102" },
-      { id: "req_6", name: "Karan Johar", phone: "+91 88770 11223", email: "karan.j@papaveg.com", store: "Bhopal MP Nagar", franchise: "Bhopal Foods", employeeId: "EMP-KIT-94" }
-    ],
-    "Delivery Partner": [
-      { id: "req_7", name: "Rahul Dev", phone: "+91 98930 22114", email: "rahul.rider@gmail.com", store: "Bhopal MP Nagar", franchise: "Bhopal Foods", employeeId: "EMP-RDR-442" },
-      { id: "req_8", name: "Karan Singh", phone: "+91 90390 12903", email: "karan.rider@gmail.com", store: "Indore Vijay Nagar", franchise: "Indore Group", employeeId: "EMP-RDR-201" }
-    ],
-    "System": [
-      { id: "req_9", name: "Automated Job Server", phone: "-", email: "cron-agent@papaveg.com", store: "Infrastructure Cloud", franchise: "System Admin", employeeId: "SYS-CRON-01" },
-      { id: "req_10", name: "API Monitoring Agent", phone: "-", email: "monitor-agent@papaveg.com", store: "API Cloud Gateway", franchise: "System Admin", employeeId: "SYS-MON-02" }
-    ]
-  };
+  // Database for Requesters
+  const requesters = {};
 
   const handleRoleChange = (e) => {
     const role = e.target.value;
@@ -132,41 +111,8 @@ export default function CreateSupportRequestModal({ isOpen, onClose, onCreateSuc
     }
 
     setLoading(true);
-    // Simulate POST /api/support-requests
-    setTimeout(() => {
-      setLoading(false);
-      const chosenList = requesters[selectedRole] || [];
-      const chosenReq = chosenList.find(r => r.id === selectedRequesterId);
-
-      const mockNewRequest = {
-        _id: `sr_${Math.floor(1000 + Math.random() * 9000)}`,
-        requestNumber: `SRQ-${Math.floor(10000 + Math.random() * 90000)}`,
-        requesterId: selectedRequesterId,
-        requesterName: chosenReq.name,
-        requesterRole: selectedRole,
-        employeeId: autoFields.employeeId,
-        phone: autoFields.phone,
-        email: autoFields.email,
-        store: autoFields.store,
-        franchise: autoFields.franchise,
-        category,
-        subcategory,
-        subject,
-        description,
-        priority,
-        status: 'Open',
-        assignedTo: 'Unassigned',
-        attachments: attachments.map(a => a.name),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      toast.success(`Support Request ${mockNewRequest.requestNumber} logged successfully`);
-      if (onCreateSuccess) {
-        onCreateSuccess(mockNewRequest);
-      }
-      onClose();
-    }, 1200);
+    setLoading(false);
+    toast.info("Logging a support request is not available yet.");
   };
 
   const subcategoriesList = categorySubcategories[category] || [];

@@ -110,7 +110,7 @@ export default function NotificationsTab({ initialNotifications = {} }) {
       title: "Notification Channels",
       description: "Preferred delivery methods for critical alerts.",
       items: [
-        { key: "smsAlerts", label: "Direct SMS Alerts", sub: "Send text alerts to +91 98765 43210 for emergency incidents" },
+        { key: "smsAlerts", label: "Direct SMS Alerts", sub: "Send text alerts to your registered mobile number for emergency incidents" },
         { key: "pushNotifications", label: "In-Browser Push Notifications", sub: "Popup warnings in the admin operations dashboard" },
       ],
     },

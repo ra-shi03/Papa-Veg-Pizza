@@ -1,6 +1,6 @@
 import React from "react"
 import { Calendar as CalendarIcon, CheckCircle2, Clock, CalendarDays, AlertTriangle, X } from "lucide-react"
-import { getManagerAttendance } from "../mockManagersData"
+import { getManagerAttendance } from "../staffDetailPlaceholders"
 
 export default function AttendanceModal({ isOpen, onClose, manager }) {
   if (!isOpen || !manager) return null

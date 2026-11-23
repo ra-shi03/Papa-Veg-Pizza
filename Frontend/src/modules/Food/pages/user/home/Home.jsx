@@ -22,6 +22,7 @@ import RewardsWalletLoading from "@food/components/user/RewardsWalletLoading"
 import PreviousRewardsView from "../rewards/PreviousRewardsView"
 import { ChevronsUp, ChevronRight, ShoppingCart, X } from "lucide-react"
 import apiClient from "@/services/api/axios"
+import { couponStoreParams } from "@food/utils/savedLocation"
 import { userAPI } from "@food/api"
 import { applySystemTheme } from "@/shared/utils/themeSync"
 import { useAppConfig } from "@food/context/AppConfigContext"
@@ -497,7 +498,7 @@ export default function Home() {
         return;
       }
       try {
-        const res = await apiClient.get('/settings/coupons/public');
+        const res = await apiClient.get('/settings/coupons/public', { params: couponStoreParams() });
         const list = res?.data?.data || res?.data;
         if (Array.isArray(list) && list.length > 0) {
           setCoupons(list);
@@ -640,16 +641,17 @@ export default function Home() {
   }
 
   const handleOpenCouponModal = (c) => {
-    const code = c.code || c.couponCode || "PVPDEAL";
+    // Only what the coupon says: no invented code, cap or end time.
+    const code = c.code || c.couponCode || "";
     const minOrder = c.minimumOrderAmount || c.minOrderValue || 0;
-    const maxDiscount = c.maximumDiscount || c.maxDiscount || c.value || c.discountValue || 80;
-    const val = c.value || c.discountValue || 80;
+    const val = Number(c.value || c.discountValue || 0);
     const isPercentage = c.couponType === "Percentage" || c.discountType === "percentage";
-    const discountText = isPercentage ? `${val}% (up to ₹${maxDiscount})` : `₹${val}`;
+    const maxDiscount = Number(c.maximumDiscount || c.maxDiscount || 0) || (isPercentage ? 0 : val);
+    const discountText = isPercentage ? (maxDiscount ? `${val}% (up to ₹${maxDiscount})` : `${val}%`) : `₹${val}`;
 
     setSelectedCouponDetails({
-      title: c.title || (isPercentage ? `Get up to ₹${maxDiscount} Off` : `Flat ₹${val} Off`),
-      subtitle: c.description || `Up to ₹${maxDiscount} Off on orders worth ₹${minOrder} or more`,
+      title: c.title || (isPercentage ? (maxDiscount ? `Get up to ₹${maxDiscount} Off` : `Get ${val}% Off`) : `Flat ₹${val} Off`),
+      subtitle: c.description || (minOrder > 0 ? `${discountText} off on orders worth ₹${minOrder} or more` : `${discountText} off`),
       couponCode: code,
       code: code,
       minOrderValue: minOrder,
@@ -657,8 +659,8 @@ export default function Home() {
       discountText: discountText,
       value: val,
       isPercentage: isPercentage,
-      validTill: c.endDate ? new Date(c.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : "Today 11:00 PM",
-      isFirstOrderOnly: Boolean(c.isFirstOrderOnly || (Array.isArray(c.customerSegments) && c.customerSegments.includes('New Customers'))),
+      validTill: c.endDate ? new Date(c.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : "",
+      isFirstOrderOnly: c.customerScope === 'first-time' || Boolean(c.isFirstOrderOnly),
       rawCoupon: c,
       actionType: 'apply_coupon',
       actionValue: code
@@ -1182,10 +1184,12 @@ export default function Home() {
               >
                 {coupons.map((c) => {
                   const minOrder = c.minimumOrderAmount || c.minOrderValue || 0;
-                  const maxDiscount = c.maximumDiscount || c.maxDiscount || c.value || c.discountValue || 80;
+                  const val = Number(c.value || c.discountValue || 0);
                   const isPercentage = c.couponType === 'Percentage' || c.discountType === 'percentage';
-                  const titleText = c.title || (isPercentage ? `Get up to ₹${maxDiscount} Off` : `Flat ₹${c.value || c.discountValue || maxDiscount} Off`);
-                  const subText = c.description || `Up to ₹${maxDiscount} Off on orders worth ₹${minOrder} or more`;
+                  const maxDiscount = Number(c.maximumDiscount || c.maxDiscount || 0) || (isPercentage ? 0 : val);
+                  const saving = isPercentage ? (maxDiscount ? `Up to ₹${maxDiscount} Off` : `${val}% Off`) : `Flat ₹${val} Off`;
+                  const titleText = c.title || (isPercentage && maxDiscount ? `Get up to ₹${maxDiscount} Off` : saving);
+                  const subText = c.description || (minOrder > 0 ? `${saving} on orders worth ₹${minOrder} or more` : saving);
 
                   return (
                     <div
@@ -1402,12 +1406,12 @@ export default function Home() {
                 code: code,
                 couponCode: code,
                 title: offer.title,
-                value: offer.value || offer.maxDiscount || 80,
-                discountValue: offer.value || offer.maxDiscount || 80,
+                value: offer.value || 0,
+                discountValue: offer.value || 0,
                 discountType: offer.isPercentage ? 'percentage' : 'flat-price',
                 minOrder: offer.minOrderValue || 0,
                 minimumOrderAmount: offer.minOrderValue || 0,
-                maxDiscount: offer.maxDiscount || 80
+                maxDiscount: offer.maxDiscount || null
               };
               localStorage.setItem("pvp_applied_coupon", JSON.stringify(couponObj));
               localStorage.setItem("cart_applied_coupon", JSON.stringify(couponObj));

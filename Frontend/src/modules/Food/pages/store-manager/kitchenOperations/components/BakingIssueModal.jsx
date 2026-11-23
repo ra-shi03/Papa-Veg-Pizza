@@ -33,7 +33,7 @@ export default function BakingIssueModal({ visible, onClose, item, onSubmit }) {
       issueType,
       severity,
       remarks,
-      image: fileList.length > 0 ? "mock_photo_url.webp" : "",
+      image: "", // photo upload is not wired yet: never send a made-up file name
       notifyManager,
     });
     

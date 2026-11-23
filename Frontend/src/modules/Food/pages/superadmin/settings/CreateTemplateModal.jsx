@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, ShieldAlert, Sparkles, Mail, MessageSquare, Bell, Phone, Eye, ArrowRight, Loader2, Check } from 'lucide-react';
 
-const MOCK_VARIABLES = [
-  { name: '{{customerName}}', sample: 'Shubham Jamliya' },
-  { name: '{{orderId}}', sample: 'ord_PVP_8820' },
-  { name: '{{amount}}', sample: '₹450.00' },
-  { name: '{{otpCode}}', sample: '883012' },
-  { name: '{{eta}}', sample: '25 minutes' }
+// Variables a template can use (the preview shows them empty; real values are filled when a message is sent)
+const TEMPLATE_VARIABLES = [
+  { name: '{{customerName}}', sample: '' },
+  { name: '{{orderId}}', sample: '' },
+  { name: '{{amount}}', sample: '' },
+  { name: '{{otpCode}}', sample: '' },
+  { name: '{{eta}}', sample: '' }
 ];
 
 export default function CreateTemplateModal({ isOpen, onClose, onSave }) {
@@ -98,10 +99,10 @@ export default function CreateTemplateModal({ isOpen, onClose, onSave }) {
     }
   };
 
-  // Render Live Preview text replacing variables with mock sample values
+  // Render Live Preview text replacing variables with sample values
   const getRenderedPreview = () => {
     let preview = formData.body || 'Type template body to see real-time preview...';
-    MOCK_VARIABLES.forEach(v => {
+    TEMPLATE_VARIABLES.forEach(v => {
       preview = preview.replaceAll(v.name, v.sample);
     });
     return preview;
@@ -216,7 +217,7 @@ export default function CreateTemplateModal({ isOpen, onClose, onSave }) {
                 Click tags to insert into template body
               </label>
               <div className="flex flex-wrap gap-1.5">
-                {MOCK_VARIABLES.map(v => (
+                {TEMPLATE_VARIABLES.map(v => (
                   <button 
                     key={v.name}
                     type="button"
@@ -279,10 +280,10 @@ export default function CreateTemplateModal({ isOpen, onClose, onSave }) {
                     <div className="border-b border-zinc-100 dark:border-zinc-800 pb-2 text-[10.5px] font-bold text-zinc-700 dark:text-zinc-300 space-y-1">
                       <div><span className="opacity-75 font-semibold">Subject:</span> <span className="text-black dark:text-zinc-50 font-black">{formData.subject.replaceAll('{{orderId}}', 'ord_PVP_8820')}</span></div>
                       <div><span className="opacity-75 font-semibold">From:</span> info@papavegpizza.in</div>
-                      <div><span className="opacity-75 font-semibold">To:</span> customer@example.com</div>
+                      <div><span className="opacity-75 font-semibold">To:</span> the customer</div>
                     </div>
                     
-                    {/* Rendered HTML mock box */}
+                    {/* Rendered HTML box */}
                     <div className="flex-1 py-4 text-xs font-semibold text-zinc-800 dark:text-zinc-100 leading-relaxed whitespace-pre-wrap">
                       {getRenderedPreview()}
                     </div>

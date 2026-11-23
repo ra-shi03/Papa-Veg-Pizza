@@ -87,7 +87,7 @@ export default function StoreApprovals() {
     return () => clearTimeout(handler)
   }, [searchVal])
 
-  // 2. Fetch KPIs from mock server
+  // 2. Fetch KPIs from server
   const fetchKPIs = useCallback(async () => {
     try {
       setLoadingKpis(true)
@@ -100,7 +100,7 @@ export default function StoreApprovals() {
     }
   }, [])
 
-  // 3. Fetch Approvals from mock server
+  // 3. Fetch Approvals from server
   const fetchApprovals = useCallback(async () => {
     try {
       setLoading(true)
@@ -136,7 +136,7 @@ export default function StoreApprovals() {
     fetchKPIs()
   }, [fetchKPIs])
 
-  // Removed WebSocket Live simulation that was mocking fake metrics
+  // Live figures come from the server only
 
   // Reset Filters handler
   const handleResetFilters = () => {

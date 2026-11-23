@@ -136,7 +136,7 @@ export default function AddFranchiseStores({ isOpen, onClose, store, onSave }) {
   };
 
   const handleMapPickerClick = () => {
-    // Mock location updates
+    // location updates
     const randomLat = (22.7 + Math.random() * 0.1).toFixed(4);
     const randomLng = (75.8 + Math.random() * 0.1).toFixed(4);
     setLatitude(randomLat);
@@ -243,10 +243,6 @@ export default function AddFranchiseStores({ isOpen, onClose, store, onSave }) {
                     className="w-full h-8.5 px-3 text-xs border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg focus:ring-1 focus:ring-red-500/20 focus:border-red-650 outline-none text-black dark:text-white cursor-pointer"
                   >
                     <option value="">Select Store Manager...</option>
-                    <option value="Rahul Sharma">Rahul Sharma</option>
-                    <option value="Priya Mehra">Priya Mehra</option>
-                    <option value="Vikram Singh">Vikram Singh</option>
-                    <option value="Aniket Deshpande">Aniket Deshpande</option>
                   </select>
                 </div>
               </div>
@@ -344,10 +340,6 @@ export default function AddFranchiseStores({ isOpen, onClose, store, onSave }) {
                     className="w-full h-8.5 px-3 text-xs border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg text-black dark:text-white outline-none"
                   >
                     <option value="">Select Territory...</option>
-                    <option value="Bholaram Ustad Marg">Bholaram Ustad Marg</option>
-                    <option value="Connaught Place">Connaught Place</option>
-                    <option value="Bandra West">Bandra West</option>
-                    <option value="Indiranagar">Indiranagar</option>
                   </select>
                 </div>
               </div>

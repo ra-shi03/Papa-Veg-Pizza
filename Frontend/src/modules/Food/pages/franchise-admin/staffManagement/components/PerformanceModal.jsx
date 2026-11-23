@@ -12,7 +12,7 @@ import {
   LineChart,
   Line
 } from "recharts"
-import { getManagerPerformance } from "../mockManagersData"
+import { getManagerPerformance } from "../staffDetailPlaceholders"
 
 export default function PerformanceModal({ isOpen, onClose, manager }) {
   const [timeframe, setTimeframe] = useState("daily") // daily | weekly | monthly

@@ -35,9 +35,9 @@ export default function SendTestNotificationModal({ isOpen, onClose, templates =
         setChannel(t.type);
         setSubject(t.subject || '');
         
-        // Mock interpolation
+        // interpolation
         let replacedBody = t.body || '';
-        replacedBody = replacedBody.replaceAll('{{customerName}}', 'Shubham Jamliya');
+        replacedBody = replacedBody.replaceAll('{{customerName}}', '');
         replacedBody = replacedBody.replaceAll('{{orderId}}', 'ord_PVP_29108');
         replacedBody = replacedBody.replaceAll('{{amount}}', '₹450.00');
         replacedBody = replacedBody.replaceAll('{{otpCode}}', '883012');
@@ -266,7 +266,7 @@ export default function SendTestNotificationModal({ isOpen, onClose, templates =
                   <div className="space-y-2 text-xs">
                     <div className="border-b border-zinc-100 dark:border-zinc-855 pb-1 text-[10px] text-zinc-750 dark:text-zinc-300">
                       <div>Subject: <strong className="text-black dark:text-zinc-50 font-black">{subject || '(No Subject)'}</strong></div>
-                      <div>To: <span className="font-mono">{recipient || 'recipient@example.com'}</span></div>
+                      <div>To: <span className="font-mono">{recipient || '—'}</span></div>
                     </div>
                     <div className="py-2 leading-relaxed text-zinc-800 dark:text-zinc-100 whitespace-pre-wrap">
                       {message || 'Type alert message body to see preview...'}

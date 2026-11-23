@@ -1,8 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
-import { INV, failOrMock } from "./inventoryApi";
-import { getLocalShortages, setLocalShortages, mockShortageTimeline } from "../mockData";
+import { INV, throwApiError } from "./inventoryApi";
 
 export function useResolveShortage() {
   const queryClient = useQueryClient();
@@ -27,47 +26,8 @@ export function useResolveShortage() {
         }
         throw new Error(response.data?.message || "Failed to resolve shortage");
       } catch (err) {
-        failOrMock(err);
-        console.warn("Backend API unavailable. Resolving shortage in local database.");
-
-        // Simulate network delay
-        await new Promise((resolve) => setTimeout(resolve, 300));
-
-        const shortages = getLocalShortages();
-        const index = shortages.findIndex((s) => s._id === shortageId);
-
-        if (index === -1) {
-          throw new Error("Shortage record not found");
-        }
-
-        const currentUser = localStorage.getItem("store_user_name") || "Shubham Jamliya";
-
-        shortages[index] = {
-          ...shortages[index],
-          status: "resolved",
-          actionTaken,
-          resolvedBy: currentUser,
-          resolvedAt: new Date().toISOString(),
-          resolutionNote: notes
-        };
-
-        setLocalShortages(shortages);
-
-        // Update timeline
-        if (!mockShortageTimeline[shortageId]) {
-          mockShortageTimeline[shortageId] = [];
-        }
-        mockShortageTimeline[shortageId].push({
-          user: currentUser,
-          action: "resolved",
-          remarks: notes || `Resolved shortage: ${actionTaken}`,
-          createdAt: new Date().toISOString()
-        });
-
-        return {
-          success: true,
-          message: "Shortage marked as resolved successfully"
-        };
+        throwApiError(err);
+        
       }
     },
     onSuccess: (data) => {

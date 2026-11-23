@@ -75,7 +75,7 @@ export const useDeliveryStore = create(
     }),
     {
       name: 'delivery-v2-online-pref',
-      // ONLY persist the 'isOnline' state, ignoring orders/location to prevent dummy order bugs
+      // ONLY persist the 'isOnline' state, ignoring orders/location to prevent order bugs
       partialize: (state) => ({ isOnline: state.isOnline }),
     }
   )

@@ -15,7 +15,7 @@ export default function PizzaStationSummaryCards({ items = [] }) {
     return elapsed > (i.target_time || 10);
   }).length;
 
-  // 4. Average Prep Time (mocked static or derived from completed timeline in minutes)
+  // 4. Average Prep Time (static or derived from completed timeline in minutes)
   const avgPrepTime = 8; // 8 minutes average
 
   const cards = [

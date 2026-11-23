@@ -41,58 +41,14 @@ export default function ViewComplaintModal({ isOpen, onClose, complaint, onUpdat
     }
   }, [activeTab, chatMessages]);
 
-  // Load static or dynamic mock data upon complaint changes
+  // Load static or dynamic data upon complaint changes
   useEffect(() => {
     if (complaint) {
       // 1. Load support messages
-      setChatMessages([
-        {
-          _id: "m1",
-          senderRole: "Customer",
-          senderName: complaint.customerName || "Rohan Malhotra",
-          message: "I ordered a Farmhouse Veg Pizza, but received a cold Margherita instead. The box was also squashed. Please process a refund.",
-          createdAt: new Date(new Date(complaint.createdAt).getTime() + 120000).toISOString(),
-          attachments: ["damaged_box.png"]
-        },
-        {
-          _id: "m2",
-          senderRole: "Delivery Partner",
-          senderName: complaint.deliveryPartner || "Karan Singh",
-          message: "The store handed over the order 15 mins late. The rain caused the delivery box cover to become wet, but I did not damage the container.",
-          createdAt: new Date(new Date(complaint.createdAt).getTime() + 450000).toISOString()
-        },
-        {
-          _id: "m3",
-          senderRole: "Store Manager",
-          senderName: "Amit Sharma",
-          message: "We prepared the pizza on time. The rider kept it waiting on his bike. The toppings were correct as per the slip #PV-9042.",
-          createdAt: new Date(new Date(complaint.createdAt).getTime() + 900000).toISOString()
-        }
-      ]);
+      setChatMessages([]);
 
       // 2. Load audit logs
-      setAuditLogs([
-        {
-          _id: "l1",
-          action: "Complaint Ticket Created",
-          performedBy: "System Portal",
-          role: "System API",
-          oldValue: "-",
-          newValue: "Status: Open",
-          ipAddress: "192.168.1.14",
-          createdAt: complaint.createdAt
-        },
-        {
-          _id: "l2",
-          action: "Assigned Representative",
-          performedBy: "Neha Singh",
-          role: "Super Admin",
-          oldValue: "Unassigned",
-          newValue: `Assigned: ${complaint.assignedTo || 'Amit Sharma'}`,
-          ipAddress: "103.45.221.84",
-          createdAt: new Date(new Date(complaint.createdAt).getTime() + 300000).toISOString()
-        }
-      ]);
+      setAuditLogs([]);
     }
   }, [complaint]);
 
@@ -112,7 +68,7 @@ export default function ViewComplaintModal({ isOpen, onClose, complaint, onUpdat
     const newMsg = {
       _id: Date.now().toString(),
       senderRole: "Super Admin",
-      senderName: "Neha Singh (You)",
+      senderName: "You",
       message: newMessage,
       createdAt: new Date().toISOString()
     };
@@ -124,11 +80,11 @@ export default function ViewComplaintModal({ isOpen, onClose, complaint, onUpdat
     const newLog = {
       _id: Date.now().toString(),
       action: "Support Reply Sent",
-      performedBy: "Neha Singh",
+      performedBy: "You",
       role: "Super Admin",
       oldValue: "-",
       newValue: `Message: "${newMsg.message.substring(0, 30)}..."`,
-      ipAddress: "103.45.221.84",
+      ipAddress: "",
       createdAt: new Date().toISOString()
     };
     setAuditLogs(prev => [newLog, ...prev]);
@@ -148,11 +104,11 @@ export default function ViewComplaintModal({ isOpen, onClose, complaint, onUpdat
     const log = {
       _id: Date.now().toString(),
       action: "Reassigned Agent & Priority",
-      performedBy: "Neha Singh",
+      performedBy: "You",
       role: "Super Admin",
       oldValue: `Agent: ${complaint.assignedTo}, Priority: ${complaint.priority}`,
       newValue: `Agent: ${agent}, Priority: ${priority}, Status: In Progress`,
-      ipAddress: "103.45.221.84",
+      ipAddress: "",
       createdAt: new Date().toISOString()
     };
     setAuditLogs(prev => [log, ...prev]);
@@ -170,11 +126,11 @@ export default function ViewComplaintModal({ isOpen, onClose, complaint, onUpdat
     const log = {
       _id: Date.now().toString(),
       action: "Escalated Ticket Level",
-      performedBy: "Neha Singh",
+      performedBy: "You",
       role: "Super Admin",
       oldValue: `Status: ${complaint.status}`,
       newValue: `Status: Escalated, Dept: ${department}, Level: ${level}`,
-      ipAddress: "103.45.221.84",
+      ipAddress: "",
       createdAt: new Date().toISOString()
     };
     setAuditLogs(prev => [log, ...prev]);
@@ -192,11 +148,11 @@ export default function ViewComplaintModal({ isOpen, onClose, complaint, onUpdat
     const log = {
       _id: Date.now().toString(),
       action: "Issued Customer Refund",
-      performedBy: "Neha Singh",
+      performedBy: "You",
       role: "Super Admin",
       oldValue: `Refunded: ₹${complaint.refundAmount || 0}`,
       newValue: `Refunded: ₹${updated.refundAmount} via ${method}`,
-      ipAddress: "103.45.221.84",
+      ipAddress: "",
       createdAt: new Date().toISOString()
     };
     setAuditLogs(prev => [log, ...prev]);
@@ -214,11 +170,11 @@ export default function ViewComplaintModal({ isOpen, onClose, complaint, onUpdat
     const log = {
       _id: Date.now().toString(),
       action: "Resolved Ticket",
-      performedBy: "Neha Singh",
+      performedBy: "You",
       role: "Super Admin",
       oldValue: `Status: ${complaint.status}`,
       newValue: `Status: Resolved, Coupon: ${coupon || 'None'}, Rating: ${rating}`,
-      ipAddress: "103.45.221.84",
+      ipAddress: "",
       createdAt: new Date().toISOString()
     };
     setAuditLogs(prev => [log, ...prev]);
@@ -235,11 +191,11 @@ export default function ViewComplaintModal({ isOpen, onClose, complaint, onUpdat
     const log = {
       _id: Date.now().toString(),
       action: "Closed Complaint Ticket",
-      performedBy: "Neha Singh",
+      performedBy: "You",
       role: "Super Admin",
       oldValue: `Status: ${complaint.status}`,
       newValue: `Status: Closed - ${finalStatus}`,
-      ipAddress: "103.45.221.84",
+      ipAddress: "",
       createdAt: new Date().toISOString()
     };
     setAuditLogs(prev => [log, ...prev]);
@@ -422,9 +378,9 @@ export default function ViewComplaintModal({ isOpen, onClose, complaint, onUpdat
                   </div>
                   <div className="min-w-0">
                     <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wide">Customer Details</p>
-                    <p className="text-xs font-black text-zinc-805 dark:text-zinc-50 truncate mt-0.5">{complaint.customerName || 'Rohan Malhotra'}</p>
-                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1">+91 98402 12903</p>
-                    <p className="text-[10px] text-zinc-400 truncate mt-0.5">rohan@gmail.com</p>
+                    <p className="text-xs font-black text-zinc-805 dark:text-zinc-50 truncate mt-0.5">{complaint.customerName || '—'}</p>
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1">{complaint.customerPhone || ""}</p>
+                    <p className="text-[10px] text-zinc-400 truncate mt-0.5">{complaint.customerEmail || ""}</p>
                   </div>
                 </div>
 
@@ -435,9 +391,9 @@ export default function ViewComplaintModal({ isOpen, onClose, complaint, onUpdat
                   </div>
                   <div className="min-w-0">
                     <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wide">Store Node</p>
-                    <p className="text-xs font-black text-zinc-805 dark:text-zinc-50 truncate mt-0.5">{complaint.store || 'Indore Central'}</p>
-                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1">Manager: Amit Sharma</p>
-                    <p className="text-[10px] text-zinc-400 mt-0.5">POS: Central-AP-1</p>
+                    <p className="text-xs font-black text-zinc-805 dark:text-zinc-50 truncate mt-0.5">{complaint.store || '—'}</p>
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1">{complaint.storeManager ? `Manager: ${complaint.storeManager}` : ""}</p>
+                    <p className="text-[10px] text-zinc-400 mt-0.5"></p>
                   </div>
                 </div>
 
@@ -448,8 +404,8 @@ export default function ViewComplaintModal({ isOpen, onClose, complaint, onUpdat
                   </div>
                   <div className="min-w-0">
                     <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wide">Franchise Node</p>
-                    <p className="text-xs font-black text-zinc-805 dark:text-zinc-50 truncate mt-0.5">{complaint.franchise || 'Indore Group'}</p>
-                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1">Owner: Priyanshu Patel</p>
+                    <p className="text-xs font-black text-zinc-805 dark:text-zinc-50 truncate mt-0.5">{complaint.franchise || '—'}</p>
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1">{complaint.franchiseOwner ? `Owner: ${complaint.franchiseOwner}` : ""}</p>
                     <p className="text-[10px] text-zinc-400 mt-0.5">Rating: 92% (Platinum)</p>
                   </div>
                 </div>
@@ -461,7 +417,7 @@ export default function ViewComplaintModal({ isOpen, onClose, complaint, onUpdat
                   </div>
                   <div className="min-w-0">
                     <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wide">Delivery Partner</p>
-                    <p className="text-xs font-black text-zinc-805 dark:text-zinc-50 truncate mt-0.5">{complaint.deliveryPartner || 'Karan Singh'}</p>
+                    <p className="text-xs font-black text-zinc-805 dark:text-zinc-50 truncate mt-0.5">{complaint.deliveryPartner || '—'}</p>
                     <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1">Status: Delivery Transit</p>
                     <p className="text-[10px] text-zinc-400 mt-0.5">Bike: Splendor Plus</p>
                   </div>
@@ -503,7 +459,7 @@ export default function ViewComplaintModal({ isOpen, onClose, complaint, onUpdat
                   <div className="space-y-2 text-xs font-semibold text-zinc-650 dark:text-zinc-350">
                     <div className="flex justify-between">
                       <span className="text-zinc-400">Order ID:</span>
-                      <span>{complaint.orderNumber || 'PV-9042'}</span>
+                      <span>{complaint.orderNumber || '—'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-zinc-400">Payment:</span>
@@ -515,11 +471,11 @@ export default function ViewComplaintModal({ isOpen, onClose, complaint, onUpdat
                     </div>
                     <div className="flex justify-between">
                       <span className="text-zinc-400">Delivery Charge:</span>
-                      <span>₹40</span>
+                      <span>—</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-zinc-400">GST Taxes:</span>
-                      <span>₹25</span>
+                      <span>—</span>
                     </div>
                     <hr className="border-zinc-100 dark:border-zinc-800" />
                     <div className="flex justify-between text-sm font-black text-emerald-600 dark:text-emerald-450 pt-1">
@@ -531,7 +487,7 @@ export default function ViewComplaintModal({ isOpen, onClose, complaint, onUpdat
                   <div className="pt-3 border-t border-zinc-150 dark:border-zinc-800 space-y-2">
                     <p className="text-[10px] font-bold text-zinc-550 uppercase">Delivery Address</p>
                     <p className="text-xs text-zinc-700 dark:text-zinc-300 font-medium leading-relaxed">
-                      Flat 302, Green Glen Heights, Sector 3, Vijay Nagar, Indore, MP - 452010
+                      {complaint.deliveryAddress || '—'}
                     </p>
                   </div>
                 </div>
@@ -557,20 +513,20 @@ export default function ViewComplaintModal({ isOpen, onClose, complaint, onUpdat
                           <tr>
                             <td className="py-2.5 font-bold">Paneer Tikka Pizza (Medium)</td>
                             <td className="py-2.5 text-center">1</td>
-                            <td className="py-2.5 text-right">₹350</td>
-                            <td className="py-2.5 text-right">₹350</td>
+                            <td className="py-2.5 text-right">—</td>
+                            <td className="py-2.5 text-right">—</td>
                           </tr>
                           <tr>
                             <td className="py-2.5 font-bold">Garlic Breadsticks</td>
                             <td className="py-2.5 text-center">1</td>
-                            <td className="py-2.5 text-right">₹110</td>
-                            <td className="py-2.5 text-right">₹110</td>
+                            <td className="py-2.5 text-right">—</td>
+                            <td className="py-2.5 text-right">—</td>
                           </tr>
                           <tr>
                             <td className="py-2.5 font-bold">Cold Drink - Pepsi (500ml)</td>
                             <td className="py-2.5 text-center">1</td>
-                            <td className="py-2.5 text-right">₹40</td>
-                            <td className="py-2.5 text-right">₹40</td>
+                            <td className="py-2.5 text-right">—</td>
+                            <td className="py-2.5 text-right">—</td>
                           </tr>
                         </tbody>
                       </table>

@@ -1,3 +1,4 @@
+import { getCurrentUser as getSignedInUser } from "@food/utils/auth";
 import React, { useState, useEffect } from "react";
 import { useSearchParams, useOutletContext } from "react-router-dom";
 import { toast } from "sonner";
@@ -46,15 +47,7 @@ export default function LowStockAlerts() {
   const [columnVisibility, setColumnVisibility] = useState({});
 
   // 1. Resolve Current User Name based on active role
-  const getCurrentUser = () => {
-    switch (role) {
-      case "kitchen_staff":
-        return "Aman Verma";
-      case "store_manager":
-      default:
-        return "Shubham Jamliya";
-    }
-  };
+  const getCurrentUser = () => getSignedInUser("admin")?.name || "";
 
   const currentUser = getCurrentUser();
 

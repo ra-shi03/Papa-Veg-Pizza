@@ -224,7 +224,7 @@ export default function ProfileDetails() {
       } catch (err) {
         if (!cancelled) {
           if (cached) {
-            // Keep local user profile if API fails or in offline/mock mode
+            // Keep local user profile if API fails or in offline/mode
             setAccount(cached)
             setIsAuthenticated(true)
             setNameDraft(cached.name || "")

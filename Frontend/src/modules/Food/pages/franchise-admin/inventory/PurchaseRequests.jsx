@@ -39,9 +39,8 @@ const STATUS_OPTIONS = [
 ];
 
 export default function PurchaseRequests() {
-  // Mock Role Simulation State
-  // Roles: franchise_admin, store_manager, inventory_executive, finance_manager
-  const [mockRole, setMockRole] = useState("franchise_admin");
+  // This screen is the franchise admin's
+  const panelRole = "franchise_admin";
 
   // Query Filters State
   const [filters, setFilters] = useState({
@@ -88,7 +87,7 @@ export default function PurchaseRequests() {
     ...filters, 
     page, 
     limit,
-    requestedBy: mockRole === "store_manager" ? "mgr-1" : filters.requestedBy 
+    requestedBy: panelRole === "store_manager" ? "mgr-1" : filters.requestedBy 
   };
 
   const { data: prResponse, isLoading, isError, refetch } = usePurchaseRequestsQuery(activeQueryParams);
@@ -298,10 +297,10 @@ export default function PurchaseRequests() {
   };
 
   // Role Permissions Helpers
-  const canCreate = mockRole === "franchise_admin" || mockRole === "store_manager" || mockRole === "inventory_executive";
-  const canApprove = mockRole === "franchise_admin";
-  const canReceive = mockRole === "franchise_admin" || mockRole === "inventory_executive";
-  const canExport = mockRole === "franchise_admin" || mockRole === "finance_manager";
+  const canCreate = panelRole === "franchise_admin" || panelRole === "store_manager" || panelRole === "inventory_executive";
+  const canApprove = panelRole === "franchise_admin";
+  const canReceive = panelRole === "franchise_admin" || panelRole === "inventory_executive";
+  const canExport = panelRole === "franchise_admin" || panelRole === "finance_manager";
 
   // Loading skeleton
   const renderLoadingSkeleton = () => (
@@ -327,24 +326,6 @@ export default function PurchaseRequests() {
   return (
     <div className="p-6 space-y-6 bg-zinc-50/40 dark:bg-zinc-950 min-h-screen text-xs font-semibold text-zinc-700 dark:text-zinc-350">
       
-      {/* Role Selection Sticky Panel */}
-      <div className="fixed bottom-4 right-4 z-40 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2.5 rounded-2xl shadow-2xl flex items-center gap-2">
-        <ShieldAlert size={14} className="text-[var(--primary)]" />
-        <span className="text-[10px] font-black text-zinc-450 uppercase">Mock Role Selector:</span>
-        <select
-          value={mockRole}
-          onChange={(e) => {
-            setMockRole(e.target.value);
-            toast.info(`Switched role simulation to ${e.target.value.replace("_", " ")}`);
-          }}
-          className="px-2 py-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-lg text-[10px] font-bold text-zinc-850 dark:text-white"
-        >
-          <option value="franchise_admin">Franchise Admin</option>
-          <option value="store_manager">Store Manager (Subham)</option>
-          <option value="inventory_executive">Inventory Executive</option>
-          <option value="finance_manager">Finance Manager</option>
-        </select>
-      </div>
 
       {/* 1. Page Header Section */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -529,7 +510,7 @@ export default function PurchaseRequests() {
         </div>
 
         {/* Requested By (Requester select) */}
-        {mockRole !== "store_manager" && (
+        {panelRole !== "store_manager" && (
           <div className="space-y-1">
             <span className="text-[9px] uppercase text-zinc-450 font-extrabold tracking-wider block">Requested By</span>
             <select
@@ -620,7 +601,7 @@ export default function PurchaseRequests() {
           <AlertCircle size={32} className="mx-auto text-red-550" />
           <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white">Unable to load purchase requests</h3>
           <p className="text-[10px] text-zinc-400 max-w-sm mx-auto">
-            A database loading error occurred. Please verify local storage mock cache config or retry.
+            A database loading error occurred. Please retry.
           </p>
           <button onClick={() => refetch()} className="px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-black rounded-xl">
             Retry Loading

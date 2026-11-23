@@ -5,8 +5,8 @@ import {
   ChevronLeft, ChevronRight, Copy, RefreshCw, BarChart
 } from 'lucide-react';
 import { 
-  mockRegions, mockZones, mockTerritories, mockFranchises, mockStores, 
-  mockProducts, mockCategories, mockCustomers, api 
+  regionOptions, zoneOptions, territoryOptions, franchiseOptions, storeOptions, 
+  productOptions, categoryOptions, customerOptions, api 
 } from './CouponsData';
 import { adminClient } from '../../../../../services/api/axios';
 import { toast } from 'sonner';
@@ -74,49 +74,49 @@ export default function CouponDetails({ isOpen, onClose, coupon }) {
   // Name Resolution Maps
   const regionMap = useMemo(() => {
     const map = {};
-    mockRegions.forEach(r => { map[r.id] = r.name; });
+    regionOptions.forEach(r => { map[r.id] = r.name; });
     dbRegions.forEach(r => { map[r.id] = r.name; if (r._id) map[String(r._id)] = r.name; });
     return map;
   }, [dbRegions]);
 
   const zoneMap = useMemo(() => {
     const map = {};
-    mockZones.forEach(z => { map[z.id] = z.name; });
+    zoneOptions.forEach(z => { map[z.id] = z.name; });
     dbZones.forEach(z => { map[z.id] = z.name; if (z._id) map[String(z._id)] = z.name; });
     return map;
   }, [dbZones]);
 
   const territoryMap = useMemo(() => {
     const map = {};
-    mockTerritories.forEach(t => { map[t.id] = t.name; });
+    territoryOptions.forEach(t => { map[t.id] = t.name; });
     dbTerritories.forEach(t => { map[t.id] = t.name; if (t._id) map[String(t._id)] = t.name; });
     return map;
   }, [dbTerritories]);
 
   const franchiseMap = useMemo(() => {
     const map = {};
-    mockFranchises.forEach(f => { map[f.id] = f.name; });
+    franchiseOptions.forEach(f => { map[f.id] = f.name; });
     dbFranchises.forEach(f => { map[f.id] = f.name; if (f._id) map[String(f._id)] = f.name; });
     return map;
   }, [dbFranchises]);
 
   const storeMap = useMemo(() => {
     const map = {};
-    mockStores.forEach(s => { map[s.id] = s.name; });
+    storeOptions.forEach(s => { map[s.id] = s.name; });
     dbStores.forEach(s => { map[s.id] = s.name; if (s._id) map[String(s._id)] = s.name; });
     return map;
   }, [dbStores]);
 
   const categoryMap = useMemo(() => {
     const map = {};
-    mockCategories.forEach(c => { map[c.id] = c.name; });
+    categoryOptions.forEach(c => { map[c.id] = c.name; });
     dbCategories.forEach(c => { map[c.id] = c.name; if (c._id) map[String(c._id)] = c.name; });
     return map;
   }, [dbCategories]);
 
   const productMap = useMemo(() => {
     const map = {};
-    mockProducts.forEach(p => { map[p.id] = p; });
+    productOptions.forEach(p => { map[p.id] = p; });
     dbProducts.forEach(p => { map[p.id] = p; if (p._id) map[String(p._id)] = p; });
     return map;
   }, [dbProducts]);
@@ -600,7 +600,7 @@ export default function CouponDetails({ isOpen, onClose, coupon }) {
                     ) : (
                       <div className="border border-zinc-150 dark:border-zinc-850 rounded-xl overflow-hidden bg-white dark:bg-zinc-950 divide-y divide-zinc-150 dark:divide-zinc-850 max-h-[260px] overflow-y-auto">
                         {customerIds.map(custId => {
-                          const cust = mockCustomers.find(c => c.id === custId);
+                          const cust = customerOptions.find(c => c.id === custId);
                           return (
                             <div key={custId} className="p-3 flex justify-between items-center hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
                               <div>

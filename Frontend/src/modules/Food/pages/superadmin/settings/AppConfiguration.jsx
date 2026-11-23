@@ -50,7 +50,7 @@ import {
 import UpdateFeatureModal from './UpdateFeatureModal';
 import ForceUpdateModal from './ForceUpdateModal';
 
-// Mock Toast Hook for notification banners
+// Toast Hook for notification banners
 function useToast() {
   const [toasts, setToasts] = useState([]);
   const addToast = (message, type = 'success') => {
@@ -110,7 +110,7 @@ export default function AppConfiguration() {
     analyticsEnabled: true,
     pushNotificationsEnabled: true,
     inventorySyncEnabled: true,
-    updatedBy: 'Rohan Sharma (Super Admin)',
+    updatedBy: 'You',
     updatedAt: new Date().toISOString(),
     versionHistory: []
   });
@@ -962,12 +962,7 @@ export default function AppConfiguration() {
             </div>
 
             <div className="p-3.5 space-y-4 flex-1 overflow-y-auto max-h-[350px] scrollbar-none">
-              {(config.versionHistory?.length ? config.versionHistory : [
-                { version: 'v2.4.2', notes: 'Patch: UPI auto-routing updates', time: '10 mins ago', user: 'Rohan Sharma' },
-                { version: 'v2.4.1', notes: 'Minor: Referral program activation', time: '2 hours ago', user: 'Rohan Sharma' },
-                { version: 'v2.4.0', notes: 'Feature: Multi-store regional routing', time: '1 day ago', user: 'Aman Verma' },
-                { version: 'v2.3.9', notes: 'Fix: Invoice sequence prefix alignment', time: '3 days ago', user: 'Sarah D.' }
-              ]).map((log, index, arr) => (
+              {(config.versionHistory || []).map((log, index, arr) => (
                 <div key={index} className="flex gap-2.5 relative group">
                   {index !== arr.length - 1 && (
                     <div className="absolute left-[3px] top-3.5 bottom-0 w-[1px] bg-zinc-200 dark:bg-zinc-800 group-hover:bg-[var(--primary)]/30 transition-colors" />

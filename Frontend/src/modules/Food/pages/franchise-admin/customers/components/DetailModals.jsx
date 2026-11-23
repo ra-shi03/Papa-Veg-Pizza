@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X, Check, MapPin, Phone } from "lucide-react";
-import { mockStores } from "../mockData";
+
 
 // Helper to format date nicely
 const formatDateTime = (value) => {

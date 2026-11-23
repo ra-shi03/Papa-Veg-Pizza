@@ -112,7 +112,7 @@ export function UpdateStockModal({ isOpen, onClose, ingredientId }) {
         quantity: qty,
         reason: reason.trim(),
         notes: notes.trim(),
-        updatedBy: localStorage.getItem("store_user_name") || "Shubham Jamliya"
+        updatedBy: localStorage.getItem("store_user_name") || "—"
       },
       {
         onSuccess: () => {

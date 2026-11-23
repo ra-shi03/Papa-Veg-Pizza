@@ -47,7 +47,7 @@ export function ResolveAlertModal({ isOpen, onClose, alert }) {
       {
         alertId: alert._id,
         resolutionNote: resolutionNote.trim(),
-        resolvedBy: localStorage.getItem("store_user_name") || "Shubham Jamliya"
+        resolvedBy: localStorage.getItem("store_user_name") || "—"
       },
       {
         onSuccess: () => {

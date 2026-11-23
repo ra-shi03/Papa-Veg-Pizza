@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { Wallet, X, ArrowUpRight, ArrowDownRight, TrendingUp, ShieldAlert, Award, Calendar, DollarSign } from "lucide-react"
-import { getDeliveryPartnerWallet } from "../mockManagersData"
+import { getDeliveryPartnerWallet } from "../staffDetailPlaceholders"
 
 export default function WalletModal({ isOpen, onClose, rider }) {
   const [walletData, setWalletData] = useState(null)

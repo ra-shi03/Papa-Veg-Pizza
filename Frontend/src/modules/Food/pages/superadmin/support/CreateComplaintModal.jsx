@@ -26,32 +26,10 @@ export default function CreateComplaintModal({ isOpen, onClose, onCreateSuccess 
 
   if (!isOpen) return null;
 
-  // Mock collections for search
-  const customers = [
-    { id: "c1", name: "Rohan Malhotra", phone: "+91 98402 12903", email: "rohan@gmail.com" },
-    { id: "c2", name: "Isha Sharma", phone: "+91 88401 22894", email: "isha@gmail.com" },
-    { id: "c3", name: "Amit Verma", phone: "+91 74029 88390", email: "amit.v@yahoo.com" },
-    { id: "c4", name: "Pooja Patel", phone: "+91 99002 44101", email: "pooja.patel@gmail.com" },
-    { id: "c5", name: "Deepak Rawat", phone: "+91 81029 99882", email: "deepak.r@outlook.com" }
-  ];
+  // collections for search
+  const customers = [];
 
-  const orders = {
-    "c1": [
-      { id: "o1", orderNumber: "PV-9042", store: "Indore Central", franchise: "Indore Group", deliveryPartner: "Karan Singh", orderAmount: 450, paymentMethod: "UPI (Google Pay)" }
-    ],
-    "c2": [
-      { id: "o2", orderNumber: "PV-9041", store: "Bhopal Zone", franchise: "Bhopal Foods", deliveryPartner: "Rahul Dev", orderAmount: 590, paymentMethod: "Cash on Delivery" }
-    ],
-    "c3": [
-      { id: "o3", orderNumber: "PV-9039", store: "Ujjain Branch", franchise: "Mahakal Franchises", deliveryPartner: "Vikram Rathore", orderAmount: 380, paymentMethod: "Net Banking" }
-    ],
-    "c4": [
-      { id: "o4", orderNumber: "PV-9038", store: "Indore Central", franchise: "Indore Group", deliveryPartner: "Karan Singh", orderAmount: 320, paymentMethod: "Papa Store Wallet" }
-    ],
-    "c5": [
-      { id: "o5", orderNumber: "PV-9036", store: "Bhopal Zone", franchise: "Bhopal Foods", deliveryPartner: "Rahul Dev", orderAmount: 520, paymentMethod: "UPI (PhonePe)" }
-    ]
-  };
+  const orders = {};
 
   const handleCustomerChange = (e) => {
     const custId = e.target.value;
@@ -120,40 +98,8 @@ export default function CreateComplaintModal({ isOpen, onClose, onCreateSuccess 
     }
 
     setLoading(true);
-    // Simulate POST /api/customer-complaints
-    setTimeout(() => {
-      setLoading(false);
-      const chosenCustomer = customers.find(c => c.id === selectedCustomerId);
-      const chosenOrder = (orders[selectedCustomerId] || []).find(o => o.id === selectedOrderId);
-      
-      const mockNewComplaint = {
-        complaintNumber: `CMP-${Math.floor(1000 + Math.random() * 9000)}`,
-        customerName: chosenCustomer.name,
-        orderNumber: chosenOrder.orderNumber,
-        type: complaintType,
-        category,
-        priority,
-        status: 'Open',
-        assignedTo: 'Unassigned',
-        refundAmount: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        subject,
-        description,
-        store: autoFields.store,
-        franchise: autoFields.franchise,
-        deliveryPartner: autoFields.deliveryPartner,
-        orderAmount: autoFields.orderAmount,
-        paymentMethod: autoFields.paymentMethod,
-        attachments: attachments.map(a => a.name)
-      };
-
-      toast.success(`Complaint ${mockNewComplaint.complaintNumber} registered successfully`);
-      if (onCreateSuccess) {
-        onCreateSuccess(mockNewComplaint);
-      }
-      onClose();
-    }, 1200);
+    setLoading(false);
+    toast.info("Registering a complaint is not available yet.");
   };
 
   const categories = {

@@ -36,9 +36,9 @@ export default function DeliveryPartnersFilters({
     return () => clearTimeout(timer)
   }, [localSearch, setSearchQuery])
 
-  // The real franchise, store and vehicle lists come from the screen; the sample lists only run in standalone mock mode
-  const franchises = ["All Franchises", ...(franchiseOptions || ["Papa Veg Mumbai", "Papa Veg Pune", "Papa Veg Delhi", "Papa Veg Bangalore"])]
-  const stores = ["All Stores", ...(storeOptions || ["Mumbai - Andheri West", "Pune - Koregaon Park", "Delhi - Connaught Place", "Bangalore - Indiranagar"])]
+  // The franchise, store and vehicle lists come from the screen
+  const franchises = ["All Franchises", ...(franchiseOptions || [])]
+  const stores = ["All Stores", ...(storeOptions || [])]
   const statuses = ["All Statuses", "Pending", "Online", "Offline", "Busy", "Suspended"]
   const vehicles = ["Vehicle Type", ...(vehicleOptions || ["Electric Bike", "Scooter", "Car"])]
 

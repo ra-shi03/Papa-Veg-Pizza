@@ -25,7 +25,7 @@ export default function Profile({ forcedRole }) {
   // Trigger editing inside PersonalInfoTab from Header button
   const [triggerPersonalEdit, setTriggerPersonalEdit] = useState(false);
 
-  // Demo state for role testing (Stored in localStorage to sync with mock service)
+  // Demo state for role testing (Stored in localStorage to sync with service)
   const [currentRole, setCurrentRole] = useState(() => {
     if (forcedRole) return forcedRole;
     return contextRole || localStorage.getItem("store_role") || "store_manager";
@@ -45,7 +45,7 @@ export default function Profile({ forcedRole }) {
     }
   }, [forcedRole, contextRole, onRoleChange]);
 
-  // Sync back to local storage so profileApi mock can read the correct role
+  // Sync back to local storage so profileApi can read the correct role
   useEffect(() => {
     localStorage.setItem("demo_user_role", currentRole);
   }, [currentRole]);

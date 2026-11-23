@@ -70,11 +70,11 @@ const FeedbackAndReview = () => {
                 <div className="bg-white dark:bg-zinc-900 p-3 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 flex items-center justify-between h-[75px] hover:shadow-md transition-shadow">
                     <div className="flex flex-col justify-center">
                         <p className="text-zinc-500 dark:text-zinc-400 text-[10px] font-bold uppercase tracking-wider">Avg Rating</p>
-                        <p className="text-xl font-black text-zinc-900 dark:text-zinc-50 mt-0.5">4.2</p>
+                        <p className="text-xl font-black text-zinc-900 dark:text-zinc-50 mt-0.5">—</p>
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
                         <Star className="w-4 h-4 text-blue-600 dark:text-blue-400 fill-blue-600/10" />
-                        <span className="text-[8px] font-bold text-[var(--primary)] bg-[var(--primary)]/10 px-1 rounded">+2.4%</span>
+                        <span className="text-[8px] font-bold text-[var(--primary)] bg-[var(--primary)]/10 px-1 rounded">—</span>
                     </div>
                 </div>
 
@@ -104,7 +104,7 @@ const FeedbackAndReview = () => {
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
                         <Frown className="w-4 h-4 text-red-650 dark:text-red-400" />
-                        <span className="text-[8px] font-bold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1 rounded">+5%</span>
+                        <span className="text-[8px] font-bold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1 rounded">—</span>
                     </div>
                 </div>
             </div>
@@ -151,7 +151,7 @@ const FeedbackAndReview = () => {
                                 <circle className="stroke-red-500 transition-all duration-1000" cx="18" cy="18" fill="none" r="16" strokeDasharray={animateCharts ? "10, 100" : "0, 100"} strokeDashoffset="-90" strokeWidth="4"></circle>
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <span className="text-base font-black text-zinc-900 dark:text-zinc-50">75%</span>
+                                <span className="text-base font-black text-zinc-900 dark:text-zinc-50">—</span>
                                 <span className="text-[8px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Positive</span>
                             </div>
                         </div>
@@ -159,17 +159,17 @@ const FeedbackAndReview = () => {
                             <div className="flex items-center gap-2 p-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded transition-colors text-xs font-semibold">
                                 <div className="w-2 h-2 rounded-full bg-[var(--primary)] dark:bg-blue-500 shadow-sm"></div>
                                 <span className="text-zinc-650 dark:text-zinc-355 flex-1">Positive</span>
-                                <span className="font-bold text-zinc-900 dark:text-zinc-50">75%</span>
+                                <span className="font-bold text-zinc-900 dark:text-zinc-50">—</span>
                             </div>
                             <div className="flex items-center gap-2 p-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded transition-colors text-xs font-semibold">
                                 <div className="w-2 h-2 rounded-full bg-orange-400 shadow-sm"></div>
                                 <span className="text-zinc-655 dark:text-zinc-355 flex-1">Neutral</span>
-                                <span className="font-bold text-zinc-900 dark:text-zinc-50">15%</span>
+                                <span className="font-bold text-zinc-900 dark:text-zinc-50">—</span>
                             </div>
                             <div className="flex items-center gap-2 p-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded transition-colors text-xs font-semibold">
                                 <div className="w-2 h-2 rounded-full bg-red-500 shadow-sm"></div>
                                 <span className="text-zinc-655 dark:text-zinc-355 flex-1">Negative</span>
-                                <span className="font-bold text-zinc-900 dark:text-zinc-50">10%</span>
+                                <span className="font-bold text-zinc-900 dark:text-zinc-50">—</span>
                             </div>
                         </div>
                     </div>
@@ -196,7 +196,7 @@ const FeedbackAndReview = () => {
                         </div>
                         <div className="text-right">
                             <p className="font-bold text-zinc-900 dark:text-zinc-50 text-xs flex items-center justify-end gap-1">
-                                4.8 <Star className="w-3 h-3 fill-orange-400 text-orange-400" />
+                                —<Star className="w-3 h-3 fill-orange-400 text-orange-400" />
                             </p>
                             <p className="text-[9px] text-[var(--primary)] font-bold uppercase tracking-wider mt-0.5">Top Performer</p>
                         </div>
@@ -214,7 +214,7 @@ const FeedbackAndReview = () => {
                         </div>
                         <div className="text-right">
                             <p className="font-bold text-zinc-900 dark:text-zinc-50 text-xs flex items-center justify-end gap-1">
-                                4.2 <Star className="w-3 h-3 fill-orange-400 text-orange-400" />
+                                —<Star className="w-3 h-3 fill-orange-400 text-orange-400" />
                             </p>
                             <p className="text-[9px] text-zinc-450 dark:text-zinc-500 font-bold uppercase tracking-wider mt-0.5">Average</p>
                         </div>
@@ -232,7 +232,7 @@ const FeedbackAndReview = () => {
                         </div>
                         <div className="text-right">
                             <p className="font-bold text-zinc-900 dark:text-zinc-50 text-xs flex items-center justify-end gap-1">
-                                3.9 <Star className="w-3 h-3 fill-orange-400 text-orange-400" />
+                                —<Star className="w-3 h-3 fill-orange-400 text-orange-400" />
                             </p>
                             <p className="text-[9px] text-red-500 font-bold uppercase tracking-wider mt-0.5">Needs Attention</p>
                         </div>

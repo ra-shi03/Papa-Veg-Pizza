@@ -8,128 +8,7 @@ import { adminClient } from '@/services/api/axios';
 import { uploadAPI } from '@/services/api';
 
 // 10 Signature Pizza Products for Cheesy Rewards Catalogue (matching reference screenshot)
-const SIGNATURE_10_PIZZAS = [
-  {
-    productId: 'so-cheesee',
-    name: 'SO CHEESEE',
-    size: 'Regular',
-    crust: 'New Hand Tossed',
-    description: 'So Cheesy Pizza Sandwich with premium molten mozzarella & herb seasoning.',
-    image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=60',
-    requiredPoints: 600,
-    originalPrice: 149,
-    isVeg: true,
-    sortOrder: 0
-  },
-  {
-    productId: 'smoky-corn-paneer',
-    name: 'SMOKY CORN PANEER',
-    size: 'Regular',
-    crust: 'New Hand Tossed',
-    description: 'Smoky Corn Paneer Pizza Sandwich loaded with roasted corn and spiced cottage cheese.',
-    image: 'https://images.unsplash.com/photo-1604382355076-af4b0eb60143?w=500&auto=format&fit=crop&q=60',
-    requiredPoints: 600,
-    originalPrice: 129,
-    isVeg: true,
-    sortOrder: 1
-  },
-  {
-    productId: 'paneer-tikka',
-    name: 'PANEER TIKKA',
-    size: 'Regular',
-    crust: 'New Hand Tossed',
-    description: 'Paneer Tikka Pizza Sandwich infused with aromatic tandoori masala and crunchy capsicum.',
-    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=500&auto=format&fit=crop&q=60',
-    requiredPoints: 600,
-    originalPrice: 129,
-    isVeg: true,
-    sortOrder: 2
-  },
-  {
-    productId: 'hott-pepper',
-    name: 'HOTT PEPPER',
-    size: 'Regular',
-    crust: 'New Hand Tossed',
-    description: 'Hot Pepper Pizza Sandwich with fiery red paprika and roasted jalapenos.',
-    image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=500&auto=format&fit=crop&q=60',
-    requiredPoints: 600,
-    originalPrice: 119,
-    isVeg: true,
-    sortOrder: 3
-  },
-  {
-    productId: 'margherita',
-    name: 'MARGHERITA',
-    size: 'Regular',
-    crust: 'New Hand Tossed',
-    description: 'Classic delight with 100% real mozzarella cheese.',
-    image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=500&auto=format&fit=crop&q=60',
-    requiredPoints: 600,
-    originalPrice: 119,
-    isVeg: true,
-    sortOrder: 4
-  },
-  {
-    productId: 'corn-n-cheese',
-    name: 'CORN N CHEESE',
-    size: 'Regular',
-    crust: 'New Hand Tossed',
-    description: 'Sweet & juicy golden corn feast with molten mozzarella cheese.',
-    image: 'https://images.unsplash.com/photo-1594007654729-407eedc4be65?w=500&auto=format&fit=crop&q=60',
-    requiredPoints: 600,
-    originalPrice: 149,
-    isVeg: true,
-    sortOrder: 5
-  },
-  {
-    productId: 'farmhouse',
-    name: 'FARMHOUSE',
-    size: 'Regular',
-    crust: 'New Hand Tossed',
-    description: 'Delightful combination of onion, capsicum, tomato & grilled mushroom.',
-    image: 'https://images.unsplash.com/photo-1571407970349-bc81e7e96d47?w=500&auto=format&fit=crop&q=60',
-    requiredPoints: 600,
-    originalPrice: 199,
-    isVeg: true,
-    sortOrder: 6
-  },
-  {
-    productId: 'veggie-paradise',
-    name: 'VEGGIE PARADISE',
-    size: 'Regular',
-    crust: 'New Hand Tossed',
-    description: 'The awesome foursome! Golden corn, black olives, capsicum, red paprika.',
-    image: 'https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?w=500&auto=format&fit=crop&q=60',
-    requiredPoints: 600,
-    originalPrice: 219,
-    isVeg: true,
-    sortOrder: 7
-  },
-  {
-    productId: 'peppy-paneer',
-    name: 'PEPPY PANEER',
-    size: 'Regular',
-    crust: 'Fresh Pan Pizza',
-    description: 'Flavorful trio of juicy paneer, crisp capsicum with spicy red paprika.',
-    image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=60',
-    requiredPoints: 600,
-    originalPrice: 229,
-    isVeg: true,
-    sortOrder: 8
-  },
-  {
-    productId: 'paneer-makhani',
-    name: 'PANEER MAKHANI',
-    size: 'Regular',
-    crust: 'New Hand Tossed',
-    description: 'Juicy paneer chunks marinated in rich tandoori makhani gravy with onion and capsicum.',
-    image: 'https://images.unsplash.com/photo-1534308983496-4fabb1a015ee?w=500&auto=format&fit=crop&q=60',
-    requiredPoints: 600,
-    originalPrice: 249,
-    isVeg: true,
-    sortOrder: 9
-  }
-];
+const SIGNATURE_10_PIZZAS = [];
 
 export default function RewardsManagement() {
   const [config, setConfig] = useState({
@@ -438,6 +317,27 @@ export default function RewardsManagement() {
     }));
   };
 
+  // A menu product as a reward catalogue item (its real id, name, first size, crust, image and price).
+  const toRewardItem = (prod, sortOrder) => {
+    const firstSize = Array.isArray(prod.sizes) && prod.sizes.length > 0 ? prod.sizes[0] : null;
+    const price = Number(firstSize?.price ?? prod.price ?? 0);
+    const originalPrice = Number(firstSize?.originalPrice ?? prod.originalPrice ?? price);
+    const isVeg = prod.vegType ? prod.vegType === 'veg' || prod.vegType === 'vegan' : !String(prod.name).toLowerCase().includes('chicken');
+    
+    return {
+      productId: prod._id || prod.id,
+      name: String(prod.name || '').toUpperCase(),
+      size: firstSize?.size || 'Regular',
+      crust: prod.defaultCrust || 'New Hand Tossed',
+      description: prod.shortDescription || prod.description || '',
+      image: prod.image || 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=60',
+      requiredPoints: Number(config.defaultPointsRequired || 600),
+      originalPrice: originalPrice > 0 ? originalPrice : price,
+      isVeg,
+      sortOrder
+    };
+  };
+
   const handleAddProductFromStore = (prod) => {
     if ((config.rewardProducts?.length || 0) >= 10) {
       toast.error('Maximum 10 reward products can be displayed.');
@@ -450,23 +350,7 @@ export default function RewardsManagement() {
       toast.warning(`"${prod.name}" is already in the rewards list.`);
       return;
     }
-    const firstSize = Array.isArray(prod.sizes) && prod.sizes.length > 0 ? prod.sizes[0] : null;
-    const price = Number(firstSize?.price ?? prod.price ?? 149);
-    const originalPrice = Number(firstSize?.originalPrice ?? prod.originalPrice ?? price);
-    const isVeg = prod.vegType ? prod.vegType === 'veg' || prod.vegType === 'vegan' : !String(prod.name).toLowerCase().includes('chicken');
-    
-    const newItem = {
-      productId: prod._id || prod.id,
-      name: String(prod.name || '').toUpperCase(),
-      size: firstSize?.size || 'Regular',
-      crust: prod.defaultCrust || 'New Hand Tossed',
-      description: prod.shortDescription || prod.description || `${prod.name} Pizza Sandwich`,
-      image: prod.image || 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&auto=format&fit=crop&q=60',
-      requiredPoints: Number(config.defaultPointsRequired || 600),
-      originalPrice: originalPrice > 0 ? originalPrice : price,
-      isVeg,
-      sortOrder: (config.rewardProducts?.length || 0)
-    };
+    const newItem = toRewardItem(prod, config.rewardProducts?.length || 0);
 
     setConfig(prev => ({
       ...prev,
@@ -475,12 +359,30 @@ export default function RewardsManagement() {
     toast.success(`Added "${prod.name}" to Reward Products`);
   };
 
-  const handleAutoFillSignaturePizzas = () => {
-    setConfig(prev => ({
-      ...prev,
-      rewardProducts: [...SIGNATURE_10_PIZZAS]
-    }));
-    toast.success('Loaded 10 signature pizzas matching reference!');
+  // Fills the catalogue with up to 10 active pizzas from the real menu: products in a pizza category or with crusts,
+  // badged ones (Bestseller, Signature...) first. Replaces the current list; nothing is saved until "Save".
+  const handleAutoFillSignaturePizzas = async () => {
+    try {
+      const res = await adminClient.get('/food/admin/products');
+      const list = res?.data?.data?.products || res?.data?.data || [];
+      const isPizza = (p) =>
+        /pizza/i.test(String(p?.categoryId?.label || p?.categoryId?.name || '')) ||
+        Boolean(p?.showCrust) || (Array.isArray(p?.crusts) && p.crusts.length > 0);
+      const available = (p) => p && p.inStock !== false && String(p.status || 'Active').toLowerCase() === 'active';
+      const pizzas = (Array.isArray(list) ? list : []).filter((p) => available(p) && isPizza(p));
+      const picked = [...pizzas.filter((p) => p.badge), ...pizzas.filter((p) => !p.badge)].slice(0, 10);
+      if (picked.length === 0) {
+        toast.error('No active pizzas on the menu yet. Add pizzas in Products first, or use "Pick from Store".');
+        return;
+      }
+      setConfig(prev => ({
+        ...prev,
+        rewardProducts: picked.map((p, idx) => toRewardItem(p, idx))
+      }));
+      toast.success(`Loaded ${picked.length} pizza${picked.length === 1 ? '' : 's'} from your menu. Review the points, then Save.`);
+    } catch (err) {
+      toast.error('Could not load the menu. Please try again.');
+    }
   };
 
   const handleAddCustomRewardProduct = () => {
@@ -790,7 +692,7 @@ export default function RewardsManagement() {
                       <Pizza className="w-10 h-10 text-zinc-300 dark:text-zinc-700 mb-2" />
                       <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">No Reward Products Configured</p>
                       <p className="text-xs text-zinc-400 mt-1 max-w-sm">
-                        Click "Auto-fill 10 Pizzas" to load the recommended products from the reference screenshot, or "Pick from Store" to select your own.
+                        Click "Auto-fill 10 Pizzas" to load up to 10 pizzas from your menu, or "Pick from Store" to select your own.
                       </p>
                       <button
                         type="button"
@@ -1521,13 +1423,13 @@ export default function RewardsManagement() {
 
             {/* Mobile screen frame */}
             <div className="max-w-[340px] mx-auto bg-white rounded-2xl shadow-md border border-zinc-200 overflow-hidden text-zinc-900">
-              {/* Mock Mobile Top Bar */}
+              {/* Mobile Top Bar */}
               <div className="h-12 px-3 flex items-center gap-2 border-b border-zinc-100 bg-white">
                 <span className="text-xs">←</span>
                 <span className="text-xs font-bold">Rewards & Wallet</span>
               </div>
 
-              {/* Mock Switcher */}
+              {/* Switcher */}
               <div className="p-3 space-y-3 bg-zinc-50/50">
                 <div className="bg-zinc-200/60 p-1 rounded-xl flex text-[11px] font-bold">
                   <span className="flex-1 text-center py-1 bg-white rounded-lg shadow-2xs">
@@ -1579,7 +1481,7 @@ export default function RewardsManagement() {
                   </p>
                 </div>
 
-                {/* Filter chips mock (Reflecting Dynamic Toggles) */}
+                {/* Filter chips (Reflecting Dynamic Toggles) */}
                 <div className="flex items-center justify-between text-[10px]">
                   <div className="flex gap-1.5">
                     {config.showVegFilter !== false && (
@@ -1594,7 +1496,7 @@ export default function RewardsManagement() {
                   )}
                 </div>
 
-                {/* Mock product cards */}
+                {/* product cards */}
                 <div className="space-y-2 max-h-[260px] overflow-y-auto hide-scrollbar">
                   {((config.rewardProducts && config.rewardProducts.length > 0) ? config.rewardProducts : SIGNATURE_10_PIZZAS).slice(0, 4).map((p, idx) => (
                     <div key={idx} className="bg-white rounded-xl p-2 border border-zinc-150 flex items-center gap-2">
@@ -1626,7 +1528,7 @@ export default function RewardsManagement() {
                   ))}
                 </div>
 
-                {/* Mock Footer Links */}
+                {/* Footer Links */}
                 <div className="text-center text-[10px] py-1 text-sky-600 font-bold">
                   FAQs | Terms & Conditions
                 </div>

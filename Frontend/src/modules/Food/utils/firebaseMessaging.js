@@ -33,7 +33,13 @@ const pushDebugWarn = (prefix, message, data = {}) => {};
 function normalizeModuleFromPath(pathname = window.location.pathname) {
   if (pathname.includes("/restaurant") && !pathname.includes("/restaurants")) return "restaurant";
   if (pathname.includes("/delivery")) return "delivery";
-  if (pathname.includes("/admin")) return "admin";
+  // Every staff panel (super admin, franchise admin, store manager / kitchen staff) signs in with the admin token.
+  if (
+    pathname.includes("/admin") ||
+    pathname.includes("/superadmin") ||
+    pathname.includes("/franchise-admin") ||
+    pathname.includes("/store-operations")
+  ) return "admin";
   return "user";
 }
 
@@ -467,10 +473,26 @@ async function saveTokenByModule(moduleName, token, platform = "web") {
     await deliveryAPI.saveFcmToken(token, platform);
     return;
   }
+  if (moduleName === "admin") {
+    await adminAPI.saveFcmToken(token, platform);
+    return;
+  }
   if (moduleName === "user") {
     await userAPI.saveFcmToken(token, { platform });
   }
 }
+
+// The public web config travels in the worker's URL so the worker can start Firebase the moment it loads.
+function serviceWorkerUrl(config) {
+  const params = new URLSearchParams();
+  for (const key of ["apiKey", "authDomain", "projectId", "appId", "messagingSenderId", "storageBucket", "measurementId"]) {
+    if (config?.[key]) params.set(key, config[key]);
+  }
+  return `/firebase-messaging-sw.js?${params.toString()}`;
+}
+
+// One save per signed-in account and device token per page load, not one per route change.
+const savedThisSession = new Set();
 
 async function registerNativeWebViewFcmToken(moduleName) {
   if (!isFlutterWebView()) return;
@@ -708,10 +730,6 @@ export function initPushNotificationClient() {
     soundEnabled: isPushSoundEnabled(),
   });
 
-  if (moduleName === "admin") {
-    return;
-  }
-
   if (isPushSoundEnabled()) {
     pushSoundUnlocked = true;
   }
@@ -741,7 +759,6 @@ async function attachForegroundListener(firebaseAppInstance) {
 
 export async function registerWebPushForCurrentModule(pathname = window.location.pathname) {
   const moduleName = normalizeModuleFromPath(pathname);
-  if (moduleName === "admin") return;
   initPushNotificationClient();
 
   const accessToken = localStorage.getItem(`${moduleName}_accessToken`);
@@ -779,7 +796,7 @@ export async function registerWebPushForCurrentModule(pathname = window.location
       const supported = await isSupported().catch(() => false);
       if (!supported) return;
 
-      const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+      const registration = await navigator.serviceWorker.register(serviceWorkerUrl(firebasePublicEnv));
       pushDebugLog(PUSH_DEBUG_PREFIX, "Service worker registered for push", {
         scope: registration.scope,
         moduleName,
@@ -800,9 +817,13 @@ export async function registerWebPushForCurrentModule(pathname = window.location
       // Cache the token in localStorage so it can be retrieved during logout for cleanup.
       setSavedToken(moduleName, token);
 
+      const saveKey = `${moduleName}|${accessToken}|${token}`;
       try {
         pushDebugLog(PUSH_DEBUG_PREFIX, "Synchronizing FCM token with backend database", { moduleName, tokenPreview: `${token?.slice(0, 10)}...` });
-        await saveTokenByModule(moduleName, token);
+        if (!savedThisSession.has(saveKey)) {
+          await saveTokenByModule(moduleName, token);
+          savedThisSession.add(saveKey);
+        }
         pushDebugLog(PUSH_DEBUG_PREFIX, "FCM token synchronized with backend successfully");
       } catch (e) {
         pushDebugWarn(PUSH_DEBUG_PREFIX, "Failed to synchronize FCM token to backend", { error: e?.message || e, stack: e?.stack });

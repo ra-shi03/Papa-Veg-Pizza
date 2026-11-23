@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { X, User, Mail, Phone, Calendar, Clock, Star, MapPin, Package, ClipboardList, ShieldAlert, Trophy, Trash2, Edit, Plus, FileText, CheckCircle2, ChevronRight, Check, Eye } from "lucide-react";
 import { AddNoteModal, EditCustomerModal } from "./Modals";
 import { AddAddressModal, AdjustPointsModal, OrderDetailsModal, ComplaintDetailsModal } from "./DetailModals";
-import { mockStores } from "../mockData";
+
+const stores = [];
 
 // Helper to format date nicely
 const formatDateTime = (value) => {
@@ -220,7 +221,7 @@ export default function CustomerDrawer({
                         <div>
                           <p className="text-[9px] font-bold text-zinc-400 uppercase">Favorite store outlet</p>
                           <p className="font-semibold text-zinc-700 dark:text-zinc-300 mt-0.5">
-                            {mockStores.find(s => s.id === customerDetails.favoriteStoreId)?.name || "Indore Central"}
+                            {stores.find(s => s.id === customerDetails.favoriteStoreId)?.name || "Indore Central"}
                           </p>
                         </div>
                       </div>
@@ -532,7 +533,7 @@ export default function CustomerDrawer({
                               </tr>
                             ))
                           ) : (
-                            // Fallback to mock search in sessionStorage DB for loyalty transactions
+                            // Fallback to search in sessionStorage DB for loyalty transactions
                             JSON.parse(localStorage.getItem("pv_loyalty_transactions") || "[]")
                               .filter(txn => txn.customerId === customerDetails._id)
                               .map((txn, index) => (

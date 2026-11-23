@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import React, { useState } from "react";
 import { Modal, Input, Select, Upload, message } from "antd";
 import { Loader2, Plus, Camera } from "lucide-react";
@@ -188,11 +189,11 @@ export default function CreateIssueModal({ visible, onClose }) {
           />
         </div>
 
-        {/* Row 5: Attachment (Simulated) */}
+        {/* Row 5: Attachment */}
         <div className="space-y-1.5 text-left">
           <span className="text-slate-400 dark:text-zinc-500 font-extrabold uppercase text-[9px] block">Attach Image Evidence</span>
           <div
-            onClick={() => setForm(prev => ({ ...prev, image: "/mock-evidence.webp" }))}
+            onClick={() => toast.info("Attaching photos is not available yet.")}
             className={`border border-dashed p-4 rounded-2xl flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all duration-300 ${
               form.image
                 ? "border-emerald-500 bg-emerald-500/5 text-emerald-600"
@@ -201,7 +202,7 @@ export default function CreateIssueModal({ visible, onClose }) {
           >
             <Camera size={20} />
             <span className="text-[10px] font-bold">
-              {form.image ? "Image attached (mock-evidence.webp)" : "Click to attach mock photo evidence"}
+              {form.image ? "Image attached" : "Photo evidence (not available yet)"}
             </span>
           </div>
         </div>

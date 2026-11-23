@@ -1,16 +1,15 @@
-import {
-  mockAddons,
-  mockAddonGroups,
-  mockInventoryItems,
-  mockProductAddonAssignments,
-  initialProducts,
-  mockCategories
-} from "./mockProducts";
 
-const ADDONS_STORAGE_KEY = "mock_db_addons";
-const GROUPS_STORAGE_KEY = "mock_db_addon_groups";
-const ASSIGNMENTS_STORAGE_KEY = "mock_db_addon_assignments";
-const INVENTORY_STORAGE_KEY = "mock_db_inventory";
+const emptyAddons = [];
+const emptyAddonGroups = [];
+const emptyInventoryItems = [];
+const productAddonAssignments = [];
+const emptyProducts = [];
+const categories = [];
+
+const ADDONS_STORAGE_KEY = "pvp_local_addons";
+const GROUPS_STORAGE_KEY = "pvp_local_addon_groups";
+const ASSIGNMENTS_STORAGE_KEY = "pvp_local_addon_assignments";
+const INVENTORY_STORAGE_KEY = "pvp_local_inventory";
 
 // In-memory data variables
 let addons = [];
@@ -21,25 +20,25 @@ let inventoryItems = [];
 // Initialize databases from localStorage
 try {
   const cachedAddons = localStorage.getItem(ADDONS_STORAGE_KEY);
-  addons = cachedAddons ? JSON.parse(cachedAddons) : [...mockAddons];
+  addons = cachedAddons ? JSON.parse(cachedAddons) : [...emptyAddons];
   if (!cachedAddons) localStorage.setItem(ADDONS_STORAGE_KEY, JSON.stringify(addons));
 
   const cachedGroups = localStorage.getItem(GROUPS_STORAGE_KEY);
-  addonGroups = cachedGroups ? JSON.parse(cachedGroups) : [...mockAddonGroups];
+  addonGroups = cachedGroups ? JSON.parse(cachedGroups) : [...emptyAddonGroups];
   if (!cachedGroups) localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(addonGroups));
 
   const cachedAssignments = localStorage.getItem(ASSIGNMENTS_STORAGE_KEY);
-  assignments = cachedAssignments ? JSON.parse(cachedAssignments) : [...mockProductAddonAssignments];
+  assignments = cachedAssignments ? JSON.parse(cachedAssignments) : [...productAddonAssignments];
   if (!cachedAssignments) localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(assignments));
 
   const cachedInventory = localStorage.getItem(INVENTORY_STORAGE_KEY);
-  inventoryItems = cachedInventory ? JSON.parse(cachedInventory) : [...mockInventoryItems];
+  inventoryItems = cachedInventory ? JSON.parse(cachedInventory) : [...emptyInventoryItems];
   if (!cachedInventory) localStorage.setItem(INVENTORY_STORAGE_KEY, JSON.stringify(inventoryItems));
 } catch (e) {
-  addons = [...mockAddons];
-  addonGroups = [...mockAddonGroups];
-  assignments = [...mockProductAddonAssignments];
-  inventoryItems = [...mockInventoryItems];
+  addons = [...emptyAddons];
+  addonGroups = [...emptyAddonGroups];
+  assignments = [...productAddonAssignments];
+  inventoryItems = [...emptyInventoryItems];
 }
 
 const saveToStorage = () => {
@@ -218,8 +217,8 @@ export const addonService = {
     const assignedProducts = assignments
       .filter((asg) => asg.addonIds.includes(addon._id))
       .map((asg) => {
-        const prod = initialProducts.find((p) => p._id === asg.productId);
-        const cat = prod ? mockCategories.find((c) => c._id === prod.categoryId) : null;
+        const prod = emptyProducts.find((p) => p._id === asg.productId);
+        const cat = prod ? categories.find((c) => c._id === prod.categoryId) : null;
         return prod ? {
           _id: prod._id,
           name: prod.name,
@@ -346,9 +345,9 @@ export const addonService = {
   getAssignedProducts: async (addonId) => {
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    const result = initialProducts.map((p) => {
+    const result = emptyProducts.map((p) => {
       const isAssigned = assignments.some((asg) => asg.productId === p._id && asg.addonIds.includes(addonId));
-      const cat = mockCategories.find((c) => c._id === p.categoryId);
+      const cat = categories.find((c) => c._id === p.categoryId);
       const currentAddonsList = assignments.find((asg) => asg.productId === p._id)?.addonIds || [];
       const currentAddonsNames = addons.filter((a) => currentAddonsList.includes(a._id)).map((a) => a.name);
 
@@ -374,7 +373,7 @@ export const addonService = {
     // Clear existing assignments for this addonId in the specified list (or all if modifying)
     // and re-apply assignments.
     // For each productId in the catalog:
-    initialProducts.forEach((p) => {
+    emptyProducts.forEach((p) => {
       const isSelected = productIds.includes(p._id);
       let asgIndex = assignments.findIndex((asg) => asg.productId === p._id);
 

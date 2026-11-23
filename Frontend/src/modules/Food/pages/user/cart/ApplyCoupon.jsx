@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { ArrowLeft, ChevronDown, BadgePercent, Check, AlertCircle } from "lucide-react"
 import { offerDiscount, offerLocked, offerLockText } from "./cartHelpers"
 import apiClient from "@/services/api/axios"
+import { couponStoreParams } from "@food/utils/savedLocation"
 
 /**
  * Perforated coupon ticket card matching Image 4:
@@ -231,24 +232,13 @@ export default function ApplyCoupon({
         return
       }
 
+      // The coupons checkout accepts at the customer's store (Marketing > Coupons, one list for every screen)
       let fetched = []
       try {
-        const res = await apiClient.get("/food/offers/public", { _isFallback: true })
-        const list = res?.data?.data?.allOffers || res?.data?.allOffers || res?.data?.data
-        if (Array.isArray(list) && list.length > 0) {
-          fetched = list
-        }
+        const res = await apiClient.get("/food/offers/public", { params: couponStoreParams(), _isFallback: true })
+        const list = res?.data?.data?.allOffers || res?.data?.allOffers
+        if (Array.isArray(list)) fetched = list
       } catch (_) {}
-
-      if (fetched.length === 0) {
-        try {
-          const res = await apiClient.get("/settings/coupons/public")
-          const list = res?.data?.data || res?.data
-          if (Array.isArray(list) && list.length > 0) {
-            fetched = list
-          }
-        } catch (_) {}
-      }
 
       if (fetched.length > 0) {
         setDynamicOffers(fetched)

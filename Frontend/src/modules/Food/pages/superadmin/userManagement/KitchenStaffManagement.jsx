@@ -27,56 +27,7 @@ import {
 import KitchenStaffFilters from "./KitchenStaffFilters"
 import KitchenStaffDetail from "./KitchenStaffDetail"
 
-const INITIAL_STAFF = [
-  {
-    id: "KS-9842",
-    name: "Ravi Sharma",
-    email: "r.sharma@papaveg.com",
-    store: "Mumbai - Andheri West",
-    franchise: "Papa Veg Mumbai",
-    role: "Pizza Maker",
-    orders: 1240,
-    efficiency: 94,
-    shift: "Morning",
-    status: "Active"
-  },
-  {
-    id: "KS-7721",
-    name: "Neha Singh",
-    email: "n.singh@papaveg.com",
-    store: "Pune - Koregaon Park",
-    franchise: "Papa Veg Pune",
-    role: "Supervisor",
-    orders: 856,
-    efficiency: 88,
-    shift: "Evening",
-    status: "Inactive"
-  },
-  {
-    id: "KS-1104",
-    name: "Amit Patel",
-    email: "a.patel@papaveg.com",
-    store: "Delhi - Connaught Place",
-    franchise: "Papa Veg Delhi",
-    role: "Prep Cook",
-    orders: 3110,
-    efficiency: 91,
-    shift: "Night",
-    status: "Suspended"
-  },
-  {
-    id: "KS-4452",
-    name: "Rahul Verma",
-    email: "r.verma@papaveg.com",
-    store: "Bangalore - Indiranagar",
-    franchise: "Papa Veg Bangalore",
-    role: "Pizza Maker",
-    orders: 2440,
-    efficiency: 98,
-    shift: "Morning",
-    status: "Active"
-  }
-]
+const INITIAL_STAFF = []
 
 export default function KitchenStaffManagement() {
   const [staffList, setStaffList] = useState(INITIAL_STAFF)
@@ -102,8 +53,8 @@ export default function KitchenStaffManagement() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    store: "Mumbai - Andheri West",
-    franchise: "Papa Veg Mumbai",
+    store: "",
+    franchise: "",
     role: "Pizza Maker",
     orders: 0,
     efficiency: 95,
@@ -122,7 +73,7 @@ export default function KitchenStaffManagement() {
   const kpiStats = useMemo(() => {
     const total = staffList.length
     const active = staffList.filter((s) => s.status === "Active").length
-    const onShift = staffList.filter((s) => s.status === "Active" && (s.shift === "Morning" || s.shift === "Evening")).length // Mock shift representation
+    const onShift = staffList.filter((s) => s.status === "Active" && (s.shift === "Morning" || s.shift === "Evening")).length // shift representation
     const offShift = total - onShift
 
     return {
@@ -165,8 +116,8 @@ export default function KitchenStaffManagement() {
     setFormData({
       name: "",
       email: "",
-      store: "Mumbai - Andheri West",
-      franchise: "Papa Veg Mumbai",
+      store: "",
+      franchise: "",
       role: "Pizza Maker",
       orders: 0,
       efficiency: 95,

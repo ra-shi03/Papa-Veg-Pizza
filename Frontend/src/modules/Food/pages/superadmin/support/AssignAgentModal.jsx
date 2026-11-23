@@ -29,13 +29,8 @@ export default function AssignAgentModal({ isOpen, onClose, complaintId, onAssig
     }, 1000);
   };
 
-  const agents = [
-    'Amit Sharma (Senior Support)',
-    'Rohan Gupta (Customer Success)',
-    'Neha Singh (Franchise Operations)',
-    'Vikram Rathore (Delivery Operations)',
-    'Priya Verma (Refund Lead)'
-  ];
+  // support agents are not loaded from the server yet
+  const agents = [];
 
   return (
     <div className="fixed top-[52px] left-0 lg:left-[280px] right-0 bottom-0 z-[9999] flex items-center justify-center p-4 bg-zinc-900/50 dark:bg-zinc-955/80 backdrop-blur-sm animate-in fade-in duration-250">

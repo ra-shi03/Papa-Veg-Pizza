@@ -655,7 +655,7 @@ export function TransactionDetailsModal({ isOpen, onClose, transaction }) {
           </div>
           <div className="flex justify-between py-1.5">
             <span className="text-zinc-450">Audit Logger</span>
-            <span className="font-black text-zinc-650 dark:text-zinc-350">Admin Shubham</span>
+            <span className="font-black text-zinc-650 dark:text-zinc-350">{transaction.performedBy || "—"}</span>
           </div>
         </div>
 

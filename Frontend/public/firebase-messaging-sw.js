@@ -80,6 +80,29 @@ async function hasVisibleClientForTarget(payload = {}) {
   return Boolean(visibleClient);
 }
 
+// The page registers this worker as /firebase-messaging-sw.js?apiKey=...&projectId=... (the public web config, the same
+// values every page bundle already carries). Reading it from our own URL is synchronous, so Firebase attaches its push
+// listener while the worker script first runs; a push that wakes a stopped worker is then never missed.
+function readFirebaseConfigFromUrl() {
+  try {
+    const params = new URL(self.location.href).searchParams;
+    const config = {
+      apiKey: sanitize(params.get("apiKey")),
+      authDomain: sanitize(params.get("authDomain")),
+      projectId: sanitize(params.get("projectId")),
+      appId: sanitize(params.get("appId")),
+      messagingSenderId: sanitize(params.get("messagingSenderId")),
+    };
+    const storageBucket = sanitize(params.get("storageBucket"));
+    const measurementId = sanitize(params.get("measurementId"));
+    if (storageBucket) config.storageBucket = storageBucket;
+    if (measurementId) config.measurementId = measurementId;
+    return config.apiKey && config.projectId && config.appId && config.messagingSenderId ? config : null;
+  } catch {
+    return null;
+  }
+}
+
 async function loadFirebaseWebConfig() {
   const candidates = [
     "/api/v1/food/public/env",
@@ -114,8 +137,7 @@ async function loadFirebaseWebConfig() {
   return null;
 }
 
-(async () => {
-  const config = await loadFirebaseWebConfig();
+function startMessaging(config) {
   if (!config || !config.apiKey || !config.projectId || !config.appId || !config.messagingSenderId) {
     return;
   }
@@ -166,7 +188,15 @@ async function loadFirebaseWebConfig() {
     // Always notify clients regardless of visibility
     await notifyOpenClients(payload);
   });
-})();
+}
+
+const urlFirebaseConfig = readFirebaseConfigFromUrl();
+if (urlFirebaseConfig) {
+  startMessaging(urlFirebaseConfig);
+} else {
+  // Older registrations without the config in the URL: best effort from the server.
+  loadFirebaseWebConfig().then(startMessaging).catch(() => {});
+}
 
 self.addEventListener("push", (event) => {
   if (!event.data) return;

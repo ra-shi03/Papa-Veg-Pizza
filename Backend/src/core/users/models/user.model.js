@@ -69,6 +69,19 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: null
     },
+    // Firebase push device tokens (browser and phone), written by /fcm-tokens/save. Customers and every staff
+    // panel account (super admin, franchise admin, store manager, kitchen staff) are Users, so their tokens live
+    // here. Without these paths strict mode silently dropped every saved token. Never returned unless asked for.
+    fcmTokens: {
+        type: [String],
+        default: undefined,
+        select: false
+    },
+    fcmTokenMobile: {
+        type: [String],
+        default: undefined,
+        select: false
+    },
     addresses: [{
         label: { type: String, default: 'Home' },
         street: { type: String, default: '' },

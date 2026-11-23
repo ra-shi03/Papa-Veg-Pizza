@@ -41,7 +41,7 @@ export function RejectRequestModal({ isOpen, onClose, requestId }) {
       {
         requestId,
         remarks: remarks.trim(),
-        approvedBy: localStorage.getItem("store_user_name") || "Shubham Jamliya"
+        approvedBy: localStorage.getItem("store_user_name") || "—"
       },
       {
         onSuccess: () => {

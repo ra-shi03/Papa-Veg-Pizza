@@ -4,7 +4,7 @@ import {
   Layers, Users, BarChart3, TrendingUp, Loader2, Info, Bell 
 } from 'lucide-react';
 import { apiGetNotificationById } from './NotificationData';
-import { mockRegions, mockFranchises } from './CouponsData';
+import { regionOptions, franchiseOptions } from './CouponsData';
 
 export default function NotificationDetails({ notificationId, isOpen, onClose, onEdit }) {
   const [activeTab, setActiveTab] = useState('Overview');
@@ -45,14 +45,14 @@ export default function NotificationDetails({ notificationId, isOpen, onClose, o
 
   const regionNames = useMemo(() => {
     if (!notification || !notification.regionIds) return [];
-    return mockRegions
+    return regionOptions
       .filter(r => notification.regionIds.includes(r.id))
       .map(r => r.name);
   }, [notification]);
 
   const franchiseNames = useMemo(() => {
     if (!notification || !notification.franchiseIds) return [];
-    return mockFranchises
+    return franchiseOptions
       .filter(f => notification.franchiseIds.includes(f.id))
       .map(f => f.name);
   }, [notification]);

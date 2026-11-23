@@ -1186,7 +1186,7 @@ export const verifyTruecallerAndLogin = async (payload) => {
   const normalizedMobile = String(payload.phone).replace(/\D/g, "");
   
   // In a real implementation, we would verify the Truecaller signature here
-  // For the mock, we just trust the payload if it comes from our frontend
+  // Not verified: the controller refuses this login (501) until a real Truecaller check exists
 
   let userDoc = await User.findOne({ mobile: normalizedMobile });
   let isNewUser = false;

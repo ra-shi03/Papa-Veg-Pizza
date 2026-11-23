@@ -21,12 +21,12 @@ export default function AssignDepartmentModal({ isOpen, onClose, ticketNumber, o
   ];
 
   const departmentAgents = {
-    'Finance': ['Priya Verma (Finance Lead)', 'Rohan Gupta (Accounts Coordinator)'],
-    'Operations': ['Neha Singh (Franchise Operations)', 'Harish Patel (West Ops Manager)'],
-    'Inventory': ['Amit Sharma (Inventory Planner)', 'Kunal Sen (Warehouse Lead)'],
-    'Technical Support': ['Amit Sharma (Senior Tech Engineer)', 'Vikram Rathore (SysAdmin)'],
-    'HR': ['Pooja Desai (Franchise HR Manager)'],
-    'Settlement Team': ['Karan Singh (Settlement Lead)', 'Gaurav Joshi (Dispute Specialist)']
+    'Finance': [],
+    'Operations': [],
+    'Inventory': [],
+    'Technical Support': [],
+    'HR': [],
+    'Settlement Team': []
   };
 
   const currentAgents = departmentAgents[department] || [];

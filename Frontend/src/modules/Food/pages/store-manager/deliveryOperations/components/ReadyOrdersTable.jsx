@@ -26,15 +26,7 @@ export default function ReadyOrdersTable({
     if (!riderId) return "-";
     const rider = safeRiders.find(r => r._id === riderId || r.id === riderId);
     if (rider) return rider.name;
-    const mockRidersMap = {
-      "rider-001": "Ramesh Kumar",
-      "rider-002": "Sunita Patil",
-      "rider-003": "Karan Singh",
-      "rider-1": "Rahul Singh",
-      "rider-2": "Amit Patel",
-      "rider-3": "Suresh Pillai"
-    };
-    return mockRidersMap[riderId] || "Assigned Rider";
+    return "Assigned rider";
   };
 
   const getWaitTimeAndColor = (completedAt) => {

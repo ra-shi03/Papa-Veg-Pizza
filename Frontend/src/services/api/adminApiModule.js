@@ -171,6 +171,12 @@ export const adminAPI = {
     const fcmToken = typeof localStorage !== "undefined" ? localStorage.getItem("fcm_web_registered_token_admin") : null;
     return authService.logout(token, fcmToken, "web");
   },
+  /** Register this browser for push notifications for the signed-in panel user. */
+  saveFcmToken: (token, platform = "web") => {
+    if (!token) return Promise.reject(new Error("FCM token is required"));
+    const path = platform === "mobile" ? "/fcm-tokens/mobile/save" : "/fcm-tokens/save";
+    return adminClient.post(path, { token: String(token), platform });
+  },
   // Restaurant approvals and join requests
   getPendingRestaurants: () =>
     adminClient.get("/food/admin/restaurants/pending"),
@@ -443,16 +449,6 @@ export const adminAPI = {
         })
       return { ...res, data: { success: true, data: { categories }, categories } }
     }),
-
-  /** Offers & Coupons (admin) */
-  getAllOffers: (params = {}) =>
-    adminClient.get("/food/admin/offers", { params }),
-  createAdminOffer: (body) =>
-    adminClient.post("/food/admin/offers", body ?? {}),
-  updateAdminOfferCartVisibility: (offerId, itemId, showInCart) =>
-    adminClient.patch(`/food/admin/offers/${String(offerId)}/cart-visibility`, { itemId: String(itemId), showInCart: Boolean(showInCart) }),
-  deleteAdminOffer: (offerId) =>
-    adminClient.delete(`/food/admin/offers/${String(offerId)}`),
 
   /** Delivery Partner Bonus (admin) */
   getDeliveryPartnerBonusTransactions: (params = {}) =>

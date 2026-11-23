@@ -294,29 +294,7 @@ function ItemPicker({ items, selectedIds, onToggle }) {
 
 // What the customer will see, as a live mobile-style preview matching the reference design.
 function UpsellPreview({ title, items = [], mode = 'auto' }) {
-  const sampleItems = [
-    {
-      id: 'sample-cheesy-dip',
-      label: 'Cheesy Dip',
-      hint: '₹30',
-      group: 'Garlic Breads & Dips',
-      image: 'https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?w=300&q=80',
-    },
-    {
-      id: 'sample-veg-parcel',
-      label: 'Veg Parcel',
-      hint: '₹52',
-      group: 'Tacos & Parcels',
-      image: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=300&q=80',
-    },
-    {
-      id: 'sample-garlic-bread',
-      label: 'Garlic Breadsticks',
-      hint: '₹125',
-      group: 'Garlic Breads & Dips',
-      image: 'https://images.unsplash.com/photo-1544982503-9f984c14501a?w=300&q=80',
-    },
-  ];
+  const sampleItems = [];
 
   const hasCustomItems = Array.isArray(items) && items.length > 0;
   const displayItems = hasCustomItems ? items.slice(0, 8) : sampleItems;

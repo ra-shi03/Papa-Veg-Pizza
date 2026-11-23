@@ -1,6 +1,7 @@
 import React from "react";
 import { Search, Sliders, X } from "lucide-react";
-import { mockCategories } from "../mockProducts";
+
+const categories = [];
 
 export default function ProductsFilters({
   localSearch,
@@ -43,7 +44,7 @@ export default function ProductsFilters({
               className="px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl font-bold text-zinc-805 dark:text-zinc-250 focus:outline-none cursor-pointer"
             >
               <option value="all">All Categories</option>
-              {mockCategories.map((c) => (
+              {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>

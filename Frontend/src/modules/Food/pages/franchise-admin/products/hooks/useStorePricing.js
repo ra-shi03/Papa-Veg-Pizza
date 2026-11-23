@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { adminAPI } from "@food/api";
 import { subscribeToPricingChanges } from "../services/storePricingService";
 import { adminClient } from "@/services/api/axios";
-import { failOrMock } from "@/services/api/mockPolicy";
+import { throwApiError } from "@/services/api/apiError";
 import { categoryService } from "../categoryService";
 import { productService } from "../productService";
 
@@ -46,7 +46,7 @@ export function useUpdateStorePricing() {
 }
 
 // The real catalogue for the pricing pickers (GET /food/admin/category-products and /food/admin/products), not the local
-// sample catalogue. The sample one is used only when VITE_STANDALONE_MOCK=true.
+
 export function usePricingCategories() {
   return useQuery({
     queryKey: ["pricing-catalogue-categories"],
@@ -56,8 +56,8 @@ export function usePricingCategories() {
         const rows = Array.isArray(res.data?.data) ? res.data.data : [];
         return { categories: rows.map((c) => ({ ...c, _id: String(c._id), name: c.label || c.name || "Category" })) };
       } catch (err) {
-        failOrMock(err, "Could not load categories");
-        return categoryService.getCategories({ limit: 1000 });
+        throwApiError(err, "Could not load categories");
+        
       }
     },
     staleTime: 60000,
@@ -82,8 +82,8 @@ export function usePricingProducts() {
           })),
         };
       } catch (err) {
-        failOrMock(err, "Could not load products");
-        return productService.getProducts({ limit: 1000 });
+        throwApiError(err, "Could not load products");
+        
       }
     },
     staleTime: 60000,

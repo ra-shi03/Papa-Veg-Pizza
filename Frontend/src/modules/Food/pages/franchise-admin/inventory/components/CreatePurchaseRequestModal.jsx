@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { X, Trash2, Plus, AlertCircle, ShoppingBag } from "lucide-react";
 import { useCreatePurchaseRequestMutation } from "../hooks/usePurchaseRequests";
 import { useStores } from "../hooks/useStock";
-import { mockIngredients } from "../mockData";
+
+const emptyIngredients = [];
 
 export default function CreatePurchaseRequestModal({ isOpen, onClose, alertRecord }) {
   const createMutation = useCreatePurchaseRequestMutation();
@@ -21,7 +22,7 @@ export default function CreatePurchaseRequestModal({ isOpen, onClose, alertRecor
   // Retrieve stock records to find current stock and ideal stock
   const getStockInfo = (selectedStoreId, selectedIngredientId) => {
     try {
-      const cachedStocks = localStorage.getItem("mock_db_inventory_stock");
+      const cachedStocks = localStorage.getItem("pvp_local_inventory_stock");
       const stocksList = cachedStocks ? JSON.parse(cachedStocks) : [];
       const stock = stocksList.find(s => s.storeId === selectedStoreId && s.ingredientId === selectedIngredientId);
       if (stock) {
@@ -34,7 +35,7 @@ export default function CreatePurchaseRequestModal({ isOpen, onClose, alertRecor
     } catch (e) {}
 
     // Fallback info from ingredients
-    const ing = mockIngredients.find(i => i._id === selectedIngredientId);
+    const ing = emptyIngredients.find(i => i._id === selectedIngredientId);
     return {
       currentStock: 0,
       idealStock: ing ? ing.reorderLevel * 4 : 100,
@@ -114,7 +115,7 @@ export default function CreatePurchaseRequestModal({ isOpen, onClose, alertRecor
 
       if (field === "ingredientId") {
         target.ingredientId = value;
-        const ing = mockIngredients.find(i => i._id === value);
+        const ing = emptyIngredients.find(i => i._id === value);
         const stockInfo = getStockInfo(storeId, value);
         const suggestedQty = Math.max(0, stockInfo.idealStock - stockInfo.currentStock);
 
@@ -315,7 +316,7 @@ export default function CreatePurchaseRequestModal({ isOpen, onClose, alertRecor
                               className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-250 dark:border-zinc-800 rounded-lg text-zinc-800 dark:text-white font-bold outline-none disabled:opacity-70"
                             >
                               <option value="" disabled>Select Ingredient...</option>
-                              {mockIngredients.map(ing => (
+                              {emptyIngredients.map(ing => (
                                 <option key={ing._id} value={ing._id}>
                                   {ing.name} ({ing.ingredientCode})
                                 </option>

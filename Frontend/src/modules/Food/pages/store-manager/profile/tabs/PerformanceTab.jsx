@@ -76,14 +76,14 @@ export default function PerformanceTab({ userRole = "store_manager" }) {
         },
         {
           title: "Customer Satisfaction",
-          value: perfData?.customerSatisfaction || "94%",
+          value: perfData?.customerSatisfaction || "—",
           subtext: "Feedback rating (Google & Portal)",
           icon: Users,
           color: "text-blue-500 bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/35",
         },
         {
           title: "Staff Efficiency Index",
-          value: perfData?.staffEfficiency || "91%",
+          value: perfData?.staffEfficiency || "—",
           subtext: "Average task dispatch speeds",
           icon: TrendingUp,
           color: "text-purple-500 bg-purple-50 dark:bg-purple-950/20 border-purple-100 dark:border-purple-900/35",
@@ -102,7 +102,7 @@ export default function PerformanceTab({ userRole = "store_manager" }) {
     return [
       {
         title: "Orders Prepared",
-        value: perfData?.ordersPrepared || 820,
+        value: perfData?.ordersPrepared || 0,
         subtext: "Personal items dispatched",
         icon: CheckCircle2,
         color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/35",

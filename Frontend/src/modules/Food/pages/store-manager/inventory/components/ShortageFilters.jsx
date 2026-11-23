@@ -23,11 +23,7 @@ export function ShortageFilters({ filters, onFilterChange, onReset }) {
     { label: "Resolved", value: "resolved" }
   ];
 
-  const stores = [
-    { label: "Indore Main Store", value: "st-indore-01" },
-    { label: "Vijay Nagar Store", value: "st-indore-02" },
-    { label: "Palasia Store", value: "st-indore-03" }
-  ];
+  const stores = [];
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-2xl p-4 shadow-sm space-y-3 select-none">

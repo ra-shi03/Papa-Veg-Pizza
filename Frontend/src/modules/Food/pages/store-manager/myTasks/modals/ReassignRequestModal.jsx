@@ -9,7 +9,7 @@ export default function ReassignRequestModal({
   loading = false,
 }) {
   const [reason, setReason] = useState("");
-  const [preferredStaff, setPreferredStaff] = useState("Karan Singh");
+  const [preferredStaff, setPreferredStaff] = useState("");
 
   if (!isOpen) return null;
 
@@ -21,11 +21,8 @@ export default function ReassignRequestModal({
     });
   };
 
-  const staffOptions = [
-    "Karan Singh",
-    "Amit Patel",
-    "Sunita Sharma",
-  ];
+  // the store's kitchen team is not loaded in this dialog yet
+  const staffOptions = [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-955/45 dark:bg-zinc-955/65 backdrop-blur-xs animate-fade">

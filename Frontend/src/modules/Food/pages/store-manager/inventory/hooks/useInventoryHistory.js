@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
-import { INV, failOrMock } from "./inventoryApi";
-import { getLocalTransactions } from "../mockData";
+import { INV, throwApiError } from "./inventoryApi";
 
 export function useInventoryHistory(ingredientId, filters = {}) {
   const {
@@ -34,46 +33,8 @@ export function useInventoryHistory(ingredientId, filters = {}) {
 
         throw new Error("Invalid response format");
       } catch (err) {
-        failOrMock(err);
-        console.warn(`Backend API unavailable for history on ingredient ${ingredientId}. Using local history logs.`);
+        throwApiError(err);
         
-        let list = getLocalTransactions().filter(t => t.ingredientId === ingredientId);
-
-        // 1. Filter by transaction type
-        if (type && type !== "All") {
-          list = list.filter(t => t.type === type);
-        }
-
-        // 2. Filter by search query (reason or createdBy)
-        if (search) {
-          const q = search.toLowerCase();
-          list = list.filter(t => 
-            t.reason.toLowerCase().includes(q) ||
-            t.createdBy.toLowerCase().includes(q)
-          );
-        }
-
-        // 3. Sort by date descending
-        list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-        // 4. Calculate pagination
-        const total = list.length;
-        const totalPages = Math.ceil(total / limit);
-        const startIndex = (page - 1) * limit;
-        const paginatedData = list.slice(startIndex, startIndex + limit);
-
-        // Simulate network delay
-        await new Promise((resolve) => setTimeout(resolve, 200));
-
-        return {
-          data: paginatedData,
-          pagination: {
-            total,
-            page: Number(page),
-            limit: Number(limit),
-            totalPages
-          }
-        };
       }
     },
     enabled: !!ingredientId,

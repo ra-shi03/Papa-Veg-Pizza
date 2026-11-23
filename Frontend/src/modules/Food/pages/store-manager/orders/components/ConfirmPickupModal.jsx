@@ -19,11 +19,8 @@ export default function ConfirmPickupModal({ visible, onClose, order }) {
 
   if (!order) return null;
 
-  // Retrieve assigned rider info (simulate lookup in local storage mock riders if not fully populated)
-  const assignedRider = order.deliveryPartner
-    || (order.deliveryPartnerId
-      ? (JSON.parse(localStorage.getItem("pvp_riders")) || []).find(r => r._id === order.deliveryPartnerId)
-      : null);
+  // The rider the server sent with the order
+  const assignedRider = order.deliveryPartner || null;
 
   // collected at the store: no rider, no code
   const isPickup = order.orderType === "pickup" || order.isPickup === true;

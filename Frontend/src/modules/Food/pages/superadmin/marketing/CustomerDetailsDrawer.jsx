@@ -67,15 +67,8 @@ export default function CustomerDetailsDrawer({ customerId, isOpen, onClose }) {
     };
   }, [customer, transactions]);
 
-  // Points activity chart data (e.g. last 6 months activity)
-  const monthlyActivityData = [
-    { month: 'Jan', Earned: 240, Redeemed: 100 },
-    { month: 'Feb', Earned: 350, Redeemed: 200 },
-    { month: 'Mar', Earned: 180, Redeemed: 0 },
-    { month: 'Apr', Earned: 420, Redeemed: 300 },
-    { month: 'May', Earned: 600, Redeemed: 450 },
-    { month: 'Jun', Earned: analyticsData.pointsEarned ? Math.min(analyticsData.pointsEarned, 800) : 320, Redeemed: analyticsData.pointsRedeemed ? Math.min(analyticsData.pointsRedeemed, 500) : 120 }
-  ];
+  // Points activity by month: no monthly history is loaded yet
+  const monthlyActivityData = [];
 
   if (!isOpen) return null;
 

@@ -7,7 +7,6 @@
     "GET /api/v1/app-config/public",
     "GET /api/v1/bulk-order/config",
     "GET /api/v1/dynamic-home/home-layout",
-    "GET /api/v1/dynamic-home/offers",
     "GET /api/v1/env/public",
     "GET /api/v1/fcm-tokens/check",
     "GET /api/v1/fee-config",

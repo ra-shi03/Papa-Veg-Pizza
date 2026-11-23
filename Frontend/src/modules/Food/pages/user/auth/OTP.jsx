@@ -175,7 +175,7 @@ export default function OTP() {
       const data = response?.data?.data || response?.data || {}
       const user = data.user || data
       const token = data.accessToken || data.token
-      const refreshToken = data.refreshToken || "dummy_refresh_token"
+      const refreshToken = data.refreshToken || ""
 
       if (user && token) {
         // Save current user session

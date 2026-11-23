@@ -6,7 +6,7 @@ export default function AnalyticsTabModal({ isOpen, onClose, store }) {
 
   if (!isOpen) return null;
 
-  const storeName = store?.name || "Connaught Place Central";
+  const storeName = store?.name || "—";
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-3 lg:pl-[280px]">
@@ -58,12 +58,12 @@ export default function AnalyticsTabModal({ isOpen, onClose, store }) {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-white dark:bg-zinc-900 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800">
               <p className="text-[9px] font-bold text-zinc-500 uppercase">Gross Revenue</p>
-              <h4 className="text-base font-black text-zinc-900 dark:text-zinc-100 mt-1">₹ 2,45,800</h4>
+              <h4 className="text-base font-black text-zinc-900 dark:text-zinc-100 mt-1">—</h4>
               <span className="text-emerald-500 text-[8px] font-bold">+12.4% vs last period</span>
             </div>
             <div className="bg-white dark:bg-zinc-900 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800">
               <p className="text-[9px] font-bold text-zinc-500 uppercase">Average Order Value</p>
-              <h4 className="text-base font-black text-zinc-900 dark:text-zinc-100 mt-1">₹ 652.00</h4>
+              <h4 className="text-base font-black text-zinc-900 dark:text-zinc-100 mt-1">—</h4>
               <span className="text-emerald-500 text-[8px] font-bold">+3.2% vs last period</span>
             </div>
             <div className="bg-white dark:bg-zinc-900 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800">
@@ -164,28 +164,28 @@ export default function AnalyticsTabModal({ isOpen, onClose, store }) {
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                     Delivered
                   </span>
-                  <span className="font-bold text-zinc-850 dark:text-zinc-200">92.5%</span>
+                  <span className="font-bold text-zinc-850 dark:text-zinc-200">—</span>
                 </div>
                 <div className="flex justify-between items-center py-1 border-b border-zinc-100 dark:border-zinc-850">
                   <span className="flex items-center gap-1.5 font-semibold text-zinc-500">
                     <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
                     Cancelled
                   </span>
-                  <span className="font-bold text-zinc-850 dark:text-zinc-200">3.8%</span>
+                  <span className="font-bold text-zinc-850 dark:text-zinc-200">—</span>
                 </div>
                 <div className="flex justify-between items-center py-1 border-b border-zinc-100 dark:border-zinc-850">
                   <span className="flex items-center gap-1.5 font-semibold text-zinc-500">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                     Refunded
                   </span>
-                  <span className="font-bold text-zinc-850 dark:text-zinc-200">2.1%</span>
+                  <span className="font-bold text-zinc-850 dark:text-zinc-200">—</span>
                 </div>
                 <div className="flex justify-between items-center py-1 border-b border-zinc-100 dark:border-zinc-850">
                   <span className="flex items-center gap-1.5 font-semibold text-zinc-500">
                     <span className="w-1.5 h-1.5 rounded-full bg-zinc-400"></span>
                     Failed / Void
                   </span>
-                  <span className="font-bold text-zinc-850 dark:text-zinc-200">1.6%</span>
+                  <span className="font-bold text-zinc-850 dark:text-zinc-200">—</span>
                 </div>
               </div>
             </div>

@@ -1,18 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
-import { STANDALONE_MOCK, failOrMock } from "@/services/api/mockPolicy";
-import { initialMockRiders } from "../mockDeliveryData";
+import { throwApiError } from "@/services/api/apiError";
+
 
 const RIDERS_KEY = "pvp_available_riders";
 
 // Initialize localStorage fallback
-const initializeRidersDb = () => {
-  if (!localStorage.getItem(RIDERS_KEY)) {
-    localStorage.setItem(RIDERS_KEY, JSON.stringify(initialMockRiders));
-  }
-};
 
-initializeRidersDb();
 
 export const getLocalRiders = () => {
   try {
@@ -43,12 +37,12 @@ export default function useAvailableRiders() {
         }
 
         // An empty list is a real answer ("no riders free"), never a reason to show sample riders
-        if (!STANDALONE_MOCK || apiItems.length > 0) return apiItems;
-        throw new Error("No riders returned");
+        return apiItems;
+        
       } catch (err) {
-        failOrMock(err, "Could not load riders");
+        throwApiError(err, "Could not load riders");
         // Local fallback (only return online riders or all riders, let's return all online/available riders)
-        return getLocalRiders();
+        
       }
     }
   });

@@ -8,8 +8,10 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@food/components/ui/select";
-import { initialMockSuppliers } from "../mockData";
+
 import { SlidersHorizontal, RotateCcw } from "lucide-react";
+
+const suppliers = [];
 
 export function InventoryFilters({ filters, onFilterChange, onReset }) {
   const categories = ["Cheese", "Sauce", "Veggie & Toppings", "Flour & Dough", "Packaging & Addons"];
@@ -105,7 +107,7 @@ export function InventoryFilters({ filters, onFilterChange, onReset }) {
             </SelectTrigger>
             <SelectContent className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 rounded-xl max-w-[240px]">
               <SelectItem value="All" className="text-xs font-semibold py-2">All Suppliers</SelectItem>
-              {initialMockSuppliers.map((sup) => (
+              {suppliers.map((sup) => (
                 <SelectItem key={sup._id} value={sup._id} className="text-xs font-semibold py-2 truncate">
                   {sup.name}
                 </SelectItem>

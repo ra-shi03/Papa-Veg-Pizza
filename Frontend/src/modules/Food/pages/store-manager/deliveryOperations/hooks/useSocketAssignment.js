@@ -37,9 +37,7 @@ export default function useSocketAssignment() {
     });
 
     // Standalone Simulation
-    if (import.meta.env?.VITE_STANDALONE_MOCK === "true") {
-      setSocketConnected(true);
-    }
+    
 
     return () => {
       socket.disconnect();

@@ -281,7 +281,7 @@
 //       const nextTransactions = [
 //         {
 //           id: `TXN-${Date.now()}`,
-//           desc: "Mock Balance Top-up Deposit",
+//           desc: "Balance Top-up Deposit",
 //           amount: amount,
 //           type: "credit",
 //           date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -662,7 +662,7 @@
 //               <div className="flex justify-between items-center pb-2 border-b border-zinc-100 dark:border-zinc-800 mb-3.5">
 //                 <h3 className="font-extrabold text-xs text-zinc-900 dark:text-zinc-50 flex items-center gap-1.5">
 //                   <CreditCard size={14} className="text-[var(--primary)]" />
-//                   Deposit Mock Wallet Funds
+//                   Deposit Wallet Funds
 //                 </h3>
 //                 <button onClick={() => setShowWalletModal(false)} className="text-zinc-400 hover:text-zinc-650">
 //                   <X size={14} />
@@ -705,7 +705,7 @@
 //                 <div className="p-2 bg-zinc-50 dark:bg-zinc-955/20 border border-zinc-100 dark:border-zinc-800 rounded-lg text-[9px] text-zinc-450 leading-relaxed flex gap-1.5 items-start">
 //                   <Info size={12} className="text-zinc-400 flex-shrink-0 mt-0.5" />
 //                   <span>
-//                     Mock deposit operates entirely in local page state. Balance is updated in real-time for evaluation.
+//                     deposit operates entirely in local page state. Balance is updated in real-time for evaluation.
 //                   </span>
 //                 </div>
 

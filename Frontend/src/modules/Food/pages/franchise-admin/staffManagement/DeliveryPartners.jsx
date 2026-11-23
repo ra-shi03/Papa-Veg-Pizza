@@ -18,22 +18,22 @@ import DeleteRiderModal from "./components/DeleteRiderModal"
 import DocumentsModal from "./components/DocumentsModal"
 import RiderPerformanceModal from "./components/RiderPerformanceModal"
 
-// Import Mock Data
-import { initialDeliveryPartners, initialStores, getDeliveryPartnerDashboardStats } from "./mockManagersData"
+// Import Data
 import useFranchiseRiders, { riderKpis } from "./useFranchiseRiders"
 import { adminAPI } from "@food/api"
 import RiderVerificationDrawer from "./components/RiderVerificationDrawer"
 import RiderWalletMinimumCard from "./components/RiderWalletMinimumCard"
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
+
+const deliveryPartners = [];
 
 export default function DeliveryPartners() {
   // Main Data States
-  // Real riders near this franchise's stores (server); the sample list and its stats only run with VITE_STANDALONE_MOCK=true
-  const { riders, setRiders, stores: realStores, error: loadError, reload: reloadRiders } = useFranchiseRiders(initialDeliveryPartners)
+
+  const { riders, setRiders, stores: realStores, error: loadError, reload: reloadRiders } = useFranchiseRiders(deliveryPartners)
   const [verifyRiderId, setVerifyRiderId] = useState(null)
   const [verifyMode, setVerifyMode] = useState(null) // opens the drawer straight on the reject / suspend reason box
-  const storeList = STANDALONE_MOCK ? initialStores : realStores
-  const [kpis, setKpis] = useState(STANDALONE_MOCK ? getDeliveryPartnerDashboardStats(initialDeliveryPartners) : riderKpis([]))
+  const storeList = (realStores)
+  const [kpis, setKpis] = useState((riderKpis([])))
   const [filteredRiders, setFilteredRiders] = useState([])
   const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -73,7 +73,7 @@ export default function DeliveryPartners() {
   const [drawerTab, setDrawerTab] = useState("profile")
   
   // Socket.IO simulator control
-  const [socketRunning, setSocketRunning] = useState(STANDALONE_MOCK)
+  const [socketRunning, setSocketRunning] = useState(false)
 
   // Toast notifications
   const [toast, setToast] = useState(null)
@@ -164,7 +164,7 @@ export default function DeliveryPartners() {
 
     setFilteredRiders(paginatedList)
     const live = riders.filter(r => r.status !== "DELETED")
-    setKpis(STANDALONE_MOCK ? getDeliveryPartnerDashboardStats(live) : riderKpis(live))
+    setKpis((riderKpis(live)))
     setLoading(false)
   }, [riders, debouncedSearch, storeFilter, vehicleTypeFilter, statusFilter, availabilityFilter, ratingFilter, sortKey, sortOrder, page, limit])
 
@@ -174,61 +174,9 @@ export default function DeliveryPartners() {
 
   // Real-time WebSocket Simulator (Interval updates)
   useEffect(() => {
-    if (!STANDALONE_MOCK || !socketRunning) return
+    return
 
-    const timer = setInterval(() => {
-      const activeList = riders.filter((r) => r.status !== "DELETED" && r.status !== "Suspended")
-      if (activeList.length === 0) return
-
-      const randomIndex = Math.floor(Math.random() * activeList.length)
-      const rider = activeList[randomIndex]
-
-      const events = [
-        {
-          msg: `delivery_completed: ${rider.name} delivered order #ORD-${Math.floor(1000 + Math.random() * 9000)} successfully.`,
-          type: "success",
-          action: () => {
-            setRiders(prev => prev.map(r => r.id === rider.id ? { ...r, ordersToday: r.ordersToday + 1 } : r))
-          }
-        },
-        {
-          msg: `delivery_partner_location_changed: ${rider.name} is moving along Palasia main road.`,
-          type: "info",
-          action: null
-        },
-        {
-          msg: `wallet_updated: ₹45 credited to ${rider.name}'s wallet account.`,
-          type: "success",
-          action: null
-        },
-        {
-          msg: `delivery_partner_offline: ${rider.name} is now Offline (Shift Finished).`,
-          type: "warning",
-          action: () => {
-            setRiders(prev => prev.map(r => r.id === rider.id ? { ...r, status: "Offline", availability: "Unavailable" } : r))
-          }
-        },
-        {
-          msg: `delivery_partner_online: ${rider.name} is now Online (Available).`,
-          type: "success",
-          action: () => {
-            // Find an offline rider to set online
-            const offline = riders.find(r => r.status === "Offline")
-            if (offline) {
-              setRiders(prev => prev.map(r => r.id === offline.id ? { ...r, status: "Online", availability: "Available" } : r))
-            }
-          }
-        }
-      ]
-
-      const randomEvent = events[Math.floor(Math.random() * events.length)]
-      showToast(`[Socket] ${randomEvent.msg}`, randomEvent.type)
-      if (randomEvent.action) {
-        randomEvent.action()
-      }
-    }, 18000)
-
-    return () => clearInterval(timer)
+    
   }, [riders, socketRunning])
 
   useEffect(() => {
@@ -254,7 +202,7 @@ export default function DeliveryPartners() {
   const activateNow = (rider) => callServer(() => adminAPI.activateDeliveryPartner(rider.id), `${rider.name} is active again`)
   const VERIFY_SETTERS = [setIsViewOpen, setIsDocumentsOpen, setIsPerformanceOpen, setIsSuspendOpen, setIsAddEditOpen]
   const openModal = (setter, rider) => {
-    if (STANDALONE_MOCK) return setter(true)
+    
     if (rider && VERIFY_SETTERS.includes(setter)) { setVerifyMode(null); return setVerifyRiderId(rider.id) }
     return notAvailable()
   }
@@ -298,8 +246,8 @@ export default function DeliveryPartners() {
   }
 
   const handleImportCSV = () => {
-    if (!STANDALONE_MOCK) return notAvailable()
-    showToast("CSV Import Dialog Triggered. Parse complete (0 new riders onboarded).", "info")
+    return notAvailable()
+    
   }
 
   // Bulk actions handlers
@@ -320,56 +268,33 @@ export default function DeliveryPartners() {
   }
 
   const handleBulkActivate = () => {
-    if (!STANDALONE_MOCK) return notAvailable()
-    if (selectedRiderIds.length === 0) return
-    setRiders((prev) =>
-      prev.map((r) => (selectedRiderIds.includes(r.id) ? { ...r, status: "Online", availability: "Available" } : r))
-    )
-    showToast(`Bulk activated ${selectedRiderIds.length} delivery partners.`)
-    setSelectedRiderIds([])
+    return notAvailable()
+    
   }
 
   const handleBulkSuspend = () => {
-    if (!STANDALONE_MOCK) return notAvailable()
-    if (selectedRiderIds.length === 0) return
-    setRiders((prev) =>
-      prev.map((r) => (selectedRiderIds.includes(r.id) ? { ...r, status: "Suspended", availability: "Unavailable" } : r))
-    )
-    showToast(`Bulk suspended ${selectedRiderIds.length} riders.`, "warning")
-    setSelectedRiderIds([])
+    return notAvailable()
+    
   }
 
   const handleBulkDelete = () => {
-    if (!STANDALONE_MOCK) return notAvailable()
-    if (selectedRiderIds.length === 0) return
-    setRiders((prev) =>
-      prev.map((r) => (selectedRiderIds.includes(r.id) ? { ...r, status: "DELETED" } : r))
-    )
-    showToast(`Soft deleted ${selectedRiderIds.length} delivery partners.`, "warning")
-    setSelectedRiderIds([])
+    return notAvailable()
+    
   }
 
   const handleBulkAssignStore = () => {
-    if (!STANDALONE_MOCK) return notAvailable()
-    if (selectedRiderIds.length === 0) return
-    // Pick the first rider in selection to mock-trigger store assignment
-    const firstRider = riders.find((r) => r.id === selectedRiderIds[0])
-    setSelectedRider(firstRider)
-    openModal(setIsAssignStoreOpen)
+    return notAvailable()
+    
   }
 
   const handleBulkNotify = () => {
-    if (!STANDALONE_MOCK) return notAvailable()
-    if (selectedRiderIds.length === 0) return
-    showToast(`Broadcasting notifications to ${selectedRiderIds.length} riders.`, "info")
-    setSelectedRiderIds([])
+    return notAvailable()
+    
   }
 
   const handleBulkReport = () => {
-    if (!STANDALONE_MOCK) return notAvailable()
-    if (selectedRiderIds.length === 0) return
-    showToast(`Generating combined performance reports for ${selectedRiderIds.length} selected riders.`, "info")
-    setSelectedRiderIds([])
+    return notAvailable()
+    
   }
 
   // CALLBACK IMPLEMENTATIONS FOR MODALS
@@ -511,27 +436,7 @@ export default function DeliveryPartners() {
         </div>
         <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto whitespace-nowrap scrollbar-none py-1">
           
-          {STANDALONE_MOCK && (
-          <button
-            onClick={() => setSocketRunning(!socketRunning)}
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer shrink-0 ${
-              socketRunning 
-                ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-650 border-emerald-200"
-                : "bg-zinc-50 dark:bg-zinc-950 text-zinc-500 border-zinc-200 dark:border-zinc-800"
-            }`}
-            title={socketRunning ? "Click to Pause Socket Simulator" : "Click to Resume Socket Simulator"}
-          >
-            {socketRunning ? (
-              <>
-                <Play className="w-3 h-3 fill-emerald-600 stroke-[3]" /> Live Socket ON
-              </>
-            ) : (
-              <>
-                <Pause className="w-3 h-3 fill-zinc-500 stroke-[3]" /> Socket Off
-              </>
-            )}
-          </button>
-          )}
+          
 
 
 
@@ -570,7 +475,7 @@ export default function DeliveryPartners() {
       </div>
 
       <>
-          {!STANDALONE_MOCK && <RiderWalletMinimumCard riders={riders} onToast={showToast} />}
+          {(<RiderWalletMinimumCard riders={riders} onToast={showToast} />)}
           {/* KPI CARDS SECTION */}
           <div className="grid grid-cols-2 lg:grid-cols-8 gap-2.5">
             {[
@@ -891,23 +796,17 @@ export default function DeliveryPartners() {
                             </td>
                             <td className="px-3 py-2 text-right">
                               {/* Buttons shown directly (no three-dots menu). With the server: view, verify (approve / reject) and
-                                  suspend / activate, all in the verification drawer. The extra sample-data actions are mock only. */}
+                                  suspend / activate, all in the verification drawer. The extra sample-data actions are only. */}
                               <div className="flex items-center justify-end gap-1">
                                 {[
                                   { key: "view", title: "View details", Icon: Eye, cls: "text-blue-600 border-blue-200 hover:bg-blue-50", run: () => { setSelectedRider(rider); setDrawerTab("profile"); openModal(setIsViewOpen, rider) } },
                                   { key: "verify", title: rider.status === "Pending approval" ? "Verify documents, approve or reject" : "Verify documents", Icon: Shield, cls: "text-emerald-600 border-emerald-200 hover:bg-emerald-50", run: () => { setSelectedRider(rider); openModal(setIsDocumentsOpen, rider) } },
-                                  ...(!STANDALONE_MOCK ? [
+                                  ...(([
                                     { key: "approve", title: "Approve", Icon: CheckCircle2, cls: "text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100", hide: rider.status !== "Pending approval", run: () => approveNow(rider) },
                                     { key: "reject", title: "Reject (a reason is required)", Icon: XCircle, cls: "text-rose-700 border-rose-300 bg-rose-50 hover:bg-rose-100", hide: rider.status !== "Pending approval", run: () => { setVerifyMode("reject"); setVerifyRiderId(rider.id) } },
                                     { key: "suspend-now", title: rider.status === "Suspended" ? "Activate rider" : "Suspend rider", Icon: rider.status === "Suspended" ? UserCheck : Ban, cls: "text-amber-700 border-amber-300 bg-amber-50 hover:bg-amber-100", hide: rider.status === "Pending approval", run: () => rider.status === "Suspended" ? activateNow(rider) : (setVerifyMode("suspend"), setVerifyRiderId(rider.id)) },
-                                  ] : [{ key: "suspend", title: rider.status === "Suspended" ? "Activate rider" : "Suspend rider", Icon: rider.status === "Suspended" ? UserCheck : Ban, cls: "text-amber-600 border-amber-200 hover:bg-amber-50", hide: rider.status === "Pending approval", run: () => { setSelectedRider(rider); openModal(setIsSuspendOpen, rider) } }]),
-                                  ...(STANDALONE_MOCK ? [
-                                    { key: "edit", title: "Edit profile", Icon: Clock, cls: "text-zinc-600 border-zinc-200 hover:bg-zinc-50", run: () => { setSelectedRider(rider); openModal(setIsAddEditOpen, rider) } },
-                                    { key: "perf", title: "Performance charts", Icon: TrendingUp, cls: "text-zinc-600 border-zinc-200 hover:bg-zinc-50", run: () => { setSelectedRider(rider); openModal(setIsPerformanceOpen, rider) } },
-                                    { key: "wallet", title: "Wallet payouts", Icon: Wallet, cls: "text-zinc-600 border-zinc-200 hover:bg-zinc-50", run: () => { setSelectedRider(rider); openModal(setIsWalletOpen, rider) } },
-                                    { key: "live", title: "Live GPS tracking", Icon: Compass, cls: "text-zinc-600 border-zinc-200 hover:bg-zinc-50", run: () => { setSelectedRider(rider); openModal(setIsLiveOpen, rider) } },
-                                    { key: "delete", title: "Delete rider", Icon: Trash2, cls: "text-red-600 border-red-200 hover:bg-red-50", run: () => { setSelectedRider(rider); openModal(setIsDeleteOpen, rider) } },
-                                  ] : []),
+                                  ])),
+                                  ...(([])),
                                 ].filter((b) => !b.hide).map(({ key, title, Icon, cls, run }) => (
                                   <button
                                     key={key}

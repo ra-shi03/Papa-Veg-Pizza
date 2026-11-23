@@ -6,6 +6,7 @@ import { Product } from '../../admin/models/product.model.js';
 import { FoodStore } from '../../store/models/store.model.js';
 import { FoodFranchise } from '../../franchise/models/franchise.model.js';
 import { CategoryProduct } from '../../admin/models/categoryProduct.model.js';
+import { FoodAppConfig } from '../models/appConfig.model.js';
 
 const ids = (list) => (list || []).map(String);
 
@@ -175,4 +176,118 @@ export async function evaluateCoupon(offer, { userId, store, items, subtotal }) 
   }
   discount = Math.max(0, Math.min(eligibleSubtotal, Math.floor(discount)));
   return { ok: true, reason: '', discount, eligibleSubtotal };
+}
+
+// ----- What customers see -----
+// One coupon system: the super admin's Marketing > Coupons (FoodCoupon). Every customer screen (home, Coupons page,
+// cart, Apply Coupon) lists coupons through liveCouponsForStore, with the same place rule checkout applies, so a coupon
+// shown is a coupon checkout accepts at that store.
+
+const HIDDEN_STATUSES = ['disabled', 'Disabled', 'inactive', 'Inactive', 'expired', 'Expired'];
+const HISTORY_DAYS = 30;
+
+/** What a customer may see of a coupon: display fields only (no store / franchise ids, usage counts or audit fields). */
+export const publicCouponView = (o) => ({
+  id: o.id,
+  _id: o._id,
+  couponCode: o.couponCode,
+  title: o.title || '',
+  description: o.description || '',
+  discountType: o.discountType,
+  discountValue: o.discountValue,
+  maxDiscount: o.maxDiscount,
+  minOrderValue: o.minOrderValue,
+  startDate: o.startDate || null,
+  endDate: o.endDate || null,
+  customerScope: o.customerScope,
+  status: o.status,
+});
+
+/**
+ * The store a customer coupon list is for: ?storeId=, else the store serving ?lat=&lng= (the rule
+ * /food/stores/status uses). No store means only coupons that apply everywhere are listed.
+ */
+export async function couponStoreFromQuery(query = {}) {
+  const storeId = String(query.storeId || '');
+  if (mongoose.isValidObjectId(storeId)) return storeId;
+  const lat = parseFloat(query.lat);
+  const lng = parseFloat(query.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  try {
+    const { resolveStoreForLocation } = await import('../../orders/services/order-store.service.js');
+    const found = await resolveStoreForLocation(lat, lng, { anyHours: true });
+    return found?.store?._id ? String(found.store._id) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The super admin can switch coupons off for the whole app (App configuration > Coupons). */
+export async function couponsSwitchedOff() {
+  const config = await FoodAppConfig.findOne().select('couponEnabled').lean();
+  return config?.couponEnabled === false;
+}
+
+const placeFilter = async (storeId) => {
+  const where = storeId ? await placeOfStore(storeId) : null;
+  return (o) => (where ? couponAppliesAtPlace(o, where) : isGlobalCoupon(o));
+};
+
+/** Coupons a customer can use right now at this store (offer shape). Without a store: global coupons only. */
+export async function liveCouponsForStore(storeId) {
+  if (await couponsSwitchedOff()) return [];
+  const now = new Date();
+  const coupons = await FoodCoupon.find({
+    isActive: { $ne: false },
+    status: { $nin: HIDDEN_STATUSES },
+    $or: [{ endDate: null }, { endDate: { $exists: false } }, { endDate: { $gte: now } }],
+  }).sort({ createdAt: -1 }).limit(100).lean();
+  const atPlace = await placeFilter(storeId);
+  return coupons
+    .map(couponToOffer)
+    .filter((o) => o.discountType !== 'unsupported')
+    .filter((o) => !o.startDate || new Date(o.startDate) <= now)
+    .filter((o) => !(o.usageLimit > 0 && o.usedCount >= o.usageLimit))
+    .filter(atPlace);
+}
+
+/**
+ * The customer's coupon history for the Coupons page.
+ * expired: coupons for this store (same place rule) whose end date passed in the last 30 days.
+ * redeemed: coupons this customer has used (the usage record checkout writes when an order is placed), newest first;
+ * `usedUp` means they hit the per-customer limit, so the coupon no longer works for them.
+ */
+export async function couponHistoryFor(userId, storeId) {
+  if (!mongoose.isValidObjectId(String(userId || ''))) return { expired: [], redeemed: [] };
+  const now = new Date();
+  const since = new Date(now.getTime() - HISTORY_DAYS * 24 * 60 * 60 * 1000);
+  const [usages, ended] = await Promise.all([
+    FoodOfferUsage.find({ userId, count: { $gt: 0 } }).sort({ lastUsedAt: -1 }).limit(50).lean(),
+    FoodCoupon.find({ endDate: { $lt: now, $gte: since } }).sort({ endDate: -1 }).limit(50).lean(),
+  ]);
+
+  const used = usages.length ? await FoodCoupon.find({ _id: { $in: usages.map((u) => u.offerId) } }).lean() : [];
+  const usedById = new Map(used.map((c) => [String(c._id), couponToOffer(c)]));
+  const redeemed = usages
+    .map((u) => {
+      const o = usedById.get(String(u.offerId));
+      if (!o) return null;   // the coupon was deleted
+      return {
+        ...publicCouponView(o),
+        status: 'redeemed',
+        timesUsed: u.count,
+        lastUsedAt: u.lastUsedAt || null,
+        usedUp: o.perUserLimit > 0 && u.count >= o.perUserLimit,
+      };
+    })
+    .filter(Boolean);
+
+  const atPlace = await placeFilter(storeId);
+  const expired = ended
+    .map(couponToOffer)
+    .filter((o) => o.discountType !== 'unsupported')
+    .filter(atPlace)
+    .map((o) => ({ ...publicCouponView(o), status: 'expired' }));
+
+  return { expired, redeemed };
 }

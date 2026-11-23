@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
-import { INV, failOrMock } from "./inventoryApi";
-import { getLocalWasteLogs, getLocalIngredients, mockStaffProfiles } from "../mockData";
+import { INV, throwApiError } from "./inventoryApi";
 
 export function useWasteDetails(wasteId) {
   return useQuery({
@@ -21,39 +20,8 @@ export function useWasteDetails(wasteId) {
         }
         throw new Error("Invalid response format");
       } catch (err) {
-        failOrMock(err);
-        console.warn("Backend API unavailable. Fetching waste log detail from local database.");
-
-        // Simulate network latency
-        await new Promise((resolve) => setTimeout(resolve, 300));
-
-        const logs = getLocalWasteLogs();
-        const wasteLog = logs.find(log => log._id === wasteId);
-
-        if (!wasteLog) {
-          throw new Error("Waste log not found in local database");
-        }
-
-        const ingredients = getLocalIngredients();
-        const ingredient = ingredients.find(ing => ing._id === wasteLog.ingredientId);
-
-        const reportedProfile = mockStaffProfiles[wasteLog.reportedBy] || { name: wasteLog.reportedBy };
-        const approvedProfile = wasteLog.approvedBy ? (mockStaffProfiles[wasteLog.approvedBy] || { name: wasteLog.approvedBy }) : null;
-
-        return {
-          wasteLog,
-          ingredient: ingredient || {
-            ingredientName: wasteLog.ingredientName,
-            category: "Unknown",
-            currentStock: 0,
-            costPerUnit: (wasteLog.estimatedLoss / (wasteLog.quantity || 1)) || 0,
-            unit: "Unit"
-          },
-          reportedBy: reportedProfile,
-          approvedBy: approvedProfile,
-          images: wasteLog.images || [],
-          timeline: wasteLog.timeline || []
-        };
+        throwApiError(err);
+        
       }
     }
   });

@@ -2,63 +2,18 @@ import { useState, useEffect } from "react";
 import { storeOrdersApi, LIVE_POLL_MS, useLiveIndicator } from "../../api/storeOrdersApi";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { STANDALONE_MOCK, failOrMock } from "@/services/api/mockPolicy";
+import { throwApiError } from "@/services/api/apiError";
 import io from "socket.io-client";
-import { initialMockReadyOrders, initialMockRiders } from "../mockData";
 
-// Local storage key names for fallback mock db
-const READY_ORDERS_STORAGE_KEY = "pvp_ready_orders";
-const RIDERS_STORAGE_KEY = "pvp_riders";
-const ASSIGNMENTS_STORAGE_KEY = "pvp_delivery_assignments";
 
-// Helpers to get/set items in local storage with automatic mock seeding
-const getLocalReadyOrders = () => {
-  try {
-    let list = JSON.parse(localStorage.getItem(READY_ORDERS_STORAGE_KEY));
-    if (!list || !Array.isArray(list) || list.length === 0) {
-      list = initialMockReadyOrders;
-      localStorage.setItem(READY_ORDERS_STORAGE_KEY, JSON.stringify(list));
-    }
-    return list;
-  } catch (e) {
-    localStorage.setItem(READY_ORDERS_STORAGE_KEY, JSON.stringify(initialMockReadyOrders));
-    return initialMockReadyOrders;
-  }
-};
+// Local storage key names for fallback db
 
-const setLocalReadyOrders = (orders) => {
-  localStorage.setItem(READY_ORDERS_STORAGE_KEY, JSON.stringify(orders));
-};
+// Helpers to get/set items in local storage with automatic seeding
 
-const getLocalRiders = () => {
-  try {
-    let list = JSON.parse(localStorage.getItem(RIDERS_STORAGE_KEY));
-    if (!list || !Array.isArray(list) || list.length === 0) {
-      list = initialMockRiders;
-      localStorage.setItem(RIDERS_STORAGE_KEY, JSON.stringify(list));
-    }
-    return list;
-  } catch (e) {
-    localStorage.setItem(RIDERS_STORAGE_KEY, JSON.stringify(initialMockRiders));
-    return initialMockRiders;
-  }
-};
 
-const setLocalRiders = (riders) => {
-  localStorage.setItem(RIDERS_STORAGE_KEY, JSON.stringify(riders));
-};
 
-const getLocalAssignments = () => {
-  try {
-    return JSON.parse(localStorage.getItem(ASSIGNMENTS_STORAGE_KEY)) || [];
-  } catch (e) {
-    return [];
-  }
-};
 
-const setLocalAssignments = (assignments) => {
-  localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(assignments));
-};
+
 
 // Hook to query ready orders
 export function useReadyOrders(filters = {}) {
@@ -102,8 +57,8 @@ export function useAvailableRiders(searchQuery = "") {
           .filter((r) => r.availability === "idle")
           .map((r) => ({ ...r, employeeId: r.mobile || "", currentDeliveries: r.activeOrders || 0, availability: "available", status: "active" }));
       } catch (err) {
-        failOrMock(err, "Could not load riders"); // the local list below only runs when VITE_STANDALONE_MOCK=true
-        list = getLocalRiders().filter((r) => r.status === "active" && r.availability === "available");
+        throwApiError(err, "Could not load riders");
+        
       }
       
       if (searchQuery) {
@@ -128,70 +83,9 @@ export function useAssignRider() {
         const res = await storeOrdersApi.assignRider(args.orderId, args.deliveryPartnerId);
         return { ...res, orderId: args.orderId, rider: riders.find((r) => r._id === args.deliveryPartnerId) || { name: "The rider" } };
       } catch (err) {
-        failOrMock(err, "Could not assign the rider"); // the local copy below only runs when VITE_STANDALONE_MOCK=true
+        throwApiError(err, "Could not assign the rider");
       }
-      const { orderId, deliveryPartnerId, estimatedDistance, estimatedETA, notes } = args;
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      const orders = getLocalReadyOrders();
-      const riders = getLocalRiders();
-      const assignments = getLocalAssignments();
-
-      const rider = riders.find((r) => r._id === deliveryPartnerId);
-      if (!rider) throw new Error("Rider not found");
-
-      // 1. Create delivery assignment record
-      const newAssignment = {
-        _id: `assign-${Date.now()}`,
-        orderId,
-        deliveryPartnerId,
-        assignedBy: "Store Manager",
-        assignedAt: new Date().toISOString(),
-        estimatedDistance,
-        estimatedETA,
-        status: "assigned",
-        notes
-      };
-
-      assignments.push(newAssignment);
-      setLocalAssignments(assignments);
-
-      // 2. Update order with rider information
-      const updatedOrders = orders.map((o) => {
-        if (o._id === orderId) {
-          const currentTimeline = o.timeline || [];
-          return {
-            ...o,
-            deliveryPartnerId,
-            riderAssignedAt: new Date().toISOString(),
-            timeline: [
-              ...currentTimeline,
-              {
-                status: "ready",
-                timestamp: new Date().toISOString(),
-                note: `Rider ${rider.name} assigned. ETA: ${estimatedETA}m, Distance: ${estimatedDistance}km`
-              }
-            ]
-          };
-        }
-        return o;
-      });
-      setLocalReadyOrders(updatedOrders);
-
-      // 3. Increment rider workload
-      const updatedRiders = riders.map((r) => {
-        if (r._id === deliveryPartnerId) {
-          return {
-            ...r,
-            currentDeliveries: (r.currentDeliveries || 0) + 1,
-            availability: "busy" // Set busy if assigned
-          };
-        }
-        return r;
-      });
-      setLocalRiders(updatedRiders);
-
-      return { success: true, orderId, rider };
+      
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["readyOrders"] });
@@ -215,66 +109,9 @@ export function useConfirmPickup() {
       try {
         return await storeOrdersApi.confirmPickup(orderId, { notes });
       } catch (err) {
-        failOrMock(err, "Could not confirm the pickup"); // the local copy below only runs when VITE_STANDALONE_MOCK=true
+        throwApiError(err, "Could not confirm the pickup");
       }
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      const orders = getLocalReadyOrders();
-      const order = orders.find((o) => o._id === orderId);
-      if (!order) throw new Error("Order not found");
-
-      const riders = getLocalRiders();
-      const rider = riders.find((r) => r._id === order.deliveryPartnerId);
-
-      // 1. Update order status to out_for_delivery
-      const updatedOrders = orders.map((o) => {
-        if (o._id === orderId) {
-          const currentTimeline = o.timeline || [];
-          return {
-            ...o,
-            status: "out_for_delivery",
-            pickedUpAt: pickedUpAt || new Date().toISOString(),
-            pickupNotes: notes,
-            timeline: [
-              ...currentTimeline,
-              {
-                status: "out_for_delivery",
-                timestamp: pickedUpAt || new Date().toISOString(),
-                note: `Order picked up by rider. Live customer tracking enabled.`
-              }
-            ]
-          };
-        }
-        return o;
-      });
-      setLocalReadyOrders(updatedOrders);
-
-      // 2. Free rider workload after pickup if needed or set their state
-      if (rider) {
-        const updatedRiders = riders.map((r) => {
-          if (r._id === rider._id) {
-            return {
-              ...r,
-              availability: "available",
-              currentDeliveries: Math.max(0, (r.currentDeliveries || 1) - 1)
-            };
-          }
-          return r;
-        });
-        setLocalRiders(updatedRiders);
-      }
-
-      // 3. Update assignment state
-      const assignments = getLocalAssignments();
-      const updatedAssignments = assignments.map((a) => {
-        if (a.orderId === orderId) {
-          return { ...a, status: "picked_up", pickedUpAt: pickedUpAt || new Date().toISOString() };
-        }
-        return a;
-      });
-      setLocalAssignments(updatedAssignments);
-
-      return { success: true, orderId };
+      
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["readyOrders"] });
@@ -298,34 +135,9 @@ export function useEscalateOrder() {
         await storeOrdersApi.escalate(orderId, { reason, notes, severity: "High" });
         return { success: true, orderId, reason };
       } catch (err) {
-        failOrMock(err, "Could not escalate the order"); // the local copy below only runs when VITE_STANDALONE_MOCK=true
+        throwApiError(err, "Could not escalate the order");
       }
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      const orders = getLocalReadyOrders();
-      const updatedOrders = orders.map((o) => {
-        if (o._id === orderId) {
-          const currentTimeline = o.timeline || [];
-          return {
-            ...o,
-            isEscalated: true,
-            escalationReason: reason,
-            escalationNotes: notes,
-            timeline: [
-              ...currentTimeline,
-              {
-                status: o.status,
-                timestamp: new Date().toISOString(),
-                note: `CRITICAL: Order escalated. Reason: ${reason} (${notes || "N/A"})`
-              }
-            ]
-          };
-        }
-        return o;
-      });
-      setLocalReadyOrders(updatedOrders);
-
-      return { success: true, orderId, reason };
+      
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["readyOrders"] });

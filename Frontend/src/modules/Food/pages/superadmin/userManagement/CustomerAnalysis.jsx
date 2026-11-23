@@ -13,116 +13,8 @@ import {
 } from "lucide-react"
 import UserDetailsModal from "./UserDetailsModal"
 
-// Rich Mock Customers Data matching UserProfile and CustomerList
-const INITIAL_CUSTOMERS = [
-  {
-    id: "CUST-9842",
-    name: "Marco Rossi",
-    email: "marco.r@example.com",
-    phone: "+39 333 456 7890",
-    status: "ACTIVE",
-    loyalty: "Gold Tier",
-    orders: 14,
-    spent: 1250,
-    memberSince: "Oct 12, 2023",
-    avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuDh75eq_s9eg7xnwZQcweM7ldZvNc3ToQs4NGIReb_UgvLSGQnJfAZLHzsW-oFaE7kSdmx-5FCwFlTW4jLwsiMwSDm3LkauPnHcQNLLIHCIKbRaD4XmGQopNE_WtKDpVBKyt2HMVTctdCoOzOrplhsnwdLHrjss29Gq6m2qFyscXr-pZCd2d6MC3J_C8WeHh4BaM02aPHt-vBlRTITRokmD0AvKuG6tGel5STb4VKb2Ir2yjICGcgDs59l4ofn389Nw8XvHNJ_SQcoS",
-    ordersList: [
-      { id: "ORD-123", date: "Oct 14, 2023" },
-      { id: "ORD-119", date: "Oct 10, 2023" }
-    ]
-  },
-  {
-    id: "CUST-7215",
-    name: "Elena Vance",
-    email: "elena.v@example.com",
-    phone: "+39 342 112 0044",
-    status: "BLOCKED",
-    loyalty: "Silver Tier",
-    orders: 8,
-    spent: 720,
-    memberSince: "Sep 15, 2023",
-    avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuA6n4i4OqmTeyK-H0oq23VRRrSr1yhXRFFvHwCKd7u_bH_34RtmKQq0_lsfGxNd4Nnd-HdPct9xcvqPFdGomJO33cw3CSJnTqYTNahxg4LFhDaNs5sf_iBcwt5_cF-21mbpQd5ivvJ_W5hvbT-jE2hWn_KLZjLMXmNkopAdMum1UwCR8pW3aUMCcy5GlRqbR1uziSRABGtiHcuGjDCQXeLGV4Dexv6oLTDnO0lIagYabizec_qJ7KCEijke0H795e-zS-dSZGWzz93B",
-    ordersList: [
-      { id: "ORD-095", date: "Sep 28, 2023" }
-    ]
-  },
-  {
-    id: "CUST-5501",
-    name: "Luca Moretti",
-    email: "luca.m@example.com",
-    phone: "+39 321 009 8877",
-    status: "SUSPENDED",
-    loyalty: "Platinum Tier",
-    orders: 28,
-    spent: 2450,
-    memberSince: "Nov 02, 2022",
-    avatar: "",
-    ordersList: [
-      { id: "ORD-204", date: "Nov 01, 2023" }
-    ]
-  },
-  {
-    id: "CUST-2234",
-    name: "Alice Smith",
-    email: "alice.s@example.com",
-    phone: "+1 234 567 8910",
-    status: "ACTIVE",
-    loyalty: "Platinum Tier",
-    orders: 34,
-    spent: 3100,
-    memberSince: "Jun 04, 2022",
-    avatar: "",
-    ordersList: [
-      { id: "ORD-225", date: "May 20, 2026" },
-      { id: "ORD-220", date: "May 15, 2026" }
-    ]
-  },
-  {
-    id: "CUST-4112",
-    name: "Chloe Bennett",
-    email: "chloe.b@example.com",
-    phone: "+1 415 982 1204",
-    status: "ACTIVE",
-    loyalty: "Gold Tier",
-    orders: 11,
-    spent: 980,
-    memberSince: "Jan 20, 2024",
-    avatar: "",
-    ordersList: [
-      { id: "ORD-301", date: "May 26, 2026" }
-    ]
-  },
-  {
-    id: "CUST-1049",
-    name: "David Miller",
-    email: "david.m@example.com",
-    phone: "+1 617 384 9081",
-    status: "SUSPENDED",
-    loyalty: "Silver Tier",
-    orders: 2,
-    spent: 150,
-    memberSince: "Feb 10, 2024",
-    avatar: "",
-    ordersList: [
-      { id: "ORD-055", date: "Mar 02, 2026" }
-    ]
-  },
-  {
-    id: "CUST-8831",
-    name: "Sophia Martinez",
-    email: "sophia.m@example.com",
-    phone: "+1 305 771 9082",
-    status: "ACTIVE",
-    loyalty: "Gold Tier",
-    orders: 16,
-    spent: 1420,
-    memberSince: "Dec 01, 2023",
-    avatar: "",
-    ordersList: [
-      { id: "ORD-412", date: "May 22, 2026" }
-    ]
-  }
-]
+// Rich Customers Data matching UserProfile and CustomerList
+const INITIAL_CUSTOMERS = []
 
 export default function CustomerAnalysis() {
   const navigate = useNavigate()
@@ -279,7 +171,7 @@ export default function CustomerAnalysis() {
   }
 
   const handleExportExcel = () => {
-    // Generate dummy Excel/XML or trigger CSV download with .xls extension
+    // Generate Excel/XML or trigger CSV download with .xls extension
     handleExportCSV()
   }
 

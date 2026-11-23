@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
-import { INV, failOrMock } from "./inventoryApi";
-import { getLocalStockRequests } from "../mockData";
+import { INV, throwApiError } from "./inventoryApi";
 
 export function useStockRequestsDashboard() {
   return useQuery({
@@ -26,24 +25,8 @@ export function useStockRequestsDashboard() {
 
         throw new Error("Invalid response format");
       } catch (err) {
-        failOrMock(err);
-        console.warn("Backend API unavailable for stock requests dashboard. Calculating locally.");
+        throwApiError(err);
         
-        const requests = getLocalStockRequests();
-        const pendingRequests = requests.filter(r => r.status === "pending").length;
-        const approvedRequests = requests.filter(r => r.status === "approved").length;
-        const rejectedRequests = requests.filter(r => r.status === "rejected").length;
-        const urgentRequests = requests.filter(r => r.urgency === "critical" || r.urgency === "high").length;
-
-        // Simulate network delay
-        await new Promise((resolve) => setTimeout(resolve, 300));
-
-        return {
-          pendingRequests,
-          approvedRequests,
-          rejectedRequests,
-          urgentRequests
-        };
       }
     },
     staleTime: 5000,

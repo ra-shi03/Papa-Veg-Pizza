@@ -4,39 +4,8 @@ import { X, History, User, Calendar, Tag, ArrowRight } from "lucide-react";
 export default function PriceHistoryModal({ isOpen, onClose, rule }) {
   if (!isOpen || !rule) return null;
 
-  // Mock pricing history audit trail using Indian names and rupees
-  const historyLogs = [
-    {
-      id: "H01",
-      prevBasePrice: rule.basePrice,
-      prevEffectivePrice: Math.round(rule.effectivePrice * 1.05),
-      changedBy: "Admin Shubh",
-      changedAt: "15 Jun 2026, 02:30 PM",
-      reason: "Revised zone promotion margin adjustments",
-      effectiveFrom: "15 Jun 2026",
-      effectiveTo: "30 Jun 2026"
-    },
-    {
-      id: "H02",
-      prevBasePrice: Math.round(rule.basePrice * 0.95),
-      prevEffectivePrice: Math.round(rule.effectivePrice * 0.95),
-      changedBy: "Manager Amit",
-      changedAt: "01 Jun 2026, 11:15 AM",
-      reason: "Summer holiday season discount initiation",
-      effectiveFrom: "01 Jun 2026",
-      effectiveTo: "14 Jun 2026"
-    },
-    {
-      id: "H03",
-      prevBasePrice: Math.round(rule.basePrice * 0.95),
-      prevEffectivePrice: Math.round(rule.basePrice * 0.95),
-      changedBy: "System Setup",
-      changedAt: "10 May 2026, 09:00 AM",
-      reason: "Base pricing rules definition",
-      effectiveFrom: "10 May 2026",
-      effectiveTo: "31 May 2026"
-    }
-  ];
+  // pricing history audit trail using Indian names and rupees
+  const historyLogs = [];
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">

@@ -4,7 +4,8 @@ import {
   User, DollarSign, List, History, SlidersHorizontal, Info 
 } from "lucide-react";
 import { usePurchaseRequestDetailsQuery } from "../hooks/usePurchaseRequests";
-import { mockSuppliers } from "../mockData";
+
+const suppliers = [];
 
 export default function PurchaseRequestDetailsDrawer({ 
   isOpen, onClose, requestId, onApprove, onReject, onReceive 
@@ -83,7 +84,7 @@ export default function PurchaseRequestDetailsDrawer({
     }
   };
 
-  const supplier = mockSuppliers.find(s => s._id === request?.vendorId);
+  const supplier = suppliers.find(s => s._id === request?.vendorId);
 
   return (
     <div className="fixed inset-y-0 right-0 left-0 lg:left-[280px] z-50 overflow-hidden text-xs font-semibold text-zinc-700 dark:text-zinc-350">

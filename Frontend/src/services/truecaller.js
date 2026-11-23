@@ -6,7 +6,7 @@ import { toast } from "sonner";
 // Resolving never happens, so the login page's catch simply ends its loading state.
 const MESSAGE = "Truecaller login isn't available right now. Please continue with your mobile number.";
 
-export const truecallerMock = {
+export const truecaller = {
   isInstalled: () => true,
   requestVerification: () => {
     try {

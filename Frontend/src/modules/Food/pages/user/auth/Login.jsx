@@ -5,7 +5,7 @@ import { clearModuleAuth } from "@food/utils/auth";
 import { requestUserOtp } from "@/services/api/auth";
 import axiosInstance from "@/services/api/axios";
 import OTP from "./OTP";
-import { truecallerMock } from "@/services/truecallerMock";
+import { truecaller } from "@/services/truecaller";
 import logoNew from "@/assets/logo1.png";
 
 export default function Login() {
@@ -43,11 +43,11 @@ export default function Login() {
   }, []);
 
   const handleTruecallerLogin = async () => {
-    if (!truecallerMock.isInstalled()) return;
+    if (!truecaller.isInstalled()) return;
     
     setIsTruecallerLoading(true);
     try {
-      const response = await truecallerMock.requestVerification();
+      const response = await truecaller.requestVerification();
       if (response.successful) {
         // Send payload to backend verify endpoint
         const apiResponse = await axiosInstance.post('/food/auth/user/verify-truecaller', {
@@ -151,7 +151,7 @@ export default function Login() {
               </p>
             </motion.div>
 
-            {truecallerMock.isInstalled() && config?.enableTruecaller !== false && (
+            {truecaller.isInstalled() && config?.enableTruecaller !== false && (
               <motion.div variants={itemVariants} className="mb-6 w-full">
                 <button
                   type="button"
@@ -173,7 +173,7 @@ export default function Login() {
               </motion.div>
             )}
 
-            {truecallerMock.isInstalled() && config?.enableTruecaller !== false && (
+            {truecaller.isInstalled() && config?.enableTruecaller !== false && (
               <motion.div variants={itemVariants} className="flex items-center w-full mb-6">
                 <div className="flex-1 border-t border-gray-200"></div>
                 <span className="px-4 text-sm text-gray-400 font-medium">or</span>

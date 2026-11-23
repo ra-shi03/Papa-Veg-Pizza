@@ -9,7 +9,8 @@ import {
   Check, Trash2, ShieldAlert, ArrowUpDown, ChevronDown, 
   Pizza, Flame, Leaf, HelpCircle 
 } from "lucide-react";
-import { mockCategories } from "../mockProducts";
+
+const categories = [];
 
 export default function ProductsTable({
   data,
@@ -38,7 +39,7 @@ export default function ProductsTable({
 
   // Map categoryId to Category Name
   const getCategoryName = (catId) => {
-    const cat = mockCategories.find((c) => c.id === catId);
+    const cat = categories.find((c) => c.id === catId);
     return cat ? cat.name : catId;
   };
 

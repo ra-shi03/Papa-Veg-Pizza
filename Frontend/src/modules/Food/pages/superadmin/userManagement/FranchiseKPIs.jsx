@@ -6,7 +6,7 @@ export default function FranchiseKPIs({ stats }) {
     {
       title: "Total Franchise Admins",
       value: stats.total,
-      change: "+12.5%",
+      change: "",
       isPositive: true,
       icon: Users,
       color: "text-black dark:text-white bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-800",
@@ -15,7 +15,7 @@ export default function FranchiseKPIs({ stats }) {
     {
       title: "Active Franchise Admins",
       value: stats.active,
-      change: "+8.3%",
+      change: "",
       isPositive: true,
       icon: UserCheck,
       color: "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/30",
@@ -24,7 +24,7 @@ export default function FranchiseKPIs({ stats }) {
     {
       title: "Inactive Franchise Admins",
       value: stats.inactive,
-      change: "-4.2%",
+      change: "",
       isPositive: false,
       icon: UserX,
       color: "text-black dark:text-white bg-zinc-100/50 dark:bg-zinc-800/30 border-zinc-200 dark:border-zinc-800/50",
@@ -33,7 +33,7 @@ export default function FranchiseKPIs({ stats }) {
     {
       title: "Total Franchise Revenue",
       value: `₹${stats.revenue.toLocaleString()}`,
-      change: "+18.2%",
+      change: "",
       isPositive: true,
       icon: DollarSign,
       color: "text-[var(--primary)] bg-[var(--primary)]/5 dark:bg-[var(--primary)]/10 border-[var(--primary)]/20",

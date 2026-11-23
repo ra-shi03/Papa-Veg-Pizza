@@ -204,24 +204,7 @@ export default function CustomerComplaints({ storeId, refreshKey }) {
               )}
 
               {activeTab === "timeline" && (
-                <div className="space-y-2.5 p-1 text-[10px]">
-                  <div className="flex gap-2">
-                    <span className="text-slate-405 shrink-0">10:30 AM:</span>
-                    <span>Order Placed by client</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <span className="text-slate-405 shrink-0">10:32 AM:</span>
-                    <span>Store accepted & cook started</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <span className="text-slate-405 shrink-0">10:48 AM:</span>
-                    <span>Rider Ramesh allocated to order</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <span className="text-rose-500 font-black shrink-0">11:15 AM:</span>
-                    <span className="text-rose-550 font-black">Delayed delivery complaint filed by customer</span>
-                  </div>
-                </div>
+                <div className="p-1 text-[10px] text-slate-400 font-semibold">No timeline is recorded for this complaint yet.</div>
               )}
 
               {activeTab === "staff" && (
@@ -232,9 +215,6 @@ export default function CustomerComplaints({ storeId, refreshKey }) {
                     onChange={(e) => toast.success(`Assigned ${e.target.value} to this resolution case.`)}
                   >
                     <option value="">Select resolution executive...</option>
-                    <option value="Vijay (Chef)">Vijay (Chef) - Kitchen Lead</option>
-                    <option value="Ramesh (Rider)">Ramesh (Rider) - Courier Lead</option>
-                    <option value="Shubham (Manager)">Shubham (Manager) - Store Lead</option>
                   </select>
                 </div>
               )}

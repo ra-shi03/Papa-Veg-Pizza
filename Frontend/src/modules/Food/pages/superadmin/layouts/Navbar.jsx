@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { clearModuleAuth, getModuleRefreshToken } from "@food/utils/auth"
+import { clearModuleAuth, getModuleRefreshToken, getCurrentUser } from "@food/utils/auth"
 import { Menu, Bell, Store, ChevronDown, User, LogOut, Settings as SettingsIcon, AlertCircle, X, Loader2, Save } from "lucide-react"
 import Profile from "../profile/Profile"
 import { adminAPI } from "@food/api"
@@ -212,8 +212,8 @@ export default function Navbar({ onToggleSidebar, isCollapsed }) {
           {showProfileMenu && (
             <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 shadow-xl py-2 z-50 animate-fade-down">
               <div className="px-3.5 py-2 border-b border-zinc-50 dark:border-zinc-800 mb-1.5">
-                <p className="text-xs font-bold text-zinc-800 dark:text-zinc-100">Global Manager</p>
-                <p className="text-[10px] text-zinc-400 truncate">manager@papaveg.com</p>
+                <p className="text-xs font-bold text-zinc-800 dark:text-zinc-100">{getCurrentUser("admin")?.name || "Super Admin"}</p>
+                <p className="text-[10px] text-zinc-400 truncate">{getCurrentUser("admin")?.email || ""}</p>
               </div>
               <button 
                 onClick={() => {

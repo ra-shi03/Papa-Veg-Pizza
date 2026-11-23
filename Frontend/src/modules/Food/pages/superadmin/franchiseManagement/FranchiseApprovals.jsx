@@ -267,7 +267,7 @@ export default function FranchiseApprovals() {
           </div>
         </div>
 
-        {/* Mock cards removed to show only required real data */}
+        {/* cards removed to show only required real data */}
 
       </div>
 
@@ -469,7 +469,7 @@ export default function FranchiseApprovals() {
         </div>
       )}
 
-      {/* Removed Mock Audit Modal */}
+      {/* Removed Audit Modal */}
 
     </div>
   );

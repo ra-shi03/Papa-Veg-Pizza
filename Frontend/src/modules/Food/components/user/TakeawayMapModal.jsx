@@ -92,7 +92,7 @@ export default function TakeawayMapModal({
 
   return (
     <div className="fixed inset-0 z-55 overflow-hidden animate-fadeIn" style={{ backgroundColor: mapBg }}>
-      {/* Draggable Mock Map Area */}
+      {/* Draggable Map Area */}
       <div className="absolute inset-0 w-full h-full">
         {/* Grid of roads and blocks */}
         <svg className="absolute inset-0 w-full h-full opacity-90" xmlns="http://www.w3.org/2000/svg">

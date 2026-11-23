@@ -72,6 +72,16 @@ export function AppRoutes() {
     }
   }, [location.pathname, location.search])
 
+  // Staff panels outside /food (super admin, franchise admin, store operations) register this browser for push
+  // the same way the /food apps do. Loaded on demand so the Firebase SDK stays out of the first bundle.
+  useEffect(() => {
+    const path = location.pathname || ''
+    if (!/^\/(superadmin|franchise-admin|store-operations)(\/|$)/.test(path)) return
+    import('@food/utils/firebaseMessaging')
+      .then(({ registerWebPushForCurrentModule }) => registerWebPushForCurrentModule(path))
+      .catch(() => {})
+  }, [location.pathname])
+
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>

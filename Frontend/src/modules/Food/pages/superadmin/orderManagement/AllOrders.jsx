@@ -12,8 +12,8 @@ import { toast } from 'sonner';
 import { 
   getKpiData, 
   getOrders, 
-  mockFranchises, 
-  mockStores,
+  franchiseOptions, 
+  storeOptions,
   useDebounce 
 } from './AllOrdersData';
 
@@ -198,7 +198,7 @@ export default function AllOrders() {
 
   // Helper lists derived from static configs
   const cities = useMemo(() => {
-    const c = new Set(mockFranchises.map(f => f.city));
+    const c = new Set(franchiseOptions.map(f => f.city));
     return ['All', ...Array.from(c)];
   }, []);
 
@@ -388,7 +388,7 @@ export default function AllOrders() {
                 className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg h-9 px-2.5 text-xs text-zinc-800 dark:text-zinc-200 focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none font-bold"
               >
                 <option value="All">All Franchises</option>
-                {mockFranchises.map(f => (
+                {franchiseOptions.map(f => (
                   <option key={f._id} value={f._id}>{f.name}</option>
                 ))}
               </select>
@@ -406,7 +406,7 @@ export default function AllOrders() {
                 className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg h-9 px-2.5 text-xs text-zinc-800 dark:text-zinc-200 focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none font-bold"
               >
                 <option value="All">All Stores</option>
-                {mockStores
+                {storeOptions
                   .filter(s => filters.franchise === 'All' || s.franchiseId === filters.franchise)
                   .map(s => (
                     <option key={s._id} value={s._id}>{s.name}</option>

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
 import { adminAPI } from "@food/api"
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 const errorText = (err) =>
   err?.response?.data?.message || err?.response?.data?.error || err?.message || "Could not load delivery partners"
@@ -58,16 +57,16 @@ export function riderKpis(rows) {
 
 /**
  * The franchise admin's delivery partners: GET /food/admin/delivery/partners, already limited by the server to riders
- * near or working for this franchise's stores. Sample riders only with VITE_STANDALONE_MOCK=true.
+ * near or working for this franchise's stores.
  */
 export default function useFranchiseRiders(initialRiders = []) {
-  const [riders, setRiders] = useState(STANDALONE_MOCK ? initialRiders : [])
+  const [riders, setRiders] = useState(([]))
   const [stores, setStores] = useState([])
-  const [loading, setLoading] = useState(!STANDALONE_MOCK)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
   const reload = useCallback(async () => {
-    if (STANDALONE_MOCK) return
+    
     setLoading(true)
     setError("")
     try {

@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
-import { INV, failOrMock } from "./inventoryApi";
-import { getLocalInventoryAlerts } from "../mockData";
+import { INV, throwApiError } from "./inventoryApi";
 
 export function useAlertsDashboard() {
   return useQuery({
@@ -20,30 +19,8 @@ export function useAlertsDashboard() {
         }
         throw new Error("Invalid response format");
       } catch (err) {
-        failOrMock(err);
-        console.warn("Backend API unavailable. Fetching alerts dashboard from local storage.");
-
-        // Simulate network latency
-        await new Promise((resolve) => setTimeout(resolve, 300));
-
-        const alerts = getLocalInventoryAlerts();
-        const activeList = alerts.filter(a => a.status === "active");
-        const resolvedList = alerts.filter(a => a.status === "resolved");
-
-        const activeAlerts = activeList.length;
-        const criticalAlerts = activeList.filter(a => a.severity === "critical").length;
-        const resolvedAlerts = resolvedList.length;
-
-        // Unique ingredients affected
-        const uniqueIngredients = new Set(activeList.map(a => a.ingredientId));
-        const ingredientsAffected = uniqueIngredients.size;
-
-        return {
-          activeAlerts,
-          criticalAlerts,
-          resolvedAlerts,
-          ingredientsAffected
-        };
+        throwApiError(err);
+        
       }
     }
   });

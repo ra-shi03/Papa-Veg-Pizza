@@ -27,3 +27,17 @@ export function readPickupStore() {
   const store = readJson("pickupStore")
   return store?.id && store.service === service ? { id: String(store.id), name: String(store.name || ""), service } : null
 }
+
+/**
+ * Which store a coupon list is for, as query params: the pickup store, else the store saved for this address, else the
+ * saved delivery point (the server finds the store serving it). Same order as the store open / closed check, so every
+ * coupon screen lists exactly the coupons checkout accepts at that store.
+ */
+export function couponStoreParams() {
+  const pickup = readPickupStore()
+  if (pickup?.id) return { storeId: pickup.id }
+  const saved = (() => { try { return localStorage.getItem("user_storeId") || "" } catch (_) { return "" } })()
+  if (saved) return { storeId: saved }
+  const p = readSavedCoords()
+  return p ? { lat: p.lat, lng: p.lng } : {}
+}

@@ -12,7 +12,8 @@ import {
   ChevronUp 
 } from "lucide-react"
 import AnimatedPage from "@food/components/user/AnimatedPage"
-import { restaurantAPI } from "@food/api"
+import { restaurantAPI, userAPI } from "@food/api"
+import { couponStoreParams } from "@food/utils/savedLocation"
 import { useAppConfig } from "@food/context/AppConfigContext"
 import { toast } from "sonner"
 
@@ -23,6 +24,8 @@ export default function AllCoupons() {
   const [selectedFilter, setSelectedFilter] = useState("") // "", "online", "instore", "expiring"
   const [loading, setLoading] = useState(true)
   const [activeOffers, setActiveOffers] = useState([])
+  const [expiredOffers, setExpiredOffers] = useState([])
+  const [redeemedOffers, setRedeemedOffers] = useState([])
   const [copiedCode, setCopiedCode] = useState("")
   const [expandedCardId, setExpandedCardId] = useState(null)
 
@@ -52,14 +55,30 @@ export default function AllCoupons() {
       }
       try {
         setLoading(true)
-        const res = await restaurantAPI.getPublicOffers()
+        const params = couponStoreParams()
+        const signedIn = Boolean(localStorage.getItem("user_accessToken"))
+        const [res, history] = await Promise.all([
+          restaurantAPI.getPublicOffers(params),
+          // Expired / redeemed come from the server for the signed-in customer; a guest has no history.
+          signedIn ? userAPI.getCouponHistory(params).catch(() => null) : Promise.resolve(null),
+        ])
         const list = res?.data?.data?.allOffers || res?.data?.allOffers || []
+        const past = history?.data?.data || {}
+        const redeemed = Array.isArray(past.redeemed) ? past.redeemed : []
+        // A coupon the customer has used up (per-customer limit reached) no longer works for them: not "active".
+        const usedUp = new Set(redeemed.filter((o) => o.usedUp).map((o) => o.couponCode))
         if (!cancelled) {
-          const visible = Array.isArray(list) ? list.filter((o) => o?.showInCart !== false) : []
+          const visible = Array.isArray(list) ? list.filter((o) => o?.showInCart !== false && !usedUp.has(o.couponCode)) : []
           setActiveOffers(visible)
+          setExpiredOffers(Array.isArray(past.expired) ? past.expired : [])
+          setRedeemedOffers(redeemed)
         }
       } catch (e) {
-        if (!cancelled) setActiveOffers([])
+        if (!cancelled) {
+          setActiveOffers([])
+          setExpiredOffers([])
+          setRedeemedOffers([])
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -70,80 +89,12 @@ export default function AllCoupons() {
     }
   }, [appConfig?.couponEnabled])
 
-  // Mock expired coupons based on UX screenshots
-  const expiredOffers = [
-    {
-      id: "exp-1",
-      couponCode: "XXXXXX",
-      actualCode: "FLAT125",
-      title: "FLAT 125 OFF",
-      description: "Rs. 125 Off on bill value above Rs.500",
-      offerType: "online",
-      isInstore: false,
-      endDate: "2026-05-10",
-      status: "expired",
-      terms: "Valid on all pizzas except Margherita. Cannot be combined with other offers."
-    },
-    {
-      id: "exp-2",
-      couponCode: "XXXXXX",
-      actualCode: "FLAT100",
-      title: "FLAT 100 OFF",
-      description: "Rs. 100 Off on bill value above Rs.400",
-      offerType: "online",
-      isInstore: false,
-      endDate: "2026-05-01",
-      status: "expired",
-      terms: "Offer valid once per user. Applicable on delivery orders only."
-    },
-    {
-      id: "exp-3",
-      couponCode: "XXXXXX",
-      actualCode: "MOM",
-      title: "MOM",
-      description: "Get 100% Cashback* + a FREE personal Pizza of your choice.",
-      offerType: "online/instore",
-      isInstore: true,
-      endDate: "2026-04-15",
-      status: "expired",
-      terms: "100% cashback up to Rs. 200. Free pizza applies to personal pan size only."
-    }
-  ]
-
-  // Mock redeemed coupons
-  const redeemedOffers = [
-    {
-      id: "red-1",
-      couponCode: "XXXXXX",
-      actualCode: "WELCOME200",
-      title: "WELCOME 200",
-      description: "Rs. 200 Off on your very first order value above Rs.499",
-      offerType: "online",
-      isInstore: false,
-      endDate: "2026-06-12",
-      status: "redeemed",
-      terms: "Only valid for newly registered users on their first completed transaction."
-    },
-    {
-      id: "red-2",
-      couponCode: "XXXXXX",
-      actualCode: "FREEGB",
-      title: "FREE GARLIC BREAD",
-      description: "Get free Garlic Breadsticks on orders above Rs.399",
-      offerType: "online/instore",
-      isInstore: true,
-      endDate: "2026-06-25",
-      status: "redeemed",
-      terms: "Must include at least one medium or large pizza in cart to redeem garlic bread."
-    }
-  ]
-
   // Determine current list to render based on active tab
   const currentOffersList = useMemo(() => {
     if (activeTab === "expired") return expiredOffers
     if (activeTab === "redeemed") return redeemedOffers
     return activeOffers
-  }, [activeTab, activeOffers])
+  }, [activeTab, activeOffers, expiredOffers, redeemedOffers])
 
   // Filter current list based on filter pills
   const filteredOffersList = useMemo(() => {

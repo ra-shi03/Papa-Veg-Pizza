@@ -6,7 +6,7 @@ export default function KpiCards({ data, loading }) {
     {
       title: "Today's Revenue",
       value: `₹${Number(data?.revenue || 0).toLocaleString("en-IN")}`,
-      trend: "+12.4%",
+      trend: "",
       up: true,
       icon: DollarSign,
       color: "text-[var(--primary)] bg-[var(--primary)]/10 border-[var(--primary)]/20",
@@ -14,7 +14,7 @@ export default function KpiCards({ data, loading }) {
     {
       title: "Today's Orders",
       value: `${data?.orders || 0} Orders`,
-      trend: "+8.2%",
+      trend: "",
       up: true,
       icon: ShoppingBag,
       color: "text-[var(--primary)] bg-[var(--primary)]/10 border-[var(--primary)]/20",
@@ -30,7 +30,7 @@ export default function KpiCards({ data, loading }) {
     {
       title: "Online Riders",
       value: `${data?.activeRiders || 0} Partners`,
-      trend: "+4.1%",
+      trend: "",
       up: true,
       icon: Truck,
       color: "text-[var(--primary)] bg-[var(--primary)]/10 border-[var(--primary)]/20",
@@ -38,7 +38,7 @@ export default function KpiCards({ data, loading }) {
     {
       title: "Pending Refunds",
       value: `${data?.refunds || 0} Requests`,
-      trend: "+1.2%",
+      trend: "",
       up: false,
       icon: RotateCcw,
       color: "text-rose-500 bg-rose-50 dark:bg-rose-950/20 border-rose-100 dark:border-rose-900/30",
@@ -56,7 +56,7 @@ export default function KpiCards({ data, loading }) {
     {
       title: "Avg Order Value",
       value: `₹${data?.avgOrderValue || 0}`,
-      trend: "+2.5%",
+      trend: "",
       up: true,
       icon: Scale,
       color: "text-[var(--primary)] bg-[var(--primary)]/10 border-[var(--primary)]/20",

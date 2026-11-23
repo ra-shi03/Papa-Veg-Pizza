@@ -159,7 +159,7 @@ export default function KitchenStaffDetail({ isOpen, onClose, staff, onEdit, onS
                     </div>
                     <div className="bg-orange-50 dark:bg-orange-955/20 p-2.5 rounded-xl text-center border border-orange-100 dark:border-orange-900/30">
                       <p className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 mb-1">Rating</p>
-                      <p className="text-base font-bold text-orange-600 dark:text-orange-400">4.8</p>
+                      <p className="text-base font-bold text-orange-600 dark:text-orange-400">—</p>
                       <p className="text-[9px] text-zinc-500 dark:text-zinc-400 mt-1">Top Tier</p>
                     </div>
                   </div>
@@ -195,7 +195,7 @@ export default function KitchenStaffDetail({ isOpen, onClose, staff, onEdit, onS
                     </div>
                     <div className="p-2.5 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl">
                       <p className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 mb-1">Accuracy Rate</p>
-                      <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100">99%</p>
+                      <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100">—</p>
                     </div>
                   </div>
                 </section>

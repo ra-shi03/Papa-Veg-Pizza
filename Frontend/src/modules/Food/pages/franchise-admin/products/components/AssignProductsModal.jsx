@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { X, Search, Sparkles, AlertCircle, Check } from "lucide-react";
 import { useAssignedProducts } from "../hooks/useAssignedProducts";
-import { mockCategories } from "../mockProducts";
+
+const categories = [];
 
 export default function AssignProductsModal({ isOpen, onClose, onSubmit, addon }) {
   const { data: response, isLoading } = useAssignedProducts(addon?._id);
@@ -104,7 +105,7 @@ export default function AssignProductsModal({ isOpen, onClose, onSubmit, addon }
                   className="px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-[var(--primary)] text-zinc-700 dark:text-zinc-350 cursor-pointer font-bold"
                 >
                   <option value="all">All Categories</option>
-                  {mockCategories.map((c) => (
+                  {categories.map((c) => (
                     <option key={c._id} value={c._id}>{c.name}</option>
                   ))}
                 </select>

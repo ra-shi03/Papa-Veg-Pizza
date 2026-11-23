@@ -7,7 +7,7 @@ export default function AttachmentGalleryModal({ isOpen, onClose, attachments })
 
   useEffect(() => {
     if (attachments && attachments.length > 0) {
-      // Map names to mock structures if it's just an array of strings
+      // Map names to structures if it's just an array of strings
       const normalized = attachments.map((att, idx) => {
         if (typeof att === 'string') {
           const extension = att.split('.').pop().toLowerCase();

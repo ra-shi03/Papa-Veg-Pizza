@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
-import { INV, failOrMock } from "./inventoryApi";
-import { getLocalInventoryAlerts, getLocalIngredients, mockConsumptionStats } from "../mockData";
+import { INV, throwApiError } from "./inventoryApi";
 
 export function useAlertDetails(alertId) {
   return useQuery({
@@ -21,50 +20,8 @@ export function useAlertDetails(alertId) {
         }
         throw new Error("Invalid response format");
       } catch (err) {
-        failOrMock(err);
-        console.warn(`Backend API unavailable. Fetching alert details for ${alertId} from local storage.`);
-
-        // Simulate network latency
-        await new Promise((resolve) => setTimeout(resolve, 300));
-
-        const alerts = getLocalInventoryAlerts();
-        const alert = alerts.find((a) => a._id === alertId);
-
-        if (!alert) {
-          throw new Error("Alert not found");
-        }
-
-        const ingredients = getLocalIngredients();
-        const ingredient = ingredients.find((i) => i._id === alert.ingredientId);
-
-        const consumption = mockConsumptionStats[alert.ingredientId] || {
-          today: 0,
-          week: 0,
-          month: 0,
-          averageDaily: 0,
-        };
-
-        // Calculate estimated depletion time
-        let depletionEstimation = "N/A";
-        if (alert.currentStock === 0) {
-          depletionEstimation = "Out of Stock / Depleted";
-        } else if (consumption.averageDaily > 0) {
-          const days = (alert.currentStock / consumption.averageDaily).toFixed(1);
-          depletionEstimation = `${days} days remaining`;
-        } else {
-          depletionEstimation = "No daily consumption data available";
-        }
-
-        return {
-          ...alert,
-          category: ingredient?.category || "Unknown",
-          unit: ingredient?.unit || "Unit",
-          costPerUnit: ingredient?.costPerUnit || 0,
-          reorderLevel: ingredient?.reorderLevel || 0,
-          supplierName: ingredient?.supplierName || "Default Supplier",
-          consumption,
-          depletionEstimation,
-        };
+        throwApiError(err);
+        
       }
     },
   });

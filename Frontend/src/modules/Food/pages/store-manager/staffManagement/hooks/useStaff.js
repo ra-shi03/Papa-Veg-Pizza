@@ -1,22 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
-import { failOrMock } from "@/services/api/mockPolicy";
+import { throwApiError } from "@/services/api/apiError";
 
-// Local copy of the staff list, used only by the VITE_STANDALONE_MOCK=true paths below (it was referenced but never defined)
-const STAFF_STORAGE_KEY = "pvp_kitchen_staff";
-const getLocalStaff = () => {
-  try {
-    return JSON.parse(localStorage.getItem(STAFF_STORAGE_KEY)) || [];
-  } catch {
-    return [];
-  }
-};
-const setLocalStaff = (list) => {
-  try {
-    localStorage.setItem(STAFF_STORAGE_KEY, JSON.stringify(list));
-  } catch {}
-};
+
 
 // 1. Fetch Staff List Hook
 export function useStaffList(filters = {}) {
@@ -48,11 +35,8 @@ export function useStaffDetails(id) {
         }
         throw new Error("API return format mismatch");
       } catch (err) {
-        failOrMock(err, "Could not load the staff member"); // sample data only when VITE_STANDALONE_MOCK=true
-        const list = getLocalStaff();
-        const found = list.find((s) => s._id === id);
-        if (found) return found;
-        throw new Error("Staff member not found");
+        throwApiError(err, "Could not load the staff member");
+        
       }
     },
     enabled: !!id,
@@ -74,37 +58,9 @@ export function useCreateStaff() {
             err?.response?.data?.message || "Failed to register staff member."
           );
         }
-        // No server: a real error unless VITE_STANDALONE_MOCK=true (then it is saved to localStorage below)
-        failOrMock(err, "Failed to register staff member.");
-        const list = getLocalStaff();
-        const nextCodeNum = list.length + 1;
-        const codeMap = { "Kitchen Supervisor": "KS", "Pizza Maker": "PM", "Baker": "BK", "Packager": "PK" };
-        const prefix = codeMap[payload.role] || "ST";
-        const employeeCode = payload.employeeId || `PVP-${prefix}-0${nextCodeNum}`;
-        const newStaff = {
-          _id: `staff-${Date.now()}`,
-          fullName: payload.fullName,
-          email: payload.email,
-          phone: payload.phone,
-          profileImage: payload.profileImage || "",
-          role: payload.role,
-          employeeCode,
-          joiningDate: payload.joiningDate || new Date().toISOString().split("T")[0],
-          shiftId: payload.shiftType || "Morning",
-          salaryType: payload.salaryType || "Monthly",
-          salary: Number(payload.salary) || 0,
-          experience: Number(payload.experience) || 0,
-          skills: payload.skills || [],
-          emergencyContact: payload.emergencyContact || "",
-          status: "active",
-          todayStatus: "present",
-          performanceScore: 90,
-          createdAt: new Date().toISOString(),
-          stats: { ordersCompleted: 0, avgPrepTime: 15, delayedOrders: 0, attendance: 100 },
-          activities: [{ id: `act-${Date.now()}`, type: "Shift Changes", title: "Joined the store", time: "Just now", status: "completed" }],
-        };
-        setLocalStaff([...list, newStaff]);
-        return { success: true, data: newStaff };
+
+        throwApiError(err, "Failed to register staff member.");
+        
       }
     },
     onSuccess: () => {
@@ -195,11 +151,8 @@ export function useDeleteStaff() {
         const response = await apiClient.delete(`/food/store/staff/${id}`);
         return response.data;
       } catch (err) {
-        failOrMock(err, "Failed to delete staff member");
-        const list = getLocalStaff();
-        const filtered = list.filter((s) => s._id !== id);
-        setLocalStaff(filtered);
-        return { success: true, id };
+        throwApiError(err, "Failed to delete staff member");
+        
       }
     },
     onSuccess: () => {

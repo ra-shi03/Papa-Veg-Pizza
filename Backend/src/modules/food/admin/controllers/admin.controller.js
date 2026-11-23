@@ -3,7 +3,6 @@ import * as adminService from '../services/admin.service.js';
 import { FoodStore as FoodStore } from '../../store/models/store.model.js';
 import { findScopedStore, franchiseFilter, scopedStoreIds } from '../../shared/franchiseScope.js';
 import { validateCategoryListQuery, validateCategoryRejectDto, validateCategoryUpsertDto } from '../validators/category.validator.js';
-import { validateCreateOfferDto, validateUpdateOfferCartVisibilityDto } from '../validators/offer.validator.js';
 import { validateAddDeliveryBonusDto } from '../validators/deliveryBonus.validator.js';
 import { validateCheckCompletionsDto, validateEarningAddonHistoryActionDto, validateEarningAddonUpsertDto, validateToggleEarningAddonStatusDto } from '../validators/earningAddon.validator.js';
 import { validateDeliveryCommissionRuleDto, validateOptionalStatusDto, validateStoreCommissionUpsertDto } from '../validators/commission.validator.js';
@@ -629,61 +628,6 @@ export async function makeCategoryGlobal(req, res, next) {
             return res.status(404).json({ success: false, message: 'Category not found' });
         }
         res.status(200).json({ success: true, message: 'Category is now global', data: { category: updated } });
-    } catch (error) {
-        next(error);
-    }
-}
-
-// ----- Offers & Coupons -----
-export async function getAllOffers(req, res, next) {
-    try {
-        const data = await adminService.getAllOffers(req.query || {});
-        res.status(200).json({ success: true, message: 'Offers fetched successfully', data });
-    } catch (error) {
-        next(error);
-    }
-}
-
-/**
- * POST /food/admin/offers : retired. Checkout, the cart and the public coupon list read only Marketing > Coupons
- * (FoodCoupon), so an offer saved here would never apply. The old records stay readable and deletable.
- */
-export async function createAdminOffer(req, res) {
-    return res.status(410).json({
-        success: false,
-        message: 'Offers are no longer created here. Create the coupon in Marketing > Coupons; that is the list checkout uses.',
-        data: null,
-    });
-}
-
-export async function updateAdminOfferCartVisibility(req, res, next) {
-    try {
-        const { id } = req.params;
-        if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ success: false, message: 'Invalid offer id' });
-        }
-        const body = validateUpdateOfferCartVisibilityDto(req.body || {});
-        const updated = await adminService.updateAdminOfferCartVisibility(id, body.itemId, body.showInCart);
-        if (!updated) {
-            return res.status(404).json({ success: false, message: 'Offer not found' });
-        }
-        res.status(200).json({ success: true, message: 'Offer updated successfully', data: { offer: updated } });
-    } catch (error) {
-        next(error);
-    }
-}
-
-export async function deleteAdminOffer(req, res, next) {
-    try {
-        const { id } = req.params;
-        if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ success: false, message: 'Invalid offer id' });
-        }
-        const result = await adminService.deleteAdminOffer(id);
-        if (!result) {
-            return res.status(404).json({ success: false, message: 'Offer not found' });
-        }
-        res.status(200).json({ success: true, message: 'Offer deleted successfully', data: result });
     } catch (error) {
         next(error);
     }

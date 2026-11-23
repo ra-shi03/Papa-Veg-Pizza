@@ -5,7 +5,8 @@ import {
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts";
 import { useAlertDetailQuery, useUpdateAlertMutation, useAlertConsumptionTrend } from "../hooks/useAlerts";
-import { mockSuppliers } from "../mockData";
+
+const suppliers = [];
 
 export default function AlertDetailsDrawer({ isOpen, onClose, alertId, onResolve, onCreatePR }) {
   const [activeTab, setActiveTab] = useState("stock"); // stock, consumption, suggestion, timeline
@@ -98,11 +99,7 @@ export default function AlertDetailsDrawer({ isOpen, onClose, alertId, onResolve
   const suggestedPRQty = Math.max(0, idealStock - (alertRecord?.currentStock || 0));
 
   // Find supplier
-  const supplier = mockSuppliers.find(s => s._id === ingredient?.supplierId) || {
-    name: "Durga Dairy Farms",
-    contact: "Sunil Sharma",
-    phone: "+91 98270 12345"
-  };
+  const supplier = suppliers.find(s => s._id === ingredient?.supplierId) || { name: "", contact: "", phone: "" };
 
   const estimatedCost = suggestedPRQty * (ingredient?.costPerUnit || 0);
 

@@ -276,7 +276,7 @@ export default function CampaignAnalytics({ campaignId, isOpen, onClose }) {
                       </svg>
                       {/* Center details */}
                       <div className="absolute inset-0 flex flex-col justify-center items-center">
-                        <span className="text-lg font-black text-zinc-900 dark:text-zinc-150">100%</span>
+                        <span className="text-lg font-black text-zinc-900 dark:text-zinc-150">—</span>
                         <span className="text-[8px] uppercase tracking-wider text-zinc-400 font-bold">Split</span>
                       </div>
                     </div>
@@ -339,15 +339,7 @@ export default function CampaignAnalytics({ campaignId, isOpen, onClose }) {
                     <svg className="w-full h-full overflow-visible" viewBox="0 0 240 100" preserveAspectRatio="none">
                       {/* Bars: Mon, Tue, Wed, Thu, Fri, Sat, Sun */}
                       {/* Heights mapping: Mon:45%, Tue:52%, Wed:68%, Thu:59%, Fri:110%(max->100%), Sat:145%(100%), Sun:130%(90%) */}
-                      {[
-                        {day: 'Mon', height: 31, val: '₹45k'},
-                        {day: 'Tue', height: 35, val: '₹52k'},
-                        {day: 'Wed', height: 46, val: '₹68k'},
-                        {day: 'Thu', height: 40, val: '₹59k'},
-                        {day: 'Fri', height: 75, val: '₹110k'},
-                        {day: 'Sat', height: 98, val: '₹145k'},
-                        {day: 'Sun', height: 89, val: '₹130k'}
-                      ].map((item, i) => {
+                      {[].map((item, i) => {
                         const barW = 16;
                         const gap = 16;
                         const startX = 12 + i * (barW + gap);

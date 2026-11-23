@@ -422,15 +422,15 @@ export default function NotificationLogs({ notificationId, isOpen, onClose }) {
                     <div className="grid grid-cols-3 gap-2 text-[10px] font-bold text-zinc-700 dark:text-zinc-300 dark:text-zinc-400 border-t border-zinc-100 dark:border-zinc-800 pt-3 select-none">
                       <div className="flex flex-col items-center gap-1">
                         <span className="flex items-center gap-1 text-blue-500"><span className="w-2 h-2 rounded bg-blue-500"></span> Push</span>
-                        <span className="text-zinc-800 dark:text-zinc-200 font-black">50%</span>
+                        <span className="text-zinc-800 dark:text-zinc-200 font-black">—</span>
                       </div>
                       <div className="flex flex-col items-center gap-1">
                         <span className="flex items-center gap-1 text-orange-500"><span className="w-2 h-2 rounded bg-orange-500"></span> SMS</span>
-                        <span className="text-zinc-800 dark:text-zinc-200 font-black">30%</span>
+                        <span className="text-zinc-800 dark:text-zinc-200 font-black">—</span>
                       </div>
                       <div className="flex flex-col items-center gap-1">
                         <span className="flex items-center gap-1 text-purple-500"><span className="w-2 h-2 rounded bg-purple-500"></span> Email</span>
-                        <span className="text-zinc-800 dark:text-zinc-200 font-black">20%</span>
+                        <span className="text-zinc-800 dark:text-zinc-200 font-black">—</span>
                       </div>
                     </div>
                   </div>

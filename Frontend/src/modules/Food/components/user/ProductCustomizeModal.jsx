@@ -3,32 +3,7 @@ import { X, Check } from 'lucide-react';
 import apiClient from '@/services/api/axios';
 import { useScrollLock } from "@food/hooks/useScrollLock";
 
-const DEFAULT_CRUST_OPTIONS = [
-  {
-    name: "New Hand Tossed",
-    description: "Fresh Dough, Flavourful Edges",
-    price: 0,
-    image: "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=120&auto=format&fit=crop&q=80"
-  },
-  {
-    name: "Fresh Garlic Crust",
-    description: "Fresh Dough, Flavourful Edges",
-    price: 20,
-    image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=120&auto=format&fit=crop&q=80"
-  },
-  {
-    name: "Thin Crust",
-    description: "Fresh Dough, Flavourful Edges",
-    price: 20,
-    image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=120&auto=format&fit=crop&q=80"
-  },
-  {
-    name: "Herby Crust",
-    description: "Fresh Dough, Flavourful Edges",
-    price: 20,
-    image: "https://images.unsplash.com/photo-1534308983496-4fabb1a015ee?w=120&auto=format&fit=crop&q=80"
-  }
-];
+const DEFAULT_CRUST_OPTIONS = [];
 
 export default function ProductCustomizeModal({
   isOpen,
@@ -99,7 +74,7 @@ export default function ProductCustomizeModal({
     }
 
     // Fallback: derive 3 standard sizes based on base price
-    const base = Number(item.price) || 299;
+    const base = Number(item.price) || 0;
     return [
       { name: "Regular", size: "Regular", price: base, originalPrice: item.originalPrice || null, saveAmount: item.saveAmount || 0, description: "Regular Size" },
       { name: "Medium", size: "Medium", price: Math.round(base * 1.74), originalPrice: null, saveAmount: 0, description: "Medium Size" },
@@ -113,7 +88,7 @@ export default function ProductCustomizeModal({
   // Reset state on open or item change
   useEffect(() => {
     if (isOpen && item) {
-      const initialSize = parsedSizes[0] || { name: "Regular", price: Number(item.price) || 299, description: "Serves 1 person only" };
+      const initialSize = parsedSizes[0] || { name: "Regular", price: Number(item.price) || 0, description: "Serves 1 person only" };
       setSelectedSizeOption(initialSize);
       setSelectedCrust(item.defaultCrust || item.crust || "New Hand Tossed");
       setSelectedToppingsList([]);

@@ -8,7 +8,7 @@ export default function ReassignTaskModal({
   onConfirm = () => {},
   loading = false,
 }) {
-  const [assignedTo, setAssignedTo] = useState("Siddharth Verma");
+  const [assignedTo, setAssignedTo] = useState("");
   const [reason, setReason] = useState("");
 
   if (!isOpen) return null;
@@ -21,12 +21,8 @@ export default function ReassignTaskModal({
     });
   };
 
-  const staffOptions = [
-    "Siddharth Verma",
-    "Karan Singh",
-    "Amit Patel",
-    "Sunita Sharma",
-  ];
+  // the store's kitchen team is not loaded in this dialog yet
+  const staffOptions = [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-955/45 dark:bg-zinc-955/65 backdrop-blur-xs animate-fade">

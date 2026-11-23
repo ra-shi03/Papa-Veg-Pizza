@@ -252,12 +252,6 @@ router.put('/combos/:id', comboController.updateCombo);
 router.patch('/combos/:id/status', comboController.updateComboStatus);
 router.delete('/combos/:id', comboController.deleteCombo);
 
-// ----- Offers & Coupons -----
-router.get('/offers', adminController.getAllOffers);
-router.post('/offers', adminController.createAdminOffer);
-router.patch('/offers/:id/cart-visibility', adminController.updateAdminOfferCartVisibility);
-router.delete('/offers/:id', adminController.deleteAdminOffer);
-
 // ----- Feedback Experience (Admin) -----
 router.get('/feedback-experiences', feedbackExperienceController.getFeedbackExperiences);
 router.delete('/feedback-experiences/:id', feedbackExperienceController.deleteFeedbackExperience);

@@ -26,37 +26,11 @@ export default function CreateFranchiseTicketModal({ isOpen, onClose, onCreateSu
 
   if (!isOpen) return null;
 
-  // Mock collections for franchise lookup (Indian contexts)
-  const franchises = [
-    { id: "fr_1", code: "PV-IND-01", name: "Indore Foods Pvt Ltd", owner: "Priyanshu Patel", region: "Madhya Pradesh (Central)", stores: 8, email: "priyanshu@indorefoods.in", phone: "+91 98270 12345" },
-    { id: "fr_2", code: "PV-BHO-02", name: "Bhopal Pizza Ventures", owner: "Ramanathan Iyer", region: "Madhya Pradesh (West)", stores: 5, email: "ram@bhopalventures.co.in", phone: "+91 75524 88392" },
-    { id: "fr_3", code: "PV-DEL-03", name: "Capital Crust Franchisees", owner: "Gurpreet Singh", region: "NCR Delhi", stores: 12, email: "gurpreet@capitalcrust.in", phone: "+91 99110 55432" },
-    { id: "fr_4", code: "PV-MUM-04", name: "Western Coast Pizzas", owner: "Ananya Deshmukh", region: "Maharashtra (West)", stores: 15, email: "ananya@westerncoast.in", phone: "+91 90220 77112" },
-    { id: "fr_5", code: "PV-BLR-05", name: "Bengaluru Tech Foods", owner: "Karthik Reddy", region: "Karnataka (South)", stores: 6, email: "karthik@techfoods.co.in", phone: "+91 80491 66224" }
-  ];
+  // collections for franchise lookup (Indian contexts)
+  const franchises = [];
 
   // Franchise Admins lookup mapping
-  const franchiseAdmins = {
-    "fr_1": [
-      { id: "adm_11", name: "Suresh Gupta (Store Ops Coordinator)" },
-      { id: "adm_12", name: "Priyan Patel (Managing Director)" }
-    ],
-    "fr_2": [
-      { id: "adm_21", name: "Rajesh Kulkarni (Finance Head)" },
-      { id: "adm_22", name: "Kirti Iyer (Operations Lead)" }
-    ],
-    "fr_3": [
-      { id: "adm_31", name: "Harpreet Singh (Area Manager)" },
-      { id: "adm_32", name: "Sonia Gandhi (Accounts Desk)" }
-    ],
-    "fr_4": [
-      { id: "adm_41", name: "Vijay Kadam (Logistics Lead)" },
-      { id: "adm_42", name: "Deshmukh Senior (Owner Liaison)" }
-    ],
-    "fr_5": [
-      { id: "adm_51", name: "Nandini Gowda (Operations Supervisor)" }
-    ]
-  };
+  const franchiseAdmins = {};
 
   const handleFranchiseChange = (e) => {
     const frId = e.target.value;
@@ -125,43 +99,8 @@ export default function CreateFranchiseTicketModal({ isOpen, onClose, onCreateSu
 
     setLoading(true);
     
-    // Simulate API POST /api/franchise-tickets
-    setTimeout(() => {
-      setLoading(false);
-      const chosenFr = franchises.find(f => f.id === selectedFranchiseId);
-      const chosenAdmin = (franchiseAdmins[selectedFranchiseId] || []).find(a => a.id === selectedAdminId);
-      
-      const mockNewTicket = {
-        _id: `ft_${Math.floor(1000 + Math.random() * 9000)}`,
-        ticketNumber: `FTK-${Math.floor(10000 + Math.random() * 90000)}`,
-        franchiseId: selectedFranchiseId,
-        franchiseName: chosenFr.name,
-        franchiseCode: chosenFr.code,
-        adminId: selectedAdminId,
-        adminName: chosenAdmin.name,
-        ownerName: chosenFr.owner,
-        contactEmail: chosenFr.email,
-        contactPhone: chosenFr.phone,
-        region: chosenFr.region,
-        storesCount: chosenFr.stores,
-        type: ticketType,
-        subject,
-        description,
-        priority,
-        status: 'Open',
-        assignedDepartment: 'Technical Support',
-        assignedTo: 'Unassigned',
-        attachments: attachments.map(a => a.name),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      toast.success(`Franchise Ticket ${mockNewTicket.ticketNumber} registered successfully`);
-      if (onCreateSuccess) {
-        onCreateSuccess(mockNewTicket);
-      }
-      onClose();
-    }, 1200);
+    setLoading(false);
+    toast.info("Raising a franchise ticket is not available yet.");
   };
 
   return (

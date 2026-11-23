@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { X, Layers, AlertTriangle, ShieldCheck, Check, Trash2 } from "lucide-react";
-import { mockCategories } from "../mockProducts";
 import { useStores } from "@food/pages/franchise-admin/orders/ordersQuery";
 import { toast } from "sonner";
+
+const categories = [];
 
 export default function BulkActionModal({ isOpen, onClose, selectedCount, selectedIds, onBulkSubmit }) {
   const [action, setAction] = useState("CHANGE_CATEGORY");
@@ -88,7 +89,7 @@ export default function BulkActionModal({ isOpen, onClose, selectedCount, select
                   className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-[var(--primary)] text-zinc-800 dark:text-zinc-250 cursor-pointer"
                 >
                   <option value="">Choose category...</option>
-                  {mockCategories.map((c) => (
+                  {categories.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>

@@ -155,7 +155,7 @@ export default function ReadyOrders() {
   // KPI Calculations
   const readyOrdersCount = orders.length;
 
-  // Average Waiting Time calculation based on current mock database
+  // Average Waiting Time calculation based on current database
   const averageWaitingTime = useMemo(() => {
     if (orders.length === 0) return 0;
     const totalWaitingTimeMins = orders.reduce((acc, order) => {

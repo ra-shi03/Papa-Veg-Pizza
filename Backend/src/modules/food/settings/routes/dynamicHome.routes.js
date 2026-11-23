@@ -1,22 +1,16 @@
 import express from 'express';
 import {
     getHomeLayout,
-    getActiveOffers,
-    createUiOffer,
-    updateUiOffer,
-    deleteUiOffer,
     createHomeSection,
     updateHomeSection,
     deleteHomeSection,
     toggleActiveStatus,
     reorderItems,
     uploadDynamicImage,
-    getAllUiOffersAdmin,
     getAllHomeSectionsAdmin
 } from '../controllers/dynamicHome.controller.js';
 
 import {
-    validateUiOffer,
     validateHomeSection,
     validateReorder,
     validateToggleActive
@@ -31,7 +25,6 @@ const router = express.Router();
 // PUBLIC ROUTES
 // ==========================================
 router.get('/home-layout', getHomeLayout);
-router.get('/offers', getActiveOffers);
 
 // ==========================================
 // SUPERADMIN ROUTES (Protected)
@@ -48,13 +41,7 @@ router.patch('/reorder', validateReorder, reorderItems);
 router.patch('/:id/toggle-active', validateToggleActive, toggleActiveStatus);
 
 // Admin GET ALL
-router.get('/offers-admin', getAllUiOffersAdmin);
 router.get('/home-sections-admin', getAllHomeSectionsAdmin);
-
-// UiOffer CRUD
-router.post('/offers', validateUiOffer, createUiOffer);
-router.put('/offers/:id', validateUiOffer, updateUiOffer);
-router.delete('/offers/:id', deleteUiOffer);
 
 // HomeSection CRUD
 router.post('/home-sections', validateHomeSection, createHomeSection);

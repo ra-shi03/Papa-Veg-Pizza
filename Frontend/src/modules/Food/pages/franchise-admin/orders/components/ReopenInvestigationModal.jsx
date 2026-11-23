@@ -9,7 +9,7 @@ export default function ReopenInvestigationModal({ isOpen, onClose, order }) {
   // Form fields state
   const [investigationReason, setInvestigationReason] = useState("Disputed Customer cancellation timeline");
   const [priority, setPriority] = useState("Medium");
-  const [assignedStaff, setAssignedStaff] = useState("Amit Patel");
+  const [assignedStaff, setAssignedStaff] = useState("");
   const [description, setDescription] = useState("");
   const [attachments, setAttachments] = useState([]);
 
@@ -38,18 +38,10 @@ export default function ReopenInvestigationModal({ isOpen, onClose, order }) {
     }
   };
 
-  const handleMockAttachment = () => {
-    const mockFileNames = ["store_kitchen_logs.pdf", "customer_chat_screenshot.webp", "razorpay_settlement_receipt.xlsx"];
-    const randomFile = mockFileNames[Math.floor(Math.random() * mockFileNames.length)];
-    
-    if (attachments.find(a => a.name === randomFile)) {
-      toast.info("Attachment already added.");
-      return;
-    }
-
-    setAttachments([...attachments, { name: randomFile, size: "142 KB" }]);
-    toast.success(`Mock file "${randomFile}" attached successfully.`);
+  const handleAttachment = () => {
+    toast.info("Attaching files is not available yet.");
   };
+
 
   const handleRemoveAttachment = (name) => {
     setAttachments(attachments.filter(a => a.name !== name));
@@ -168,10 +160,7 @@ export default function ReopenInvestigationModal({ isOpen, onClose, order }) {
                 onChange={(e) => setAssignedStaff(e.target.value)}
                 className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl font-bold focus:outline-none focus:border-[var(--primary)]"
               >
-                <option value="Amit Patel">Amit Patel (Connaught Place Ops)</option>
-                <option value="Suresh Raina">Suresh Raina (Bandra West Ops)</option>
-                <option value="Karan Johar">Karan Johar (HQ Financial Auditor)</option>
-                <option value="Rahul Sharma">Rahul Sharma ( बेंगलुरु Local Inspector )</option>
+                <option value="">No staff list loaded yet</option>
               </select>
             </div>
 
@@ -180,11 +169,11 @@ export default function ReopenInvestigationModal({ isOpen, onClose, order }) {
               <label className="font-semibold text-zinc-700 dark:text-zinc-350">Upload Logs & Evidence</label>
               <button
                 type="button"
-                onClick={handleMockAttachment}
+                onClick={handleAttachment}
                 className="w-full py-2 border-2 border-dashed border-zinc-200 dark:border-zinc-800 hover:border-[var(--primary)] text-zinc-550 dark:hover:text-zinc-200 rounded-xl font-bold transition-all bg-zinc-50/50 dark:bg-zinc-950/20 cursor-pointer flex items-center justify-center gap-1.5"
               >
                 <Sparkles size={13} className="text-[var(--primary)]" />
-                Attach Simulated Audit File
+                Attach Audit File
               </button>
             </div>
 

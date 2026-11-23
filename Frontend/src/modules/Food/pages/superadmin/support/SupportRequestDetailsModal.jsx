@@ -27,7 +27,7 @@ export default function SupportRequestDetailsModal({ isOpen, onClose, request, o
   const [isCloseOpen, setIsCloseOpen] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
-  // Lists state (local mock database synced on request changes)
+  // Lists state (local database synced on request changes)
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [internalNotes, setInternalNotes] = useState([]);
@@ -51,62 +51,38 @@ export default function SupportRequestDetailsModal({ isOpen, onClose, request, o
     }
   }, [activeTab, messages, internalNotes]);
 
-  // Generate realistic mock records based on the request metadata
+  // Generate realistic records based on the request metadata
   useEffect(() => {
     if (request) {
-      // 1. Mock Conversation
-      const conversationTemplates = {
-        'Technical': [
-          { sender: request.requesterName, role: request.requesterRole, text: `Hello support, my ${request.subcategory || 'POS System'} is crashing when processing payments. Can anyone look?`, time: '1 hour ago' },
-          { sender: 'System Router', role: 'System', text: 'Ticket automatically routed to Technical Desk.', time: '58 mins ago' },
-          { sender: 'Neha Reddy', role: 'Support Agent', text: 'Checking socket connectivity logs. Please confirm if other devices are online.', time: '40 mins ago' },
-          { sender: request.requesterName, role: request.requesterRole, text: 'Yes, kitchen display is online. Only the counter POS has issues.', time: '35 mins ago' }
-        ],
-        'Operational': [
-          { sender: request.requesterName, role: request.requesterRole, text: `Facing ${request.subcategory || 'Inventory Issue'}. The shipment contains damaged items. Need replacement approval.`, time: '2 hours ago' },
-          { sender: 'Rajesh Sharma', role: 'Support Agent', text: 'Please upload photos of the damaged inventory logs so we can cross-verify.', time: '1.5 hours ago' }
-        ],
-        'Delivery': [
-          { sender: request.requesterName, role: request.requesterRole, text: `Rider reported GPS mapping failure on order ${request.requestNumber}. App shows wrong store address.`, time: '45 mins ago' },
-          { sender: 'Sanjay Verma', role: 'Support Agent', text: 'Checking the lat/long coordinates in store master. We will sync it.', time: '30 mins ago' }
-        ],
-        'HR': [
-          { sender: request.requesterName, role: request.requesterRole, text: `Salary dispute regarding attendance count for May. Biometric punch was not recorded for 3 days.`, time: '3 hours ago' },
-          { sender: 'Shalini Gupta', role: 'Support Agent', text: 'Please share approved manual attendance slips from store manager.', time: '2.5 hours ago' }
-        ],
-        'System': [
-          { sender: 'Automated Monitor', role: 'System', text: `System cron job failed: ${request.subcategory || 'Database sync issue'}. Executed recovery script.`, time: '5 mins ago' }
-        ]
-      };
+      // 1. Conversation
+      const conversationTemplates = {};
 
       setMessages(conversationTemplates[request.category] || [
         { sender: request.requesterName, role: request.requesterRole, text: `Request logged: ${request.description}`, time: '30 mins ago' }
       ]);
 
-      // 2. Mock Internal Notes
-      setInternalNotes([
-        { author: 'Neha Singh', role: 'Super Admin', text: `Verified requester store node (${request.store}). POS version is currently v4.82. Checking database migration status.`, time: '50 mins ago' }
-      ]);
+      // 2. Internal Notes
+      setInternalNotes([]);
 
-      // 3. Mock Timeline
+      // 3. Timeline
       setTimeline([
         { event: 'Ticket Raised', actor: request.requesterName, role: request.requesterRole, remarks: `Raised ${request.category} support request via Portal.`, time: request.createdAt },
         { event: 'Routed to Queue', actor: 'System Router', role: 'System', remarks: `Categorized under ${request.category} -> ${request.subcategory}`, time: new Date(new Date(request.createdAt).getTime() + 60000).toISOString() }
       ]);
 
-      // 4. Mock Assignment History
+      // 4. Assignment History
       setAssignmentHistory([
         { assignedTo: request.assignedTo || 'Unassigned', department: request.category + ' Team', assignedBy: 'System Router', time: request.createdAt }
       ]);
 
-      // 5. Mock Status History
+      // 5. Status History
       setStatusHistory([
         { oldStatus: '-', newStatus: request.status, changedBy: request.requesterName, role: request.requesterRole, time: request.createdAt }
       ]);
 
-      // 6. Mock Audit Logs
+      // 6. Audit Logs
       setAuditLogs([
-        { action: 'Ticket Submission', actor: request.requesterName, role: request.requesterRole, ip: '192.168.10.82', device: 'Windows 11 POS client', browser: 'Chrome 124.0.0', location: 'Indore, MP', time: request.createdAt }
+        { action: 'Ticket Submission', actor: request.requesterName, role: request.requesterRole, ip: '', device: '', browser: '', location: 'Indore, MP', time: request.createdAt }
       ]);
     }
   }, [request, isOpen]);
@@ -126,7 +102,7 @@ export default function SupportRequestDetailsModal({ isOpen, onClose, request, o
     if (!newMessage.trim()) return;
 
     const msg = {
-      sender: 'Neha Singh',
+      sender: 'You',
       role: 'Super Admin',
       text: newMessage,
       time: 'Just now'
@@ -138,7 +114,7 @@ export default function SupportRequestDetailsModal({ isOpen, onClose, request, o
     // Log in Timeline
     setTimeline(prev => [
       ...prev,
-      { event: 'Conversation Reply Sent', actor: 'Neha Singh', role: 'Super Admin', remarks: `Replied: "${newMessage.substring(0, 30)}..."`, time: new Date().toISOString() }
+      { event: 'Conversation Reply Sent', actor: 'You', role: 'Super Admin', remarks: `Replied: "${newMessage.substring(0, 30)}..."`, time: new Date().toISOString() }
     ]);
   };
 
@@ -148,7 +124,7 @@ export default function SupportRequestDetailsModal({ isOpen, onClose, request, o
     if (!newNote.trim()) return;
 
     const note = {
-      author: 'Neha Singh',
+      author: 'You',
       role: 'Super Admin',
       text: newNote,
       time: 'Just now'
@@ -160,11 +136,11 @@ export default function SupportRequestDetailsModal({ isOpen, onClose, request, o
     // Log in Timeline & Audit Logs
     setTimeline(prev => [
       ...prev,
-      { event: 'Internal Note Added', actor: 'Neha Singh', role: 'Super Admin', remarks: 'Added a private note', time: new Date().toISOString() }
+      { event: 'Internal Note Added', actor: 'You', role: 'Super Admin', remarks: 'Added a private note', time: new Date().toISOString() }
     ]);
 
     setAuditLogs(prev => [
-      { action: 'Add Internal Note', actor: 'Neha Singh', role: 'Super Admin', ip: '192.168.1.1', device: 'MacBook Pro M3', browser: 'Safari 17.4', location: 'Corporate Office', time: new Date().toISOString() },
+      { action: 'Add Internal Note', actor: 'You', role: 'Super Admin', ip: '', device: '', browser: '', location: 'Corporate Office', time: new Date().toISOString() },
       ...prev
     ]);
   };
@@ -198,16 +174,16 @@ export default function SupportRequestDetailsModal({ isOpen, onClose, request, o
     
     setTimeline(prev => [
       ...prev,
-      { event: 'Agent Assigned', actor: 'Neha Singh', role: 'Super Admin', remarks: `Assigned to ${details.agent} (${details.department}). Notes: ${details.notes}`, time: details.timestamp }
+      { event: 'Agent Assigned', actor: 'You', role: 'Super Admin', remarks: `Assigned to ${details.agent} (${details.department}). Notes: ${details.notes}`, time: details.timestamp }
     ]);
 
     setAssignmentHistory(prev => [
-      { assignedTo: details.agent, department: details.department, assignedBy: 'Neha Singh', time: details.timestamp },
+      { assignedTo: details.agent, department: details.department, assignedBy: 'You', time: details.timestamp },
       ...prev
     ]);
 
     setStatusHistory(prev => [
-      { oldStatus: request.status, newStatus: 'In Progress', changedBy: 'Neha Singh', role: 'Super Admin', time: details.timestamp },
+      { oldStatus: request.status, newStatus: 'In Progress', changedBy: 'You', role: 'Super Admin', time: details.timestamp },
       ...prev
     ]);
   };
@@ -217,11 +193,11 @@ export default function SupportRequestDetailsModal({ isOpen, onClose, request, o
 
     setTimeline(prev => [
       ...prev,
-      { event: 'Priority Updated', actor: 'Neha Singh', role: 'Super Admin', remarks: `Changed priority from ${details.oldPriority} to ${details.newPriority}. Reason: ${details.reason}`, time: details.timestamp }
+      { event: 'Priority Updated', actor: 'You', role: 'Super Admin', remarks: `Changed priority from ${details.oldPriority} to ${details.newPriority}. Reason: ${details.reason}`, time: details.timestamp }
     ]);
 
     setAuditLogs(prev => [
-      { action: 'Modify Priority', actor: 'Neha Singh', role: 'Super Admin', ip: '192.168.1.1', device: 'MacBook Pro M3', browser: 'Safari 17.4', location: 'Corporate Office', time: details.timestamp },
+      { action: 'Modify Priority', actor: 'You', role: 'Super Admin', ip: '', device: '', browser: '', location: 'Corporate Office', time: details.timestamp },
       ...prev
     ]);
   };
@@ -231,11 +207,11 @@ export default function SupportRequestDetailsModal({ isOpen, onClose, request, o
 
     setTimeline(prev => [
       ...prev,
-      { event: 'Ticket Escalated', actor: 'Neha Singh', role: 'Super Admin', remarks: `Escalated to ${details.tier} (${details.targetDept}). Remarks: ${details.remarks}`, time: details.timestamp }
+      { event: 'Ticket Escalated', actor: 'You', role: 'Super Admin', remarks: `Escalated to ${details.tier} (${details.targetDept}). Remarks: ${details.remarks}`, time: details.timestamp }
     ]);
 
     setStatusHistory(prev => [
-      { oldStatus: request.status, newStatus: 'Escalated', changedBy: 'Neha Singh', role: 'Super Admin', time: details.timestamp },
+      { oldStatus: request.status, newStatus: 'Escalated', changedBy: 'You', role: 'Super Admin', time: details.timestamp },
       ...prev
     ]);
   };
@@ -245,11 +221,11 @@ export default function SupportRequestDetailsModal({ isOpen, onClose, request, o
 
     setTimeline(prev => [
       ...prev,
-      { event: 'Ticket Resolved', actor: 'Neha Singh', role: 'Super Admin', remarks: `Resolution Category: ${details.category}. Notes: ${details.notes}`, time: details.timestamp }
+      { event: 'Ticket Resolved', actor: 'You', role: 'Super Admin', remarks: `Resolution Category: ${details.category}. Notes: ${details.notes}`, time: details.timestamp }
     ]);
 
     setStatusHistory(prev => [
-      { oldStatus: request.status, newStatus: 'Resolved', changedBy: 'Neha Singh', role: 'Super Admin', time: details.timestamp },
+      { oldStatus: request.status, newStatus: 'Resolved', changedBy: 'You', role: 'Super Admin', time: details.timestamp },
       ...prev
     ]);
   };
@@ -259,11 +235,11 @@ export default function SupportRequestDetailsModal({ isOpen, onClose, request, o
 
     setTimeline(prev => [
       ...prev,
-      { event: 'Ticket Closed', actor: 'Neha Singh', role: 'Super Admin', remarks: `Remarks: ${details.closingRemarks}. Consensus: Confirmed.`, time: details.timestamp }
+      { event: 'Ticket Closed', actor: 'You', role: 'Super Admin', remarks: `Remarks: ${details.closingRemarks}. Consensus: Confirmed.`, time: details.timestamp }
     ]);
 
     setStatusHistory(prev => [
-      { oldStatus: request.status, newStatus: 'Closed', changedBy: 'Neha Singh', role: 'Super Admin', time: details.timestamp },
+      { oldStatus: request.status, newStatus: 'Closed', changedBy: 'You', role: 'Super Admin', time: details.timestamp },
       ...prev
     ]);
   };
@@ -500,7 +476,7 @@ export default function SupportRequestDetailsModal({ isOpen, onClose, request, o
               {/* Message List */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
                 {messages.map((msg, i) => {
-                  const isMe = msg.sender === 'Neha Singh';
+                  const isMe = msg.sender === 'You';
                   return (
                     <div key={i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                       <div className="flex items-center gap-1.5 mb-1 text-[10px] font-bold text-zinc-400">

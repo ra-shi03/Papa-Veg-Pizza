@@ -51,7 +51,7 @@ const fromBusinessSettings = (saved = {}) => ({
   updatedAt: saved.updatedAt || null,
 });
 
-// Mock Toast Hook/Component for beautiful notifications
+// Toast Hook/Component for beautiful notifications
 function useToast() {
   const [toasts, setToasts] = useState([]);
   const addToast = (message, type = 'success') => {
@@ -196,7 +196,7 @@ export default function Settings() {
           setSettings(prev => ({
             ...prev,
             ...newValues,
-            updatedBy: 'Rohan Sharma (Super Admin)',
+            updatedBy: 'You',
             updatedAt: new Date().toISOString()
           }));
           setIsSavingAll(false);
@@ -213,7 +213,7 @@ export default function Settings() {
           setSettings(prev => ({
             ...prev,
             ...secValues,
-            updatedBy: 'Rohan Sharma (Super Admin)',
+            updatedBy: 'You',
             updatedAt: new Date().toISOString()
           }));
           resolve(true);
@@ -275,12 +275,8 @@ export default function Settings() {
     addToast('Configuration file exported successfully.', 'success');
   };
 
-  // Activity Log history mock
-  const recentChanges = [
-    { type: 'TAX', desc: 'GST rate adjusted to 5%', time: '10 mins ago', user: 'Rohan Sharma' },
-    { type: 'ORDER', desc: 'Minimum order amount changed to ₹299', time: '1 day ago', user: 'Aman Verma' },
-    { type: 'INVOICE', desc: 'Invoice footer modified', time: '3 days ago', user: 'Sarah D.' }
-  ];
+  // Activity Log history 
+  const recentChanges = [];
 
   // Filter content based on debounced search query
   const matchesSearch = (text) => {

@@ -1,6 +1,5 @@
 import { FoodCoupon } from '../models/foodCoupon.model.js';
-import { FoodAppConfig } from '../models/appConfig.model.js';
-import { couponToOffer } from '../services/couponOffer.service.js';
+import { couponToOffer, couponStoreFromQuery, liveCouponsForStore, publicCouponView } from '../services/couponOffer.service.js';
 
 export const getAllCoupons = async (req, res) => {
     try {
@@ -11,29 +10,13 @@ export const getAllCoupons = async (req, res) => {
     }
 };
 
+// GET /settings/coupons/public[?storeId= | ?lat=&lng=] : the same live list as /food/offers/public (one rule for
+// every customer screen), in the offer shape the home page and Coupons screen read.
 export const getActivePublicCoupons = async (req, res) => {
     try {
-        const config = await FoodAppConfig.findOne().lean();
-        if (config && config.couponEnabled === false) {
-            return res.status(200).json({ success: true, data: [] });
-        }
-        const now = new Date();
-        const coupons = await FoodCoupon.find({
-            isActive: { $ne: false },
-            status: { $nin: ['disabled', 'Disabled', 'inactive', 'Inactive', 'expired', 'Expired'] },
-            $or: [
-                { endDate: { $exists: false } },
-                { endDate: null },
-                { endDate: { $gte: now } }
-            ]
-        }).sort({ createdAt: -1 });
-        const storeId = String(req.query.storeId || '');
-        const data = coupons
-            .map(couponToOffer)
-            .filter((o) => o.discountType !== 'unsupported')
-            .filter((o) => !o.startDate || new Date(o.startDate) <= now)
-            .filter((o) => !(o.usageLimit > 0 && o.usedCount >= o.usageLimit))
-            .filter((o) => !storeId || o.storeIds.length === 0 || o.storeIds.includes(storeId));
+        const storeId = await couponStoreFromQuery(req.query);
+        const data = (await liveCouponsForStore(storeId)).map(publicCouponView);
+        res.set('Cache-Control', 'no-store');
         res.status(200).json({ success: true, data });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

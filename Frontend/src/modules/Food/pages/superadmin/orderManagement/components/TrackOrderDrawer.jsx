@@ -41,7 +41,7 @@ export default function TrackOrderDrawer({
     }
   }, [isOpen, orderId]);
 
-  // Simulated Socket.IO live coordinate updates
+  // The rider's last known position from the server (nothing is simulated)
   useEffect(() => {
     if (!isVisible || !tracking || !tracking.rider) return;
 
@@ -53,45 +53,6 @@ export default function TrackOrderDrawer({
       eta: tracking.rider.eta
     });
 
-    const interval = setInterval(() => {
-      // Simulate rider moving closer to customer
-      setLiveCoords(prev => {
-        const custLat = tracking.customer.lat;
-        const custLng = tracking.customer.lng;
-        
-        // Move 10% closer to customer
-        const nextLat = prev.lat + (custLat - prev.lat) * 0.1;
-        const nextLng = prev.lng + (custLng - prev.lng) * 0.1;
-        
-        // Parse ETA and distance
-        const currEta = parseInt(prev.eta);
-        const nextEta = currEta > 1 ? `${currEta - 1} mins` : 'Arrived';
-        const currDist = parseFloat(prev.distance);
-        const nextDist = currDist > 0.1 ? `${(currDist - 0.15).toFixed(2)} km` : '0 km';
-
-        // Add Socket.IO location updated event to stream
-        const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        setEvents(evtList => [
-          { 
-            id: `ev-socket-${Date.now()}`, 
-            event: 'riderLocationUpdated', 
-            time: timeNow, 
-            user: tracking.rider.name, 
-            role: 'Rider GPS Telemetry' 
-          },
-          ...evtList
-        ]);
-
-        return {
-          lat: nextLat,
-          lng: nextLng,
-          distance: nextDist,
-          eta: nextEta
-        };
-      });
-    }, 4500); // Trigger every 4.5 seconds
-
-    return () => clearInterval(interval);
   }, [isVisible, tracking]);
 
   // Auto scroll event stream to top on new event
@@ -245,7 +206,7 @@ export default function TrackOrderDrawer({
                 <div className="h-[220px] bg-zinc-950 rounded-xl overflow-hidden relative flex items-center justify-center border border-zinc-850 select-none shadow-inner">
                   <div className="absolute inset-0 bg-radial-gradient opacity-10 pointer-events-none"></div>
                   
-                  {/* Mock map details */}
+                  {/* map details */}
                   <div className="absolute top-[35%] left-[20%] z-10 flex flex-col items-center">
                     <div className="bg-[var(--primary)] text-white p-1 rounded-full border border-white shadow-md">
                       <Store size={12} />
@@ -273,7 +234,7 @@ export default function TrackOrderDrawer({
                     <span className="text-[8px] bg-white text-zinc-900 px-1 rounded shadow border mt-0.5 font-bold">Client Drop</span>
                   </div>
 
-                  {/* Route Polyline mock lines */}
+                  {/* Route Polyline lines */}
                   <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
                     <path d="M 20 35 L 50 52 L 75 75" fill="none" stroke="rgba(16, 185, 129, 0.4)" strokeWidth="3" strokeDasharray="5, 5" />
                   </svg>
@@ -299,7 +260,7 @@ export default function TrackOrderDrawer({
                   </div>
                   <div>
                     <span className="text-[9px] text-zinc-400 block uppercase">Rider Current Speed</span>
-                    <span>{tracking.rider ? `${tracking.rider.speed} km/h` : '0 km/h'}</span>
+                    <span>{Number.isFinite(tracking.rider?.speed) ? `${tracking.rider.speed} km/h` : 'No live speed'}</span>
                   </div>
                   <div>
                     <span className="text-[9px] text-zinc-400 block uppercase">Heading Direction</span>

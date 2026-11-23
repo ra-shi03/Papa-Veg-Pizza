@@ -13,7 +13,8 @@ import {
   CustomerHistoryModal,
   ExportReviewsModal 
 } from "./components/ReviewModals";
-import { mockStores } from "./mockData";
+
+const stores = [];
 
 export default function ReviewsRatings() {
   const useReviewsHook = useReviews();
@@ -205,7 +206,7 @@ export default function ReviewsRatings() {
               className="w-full p-2 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 focus:outline-none font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer"
             >
               <option value="All">All Store Outlets</option>
-              {mockStores.map(store => (
+              {stores.map(store => (
                 <option key={store.id} value={store.id}>{store.name}</option>
               ))}
             </select>

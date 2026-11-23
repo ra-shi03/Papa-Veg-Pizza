@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useState } from "react"
 import { adminAPI } from "@food/api"
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy"
 
 /**
  * The full signup record of one rider for the super admin's Partner Profile drawer
- * (GET /food/admin/delivery/:id: contact, address, vehicle, licence, documents, bank, location). Nothing in standalone mock.
+ * (GET /food/admin/delivery/:id: contact, address, vehicle, licence, documents, bank, location). Nothing in standalone .
  */
 export default function useDeliveryPartnerDetails(id, enabled) {
   const [details, setDetails] = useState(null)
@@ -12,7 +11,7 @@ export default function useDeliveryPartnerDetails(id, enabled) {
   const [error, setError] = useState("")
 
   const reload = useCallback(async () => {
-    if (STANDALONE_MOCK || !id || !enabled) return
+    if ((!id) || !enabled) return
     setLoading(true)
     setError("")
     try {

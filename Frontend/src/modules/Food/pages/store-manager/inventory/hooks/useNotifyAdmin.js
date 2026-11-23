@@ -1,8 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
-import { INV, failOrMock } from "./inventoryApi";
-import { mockShortageTimeline } from "../mockData";
+import { INV, throwApiError } from "./inventoryApi";
 
 export function useNotifyAdmin() {
   const queryClient = useQueryClient();
@@ -29,29 +28,8 @@ export function useNotifyAdmin() {
         }
         throw new Error(response.data?.message || "Failed to notify admin");
       } catch (err) {
-        failOrMock(err);
-        console.warn("Backend API unavailable. Logging admin notification.");
-
-        // Simulate network delay
-        await new Promise((resolve) => setTimeout(resolve, 300));
-
-        // Update timeline in local memory
-        if (shortageId) {
-          if (!mockShortageTimeline[shortageId]) {
-            mockShortageTimeline[shortageId] = [];
-          }
-          mockShortageTimeline[shortageId].push({
-            user: localStorage.getItem("store_user_name") || "Shubham Jamliya",
-            action: "reported",
-            remarks: `Dispatched Admin Emergency Alert [Priority: ${priority.toUpperCase()}]: ${message}`,
-            createdAt: new Date().toISOString()
-          });
-        }
-
-        return {
-          success: true,
-          message: "Emergency notification successfully dispatched to administrator dashboard."
-        };
+        throwApiError(err);
+        
       }
     },
     onSuccess: (data) => {

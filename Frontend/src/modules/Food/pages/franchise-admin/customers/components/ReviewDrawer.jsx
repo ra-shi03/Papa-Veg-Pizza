@@ -6,7 +6,8 @@ import {
   Check, Eye, AlertTriangle, AlertCircle, RefreshCw,
   Send, ExternalLink, HelpCircle, Download, ZoomIn
 } from "lucide-react";
-import { mockStores } from "../mockData";
+
+const stores = [];
 
 // Helper to format date nicely
 const formatDateTime = (value) => {
@@ -86,15 +87,9 @@ export default function ReviewDrawer({
     }
   };
 
-  // Mock Rating distribution calculation for progress bars
-  const totalMockDist = 120;
-  const ratingBreakdown = [
-    { stars: 5, count: 80, pct: 67 },
-    { stars: 4, count: 25, pct: 21 },
-    { stars: 3, count: 10, pct: 8 },
-    { stars: 2, count: 3, pct: 3 },
-    { stars: 1, count: 2, pct: 1 }
-  ];
+  // No rating breakdown is loaded for this view yet
+  const totalRatingCount = 0;
+  const ratingBreakdown = [5, 4, 3, 2, 1].map((stars) => ({ stars, count: 0, pct: 0 }));
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
@@ -520,7 +515,7 @@ export default function ReviewDrawer({
                           reviewDetails.previousReviews.map((rev) => (
                             <tr key={rev._id} className="text-zinc-700 dark:text-zinc-350 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50">
                               <td className="px-4 py-2.5 font-medium whitespace-nowrap">{formatDateTime(rev.createdAt || rev.date)}</td>
-                              <td className="px-4 py-2.5 font-bold">{mockStores.find(s => s.id === rev.storeId)?.name || rev.storeName || "N/A"}</td>
+                              <td className="px-4 py-2.5 font-bold">{stores.find(s => s.id === rev.storeId)?.name || rev.storeName || "N/A"}</td>
                               <td className="px-4 py-2.5 text-amber-500 font-bold whitespace-nowrap">{rev.rating} ★</td>
                               <td className="px-4 py-2.5 italic max-w-xs truncate">"{rev.reviewText || 'No text review'}"</td>
                               <td className="px-4 py-2.5">

@@ -62,7 +62,7 @@ export default function RefundModal({ isOpen, onClose, complaint, onRefundSucces
         <div className="px-4 py-3 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0">
           <div>
             <h2 className="text-sm font-extrabold text-zinc-900 dark:text-zinc-50">Issue Refund</h2>
-            <p className="text-[10px] text-zinc-500">Order: {complaint?.orderNumber || 'PV-9042'} • ID: {complaint?.complaintNumber || 'CMP-1049'}</p>
+            <p className="text-[10px] text-zinc-500">Order: {complaint?.orderNumber || '—'} • ID: {complaint?.complaintNumber || '—'}</p>
           </div>
           <button onClick={onClose} className="p-1 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
             <X className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />

@@ -24,8 +24,8 @@ export default function Profile({ onClose }) {
           setUser(currentUser);
           setFormData({
             name: currentUser.name || "Global Manager",
-            email: currentUser.email || "manager@papaveg.com",
-            phone: currentUser.phone || "+91 9876543210",
+            email: currentUser.email || "—",
+            phone: currentUser.phone || "—",
           });
         } else {
           // Fallback to local storage if API fails or returns null
@@ -34,8 +34,8 @@ export default function Profile({ onClose }) {
             setUser(localUser);
             setFormData({
               name: localUser.name || "Global Manager",
-              email: localUser.email || "manager@papaveg.com",
-              phone: localUser.phone || "+91 9876543210",
+              email: localUser.email || "—",
+              phone: localUser.phone || "—",
             });
           }
         }

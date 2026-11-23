@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/services/api/axios";
-import { INV, failOrMock } from "./inventoryApi";
-import { getLocalIngredients } from "../mockData";
+import { INV, throwApiError } from "./inventoryApi";
 
 export function useInventoryDashboard() {
   return useQuery({
@@ -27,30 +26,8 @@ export function useInventoryDashboard() {
 
         throw new Error("Invalid response format");
       } catch (err) {
-        failOrMock(err);
-        console.warn("Backend API unavailable for dashboard. Using local calculated values.");
+        throwApiError(err);
         
-        // Compute dashboard metrics from local storage
-        const ingredients = getLocalIngredients();
-        const totalIngredients = ingredients.length;
-        const availableIngredients = ingredients.filter(i => i.status === "available").length;
-        const lowStockCount = ingredients.filter(i => i.status === "low_stock").length;
-        const outOfStockCount = ingredients.filter(i => i.status === "out_of_stock").length;
-        
-        const inventoryValue = ingredients.reduce((sum, item) => {
-          return sum + (item.currentStock * item.costPerUnit);
-        }, 0);
-
-        // Simulate network delay
-        await new Promise((resolve) => setTimeout(resolve, 300));
-
-        return {
-          totalIngredients,
-          availableIngredients,
-          lowStockCount,
-          outOfStockCount,
-          inventoryValue: Math.round(inventoryValue)
-        };
       }
     },
     staleTime: 5000,

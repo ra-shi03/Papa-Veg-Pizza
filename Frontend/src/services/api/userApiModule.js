@@ -286,6 +286,8 @@ export const userAPI = {
     Promise.resolve({
       data: { success: true, message: "Location saved (client)", data: null },
     }),
+  /** The signed-in customer's coupon history: { expired, redeemed } (coupons for their store, from Marketing > Coupons). */
+  getCouponHistory: (params = {}) => userClient.get("/food/user/coupons/history", { params }),
   saveFcmToken: (token, options = {}) => {
     if (!token) return Promise.reject(new Error("FCM token is required"));
     const platform = options?.platform === "mobile" ? "mobile" : "web";

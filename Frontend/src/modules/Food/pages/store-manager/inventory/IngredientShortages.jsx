@@ -1,3 +1,4 @@
+import { getCurrentUser as getSignedInUser } from "@food/utils/auth";
 import React, { useState, useEffect } from "react";
 import { useSearchParams, useOutletContext } from "react-router-dom";
 import { toast } from "sonner";
@@ -26,7 +27,9 @@ import { ShortageDetailsModal } from "./components/ShortageDetailsModal";
 import { TransferStockModal } from "./components/TransferStockModal";
 import { ResolveShortageModal } from "./components/ResolveShortageModal";
 import { NotifyAdminModal } from "./components/NotifyAdminModal";
-import { mockAffectedOrders } from "./mockData";
+
+
+const emptyAffectedOrders = {};
 
 export default function IngredientShortages() {
   // Retrieve role from Outlet Context
@@ -50,15 +53,7 @@ export default function IngredientShortages() {
   const [columnVisibility, setColumnVisibility] = useState({});
 
   // 1. Resolve Current User Name based on active role
-  const getCurrentUser = () => {
-    switch (role) {
-      case "kitchen_staff":
-        return "Aman Verma";
-      case "store_manager":
-      default:
-        return "Shubham Jamliya";
-    }
-  };
+  const getCurrentUser = () => getSignedInUser("admin")?.name || "";
 
   const currentUser = getCurrentUser();
 
@@ -345,7 +340,7 @@ export default function IngredientShortages() {
           shortage={selectedNotifyShortage}
           estimatedRevenueLoss={
             // Find estimated revenue loss of selected alert
-            mockAffectedOrders[selectedNotifyShortage.ingredientId]?.reduce((sum, o) => sum + (o.revenue || 0), 0) || 
+            emptyAffectedOrders[selectedNotifyShortage.ingredientId]?.reduce((sum, o) => sum + (o.revenue || 0), 0) || 
             (selectedNotifyShortage.affectedOrders || 0) * 450
           }
         />

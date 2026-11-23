@@ -1,36 +1,27 @@
 import { useState, useEffect, useCallback } from "react";
-import { 
-  mockOrders as initialOrders, 
-  mockStores, 
-  mockDeliveryPartners, 
-  mockReorderAnalytics,
-  mockCancelledAnalytics,
-  mockCancellationTrend,
-  mockCancellationReasons,
-  mockStoreCancellations,
-  mockRefundStatusDistribution,
-  mockRefundRequests,
-  mockRefundTransactions,
-  mockRefundAnalytics as initialRefundAnalytics,
-  mockRefundTrend,
-  mockRefundRequestsStatusDistribution,
-  mockRefundReasonsDistribution,
-  mockStoreRefundChart,
-  mockIssueStaff,
-  mockOrderIssues,
-  mockIssueAnalytics as initialIssueAnalytics,
-  mockIssueTrend,
-  mockIssueCategoriesDistribution,
-  mockIssuePriorityDistribution,
-  mockStoreIssuesChart,
-  mockResolutionTypesChart
-} from "./mockOrders";
 import { toast } from "sonner";
 import { adminClient } from "@/services/api/axios";
-import { STANDALONE_MOCK } from "@/services/api/mockPolicy";
+
+const emptyStores = [];
+const deliveryPartners = [];
+const reorderAnalytics = {};
+const cancelledAnalytics = { cancelledTodayCount: 0, customerCancellationsCount: 0, storeCancellationsCount: 0, refundPendingCount: 0, totalOrdersCount: 0, cancelledOrdersCount: 0, mostCommonReason: "", refundAmountThisMonth: 0, cancelledRevenue: 0, averageRefundTime: "", highestCancellationStore: "", highestCancellationStorePercentage: "" };
+const emptyCancellationTrend = [];
+const emptyCancellationReasons = [];
+const emptyStoreCancellations = [];
+const emptyRefundStatusDistribution = [];
+const refundTransactions = [];
+const refundAnalytics = { refundAmountToday: 0, refundAmountThisMonth: 0, highestRefundStore: "", averageRefundValue: 0, refundSuccessRate: "" };
+const emptyRefundTrend = [];
+const emptyStoreRefundChart = [];
+const issueStaff = [];
+const orderIssues = [];
+const issueAnalytics = { openIssuesCount: 0, highPriorityCount: 0, resolvedTodayCount: 0, avgResolutionTime: "", customerSatisfaction: "", issuesToday: 0, compensationPaid: 0, topCategory: "", highestComplaintStore: "" };
+const emptyIssueTrend = [];
+const emptyStoreIssuesChart = [];
 
 // A franchise admin watches orders; the store changes them (accept, kitchen, rider, cancel). There is no franchise
-// endpoint for these, so outside standalone mock mode the actions refuse instead of changing a local copy.
+// endpoint for these, so outside standalone mode the actions refuse instead of changing a local copy.
 const READ_ONLY = "Orders are updated by the store. A franchise admin can view them but not change them.";
 
 // Orders come from the backend (read-only for the franchise admin); refunds / issues below are still local.
@@ -70,9 +61,9 @@ export const syncRefundRequests = async () => {
     toast.error(err?.response?.data?.message || "Could not load the refund requests");
   }
 };
-let dbRefundTransactions = [...mockRefundTransactions];
-let dbOrderIssues = [...mockOrderIssues];
-let dbIssueStaff = [...mockIssueStaff];
+let dbRefundTransactions = [...refundTransactions];
+let dbOrderIssues = [...orderIssues];
+let dbIssueStaff = [...issueStaff];
 
 // Simple Pub/Sub for Query Invalidation
 const listeners = new Set();
@@ -318,7 +309,7 @@ export function useDeliveryPartners(availableOnly = false) {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      let riders = [...mockDeliveryPartners];
+      let riders = [...deliveryPartners];
       if (availableOnly) {
         riders = riders.filter((r) => r.available);
       }
@@ -336,37 +327,8 @@ export function useUpdateOrderStatus() {
   const [isLoading, setIsLoading] = useState(false);
 
   const mutateAsync = async ({ orderId, status, remarks, updatedBy = "Franchise Admin" }) => {
-    if (!STANDALONE_MOCK) throw new Error(READ_ONLY);
-    setIsLoading(true);
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const orderIndex = dbOrders.findIndex((o) => o.id === orderId);
-        if (orderIndex === -1) {
-          setIsLoading(false);
-          reject(new Error("Order not found"));
-          return;
-        }
-
-        const oldOrder = dbOrders[orderIndex];
-        
-        // Update order status & timeline
-        const updatedTimeline = [
-          ...oldOrder.timeline,
-          { status, updatedBy, timestamp: new Date().toISOString() }
-        ];
-
-        dbOrders[orderIndex] = {
-          ...oldOrder,
-          orderStatus: status,
-          remarks: remarks || oldOrder.remarks,
-          timeline: updatedTimeline,
-        };
-
-        setIsLoading(false);
-        notifyListeners(); // Invalidate live-orders & order-details
-        resolve({ success: true, order: dbOrders[orderIndex] });
-      }, 500);
-    });
+    throw new Error(READ_ONLY);
+    
   };
 
   const mutate = (variables, options = {}) => {
@@ -387,49 +349,8 @@ export function useAssignRider() {
   const [isLoading, setIsLoading] = useState(false);
 
   const mutateAsync = async ({ orderId, riderId, estimatedPickupTime, notes }) => {
-    if (!STANDALONE_MOCK) throw new Error(READ_ONLY);
-    setIsLoading(true);
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const orderIndex = dbOrders.findIndex((o) => o.id === orderId);
-        const rider = mockDeliveryPartners.find((r) => r.riderId === riderId);
-
-        if (orderIndex === -1) {
-          setIsLoading(false);
-          reject(new Error("Order not found"));
-          return;
-        }
-        if (!rider) {
-          setIsLoading(false);
-          reject(new Error("Rider not found"));
-          return;
-        }
-
-        const oldOrder = dbOrders[orderIndex];
-        const updatedTimeline = [
-          ...oldOrder.timeline,
-          { status: "Rider Assigned", updatedBy: "System", timestamp: new Date().toISOString() }
-        ];
-
-        dbOrders[orderIndex] = {
-          ...oldOrder,
-          orderStatus: "Rider Assigned",
-          deliveryPartner: {
-            riderId: rider.riderId,
-            name: rider.name,
-            vehicleType: rider.vehicleType,
-            phone: rider.phone,
-          },
-          estimatedPickupTime,
-          remarks: notes || oldOrder.remarks,
-          timeline: updatedTimeline,
-        };
-
-        setIsLoading(false);
-        notifyListeners(); // Invalidate
-        resolve({ success: true, order: dbOrders[orderIndex] });
-      }, 500);
-    });
+    throw new Error(READ_ONLY);
+    
   };
 
   const mutate = (variables, options = {}) => {
@@ -450,35 +371,8 @@ export function useCancelOrder() {
   const [isLoading, setIsLoading] = useState(false);
 
   const mutateAsync = async ({ orderId, reason, remarks, notifyCustomer }) => {
-    if (!STANDALONE_MOCK) throw new Error(READ_ONLY);
-    setIsLoading(true);
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const orderIndex = dbOrders.findIndex((o) => o.id === orderId);
-        if (orderIndex === -1) {
-          setIsLoading(false);
-          reject(new Error("Order not found"));
-          return;
-        }
-
-        const oldOrder = dbOrders[orderIndex];
-        const updatedTimeline = [
-          ...oldOrder.timeline,
-          { status: "Cancelled", updatedBy: "Franchise Admin", timestamp: new Date().toISOString() }
-        ];
-
-        dbOrders[orderIndex] = {
-          ...oldOrder,
-          orderStatus: "Cancelled",
-          remarks: remarks ? `Cancelled: ${reason}. Notes: ${remarks}` : `Cancelled: ${reason}`,
-          timeline: updatedTimeline,
-        };
-
-        setIsLoading(false);
-        notifyListeners(); // Invalidate
-        resolve({ success: true, order: dbOrders[orderIndex] });
-      }, 500);
-    });
+    throw new Error(READ_ONLY);
+    
   };
 
   const mutate = (variables, options = {}) => {
@@ -494,83 +388,6 @@ export function useCancelOrder() {
   return { mutate, mutateAsync, isLoading };
 }
 
-// Real-time Order Simulation helper (simulates a new order arriving)
-export function simulateNewOrder() {
-  if (!STANDALONE_MOCK) throw new Error("Sample orders are available in standalone mock mode only.");
-  const newId = `ORD-98${Math.floor(100 + Math.random() * 900)}`;
-  const orderNum = `PVP-${newId.split("-")[1]}`;
-  const randomNames = ["Vikram Malhotra", "Kriti Sanon", "Deepak Chahar", "Neha Sharma", "Arjun Kapoor"];
-  const randomAddresses = [
-    "C-45, GK 2, New Delhi - 110048",
-    "Flat 101, Prestige Palms, Whitefield, Bengaluru - 560066",
-    "Sector 5, Salt Lake City, Kolkata - 700091",
-    "Flat 304, Jubilee Hills Road 36, Hyderabad - 500033",
-    "Bldg 12, JVPD Scheme, Juhu, Mumbai - 400049"
-  ];
-  
-  const selectedName = randomNames[Math.floor(Math.random() * randomNames.length)];
-  const selectedAddress = randomAddresses[Math.floor(Math.random() * randomAddresses.length)];
-  const store = mockStores[Math.floor(Math.random() * mockStores.length)];
-
-  const pizzaOptions = [
-    { name: "Double Cheese Margherita Pizza", price: 399, image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=150&q=80" },
-    { name: "Tandoori Paneer Pizza", price: 420, image: "https://images.unsplash.com/photo-1571066811602-71683a3f680d?auto=format&fit=crop&w=150&q=80" },
-    { name: "Veg Supreme Burst Pizza", price: 699, image: "https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?auto=format&fit=crop&w=150&q=80" }
-  ];
-  const pizza = pizzaOptions[Math.floor(Math.random() * pizzaOptions.length)];
-
-  const newOrder = {
-    id: newId,
-    orderNumber: orderNum,
-    customer: {
-      name: selectedName,
-      phone: `+91 ${Math.floor(60000 + Math.random() * 40000)} ${Math.floor(10000 + Math.random() * 90000)}`,
-      email: `${selectedName.toLowerCase().replace(" ", ".")}@gmail.com`,
-      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80",
-      address: selectedAddress,
-      coords: { lat: 28.5 + Math.random() * 0.1, lng: 77.0 + Math.random() * 0.1 }
-    },
-    store: {
-      storeId: store.storeId,
-      name: store.storeName.split(" - ")[1] || store.storeName
-    },
-    orderType: "Delivery",
-    placedAt: new Date().toISOString(),
-    estimatedDeliveryTime: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-    orderStatus: "Pending",
-    pricing: {
-      subtotal: pizza.price,
-      tax: pizza.price * 0.05,
-      deliveryFee: 40,
-      discount: 0,
-      total: pizza.price * 1.05 + 40
-    },
-    paymentMethod: Math.random() > 0.4 ? "UPI" : "COD",
-    paymentStatus: Math.random() > 0.4 ? "Paid" : "Pending",
-    transactionId: Math.random() > 0.4 ? `TXN-UPI${Math.floor(100000 + Math.random() * 900000)}` : null,
-    couponApplied: null,
-    deliveryPartner: null,
-    items: [
-      {
-        productId: pizza.name.toLowerCase().replace(/ /g, "-"),
-        productName: pizza.name,
-        variant: "Medium / Regular",
-        quantity: 1,
-        price: pizza.price,
-        image: pizza.image,
-        specialInstructions: ""
-      }
-    ],
-    timeline: [
-      { status: "Placed", updatedBy: "Customer", timestamp: new Date().toISOString() }
-    ],
-    remarks: ""
-  };
-
-  dbOrders = [newOrder, ...dbOrders];
-  notifyListeners();
-  return newOrder;
-}
 
 // Hook for Completed Orders list query
 export function useCompletedOrders(filters = {}) {
@@ -701,7 +518,7 @@ export function useReorderAnalytics(orderId) {
     }
     setIsLoading(true);
     const timer = setTimeout(() => {
-      const analytics = mockReorderAnalytics[orderId] || {
+      const analytics = reorderAnalytics[orderId] || {
         lifetimeOrders: 4,
         previousOrderCount: 3,
         avgSpend: 320,
@@ -911,17 +728,17 @@ export function useCancellationAnalytics() {
           storeCancellations: storeCancellations.length,
           refundPending: refundPending.length,
           cancellationPercentage: `${cancellationRate}%`,
-          mostCommonReason: mockCancelledAnalytics.mostCommonReason,
+          mostCommonReason: cancelledAnalytics.mostCommonReason,
           refundAmountThisMonth,
           cancelledRevenue,
-          averageRefundTime: mockCancelledAnalytics.averageRefundTime,
-          highestCancellationStore: mockCancelledAnalytics.highestCancellationStore,
-          highestCancellationStorePercentage: mockCancelledAnalytics.highestCancellationStorePercentage
+          averageRefundTime: cancelledAnalytics.averageRefundTime,
+          highestCancellationStore: cancelledAnalytics.highestCancellationStore,
+          highestCancellationStorePercentage: cancelledAnalytics.highestCancellationStorePercentage
         },
-        cancellationTrend: mockCancellationTrend,
-        cancellationReasons: mockCancellationReasons,
-        storeCancellations: mockStoreCancellations,
-        refundStatusDistribution: mockRefundStatusDistribution
+        cancellationTrend: emptyCancellationTrend,
+        cancellationReasons: emptyCancellationReasons,
+        storeCancellations: emptyStoreCancellations,
+        refundStatusDistribution: emptyRefundStatusDistribution
       });
       setIsLoading(false);
     }, 300);
@@ -1187,10 +1004,10 @@ export function useRefundAnalytics() {
         totalRefundAmount: refundAmountVal,
         avgResolutionTime: `${avgResolutionDays} Days`,
         refundAmountToday: refundToday || 0,
-        refundAmountThisMonth: initialRefundAnalytics.refundAmountThisMonth,
-        highestRefundStore: initialRefundAnalytics.highestRefundStore,
-        averageRefundValue: initialRefundAnalytics.averageRefundValue,
-        refundSuccessRate: initialRefundAnalytics.refundSuccessRate,
+        refundAmountThisMonth: refundAnalytics.refundAmountThisMonth,
+        highestRefundStore: refundAnalytics.highestRefundStore,
+        averageRefundValue: refundAnalytics.averageRefundValue,
+        refundSuccessRate: refundAnalytics.refundSuccessRate,
       });
       setIsLoading(false);
     }, 200);
@@ -1255,10 +1072,10 @@ export function useRefundChartData() {
       });
 
       setData({
-        refundTrend: mockRefundTrend,
+        refundTrend: emptyRefundTrend,
         refundStatusDistribution: dynamicStatusDist,
         refundReasonsDistribution: dynamicReasonsDist,
-        storeRefundChart: mockStoreRefundChart,
+        storeRefundChart: emptyStoreRefundChart,
       });
       setIsLoading(false);
     }, 200);
@@ -1420,73 +1237,6 @@ export function useProcessRefund() {
   return { mutate, mutateAsync, isLoading };
 }
 
-// WebSocket simulator for refund requests
-export function simulateNewRefundRequest() {
-  const newId = `REF-REQ-0${Math.floor(10 + Math.random() * 90)}`;
-  const orderNum = `PVP-98${Math.floor(400 + Math.random() * 99)}`;
-  const randomNames = ["Virat Kohli", "Jasprit Bumrah", "Rohit Sharma", "Shubman Gill", "Hardik Pandya"];
-  const selectedName = randomNames[Math.floor(Math.random() * randomNames.length)];
-  const store = mockStores[Math.floor(Math.random() * mockStores.length)];
-  const amount = Number((100 + Math.random() * 900).toFixed(2));
-  const reasons = ["Food Quality", "Wrong Order", "Late Delivery", "Damaged Packaging", "Missing Items"];
-  const selectedReason = reasons[Math.floor(Math.random() * reasons.length)];
-
-  const newRefund = {
-    _id: newId,
-    requestId: newId,
-    orderId: `ORD-${orderNum.split("-")[1]}`,
-    orderNumber: orderNum,
-    customerId: `CUST-${Math.floor(200 + Math.random() * 800)}`,
-    franchiseId: "FRAN-001",
-    customer: {
-      name: selectedName,
-      phone: `+91 ${Math.floor(60000 + Math.random() * 40000)} ${Math.floor(10000 + Math.random() * 90000)}`,
-      email: `${selectedName.toLowerCase().replace(" ", ".")}@gmail.com`,
-      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80",
-      address: "Sector 62, Noida, Uttar Pradesh - 201301",
-      memberSince: "15 Jan 2024",
-      totalOrders: Math.floor(2 + Math.random() * 30),
-      lifetimeValue: Math.floor(1000 + Math.random() * 15000),
-    },
-    store: {
-      storeId: store.storeId,
-      name: store.storeName.split(" - ")[1] || store.storeName,
-    },
-    refundAmount: amount,
-    reason: selectedReason,
-    description: `Received a request because of ${selectedReason.toLowerCase()}. Please review and process this immediately.`,
-    attachments: Math.random() > 0.5 ? ["https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80"] : [],
-    refundStatus: "Pending",
-    requestedAt: new Date().toISOString(),
-    approvedBy: null,
-    processedAt: null,
-    paymentTransactionId: `TXN-UPI${Math.floor(100000 + Math.random() * 900000)}`,
-    timeline: [
-      {
-        status: "Request Submitted",
-        updatedBy: selectedName,
-        timestamp: new Date().toISOString(),
-        remarks: `Requested refund for ${selectedReason.toLowerCase()}.`,
-      },
-    ],
-    paymentInfo: {
-      originalTransactionId: `TXN-UPI${Math.floor(100000 + Math.random() * 900000)}`,
-      gateway: Math.random() > 0.5 ? "Razorpay" : "PhonePe",
-      gatewayStatus: "Success",
-      refundTransactionId: "",
-      processedAmount: 0,
-      processedBy: "",
-      processingDate: "",
-    },
-  };
-
-  dbRefundRequests = [newRefund, ...dbRefundRequests];
-  notifyListeners();
-  toast.info(`WebSocket: New Refund Request ${newId} received!`, {
-    description: `${selectedName} requested ₹${amount} for ${selectedReason}`,
-  });
-  return newRefund;
-}
 
 // Mutation: Reopen Investigation
 export function useReopenInvestigation() {
@@ -1730,13 +1480,13 @@ export function useIssueAnalytics() {
       setData({
         openIssuesCount: open,
         highPriorityCount: high,
-        resolvedTodayCount: resolvedToday || initialIssueAnalytics.resolvedTodayCount,
-        avgResolutionTime: initialIssueAnalytics.avgResolutionTime,
-        customerSatisfaction: initialIssueAnalytics.customerSatisfaction,
+        resolvedTodayCount: resolvedToday || issueAnalytics.resolvedTodayCount,
+        avgResolutionTime: issueAnalytics.avgResolutionTime,
+        customerSatisfaction: issueAnalytics.customerSatisfaction,
         issuesToday: dbOrderIssues.length,
-        compensationPaid: compPaid || initialIssueAnalytics.compensationPaid,
-        topCategory: initialIssueAnalytics.topCategory,
-        highestComplaintStore: initialIssueAnalytics.highestComplaintStore,
+        compensationPaid: compPaid || issueAnalytics.compensationPaid,
+        topCategory: issueAnalytics.topCategory,
+        highestComplaintStore: issueAnalytics.highestComplaintStore,
       });
       setIsLoading(false);
     }, 200);
@@ -1816,10 +1566,10 @@ export function useIssueChartData() {
       }));
 
       setData({
-        issueTrend: mockIssueTrend,
+        issueTrend: emptyIssueTrend,
         issueCategoriesDistribution: dynamicCategoryDist,
         issuePriorityDistribution: dynamicPriorityDist,
-        storeIssuesChart: mockStoreIssuesChart,
+        storeIssuesChart: emptyStoreIssuesChart,
         resolutionTypesChart: dynamicResolutionDist,
       });
       setIsLoading(false);
@@ -2048,68 +1798,3 @@ export function useCloseIssue() {
   return { mutate, mutateAsync, isLoading };
 }
 
-// WebSocket Simulator for post-order issue logs
-export function simulateNewOrderIssue() {
-  const newId = `ISS-10${Math.floor(7 + Math.random() * 90)}`;
-  const orderNum = `PVP-98${Math.floor(400 + Math.random() * 99)}`;
-  const randomNames = ["Sachin Tendulkar", "MS Dhoni", "Virat Kohli", "Sourav Ganguly", "Kapil Dev"];
-  const selectedName = randomNames[Math.floor(Math.random() * randomNames.length)];
-  const categories = ["Wrong Item", "Missing Item", "Late Delivery", "Cold Pizza", "Damaged Package", "Rider Misbehavior", "Payment Problem"];
-  const selectedCategory = categories[Math.floor(Math.random() * categories.length)];
-  const priorities = ["Low", "Medium", "High", "Critical"];
-  const selectedPriority = priorities[Math.floor(Math.random() * priorities.length)];
-  const store = mockStores[Math.floor(Math.random() * mockStores.length)];
-
-  const newIssue = {
-    _id: newId,
-    issueNumber: newId,
-    orderId: `ORD-${orderNum.split("-")[1]}`,
-    orderNumber: orderNum,
-    customerId: `CUST-${Math.floor(200 + Math.random() * 800)}`,
-    storeId: store.storeId,
-    franchiseId: "FRAN-001",
-    category: selectedCategory,
-    priority: selectedPriority,
-    description: `Reported issue of ${selectedCategory.toLowerCase()}. Need immediate assistance to review what happened.`,
-    attachments: Math.random() > 0.6 ? ["https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80"] : [],
-    assignedTo: null,
-    status: "Open",
-    resolution: null,
-    createdAt: new Date().toISOString(),
-    resolvedAt: null,
-    customer: {
-      name: selectedName,
-      phone: `+91 ${Math.floor(60000 + Math.random() * 40000)} ${Math.floor(10000 + Math.random() * 90000)}`,
-      email: `${selectedName.toLowerCase().replace(" ", ".")}@gmail.com`,
-      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80",
-      address: "Sector 18, Noida, Uttar Pradesh - 201301",
-      memberSince: "10 Oct 2023",
-      totalOrders: Math.floor(4 + Math.random() * 20),
-      lifetimeValue: Math.floor(2000 + Math.random() * 10000),
-    },
-    store: { storeId: store.storeId, name: store.storeName.split(" - ")[1] || store.storeName },
-    order: {
-      orderNumber: orderNum,
-      storeName: store.storeName.split(" - ")[1] || store.storeName,
-      placedAt: new Date(Date.now() - 30 * 60000).toISOString(),
-      items: "Veg Combo Margherita Pizza Large x1",
-      paymentMethod: "UPI",
-      deliveryPartner: "Amit Patel (RD-102)",
-      deliveredAt: new Date(Date.now() - 5 * 60000).toISOString(),
-      totalAmount: 649.00,
-    },
-    internalNotes: [
-      { addedBy: "System", department: "Operations", note: `Ticket created dynamically for ${selectedCategory}.`, createdAt: new Date().toISOString() }
-    ],
-    timeline: [
-      { status: "Issue Created", updatedBy: selectedName, timestamp: new Date().toISOString(), remarks: `Logged complaint for ${selectedCategory.toLowerCase()}.` }
-    ]
-  };
-
-  dbOrderIssues = [newIssue, ...dbOrderIssues];
-  notifyListeners();
-  toast.error(`WebSocket: New Order Issue ${newId} logged!`, {
-    description: `${selectedName} reported [${selectedCategory}] on order ${orderNum}`,
-  });
-  return newIssue;
-}

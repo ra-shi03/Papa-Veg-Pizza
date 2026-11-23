@@ -22,7 +22,7 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
   const [isResolveOpen, setIsResolveOpen] = useState(false);
   const [isCloseOpen, setIsCloseOpen] = useState(false);
 
-  // Internal Notes State (mock db notes collection representation)
+  // Internal Notes State (db notes collection representation)
   const [internalNotes, setInternalNotes] = useState([]);
   const [newNote, setNewNote] = useState('');
   const [noteAttachments, setNoteAttachments] = useState([]);
@@ -46,80 +46,17 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
     }
   }, [activeTab, internalNotes]);
 
-  // Load ticket mock data relationships
+  // Load ticket data relationships
   useEffect(() => {
     if (ticket) {
       // 1. Populate Internal Notes
-      setInternalNotes([
-        {
-          _id: "in_1",
-          createdBy: "Amit Sharma",
-          role: "Operations Team",
-          note: "Franchise code PV-IND-01 is disputing Indore Central store commission on order batch ID 90812. Finance logs show Razorpay payout was processed on 15th, but POS sync was delayed by 3 hours.",
-          attachments: ["pos_reconciliation_report.xlsx"],
-          createdAt: new Date(new Date(ticket.createdAt).getTime() + 1800000).toISOString()
-        },
-        {
-          _id: "in_2",
-          createdBy: "Neha Singh",
-          role: "Super Admin",
-          note: "Reviewed Razorpay API response. Re-calculated settlement values: Gross: ₹85,420, Platform share (10%): ₹8,542, Net eligible payout: ₹76,878. Transferred discrepancy details to Finance Queue.",
-          attachments: [],
-          createdAt: new Date(new Date(ticket.createdAt).getTime() + 3600000).toISOString()
-        }
-      ]);
+      setInternalNotes([]);
 
       // 2. Populate Activity Timeline
-      setTimelineEvents([
-        {
-          _id: "ta_1",
-          action: "Ticket Raised",
-          performedBy: ticket.adminName || "Suresh Gupta",
-          role: "Franchise Admin",
-          remarks: `Initiated via Super Admin Portal. Initial Priority: ${ticket.priority}. Type: ${ticket.type}.`,
-          createdAt: ticket.createdAt
-        },
-        {
-          _id: "ta_2",
-          action: "Assigned Department Node",
-          performedBy: "System Gateway",
-          role: "System Routing API",
-          remarks: `Routed to Technical Support Desk based on ticket metadata categorization.`,
-          createdAt: new Date(new Date(ticket.createdAt).getTime() + 120000).toISOString()
-        }
-      ]);
+      setTimelineEvents([]);
 
       // 3. Populate Audit Logs
-      setAuditLogs([
-        {
-          _id: "al_1",
-          actorRole: "Franchise Admin",
-          actorName: ticket.adminName || "Suresh Gupta",
-          action: "Ticket Submission",
-          module: "Franchise Support",
-          oldValue: "-",
-          newValue: `Status: Open | Subj: "${ticket.subject}"`,
-          ipAddress: "157.34.120.91",
-          device: "Windows 11 Desktop",
-          browser: "Google Chrome v124",
-          location: "Indore, MP",
-          createdAt: ticket.createdAt
-        },
-        {
-          _id: "al_2",
-          actorRole: "System Route Agent",
-          actorName: "System Gateway",
-          action: "Status Transition",
-          module: "Franchise Support",
-          oldValue: "Pending Route",
-          newValue: "Status: Open | Queue: Technical Support",
-          ipAddress: "127.0.0.1",
-          device: "AWS EC2 API Node",
-          browser: "Node.js Axios v1.6",
-          location: "Mumbai Region (ap-south-1)",
-          createdAt: new Date(new Date(ticket.createdAt).getTime() + 120000).toISOString()
-        }
-      ]);
+      setAuditLogs([]);
     }
   }, [ticket]);
 
@@ -138,7 +75,7 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
 
     const newN = {
       _id: Date.now().toString(),
-      createdBy: "Neha Singh (You)",
+      createdBy: "You",
       role: "Super Admin",
       note: newNote,
       attachments: noteAttachments,
@@ -153,7 +90,7 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
     const act = {
       _id: Date.now().toString(),
       action: "Internal Note Added",
-      performedBy: "Neha Singh",
+      performedBy: "You",
       role: "Super Admin",
       remarks: `Added a private operational comment.`,
       createdAt: new Date().toISOString()
@@ -163,14 +100,14 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
     const audit = {
       _id: Date.now().toString(),
       actorRole: "Super Admin",
-      actorName: "Neha Singh",
+      actorName: "You",
       action: "Create Internal Note",
       module: "Franchise Support",
       oldValue: "-",
       newValue: `Note preview: "${newN.note.substring(0, 30)}..."`,
-      ipAddress: "103.45.221.84",
-      device: "MacBook Pro M3",
-      browser: "Safari v17.2",
+      ipAddress: "",
+      device: "",
+      browser: "",
       location: "Bhopal, MP",
       createdAt: new Date().toISOString()
     };
@@ -192,7 +129,7 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
     const act = {
       _id: Date.now().toString(),
       action: "Assigned Representative Node",
-      performedBy: "Neha Singh",
+      performedBy: "You",
       role: "Super Admin",
       remarks: `Assigned: ${agent} (${dept}). Priority severity adjusted to ${prio}.`,
       createdAt: new Date().toISOString()
@@ -202,14 +139,14 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
     const audit = {
       _id: Date.now().toString(),
       actorRole: "Super Admin",
-      actorName: "Neha Singh",
+      actorName: "You",
       action: "Reassign Ticket Node",
       module: "Franchise Support",
       oldValue: `Dept: ${ticket.assignedDepartment}, Handler: ${ticket.assignedTo}`,
       newValue: `Dept: ${dept}, Handler: ${agent}, Status: In Progress`,
-      ipAddress: "103.45.221.84",
-      device: "MacBook Pro M3",
-      browser: "Safari v17.2",
+      ipAddress: "",
+      device: "",
+      browser: "",
       location: "Bhopal, MP",
       createdAt: new Date().toISOString()
     };
@@ -229,7 +166,7 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
     const act = {
       _id: Date.now().toString(),
       action: "Ticket Escalated",
-      performedBy: "Neha Singh",
+      performedBy: "You",
       role: "Super Admin",
       remarks: `Escalated to: ${lvl} in ${dept}. Reason: ${reason}.`,
       createdAt: new Date().toISOString()
@@ -239,14 +176,14 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
     const audit = {
       _id: Date.now().toString(),
       actorRole: "Super Admin",
-      actorName: "Neha Singh",
+      actorName: "You",
       action: "Ticket Escalation",
       module: "Franchise Support",
       oldValue: `Status: ${ticket.status}, Priority: ${ticket.priority}`,
       newValue: `Status: Escalated, Priority: Critical, Level: ${lvl}, Target: ${dept}`,
-      ipAddress: "103.45.221.84",
-      device: "MacBook Pro M3",
-      browser: "Safari v17.2",
+      ipAddress: "",
+      device: "",
+      browser: "",
       location: "Bhopal, MP",
       createdAt: new Date().toISOString()
     };
@@ -266,7 +203,7 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
     const act = {
       _id: Date.now().toString(),
       action: "Ticket Resolved",
-      performedBy: "Neha Singh",
+      performedBy: "You",
       role: "Super Admin",
       remarks: `Solved Category: ${category}. Fix Notes: ${notes}.`,
       createdAt: new Date().toISOString()
@@ -276,14 +213,14 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
     const audit = {
       _id: Date.now().toString(),
       actorRole: "Super Admin",
-      actorName: "Neha Singh",
+      actorName: "You",
       action: "Resolve Ticket Action",
       module: "Franchise Support",
       oldValue: `Status: ${ticket.status}`,
       newValue: `Status: Resolved | Resolved Category: ${category}`,
-      ipAddress: "103.45.221.84",
-      device: "MacBook Pro M3",
-      browser: "Safari v17.2",
+      ipAddress: "",
+      device: "",
+      browser: "",
       location: "Bhopal, MP",
       createdAt: new Date().toISOString()
     };
@@ -301,7 +238,7 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
     const act = {
       _id: Date.now().toString(),
       action: "Ticket Closed & Archived",
-      performedBy: "Neha Singh",
+      performedBy: "You",
       role: "Super Admin",
       remarks: `Remarks: ${remarks}. Archive Status: ${finalStatus}.`,
       createdAt: new Date().toISOString()
@@ -311,14 +248,14 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
     const audit = {
       _id: Date.now().toString(),
       actorRole: "Super Admin",
-      actorName: "Neha Singh",
+      actorName: "You",
       action: "Close Ticket Action",
       module: "Franchise Support",
       oldValue: `Status: ${ticket.status}`,
       newValue: `Status: Closed | Archive Classification: ${finalStatus}`,
-      ipAddress: "103.45.221.84",
-      device: "MacBook Pro M3",
-      browser: "Safari v17.2",
+      ipAddress: "",
+      device: "",
+      browser: "",
       location: "Bhopal, MP",
       createdAt: new Date().toISOString()
     };
@@ -540,9 +477,9 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
                   </div>
                   <div className="min-w-0">
                     <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wide">Reporter Admin</p>
-                    <p className="text-xs font-black text-zinc-805 dark:text-zinc-50 truncate mt-0.5">{ticket.adminName || 'Suresh Gupta'}</p>
+                    <p className="text-xs font-black text-zinc-805 dark:text-zinc-50 truncate mt-0.5">{ticket.adminName || '—'}</p>
                     <p className="text-[10px] text-zinc-550 mt-1">Role: Franchise Manager</p>
-                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">{ticket.contactPhone || '+91 98270 12345'}</p>
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">{ticket.contactPhone || '—'}</p>
                     <p className="text-[10px] text-zinc-400 truncate mt-0.5">{ticket.contactEmail || 'suresh@franchise.in'}</p>
                   </div>
                 </div>
@@ -611,11 +548,11 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm text-center">
                       <p className="text-[9px] font-bold text-zinc-500 uppercase">Pending Settlement</p>
-                      <p className="text-xl font-black text-red-650 dark:text-red-450 mt-1">₹85,420</p>
+                      <p className="text-xl font-black text-red-650 dark:text-red-450 mt-1">—</p>
                     </div>
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm text-center">
                       <p className="text-[9px] font-bold text-zinc-500 uppercase">Last Settled Amount</p>
-                      <p className="text-xl font-black text-emerald-600 dark:text-emerald-450 mt-1">₹1,12,900</p>
+                      <p className="text-xl font-black text-emerald-600 dark:text-emerald-450 mt-1">—</p>
                     </div>
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm text-center">
                       <p className="text-[9px] font-bold text-zinc-500 uppercase">Platform Commission</p>
@@ -672,17 +609,17 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
                         <tr>
                           <td className="p-3 font-mono">TXN-90812</td>
                           <td className="p-3">08 June - 14 June</td>
-                          <td className="p-3">₹1,25,440</td>
-                          <td className="p-3">₹12,544</td>
-                          <td className="p-3 font-black text-emerald-600">₹1,12,900</td>
+                          <td className="p-3">—</td>
+                          <td className="p-3">—</td>
+                          <td className="p-3 font-black text-emerald-600">—</td>
                           <td className="p-3 text-right font-bold text-emerald-555">Settled</td>
                         </tr>
                         <tr className="bg-red-500/5">
                           <td className="p-3 font-mono">TXN-90411</td>
                           <td className="p-3">01 June - 07 June</td>
-                          <td className="p-3">₹94,910</td>
-                          <td className="p-3">₹9,491</td>
-                          <td className="p-3 font-black text-red-600">₹85,420</td>
+                          <td className="p-3">—</td>
+                          <td className="p-3">—</td>
+                          <td className="p-3 font-black text-red-600">—</td>
                           <td className="p-3 text-right font-bold text-red-650">Disputed</td>
                         </tr>
                       </tbody>
@@ -767,9 +704,9 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
                         <Store className="w-6 h-6" />
                       </div>
                       <div className="space-y-0.5">
-                        <h4 className="text-sm font-black text-zinc-900 dark:text-zinc-50">Indore Vijay Nagar Outlet</h4>
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Flat 202, Sector C, Vijay Nagar, Indore</p>
-                        <p className="text-[10px] text-zinc-400">POS Identifier: IND-VJY-04 • Opening Hours: 11:00 AM - 11:00 PM</p>
+                        <h4 className="text-sm font-black text-zinc-900 dark:text-zinc-50">{ticket.storeName || ticket.store || "—"}</h4>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{ticket.storeAddress || "—"}</p>
+                        <p className="text-[10px] text-zinc-400">{ticket.storeCode ? `Store code: ${ticket.storeCode}` : ""}</p>
                       </div>
                     </div>
 
@@ -787,9 +724,9 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 p-4 rounded-xl shadow-sm">
                       <p className="text-[9px] font-bold text-zinc-400 uppercase">Outlet Manager</p>
-                      <p className="text-xs font-black text-zinc-800 dark:text-zinc-100 mt-1">Amit Sharma</p>
-                      <p className="text-[10px] text-zinc-500 mt-1">+91 94072 88402</p>
-                      <p className="text-[9px] text-zinc-400 mt-0.5">amit.sharma@papaveg.com</p>
+                      <p className="text-xs font-black text-zinc-800 dark:text-zinc-100 mt-1">{ticket.storeManager || "—"}</p>
+                      <p className="text-[10px] text-zinc-500 mt-1">{ticket.storeManagerPhone || ""}</p>
+                      <p className="text-[9px] text-zinc-400 mt-0.5">{ticket.storeManagerEmail || ""}</p>
                     </div>
 
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 p-4 rounded-xl shadow-sm">
@@ -800,7 +737,7 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
 
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 p-4 rounded-xl shadow-sm">
                       <p className="text-[9px] font-bold text-zinc-400 uppercase">Weekly Net Sales</p>
-                      <p className="text-xl font-black text-emerald-600 mt-1">₹4,28,450</p>
+                      <p className="text-xl font-black text-emerald-600 mt-1">—</p>
                       <p className="text-[9px] text-zinc-400 mt-1">Rating: 4.8 / 5.0 (2,400+ reviews)</p>
                     </div>
                   </div>
@@ -854,23 +791,23 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
                         <tr>
                           <td className="p-3 font-bold">Double Cheese Margherita (Medium)</td>
                           <td className="p-3">Classic Veg Pizza</td>
-                          <td className="p-3 font-semibold">₹349</td>
-                          <td className="p-3 font-semibold text-red-500">₹329</td>
+                          <td className="p-3 font-semibold">—</td>
+                          <td className="p-3 font-semibold text-red-500">—</td>
                           <td className="p-3">18 June 11:20 PM</td>
                           <td className="p-3 text-right font-black text-red-650">₹20 Price Mismatch</td>
                         </tr>
                         <tr>
                           <td className="p-3 font-bold">Paneer Tikka Roll</td>
                           <td className="p-3">Snacks / Starters</td>
-                          <td className="p-3 font-semibold">₹159</td>
-                          <td className="p-3 font-semibold text-red-500">₹149</td>
+                          <td className="p-3 font-semibold">—</td>
+                          <td className="p-3 font-semibold text-red-500">—</td>
                           <td className="p-3">18 June 11:20 PM</td>
                           <td className="p-3 text-right font-black text-red-650">₹10 Price Mismatch</td>
                         </tr>
                         <tr>
                           <td className="p-3 font-bold">Cheesy Garlic Breadsticks</td>
                           <td className="p-3 font-semibold text-yellow-600">Sides (Missing in POS)</td>
-                          <td className="p-3 font-semibold">₹129</td>
+                          <td className="p-3 font-semibold">—</td>
                           <td className="p-3 text-zinc-400">-</td>
                           <td className="p-3">18 June 11:20 PM</td>
                           <td className="p-3 text-right font-black text-red-650">Node Missing</td>
@@ -887,11 +824,11 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm text-center">
                       <p className="text-[9px] font-bold text-zinc-500 uppercase">Gross Dispute Amount</p>
-                      <p className="text-xl font-black text-red-650 mt-1">₹8,542</p>
+                      <p className="text-xl font-black text-red-650 mt-1">—</p>
                     </div>
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm text-center">
                       <p className="text-[9px] font-bold text-zinc-500 uppercase">Gross Sales Revenue</p>
-                      <p className="text-xl font-black text-zinc-900 dark:text-zinc-50 mt-1">₹85,420</p>
+                      <p className="text-xl font-black text-zinc-900 dark:text-zinc-50 mt-1">—</p>
                     </div>
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm text-center">
                       <p className="text-[9px] font-bold text-zinc-500 uppercase">Agreed Commission %</p>
@@ -899,7 +836,7 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
                     </div>
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm text-center">
                       <p className="text-[9px] font-bold text-zinc-500 uppercase">Extra Platform Fees Charged</p>
-                      <p className="text-xl font-black text-orange-655 mt-1">₹3,400</p>
+                      <p className="text-xl font-black text-orange-655 mt-1">—</p>
                     </div>
                   </div>
 
@@ -922,7 +859,7 @@ export default function FranchiseTicketDetailsModal({ isOpen, onClose, ticket, o
                       <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50 text-zinc-700 dark:text-zinc-300">
                         <tr className="bg-red-500/5">
                           <td className="p-3 font-semibold">01 June - 07 June</td>
-                          <td className="p-3">₹85,420</td>
+                          <td className="p-3">—</td>
                           <td className="p-3 font-bold text-red-500">₹12,042 (14%)</td>
                           <td className="p-3">₹8,542 (10% + 4% service charge)</td>
                           <td className="p-3 text-zinc-500">Charge index calculated at 14% instead of 10% contract value.</td>

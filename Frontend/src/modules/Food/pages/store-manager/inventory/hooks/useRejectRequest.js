@@ -1,15 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import apiClient from "@/services/api/axios";
-import { INV, failOrMock } from "./inventoryApi";
-import { getLocalStockRequests, setLocalStockRequests } from "../mockData";
+import { INV, throwApiError } from "./inventoryApi";
 
 export function useRejectRequest() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (payload) => {
-      const { requestId, remarks, approvedBy = "Shubham Jamliya" } = payload;
+      const { requestId, remarks } = payload;
 
       try {
         const response = await apiClient.patch(`${INV}/stock-requests/reject`, {
@@ -23,37 +22,8 @@ export function useRejectRequest() {
 
         throw new Error(response.data?.message || "Failed to reject request");
       } catch (err) {
-        failOrMock(err);
-        console.warn("Backend API unavailable for stock rejection. Simulating locally.");
-
-        // Simulate network delay
-        await new Promise((resolve) => setTimeout(resolve, 400));
-
-        const requests = getLocalStockRequests();
-        const requestIndex = requests.findIndex(r => r._id === requestId);
-
-        if (requestIndex === -1) {
-          throw new Error("Stock request not found");
-        }
-
-        const request = requests[requestIndex];
-
-        // Perform local update
-        const updatedRequest = {
-          ...request,
-          status: "rejected",
-          remarks: remarks || "Rejected",
-          approvedBy,
-          updatedAt: new Date().toISOString()
-        };
-
-        requests[requestIndex] = updatedRequest;
-        setLocalStockRequests(requests);
-
-        return {
-          success: true,
-          message: `Request ${request.requestNo} rejected`
-        };
+        throwApiError(err);
+        
       }
     },
     onSuccess: (data, variables) => {

@@ -17,7 +17,10 @@ import {
   ListCollapse
 } from "lucide-react";
 import { getStaffName } from "../hooks/useDelayedOrders";
-import { mockChefs, mockStaff, mockPackagingStaff } from "../mockData";
+
+const chefs = [];
+const emptyStaff = [];
+const packagingStaff = [];
 
 export default function DelayedOrdersTable({
   data = [],
@@ -33,7 +36,7 @@ export default function DelayedOrdersTable({
   // Look up staff info
   const getStaffData = (staffId) => {
     if (!staffId) return null;
-    const allStaff = [...mockChefs, ...mockStaff, ...mockPackagingStaff];
+    const allStaff = [...chefs, ...emptyStaff, ...packagingStaff];
     return allStaff.find((s) => s._id === staffId);
   };
 

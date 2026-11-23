@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 const globalQueryCache = new Map()
 
 /**
- * Custom React Query-like hook useMockQuery
+ * Custom React Query-like hook useApiQuery
  * @param {string|Array} queryKey Unique key for the query (array of keys is serialized)
  * @param {Function} queryFn Axios-based function that returns a Promise resolving to a response
  * @param {Object} options Configuration parameters:
@@ -14,7 +14,7 @@ const globalQueryCache = new Map()
  *                         - onSuccess: callback on successful fetch
  *                         - onError: callback on error
  */
-export function useMockQuery(queryKey, queryFn, options = {}) {
+export function useApiQuery(queryKey, queryFn, options = {}) {
   const {
     enabled = true,
     cacheTime = 30000,

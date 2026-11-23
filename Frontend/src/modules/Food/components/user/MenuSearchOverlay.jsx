@@ -17,32 +17,7 @@ import apiClient from '@/services/api/axios';
 const RECENTLY_VIEWED_KEY = 'pvp_recently_viewed_products';
 const RECENT_SEARCHES_KEY = 'pvp_recent_searches_list';
 
-const DEFAULT_NEW_LAUNCHES = [
-  {
-    _id: 'launch-default-1',
-    title: 'Paneer Maxxx',
-    image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80',
-    searchQuery: 'paneer',
-    sortOrder: 1,
-    isActive: true
-  },
-  {
-    _id: 'launch-default-2',
-    title: 'Four Cheese Sourdough Pizza',
-    image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800&auto=format&fit=crop&q=80',
-    searchQuery: 'cheese',
-    sortOrder: 2,
-    isActive: true
-  },
-  {
-    _id: 'launch-default-3',
-    title: 'Big Pizza Bonanza',
-    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&auto=format&fit=crop&q=80',
-    searchQuery: 'pizza',
-    sortOrder: 3,
-    isActive: true
-  }
-];
+const DEFAULT_NEW_LAUNCHES = [];
 
 export default function MenuSearchOverlay({
   isOpen,
@@ -246,12 +221,12 @@ const getImageForAddon = (name, type, existingImage) => {
         if (data) {
           let tabs = data.searchByTabs || [];
 
-          // Check if tabs still have initial mock placeholder items
-          const isMockTabs = tabs.some(t => 
+          // Tabs still holding the old placeholder items are replaced by the real add-ons
+          const hasPlaceholderTabs = tabs.some(t => 
             (t.items || []).some(i => i.title === 'Double Cheeseburst' || i.title === 'Cheese Volcano Crust')
           );
 
-          if (isMockTabs || tabs.length === 0) {
+          if (hasPlaceholderTabs || tabs.length === 0) {
             try {
               const [addonsRes, typesRes] = await Promise.all([
                 apiClient.get('/food/admin/addons/public').catch(() => null),
@@ -395,7 +370,7 @@ const getImageForAddon = (name, type, existingImage) => {
       }
     } catch (_) {}
 
-    // Real data only! Never fallback to fake mock dishes when unviewed.
+    // Real data only! Never fallback to fake dishes when unviewed.
     setRecentlyViewed([]);
   };
 

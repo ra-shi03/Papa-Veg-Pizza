@@ -35,6 +35,7 @@ import {
     listMyRefundsController,
     getMyRefundController
 } from '../controllers/userWallet.controller.js';
+import { getMyCouponHistoryController } from '../controllers/userCoupons.controller.js';
 import { listMyBulkOrders, getMyBulkOrder, cancelMyBulkOrder, payMyBulkOrder, verifyMyBulkOrderPayment } from '../controllers/userBulkOrders.controller.js';
 import {
     getUserReferralDetailsController,
@@ -79,6 +80,9 @@ router.get('/bulk-orders/:id', getMyBulkOrder);
 router.post('/bulk-orders/:id/cancel', cancelMyBulkOrder);
 router.post('/bulk-orders/:id/pay', payMyBulkOrder);
 router.post('/bulk-orders/:id/verify-payment', verifyMyBulkOrderPayment);
+
+// Coupon history (Expired / Redeemed tabs); the live list is public (/food/offers/public)
+router.get('/coupons/history', getMyCouponHistoryController);
 
 // Cheesy Rewards (points) — separate from the wallet
 router.get('/rewards/me', getMyRewardsController);

@@ -1,20 +1,8 @@
 import { HomeSection } from '../models/homeSection.model.js';
-import { UiOffer } from '../models/uiOffer.model.js';
-import { FoodCoupon } from '../models/foodCoupon.model.js';
-import { FoodAppConfig } from '../models/appConfig.model.js';
+import { liveCouponsForStore, couponStoreFromQuery } from '../services/couponOffer.service.js';
 import { sendResponse, sendError } from '../../../../utils/response.js';
 import { uploadImageBufferDetailed } from '../../../../services/cloudinary.service.js';
 import cloudinary from 'cloudinary';
-
-const currentDateQuery = () => ({
-    isActive: true,
-    $or: [
-        { startDate: null, endDate: null },
-        { startDate: { $lte: new Date() }, endDate: null },
-        { startDate: null, endDate: { $gte: new Date() } },
-        { startDate: { $lte: new Date() }, endDate: { $gte: new Date() } }
-    ]
-});
 
 // ==========================================
 // PUBLIC ENDPOINTS
@@ -22,57 +10,23 @@ const currentDateQuery = () => ({
 
 export const getHomeLayout = async (req, res) => {
     try {
-        // Set Cache-Control header for performance (5 mins)
-        res.setHeader('Cache-Control', 'public, max-age=300');
-
+        res.setHeader('Cache-Control', 'no-store');
         const populatedSections = [];
-        const config = await FoodAppConfig.findOne().lean();
 
-        // 1. Auto-map Offers Section (only if coupons are enabled globally)
-        if (!config || config.couponEnabled !== false) {
-            const rawCoupons = await FoodCoupon.find({ showOnHome: true, isActive: true, ...currentDateQuery() }).sort({ createdAt: -1 }).lean();
-            const offers = rawCoupons.map(coupon => ({
-                _id: coupon._id,
-                title: coupon.title,
-                subtitle: coupon.description,
-                buttonText: 'View'
-            }));
-            if (offers && offers.length > 0) {
-                populatedSections.push({
-                    _id: 'auto-offers',
-                    type: 'offers',
-                    isActive: true,
-                    data: offers
-                });
-            }
+        // Offers section: the same live coupon list every customer screen uses (Marketing > Coupons, store rule,
+        // the app-wide coupon switch), for the store of ?storeId= / ?lat=&lng= (global coupons without one).
+        const offers = (await liveCouponsForStore(await couponStoreFromQuery(req.query))).map((o) => ({
+            _id: o._id,
+            title: o.title,
+            subtitle: o.description,
+            couponCode: o.couponCode,
+            buttonText: 'View'
+        }));
+        if (offers.length > 0) {
+            populatedSections.push({ _id: 'auto-offers', type: 'offers', isActive: true, data: offers });
         }
 
         return sendResponse(res, 200, 'Home layout fetched successfully', populatedSections);
-    } catch (error) {
-        return sendError(res, 500, error.message);
-    }
-};
-
-export const getActiveOffers = async (req, res) => {
-    try {
-        const config = await FoodAppConfig.findOne().lean();
-        if (config && config.couponEnabled === false) {
-            return sendResponse(res, 200, 'Offers fetched successfully', []);
-        }
-        res.setHeader('Cache-Control', 'public, max-age=300');
-        const offers = await UiOffer.find(currentDateQuery())
-            .sort({ sortOrder: 1 })
-            .lean();
-        return sendResponse(res, 200, 'Offers fetched successfully', offers);
-    } catch (error) {
-        return sendError(res, 500, error.message);
-    }
-};
-
-export const getAllUiOffersAdmin = async (req, res) => {
-    try {
-        const offers = await FoodCoupon.find().sort({ createdAt: -1 }).lean();
-        return sendResponse(res, 200, 'Offers fetched', offers);
     } catch (error) {
         return sendError(res, 500, error.message);
     }
@@ -87,40 +41,6 @@ export const getAllHomeSectionsAdmin = async (req, res) => {
     }
 };
 
-
-// ==========================================
-// SUPERADMIN - UIOFFER ENDPOINTS
-// ==========================================
-
-export const createUiOffer = async (req, res) => {
-    try {
-        const payload = { ...req.body, createdBy: req.user.userId };
-        const offer = await UiOffer.create(payload);
-        return sendResponse(res, 201, 'Offer created', offer);
-    } catch (error) {
-        return sendError(res, 500, error.message);
-    }
-};
-
-export const updateUiOffer = async (req, res) => {
-    try {
-        const offer = await UiOffer.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        if (!offer) return sendError(res, 404, 'Offer not found');
-        return sendResponse(res, 200, 'Offer updated', offer);
-    } catch (error) {
-        return sendError(res, 500, error.message);
-    }
-};
-
-export const deleteUiOffer = async (req, res) => {
-    try {
-        const offer = await UiOffer.findByIdAndDelete(req.params.id);
-        if (!offer) return sendError(res, 404, 'Offer not found');
-        return sendResponse(res, 200, 'Offer deleted', null);
-    } catch (error) {
-        return sendError(res, 500, error.message);
-    }
-};
 
 // ==========================================
 // SUPERADMIN - HOMESECTION ENDPOINTS
@@ -163,11 +83,10 @@ export const deleteHomeSection = async (req, res) => {
 export const toggleActiveStatus = async (req, res) => {
     try {
         const { id } = req.params;
-        const { modelName, isActive } = req.body; // modelName: 'UiOffer', 'HomeSection'
+        const { modelName, isActive } = req.body; // modelName: 'HomeSection'
         
         let Model;
-        if (modelName === 'UiOffer') Model = UiOffer;
-        else if (modelName === 'HomeSection') Model = HomeSection;
+        if (modelName === 'HomeSection') Model = HomeSection;
         else return sendError(res, 400, 'Invalid model name');
 
         const updated = await Model.findByIdAndUpdate(id, { isActive }, { new: true });
@@ -184,8 +103,7 @@ export const reorderItems = async (req, res) => {
         const { modelName, items } = req.body; // items: [{ id, sortOrder }]
         
         let Model;
-        if (modelName === 'UiOffer') Model = UiOffer;
-        else if (modelName === 'HomeSection') Model = HomeSection;
+        if (modelName === 'HomeSection') Model = HomeSection;
         else return sendError(res, 400, 'Invalid model name');
 
         const bulkOps = items.map(item => ({

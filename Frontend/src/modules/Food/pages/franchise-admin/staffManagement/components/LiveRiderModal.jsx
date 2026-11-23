@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { Map, X, Battery, Wifi, Navigation, ShieldCheck, RefreshCw, Compass, AlertCircle, ShoppingBag, Clock } from "lucide-react"
-import { getDeliveryPartnerLiveTracking } from "../mockManagersData"
+import { getDeliveryPartnerLiveTracking } from "../staffDetailPlaceholders"
 
 export default function LiveRiderModal({ isOpen, onClose, rider }) {
   const [telemetry, setTelemetry] = useState(null)
@@ -129,13 +129,13 @@ export default function LiveRiderModal({ isOpen, onClose, rider }) {
                   {/* Intermediate Waypoint: Palasia */}
                   <circle cx="150" cy="160" r="4.5" fill="currentColor" className="text-zinc-400" />
                   <text x="160" y="165" fontSize="7" fill="currentColor" className="text-zinc-400">
-                    Palasia Jnc.
+                    
                   </text>
 
-                  {/* Intermediate Waypoint: Vijay Nagar */}
+                  {/* Intermediate waypoint */}
                   <circle cx="280" cy="80" r="4.5" fill="currentColor" className="text-zinc-400" />
                   <text x="290" y="85" fontSize="7" fill="currentColor" className="text-zinc-400">
-                    Vijay Nagar
+                    
                   </text>
 
                   {/* End Point: Customer Delivery Point */}

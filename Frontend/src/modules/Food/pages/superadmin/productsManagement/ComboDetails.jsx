@@ -36,27 +36,8 @@ export default function ComboDetails({
 
   const totalSavings = originalSum > combo.price ? originalSum - combo.price : 0;
 
-  // Mocked audit logs timeline for this combo
-  const auditTimeline = [
-    {
-      action: "Combo Modified",
-      user: combo.updatedBy || "Admin.Rashi",
-      time: combo.updatedAt ? new Date(combo.updatedAt).toLocaleString("en-IN") : "16 Jun 2026, 02:30 PM",
-      detail: "Updated discount parameters and stores assignment."
-    },
-    {
-      action: "Stores Assigned",
-      user: "Admin.Rashi",
-      time: "10 Jun 2026, 11:15 AM",
-      detail: combo.applicabilityType === "all" ? "Assigned eligibility to All Stores." : `Mapped stores/franchises availability.`
-    },
-    {
-      action: "Combo Profile Initialized",
-      user: combo.createdBy || "Admin.Rashi",
-      time: combo.createdAt ? new Date(combo.createdAt).toLocaleString("en-IN") : "01 Jun 2026, 09:00 AM",
-      detail: `Created ${combo.name} package outline.`
-    }
-  ];
+  // audit logs timeline for this combo
+  const auditTimeline = [];
 
   return (
     <>

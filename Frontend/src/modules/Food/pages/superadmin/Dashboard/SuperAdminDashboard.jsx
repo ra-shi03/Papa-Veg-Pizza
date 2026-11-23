@@ -127,36 +127,20 @@ export default function SuperAdminDashboard() {
     window.dispatchEvent(new Event("systemThemeChanged"))
   }
 
-  // KPI Bento stats state
+  // KPI cards: platform analytics is not connected yet, so no figures are invented
   const [kpis, setKpis] = useState([
-    { title: "Net Revenue", val: "₹42.8L", growth: "+12%", up: true, icon: DollarSign, sparkData: [10, 15, 8, 22, 14, 28, 20], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
-    { title: "Live Orders", val: "1,204", growth: "+8%", up: true, icon: ShoppingBag, sparkData: [5, 12, 15, 10, 22, 18, 25], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
-    { title: "Active Riders", val: "342", growth: "-3%", up: false, icon: Truck, sparkData: [24, 22, 25, 20, 19, 18, 17], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
-    { title: "New Users", val: "892", growth: "+18%", up: true, icon: Users, sparkData: [12, 18, 22, 19, 25, 30, 32], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
-    { title: "Active Stores", val: "24", growth: "0%", up: true, icon: Store, sparkData: [24, 24, 24, 24, 24, 24, 24], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
-    { title: "Comm. Earned", val: "₹6.4L", growth: "+4%", up: true, icon: Percent, sparkData: [8, 10, 14, 12, 16, 18, 20], color: "text-[var(--primary)] bg-[var(--primary)]/10" }
+    { title: "Net Revenue", val: "—", growth: "", up: true, icon: DollarSign, sparkData: [], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
+    { title: "Live Orders", val: "—", growth: "", up: true, icon: ShoppingBag, sparkData: [], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
+    { title: "Active Riders", val: "—", growth: "", up: true, icon: Truck, sparkData: [], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
+    { title: "New Users", val: "—", growth: "", up: true, icon: Users, sparkData: [], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
+    { title: "Active Stores", val: "—", growth: "", up: true, icon: Store, sparkData: [], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
+    { title: "Comm. Earned", val: "—", growth: "", up: true, icon: Percent, sparkData: [], color: "text-[var(--primary)] bg-[var(--primary)]/10" }
   ])
 
   // Recharts interactive state: Hourly vs Daily Sales Trend
   const [chartInterval, setChartInterval] = useState("Hourly")
-  const hourlyData = [
-    { time: "10 AM", revenue: 8000, orders: 120 },
-    { time: "12 PM", revenue: 15000, orders: 240 },
-    { time: "2 PM", revenue: 12000, orders: 180 },
-    { time: "4 PM", revenue: 9000, orders: 150 },
-    { time: "6 PM", revenue: 22000, orders: 310 },
-    { time: "8 PM", revenue: 31000, orders: 480 },
-    { time: "10 PM", revenue: 18000, orders: 290 }
-  ]
-  const dailyData = [
-    { time: "Mon", revenue: 210000, orders: 1400 },
-    { time: "Tue", revenue: 230000, orders: 1560 },
-    { time: "Wed", revenue: 195000, orders: 1210 },
-    { time: "Thu", revenue: 260000, orders: 1800 },
-    { time: "Fri", revenue: 380000, orders: 2400 },
-    { time: "Sat", revenue: 490000, orders: 3200 },
-    { time: "Sun", revenue: 430000, orders: 2850 }
-  ]
+  const hourlyData = []
+  const dailyData = []
   const currentChartData = chartInterval === "Hourly" ? hourlyData : dailyData
 
   // Live monitor order categories & lists
@@ -164,13 +148,7 @@ export default function SuperAdminDashboard() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedOrder, setSelectedOrder] = useState(null)
 
-  const liveOrders = [
-    { id: "PV-9042", name: "Rohan Malhotra", items: "Paneer Tikka Pizza x1, Pepsi x1", total: "₹450", time: "08:24", status: "New", distance: "2.4 km", rating: 4.8, rider: "Pending Allocation", avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=100" },
-    { id: "PV-9041", name: "Isha Sharma", items: "Veg Supreme Pizza x1, Garlic Bread x1", total: "₹590", time: "12:15", status: "New", distance: "1.8 km", rating: 4.5, rider: "Pending Allocation", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100" },
-    { id: "PV-9039", name: "Amit Verma", items: "Margherita Pizza x2, Garlic Dips x4", total: "₹380", time: "18:40", status: "Prep", distance: "3.5 km", rating: 4.2, rider: "Karan Singh", avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=100" },
-    { id: "PV-9038", name: "Pooja Patel", items: "Farmhouse Delight Pizza x1", total: "₹320", time: "Ready", status: "Ready", distance: "0.8 km", rating: 4.9, rider: "Vikram Rathore", avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=100" },
-    { id: "PV-9036", name: "Deepak Rawat", items: "Tandoori Paneer Pizza x1, Choco Lava Cake x1", total: "₹520", time: "Transit", status: "Delivery", distance: "4.2 km", rating: 4.0, rider: "Rahul Dev", avatar: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&q=80&w=100" }
-  ]
+  const liveOrders = []
 
   // Filter orders by category and query
   const filteredOrders = liveOrders.filter(order => {
@@ -183,69 +161,32 @@ export default function SuperAdminDashboard() {
   })
 
   // Franchise stats state
-  const franchises = [
-    { rank: 1, name: "Indore Central", rev: "₹8.4L", growth: "+14%", rating: "92%", type: "Platinum", color: "bg-amber-500" },
-    { rank: 2, name: "Bhopal Zone", rev: "₹6.2L", growth: "+9%", rating: "88%", type: "Gold", color: "bg-zinc-400" },
-    { rank: 3, name: "Ujjain Branch", rev: "₹4.8L", growth: "+2%", rating: "85%", type: "Silver", color: "bg-orange-400" }
-  ]
+  const franchises = []
 
   // Dynamic inventory warnings state
-  const [inventory, setInventory] = useState([
-    { id: 1, name: "Processed Cheese", stock: "12%", status: "Critical", branch: "Indore Central", loading: false, resolved: false },
-    { id: 2, name: "Wheat Dough", stock: "14%", status: "Low Warning", branch: "Ujjain Branch", loading: false, resolved: false }
-  ])
+  const [inventory, setInventory] = useState([])
 
-  // Restock simulation
-  const handleRestock = (id) => {
-    setInventory(prev =>
-      prev.map(item => (item.id === id ? { ...item, loading: true } : item))
-    )
-
-    // Simulate API delay
-    setTimeout(() => {
-      setInventory(prev =>
-        prev.map(item =>
-          item.id === id ? { ...item, stock: "85%", status: "Healthy", loading: false, resolved: true } : item
-        )
-      )
-      // Display native alert/notification simulation
-      setSystemAlerts(prev => [
-        { id: Date.now(), text: `Inventory refilled: ${inventory.find(i => i.id === id).name} updated to 85% at branch.`, severity: "info", time: "Just now" },
-        ...prev
-      ])
-    }, 1500)
+  // Restocking is done by the stores; nothing to do from here yet
+  const handleRestock = () => {
+    toast.info("Restocking is handled by each store's inventory. It is not available from this dashboard yet.")
   }
+
 
   // Payout Settlements state and interactive modal
   const [showPayoutModal, setShowPayoutModal] = useState(false)
-  const [payoutAmount, setPayoutAmount] = useState("12,45,000")
-  const [selectedBank, setSelectedBank] = useState("HDFC Corporate Bank (**** 8940)")
+  const [payoutAmount, setPayoutAmount] = useState("0")
+  const [selectedBank, setSelectedBank] = useState("")
   const [payoutStatus, setPayoutStatus] = useState("idle") // idle, processing, success
 
   const handleInitiatePayout = (e) => {
     e.preventDefault()
-    setPayoutStatus("processing")
-    setTimeout(() => {
-      setPayoutStatus("success")
-      setTimeout(() => {
-        setShowPayoutModal(false)
-        setPayoutStatus("idle")
-        setPayoutAmount("0")
-        // Add log
-        setSystemAlerts(prev => [
-          { id: Date.now(), text: `Bank settlement of ₹12,45,000 cleared with transaction ID #TXN-88402.`, severity: "success", time: "Just now" },
-          ...prev
-        ])
-      }, 1500)
-    }, 2000)
+    toast.info("Settlements are not available yet.")
+    setShowPayoutModal(false)
   }
 
+
   // System alerts/logs state
-  const [systemAlerts, setSystemAlerts] = useState([
-    { id: 1, text: "Failed Payment Gateway: Razorpay has registered 12 failed transactions in the last 5 minutes.", severity: "severe", time: "5 min ago" },
-    { id: 2, text: "Rider Complaint: Store #022 reported rider #R440 for verbal misconduct and order delays.", severity: "warning", time: "15 min ago" },
-    { id: 3, text: "System Backup Successful: Daily scheduled database backup was successfully archived.", severity: "info", time: "4 hours ago" }
-  ])
+  const [systemAlerts, setSystemAlerts] = useState([])
 
   const removeAlert = (id) => {
     setSystemAlerts(prev => prev.filter(alert => alert.id !== id))
@@ -253,11 +194,7 @@ export default function SuperAdminDashboard() {
 
   // Rider tracking radar state (simulated city marker clicking)
   const [activeRiderDetails, setActiveRiderDetails] = useState(null)
-  const simulatedRiders = [
-    { name: "Rahul Dev", order: "#PV-9036", status: "Delivering", bike: "Activa 6G", phone: "+91 98402 12903", lat: 35, lng: 40 },
-    { name: "Vikram Rathore", order: "#PV-9038", status: "At Store", bike: "Pulsar 150", phone: "+91 88401 22894", lat: 60, lng: 70 },
-    { name: "Karan Singh", order: "#PV-9039", status: "Cooking Wait", bike: "Splendor Plus", phone: "+91 74029 88390", lat: 45, lng: 20 }
-  ]
+  const simulatedRiders = []
 
   return (
     <div className="superadmin-theme min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 transition-all duration-300">
@@ -801,11 +738,11 @@ export default function SuperAdminDashboard() {
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1 p-3 bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-100 dark:border-zinc-850 rounded-xl shadow-inner">
                 <p className="text-[9px] text-black dark:text-white opacity-60 font-bold uppercase tracking-wider">Retention Rate</p>
-                <p className="text-xl font-black text-black dark:text-white mt-0.5">64%</p>
+                <p className="text-xl font-black text-black dark:text-white mt-0.5">—</p>
 
                 {/* Visual bar */}
                 <div className="w-full h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full mt-2 overflow-hidden">
-                  <div className="h-full bg-[var(--primary)] w-2/3 rounded-full" />
+                  <div className="h-full bg-[var(--primary)] w-0 rounded-full" />
                 </div>
               </div>
 
@@ -835,11 +772,11 @@ export default function SuperAdminDashboard() {
               <div className="flex flex-wrap sm:flex-nowrap gap-2 mt-3">
                 <div className="bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-md border border-white/10">
                   <p className="text-[8px] uppercase text-white/70 font-semibold">Next settlement Payout</p>
-                  <p className="text-[10px] font-bold mt-0.5">Oct 26, 2023</p>
+                  <p className="text-[10px] font-bold mt-0.5">—</p>
                 </div>
                 <div className="bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-md border border-white/10">
                   <p className="text-[8px] uppercase text-white/70 font-semibold">Taxes & GST (Accumulated)</p>
-                  <p className="text-[10px] font-bold mt-0.5">₹2.2L</p>
+                  <p className="text-[10px] font-bold mt-0.5">—</p>
                 </div>
               </div>
             </div>
@@ -1031,8 +968,7 @@ export default function SuperAdminDashboard() {
                     onChange={(e) => setSelectedBank(e.target.value)}
                     className="w-full text-xs p-2.5 border border-zinc-100 dark:border-zinc-800 rounded-xl bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100"
                   >
-                    <option>HDFC Corporate Bank (**** 8940)</option>
-                    <option>ICICI Commercial Bank (**** 1294)</option>
+                    <option value="">No bank account added</option>
                     <option>SBI Main Vault Account (**** 4402)</option>
                   </select>
                 </div>
@@ -1061,7 +997,7 @@ export default function SuperAdminDashboard() {
               <div className="text-center py-8 space-y-3.5">
                 <CheckCircle size={36} className="mx-auto text-emerald-500" />
                 <p className="text-xs text-emerald-600 dark:text-emerald-450 font-black">Payout Handshake Authorized!</p>
-                <p className="text-[10px] text-zinc-400">₹12,45,000 has been routed to RBI clearing channel.</p>
+                <p className="text-[10px] text-zinc-400">Settlements are not available yet.</p>
               </div>
             )}
 

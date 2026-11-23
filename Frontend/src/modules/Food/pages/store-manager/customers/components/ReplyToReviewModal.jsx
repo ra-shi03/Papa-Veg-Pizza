@@ -1,3 +1,4 @@
+import { getCurrentUser as getSignedInUser } from "@food/utils/auth";
 import React, { useState, useEffect } from "react";
 import { X, Sparkles, MessageSquare, AlertTriangle, Send } from "lucide-react";
 import { useReplyToReview, useReviewDetails } from "../hooks/useReviews";
@@ -60,7 +61,7 @@ export default function ReplyToReviewModal({
       {
         reviewId,
         text,
-        repliedBy: "Store Manager (Shubham Jamliya)"
+        repliedBy: `Store Manager${getSignedInUser("admin")?.name ? ` (${getSignedInUser("admin").name})` : ""}`
       },
       {
         onSuccess: () => {

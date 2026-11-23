@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { X, Pizza, Leaf, Flame, ShieldAlert, Sparkles, Clock, Compass, HelpCircle } from "lucide-react";
 import { useProductDetails } from "../hooks/useProductDetails";
-import { mockCategories, mockTaxCategories } from "../mockProducts";
-import { useStores } from "@food/pages/franchise-admin/orders/ordersQuery"; // Reuse stores query from order module
+import { useStores } from "@food/pages/franchise-admin/orders/ordersQuery";
+
+const categories = [];
+const taxCategories = []; // Reuse stores query from order module
 
 export default function ProductDrawer({ isOpen, onClose, productId }) {
   const { data: product, isLoading } = useProductDetails(productId);
@@ -19,11 +21,11 @@ export default function ProductDrawer({ isOpen, onClose, productId }) {
   if (!isOpen) return null;
 
   const getCategoryName = (catId) => {
-    return mockCategories.find((c) => c.id === catId)?.name || catId;
+    return categories.find((c) => c.id === catId)?.name || catId;
   };
 
   const getTaxCategoryName = (taxId) => {
-    return mockTaxCategories.find((t) => t.id === taxId)?.name || taxId;
+    return taxCategories.find((t) => t.id === taxId)?.name || taxId;
   };
 
   // Get pricing and availability status for a store

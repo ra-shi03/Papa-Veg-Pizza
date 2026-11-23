@@ -19,81 +19,17 @@ import ProviderConfigurationModal from './ProviderConfigurationModal';
 import SendTestNotificationModal from './SendTestNotificationModal';
 import PreviewTemplateModal from './PreviewTemplateModal';
 
-// Mock Notification Templates Data (GET /api/notification/templates)
-const INITIAL_TEMPLATES = [
-  {
-    _id: "tmp_email_welcome",
-    type: "email",
-    event: "OTP Verification",
-    title: "Customer Signup OTP Verification",
-    subject: "Verify your email address - Papa Veg Pizza",
-    body: "Hello {{customerName}},\n\nYour OTP code to verify your signup is {{otpCode}}. This code is valid for 5 minutes.\n\nThanks,\nPapa Veg Pizza Team",
-    variables: ["{{customerName}}", "{{otpCode}}"],
-    active: true,
-    updatedAt: "2026-06-19T10:15:32Z"
-  },
-  {
-    _id: "tmp_sms_order_placed",
-    type: "sms",
-    event: "Order Placed",
-    title: "Order Placement Success SMS",
-    subject: "",
-    body: "Hi {{customerName}}, your order {{orderId}} for {{amount}} is placed successfully! Track live: https://pvp.in/track",
-    variables: ["{{customerName}}", "{{orderId}}", "{{amount}}"],
-    active: true,
-    updatedAt: "2026-06-19T09:45:00Z"
-  },
-  {
-    _id: "tmp_push_order_out",
-    type: "push",
-    event: "Order Out for Delivery",
-    title: "Delivery Dispatch Push Notification",
-    subject: "",
-    body: "Hey {{customerName}}, your hot pizza is out for delivery! Our rider is arriving in {{eta}}.",
-    variables: ["{{customerName}}", "{{eta}}"],
-    active: true,
-    updatedAt: "2026-06-18T14:30:12Z"
-  },
-  {
-    _id: "tmp_wa_refund",
-    type: "whatsapp",
-    event: "Refund Processed",
-    title: "Refund Confirmation WhatsApp Alert",
-    subject: "",
-    body: "Hello {{customerName}},\n\nYour refund of {{amount}} for Order {{orderId}} has been processed. The amount will reflect in your account in 3-5 business days.",
-    variables: ["{{customerName}}", "{{orderId}}", "{{amount}}"],
-    active: false,
-    updatedAt: "2026-06-17T08:15:00Z"
-  }
-];
+// Notification Templates Data (GET /api/notification/templates)
+const INITIAL_TEMPLATES = [];
 
-// Mock Providers Data (GET /api/notification/providers)
-const INITIAL_PROVIDERS = [
-  { _id: "prov_email_sg", providerType: "email", providerName: "SendGrid", apiKey: "SG.api_key_placeholder", secret: "sg_secret_xxxx", status: "Active", successRate: 99.8 },
-  { _id: "prov_sms_twilio", providerType: "sms", providerName: "Twilio", apiKey: "AC_twilio_sid_placeholder", secret: "twilio_token_xxxx", status: "Active", successRate: 98.6 },
-  { _id: "prov_push_firebase", providerType: "push", providerName: "Firebase", apiKey: "fcm_server_key_placeholder", secret: "fcm_secret_xxxx", status: "Active", successRate: 99.9 },
-  { _id: "prov_wa_meta", providerType: "whatsapp", providerName: "Meta Cloud API", apiKey: "meta_token_placeholder", secret: "meta_secret_xxxx", status: "Inactive", successRate: 94.5 }
-];
+// Providers Data (GET /api/notification/providers)
+const INITIAL_PROVIDERS = [];
 
-// Mock Logs Data (GET /api/notification/logs)
-const INITIAL_LOGS = [
-  { _id: "log_001", event: "OTP Verification", recipient: "shubham@example.com", channel: "Email", status: "Success", errorMessage: null, sentAt: "2026-06-19T17:45:00Z" },
-  { _id: "log_002", event: "Order Placed", recipient: "+919876543210", channel: "SMS", status: "Success", errorMessage: null, sentAt: "2026-06-19T17:40:12Z" },
-  { _id: "log_003", event: "Order Out for Delivery", recipient: "user_fcm_token_99", channel: "Push", status: "Success", errorMessage: null, sentAt: "2026-06-19T17:35:00Z" },
-  { _id: "log_004", event: "Refund Processed", recipient: "+919988776655", channel: "WhatsApp", status: "Failed", errorMessage: "Meta API Token Expired", sentAt: "2026-06-19T16:54:19Z" },
-  { _id: "log_005", event: "OTP Verification", recipient: "+919922110022", channel: "SMS", status: "Pending", errorMessage: null, sentAt: "2026-06-19T17:58:00Z" }
-];
+// Logs Data (GET /api/notification/logs)
+const INITIAL_LOGS = [];
 
-// Mock Chart data
-const VOLUME_CHART_DATA = [
-  { name: 'Jun 13', Email: 1200, SMS: 2400, Push: 4500, WhatsApp: 800 },
-  { name: 'Jun 14', Email: 1400, SMS: 2500, Push: 4600, WhatsApp: 850 },
-  { name: 'Jun 15', Email: 1300, SMS: 2800, Push: 5200, WhatsApp: 900 },
-  { name: 'Jun 16', Email: 1600, SMS: 3000, Push: 4900, WhatsApp: 1100 },
-  { name: 'Jun 17', Email: 1800, SMS: 3200, Push: 5800, WhatsApp: 1300 },
-  { name: 'Jun 18', Email: 2100, SMS: 3500, Push: 6200, WhatsApp: 1500 },
-  { name: 'Jun 19', Email: 2400, SMS: 3800, Push: 7100, WhatsApp: 1900 },
-];
+// Chart data
+const VOLUME_CHART_DATA = [];
 
 const SUCCESS_CHART_DATA = [
   { name: 'Jun 13', rate: 99.4 },
@@ -113,12 +49,7 @@ const CHANNEL_SHARE_DATA = [
 ];
 
 // Timeline Events Data
-const INITIAL_TIMELINE = [
-  { id: 1, action: "Template Approved", desc: "Email Refund template configured", user: "Admin (Shubham)", time: "5 mins ago", type: "success" },
-  { id: 2, action: "Provider Failure", desc: "WhatsApp Meta Cloud API token expired", user: "System Monitor", time: "1 hour ago", type: "error" },
-  { id: 3, action: "SMTP Saved", desc: "AWS SES secure host configurations saved", user: "Admin (Shubham)", time: "3 hours ago", type: "info" },
-  { id: 4, action: "API Keys Rolled", desc: "FCM Push server key updated", user: "System", time: "1 day ago", type: "info" }
-];
+const INITIAL_TIMELINE = [];
 
 export default function NotificationSettings() {
   const [templates, setTemplates] = useState(INITIAL_TEMPLATES);

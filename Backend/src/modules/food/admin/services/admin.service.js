@@ -7,8 +7,6 @@ import { DeliverySupportTicket } from '../../delivery/models/supportTicket.model
 import { FoodZone } from '../models/zone.model.js';
 import { FoodCategory } from '../models/category.model.js';
 import { FoodItem } from '../models/food.model.js';
-import { FoodOffer } from '../models/offer.model.js';
-import { FoodOfferUsage } from '../models/offerUsage.model.js';
 import { DeliveryBonusTransaction } from '../models/deliveryBonusTransaction.model.js';
 import { FoodEarningAddon } from '../models/earningAddon.model.js';
 import { Addon as FoodAddon } from '../models/addon.model.js';
@@ -3562,8 +3560,6 @@ export async function deleteStore(id) {
         FoodStoreWithdrawal.deleteMany({ storeId }),
         // Delete support tickets
         FoodStoreSupportTicket.deleteMany({ storeId }),
-        // Delete offers linked to this store
-        FoodOffer.deleteMany({ storeId, storeScope: 'selected' }),
         // Finally delete the store
         FoodStore.findByIdAndDelete(storeId)
     ]);
@@ -3571,127 +3567,6 @@ export async function deleteStore(id) {
     return { id: storeId };
 }
 
-// ----- Offers & Coupons -----
-export async function getAllOffers(_query = {}) {
-    const list = await FoodOffer.find({})
-        .sort({ createdAt: -1 })
-        .populate({ path: 'storeId', select: 'storeName' })
-        .lean();
-
-    const offers = list.map((o, index) => {
-        const now = Date.now();
-        const endTs = o.endDate ? new Date(o.endDate).getTime() : null;
-        const isExpired = Boolean(endTs && now >= endTs);
-        const storeName =
-            o.storeScope === 'selected'
-                ? (o.storeId?.storeName || 'Selected Store')
-                : 'All Stores';
-
-        const discountPercentage = o.discountType === 'percentage' ? Number(o.discountValue) : 0;
-
-        const originalPrice = o.discountType === 'flat-price' ? Number(o.discountValue) : 0;
-        const discountedPrice = 0;
-
-        return {
-            sl: index + 1,
-            offerId: String(o._id),
-            dishId: 'all',
-            storeName,
-            dishName: 'All Items',
-            couponCode: o.couponCode,
-            customerGroup: o.customerScope === 'first-time' ? 'new' : 'all',
-            discountType: o.discountType,
-            discountPercentage,
-            originalPrice,
-            discountedPrice,
-            status: isExpired ? 'inactive' : (o.status || 'active'),
-            showInCart: o.showInCart !== false,
-            endDate: o.endDate || null,
-            // Additional info for admin UI (backward compatible)
-            minOrderValue: o.minOrderValue ?? 0,
-            maxDiscount: o.maxDiscount ?? null,
-            usageLimit: o.usageLimit ?? null,
-            usedCount: o.usedCount ?? 0,
-            storeScope: o.storeScope
-        };
-    });
-
-    return { offers };
-}
-
-export async function createAdminOffer(body) {
-    const existing = await FoodOffer.findOne({ couponCode: body.couponCode }).lean();
-    if (existing) {
-        throw new ValidationError('Coupon code already exists');
-    }
-
-    const doc = await FoodOffer.create({
-        couponCode: body.couponCode,
-        discountType: body.discountType,
-        discountValue: body.discountValue,
-        customerScope: body.customerScope,
-        storeScope: body.storeScope,
-        storeId: body.storeScope === 'selected' ? body.storeId : undefined,
-        minOrderValue: body.minOrderValue ?? 0,
-        maxDiscount: body.maxDiscount ?? null,
-        usageLimit: body.usageLimit ?? null,
-        perUserLimit: body.perUserLimit ?? null,
-        startDate: body.startDate,
-        isFirstOrderOnly: body.isFirstOrderOnly ?? false,
-        endDate: body.endDate,
-        status: body.endDate && new Date(body.endDate).getTime() <= Date.now() ? 'inactive' : 'active',
-        showInCart: true
-    });
-
-    if (doc.storeScope === 'selected' && doc.storeId) {
-        try {
-            const { notifyOwnersSafely } = await import('../../../../core/notifications/firebase.service.js');
-            await notifyOwnersSafely(
-                [{ ownerType: 'STORE', ownerId: doc.storeId }],
-                {
-                    title: 'New Campaign Invitation! Ã°Å¸â€œÂ¢',
-                    body: `You have been invited to join a new campaign: "${doc.couponCode}". Check it out now!`,
-                    data: {
-                        type: 'campaign_invitation',
-                        offerId: String(doc._id),
-                        couponCode: doc.couponCode
-                    }
-                }
-            );
-        } catch (e) {
-            console.error('Failed to send campaign invitation notification:', e);
-        }
-    }
-
-    return doc.toObject();
-}
-
-export async function updateAdminOfferCartVisibility(offerId, itemId, showInCart) {
-    if (!offerId || !mongoose.Types.ObjectId.isValid(offerId)) return null;
-    if (!itemId) return null;
-    const updated = await FoodOffer.findByIdAndUpdate(
-        offerId,
-        { $set: { showInCart: Boolean(showInCart) } },
-        { new: true }
-    ).lean();
-    return updated;
-}
-
-export async function deleteAdminOffer(id) {
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
-    const deleted = await FoodOffer.findByIdAndDelete(id).lean();
-    if (!deleted) return null;
-    await FoodOfferUsage.deleteMany({ offerId: new mongoose.Types.ObjectId(id) });
-    return { id };
-}
-
-export async function expireExpiredOffers() {
-    const now = new Date();
-    await FoodOffer.updateMany(
-        { status: 'active', endDate: { $lte: now } },
-        { $set: { status: 'inactive' } }
-    );
-}
 // ----- Delivery join requests -----
 export async function getDeliveryJoinRequests(query) {
     const { status = 'pending', page = 1, limit = 1000, search, zone, vehicleType } = query;

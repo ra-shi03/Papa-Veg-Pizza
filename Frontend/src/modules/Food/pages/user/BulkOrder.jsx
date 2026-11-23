@@ -151,75 +151,7 @@ export default function BulkOrder() {
   const [activeTab, setActiveTab] = useState("virtual_party")
 
   // Dynamic configuration loaded from Superadmin
-  const [config, setConfig] = useState({
-    virtualParty: {
-      isActive: true,
-      title: "Virtual Pizza Party",
-      bannerImage: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1200&q=80",
-      title1: "WORK TOGETHER, EAT TOGETHER",
-      description1: "As virtual parties have become the new way to bond and enjoy together, it's time to up these unique celebrations with a unique feast.",
-      calloutText: "Introducing Papa Veg Pizza's Virtual Feast, a new way to place a bulk order for your virtual celebration and get it delivered in specially designed packages.",
-      title2: "CELEBRATIONS MADE EASY",
-      description2: "Convert your work from home into party from home with Papa Veg Pizza's Virtual Feast. Order some good old favourites from Papa Veg Pizza and celebrate with your colleagues in a new and safer way.",
-      featureImage: "https://images.unsplash.com/photo-1577962917302-cd874c4e31d2?auto=format&fit=crop&w=1000&q=80",
-      corporateEmail: "",
-      corporatePhone: ""
-    },
-    egiftVoucher: {
-      isActive: true,
-      title: "E-Gift Voucher",
-      bannerImage: "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=1200&q=80",
-      heading1: "LAUNCH YOUR GIFTING WITH US NOW",
-      subheading1: "Get access to place order across Papa Veg Pizza stores in India via our app/website using E-Gift Voucher",
-      feature1Title: "Easy and secure ordering",
-      feature1Desc: "Place your E-Gift Voucher order with ease.",
-      feature2Title: "Customized to meet business needs",
-      feature2Desc: "Instant digital incentive with the flexibility of choosing the denominations.",
-      feature3Title: "Flexible delivery option",
-      feature3Desc: "Get your code delivered as an E-Gift card via e-mail.",
-      heading2: "SMALL GESTURES GO A LONG WAY",
-      description2: "Ultimate gifting for corporate and businesses. The Papa Veg Pizza's E-Gift Voucher is a great solution when it comes to rewarding and recognizing employees, customers and supporters with a sophisticated gifting platform.",
-      featureImage: "https://images.unsplash.com/photo-1577962917302-cd874c4e31d2?auto=format&fit=crop&w=1000&q=80",
-      corporateEmail: "",
-      corporatePhone: "",
-      denominationOptions: [
-        "25 - 50 Vouchers",
-        "50 - 100 Vouchers",
-        "100 - 500 Vouchers",
-        "500+ Corporate Vouchers",
-        "Custom Bulk Denomination"
-      ],
-      redeemHeading: "HOW TO REDEEM",
-      redeemSubheading: "Redeem only on Papa Veg Pizza App and Website",
-      redeemSteps: defaultRedeemSteps
-    },
-    contactPage: {
-      feedbackHeading: "Have any feedback or queries? We'd love to hear from you. Write to us at",
-      feedbackEmail: "",
-      outletButtonText: "FIND YOUR NEAREST OUTLET",
-      outletButtonLink: "/food/user/delivery-location",
-      outletHelpText: "Try our delicious treats and satisfy hunger with Papa Veg Pizza.",
-      locateLinkText: "Locate Nearby Pizza Stores",
-      locateLinkUrl: "/food/user/delivery-location",
-      customerCareTitle: "Papa Veg Pizza Customer Care Number",
-      customerCareNumber: "",
-      corporateOfficeTitle: "Papa Veg Pizza Corporate Office",
-      companyName: "",
-      addressLine1: "",
-      addressLine2: "",
-      mapEmbedUrl:
-        "https://maps.google.com/maps?q=Rajasthan&t=&z=7&ie=UTF8&iwloc=&output=embed",
-      mapExternalUrl: "https://maps.google.com/?q=Rajasthan",
-      facebookText: "Visit our page on Facebook",
-      facebookUrl: "https://facebook.com/papavegpizza",
-      googleText: "Visit our page on Google",
-      googleUrl: "https://google.com/search?q=Papa+Veg+Pizza",
-      instagramText: "Visit our page on Instagram",
-      instagramUrl: "https://instagram.com/papavegpizza",
-      twitterText: "Follow us on twitter for latest updates",
-      twitterUrl: "https://twitter.com/papavegpizza"
-    }
-  })
+  const [config, setConfig] = useState({})
 
   // Form states for Virtual Party
   const [formDataVP, setFormDataVP] = useState({

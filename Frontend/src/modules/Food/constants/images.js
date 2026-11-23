@@ -1,4 +1,4 @@
-// Shared image constants - using placeholder URLs since mock images were deleted
+// Shared image constants - using placeholder URLs since images were deleted
 // These can be replaced with actual image imports when images are available
 
 // Placeholder food images using Unsplash

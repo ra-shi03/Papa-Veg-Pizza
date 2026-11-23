@@ -85,24 +85,9 @@ export default function EditIngredientModal({ isOpen, onClose, onSubmit, ingredi
     onClose();
   };
 
-  // Handle media mock upload
   const handleMediaUpload = (e) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    toast.info("Uploading asset image...", { description: "Formatting and compression to WebP." });
-
-    setTimeout(() => {
-      const ingredientImages = [
-        "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80&fm=webp",
-        "https://images.unsplash.com/photo-1573145959986-a142c6e68ea8?auto=format&fit=crop&w=400&q=80&fm=webp",
-        "https://images.unsplash.com/photo-1571066811602-71683a3f680d?auto=format&fit=crop&w=400&q=80&fm=webp",
-        "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=400&q=80&fm=webp"
-      ];
-      const randomImage = ingredientImages[Math.floor(Math.random() * ingredientImages.length)];
-      setValue("image", randomImage, { shouldDirty: true });
-      toast.success("Ingredient image uploaded successfully!");
-    }, 850);
+    // there is no image upload on this screen yet: never put a stock photo in its place
+    toast.info("Image upload is not available here yet.");
   };
 
   const handleNextTab = async () => {

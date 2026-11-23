@@ -4,61 +4,22 @@ import { toast } from "sonner";
 import io from "socket.io-client";
 import apiClient from "@/services/api/axios";
 
-// The real endpoints are the source of truth. The localStorage mock below only runs when VITE_STANDALONE_MOCK=true.
-const STANDALONE_MOCK = import.meta.env?.VITE_STANDALONE_MOCK === "true";
+
+
 const KITCHEN = "/food/store/kitchen";
-import {
-  initialMockDelayedOrders,
-  initialMockEscalations,
-  mockManagementStaff,
-  mockChefs,
-  mockStaff,
-  mockPackagingStaff
-} from "../mockData";
+
+const managementStaff = [];
+const emptyChefs = [];
+const emptyStaff = [];
+const packagingStaff = [];
 
 // LocalStorage Keys
-const DELAYED_ORDERS_KEY = "pvp_delayed_orders";
-const ESCALATIONS_KEY = "pvp_escalations";
-const MANAGEMENT_STAFF_KEY = "pvp_management_staff";
 
-// Initialize mock DB in LocalStorage
-const initializeMockDb = () => {
-  if (!localStorage.getItem(DELAYED_ORDERS_KEY)) {
-    localStorage.setItem(DELAYED_ORDERS_KEY, JSON.stringify(initialMockDelayedOrders));
-  }
-  if (!localStorage.getItem(ESCALATIONS_KEY)) {
-    localStorage.setItem(ESCALATIONS_KEY, JSON.stringify(initialMockEscalations));
-  }
-  if (!localStorage.getItem(MANAGEMENT_STAFF_KEY)) {
-    localStorage.setItem(MANAGEMENT_STAFF_KEY, JSON.stringify(mockManagementStaff));
-  }
-};
 
-initializeMockDb();
 
-const getLocalDelayedOrders = () => {
-  try {
-    return JSON.parse(localStorage.getItem(DELAYED_ORDERS_KEY)) || [];
-  } catch (e) {
-    return [];
-  }
-};
 
-const setLocalDelayedOrders = (orders) => {
-  localStorage.setItem(DELAYED_ORDERS_KEY, JSON.stringify(orders));
-};
 
-const getLocalEscalations = () => {
-  try {
-    return JSON.parse(localStorage.getItem(ESCALATIONS_KEY)) || [];
-  } catch (e) {
-    return [];
-  }
-};
 
-const setLocalEscalations = (escalations) => {
-  localStorage.setItem(ESCALATIONS_KEY, JSON.stringify(escalations));
-};
 
 // Hook for fetching delayed orders list
 export function useDelayedOrders(filters = {}) {
@@ -110,28 +71,9 @@ export function useDelayedOrders(filters = {}) {
       queryClient.invalidateQueries({ queryKey: ["delayedOrders"] });
     });
 
-    // Standalone Simulation Mode
-    let simulationTimer;
-    if (import.meta.env?.VITE_STANDALONE_MOCK === "true") {
-      setSocketConnected(true);
-
-      // Simple delay simulator (randomly triggers every 70 seconds)
-      simulationTimer = setInterval(() => {
-        const localOrders = getLocalDelayedOrders();
-        // Increment delay duration of all active delayed orders
-        const updated = localOrders.map(o => {
-          if (o.isDelayed) {
-            return { ...o, delay_duration: o.delay_duration + 1 };
-          }
-          return o;
-        });
-        setLocalDelayedOrders(updated);
-        queryClient.invalidateQueries({ queryKey: ["delayedOrders"] });
-      }, 70000);
-    }
+    
 
     return () => {
-      if (simulationTimer) clearInterval(simulationTimer);
       socket.disconnect();
     };
   }, [queryClient]);
@@ -156,61 +98,12 @@ export function useDelayedOrders(filters = {}) {
         if (apiItems && apiItems.length > 0) {
           return apiItems;
         }
-        if (!STANDALONE_MOCK) return apiItems;
-        throw new Error("No items returned");
+        return apiItems;
+        
       } catch (err) {
-        if (!STANDALONE_MOCK) throw err;
+        throw err;
         // Fallback to LocalStorage
-        let list = getLocalDelayedOrders();
-
-        // 1. Search filter
-        if (filters.search) {
-          const q = filters.search.toLowerCase();
-          list = list.filter(o => 
-            o._id.toLowerCase().includes(q) ||
-            o.orderNumber.toLowerCase().includes(q) ||
-            o.customer.name.toLowerCase().includes(q) ||
-            o.customer.phone.includes(q) ||
-            (o.assigned_staff && getStaffName(o.assigned_staff).toLowerCase().includes(q))
-          );
-        }
-
-        // 2. Stage Filter
-        if (filters.stage && filters.stage !== "All") {
-          list = list.filter(o => o.status === filters.stage.toLowerCase());
-        }
-
-        // 3. Priority Filter
-        if (filters.priority && filters.priority !== "All") {
-          list = list.filter(o => o.priority === filters.priority);
-        }
-
-        // 4. Assigned Staff Filter
-        if (filters.staffId && filters.staffId !== "All") {
-          list = list.filter(o => o.assigned_staff === filters.staffId);
-        }
-
-        // 5. Issue Type Filter
-        if (filters.issueType && filters.issueType !== "All") {
-          list = list.filter(o => o.reason === filters.issueType);
-        }
-
-        // 6. Critical Only Filter
-        if (filters.criticalOnly === true || filters.criticalOnly === "true") {
-          list = list.filter(o => o.delay_duration > 20);
-        }
-
-        // 7. Resolved status
-        if (filters.resolved === "false") {
-          list = list.filter(o => o.isDelayed === true);
-        } else if (filters.resolved === "true") {
-          list = list.filter(o => o.isDelayed === false);
-        } else {
-          // Default: show active delayed orders
-          list = list.filter(o => o.isDelayed === true);
-        }
-
-        return list;
+        
       }
     }
   });
@@ -223,7 +116,7 @@ export function useDelayedOrders(filters = {}) {
 
 // Helper to get staff name by ID
 export function getStaffName(staffId) {
-  const allStaff = [...mockChefs, ...mockStaff, ...mockPackagingStaff, ...mockManagementStaff];
+  const allStaff = [...emptyChefs, ...emptyStaff, ...packagingStaff, ...managementStaff];
   const found = allStaff.find(s => s._id === staffId);
   return found ? found.name : "Unassigned";
 }
@@ -246,15 +139,12 @@ export function useActiveStaff() {
         if (list && list.length > 0) {
           return list;
         }
-        if (!STANDALONE_MOCK) return list;
-        throw new Error("No staff returned");
+        return list;
+        
       } catch (err) {
-        if (!STANDALONE_MOCK) throw err;
+        throw err;
         // Fallback: merge chefs, baking staff, and packaging staff
-        const chefs = mockChefs.map(c => ({ ...c, role: "Chef" }));
-        const bakers = mockStaff.map(b => ({ ...b, role: "Baking Crew" }));
-        const packers = mockPackagingStaff.map(p => ({ ...p, role: "Packaging Crew" }));
-        return [...chefs, ...bakers, ...packers];
+        
       }
     }
   });
@@ -274,21 +164,9 @@ export function useEscalateOrder() {
         });
         return response.data;
       } catch (err) {
-        if (!STANDALONE_MOCK) throw err;
+        throw err;
         // Fallback LocalStorage update
-        const escalations = getLocalEscalations();
-        const newEsc = {
-          _id: `esc-${Date.now()}`,
-          orderId,
-          severity,
-          reason,
-          assignedTo,
-          notes,
-          createdAt: new Date().toISOString()
-        };
-        escalations.push(newEsc);
-        setLocalEscalations(escalations);
-        return newEsc;
+        
       }
     },
     onSuccess: (data, variables) => {
@@ -311,26 +189,9 @@ export function useReassignStaff() {
         });
         return response.data;
       } catch (err) {
-        if (!STANDALONE_MOCK) throw err;
+        throw err;
         // Fallback LocalStorage update
-        const orders = getLocalDelayedOrders();
-        const updated = orders.map(o => {
-          if (o._id === orderId) {
-            // Update assigned_staff and add a timeline step
-            const updatedTimeline = [...o.timeline, {
-              status: "Staff Reassigned",
-              time: new Date().toISOString()
-            }];
-            return {
-              ...o,
-              assigned_staff: staffId,
-              timeline: updatedTimeline
-            };
-          }
-          return o;
-        });
-        setLocalDelayedOrders(updated);
-        return { orderId, staffId };
+        
       }
     },
     onMutate: async ({ orderId, staffId }) => {
@@ -377,9 +238,7 @@ export function useNotifyCustomer() {
         });
         return response.data;
       } catch (err) {
-        if (!STANDALONE_MOCK) throw err;
-        // Mock success
-        return { orderId, channels, message };
+        throw err;
       }
     },
     onSuccess: () => {
@@ -401,26 +260,9 @@ export function useResolveDelay() {
         });
         return response.data;
       } catch (err) {
-        if (!STANDALONE_MOCK) throw err;
+        throw err;
         // Fallback LocalStorage update: set isDelayed = false
-        const orders = getLocalDelayedOrders();
-        const updated = orders.map(o => {
-          if (o._id === orderId) {
-            const updatedTimeline = [...o.timeline, {
-              status: "Resolved",
-              time: new Date().toISOString(),
-              notes: resolutionNotes
-            }];
-            return {
-              ...o,
-              isDelayed: false,
-              timeline: updatedTimeline
-            };
-          }
-          return o;
-        });
-        setLocalDelayedOrders(updated);
-        return { orderId, resolutionNotes };
+        
       }
     },
     onSuccess: () => {
