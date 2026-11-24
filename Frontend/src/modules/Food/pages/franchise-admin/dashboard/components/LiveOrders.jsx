@@ -17,7 +17,7 @@ export default function LiveOrders({ orders, onRefresh, loading }) {
   useEffect(() => {
     let socket;
     try {
-      const socketUrl = import.meta.env?.VITE_SOCKET_URL || "http://localhost:5005"
+      const socketUrl = import.meta.env?.VITE_SOCKET_URL || window.location.origin
       socket = io(socketUrl, { autoConnect: false, transports: ["websocket"] })
       socket.connect()
 
