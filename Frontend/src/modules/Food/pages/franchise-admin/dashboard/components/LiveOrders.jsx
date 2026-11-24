@@ -18,7 +18,7 @@ export default function LiveOrders({ orders, onRefresh, loading }) {
     let socket;
     try {
       const socketUrl = import.meta.env?.VITE_SOCKET_URL || "http://localhost:5005"
-      socket = io(socketUrl, { autoConnect: false })
+      socket = io(socketUrl, { autoConnect: false, transports: ["websocket"] })
       socket.connect()
 
       socket.on("orderStatusUpdated", (updatedOrder) => {

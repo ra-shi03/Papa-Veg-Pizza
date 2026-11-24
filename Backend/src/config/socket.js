@@ -108,18 +108,23 @@ export const initSocket = async (server) => {
     });
 
     if (config.redisEnabled && config.redisUrl) {
+        let pubClient = null;
+        let subClient = null;
         try {
             const { createAdapter } = await import('@socket.io/redis-adapter');
             const { createClient } = await import('redis');
-            const pubClient = createClient({ url: config.redisUrl });
-            const subClient = pubClient.duplicate();
+            const { withConnectTimeout } = await import('./redis.js');
+            pubClient = createClient({ url: config.redisUrl });
+            subClient = pubClient.duplicate();
             pubClient.on('error', (err) => logger.error(`Socket.IO Redis pub client: ${err.message}`));
             subClient.on('error', (err) => logger.error(`Socket.IO Redis sub client: ${err.message}`));
-            await Promise.all([pubClient.connect(), subClient.connect()]);
+            await withConnectTimeout(Promise.all([pubClient.connect(), subClient.connect()]));
             io.adapter(createAdapter(pubClient, subClient));
             logger.info('Socket.IO Redis adapter attached for horizontal scaling');
         } catch (err) {
-            logger.warn(`Socket.IO Redis adapter skipped (using in-memory): ${err.message}`);
+            logger.error(`Socket.IO Redis adapter skipped (sockets only reach clients connected to THIS process): ${err.message}`);
+            pubClient?.disconnect().catch(() => {});
+            subClient?.disconnect().catch(() => {});
         }
     }
 

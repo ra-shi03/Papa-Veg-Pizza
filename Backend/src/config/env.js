@@ -61,6 +61,10 @@ export const config = {
     rateLimitMaxRequests: Number(process.env.RATE_LIMIT_MAX || 100),
     authRateLimitWindowMinutes: Number(process.env.AUTH_RATE_LIMIT_WINDOW || 15),
     authRateLimitMax: Number(process.env.AUTH_RATE_LIMIT_MAX || 30),
+    // Per-account limits (failed attempts per AUTH_RATE_LIMIT_WINDOW minutes, from any IP)
+    loginFailMax: Number(process.env.LOGIN_FAIL_MAX || 10),
+    otpVerifyFailMax: Number(process.env.OTP_VERIFY_FAIL_MAX || 10),
+    forgotOtpMax: Number(process.env.FORGOT_OTP_MAX || 5),
 
     // Security
     bcryptSaltRounds: Number(process.env.BCRYPT_SALT_ROUNDS || 10),

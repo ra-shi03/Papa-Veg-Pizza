@@ -1,0 +1,64 @@
+# Load balancer in front of several Papa Veg Pizza API servers (one machine with cluster.js, or several machines).
+# Copy to /etc/nginx/conf.d/papaveg-api.conf, change the server addresses and domain, then: nginx -t && nginx -s reload
+#
+# What the API needs from the load balancer:
+#   - forward the real client IP (X-Forwarded-For): rate limits count per client IP. The API trusts ONE proxy hop
+#     (app.set('trust proxy', 1)); if a CDN such as Cloudflare sits in front of nginx, raise that number to match.
+#   - let websocket upgrades through (live order tracking and panels use socket.io; the apps connect websocket-first)
+#   - use /ready as the health check: it answers 503 while a server is shutting down or has lost MongoDB
+#   - Redis must be on for every API server (REDIS_ENABLED=true): rate limits and socket events are shared through it.
+#   - on several machines set PVP_JOB_WORKER=1 on exactly ONE machine and PVP_JOB_WORKER=0 on the rest (the once-only
+#     background jobs run there). With cluster.js this is handled by itself on each machine.
+
+upstream papaveg_api {
+    least_conn;                                   # send each request to the server with the fewest open connections
+    server 10.0.0.11:5006 max_fails=3 fail_timeout=10s;
+    server 10.0.0.12:5006 max_fails=3 fail_timeout=10s;
+    # server 10.0.0.13:5006 backup;               # only used when the others are down
+    keepalive 64;
+}
+
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name api.example.com;
+    # ssl_certificate     /etc/letsencrypt/live/api.example.com/fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/api.example.com/privkey.pem;
+
+    client_max_body_size 12m;                     # above the 5 MB per-image upload limit (several images per request)
+
+    location /socket.io/ {
+        proxy_pass http://papaveg_api;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 3600s;                 # sockets stay open for a whole shift
+        proxy_send_timeout 3600s;
+    }
+
+    location / {
+        proxy_pass http://papaveg_api;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_next_upstream error timeout http_502 http_503;   # a server that is shutting down (503) is skipped
+        proxy_next_upstream_tries 2;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 60s;
+    }
+}
+
+# Active health checks (/ready) need nginx Plus or a module; with open-source nginx the max_fails / proxy_next_upstream lines
+# above take a failing server out of rotation. Cloud load balancers (AWS ALB, GCP, Azure) should use GET /ready as the
+# health check path.

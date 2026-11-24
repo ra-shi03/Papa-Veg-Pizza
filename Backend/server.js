@@ -10,6 +10,7 @@ import { initSocket } from './src/config/socket.js';
 import { startOrderEventStream, stopOrderEventStream } from './src/modules/food/orders/services/order-events.service.js';
 import { initializeQueues, closeBullMQConnection } from './src/queues/index.js';
 import mongoose from 'mongoose';
+import { isJobWorker } from './src/config/jobRole.js';
 import { dispatchDueScheduledOrders } from './src/modules/food/orders/services/order-dispatch.service.js';
 
 import { logger } from './src/utils/logger.js';
@@ -23,6 +24,7 @@ let scheduledDispatchInterval = null;
 
 const gracefulShutdown = async (signal) => {
     logger.info(`${signal} received, starting graceful shutdown`);
+    app.locals.shuttingDown = true;   // /ready answers 503 from now on, so the load balancer stops sending new requests here
     if (!server) {
         process.exit(0);
         return;
@@ -72,7 +74,7 @@ const startServer = async () => {
 
         // 3. Initialize Socket.IO with the HTTP server (Redis adapter when Redis enabled)
         await initSocket(httpServer);
-        startOrderEventStream(); // order events to the store and franchise rooms
+        if (isJobWorker()) startOrderEventStream(); // order events to the store and franchise rooms (once for the whole system)
 
         if (config.redisEnabled) {
             await connectRedis();
@@ -81,7 +83,7 @@ const startServer = async () => {
         // 5a. Watchdog: Recover stuck orders from previous run
         try {
             const { recoverStuckOrders } = await import('./src/modules/food/orders/services/order.service.js');
-            await recoverStuckOrders();
+            if (isJobWorker()) await recoverStuckOrders();
         } catch (err) {
             logger.error(`Watchdog startup error: ${err.message}`);
         }
@@ -106,6 +108,7 @@ const startServer = async () => {
             
             server = httpServer.listen(currentPort, config.host, () => {
                 logger.info(`Server running in ${config.nodeEnv} mode on ${config.host}:${currentPort}`);
+                logger.info(`Process ${process.pid}: ${isJobWorker() ? 'job worker (runs the once-only background jobs)' : 'web only'}`);
                 console.log(`🌐 [URL] http://localhost:${currentPort}`);
             });
 
@@ -141,7 +144,7 @@ const startServer = async () => {
                 logger.error(`Scheduled dispatch error: ${err.message}`);
             }
         };
-        scheduledDispatchInterval = setInterval(runScheduledDispatch, 60 * 1000);
+        if (isJobWorker()) scheduledDispatchInterval = setInterval(runScheduledDispatch, 60 * 1000);
 
         process.on('SIGINT', () => gracefulShutdown('SIGINT'));
         process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

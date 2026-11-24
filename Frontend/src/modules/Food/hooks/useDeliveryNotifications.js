@@ -769,7 +769,7 @@ export const useDeliveryNotifications = () => {
 
     socketRef.current = io(socketUrl, {
       path: '/socket.io/',
-      transports: ['polling', 'websocket'], // Allow both
+      transports: ['websocket', 'polling'], // websocket first: works behind a load balancer without sticky sessions
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,

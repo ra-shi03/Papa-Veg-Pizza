@@ -26,6 +26,15 @@ export const createRedisClient = () => {
     return client;
 };
 
+export const REDIS_CONNECT_TIMEOUT_MS = 8000;
+
+/** Rejects after `ms` so a Redis that does not answer cannot stop the whole server from starting. */
+export const withConnectTimeout = (promise, ms = REDIS_CONNECT_TIMEOUT_MS) => {
+    let timer;
+    const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`Redis did not answer within ${ms / 1000}s`)), ms); });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+};
+
 /**
  * Connects to Redis if REDIS_ENABLED is true.
  * @returns {Promise<import('redis').RedisClientType|null>}
@@ -44,12 +53,14 @@ export const connectRedis = async () => {
         }
 
         if (redisClient) {
-            await redisClient.connect();
+            await withConnectTimeout(redisClient.connect());
             logger.info('Successfully connected to Redis');
         }
         return redisClient;
     } catch (error) {
-        logger.error(`Failed to connect to Redis: ${error.message}`);
+        logger.error(`Failed to connect to Redis: ${error.message}. The server keeps starting; rate limits count per process until Redis is back.`);
+        redisClient?.disconnect().catch(() => {});   // stop the endless reconnect loop; a restart reconnects
+        redisClient = null;
         return null;
     }
 };

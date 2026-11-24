@@ -28,8 +28,12 @@ export function assertTestDatabaseUri(uri) {
 // Environment must be fixed BEFORE the app (and src/config/env.js) is imported.
 const setDefault = (key, value) => { if (process.env[key] === undefined) process.env[key] = value; };
 process.env.NODE_ENV = process.env.NODE_ENV === 'production' ? 'production' : 'test'; // a test file may opt in to production mode (set before importing this file)
-process.env.RATE_LIMIT_MAX = '1000000';
-process.env.AUTH_RATE_LIMIT_MAX = '1000000';
+// IP and account limits are off for the suite; a test that checks them sets its own (smaller) values before importing this file
+process.env.RATE_LIMIT_MAX ||= '1000000';
+process.env.AUTH_RATE_LIMIT_MAX ||= '1000000';
+process.env.LOGIN_FAIL_MAX ||= '1000000';
+process.env.OTP_VERIFY_FAIL_MAX ||= '1000000';
+process.env.FORGOT_OTP_MAX ||= '1000000';
 process.env.EMAIL_HOST = '';
 process.env.EMAIL_USER = '';
 process.env.FIREBASE_SERVICE_ACCOUNT = '';

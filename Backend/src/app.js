@@ -11,6 +11,7 @@ import { responseTimeLogger } from './middleware/responseTimeLogger.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { healthCheck } from './config/health.js';
 import { config } from './config/env.js';
+import mongoose from 'mongoose';
 
 const app = express();
 
@@ -29,7 +30,12 @@ app.get('/health', async (_req, res) => {
         res.status(503).json({ status: 'DOWN', error: 'Health check failed' });
     }
 });
+// Readiness for the load balancer: 503 while shutting down or when MongoDB is not connected, so it takes this process out of
+// rotation and puts it back by itself. (/health is the fuller check and stays 200 while the process is up.)
 app.get('/ready', (_req, res) => {
+    if (app.locals.shuttingDown || mongoose.connection.readyState !== 1) {
+        return res.status(503).json({ status: 'not_ready' });
+    }
     res.status(200).json({ status: 'ready' });
 });
 

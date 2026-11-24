@@ -20,7 +20,7 @@ import {
     updatePersonalProfileController
 } from './auth.controller.js';
 import { authMiddleware, requireAdmin } from './auth.middleware.js';
-import { authRateLimiter } from '../../middleware/rateLimit.js';
+import { authRateLimiter, loginAccountLimiter, otpVerifyAccountLimiter, forgotRequestAccountLimiter, forgotResetAccountLimiter } from '../../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -29,26 +29,26 @@ const router = express.Router();
 // User OTP login
 router.post('/user/request-otp', authRateLimiter, requestUserOtpController);
 router.post('/user/send-otp', authRateLimiter, requestUserOtpController);
-router.post('/user/verify-otp', authRateLimiter, verifyUserOtpController);
+router.post('/user/verify-otp', authRateLimiter, otpVerifyAccountLimiter, verifyUserOtpController);
 router.post('/user/verify-truecaller', authRateLimiter, verifyTruecallerController);
 
 
 // Delivery partner OTP login
 router.post('/delivery/request-otp', authRateLimiter, requestDeliveryOtpController);
 router.post('/delivery/send-otp', authRateLimiter, requestDeliveryOtpController);
-router.post('/delivery/verify-otp', authRateLimiter, verifyDeliveryOtpController);
+router.post('/delivery/verify-otp', authRateLimiter, otpVerifyAccountLimiter, verifyDeliveryOtpController);
 
 // Unified login for all admin panel roles: superadmin, franchise-admin, store-manager, kitchen-staff
-router.post('/login', authRateLimiter, adminLoginController);
+router.post('/login', authRateLimiter, loginAccountLimiter, adminLoginController);
 
 // Role-restricted login endpoints
-router.post('/admin/login', authRateLimiter, superAdminLoginController);
-router.post('/franchise/login', authRateLimiter, franchiseAdminLoginController);
-router.post('/store/login', authRateLimiter, storeLoginController);
+router.post('/admin/login', authRateLimiter, loginAccountLimiter, superAdminLoginController);
+router.post('/franchise/login', authRateLimiter, loginAccountLimiter, franchiseAdminLoginController);
+router.post('/store/login', authRateLimiter, loginAccountLimiter, storeLoginController);
 
 // Admin forgot password (no auth required)
-router.post('/admin/forgot-password/request-otp', authRateLimiter, requestAdminForgotPasswordOtpController);
-router.post('/admin/forgot-password/reset', authRateLimiter, resetAdminPasswordWithOtpController);
+router.post('/admin/forgot-password/request-otp', authRateLimiter, forgotRequestAccountLimiter, requestAdminForgotPasswordOtpController);
+router.post('/admin/forgot-password/reset', authRateLimiter, forgotResetAccountLimiter, resetAdminPasswordWithOtpController);
 
 // Refresh token
 router.post('/refresh-token', refreshTokenController);
