@@ -267,6 +267,20 @@ export const storeOperationsSidebarMenu = [
   },
   {
     type: "link",
+    label: "Payouts",
+    path: "/store-operations/payouts",
+    icon: "Wallet",
+    allowedRoles: ["store_manager"]
+  },
+  {
+    type: "link",
+    label: "My Salary",
+    path: "/store-operations/my-salary",
+    icon: "Wallet",
+    allowedRoles: ["kitchen_staff"]
+  },
+  {
+    type: "link",
     label: "Attendance",
     path: "/store-operations/attendance",
     icon: "CalendarCheck",

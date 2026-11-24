@@ -22,6 +22,8 @@ import RiderAvailability from "../deliveryOperations/RiderAvailability"
 import DeliveryTracking from "../deliveryOperations/DeliveryTracking"
 import DeliveryIssue from "../deliveryOperations/DeliveryIssue"
 import RiderTickets from "../deliveryOperations/RiderTickets"
+import StorePayouts from "../payouts/StorePayouts"
+import MySalary from "../payouts/MySalary"
 import IngredientStock from "../inventory/IngredientStock"
 import StockRequests from "../inventory/StockRequests"
 import WasteManagement from "../inventory/WasteManagement"
@@ -451,6 +453,23 @@ export default function StoreManagerRouter() {
           />
 
           {/* Unknown routes redirect to dashboard */}
+          {/* Payouts: the store manager pays riders and staff; kitchen staff see their salary */}
+          <Route
+            path="payouts"
+            element={
+              <RoleProtectedRoute allowedRoles={["store_manager"]}>
+                <StorePayouts />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="my-salary"
+            element={
+              <RoleProtectedRoute allowedRoles={["kitchen_staff"]}>
+                <MySalary />
+              </RoleProtectedRoute>
+            }
+          />
           <Route path="*" element={<HomeRedirect />} />
         </Route>
       </Routes>

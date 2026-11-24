@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { payoutAccountSchema } from '../../payouts/models/payoutAccount.schema.js';
 
 const storeSchema = new mongoose.Schema(
     {
@@ -120,7 +121,9 @@ const storeSchema = new mongoose.Schema(
             url: { type: String, required: true },
             isVerified: { type: Boolean, default: false },
             uploadedAt: { type: Date, default: Date.now }
-        }]
+        }],
+        // Where this store is paid (Payouts page). Bank details: never returned unless asked for.
+        payoutAccount: { type: payoutAccountSchema, default: undefined, select: false },
     },
     {
         collection: 'food_stores',

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { payoutAccountSchema } from '../../payouts/models/payoutAccount.schema.js';
 
 const franchiseSchema = new mongoose.Schema(
     {
@@ -104,7 +105,9 @@ const franchiseSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
             default: null
-        }
+        },
+        // Where this franchise is paid (Payouts page). Bank details: never returned unless asked for.
+        payoutAccount: { type: payoutAccountSchema, default: undefined, select: false },
     },
     {
         collection: 'food_franchises',

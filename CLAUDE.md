@@ -48,7 +48,14 @@ franchise and super admin order views; franchise admin AND super admin can block
 released); super admin All Orders runs on real data; the rider-accident-cost clause (franchise outlet pays, not the company) is fixed in every Terms page.
 DONE (rider readiness, docs/rider-flow.md): bank + UPI details at signup (skippable) and required to go online / accept; delivery wallet
 (recharges minus COD cash collected) must be >= the franchise admin's minimum to accept; super admin sees every rider's wallet and payout details.
-Defer: finance, marketing, reports, rewards.
+DONE (payouts, client asked for it out of the deferred finance list; Backend/src/modules/food/payouts, test/payouts.test.js):
+online money and riders' COD deposits reach the super admin; payouts go down by hand, each level paying the one below:
+super admin -> franchise -> store -> riders (one withdrawal per store they delivered for) and kitchen staff (salary; staff
+may ask once a month is overdue). Amounts are worked out only from delivered orders (24 h hold), one open request per payee
+and payer, paid once with a UTR that cannot be reused (screenshot optional), reject needs a reason, bank details are copied
+from the saved profile and payouts wait 24 h after they change, "not received" within 7 days is decided one level up.
+No franchise royalty. The old super admin withdrawal approvals are retired (410).
+Defer: the rest of finance, marketing, reports, rewards.
 
 ## Rules
 - Do NOT change user app or delivery app UI. Admin panel UI is over-built; backend only for v1 features.

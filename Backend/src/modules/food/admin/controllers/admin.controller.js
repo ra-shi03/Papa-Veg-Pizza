@@ -1471,14 +1471,17 @@ export async function getWithdrawals(req, res, next) {
     }
 }
 
-export async function updateWithdrawalStatus(req, res, next) {
-    try {
-        const { id } = req.params;
-        const data = await adminService.updateWithdrawalStatus(id, req.body || {});
-        res.status(200).json({ success: true, message: 'Withdrawal status updated successfully', data });
-    } catch (error) {
-        next(error);
-    }
+/**
+ * Retired: withdrawals are paid level by level on the Payouts pages (store manager pays riders, franchise admin pays
+ * stores, super admin pays franchises), each with a reference and a one-time status change. Approving here would skip
+ * those checks, so it is refused. The old records stay readable (GET).
+ */
+export async function updateWithdrawalStatus(req, res) {
+    return res.status(410).json({
+        success: false,
+        message: 'Withdrawals are now paid on the Payouts pages: the store manager pays riders, the franchise admin pays stores, the super admin pays franchises.',
+        data: null,
+    });
 }
 
 export async function getDeliveryWithdrawals(req, res, next) {
@@ -1490,14 +1493,17 @@ export async function getDeliveryWithdrawals(req, res, next) {
     }
 }
 
-export async function updateDeliveryWithdrawalStatus(req, res, next) {
-    try {
-        const { id } = req.params;
-        const data = await adminService.updateDeliveryWithdrawalStatus(id, req.body || {});
-        res.status(200).json({ success: true, message: 'Delivery withdrawal status updated successfully', data });
-    } catch (error) {
-        next(error);
-    }
+/**
+ * Retired: withdrawals are paid level by level on the Payouts pages (store manager pays riders, franchise admin pays
+ * stores, super admin pays franchises), each with a reference and a one-time status change. Approving here would skip
+ * those checks, so it is refused. The old records stay readable (GET).
+ */
+export async function updateDeliveryWithdrawalStatus(req, res) {
+    return res.status(410).json({
+        success: false,
+        message: 'Withdrawals are now paid on the Payouts pages: the store manager pays riders, the franchise admin pays stores, the super admin pays franchises.',
+        data: null,
+    });
 }
 
 export async function getDeliveryWallets(req, res, next) {

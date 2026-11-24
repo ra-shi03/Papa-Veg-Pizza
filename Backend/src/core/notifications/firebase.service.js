@@ -498,6 +498,15 @@ export const storeManagerUserIds = async (storeId) => {
     return activeUserIds(ids);
 };
 
+/** The franchise admins of a franchise (userRoles FRANCHISE_ADMIN with that franchise), active only. */
+export const franchiseAdminUserIds = async (franchiseId) => {
+    if (!isObjectIdLike(franchiseId)) return [];
+    const roleId = await roleIdFor('FRANCHISE_ADMIN');
+    if (!roleId) return [];
+    const links = await UserRole.find({ franchiseId, roleId, status: 'ACTIVE' }).select('userId').lean();
+    return activeUserIds(links.map((l) => l.userId));
+};
+
 export const superAdminUserIds = async () => {
     const roleId = await roleIdFor('SUPER_ADMIN');
     if (!roleId) return [];

@@ -19,6 +19,29 @@ export const PayoutV2 = () => {
   const goBack = useDeliveryBackNavigation();
   const [loading, setLoading] = useState(true);
   const [withdrawals, setWithdrawals] = useState([]);
+  const [reportingId, setReportingId] = useState(null);
+  const [reportNote, setReportNote] = useState('');
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const submitReport = async (id) => {
+    if (reportNote.trim().length < 10) {
+      toast.error('Please write at least 10 characters (for example which account you checked).');
+      return;
+    }
+    setReportBusy(true);
+    try {
+      await deliveryAPI.reportPayoutNotReceived(id, reportNote.trim());
+      toast.success('Reported. Your franchise will check it.');
+      setReportingId(null);
+      setReportNote('');
+      setReloadKey((k) => k + 1);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || err?.response?.data?.message || 'Could not report it. Please try again.');
+    } finally {
+      setReportBusy(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -50,7 +73,11 @@ export const PayoutV2 = () => {
               hour: '2-digit',
               minute: '2-digit'
             }) : null,
-            failureReason: t.failureReason || null
+            failureReason: t.failureReason || null,
+            description: t.description || '',
+            reference: t.reference || '',
+            dispute: t.dispute || null,
+            canReportNotReceived: Boolean(t.canReportNotReceived)
           })));
         }
       } catch (err) {
@@ -60,7 +87,7 @@ export const PayoutV2 = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [reloadKey]);
 
   const getStatusInfo = (status) => {
     switch (status?.toLowerCase()) {
@@ -81,6 +108,7 @@ export const PayoutV2 = () => {
         };
       case 'denied':
       case 'rejected':
+      case 'reversed':
         return {
           icon: XCircle,
           color: 'text-red-600',
@@ -147,10 +175,54 @@ export const PayoutV2 = () => {
                           Processed: {withdrawal.processedAt}
                         </p>
                       )}
+                      {withdrawal.description && (
+                        <p className="text-gray-500 text-[11px] font-medium mt-1">{withdrawal.description}</p>
+                      )}
+                      {withdrawal.reference && (
+                        <p className="text-gray-700 text-[11px] font-bold mt-1">Ref: {withdrawal.reference}</p>
+                      )}
                       {withdrawal.failureReason && (
                         <p className="text-red-600 text-[11px] mt-2 font-bold">
                           Reason: {withdrawal.failureReason}
                         </p>
+                      )}
+                      {withdrawal.dispute?.status === 'open' && (
+                        <p className="text-orange-600 text-[11px] mt-2 font-bold">Reported not received: your franchise is checking it.</p>
+                      )}
+                      {withdrawal.dispute?.status === 'resolved' && withdrawal.dispute.outcome === 'paid_confirmed' && (
+                        <p className="text-gray-600 text-[11px] mt-2 font-bold">Checked: payment confirmed. {withdrawal.dispute.resolution}</p>
+                      )}
+                      {withdrawal.canReportNotReceived && reportingId !== withdrawal.id && (
+                        <button
+                          onClick={() => { setReportingId(withdrawal.id); setReportNote(''); }}
+                          className="mt-2 text-[11px] font-bold text-orange-600 underline"
+                        >
+                          Not received?
+                        </button>
+                      )}
+                      {reportingId === withdrawal.id && (
+                        <div className="mt-3 space-y-2">
+                          <textarea
+                            value={reportNote}
+                            onChange={(e) => setReportNote(e.target.value)}
+                            maxLength={500}
+                            rows={3}
+                            placeholder="Which account did you check? (for example: no credit in my account ending 1234)"
+                            className="w-full rounded-lg border border-gray-200 p-2 text-xs outline-none"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              disabled={reportBusy}
+                              onClick={() => submitReport(withdrawal.id)}
+                              className="px-3 py-1.5 rounded-lg bg-black text-white text-xs font-bold disabled:opacity-50"
+                            >
+                              {reportBusy ? 'Sending...' : 'Report'}
+                            </button>
+                            <button onClick={() => setReportingId(null)} className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-bold">
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>

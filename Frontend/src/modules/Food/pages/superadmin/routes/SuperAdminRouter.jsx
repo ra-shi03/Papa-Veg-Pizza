@@ -18,6 +18,7 @@ const FranchiseList = lazy(() => import("../userManagement/FranchiseList"))
 const StoreManagers = lazy(() => import("../userManagement/StoreManagers"))
 const StoreManagersList = lazy(() => import("../userManagement/StoreManagersList"))
 const DeliveryPartnersManagement = lazy(() => import("../userManagement/DeliveryPartnersManagement"))
+const PlatformPayouts = lazy(() => import("../payouts/PlatformPayouts"))
 const KitchenStaffManagement = lazy(() => import("../userManagement/KitchenStaffManagement"))
 const RolesPermissionManagement = lazy(() => import("../userManagement/RolesPermissionManagement"))
 const ProductsManagement = lazy(() => import("../productsManagement/ProductsManagement"))
@@ -104,6 +105,8 @@ function SuperAdminLayout() {
     activeItem = "Bulk Orders"
   } else if (location.pathname.includes("/orders")) {
     activeItem = "All Orders"
+  } else if (location.pathname.includes("/payouts")) {
+    activeItem = "Payouts"
   } else if (location.pathname.includes("/disputes")) {
     activeItem = "Disputes"
   } else if (location.pathname.includes("/refund-requests")) {
@@ -239,6 +242,7 @@ export default function SuperAdminRouter() {
             <Route path="/bulk-orders" element={<BulkOrdersManagement />} />
             <Route path="/disputes" element={<Disputes />} />
             <Route path="/refund-requests" element={<RefundRequests />} />
+            <Route path="/payouts" element={<PlatformPayouts />} />
 
             <Route path="/coupons" element={<CouponsManagement />} />
             <Route path="/campaigns" element={<Campaign />} />

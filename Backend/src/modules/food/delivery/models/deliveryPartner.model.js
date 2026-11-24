@@ -131,6 +131,8 @@ const deliveryPartnerSchema = new mongoose.Schema(
         bankIfscCode: { type: String },
         bankName: { type: String },
         upiId: { type: String },
+        // When saved bank / UPI details were last changed (not their first entry): withdrawals wait 24 hours after it
+        payoutDetailsChangedAt: { type: Date, default: null },
         upiQrCode: { type: String },
         availabilityStatus: {
             type: String,
@@ -171,6 +173,16 @@ const deliveryPartnerSchema = new mongoose.Schema(
 
 // Indices
 deliveryPartnerSchema.index({ lastLocation: '2dsphere' });
+
+// Changing where the rider is paid (bank account, IFSC or UPI) stamps payoutDetailsChangedAt, on every save path, so a
+// withdrawal cannot be sent to new details within 24 hours of the change. Filling them in for the first time does not.
+const PAYOUT_FIELDS = ['bankAccountNumber', 'bankIfscCode', 'upiId'];
+deliveryPartnerSchema.pre('save', async function stampPayoutChange() {
+    if (this.isNew || !PAYOUT_FIELDS.some((f) => this.isModified(f))) return;
+    const before = await this.constructor.findById(this._id).select(PAYOUT_FIELDS.join(' ')).lean();
+    const changed = before && PAYOUT_FIELDS.some((f) => String(before[f] || '').trim() && String(before[f] || '').trim() !== String(this[f] || '').trim());
+    if (changed) this.payoutDetailsChangedAt = new Date();
+});
 
 export const FoodDeliveryPartner = mongoose.model('FoodDeliveryPartner', deliveryPartnerSchema);
 

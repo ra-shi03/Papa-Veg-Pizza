@@ -354,6 +354,9 @@ export const deliveryAPI = {
     deliveryClient.get("/food/delivery/cash-limit"),
   createWithdrawalRequest: (body) =>
     deliveryClient.post("/food/delivery/wallet/withdraw", body ?? {}),
+  /** A withdrawal the store marked paid never arrived (within 7 days): the franchise checks it. */
+  reportPayoutNotReceived: (payoutId, note) =>
+    deliveryClient.post(`/food/delivery/payouts/${String(payoutId)}/not-received`, { note: String(note || "") }),
   /** purpose: "cod_settlement" (pay back COD cash, the default) or "wallet_recharge" (add money to the delivery wallet) */
   createDepositOrder: (amount, purpose) =>
     deliveryClient.post("/food/delivery/wallet/deposit/order", { amount, ...(purpose ? { purpose } : {}) }),

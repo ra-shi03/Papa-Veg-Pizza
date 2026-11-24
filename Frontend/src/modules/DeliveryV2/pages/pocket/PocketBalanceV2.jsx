@@ -72,10 +72,12 @@ export const PocketBalanceV2 = () => {
             if (withdrawalTx) {
                const rawStatus = String(withdrawalTx.status || 'Pending').toLowerCase();
                const statusLabel = rawStatus === 'approved' || rawStatus === 'completed'
-                  ? 'Approved'
+                  ? 'Paid'
                   : rawStatus === 'rejected' || rawStatus === 'denied'
                      ? 'Rejected'
-                     : 'Pending';
+                     : rawStatus === 'reversed'
+                        ? 'Not paid'
+                        : 'Pending';
                const updatedAt = withdrawalTx.processedAt || withdrawalTx.updatedAt || withdrawalTx.createdAt || null;
                setWithdrawalStatus({
                   status: statusLabel,
@@ -122,7 +124,7 @@ export const PocketBalanceV2 = () => {
            goBack();
         }
      } catch (err) {
-        toast.error("Withdrawal failed");
+        toast.error(err?.response?.data?.error || err?.response?.data?.message || "Withdrawal failed");
      } finally {
         setWithdrawSubmitting(false);
      }
@@ -202,7 +204,7 @@ export const PocketBalanceV2 = () => {
                 <DetailRow
                    label="Withdrawal status"
                    value={withdrawalStatus.status}
-                   subLabel={withdrawalStatus.updatedAt ? `Updated: ${withdrawalStatus.updatedAt}` : 'Admin approval status'}
+                   subLabel={withdrawalStatus.updatedAt ? `Updated: ${withdrawalStatus.updatedAt}` : 'Paid by the store you delivered for'}
                 />
                 <DetailRow 
                    label="Min. withdrawal amount" 

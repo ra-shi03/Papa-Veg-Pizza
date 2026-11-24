@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { payoutAccountSchema } from '../../payouts/models/payoutAccount.schema.js';
 
 const personalDetailsSchema = new mongoose.Schema({
   address: { type: String, trim: true },
@@ -106,6 +107,8 @@ const storeManagerSchema = new mongoose.Schema({
     type: notificationPrefsSchema,
     default: () => ({})
   },
+  // Where this staff member's salary is paid (My salary page). Bank details: never returned unless asked for.
+  payoutAccount: { type: payoutAccountSchema, default: undefined, select: false },
 }, {
   timestamps: true,
 });

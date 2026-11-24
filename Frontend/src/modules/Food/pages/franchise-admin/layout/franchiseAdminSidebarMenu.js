@@ -29,6 +29,13 @@ export const franchiseAdminSidebarMenu = [
   },
   {
     type: "section",
+    label: "PAYOUTS",
+    items: [
+      { type: "link", label: "Payouts", path: "/franchise-admin/payouts", icon: "Wallet" },
+    ],
+  },
+  {
+    type: "section",
     label: "ORDERS",
     items: [
       { type: "link", label: "Live Orders", path: "/franchise-admin/live-orders", icon: "Activity" },

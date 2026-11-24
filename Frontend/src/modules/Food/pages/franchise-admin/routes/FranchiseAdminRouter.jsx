@@ -8,6 +8,7 @@ import Loader from "@food/components/Loader";
 // Lazy Loaded Pages
 const AdminHome = lazy(() => import("@food/pages/franchise-admin/dashboard/FranchiseAdminDashboard"));
 const RiderTickets = lazy(() => import("@food/pages/franchise-admin/staffManagement/RiderTickets"));
+const FranchisePayouts = lazy(() => import("@food/pages/franchise-admin/payouts/FranchisePayouts"));
 const TermsAndConditions = lazy(() => import("@food/pages/franchise-admin/terms/TermsAndConditions"));
 const AdminProfile = lazy(() => import("@food/pages/franchise-admin/AdminProfile"));
 const BulkOrders = lazy(() => import("@food/pages/franchise-admin/bulkOrders/BulkOrders"));
@@ -87,6 +88,7 @@ export default function FranchiseAdminRouter() {
           <Route path="kitchen-staff-approvals" element={<StaffApprovals />} />
           <Route path="delivery-partners" element={<DeliveryPartners />} />
           <Route path="rider-tickets" element={<RiderTickets />} />
+          <Route path="payouts" element={<FranchisePayouts />} />
           <Route path="store-approvals" element={<StoreApprovals />} />
           <Route path="store-performance" element={<StorePerformance />} />
           <Route path="operating-hours" element={<OperatingHours />} />

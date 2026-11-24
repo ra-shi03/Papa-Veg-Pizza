@@ -112,7 +112,8 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
         { name: "Order Tracking", icon: Truck },
         { name: "Bulk Orders", icon: Users },
         { name: "Refund Requests", icon: FileX },
-        { name: "Disputes", icon: Activity }
+        { name: "Disputes", icon: Activity },
+        { name: "Payouts", icon: CreditCard }
       ]
     },
     {
@@ -358,6 +359,8 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
                                 navigate("/food/superadmin/bulk-orders")
                               } else if (item.name === "Disputes") {
                                 navigate("/food/superadmin/disputes")
+                              } else if (item.name === "Payouts") {
+                                navigate("/food/superadmin/payouts")
                               } else if (item.name === "Refund Requests") {
                                 navigate("/food/superadmin/refund-requests")
                               } else if (item.name === "Coupons") {

@@ -9,6 +9,9 @@ import { getDeliveryCashLimitSettings } from '../../admin/services/admin.service
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { createRazorpayOrder, getRazorpayKeyId, isRazorpayConfigured, verifyPaymentSignature } from '../../orders/helpers/razorpay.helper.js';
 import { riderWalletStatus } from './riderReadiness.service.js';
+import { FoodPayout } from '../../payouts/models/payout.model.js';
+import { riderBalances, HOLD_HOURS } from '../../payouts/services/payoutBalance.service.js';
+import { requestRiderWithdrawals, DISPUTE_DAYS } from '../../payouts/services/payout.service.js';
 
 const PURPOSES = ['cod_settlement', 'wallet_recharge'];
 const purposeOf = (p) => (PURPOSES.includes(p) ? p : 'cod_settlement');
@@ -92,15 +95,23 @@ export const getDeliveryPartnerWalletEnhanced = async (deliveryPartnerId) => {
     const totalDepositedCash = Number(cashDepositsAgg?.[0]?.depositedCash) || 0;
     const cashInHand = Math.max(0, grossCashCollected - totalDepositedCash);
     const totalBonus = Number(bonusAgg?.[0]?.total) || 0;
-    const totalWithdrawn = Number(withdrawalAgg?.[0]?.totalWithdrawn) || 0;
-    const pendingWithdrawals = Number(withdrawalAgg?.[0]?.pendingWithdrawals) || 0;
+    // Withdrawals are paid by each store the rider delivered for (modules/food/payouts); older requests still count
+    const [balances, payouts] = await Promise.all([
+        riderBalances(partnerId),
+        FoodPayout.find({ kind: 'rider_withdrawal', payeeId: partnerId }).sort({ createdAt: -1 }).limit(50).lean(),
+    ]);
+    const sumOf = (status) => payouts.filter((p) => p.status === status).reduce((n, p) => n + (Number(p.amount) || 0), 0);
+    const totalWithdrawn = (Number(withdrawalAgg?.[0]?.totalWithdrawn) || 0) + sumOf('paid');
+    const pendingWithdrawals = (Number(withdrawalAgg?.[0]?.pendingWithdrawals) || 0) + sumOf('pending');
+    const availableNow = Math.round(balances.reduce((n, b) => n + b.available, 0) * 100) / 100;
+    const onHold = Math.round(balances.reduce((n, b) => n + b.onHold, 0) * 100) / 100;
+    const storeNames = new Map(balances.map((b) => [b.storeId, b.storeName]));
 
     const totalCashLimit = Number(cashLimitSettings.deliveryCashLimit) || 0;
     const deliveryWithdrawalLimit = Number(cashLimitSettings.deliveryWithdrawalLimit) || 100;
 
-    // Pocket Balance = (Earnings + Bonus) - Total Withdrawn (approved) - Pending Withdrawals
-    // Wait, usually pocket balance subtracts pending too so user knows how much is "left" to request.
-    const pocketBalance = Math.max(0, (totalEarned + totalBonus) - (totalWithdrawn + pendingWithdrawals));
+    // Pocket balance = what can be withdrawn now: earnings past the hold, per store, minus paid and waiting withdrawals
+    const pocketBalance = availableNow;
 
     // Fetch transactions for UI (Orders, Bonuses, Withdrawals)
     const [ordersTx] = await Promise.all([
@@ -120,6 +131,22 @@ export const getDeliveryPartnerWalletEnhanced = async (deliveryPartnerId) => {
             date: o.createdAt,
             description: o.payment?.method === 'cash' ? 'COD delivery earning' : 'Online delivery earning',
             orderId: o.orderId
+        })),
+        ...payouts.map((p) => ({
+            id: p._id,
+            type: 'withdrawal',
+            amount: p.amount,
+            status: { pending: 'Pending', paid: 'Completed', rejected: 'Rejected', reversed: 'Reversed' }[p.status] || p.status,
+            date: p.createdAt,
+            processedAt: p.payment?.paidAt || p.rejection?.at || null,
+            description: `Withdrawal · ${storeNames.get(String(p.storeId)) || 'Store'}`,
+            storeId: p.storeId ? String(p.storeId) : null,
+            payoutMethod: p.payment?.method || 'bank_transfer',
+            reference: p.payment?.reference || '',
+            failureReason: p.rejection?.reason || (p.status === 'reversed' ? p.dispute?.resolution || 'Marked not paid' : null),
+            dispute: p.dispute?.status && p.dispute.status !== 'none' ? { status: p.dispute.status, outcome: p.dispute.outcome || '', resolution: p.dispute.resolution || '' } : null,
+            canReportNotReceived: p.status === 'paid' && (!p.dispute || p.dispute.status === 'none')
+                && p.payment?.paidAt && Date.now() - new Date(p.payment.paidAt).getTime() < DISPUTE_DAYS * 86400000,
         })),
         ...(withdrawalsList || []).map(w => ({
             id: w._id,
@@ -151,7 +178,10 @@ export const getDeliveryPartnerWalletEnhanced = async (deliveryPartnerId) => {
     return {
         deliveryWallet,
         totalBalance: totalEarned + totalBonus, // Gross lifetime earnings
-        pocketBalance, // Available to withdraw
+        pocketBalance, // Available to withdraw (past the hold, all stores)
+        onHold, // delivered in the last HOLD_HOURS: withdrawable after that
+        holdHours: HOLD_HOURS,
+        storeBalances: balances, // what each store owes the rider
         cashInHand, // COD to be deposited/deducted
         totalWithdrawn, // Actually paid out
         pendingWithdrawals, // In process
@@ -167,38 +197,13 @@ export const getDeliveryPartnerWalletEnhanced = async (deliveryPartnerId) => {
 /**
  * Submits a new withdrawal request for a delivery partner.
  */
-export const requestDeliveryWithdrawal = async (deliveryPartnerId, payload) => {
-    const { amount, bankDetails, paymentMethod = 'bank_transfer' } = payload;
-
-    if (!amount || amount < 1) throw new ValidationError('Invalid amount');
-
-    const wallet = await getDeliveryPartnerWalletEnhanced(deliveryPartnerId);
-    if (amount < wallet.deliveryWithdrawalLimit) {
-        throw new ValidationError(`Minimum withdrawal amount is ₹${wallet.deliveryWithdrawalLimit}`);
-    }
-    if (amount > wallet.pocketBalance) {
-        throw new ValidationError('Insufficient balance for this withdrawal');
-    }
-
-    const partner = await FoodDeliveryPartner.findById(deliveryPartnerId).lean();
-    if (!partner) throw new ValidationError('Delivery partner not found');
-
-    const withdrawal = await FoodDeliveryWithdrawal.create({
-        deliveryPartnerId,
-        amount,
-        paymentMethod,
-        bankDetails: bankDetails || {
-            accountNumber: partner.bankAccountNumber,
-            ifscCode: partner.bankIfscCode,
-            bankName: partner.bankName,
-            accountHolderName: partner.bankAccountHolderName
-        },
-        upiId: partner.upiId,
-        upiQrCode: partner.upiQrCode,
-        status: 'pending'
-    });
-
-    return withdrawal;
+/**
+ * The rider's Withdraw button: one request to each store that owes the rider (payouts module). The amount and the bank
+ * details are worked out on the server; nothing from the request body is trusted except an optional storeId.
+ */
+export const requestDeliveryWithdrawal = async (deliveryPartnerId, payload = {}) => {
+    const storeId = mongoose.Types.ObjectId.isValid(String(payload?.storeId || '')) ? String(payload.storeId) : undefined;
+    return requestRiderWithdrawals(deliveryPartnerId, { storeId });
 };
 
 export const createDeliveryCashDepositOrder = async (deliveryPartnerId, amountInr, purposeRaw) => {
