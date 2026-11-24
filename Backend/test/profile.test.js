@@ -260,7 +260,7 @@ describe('attendance, performance and activity (own data only)', () => {
         assert.equal(ok(await call('GET', '/attendance', sup.token)).logs.length, 1, 'only the caller\'s own');
         assert.equal(ok(await call('GET', '/attendance', bChef.token)).logs.length, 0);
         const m = ok(await call('GET', '/attendance', A.managerToken));
-        assert.deepEqual([m.summary.presentDays, m.logs.length], [0, 0], 'the manager does not clock in');
+        assert.deepEqual([m.summary.presentDays, m.logs.length], [1, 1], 'the manager clocks in too: their own day');
     });
     test('the profile page carries the same summary', async () => {
         assert.equal(ok(await call('GET', '/', chef.token)).attendanceSummary.presentDays, 2);

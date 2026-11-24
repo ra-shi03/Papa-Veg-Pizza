@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import io from "socket.io-client";
+import { storeSocket } from "../../api/storeOrdersApi";
 import apiClient from "@/services/api/axios";
 
 
@@ -27,12 +27,7 @@ export function useDelayedOrders(filters = {}) {
   const [socketConnected, setSocketConnected] = useState(false);
 
   useEffect(() => {
-    const socketUrl = import.meta.env?.VITE_SOCKET_URL || window.location.origin;
-    const socket = io(socketUrl, {
-      transports: ["websocket"],
-      autoConnect: true,
-      reconnectionAttempts: 5,
-    });
+    const socket = storeSocket();   // the store panel's one signed-in socket
 
     socket.on("connect", () => {
       setSocketConnected(true);

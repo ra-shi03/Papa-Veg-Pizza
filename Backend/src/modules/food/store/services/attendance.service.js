@@ -5,11 +5,14 @@ import { StoreManager } from '../../franchise/models/storeManager.model.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 import { isId, toId } from '../../dashboard/services/dashboardAccess.js';
 import { escapeRegex } from '../../../../utils/helpers.js';
-import { attendanceScope, assertCanWrite, kitchenStaffRecords, displayNameOf, conflict, KITCHEN_ROLE_CODES } from './attendanceAccess.js';
+import { attendanceScope, assertCanMark, kitchenStaffRecords, storePeopleRecords, displayNameOf, conflict, KITCHEN_ROLE_CODES } from './attendanceAccess.js';
+import { notifyUsers } from './kitchenTasks.service.js';
 import { parseClock, clockOf, dateKeyOf, atClock, hoursBetween, scheduledHours, minutesLate, round2 } from './attendanceTime.js';
 
-// Attendance of one store (/v1/store/attendance). Staff clock in and out for themselves; the store manager can also mark,
-// correct and delete records. Hours, overtime and lateness are always worked out here, never taken from the request.
+// Attendance of one store (/v1/store/attendance). Kitchen staff AND the store manager clock in and out for themselves
+// (work is refused until they have: middleware/requireOnDuty.js). The store manager marks leave / absent for kitchen staff;
+// the franchise admin can do the same for anyone in its stores, and also mark someone present on behalf (a reason is
+// required, the record says who marked it). Hours, overtime and lateness are always worked out here, never taken from the request.
 
 const PRESENT = ['present', 'half_day'];
 const OPEN_SESSION_HOURS = 20;   // a clock-in older than this is not an open session any more
@@ -72,6 +75,27 @@ async function staffInStore(storeId, staffId) {
 
 // ---- read -------------------------------------------------------------------------------------
 
+/**
+ * GET /store/attendance/people?storeId= : who can be marked, with where they stand today. The store manager gets the
+ * kitchen staff; the franchise admin gets the store manager too (to mark them when they are away).
+ */
+export async function attendancePeople(user, query = {}) {
+    const scope = await attendanceScope(user, query);
+    assertCanMark(scope);
+    const people = scope.isAdmin ? await storePeopleRecords(scope.store._id) : await kitchenStaffRecords(scope.store._id, { status: { $nin: ['DELETED', 'Rejected', 'Pending Approval'] } });
+    const now = new Date();
+    const today = await StoreAttendance.find({ storeId: scope.store._id, date: dateKeyOf(now), staffId: { $in: people.map((p) => p._id) } }).lean();
+    const todayBy = new Map(today.map((r) => [String(r.staffId), r]));
+    return people.map((p) => {
+        const r = todayBy.get(String(p._id));
+        return {
+            staffId: String(p._id), name: p.name || '', role: p.role || '', employeeCode: p.employeeCode || '', isManager: /manager/i.test(p.role || ''),
+            today: r ? { id: String(r._id), status: r.status, source: r.source, clockedIn: !!r.checkInAt && !r.checkOutAt } : null,
+        };
+    }).sort((a, b) => Number(b.isManager) - Number(a.isManager) || a.name.localeCompare(b.name));
+}
+
+
 export async function listAttendance(user, query = {}) {
     const scope = await attendanceScope(user, query);
     const filter = { storeId: scope.store._id };
@@ -84,7 +108,7 @@ export async function listAttendance(user, query = {}) {
         const staffFilter = {};
         if (query.search) { const rx = { $regex: escapeRegex(query.search), $options: 'i' }; staffFilter.$or = [{ name: rx }, { employeeCode: rx }]; }
         if (query.role && query.role !== 'All') staffFilter.role = query.role;
-        const ids = await kitchenStaffRecords(scope.store._id, staffFilter);
+        const ids = await storePeopleRecords(scope.store._id, staffFilter);
         filter.staffId = { $in: ids.map((s) => s._id) };
     }
     const records = await StoreAttendance.find(filter).sort({ date: -1, checkInAt: -1, createdAt: -1 }).limit(Number(query.limit) || 500).lean();
@@ -119,26 +143,45 @@ export async function getAttendance(user, id, query = {}) {
     return (await present([rec]))[0];
 }
 
-// ---- store manager writes ---------------------------------------------------------------------
+// ---- store manager / franchise admin writes -----------------------------------------------------
 
-// Check in and check out are the staff member's own. The store manager's one write on attendance is leave.
-const onlyLeave = () => new ForbiddenError('Attendance is marked by staff themselves (check in and check out). The store manager only marks leave.');
-
+// Check in and check out are the person's own. The store manager marks leave or absent for kitchen staff; the franchise admin
+// marks leave, absent or present for anyone in its stores. Nobody overwrites a day the person worked and clocked themselves.
 const MAX_LEAVE_DAYS = 31;
 const dayAdd = (key, n) => { const d = new Date(`${key}T00:00:00`); d.setDate(d.getDate() + n); return dateKeyOf(d); };
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The person a mark is for: the franchise admin can pick the store manager too, the store manager only kitchen staff (never themselves). */
+async function personFor(scope, staffId) {
+    if (!isId(staffId)) throw new NotFoundError('Staff member not found');
+    if (scope.isAdmin) {
+        const [one] = await storePeopleRecords(scope.store._id, { _id: toId(staffId) });
+        if (!one) throw new NotFoundError('Staff member not found');
+        return one;
+    }
+    return staffInStore(scope.store._id, staffId);
+}
+
+const markerSource = (scope) => (scope.isAdmin ? 'admin' : 'manager');
+const markerRole = (scope) => (scope.isAdmin ? 'Franchise admin' : 'Store manager');
+
+async function tellPerson(person, store, title, message) {
+    if (!person?.userId) return;
+    await notifyUsers({ userIds: [person.userId], storeId: store._id, type: 'attendance', title, message }).catch(() => {});
+}
 
 /**
- * POST /store/attendance/leave { staffId, from, to, reason } : the store manager puts a staff member on leave
- * for a range of days, with a reason. Each day becomes a 'leave' record they and the franchise admin can see. A day the
- * person already worked is left alone.
+ * POST /store/attendance/leave { staffId, from, to, reason } : puts a person on leave for a range of days, with a reason.
+ * Each day becomes a 'leave' record they, the store manager and the franchise admin can see. A day the person already
+ * worked is left alone.
  */
 export async function markLeaveRange(user, body = {}, query = {}) {
     const scope = await attendanceScope(user, query);
-    assertCanWrite(scope);
+    assertCanMark(scope);
     const from = String(body.from || body.date || '');
     const to = String(body.to || from);
     const reason = String(body.reason || '').trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) throw new ValidationError('from / to: use a date like 2026-11-20');
+    if (!DATE.test(from) || !DATE.test(to)) throw new ValidationError('from / to: use a date like 2026-11-20');
     if (to < from) throw new ValidationError('to: the last day cannot be before the first day');
     if (reason.length < 3) throw new ValidationError('reason: please say why they are on leave');
     if (reason.length > 300) throw new ValidationError('reason: keep it under 300 characters');
@@ -147,7 +190,7 @@ export async function markLeaveRange(user, body = {}, query = {}) {
     if (days.length > MAX_LEAVE_DAYS) throw new ValidationError(`Leave can cover at most ${MAX_LEAVE_DAYS} days at a time`);
     if (from < dayAdd(dateKeyOf(), -7)) throw new ValidationError('from: leave can only be marked from the last 7 days onwards');
 
-    const staff = await staffInStore(scope.store._id, body.staffId);
+    const staff = await personFor(scope, body.staffId);
     const by = await displayNameOf(user);
     const written = [];
     const skipped = [];
@@ -156,76 +199,94 @@ export async function markLeaveRange(user, body = {}, query = {}) {
         if (existing && PRESENT.includes(existing.status)) { skipped.push(date); continue; }
         const set = {
             status: 'leave', notes: reason, shiftId: null, checkInAt: null, checkOutAt: null, totalHours: 0, overtimeHours: 0,
-            late: false, lateMinutes: 0, source: 'manager', markedBy: toId(user.userId), markedByName: by,
+            late: false, lateMinutes: 0, source: markerSource(scope), markedBy: toId(user.userId), markedByName: by,
         };
         const rec = existing
             ? await StoreAttendance.findOneAndUpdate({ _id: existing._id }, { $set: set }, { new: true })
             : await StoreAttendance.create({ storeId: scope.store._id, franchiseId: scope.store.franchiseId || null, staffId: staff._id, userId: staff.userId || null, date, ...set });
         written.push(rec.toObject());
     }
+    if (written.length) await tellPerson(staff, scope.store, 'You were marked on leave', `${from}${to !== from ? ` to ${to}` : ''}: ${reason}`);
     return { days: written.length, skipped, records: await present(written) };
 }
 
-/** POST /store/attendance { staffId, date, status: 'leave', notes } : one day of leave (the leave endpoint takes a range). */
-export async function markAttendance(user, body, query = {}) {
-    const scope = await attendanceScope(user, query);
-    assertCanWrite(scope);
-    if (body.status !== 'leave') throw onlyLeave();
-    return (await markLeaveRange(user, { staffId: body.staffId, from: body.date, to: body.date, reason: body.notes }, query)).records[0];
-}
+const WRITE_WINDOW_DAYS = 7;
 
-/** POST /store/attendance/bulk { date, shiftId, attendances:[{staffId,status}] } : one status per person for the day (replaces what was there). */
-/** Kept so old callers get a clear answer: check ins are the staff's own, so there is nothing to mark in bulk. */
-export async function bulkMarkAttendance(user, body, query = {}) {
+/**
+ * POST /store/attendance { staffId, date, status, notes, checkIn?, checkOut? }
+ *   store manager   -> status leave or absent, for kitchen staff
+ *   franchise admin -> status leave, absent or present (on behalf: a reason of at least 5 characters, a check-in time),
+ *                      for the store manager or kitchen staff of one of its stores
+ * Only today and the last 7 days. A day the person clocked in and out themselves is theirs and cannot be replaced.
+ */
+export async function markAttendance(user, body = {}, query = {}) {
     const scope = await attendanceScope(user, query);
-    assertCanWrite(scope);
-    throw onlyLeave();
-}
-
-export async function updateAttendance(user, id, body, query = {}) {
-    const scope = await attendanceScope(user, query);
-    assertCanWrite(scope);
-    if (!isId(id)) throw new NotFoundError('Attendance record not found');
-    const rec = await StoreAttendance.findOne({ _id: toId(id), storeId: scope.store._id });
-    if (!rec) throw new NotFoundError('Attendance record not found');
-    // A worked day (check in / check out) is the staff member's own record; only a leave record can be changed
-    if (rec.status !== 'leave' || (body.status !== undefined && body.status !== 'leave')) throw onlyLeave();
-
-    if (body.date !== undefined) { rec.date = body.date; }
-    if (body.status !== undefined) rec.status = body.status;
-    if (body.notes !== undefined) rec.notes = body.notes;
-    if (body.shiftId !== undefined) rec.shiftId = (await shiftInStore(scope.store._id, body.shiftId))?._id || null;
-    const off = rec.status === 'absent' || rec.status === 'leave';
-    if (off) {
-        Object.assign(rec, { checkInAt: null, checkOutAt: null, totalHours: 0, overtimeHours: 0, late: false, lateMinutes: 0 });
-    } else if (body.checkIn !== undefined || body.checkOut !== undefined || body.date !== undefined) {
-        // times are re-read on the (possibly new) date; whatever the request leaves out keeps its clock time
-        const keep = (d) => (d ? clockOf(d) : null);
-        const { checkInAt, checkOutAt } = timesOn(rec.date, body.checkIn !== undefined ? body.checkIn : keep(rec.checkInAt), body.checkOut !== undefined ? body.checkOut : keep(rec.checkOutAt));
-        rec.checkInAt = checkInAt; rec.checkOutAt = checkOutAt;
+    assertCanMark(scope);
+    const status = String(body.status || '');
+    const allowed = scope.isAdmin ? ['leave', 'absent', 'present'] : ['leave', 'absent'];
+    if (!allowed.includes(status)) {
+        throw new ForbiddenError(scope.isAdmin ? 'Choose present, absent or leave.' : 'The store manager marks leave or absent. Staff mark themselves present by clocking in.');
     }
-    const shift = rec.shiftId ? await StoreShift.findById(rec.shiftId).lean() : null;
-    Object.assign(rec, hoursFor(rec.checkInAt, rec.checkOutAt, shift));
-    const late = rec.checkInAt ? minutesLate(rec.checkInAt, shift) : 0;
-    rec.late = late > 0; rec.lateMinutes = late;
-    rec.markedBy = toId(user.userId); rec.markedByName = await displayNameOf(user);
+    if (status === 'leave') return (await markLeaveRange(user, { staffId: body.staffId, from: body.date, to: body.date, reason: body.notes }, query)).records[0];
+
+    const date = String(body.date || '');
+    if (!DATE.test(date)) throw new ValidationError('date: use a date like 2026-11-20');
+    if (date > dateKeyOf() || date < dayAdd(dateKeyOf(), -WRITE_WINDOW_DAYS)) throw new ValidationError(`date: only today and the last ${WRITE_WINDOW_DAYS} days can be marked`);
+    const reason = String(body.notes || '').trim();
+    if (reason.length < 5) throw new ValidationError('notes: please give a reason (at least 5 characters)');
+    if (reason.length > 300) throw new ValidationError('notes: keep it under 300 characters');
+    const person = await personFor(scope, body.staffId);
+    if (!scope.isAdmin && scope.me && String(person._id) === String(scope.me._id)) throw new ForbiddenError('You cannot mark your own attendance. Clock in yourself.');
+    const by = await displayNameOf(user);
+    const existing = await StoreAttendance.findOne({ storeId: scope.store._id, staffId: person._id, date });
+    if (existing && existing.source === 'self' && existing.checkInAt) throw conflict('This person clocked in themselves that day. Their record cannot be replaced.');
+
+    const set = { source: markerSource(scope), markedBy: toId(user.userId), markedByName: by, notes: reason, shiftId: null, late: false, lateMinutes: 0, totalHours: 0, overtimeHours: 0 };
+    if (status === 'absent') {
+        Object.assign(set, { status: 'absent', checkInAt: null, checkOutAt: null });
+    } else {
+        const { checkInAt, checkOutAt } = timesOn(date, body.checkIn, body.checkOut);
+        if (!checkInAt) throw new ValidationError('checkIn: give the time they started');
+        if (checkOutAt && checkOutAt > new Date()) throw new ValidationError('checkOut: cannot be in the future');
+        if (checkInAt > new Date()) throw new ValidationError('checkIn: cannot be in the future');
+        const shift = await assignedShiftOf(scope.store._id, person._id);
+        const late = minutesLate(checkInAt, shift);
+        Object.assign(set, { status: 'present', checkInAt, checkOutAt, shiftId: shift?._id || null, late: late > 0, lateMinutes: late }, hoursFor(checkInAt, checkOutAt, shift));
+    }
+    let rec;
     try {
-        await rec.save();
+        rec = existing
+            ? await StoreAttendance.findOneAndUpdate({ _id: existing._id }, { $set: set }, { new: true })
+            : await StoreAttendance.create({ storeId: scope.store._id, franchiseId: scope.store.franchiseId || null, staffId: person._id, userId: person.userId || null, date, ...set });
     } catch (err) {
         if (err?.code === 11000) throw conflict('Attendance for this person and day is already recorded.');
         throw err;
     }
+    await tellPerson(person, scope.store, status === 'absent' ? 'You were marked absent' : 'Your attendance was marked present',
+        `${date}, by ${markerRole(scope)} ${by}: ${reason}`);
     return (await present([rec.toObject()]))[0];
 }
 
+/** Kept so old callers get a clear answer: check ins are the person's own, so there is nothing to mark in bulk. */
+export async function bulkMarkAttendance(user, body, query = {}) {
+    const scope = await attendanceScope(user, query);
+    assertCanMark(scope);
+    throw new ForbiddenError('Staff mark themselves present by clocking in. Mark leave or absent one person at a time.');
+}
+
+/**
+ * DELETE /store/attendance/:id : takes back a leave or absent mark, or an on-behalf present, so the person can clock in.
+ * The store manager takes back only their own marks; the franchise admin any mark made by the manager or the admin.
+ * A day the person clocked themselves cannot be deleted.
+ */
 export async function deleteAttendance(user, id, query = {}) {
     const scope = await attendanceScope(user, query);
-    assertCanWrite(scope);
+    assertCanMark(scope);
     if (!isId(id)) throw new NotFoundError('Attendance record not found');
-    // Cancelling a leave is allowed; a worked day cannot be deleted
-    const rec = await StoreAttendance.findOneAndDelete({ _id: toId(id), storeId: scope.store._id, status: 'leave' });
+    const filter = { _id: toId(id), storeId: scope.store._id, source: scope.isAdmin ? { $in: ['manager', 'admin'] } : 'manager' };
+    const rec = await StoreAttendance.findOneAndDelete(filter);
     if (!rec) {
-        if (await StoreAttendance.exists({ _id: toId(id), storeId: scope.store._id })) throw onlyLeave();
+        if (await StoreAttendance.exists({ _id: toId(id), storeId: scope.store._id })) throw new ForbiddenError('That record was made by the person themselves or by someone above you, so it cannot be removed here.');
         throw new NotFoundError('Attendance record not found');
     }
     return { id: String(rec._id) };
@@ -233,10 +294,11 @@ export async function deleteAttendance(user, id, query = {}) {
 
 // ---- self service: clock in / out, today, history ---------------------------------------------
 
-/** Kitchen staff clock themselves; the staff record comes from the token, never from the request. */
+/** Kitchen staff and the store manager clock themselves; the staff record comes from the token, never from the request. */
 async function kitchenSelf(user) {
     const scope = await attendanceScope(user, {});
-    if (!KITCHEN_ROLE_CODES.includes(scope.role)) throw new ForbiddenError('Only kitchen staff clock in and out.');
+    if (!KITCHEN_ROLE_CODES.includes(scope.role) && scope.role !== 'STORE_MANAGER') throw new ForbiddenError('Only the store team clocks in and out.');
+    if (!scope.me) throw new ForbiddenError('Your staff record was not found.');
     return scope;
 }
 
@@ -355,7 +417,7 @@ export async function todayRoster(storeId, now = new Date()) {
 /** Own attendance for the profile screen: { summary, logs } over the last 30 days. */
 export async function profileAttendance(user) {
     const role = String(user?.role || '').replace(/-/g, '_').toUpperCase();
-    if (!KITCHEN_ROLE_CODES.includes(role)) return { summary: { attendanceRate: 0, presentDays: 0, absentDays: 0, totalHours: 0, lateEntries: 0 }, logs: [] };
+    if (!KITCHEN_ROLE_CODES.includes(role) && role !== 'STORE_MANAGER') return { summary: { attendanceRate: 0, presentDays: 0, absentDays: 0, totalHours: 0, lateEntries: 0 }, logs: [] };
     const scope = await attendanceScope(user, {});
     const from = new Date(); from.setDate(from.getDate() - 29);
     const records = await StoreAttendance.find({ storeId: scope.store._id, staffId: scope.me._id, date: { $gte: dateKeyOf(from) } }).sort({ date: -1 }).lean();

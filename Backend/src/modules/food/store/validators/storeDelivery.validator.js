@@ -21,6 +21,8 @@ export const validateCreateIssueDto = (body) => parse(z.object({
     description: z.string().max(1000).optional().default(''),
     reportedBy: z.string().trim().max(60).optional(),
     severity: z.enum(['low', 'medium', 'high', 'critical']).optional().default('medium'),
+    // photo evidence: the link /uploads/image returned (the screen sends it as `image`)
+    image: z.preprocess((v) => (v === '' || v === null ? undefined : v), z.string().trim().max(500).regex(/^https:\/\/\S+$/, 'must be an uploaded image link').optional()),
 }), body);
 export const validateResolveIssueDto = (body) => parse(z.object({
     status: z.enum(['open', 'in_progress', 'resolved', 'escalated', 'closed']).optional(),

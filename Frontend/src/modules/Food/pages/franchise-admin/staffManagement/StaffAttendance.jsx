@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { CalendarCheck, Search, Store, Download, CheckCircle2, AlarmClock, CalendarOff, Clock, Eye } from "lucide-react"
 import { adminAPI } from "@food/api"
 import { adminClient } from "@/services/api/axios"
+import { MarkAttendanceModal, LeaveQueue, undoMark } from "@food/components/attendance/AttendanceActions"
 
-// Read-only. Check in / check out are marked by kitchen staff themselves; leave is marked by the store
-// manager. The franchise admin looks at one store at a time and cannot change anything here.
+// One store at a time: the store manager's and the kitchen staff's attendance. Everyone clocks in and out themselves; the
+// franchise admin steps in when needed: marks someone present on behalf (with a reason), absent or on leave, takes back a
+// mark, and decides leave requests (the store manager's own, and staff ones when the manager is away).
 
 const pad = (n) => String(n).padStart(2, "0")
 const keyOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -28,6 +30,9 @@ export default function StaffAttendance() {
   const today = keyOf(new Date())
   const [storeId, setStoreId] = useState("")
   const [mode, setMode] = useState("day")
+  const [markOpen, setMarkOpen] = useState(false)
+  const queryClient = useQueryClient()
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["franchiseStaffAttendance"] })
   const [day, setDay] = useState(today)
   const [from, setFrom] = useState(shiftDay(today, -6))
   const [to, setTo] = useState(today)
@@ -59,7 +64,7 @@ export default function StaffAttendance() {
   const storeName = stores.find((s) => String(s._id || s.id) === storeId)?.storeName || ""
   const exportCsv = () => {
     const head = "Date,Name,Role,Employee Code,Check In,Check Out,Hours,Status,Late (min),Marked By,Reason\n"
-    const body = rows.map((r) => [r.date, r.staffName, r.role, r.employeeCode, clock(r.checkInAt), clock(r.checkOutAt), r.totalHours || 0, r.status, r.lateMinutes || 0, r.source === "self" ? "Self" : "Store manager", (r.notes || "").replace(/"/g, "'")].map((v) => `"${v}"`).join(",")).join("\n")
+    const body = rows.map((r) => [r.date, r.staffName, r.role, r.employeeCode, clock(r.checkInAt), clock(r.checkOutAt), r.totalHours || 0, r.status, r.lateMinutes || 0, r.source === "self" ? "Self" : `${r.markedBy || "Store manager"}${r.source === "admin" ? " (franchise)" : ""}`, (r.notes || "").replace(/"/g, "'")].map((v) => `"${v}"`).join(",")).join("\n")
     const url = URL.createObjectURL(new Blob([head + body], { type: "text/csv" }))
     const a = document.createElement("a"); a.href = url; a.download = `attendance_${storeName || "store"}_${mode === "day" ? day : `${from}_to_${to}`}.csv`; a.click(); URL.revokeObjectURL(url)
   }
@@ -76,9 +81,12 @@ export default function StaffAttendance() {
           <CalendarCheck className="text-[var(--primary)]" />
           <div>
             <h1 className="text-xl font-black tracking-tight">Staff attendance</h1>
-            <p className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400"><Eye size={12} /> View only. Staff check in and out themselves; the store manager marks leave.</p>
+            <p className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400"><Eye size={12} /> Store manager and staff check in themselves. Step in when they cannot.</p>
           </div>
         </div>
+        <button type="button" onClick={() => setMarkOpen(true)} disabled={!storeId} className="flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+          <CalendarCheck size={13} /> Mark attendance
+        </button>
         <button type="button" onClick={exportCsv} disabled={!rows.length} className="flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-bold hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-900">
           <Download size={13} /> Export CSV
         </button>
@@ -131,6 +139,9 @@ export default function StaffAttendance() {
         ))}
       </div>
 
+      <LeaveQueue storeId={storeId} onChanged={refresh} />
+      <MarkAttendanceModal open={markOpen} onClose={() => setMarkOpen(false)} onDone={refresh} storeId={storeId} admin />
+
       <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <table className="w-full min-w-[760px] text-left text-xs">
           <thead className="border-b border-zinc-100 bg-zinc-50 text-[10px] font-black uppercase tracking-wider text-zinc-400 dark:border-zinc-800 dark:bg-zinc-950">
@@ -152,7 +163,13 @@ export default function StaffAttendance() {
                   <td className="px-4 py-3 font-semibold">{r.checkOutAt ? clock(r.checkOutAt) : r.checkInAt ? <span className="text-emerald-600">Working</span> : "--"}</td>
                   <td className="px-4 py-3 font-semibold">{r.checkOutAt ? `${r.totalHours || 0} h` : "--"}</td>
                   <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-extrabold uppercase ${st.cls}`}>{st.label}</span></td>
-                  <td className="px-4 py-3 text-zinc-500">{r.status === "leave" ? `Approved by ${r.leave?.approvedBy || r.markedBy || "store manager"}` : r.source === "self" ? "Self" : r.markedBy || "Store manager"}</td>
+                  <td className="px-4 py-3 text-zinc-500">
+                    {r.status === "leave" ? `Approved by ${r.leave?.approvedBy || r.markedBy || "store manager"}` : r.source === "self" ? "Self" : `${r.markedBy || "Store manager"}${r.source === "admin" ? " (franchise)" : ""}`}
+                    {r.source !== "self" && (
+                      <button type="button" onClick={async () => { if (window.confirm(`Take back this mark for ${r.staffName}?`) && await undoMark(r.id, storeId)) refresh() }} className="ml-2 text-[10px] font-bold text-rose-600 underline">Undo</button>
+                    )}
+                    {r.notes && r.status !== "leave" && <p className="text-[10px] text-zinc-400">{r.notes}</p>}
+                  </td>
                   <td className="max-w-[300px] px-4 py-3">
                     {r.status === "leave" ? (
                       <div className="space-y-1">

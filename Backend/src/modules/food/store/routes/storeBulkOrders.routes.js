@@ -1,4 +1,5 @@
 import express from 'express';
+import { requireOnDuty } from '../../../../middleware/requireOnDuty.js';
 import { authMiddleware } from '../../../../core/auth/auth.middleware.js';
 import { requireRoles } from '../../../../core/roles/role.middleware.js';
 import { sendResponse } from '../../../../utils/response.js';
@@ -6,7 +7,7 @@ import * as svc from '../../orders/services/bulkOrderFlow.service.js';
 
 // Store manager: the bulk orders placed at their own store. Mounted at /v1/food/store/bulk-orders.
 const router = express.Router();
-router.use(authMiddleware, requireRoles('STORE_MANAGER'));
+router.use(authMiddleware, requireRoles('STORE_MANAGER'), requireOnDuty);   // attendance first, then work
 const wrap = (message, fn, status = 200) => async (req, res, next) => {
   try {
     return sendResponse(res, status, message, await fn(req));

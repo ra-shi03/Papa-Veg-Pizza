@@ -288,6 +288,13 @@ export const storeOperationsSidebarMenu = [
   },
   {
     type: "link",
+    label: "My Attendance",
+    path: "/store-operations/attendance",
+    icon: "CalendarCheck",
+    allowedRoles: ["store_manager"]
+  },
+  {
+    type: "link",
     label: "My Tasks",
     path: "/store-operations/tasks",
     icon: "ListTodo",

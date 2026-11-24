@@ -36,6 +36,8 @@ function maskToken(token) {
 
 const roomNames = {
     store: (id) => `store:${String(id)}`,
+    // kitchen staff of a store: only "something changed" signals (store_event), never the store's order events
+    storeTeam: (id) => `store-team:${String(id)}`,
     user: (id) => `user:${String(id)}`,
     delivery: (id) => `delivery:${String(id)}`,
     franchise: (id) => `franchise:${String(id)}`,
@@ -142,6 +144,11 @@ export const initSocket = async (server) => {
             const scopeRole = String(role).replace(/-/g, '_').toUpperCase();
             if (scopeRole === 'STORE_MANAGER' && socket.user.storeId) {
                 socket.join(roomNames.store(socket.user.storeId));
+            }
+            // Kitchen staff see only the orders they hold a station on, so they never get the store's order events. Their
+            // room gets id-free "something changed" signals and each screen re-reads its own (scoped) data from the API.
+            if (scopeRole === 'KITCHEN_STAFF' && socket.user.storeId) {
+                socket.join(roomNames.storeTeam(socket.user.storeId));
             }
             if (scopeRole === 'FRANCHISE_ADMIN' && socket.user.franchiseId) {
                 socket.join(roomNames.franchise(socket.user.franchiseId));
@@ -450,3 +457,16 @@ export const getIO = () => {
 };
 
 export const rooms = roomNames;
+
+/**
+ * A small "something changed" signal to a store's panel (store manager and kitchen staff sockets), so the open screens
+ * refresh at once. Ids and a type only: never personal details. type: complaint | task | attendance | leave | payout | issue
+ */
+export function emitStoreEvent(storeId, type, extra = {}) {
+    try {
+        if (!io || !storeId) return;
+        io.to([roomNames.store(storeId), roomNames.storeTeam(storeId)]).emit('store_event', { type, storeId: String(storeId), at: new Date().toISOString(), ...extra });
+    } catch {
+        // a missed refresh is caught by the screens' slow poll
+    }
+}

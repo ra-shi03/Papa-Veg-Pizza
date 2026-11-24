@@ -46,7 +46,7 @@ export default function MyTasks() {
   // 2. Fetch Tasks Data
   const { data: tasks = [], isLoading: tasksLoading } = useMyTasksQuery();
   const { data: stats = {}, isLoading: statsLoading } = useMyTaskStats();
-  const { data: teamStats = {}, isLoading: teamStatsLoading } = useTeamTasksQuery();
+  const { data: teamStats = {}, isLoading: teamStatsLoading } = useTeamTasksQuery(isManager);
 
   const queryClient = useQueryClient();
 

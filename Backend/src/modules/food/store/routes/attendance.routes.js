@@ -11,7 +11,8 @@ export const storeAttendanceRouter = express.Router();
 
 const readers = [authMiddleware, requireRoles('STORE_MANAGER', 'KITCHEN_STAFF', 'ADMIN')];
 const manager = [authMiddleware, requireRoles('STORE_MANAGER')];
-const kitchen = [authMiddleware, requireRoles('KITCHEN_STAFF')];
+const markers = [authMiddleware, requireRoles('STORE_MANAGER', 'FRANCHISE_ADMIN')];   // the franchise admin steps in when the manager is away
+const team = [authMiddleware, requireRoles('STORE_MANAGER', 'KITCHEN_STAFF')];       // everyone who clocks in
 
 // shifts: everyone in the store reads (kitchen staff only the shift they are on), the store manager writes
 storeAttendanceRouter.get('/shifts', ...readers, c.listShifts);
@@ -22,19 +23,27 @@ storeAttendanceRouter.delete('/shifts/:id', ...manager, c.deleteShift);
 storeAttendanceRouter.post('/shifts/:id/assign', ...manager, c.assignStaff);
 
 // leave requests: kitchen staff ask, the store manager accepts or rejects (with a reason)
-storeAttendanceRouter.post('/leave-requests', ...kitchen, c.requestLeave);
-storeAttendanceRouter.get('/leave-requests/mine', ...kitchen, c.myLeaveRequests);
-storeAttendanceRouter.patch('/leave-requests/:id/cancel', ...kitchen, c.cancelLeaveRequest);
-storeAttendanceRouter.get('/leave-requests', ...manager, c.listLeaveRequests);
-storeAttendanceRouter.patch('/leave-requests/:id/approve', ...manager, c.approveLeaveRequest);
-storeAttendanceRouter.patch('/leave-requests/:id/reject', ...manager, c.rejectLeaveRequest);
+// (the store manager asks the franchise admin; kitchen staff ask the store manager, or the franchise admin when the manager is away)
+storeAttendanceRouter.post('/leave-requests', ...team, c.requestLeave);
+storeAttendanceRouter.get('/leave-requests/mine', ...team, c.myLeaveRequests);
+storeAttendanceRouter.patch('/leave-requests/:id/cancel', ...team, c.cancelLeaveRequest);
+storeAttendanceRouter.get('/leave-requests', ...markers, c.listLeaveRequests);
+storeAttendanceRouter.patch('/leave-requests/:id/approve', ...markers, c.approveLeaveRequest);
+storeAttendanceRouter.patch('/leave-requests/:id/reject', ...markers, c.rejectLeaveRequest);
+
+// staff performance: worked out from finished kitchen orders, attendance, complaints and ratings
+storeAttendanceRouter.get('/performance', authMiddleware, requireRoles('STORE_MANAGER', 'ADMIN'), c.listPerformance);
+storeAttendanceRouter.get('/performance/:id', authMiddleware, requireRoles('STORE_MANAGER', 'ADMIN'), c.staffPerformance);
 
 // attendance: the fixed paths come before /:id
-storeAttendanceRouter.get('/attendance/today', ...kitchen, c.todayStatus);
-storeAttendanceRouter.get('/attendance/me', ...kitchen, c.myHistory);
-storeAttendanceRouter.post('/attendance/clock-in', ...kitchen, c.clockIn);
-storeAttendanceRouter.post('/attendance/clock-out', ...kitchen, c.clockOut);
+storeAttendanceRouter.get('/attendance/today', ...team, c.todayStatus);
+storeAttendanceRouter.get('/attendance/me', ...team, c.myHistory);
+storeAttendanceRouter.post('/attendance/clock-in', ...team, c.clockIn);
+storeAttendanceRouter.post('/attendance/clock-out', ...team, c.clockOut);
+storeAttendanceRouter.get('/attendance/people', ...markers, c.attendancePeople);
 storeAttendanceRouter.get('/attendance', ...readers, c.listAttendance);
 storeAttendanceRouter.get('/attendance/:id', ...readers, c.getAttendance);
-// leave comes only from approved leave requests; the manager can cancel a leave day, never write check ins
-storeAttendanceRouter.delete('/attendance/:id', ...manager, c.deleteAttendance);
+// marks made by the manager / franchise admin (leave, absent, present on behalf); a clock-in is always the person's own
+storeAttendanceRouter.post('/attendance', ...markers, c.markAttendance);
+storeAttendanceRouter.post('/attendance/leave', ...markers, c.markLeave);
+storeAttendanceRouter.delete('/attendance/:id', ...markers, c.deleteAttendance);

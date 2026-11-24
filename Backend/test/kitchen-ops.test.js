@@ -694,3 +694,38 @@ describe('combos in the kitchen', () => {
         assert.ok(comboRow && breadRow);
     });
 });
+
+describe('Avg Prep Time cards and the baking issue photo', () => {
+    const items = () => mongoose.connection.collection('food_kitchen_items');
+    test('the average is real: start to end of assembly over the last 24 h; staff see their own pizzas; none yet is null', async () => {
+        const o = await kitchenOrder();
+        const [p] = await itemsOf(o);
+        assert.equal((await put(chef, '/pizza-station/start', { orderItemId: p._id })).status, 200);
+        assert.equal((await put(chef, '/pizza-station/complete', { orderItemId: p._id })).status, 200);
+        // every finished pizza of the store took 10 minutes, the newest one 16
+        await items().updateMany({ storeId: new mongoose.Types.ObjectId(A.storeId), assemblyCompletedAt: { $ne: null } },
+            [{ $set: { prepStartedAt: { $subtract: ['$assemblyCompletedAt', 10 * 60000] } } }]);
+        const done = await items().countDocuments({ storeId: new mongoose.Types.ObjectId(A.storeId), assemblyCompletedAt: { $ne: null } });
+        const last = await items().findOne({ _id: new mongoose.Types.ObjectId(p._id) });
+        await items().updateOne({ _id: last._id }, { $set: { prepStartedAt: new Date(last.assemblyCompletedAt.getTime() - 16 * 60000) } });
+        const mgr = (await get({ token: A.managerToken }, '/prep-times')).body.data;
+        assert.equal(mgr.pizzas, done);
+        assert.equal(mgr.avgPrepMinutes, Math.round(((done - 1) * 10 + 16) / done * 10) / 10);
+        const own = (await get(chef, '/prep-times')).body.data;
+        assert.ok(own.pizzas >= 1 && own.pizzas <= done, 'the chef: only their own pizzas');
+        const none = (await get(bStaff, '/prep-times')).body.data;
+        assert.deepEqual([none.avgPrepMinutes, none.pizzas], [null, 0], 'another store: nothing of A');
+        // older than 24 hours no longer counts
+        await items().updateMany({ storeId: new mongoose.Types.ObjectId(A.storeId) }, { $set: { assemblyCompletedAt: new Date(Date.now() - 25 * 3600000) } });
+        assert.equal((await get({ token: A.managerToken }, '/prep-times')).body.data.avgPrepMinutes, null);
+    });
+    test('a baking issue keeps the uploaded photo link', async () => {
+        const o = await kitchenOrder();
+        const it = (await itemsOf(o))[0];
+        const url = 'https://res.cloudinary.com/demo/image/upload/v1/burnt.jpg';
+        const res = await post(chef, '/kitchen-issues', { orderItemId: it._id, issueType: 'Burnt Crust', severity: 'Medium', image: url });
+        assert.equal(res.status, 201, JSON.stringify(res.body));
+        assert.equal(res.body.data.image, url);
+        assert.ok((await get(chef, '/kitchen-issues')).body.data.some((i) => i.image === url));
+    });
+});

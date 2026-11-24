@@ -29,7 +29,7 @@ export function useMyTasksQuery() {
       }
       return [];
     },
-    refetchInterval: 10000, // auto-refresh every 10 seconds for live order queue
+    refetchInterval: 60000, // safety net: new tasks arrive over the live socket
   });
 }
 
@@ -45,9 +45,10 @@ export function useMyTaskStats() {
 }
 
 // 3. Hook to fetch team tasks (store manager only)
-export function useTeamTasksQuery() {
+export function useTeamTasksQuery(enabled = true) {
   return useQuery({
     queryKey: [QUERY_KEYS.teamTasks],
+    enabled,   // store-wide stats are the manager's; kitchen staff would get a 403
     queryFn: async () => {
       const res = await myTasksService.getTeamTasks();
       return res.success ? res.data : {};
@@ -75,7 +76,7 @@ export function useNotifications() {
       }
       return [];
     },
-    refetchInterval: 15000,
+    refetchInterval: 60000,
   });
 }
 

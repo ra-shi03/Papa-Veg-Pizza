@@ -212,7 +212,9 @@ export const toOpsOrder = (order) => {
       notes: o.note || '',
       googleMapsLink: Number.isFinite(lat) && Number.isFinite(lng) ? `https://maps.google.com/?q=${lat},${lng}` : '',
     },
-    items: (o.items || []).map((i) => ({
+    items: (o.items || []).map((i, lineIndex) => ({
+      lineIndex,   // its place on the order (Reorder names the lines by it)
+      isReward: String(i.itemId || '').startsWith('reward:'),
       productId: i.itemId,
       name: i.name,
       image: i.image || '',

@@ -118,7 +118,9 @@ function buildPasswordLoginPayload(identifier, password) {
   }
 
   const mobile = value.replace(/\D/g, "");
-  if (EMAIL_REGEX.test(value)) {
+  // Anything with an "@" is an email (any domain ending: .pizza, .store, .ai ...); the server checks it. Only a plain
+  // number is a mobile. (A fixed list of endings used to turn such emails into their digits and the login failed.)
+  if (value.includes("@") || EMAIL_REGEX.test(value)) {
     return { payload: { email: value, password: passwordStr } };
   }
   if (mobile.length >= 8) {

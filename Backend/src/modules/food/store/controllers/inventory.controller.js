@@ -54,6 +54,7 @@ export const deleteWaste = wrap((req) => ops.deleteWaste(u(req), req.params.id, 
 export const listShortages = wrap((req) => ops.listShortages(u(req), q(req)));
 export const shortagesDashboard = wrap((req) => ops.shortagesDashboard(u(req), q(req)));
 export const shortageDetails = wrap((req) => ops.shortageDetails(u(req), req.params.id, q(req)));
+export const requestRestock = wrap((req) => ops.requestRestock(u(req), req.body, q(req)), 201);
 export const reportShortage = wrap((req) => ops.reportShortage(u(req), req.body, q(req)), 201);
 export const resolveShortage = wrap((req) => ops.resolveShortage(u(req), req.params.id, req.body, q(req)));
 export const notifyAdmin = wrap((req) => ops.notifyAdminOfShortage(u(req), req.body, q(req)));

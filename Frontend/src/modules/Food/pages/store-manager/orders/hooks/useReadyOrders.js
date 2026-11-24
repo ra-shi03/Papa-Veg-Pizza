@@ -46,9 +46,10 @@ export function useReadyOrders(filters = {}) {
 }
 
 // Hook to query available riders
-export function useAvailableRiders(searchQuery = "") {
+export function useAvailableRiders(searchQuery = "", enabled = true) {
   return useQuery({
     queryKey: ["availableRiders", searchQuery],
+    enabled,   // only while the rider picker is open (the store manager's); kitchen staff would get a 403
     queryFn: async () => {
       let list;
       try {

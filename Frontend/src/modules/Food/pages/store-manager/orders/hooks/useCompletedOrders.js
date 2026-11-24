@@ -59,19 +59,22 @@ export function useReorderOrder() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    // The same items again for the same customer: the server places it at today's prices, cash on delivery, and tells
+    // the customer. Only which lines and how many are sent; customer, address and what was picked come from the old order.
     mutationFn: async ({ previousOrderId, items }) => {
-      // Placing an order on a customer's behalf needs pricing, payment and the customer's consent: not built yet.
-
-      throw new Error("Reordering from the store is not available yet. Ask the customer to place the order again in the app.");
-      
+      try {
+        return await storeOrdersApi.reorder(previousOrderId, items.map((it) => ({ index: it.lineIndex, quantity: it.quantity })));
+      } catch (err) {
+        throw new Error(err?.response?.data?.message || err?.response?.data?.error || err?.message || "Could not place the order");
+      }
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["incomingOrders"] });
       queryClient.invalidateQueries({ queryKey: ["completedOrders"] });
-      toast.success("Reorder created successfully!");
+      toast.success(res?.message || "Order placed for the customer");
     },
     onError: (err) => {
-      toast.error("Failed to create reorder: " + err.message);
+      toast.error(err.message);
     }
   });
 }

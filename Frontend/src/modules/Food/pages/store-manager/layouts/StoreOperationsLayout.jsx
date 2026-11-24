@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react"
 import { Outlet } from "react-router-dom"
 import AttendanceBanner from "./AttendanceBanner"
+import { useStoreLiveRefresh } from "../api/storeOrdersApi"
 import Sidebar from "./Sidebar"
 import Navbar from "./Navbar"
 import { API_BASE_URL } from "@food/api/config"
 
 export default function StoreOperationsLayout() {
+  useStoreLiveRefresh()   // orders, kitchen, tasks, complaints and attendance update the moment they change
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [role, setRole] = useState(() => {
     return localStorage.getItem("store_role") || "store_manager"

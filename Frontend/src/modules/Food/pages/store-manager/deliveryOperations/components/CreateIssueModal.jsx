@@ -2,12 +2,36 @@ import { toast } from "sonner";
 import React, { useState } from "react";
 import { Modal, Input, Select, Upload, message } from "antd";
 import { Loader2, Plus, Camera } from "lucide-react";
+import { adminClient } from "@/services/api/axios";
 import useRiders from "../hooks/useRiders";
 import useCreateIssue from "../hooks/useCreateIssue";
 
 const { TextArea } = Input;
 
 export default function CreateIssueModal({ visible, onClose }) {
+  const [uploading, setUploading] = useState(false);
+  // the photo is uploaded first; the issue keeps only the link the server returns
+  const onPickPhoto = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Choose an image file"); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error("The photo must be under 5 MB"); return; }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("folder", "delivery-issues");
+      const res = await adminClient.post("/uploads/image", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      const url = res?.data?.data?.url || res?.data?.url || "";
+      if (!url) throw new Error("Upload failed");
+      setForm((prev) => ({ ...prev, image: url }));
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.response?.data?.error || "Could not upload the photo");
+    } finally {
+      setUploading(false);
+    }
+  };
   const [form, setForm] = useState({
     orderId: "",
     riderId: "",
@@ -192,19 +216,19 @@ export default function CreateIssueModal({ visible, onClose }) {
         {/* Row 5: Attachment */}
         <div className="space-y-1.5 text-left">
           <span className="text-slate-400 dark:text-zinc-500 font-extrabold uppercase text-[9px] block">Attach Image Evidence</span>
-          <div
-            onClick={() => toast.info("Attaching photos is not available yet.")}
+          <label
             className={`border border-dashed p-4 rounded-2xl flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all duration-300 ${
               form.image
                 ? "border-emerald-500 bg-emerald-500/5 text-emerald-600"
                 : "border-slate-200 dark:border-zinc-855 hover:border-[var(--primary)] bg-slate-50/50 dark:bg-zinc-950/20 text-slate-400"
             }`}
           >
-            <Camera size={20} />
+            <input type="file" accept="image/*" capture="environment" className="hidden" disabled={uploading} onChange={onPickPhoto} />
+            {form.image ? <img src={form.image} alt="Evidence" className="h-20 rounded-lg object-cover" /> : <Camera size={20} />}
             <span className="text-[10px] font-bold">
-              {form.image ? "Image attached" : "Photo evidence (not available yet)"}
+              {uploading ? "Uploading..." : form.image ? "Image attached (tap to change)" : "Tap to take or choose a photo (optional)"}
             </span>
-          </div>
+          </label>
         </div>
 
       </div>

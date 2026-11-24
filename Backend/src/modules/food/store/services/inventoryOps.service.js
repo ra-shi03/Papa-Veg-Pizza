@@ -674,4 +674,30 @@ export async function notifyAdminOfShortage(user, body = {}, q = {}) {
   return { message: 'Admin notified' };
 }
 
+/**
+ * POST /food/store/inventory/reorder { ingredientId, quantity, note } : the dashboard's low-stock "Reorder". The store
+ * manager asks the franchise for more of an ingredient: it is recorded as an ingredient shortage (so it shows on the
+ * Ingredient Shortages screen with its timeline) and the franchise admins are told (in-app + push). No stock moves until
+ * it arrives and is booked in with "update stock".
+ */
+export async function requestRestock(user, body = {}, q = {}) {
+  const ctx = await inventoryContext(user, q);
+  mustManager(ctx);
+  if (!isId(body.ingredientId)) throw new ValidationError('Choose an ingredient');
+  const ing = await StoreIngredient.findOne({ _id: toId(body.ingredientId), storeId: ctx.storeId }).select('ingredientName unit currentStock reorderLevel').lean();
+  if (!ing) throw new NotFoundError('Ingredient not found');
+  const qty = round2(body.quantity);
+  if (!Number.isFinite(qty) || qty <= 0 || qty > 1e6) throw new ValidationError('Enter the quantity to reorder');
+  const note = str(body.note, 300);
+  const reported = await reportShortage(user, {
+    ingredientId: String(ing._id), missingQuantity: qty, urgency: ing.currentStock <= 0 ? 'critical' : 'high',
+    remarks: `Restock requested from the dashboard${note ? `: ${note}` : ''}`,
+  }, q);
+  await notifyAdminOfShortage(user, {
+    shortageId: reported.data._id, type: 'restock', priority: ing.currentStock <= 0 ? 'urgent' : 'high',
+    message: `Please send ${qty} ${ing.unit} of ${ing.ingredientName} (in stock: ${round2(ing.currentStock)} ${ing.unit}, reorder level ${round2(ing.reorderLevel)}).${note ? ` ${note}` : ''}`,
+  }, q);
+  return { message: `Restock request for ${ing.ingredientName} sent to the franchise.`, data: { shortageId: reported.data._id, ingredient: ing.ingredientName, quantity: qty, unit: ing.unit } };
+}
+
 export { stockStatus };

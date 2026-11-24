@@ -9,7 +9,7 @@ export default function AssignRiderModal({ visible, onClose, order }) {
   const [searchRider, setSearchRider] = useState("");
   const [notes, setNotes] = useState("");
 
-  const { data: riders = [], isLoading: loadingRiders } = useAvailableRiders(searchRider);
+  const { data: riders = [], isLoading: loadingRiders } = useAvailableRiders(searchRider, !!visible);
   const assignRiderMutation = useAssignRider();
 
   // Reset states when visible

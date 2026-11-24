@@ -1,4 +1,5 @@
 import express from 'express';
+import { requireOnDuty } from '../../../../middleware/requireOnDuty.js';
 import { authMiddleware } from '../../../../core/auth/auth.middleware.js';
 import { requireRoles } from '../../../../core/roles/role.middleware.js';
 import {
@@ -15,6 +16,7 @@ const router = express.Router();
 
 router.use(authMiddleware);
 router.use(requireRoles('STORE_MANAGER', 'STORE-MANAGER'));
+router.use(requireOnDuty);   // attendance first, then work (reads stay open)
 
 router.post('/',               createKitchenStaff);    // Add staff
 router.get('/',                getKitchenStaff);       // List staff

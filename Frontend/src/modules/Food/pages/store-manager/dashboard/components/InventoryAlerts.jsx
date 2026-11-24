@@ -26,18 +26,16 @@ export default function InventoryAlerts({ storeId, refreshKey }) {
   // Reorder Mutation (POST /inventory/reorder)
   const reorderMutation = useMutation({
     mutationFn: async (payload) => {
-      const response = await apiClient.post("/inventory/reorder", payload)
+      const response = await apiClient.post("/food/store/inventory/reorder", payload)
       return response.data
     },
     onSuccess: () => {
-      toast.success(`Purchase order generated for ${selectedItem?.ingredient}!`)
+      toast.success(`Restock request for ${selectedItem?.ingredient} sent to the franchise`)
       queryClient.invalidateQueries({ queryKey: ["inventory-alerts-widget"] })
       setShowReorderModal(false)
     },
-    onError: () => {
-      // Offline fallback success simulation
-      toast.success(`Restock request sent for ${selectedItem?.ingredient} (${reorderQty} ${selectedItem?.unit})!`)
-      setShowReorderModal(false)
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || err?.response?.data?.error || "Could not send the restock request")
     }
   })
 
@@ -54,10 +52,8 @@ export default function InventoryAlerts({ storeId, refreshKey }) {
       return
     }
     reorderMutation.mutate({
-      storeId,
-      ingredient: selectedItem.ingredient,
-      quantity: reorderQty,
-      supplier: selectedItem.supplier
+      ingredientId: selectedItem.ingredientId,
+      quantity: reorderQty
     })
   }
 

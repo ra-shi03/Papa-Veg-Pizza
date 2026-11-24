@@ -15,6 +15,7 @@ router.get('/team', c.listTeam);                            // kitchen staff of 
 router.get('/:orderId', c.getOrder);
 router.patch('/:orderId/accept', c.acceptOrder);            // manager (no supervisor)
 router.patch('/:orderId/reject', c.rejectOrder);            // manager
+router.post('/:orderId/reorder', c.reorderOrder);          // manager: the same items again for that customer (today's prices, COD)
 router.patch('/:orderId/reopen', c.reopenOrder);            // manager, within 5 minutes of the store's own cancellation
 router.patch('/:orderId/assign-staff', c.assignStaff);      // manager only; the person must be active and clocked in
 router.patch('/:orderId/stage', c.updateStage);             // station holders / manager; 'ready' only the packer or the manager

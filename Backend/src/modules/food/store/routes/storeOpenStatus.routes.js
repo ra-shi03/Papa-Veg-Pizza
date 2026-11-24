@@ -1,4 +1,5 @@
 import express from 'express';
+import { requireOnDuty } from '../../../../middleware/requireOnDuty.js';
 import { authMiddleware } from '../../../../core/auth/auth.middleware.js';
 import { requireRoles } from '../../../../core/roles/role.middleware.js';
 import { sendResponse } from '../../../../utils/response.js';
@@ -7,7 +8,7 @@ import * as service from '../services/storeOpenStatus.service.js';
 
 // /v1/food/store/open-status : the store manager's Open / Closed switch for their own store.
 const router = express.Router();
-router.use(authMiddleware, requireRoles('STORE_MANAGER'));
+router.use(authMiddleware, requireRoles('STORE_MANAGER'), requireOnDuty);   // attendance first, then work
 
 router.get('/', async (req, res, next) => {
   try {

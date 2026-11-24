@@ -98,6 +98,14 @@ export default function IssueInfoCard({ issue = {} }) {
           </p>
         </div>
 
+        {/* Photo evidence attached when the issue was logged */}
+        {issue.image && (
+          <a href={issue.image} target="_blank" rel="noreferrer" className="block">
+            <span className="text-[8px] uppercase tracking-wider text-slate-400 dark:text-zinc-555 block font-black mb-1">Photo evidence</span>
+            <img src={issue.image} alt="Issue evidence" className="h-28 rounded-xl object-cover border border-slate-150/20 dark:border-zinc-800/80" />
+          </a>
+        )}
+
         {/* Resolution notes if resolved */}
         {issue.status === "resolved" && issue.resolution && (
           <div className="space-y-1 border-t border-slate-200/40 dark:border-zinc-800/40 pt-3 select-none">

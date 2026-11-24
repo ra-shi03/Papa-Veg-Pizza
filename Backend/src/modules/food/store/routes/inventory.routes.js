@@ -1,4 +1,5 @@
 import express from 'express';
+import { requireOnDuty } from '../../../../middleware/requireOnDuty.js';
 import { authMiddleware } from '../../../../core/auth/auth.middleware.js';
 import { requireRoles } from '../../../../core/roles/role.middleware.js';
 import { safeUpload } from '../../../../middleware/safeUpload.js';
@@ -11,6 +12,7 @@ const router = express.Router();
 
 router.use(authMiddleware);
 router.use(requireRoles('STORE_MANAGER', 'KITCHEN_STAFF', 'FRANCHISE_ADMIN'));
+router.use(requireOnDuty);   // attendance first, then work (reads stay open)
 
 // Stock levels (static paths first, then /:id)
 router.get('/', c.listIngredients);
@@ -51,6 +53,7 @@ router.get('/ingredient-shortages/dashboard', c.shortagesDashboard);
 router.get('/ingredient-shortages/:id', c.shortageDetails);
 router.patch('/ingredient-shortages/:id/resolve', c.resolveShortage);
 router.post('/notifications/admin', c.notifyAdmin);
+router.post('/reorder', c.requestRestock);   // dashboard low-stock Reorder: a restock request to the franchise
 
 // Recipes
 router.get('/recipes', c.listRecipes);

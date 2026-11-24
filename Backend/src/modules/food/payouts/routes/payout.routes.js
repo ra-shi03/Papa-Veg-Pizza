@@ -1,4 +1,5 @@
 import express from 'express';
+import { requireOnDuty } from '../../../../middleware/requireOnDuty.js';
 import { authMiddleware } from '../../../../core/auth/auth.middleware.js';
 import { requireRoles } from '../../../../core/roles/role.middleware.js';
 import * as c from '../controllers/payout.controller.js';
@@ -15,7 +16,7 @@ riderPayoutsRouter.post('/:id/not-received', c.notReceived);
 
 /** /v1/food/store/payouts : store manager. */
 export const storePayoutsRouter = express.Router();
-storePayoutsRouter.use(authMiddleware, requireRoles('STORE_MANAGER'));
+storePayoutsRouter.use(authMiddleware, requireRoles('STORE_MANAGER'), requireOnDuty);
 storePayoutsRouter.get('/', c.storeDesk);
 storePayoutsRouter.get('/staff', c.storeStaff);
 storePayoutsRouter.post('/request', c.storeRequest);

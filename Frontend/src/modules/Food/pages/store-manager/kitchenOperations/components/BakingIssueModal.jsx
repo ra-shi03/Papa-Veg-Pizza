@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Modal, Select, Radio, Checkbox, Input, Upload, Button, message } from "antd";
 import { AlertOctagon, UploadCloud, AlertCircle, FileText } from "lucide-react";
+import { adminClient } from "@/services/api/axios";
 
 const { TextArea } = Input;
 
@@ -10,6 +11,8 @@ export default function BakingIssueModal({ visible, onClose, item, onSubmit }) {
   const [remarks, setRemarks] = useState("");
   const [notifyManager, setNotifyManager] = useState(false);
   const [fileList, setFileList] = useState([]);
+  const [photoUrl, setPhotoUrl] = useState(""); // the uploaded photo's link (the issue keeps only this)
+  const [uploading, setUploading] = useState(false);
 
   // Reset fields when item changes
   useEffect(() => {
@@ -19,13 +22,41 @@ export default function BakingIssueModal({ visible, onClose, item, onSubmit }) {
       setRemarks("");
       setNotifyManager(false);
       setFileList([]);
+      setPhotoUrl("");
     }
   }, [item, visible]);
 
   if (!item) return null;
 
+  // The photo is uploaded as soon as it is picked; removing it clears the link
+  const handlePhoto = async (list) => {
+    setFileList(list);
+    setPhotoUrl("");
+    const picked = list[list.length - 1];
+    const file = picked?.originFileObj;
+    if (!file) return;
+    if (!String(file.type || "").startsWith("image/")) { message.error("Choose an image file"); setFileList([]); return; }
+    if (file.size > 5 * 1024 * 1024) { message.error("The photo must be under 5 MB"); setFileList([]); return; }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await adminClient.post("/uploads/image", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      const url = res?.data?.data?.url || res?.data?.url || "";
+      if (!url) throw new Error("Upload failed");
+      setPhotoUrl(url);
+      setFileList([{ ...picked, status: "done", url }]);
+    } catch (err) {
+      message.error(err?.response?.data?.message || err?.response?.data?.error || "Could not upload the photo");
+      setFileList([]);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = () => {
     if (!issueType || !severity) return;
+    if (uploading) { message.warning("Wait for the photo to finish uploading"); return; }
     
     // Pass to parent handler
     onSubmit({
@@ -33,7 +64,7 @@ export default function BakingIssueModal({ visible, onClose, item, onSubmit }) {
       issueType,
       severity,
       remarks,
-      image: "", // photo upload is not wired yet: never send a made-up file name
+      image: photoUrl, // the uploaded link, or nothing (never a made-up file name)
       notifyManager,
     });
     
@@ -158,7 +189,7 @@ export default function BakingIssueModal({ visible, onClose, item, onSubmit }) {
             <Upload
               beforeUpload={() => false}
               fileList={fileList}
-              onChange={({ fileList }) => setFileList(fileList)}
+              onChange={({ fileList }) => handlePhoto(fileList)}
               maxCount={1}
               listType="picture"
             >

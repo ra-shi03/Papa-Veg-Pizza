@@ -38,7 +38,7 @@ export function useComplaintDetails(complaintId) {
     },
     enabled: !!complaintId,
     // an open conversation: pick up the customer's new messages
-    refetchInterval: 8000
+    refetchInterval: 60000   // safety net: new complaints arrive over the live socket
   });
 }
 

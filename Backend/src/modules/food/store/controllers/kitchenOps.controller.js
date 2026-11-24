@@ -11,6 +11,7 @@ const wrap = (message, fn, status = 200) => async (req, res, next) => {
 };
 
 // Kitchen queue
+export const prepTimes = wrap('Average prep time', (req) => items.prepTimes(req.user));
 export const queue = wrap('Kitchen queue fetched', (req) => ops.kitchenQueue(req.user, req.query));
 export const queueOrder = wrap('Order queued', (req) => ops.queueOrder(req.user, req.params.orderId));
 export const assignChef = wrap('Chef assigned', (req) => ops.assignChef(req.user, req.params.orderId, req.body));

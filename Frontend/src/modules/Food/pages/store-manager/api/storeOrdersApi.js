@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { io } from "socket.io-client";
 import { adminClient } from "@/services/api/axios";
 
@@ -27,6 +28,9 @@ export const storeOrdersApi = {
     adminClient.patch(`${BASE}/${orderId}/pause`, payload, REAL).then(unwrap),
   delay: (orderId, payload) =>
     adminClient.patch(`${BASE}/${orderId}/delay`, payload, REAL).then(unwrap),
+  // Completed Orders -> Reorder: lines = [{ index, quantity }] of the old order; the server prices it today (COD)
+  reorder: (orderId, lines) =>
+    adminClient.post(`${BASE}/${orderId}/reorder`, { lines }, REAL).then((res) => res?.data),
   reopen: (orderId, payload) =>
     adminClient.patch(`${BASE}/${orderId}/reopen`, payload, REAL).then(unwrap),
   // Rider hand-off, escalation and refunds live in the delivery and kitchen modules
@@ -52,25 +56,65 @@ export const apiErrorMessage = (err) =>
 // dropped connection; it keeps the "live feed" indicator the screens already show.
 export const LIVE_POLL_MS = 60000;
 
-let shared = null; // one socket for every list on the page
+// ONE signed-in socket for the whole store panel (order lists, kitchen stations, delivery screens). The server puts it in
+// this store's room from the signed token, so it only ever receives this store's events.
+let shared = null;
+let users = 0;           // feeds + screen hooks holding the socket
 const listeners = new Set();
-function joinLiveFeed(onEvent, onState) {
+function acquire() {
   const token = typeof localStorage !== "undefined" ? localStorage.getItem("admin_accessToken") : null;
-  if (!token) return () => {};
+  if (!token) return null;
   if (!shared) {
     const url = import.meta.env?.VITE_SOCKET_URL || window.location.origin;
-    const socket = io(url, { auth: { token }, transports: ["websocket"], reconnectionAttempts: 10 });
+    const socket = io(url, { auth: { token }, transports: ["websocket"], reconnectionAttempts: Infinity, reconnectionDelayMax: 10000 });
     shared = { socket, connected: false };
     socket.on("connect", () => { shared.connected = true; listeners.forEach((l) => l.onState(true)); });
-    socket.on("disconnect", () => { shared.connected = false; listeners.forEach((l) => l.onState(false)); });
+    socket.on("disconnect", () => { if (shared) shared.connected = false; listeners.forEach((l) => l.onState(false)); });
     socket.on("order_event", (event) => listeners.forEach((l) => l.onEvent(event)));
+    socket.on("store_event", (event) => listeners.forEach((l) => l.onEvent(event)));
   }
+  users += 1;
+  return shared;
+}
+function release() {
+  users = Math.max(0, users - 1);
+  if (!users && shared) { shared.socket.disconnect(); shared = null; }
+}
+function joinLiveFeed(onEvent, onState) {
+  const s = acquire();
+  if (!s) return () => {};
   const l = { onEvent, onState };
   listeners.add(l);
-  onState(shared.connected);
-  return () => {
-    listeners.delete(l);
-    if (!listeners.size && shared) { shared.socket.disconnect(); shared = null; }
+  onState(s.connected);
+  return () => { listeners.delete(l); release(); };
+}
+
+/**
+ * For screen hooks that listen to named events ("delivery:issue-created", "store:assignment-success", ...): a handle on the
+ * shared signed-in socket. on(event, fn) subscribes (a "connect" handler runs at once when already connected);
+ * disconnect() unsubscribes everything this handle added and lets the shared socket close when nobody needs it.
+ */
+export function storeSocket() {
+  const s = acquire();
+  const added = [];
+  let released = false;
+  return {
+    on(event, fn) {
+      if (!s) return this;
+      s.socket.on(event, fn);
+      added.push([event, fn]);
+      if (event === "connect" && s.connected) fn();
+      return this;
+    },
+    off(event, fn) { s?.socket.off(event, fn); return this; },
+    emit(...args) { s?.socket.emit(...args); return this; },
+    disconnect() {
+      if (released) return;
+      released = true;
+      for (const [event, fn] of added) s?.socket.off(event, fn);
+      if (s) release();
+    },
+    close() { this.disconnect(); },
   };
 }
 
@@ -91,4 +135,22 @@ export function useLiveIndicator(query) {
     setConnected(socketUp || (!query.isError && query.isFetched));
   }, [socketUp, query.isError, query.isFetched, query.dataUpdatedAt]);
   return connected;
+}
+
+/**
+ * Mounted once by the store panel layout: every order_event / store_event of this store refreshes whatever is on screen
+ * right away (only the queries in use are refetched, and a burst of events becomes one refresh). The screens' own
+ * slow polls stay as a safety net for a dropped connection.
+ */
+export function useStoreLiveRefresh() {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    let timer = null;
+    const refresh = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => queryClient.invalidateQueries({ refetchType: "active" }), 400);
+    };
+    const leave = joinLiveFeed(refresh, () => {});
+    return () => { clearTimeout(timer); leave(); };
+  }, [queryClient]);
 }

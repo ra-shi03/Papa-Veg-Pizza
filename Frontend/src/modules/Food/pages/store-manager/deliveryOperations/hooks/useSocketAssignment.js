@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import io from "socket.io-client";
+import { storeSocket } from "../../api/storeOrdersApi";
 
 export default function useSocketAssignment() {
   const queryClient = useQueryClient();
@@ -9,12 +9,7 @@ export default function useSocketAssignment() {
   const [socketInstance, setSocketInstance] = useState(null);
 
   useEffect(() => {
-    const socketUrl = import.meta.env?.VITE_SOCKET_URL || window.location.origin;
-    const socket = io(socketUrl, {
-      transports: ["websocket"],
-      autoConnect: true,
-      reconnectionAttempts: 5,
-    });
+    const socket = storeSocket();   // the store panel's one signed-in socket
 
     setSocketInstance(socket);
 

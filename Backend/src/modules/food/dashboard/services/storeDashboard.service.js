@@ -332,7 +332,7 @@ export async function inventoryAlerts(user, q) {
   return {
     lowStock: alerts.sort((a, b) => order[a.severity] - order[b.severity]).map((a) => {
       const i = byId.get(String(a.ingredientId)) || {};
-      return { ingredient: a.ingredientName, availableQty: round2(a.currentStock), minQty: a.minimumStock, reorderLevel: i.reorderLevel || 0, unit: i.unit || '', supplier: i.supplierName || '', severity: SEVERITY_LABEL[a.severity] || 'Normal' };
+      return { ingredientId: String(a.ingredientId), ingredient: a.ingredientName, availableQty: round2(a.currentStock), minQty: a.minimumStock, reorderLevel: i.reorderLevel || 0, unit: i.unit || '', supplier: i.supplierName || '', severity: SEVERITY_LABEL[a.severity] || 'Normal' };
     }),
   };
 }

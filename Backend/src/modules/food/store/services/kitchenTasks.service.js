@@ -7,6 +7,8 @@ import { StoreManager } from '../../franchise/models/storeManager.model.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 import { config } from '../../../../config/env.js';
 import { requirePresent } from './attendancePresence.js';
+import { notifyOwnersSafely } from '../../../../core/notifications/firebase.service.js';
+import { emitStoreEvent } from '../../../../config/socket.js';
 
 // My Tasks: the work items behind an order in the kitchen. A task (kind 'staff', one per slot) is created when
 // the store manager assigns a station. Everything is scoped by the storeId and userId in the token.
@@ -94,12 +96,38 @@ const requireManagerRole = (user) => {
 // Notifications
 // ---------------------------------------------------------------------------------------------
 
-export const notifyUsers = async ({ userIds, storeId, taskId = null, type, title, message = '' }) => {
+// Where tapping a notification opens, by kind (the store panel's own routes)
+const LINK_BY_TYPE = {
+  task_assigned: '/store-operations/tasks', task_delayed: '/store-operations/tasks', reassign_requested: '/store-operations/tasks',
+  task_reassigned: '/store-operations/tasks', leave_requested: '/store-operations/staff/leave-requests',
+  leave_approved: '/store-operations/attendance', leave_rejected: '/store-operations/attendance', attendance: '/store-operations/attendance',
+};
+
+/**
+ * Tells people about something that concerns them: an in-app record (My Tasks) AND a push notification to their phone or
+ * browser. People who switched push off in Profile > Notifications still get the in-app record, not the push. A failing
+ * push never breaks the action that caused it.
+ */
+export const notifyUsers = async ({ userIds, storeId, taskId = null, type, title, message = '', push = true }) => {
   const unique = [...new Set((userIds || []).filter(Boolean).map(String))];
   if (!unique.length) return;
   await TaskNotification.insertMany(
     unique.map((userId) => ({ userId, storeId: toId(storeId), taskId, type, title, message })),
   );
+  emitStoreEvent(storeId, type.startsWith('leave') ? 'leave' : type === 'attendance' ? 'attendance' : 'task');   // open screens refresh at once
+  if (!push) return;
+  try {
+    const optedOut = new Set(
+      (await StoreManager.find({ userId: { $in: unique.map(toId) }, 'notificationPrefs.pushNotifications': false }).select('userId').lean()).map((m) => String(m.userId)),
+    );
+    const link = LINK_BY_TYPE[type] || '/store-operations/tasks';
+    await notifyOwnersSafely(
+      unique.filter((id) => !optedOut.has(id)).map((ownerId) => ({ ownerType: 'KITCHEN_STAFF', ownerId })),
+      { title, body: message || title, data: { type: `store_${type}`, taskId: taskId ? String(taskId) : '', storeId: String(storeId), link, targetUrl: link } },
+    );
+  } catch {
+    // the in-app record is saved; the push is best effort
+  }
 };
 
 // The people who must hear about delays and handoff requests: the store's managers

@@ -1,4 +1,5 @@
 import express from 'express';
+import { requireOnDuty } from '../../../../middleware/requireOnDuty.js';
 import { authMiddleware } from '../../../../core/auth/auth.middleware.js';
 import { requireRoles } from '../../../../core/roles/role.middleware.js';
 import * as c from '../controllers/storeCrm.controller.js';
@@ -7,7 +8,7 @@ import * as riderTickets from '../../delivery/services/riderTickets.service.js';
 // Store manager panel: customers, complaints, reviews. Store manager only; kitchen staff and everyone else are refused. Each router is mounted on its own path
 // (/v1/food/store/customers, /complaints, /reviews) so these checks never run for other /food/store routes.
 // Customers are also readable by a franchise admin (own franchise's stores) and the super admin, via ?storeId=.
-const guard = [authMiddleware, requireRoles('STORE_MANAGER')];
+const guard = [authMiddleware, requireRoles('STORE_MANAGER'), requireOnDuty];   // attendance first, then work (reads stay open)
 
 export const customersRouter = express.Router();
 customersRouter.use(authMiddleware, requireRoles('STORE_MANAGER', 'ADMIN'));

@@ -1,5 +1,6 @@
 import { sendResponse } from '../../../../utils/response.js';
 import * as ops from '../services/storeOrders.service.js';
+import { reorderForCustomer } from '../services/storeReorder.service.js';
 
 const wrap = (fn) => async (req, res, next) => {
   try {
@@ -15,6 +16,15 @@ export const getOrder = wrap((req) => ops.getStoreOrder(req.user, req.params.ord
 export const listTeam = wrap((req) => ops.listTeam(req.user, req.query));
 export const acceptOrder = wrap((req) => ops.acceptOrder(req.user, req.params.orderId, req.body));
 export const rejectOrder = wrap((req) => ops.rejectOrder(req.user, req.params.orderId, req.body));
+// Completed Orders -> Reorder: the same items again for the same customer, today's prices, cash on delivery (manager only)
+export const reorderOrder = async (req, res, next) => {
+  try {
+    const { message, order } = await reorderForCustomer(req.user, req.params.orderId, req.body);
+    return sendResponse(res, 201, message, order);
+  } catch (err) {
+    next(err);
+  }
+};
 export const reopenOrder = wrap((req) => ops.reopenOrder(req.user, req.params.orderId, req.body));
 export const assignStaff = wrap((req) => ops.assignStaff(req.user, req.params.orderId, req.body));
 export const updateStage = wrap((req) => ops.updateKitchenStage(req.user, req.params.orderId, req.body));

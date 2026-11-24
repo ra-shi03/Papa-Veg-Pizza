@@ -45,7 +45,9 @@ async function makeSisterStore() {
         .field('name', 'Manager A2').field('email', email).field('phone', `55${String(fx.ts).slice(-8)}`)
         .field('employeeCode', `EMA2${fx.ts}`).field('storeId', storeId).field('password', PASSWORD).field('status', 'Active').field('salary', '1000');
     assert.equal(mc.status, 201, JSON.stringify(mc.body));
-    return { storeId, manager: { id: mc.body.data.userId, token: await login(email) } };
+    const token = await login(email);
+    assert.equal((await fx.call('POST', '/v1/store/attendance/clock-in', token)).status, 201, 'the new manager clocks in before working');
+    return { storeId, manager: { id: mc.body.data.userId, token } };
 }
 
 const ingredients = async (who) => (await get(who, '?limit=100')).body.data;

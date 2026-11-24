@@ -3,25 +3,27 @@ import { StoreManager } from '../modules/food/franchise/models/storeManager.mode
 import { dateKeyOf } from '../modules/food/store/services/attendanceTime.js';
 import { isId, toId } from '../modules/food/dashboard/services/dashboardAccess.js';
 
-const KITCHEN_ROLES = new Set(['KITCHEN_STAFF']);
+// Everyone who works in the store: kitchen staff and the store manager. (The franchise admin and super admin are not gated.)
+const GATED_ROLES = new Set(['KITCHEN_STAFF', 'STORE_MANAGER']);
 const ON_DUTY = ['present', 'half_day'];
 const OPEN_SESSION_HOURS = 20;
 
 /**
- * Kitchen staff must have marked attendance (clocked in, or been marked present by the store
- * manager) and not yet clocked out before they do any kitchen work. The store manager is never blocked, and reads
- * (GET) stay open so a person can still see their tasks and the clock-in screen before they start.
+ * Kitchen staff AND the store manager must have marked attendance (clocked in, or been marked present on their behalf by the
+ * franchise admin) and not yet clocked out before they do any work in the store. Reads (GET) stay open so a person can still
+ * see their screens and the clock-in button before they start. A manager who cannot clock in asks the franchise admin to
+ * mark them present.
  */
 export const requireOnDuty = (req, res, next) => {
     const role = String(req.user?.role || '').trim().replace(/-/g, '_').toUpperCase();
     // marking a notification read is not work
-    if (!KITCHEN_ROLES.has(role) || req.method === 'GET' || req.path.endsWith('/read')) return next();
+    if (!GATED_ROLES.has(role) || req.method === 'GET' || req.path.endsWith('/read')) return next();
 
     (async () => {
         const storeId = req.user?.storeId;
         if (!isId(storeId) || !isId(req.user?.userId)) return false;
         const me = await StoreManager.findOne({ userId: toId(req.user.userId), storeId: String(storeId), status: { $ne: 'DELETED' } }).select('_id').lean();
-        if (!me) return false;
+        if (!me) return true;   // not on this store's payroll: the route's own scope check answers (403 / 404)
         const now = new Date();
         const rec = await StoreAttendance.findOne({
             storeId: toId(storeId),
@@ -37,8 +39,8 @@ export const requireOnDuty = (req, res, next) => {
             return res.status(403).json({
                 success: false,
                 code: 'ATTENDANCE_REQUIRED',
-                error: 'Mark your attendance (Clock In) before you start work.',
-                message: 'Mark your attendance (Clock In) before you start work.',
+                error: 'Mark your attendance first (Clock In), then start work.',
+                message: 'Mark your attendance first (Clock In), then start work.',
             });
         })
         .catch(next);

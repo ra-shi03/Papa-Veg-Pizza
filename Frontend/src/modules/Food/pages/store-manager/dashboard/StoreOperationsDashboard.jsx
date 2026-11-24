@@ -14,7 +14,6 @@ import StaffOverview from "./components/StaffOverview"
 import TopSellingProducts from "./components/TopSellingProducts"
 import CustomerComplaints from "./components/CustomerComplaints"
 import ActivityTimeline from "./components/ActivityTimeline"
-import NotificationsDrawer from "./components/NotificationsDrawer"
 
 export default function StoreOperationsDashboard() {
   // The store dashboard is the store manager's (kitchen staff land on My Tasks; the kitchen supervisor role is no longer used)
@@ -24,10 +23,6 @@ export default function StoreOperationsDashboard() {
   const [selectedStoreId] = useState(() => localStorage.getItem("store_active_id") || undefined)
   const [refreshKey, setRefreshKey] = useState(0)
   
-  // Real-Time Notification State
-  const [showNotifDrawer, setShowNotifDrawer] = useState(false)
-  const [notifications, setNotifications] = useState([])
-
   // Real-time: every order_event of this store (pushed by the server over the socket) refreshes the widgets.
   // A burst of events (one order moving through several steps) is folded into one refresh.
   const refreshTimer = React.useRef(null)
@@ -103,14 +98,6 @@ export default function StoreOperationsDashboard() {
         </>
 
       </div>
-
-      {/* SECTION 12: Notification Slide-out Drawer */}
-      <NotificationsDrawer 
-        isOpen={showNotifDrawer} 
-        onClose={() => setShowNotifDrawer(false)} 
-        notifications={notifications} 
-        setNotifications={setNotifications} 
-      />
 
     </div>
   )

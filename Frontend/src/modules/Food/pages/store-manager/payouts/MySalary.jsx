@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { adminClient } from "@/services/api/axios"
+import { useOrderEvents } from "../api/storeOrdersApi"
 import { REAL, errText, money, monthLabel, card, AccountCard, PayoutList, PayoutDrawer, PageHead, when } from "@food/components/payouts/PayoutKit"
 
 // Kitchen staff: their salary, each month's state, and "request salary" once a month is overdue (not paid by the due day).
@@ -25,6 +26,14 @@ export default function MySalary() {
     }
   }, [])
   useEffect(() => { load() }, [load])
+
+  // Live: a payout request / payment of this store (store_event "payout") or a delivered order refreshes the page at once
+  const reloadSoon = useRef(null)
+  useOrderEvents(() => {
+    clearTimeout(reloadSoon.current)
+    reloadSoon.current = setTimeout(() => load(), 600)
+  })
+  useEffect(() => () => clearTimeout(reloadSoon.current), [])
 
   const ask = async (period) => {
     setAsking(period)

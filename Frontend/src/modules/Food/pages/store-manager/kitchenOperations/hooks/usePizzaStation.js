@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import io from "socket.io-client";
+import { storeSocket } from "../../api/storeOrdersApi";
 import apiClient from "@/services/api/axios";
 
 
@@ -21,12 +21,7 @@ export function usePizzaStation(filters = {}) {
   const [socketConnected, setSocketConnected] = useState(false);
 
   useEffect(() => {
-    const socketUrl = import.meta.env?.VITE_SOCKET_URL || window.location.origin;
-    const socket = io(socketUrl, {
-      transports: ["websocket"],
-      autoConnect: true,
-      reconnectionAttempts: 5,
-    });
+    const socket = storeSocket();   // the store panel's one signed-in socket
 
     socket.on("connect", () => {
       setSocketConnected(true);
@@ -100,7 +95,7 @@ export function usePizzaStation(filters = {}) {
         
       }
     },
-    refetchInterval: 15000,
+    refetchInterval: 60000,   // safety net: changes arrive over the live socket
   });
 
   return {
@@ -212,4 +207,16 @@ export function useReportShortage() {
       toast.error("Failed to report ingredient issue");
     },
   });
+}
+
+// The "Avg Prep Time" cards (Preparation Board, Pizza Station): the real average from starting a pizza to finishing its
+// assembly over the last 24 hours, from the server (kitchen staff: their own pizzas). null until a pizza is finished.
+export function useAvgPrepTime() {
+  const query = useQuery({
+    queryKey: ["kitchenPrepTimes"],
+    queryFn: async () => (await apiClient.get(`${KITCHEN}/prep-times`))?.data?.data || null,
+    refetchInterval: 60000,
+    staleTime: 15000,
+  });
+  return query.data?.avgPrepMinutes ?? null;
 }

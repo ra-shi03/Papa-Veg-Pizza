@@ -29,6 +29,7 @@ router.put('/orders/:orderId/resolve-delay', c.resolveDelay);
 
 // Preparation board
 router.get('/preparation-board', c.preparationBoard);
+router.get('/prep-times', c.prepTimes);                       // the Avg Prep Time cards (last 24 h; staff: their own pizzas)
 router.put('/order-item/:itemId/stage', c.moveStage);
 router.put('/order-item/:itemId/pause', c.pausePrep);
 router.put('/order-item/:itemId/reassign', c.reassignChefOfItem);

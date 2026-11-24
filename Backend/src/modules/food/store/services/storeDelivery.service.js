@@ -590,6 +590,7 @@ const toIssue = (i) => ({
   _id: String(i._id), orderId: i.orderRef, riderId: i.riderId ? String(i.riderId) : '', riderName: i.riderName || 'Not Assigned',
   issueType: i.issueType, description: i.description, reportedBy: i.reportedBy, severity: i.severity, status: i.status,
   resolution: i.resolution, refundAmount: i.refundAmount, penaltyAmount: i.penaltyAmount, createdAt: i.createdAt,
+  image: i.imageUrl || '', imageUrl: i.imageUrl || '',
 });
 const emitToStore = (ctx, event, payload) => getIO()?.to(rooms.store(ctx.storeId)).emit(event, payload);
 
@@ -607,7 +608,7 @@ export async function createIssue(user, body = {}, q = {}) {
   const issue = await DeliveryIssue.create({
     storeId: ctx.storeId, franchiseId: ctx.franchiseId, orderId: order._id, orderRef: order.order_id || String(order._id),
     riderId: rider?._id || null, riderName: rider?.name || '', issueType: dto.issueType, description: dto.description,
-    reportedBy: dto.reportedBy || 'Store Manager', severity: dto.severity, createdById: isId(user.userId) ? toId(user.userId) : null,
+    reportedBy: dto.reportedBy || 'Store Manager', severity: dto.severity, imageUrl: dto.image || '', createdById: isId(user.userId) ? toId(user.userId) : null,
   });
   const out = toIssue(issue.toObject());
   emitToStore(ctx, 'delivery:issue-created', { issue: out });

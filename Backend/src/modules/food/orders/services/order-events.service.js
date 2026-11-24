@@ -51,13 +51,16 @@ export function emitOrderEvents(change) {
   const io = getIO();
   if (!io) return;
   const doc = change.fullDocument;
-  for (const type of eventTypesOf(change)) {
+  const types = eventTypesOf(change);
+  for (const type of types) {
     const event = buildEvent(type, doc);
     const targets = [];
     if (doc.storeId) targets.push(rooms.store(doc.storeId));
     if (doc.franchiseId) targets.push(rooms.franchise(doc.franchiseId));
     if (targets.length) io.to(targets).emit('order_event', event);
   }
+  // the store's kitchen staff: just "an order changed" (no order id or details); their screens re-read what they may see
+  if (types.length && doc.storeId) io.to(rooms.storeTeam(doc.storeId)).emit('store_event', { type: 'order', storeId: String(doc.storeId), at: new Date().toISOString() });
 }
 
 let stream = null;

@@ -16,6 +16,8 @@ const deliveryIssueSchema = new mongoose.Schema(
         description: { type: String, default: '', trim: true, maxlength: 1000 },
         reportedBy: { type: String, default: 'Store Manager', trim: true, maxlength: 60 },
         severity: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'medium' },
+        // photo evidence the store manager attached (uploaded through /uploads/image first; only an https link is kept)
+        imageUrl: { type: String, default: '', trim: true, maxlength: 500 },
         status: { type: String, enum: ['open', 'in_progress', 'resolved', 'escalated', 'closed'], default: 'open' },
         resolution: { type: String, default: '', trim: true, maxlength: 1000 },
         refundAmount: { type: Number, default: 0, min: 0 },

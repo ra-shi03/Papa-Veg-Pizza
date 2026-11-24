@@ -164,6 +164,9 @@ async function build(ctx) {
         if (mc.status !== 201) throw new Error(`fixture: create manager ${k} -> ${mc.status} ${JSON.stringify(mc.body)}`);
         const mgrLogin = await call('POST', '/v1/auth/store/login', null, { email: mgrEmail, password: PASSWORD });
         if (mgrLogin.status !== 200) throw new Error(`fixture: manager ${k} login -> ${mgrLogin.status}`);
+        // the store manager marks attendance before any work, like a real shift (requireOnDuty); a test can clock out to check the gate
+        const mgrIn = await call('POST', '/v1/store/attendance/clock-in', mgrLogin.body.data.accessToken);
+        if (mgrIn.status !== 201) throw new Error(`fixture: manager ${k} clock-in -> ${mgrIn.status} ${JSON.stringify(mgrIn.body)}`);
 
         const customer = await User.create({ mobile: `6${d}${String(ts).slice(-8)}`, loginType: 'OTP', primaryRole: roles.CUSTOMER._id, isActive: true });
         const phone = `98${d}${String(ts).slice(-6)}`;

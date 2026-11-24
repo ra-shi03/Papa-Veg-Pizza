@@ -3,9 +3,10 @@ import { Clock } from "lucide-react"
 import { useMyAttendanceToday } from "../staffManagement/hooks/useAttendance"
 import ClockInOutButton from "../myTasks/components/ClockInOutButton"
 
-const KITCHEN_ROLES = ["kitchen_staff"]
+// Everyone who works in the store marks attendance first: kitchen staff and the store manager
+const KITCHEN_ROLES = ["kitchen_staff", "store_manager"]
 
-// Kitchen staff mark attendance first; the server refuses kitchen work until they have (and after they clock out).
+// Kitchen staff and the store manager mark attendance first; the server refuses work until they have (and after they clock out).
 export default function AttendanceBanner({ role }) {
   const isKitchen = KITCHEN_ROLES.includes(role)
   const { data: today, isLoading } = useMyAttendanceToday(isKitchen)
@@ -20,10 +21,10 @@ export default function AttendanceBanner({ role }) {
         <Clock size={15} className="shrink-0" />
         <p className="text-xs font-bold">
           {onLeave
-            ? "You are on leave today, so kitchen actions are locked."
+            ? "You are on leave today, so work actions are locked."
             : finished
-              ? "Your shift is finished for today, so kitchen actions are locked."
-              : "Check in on the Attendance page first. Kitchen actions stay locked until you do."}
+              ? "Your shift is finished for today, so work actions are locked."
+              : "Mark your attendance first (Clock In). Work actions stay locked until you do."}
         </p>
       </div>
       {!finished && !onLeave && <ClockInOutButton />}

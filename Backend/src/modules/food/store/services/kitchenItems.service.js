@@ -242,6 +242,28 @@ export async function preparationBoard(user, q = {}) {
     .map(({ it, order }) => toPrepItem(it, order, recipeFor(it.name)));
 }
 
+/**
+ * The "Avg Prep Time" card of the Preparation Board and Pizza Station: the real average, in minutes, from starting a pizza
+ * to finishing its assembly, over the pizzas finished in the last 24 hours. Kitchen staff: only their own pizzas (the
+ * same rule as the station lists). null when nothing was finished yet.
+ */
+export async function prepTimes(user) {
+  const storeId = toObjectId(requireStore(user));
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  let done = await KitchenItem.find({ storeId, rejected: false, prepStartedAt: { $ne: null }, assemblyCompletedAt: { $gte: since } })
+    .select('orderId chefId chefName prepStartedAt assemblyCompletedAt').lean();
+  if (isStaff(user)) {
+    const orders = await FoodOrder.find({ _id: { $in: [...new Set(done.map((it) => String(it.orderId)))] } }).select('kitchen.staff').lean();
+    const byOrder = new Map(orders.map((o) => [String(o._id), o]));
+    done = done.filter((it) => ownerOf(it, byOrder.get(String(it.orderId)), 'chef')?.id === String(user.userId));
+  }
+  const minutes = done
+    .map((it) => (new Date(it.assemblyCompletedAt) - new Date(it.prepStartedAt)) / 60000)
+    .filter((m) => m >= 0 && m < 24 * 60);
+  const avg = minutes.length ? minutes.reduce((a, b) => a + b, 0) / minutes.length : null;
+  return { avgPrepMinutes: avg == null ? null : Math.round(avg * 10) / 10, pizzas: minutes.length, since };
+}
+
 export async function pizzaStation(user, q = {}) {
   const { items, byOrder, recipeFor } = await loadItems(user, [...PREP_STAGES, 'baking', 'baked'], 'prep');
   return items

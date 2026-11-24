@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { emitStoreEvent } from '../../../../config/socket.js';
 import { FoodSupportTicket } from '../models/supportTicket.model.js';
 import { sendResponse, sendError } from '../../../../utils/response.js';
 import { emitSupportMessage, MAX_CUSTOMER_MESSAGES, REPORT_WINDOW_MS, MAX_TICKETS_PER_ORDER } from '../services/supportChat.js';
@@ -59,6 +60,7 @@ export async function createSupportTicketController(req, res, next) {
             doc.storeId = new mongoose.Types.ObjectId(body.storeId);
         }
         const created = await FoodSupportTicket.create(doc);
+        if (created.storeId) emitStoreEvent(created.storeId, 'complaint', { ticketId: String(created._id) });   // the store's Complaints screen refreshes
         if (type === 'order' && description) {
             // The first message of the chat is the problem as the customer described it
             emitSupportMessage(created, { message: description, byRole: 'Customer', at: created.createdAt });

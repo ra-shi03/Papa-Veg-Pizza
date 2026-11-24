@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import {
-  Menu, Bell, Store, ChevronDown, User, LogOut, Settings as SettingsIcon,
+  Menu, Store, ChevronDown, User, LogOut, Settings as SettingsIcon,
   AlertCircle, Search, Calendar, Clock, X, Trash2, Plus, Megaphone,
   BarChart3, Sun, Moon, Laptop, Shield, Activity, FileText, Check, CheckCircle2,
   AlertTriangle, ArrowRight, ClipboardList, ShieldAlert, Star
@@ -10,8 +10,6 @@ import { toast } from "sonner"
 import StoreOpenToggle from "./StoreOpenToggle"
 import { useSystemTheme } from "@/shared/utils/themeSync"
 import { adminAPI } from "@food/api"
-import { myTasksService } from "@/services/api/myTasksService"
-import { formatDistanceToNow } from "date-fns"
 
 export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
   const navigate = useNavigate()
@@ -33,7 +31,6 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
 
   // Dropdown UI toggles
   const [showProfileMenu, setShowProfileMenu] = useState(false)
-  const [showNotifications, setShowNotifications] = useState(false)
   const [selectedStore, setSelectedStore] = useState("")
   const [showStoreDropdown, setShowStoreDropdown] = useState(false)
   const [showRoleDropdown, setShowRoleDropdown] = useState(false)
@@ -46,8 +43,6 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
   const [userData, setUserData] = useState({ name: "Loading...", email: "Loading..." })
   const [franchiseData, setFranchiseData] = useState(null)
   const [storeData, setStoreData] = useState(null)
-  // Alerts are the person's own task notifications from the server (/tasks/notifications); empty until there are any.
-  const [notifications, setNotifications] = useState([])
 
   // A store team member works in the one store on their sign-in; the list holds only that store (sample stores are for
   // standalone mode).
@@ -126,23 +121,6 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
   }, [])
 
   useEffect(() => {
-    let live = true
-    myTasksService.getNotifications().then((res) => {
-      if (!live) return
-      const rows = Array.isArray(res?.data) ? res.data : []
-      setNotifications(rows.map((n) => ({
-        id: n.id || n._id,
-        title: n.title,
-        message: n.message,
-        type: n.type,
-        unread: !n.isRead,
-        time: n.createdAt ? formatDistanceToNow(new Date(n.createdAt), { addSuffix: true }) : "",
-      })))
-    }).catch(() => { if (live) setNotifications([]) })
-    return () => { live = false }
-  }, [])
-
-  useEffect(() => {
     function handleClickOutside(event) {
       if (searchRef.current && !searchRef.current.contains(event.target)) {
         setShowRecent(false)
@@ -182,19 +160,11 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
     }
   }
 
-  const markAllRead = () => {
-    notifications.filter(n => n.unread).forEach(n => myTasksService.markNotificationRead(n.id).catch(() => {}))
-    setNotifications(prev => prev.map(n => ({ ...n, unread: false })))
-    toast.success("All alerts marked as read")
-  }
-
   const handleRoleChange = (newRole) => {
     onRoleChange(newRole)
     setShowRoleDropdown(false)
     toast.success(`Role switched to ${roleLabels[newRole]}`)
   }
-
-  const unreadCount = notifications.filter(n => n.unread).length
 
   return (
     <>
@@ -232,8 +202,7 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
                 onClick={() => {
                   setShowStoreDropdown(!showStoreDropdown)
                   setShowDateDropdown(false)
-                  setShowNotifications(false)
-                  setShowProfileMenu(false)
+                    setShowProfileMenu(false)
                   setShowActionsDropdown(false)
                   setShowRoleDropdown(false)
                 }}
@@ -290,7 +259,6 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
               onClick={() => {
                 setShowDateDropdown(!showDateDropdown)
                 setShowStoreDropdown(false)
-                setShowNotifications(false)
                 setShowProfileMenu(false)
                 setShowRoleDropdown(false)
                 setShowActionsDropdown(false)
@@ -323,75 +291,11 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
 
           <span className="text-zinc-200 dark:text-zinc-800">|</span>
 
-          {/* Alerts Bell */}
-          <div className="relative">
-            <button
-              onClick={() => {
-                setShowNotifications(!showNotifications)
-                setShowStoreDropdown(false)
-                setShowDateDropdown(false)
-                setShowProfileMenu(false)
-                setShowRoleDropdown(false)
-                setShowActionsDropdown(false)
-              }}
-              className="p-1 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors cursor-pointer relative animate-none"
-            >
-              <Bell size={16} />
-              {unreadCount > 0 && (
-                <span className="absolute top-0 right-0 w-2 h-2 bg-[var(--primary)] rounded-full ring-2 ring-white dark:ring-slate-950"></span>
-              )}
-            </button>
-
-            {showNotifications && (
-              <div className="absolute right-0 mt-2.5 w-[320px] sm:w-[350px] rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 shadow-xl p-3.5 z-50 animate-in fade-in duration-100">
-                <div className="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800 mb-2">
-                  <span className="text-xs font-black text-zinc-900 dark:text-white">Active Alerts ({unreadCount})</span>
-                  {unreadCount > 0 && (
-                    <button onClick={markAllRead} className="text-[10px] font-bold text-[var(--primary)] hover:underline">Mark all read</button>
-                  )}
-                </div>
-
-                <div className="space-y-2 max-h-60 overflow-y-auto scrollbar-thin">
-                  {notifications.map((n) => (
-                    <div 
-                      key={n.id} 
-                      onClick={() => {
-                        setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, unread: false } : item))
-                        if (n.unread) myTasksService.markNotificationRead(n.id).catch(() => {})
-                      }}
-                      className={`p-2.5 rounded-xl border relative transition-colors cursor-pointer ${
-                        n.unread ? "bg-[var(--primary)]/10/10 dark:bg-red-950/5 border-red-100/40 dark:border-red-950/20" : "bg-zinc-50/50 dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800"
-                      }`}
-                    >
-                      <div className="flex items-start gap-2">
-                        {n.type === "order" && <Clock size={12} className="text-amber-500 mt-0.5 shrink-0" />}
-                        {n.type === "inventory" && <AlertTriangle size={12} className="text-[var(--primary)] mt-0.5 shrink-0" />}
-                        {n.type === "delivery" && <Activity size={12} className="text-blue-500 mt-0.5 shrink-0" />}
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-black text-zinc-800 dark:text-zinc-200 leading-tight">{n.title}</span>
-                            {n.unread && <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] shrink-0" />}
-                          </div>
-                          <p className="text-[9px] text-zinc-500 dark:text-zinc-400 mt-0.5 leading-normal">{n.message}</p>
-                          <span className="text-[8px] text-zinc-400 mt-1 block font-semibold">{n.time}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <span className="text-zinc-200 dark:text-zinc-800">|</span>
-
           {/* User Profile */}
           <div className="relative">
             <button
               onClick={() => {
                 setShowProfileMenu(!showProfileMenu)
-                setShowNotifications(false)
                 setShowStoreDropdown(false)
                 setShowDateDropdown(false)
                 setShowRoleDropdown(false)

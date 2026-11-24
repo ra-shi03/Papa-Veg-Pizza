@@ -61,6 +61,8 @@ const secondStore = async () => {
     assert.equal(mc.status, 201, JSON.stringify(mc.body));
     const login = await fx.call('POST', '/v1/auth/store/login', null, { email, password: PASSWORD });
     assert.equal(login.status, 200);
+    // like every store manager, A2's marks attendance before working (otherwise every write is refused before the 404 check)
+    assert.equal((await fx.call('POST', '/v1/store/attendance/clock-in', login.body.data.accessToken)).status, 201);
     return { storeId, managerToken: login.body.data.accessToken };
 };
 

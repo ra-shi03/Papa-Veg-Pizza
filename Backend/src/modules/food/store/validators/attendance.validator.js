@@ -46,7 +46,6 @@ export const validateAssignStaff = (body) => parse(z.object({ staffIds: z.array(
 // ---- attendance ----
 export const validateMarkAttendance = (body) => parse(z.object({
     staffId: id,
-    shiftId: optionalId,
     date: dateKey,
     checkIn: optionalClock.optional(),
     checkOut: optionalClock.optional(),

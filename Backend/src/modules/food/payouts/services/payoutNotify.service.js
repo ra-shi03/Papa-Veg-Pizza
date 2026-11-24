@@ -6,6 +6,7 @@ import {
 } from '../../../../core/notifications/firebase.service.js';
 import { createInboxNotifications } from '../../../../core/notifications/notification.service.js';
 import { logger } from '../../../../utils/logger.js';
+import { emitStoreEvent } from '../../../../config/socket.js';
 
 // Who hears about each step of a payout. Never throws: a failed notice must not undo a payment.
 //   requested -> whoever pays it (store managers / franchise admins / super admins)
@@ -62,6 +63,7 @@ function message(p, event) {
 export async function notifyPayout(payout, event) {
   try {
     const p = typeof payout?.toObject === 'function' ? payout.toObject() : payout;
+    if (p.storeId) emitStoreEvent(p.storeId, 'payout', { payoutId: String(p._id) });   // the store's Payouts / My Salary screens refresh
     const groups = [];
     if (event === 'requested') groups.push(await payerTargets(p));
     else if (event === 'disputed') groups.push(await resolverTargets(p), await payerTargets(p));

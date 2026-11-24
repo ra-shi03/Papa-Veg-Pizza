@@ -14,21 +14,25 @@ export default function ReorderModal({ visible, onClose, order }) {
     if (order && order.items) {
       // Map original items to edit quantities
       setItems(
-        order.items.map((it) => ({
-          ...it,
-          quantity: it.quantity || 1
-        }))
+        order.items
+          .filter((it) => !it.isReward) // a free reward was for that order only
+          .map((it, i) => ({
+            ...it,
+            lineIndex: it.lineIndex ?? i,
+            quantity: it.quantity || 1
+          }))
       );
     }
   }, [order, visible]);
 
   if (!order) return null;
 
-  const updateQuantity = (productId, delta) => {
+  // lines are named by their place on the order: two lines can be the same product (two sizes of one pizza)
+  const updateQuantity = (lineIndex, delta) => {
     setItems((prev) =>
       prev.map((it) => {
-        if (it.productId === productId) {
-          const newQty = Math.max(1, it.quantity + delta);
+        if (it.lineIndex === lineIndex) {
+          const newQty = Math.min(20, Math.max(1, it.quantity + delta));
           return { ...it, quantity: newQty };
         }
         return it;
@@ -36,12 +40,12 @@ export default function ReorderModal({ visible, onClose, order }) {
     );
   };
 
-  const removeItem = (productId) => {
+  const removeItem = (lineIndex) => {
     if (items.length <= 1) {
       toast.warning("Cannot remove all items. Order must have at least one product.");
       return;
     }
-    setItems((prev) => prev.filter((it) => it.productId !== productId));
+    setItems((prev) => prev.filter((it) => it.lineIndex !== lineIndex));
   };
 
   const handleCreateReorder = async () => {
@@ -52,7 +56,7 @@ export default function ReorderModal({ visible, onClose, order }) {
       });
       
       onClose();
-      // Redirect to incoming orders page to see the newly simulated reorder
+      // the new order waits in Incoming Orders like any other
       navigate("/store-operations/orders/incoming");
     } catch (e) {
       // Handled by mutation toast
@@ -123,7 +127,7 @@ export default function ReorderModal({ visible, onClose, order }) {
         <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-1">
           {items.map((item) => (
             <div 
-              key={item.productId}
+              key={item.lineIndex}
               className="bg-slate-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-850 p-3 rounded-2xl flex items-center justify-between text-xs font-bold"
             >
               <div className="flex items-center gap-2.5">
@@ -144,7 +148,7 @@ export default function ReorderModal({ visible, onClose, order }) {
               <div className="flex items-center gap-3">
                 <div className="flex items-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full px-1.5 py-0.5 shadow-sm">
                   <button 
-                    onClick={() => updateQuantity(item.productId, -1)}
+                    onClick={() => updateQuantity(item.lineIndex, -1)}
                     className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-100 transition-colors"
                   >
                     <Minus size={11} />
@@ -153,7 +157,7 @@ export default function ReorderModal({ visible, onClose, order }) {
                     {item.quantity}
                   </span>
                   <button 
-                    onClick={() => updateQuantity(item.productId, 1)}
+                    onClick={() => updateQuantity(item.lineIndex, 1)}
                     className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-100 transition-colors"
                   >
                     <Plus size={11} />
@@ -162,7 +166,7 @@ export default function ReorderModal({ visible, onClose, order }) {
 
                 <Tooltip title="Remove item from reorder">
                   <button 
-                    onClick={() => removeItem(item.productId)}
+                    onClick={() => removeItem(item.lineIndex)}
                     className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-full transition-all active:scale-95"
                   >
                     <Trash2 size={13} />

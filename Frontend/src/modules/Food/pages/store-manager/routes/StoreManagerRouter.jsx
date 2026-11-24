@@ -426,11 +426,11 @@ export default function StoreManagerRouter() {
             }
           />
 
-          {/* Attendance: kitchen staff check in / out and see their own days */}
+          {/* Attendance: kitchen staff AND the store manager check in / out and see their own days */}
           <Route
             path="attendance"
             element={
-              <RoleProtectedRoute allowedRoles={["kitchen_staff"]}>
+              <RoleProtectedRoute allowedRoles={["kitchen_staff", "store_manager"]}>
                 <MyAttendance />
               </RoleProtectedRoute>
             }

@@ -191,7 +191,8 @@ describe('store dashboard: numbers', () => {
         for (const key of ['pizzaStation', 'bakingStation', 'packagingStation']) assert.ok(k[key] >= 0 && k[key] <= 100, key);
         assert.deepEqual(await sdata(M(), 'delivery-overview'), { availableRiders: 1, assignedRiders: 1, delayedDeliveries: 1 });
         const inv = await sdata(M(), 'inventory-alerts');
-        assert.deepEqual(inv.lowStock, [{ ingredient: 'Mozzarella', availableQty: 0, minQty: 5, reorderLevel: 10, unit: 'KG', supplier: 'Dairy Co', severity: 'Critical' }]);
+        assert.match(inv.lowStock[0]?.ingredientId || '', /^[a-f0-9]{24}$/, 'the Reorder button sends this id');
+        assert.deepEqual(inv.lowStock.map(({ ingredientId, ...row }) => row), [{ ingredient: 'Mozzarella', availableQty: 0, minQty: 5, reorderLevel: 10, unit: 'KG', supplier: 'Dairy Co', severity: 'Critical' }]);
         assert.deepEqual(await sdata(M(), 'staff-overview'), { present: 0, late: 0, absent: 1 }); // nobody clocked in; one person is On Leave
     });
     test('staff widgets follow real clock-ins (not the count of active staff)', async () => {

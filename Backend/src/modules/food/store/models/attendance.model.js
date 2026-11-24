@@ -18,7 +18,7 @@ const attendanceSchema = new mongoose.Schema(
         status: { type: String, enum: ['present', 'absent', 'half_day', 'leave'], default: 'present' },
         late: { type: Boolean, default: false },
         lateMinutes: { type: Number, default: 0, min: 0 },
-        source: { type: String, enum: ['self', 'manager'], default: 'self' },
+        source: { type: String, enum: ['self', 'manager', 'admin'], default: 'self' },   // admin = the franchise admin marked it on behalf
         markedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
         markedByName: { type: String, default: '', trim: true },
         notes: { type: String, default: '', trim: true, maxlength: 300 },

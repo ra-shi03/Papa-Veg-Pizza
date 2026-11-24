@@ -2,7 +2,7 @@ import React from "react";
 import { Clock } from "lucide-react";
 import { useMyAttendanceToday, useClockInOut } from "../../staffManagement/hooks/useAttendance";
 
-// Clock in / clock out for kitchen staff (the store manager does not clock in).
+// Clock in / clock out for kitchen staff and the store manager.
 export default function ClockInOutButton() {
   const { data: today, isLoading } = useMyAttendanceToday();
   const clock = useClockInOut();

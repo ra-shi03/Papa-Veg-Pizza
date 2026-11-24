@@ -1,4 +1,5 @@
 import React from "react";
+import { useAvgPrepTime } from "../hooks/usePizzaStation";
 import { UserCheck, FileCheck, Clock, ShieldAlert } from "lucide-react";
 
 export default function PizzaStationSummaryCards({ items = [] }) {
@@ -15,8 +16,8 @@ export default function PizzaStationSummaryCards({ items = [] }) {
     return elapsed > (i.target_time || 10);
   }).length;
 
-  // 4. Average Prep Time (static or derived from completed timeline in minutes)
-  const avgPrepTime = 8; // 8 minutes average
+  // 4. Average prep time: the real one from the server (last 24 hours), "--" until a pizza is finished
+  const avgPrepTime = useAvgPrepTime();
 
   const cards = [
     {
@@ -44,7 +45,7 @@ export default function PizzaStationSummaryCards({ items = [] }) {
     },
     {
       title: "Avg Prep Time",
-      value: `${avgPrepTime} mins`,
+      value: avgPrepTime == null ? "--" : `${avgPrepTime} mins`,
       trend: "Target assembly speed",
       icon: Clock,
       color: "text-blue-500 bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30"

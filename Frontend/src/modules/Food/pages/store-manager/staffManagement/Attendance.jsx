@@ -31,6 +31,7 @@ import { useStaffList } from "./hooks/useStaff";
 import AttendanceStatsCards from "./components/AttendanceStatsCards";
 import AttendanceDetailsModal from "./components/AttendanceDetailsModal";
 import DeleteAttendanceDialog from "./components/DeleteAttendanceDialog";
+import { MarkAttendanceModal } from "@food/components/attendance/AttendanceActions";
 
 // Simple state debounce helper hook
 function useDebounce(value, delay = 300) {
@@ -50,6 +51,7 @@ export default function Attendance() {
   // Modal States
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isMarkOpen, setIsMarkOpen] = useState(false);
 
   // Selected records
   const [selectedRecordId, setSelectedRecordId] = useState(null);
@@ -138,9 +140,18 @@ export default function Attendance() {
             Staff Attendance
           </h1>
           <p className="text-zinc-500 dark:text-zinc-450 text-xs mt-1">
-            Check in and check out are marked by the staff themselves. Approved leave requests show here as leave days.
+            Check in and check out are marked by the staff themselves. Mark someone absent or on leave here; approved leave requests show as leave days.
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => setIsMarkOpen(true)}
+          className="flex items-center justify-center gap-1.5 px-4 py-2 bg-primary text-white text-xs font-bold rounded-full shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
+        >
+          <UserCheck size={14} />
+          <span>Mark absent / leave</span>
+        </button>
+        <MarkAttendanceModal open={isMarkOpen} onClose={() => setIsMarkOpen(false)} onDone={() => refetch()} />
 
       </header>
 
@@ -390,7 +401,7 @@ export default function Attendance() {
                             >
                               <Eye size={13} />
                             </button>
-                            {log.status === "leave" && (
+                            {log.source === "manager" && (log.status === "leave" || log.status === "absent") && (
                               <button
                                 onClick={() => triggerAction("delete", log)}
                                 className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/20 text-zinc-400 hover:text-red-650 rounded-lg cursor-pointer transition-colors"
@@ -440,7 +451,7 @@ export default function Attendance() {
                             <DropdownMenuItem onClick={() => triggerAction("view", log)} className="cursor-pointer font-bold text-xs py-2 text-slate-800 dark:text-zinc-300 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-900">
                               View Details
                             </DropdownMenuItem>
-                            {log.status === "leave" && (
+                            {log.source === "manager" && (log.status === "leave" || log.status === "absent") && (
                               <DropdownMenuItem onClick={() => triggerAction("delete", log)} className="cursor-pointer font-bold text-xs py-2 text-red-655 hover:bg-red-50 dark:hover:bg-red-955/20 rounded-xl">
                                 Cancel Leave
                               </DropdownMenuItem>
