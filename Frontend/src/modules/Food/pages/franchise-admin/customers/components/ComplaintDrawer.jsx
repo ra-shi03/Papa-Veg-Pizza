@@ -225,7 +225,7 @@ export default function ComplaintDrawer({
                     <div className="flex justify-between items-center">
                       <h4 className="text-[10px] font-extrabold uppercase text-zinc-900 dark:text-white tracking-wider">Customer Profile</h4>
                       <a 
-                        href={`/franchise-admin/customers?userId=${complaintDetails.customerId}`}
+                        href={window.location.pathname.includes("/superadmin/") ? `/food/superadmin/customers/profile/${complaintDetails.customerId}` : `/franchise-admin/customers?userId=${complaintDetails.customerId}`}
                         target="_blank"
                         rel="noreferrer"
                         className="text-[9px] font-bold uppercase tracking-wider text-[var(--primary)] hover:underline flex items-center gap-0.5"
@@ -253,7 +253,7 @@ export default function ComplaintDrawer({
 
                   {/* Spending Analytics */}
                   <div className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-xl p-4 shadow-xs">
-                    <h4 className="text-[10px] font-extrabold uppercase text-zinc-900 dark:text-white tracking-wider mb-3">Spending at this franchise</h4>
+                    <h4 className="text-[10px] font-extrabold uppercase text-zinc-900 dark:text-white tracking-wider mb-3">Spending</h4>
                     <div className="grid grid-cols-3 gap-3">
                       <div className="p-2.5 bg-slate-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-850 rounded-lg">
                         <span className="text-[8px] font-bold text-zinc-400 uppercase">Total Orders</span>
@@ -516,7 +516,7 @@ export default function ComplaintDrawer({
                       </button>
                     </div>
                     <span className="text-[8px] text-zinc-400 font-medium block">
-                      * Internal notes are only viewable by store managers and franchise admins. Customers do not see these logs.
+                      * Internal notes are only viewable by store managers, franchise admins and the super admin. Customers do not see these logs.
                     </span>
                   </form>
 

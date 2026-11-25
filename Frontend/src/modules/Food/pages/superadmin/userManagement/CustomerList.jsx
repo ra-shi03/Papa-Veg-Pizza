@@ -23,15 +23,14 @@ import EditUserProfile from "./EditUserProfile"
 import OrdersTransactionModal from "./OrdersTransactionModal"
 import SuspendCustomerModal from "./SuspendCustomerModal"
 import UserDetailsModal from "./UserDetailsModal"
-
-// Rich Customers Data for robust filtering
-const INITIAL_CUSTOMERS = []
+import { useCustomerList, setCustomerActive, errText } from "./customersApi"
 
 export default function CustomerList() {
   const navigate = useNavigate()
 
   // State Management
-  const [customers, setCustomers] = useState(INITIAL_CUSTOMERS)
+  const { customers, setCustomers, error: loadError } = useCustomerList()
+  useEffect(() => { if (loadError) showToast(loadError, "warning") }, [loadError])
   const [searchQuery, setSearchQuery] = useState("")
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("All Statuses")
@@ -132,37 +131,19 @@ export default function CustomerList() {
     showToast("Filters applied successfully!", "success")
   }
 
-  // Account suspension toggler inside list state
-  const handleToggleSuspension = (id) => {
-    setCustomers((prev) =>
-      prev.map((cust) => {
-        if (cust.id === id) {
-          const isCurrentlyActive = cust.status === "ACTIVE"
-          const nextStatus = isCurrentlyActive ? "SUSPENDED" : "ACTIVE"
-          showToast(
-            `${cust.name}'s account is now ${nextStatus === "ACTIVE" ? "Activated" : "Suspended"}!`,
-            nextStatus === "ACTIVE" ? "success" : "warning"
-          )
-          return { ...cust, status: nextStatus }
-        }
-        return cust
-      })
-    )
+  // Suspend / reactivate on the server (a suspended customer is signed out)
+  const changeStatus = async (id, isActive) => {
+    const name = customers.find((c) => c.id === id)?.name || "Customer"
+    try {
+      await setCustomerActive(id, isActive)
+      setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, status: isActive ? "ACTIVE" : "SUSPENDED" } : c)))
+      showToast(`${name}'s account is now ${isActive ? "active" : "suspended"}.`, isActive ? "success" : "warning")
+    } catch (e) {
+      showToast(errText(e), "warning")
+    }
     setSelectedCustomer(null)
   }
-
-  const handleSuspendAction = (id, reason, notes) => {
-    setCustomers((prev) =>
-      prev.map((cust) => {
-        if (cust.id === id) {
-          return { ...cust, status: "SUSPENDED" }
-        }
-        return cust
-      })
-    )
-    const customerName = customers.find(c => c.id === id)?.name || id
-    showToast(`${customerName}'s account has been Suspended.`, "warning")
-  }
+  const handleSuspendAction = (id) => changeStatus(id, false)
 
   return (
     <div className="pb-24 max-w-7xl mx-auto px-4 md:px-8">
@@ -200,7 +181,7 @@ export default function CustomerList() {
               Customer Directory
             </h1>
             <p className="text-black dark:text-white font-semibold text-xs mt-0.5">
-              Manage accounts, loyalty tiers, and status configurations.
+              Customer accounts, their orders and status.
             </p>
           </div>
         </div>
@@ -265,49 +246,6 @@ export default function CustomerList() {
                         }`}
                       >
                         {st}
-                      </button>
-                    ))}
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Loyalty Tier Filter Dropdown */}
-          <div className="relative flex-shrink-0">
-            <button
-              onClick={() => {
-                setShowLoyaltyDropdown(!showLoyaltyDropdown)
-                setShowStatusDropdown(false)
-                setShowSortDropdown(false)
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 rounded-full text-xs font-semibold text-black dark:text-white shadow-sm transition-colors cursor-pointer"
-            >
-              <span>{loyaltyFilter}</span>
-              <ChevronDown size={12} className={`opacity-80 transition-transform ${showLoyaltyDropdown ? "rotate-180" : ""}`} />
-            </button>
-            <AnimatePresence>
-              {showLoyaltyDropdown && (
-                <>
-                  <div className="fixed inset-0 z-30" onClick={() => setShowLoyaltyDropdown(false)} />
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 4, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute left-0 sm:right-0 sm:left-auto top-full mt-1 w-40 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-850 shadow-xl z-40 p-1"
-                  >
-                    {["All Tiers", "Gold Tier", "Silver Tier", "Platinum Tier"].map((t) => (
-                      <button
-                        key={t}
-                        onClick={() => {
-                          setLoyaltyFilter(t)
-                          setShowLoyaltyDropdown(false)
-                        }}
-                        className={`w-full text-left px-3 py-1.5 rounded text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-800 ${
-                          loyaltyFilter === t ? "text-[var(--primary)] font-bold bg-[var(--primary)]/5" : "text-black dark:text-white"
-                        }`}
-                      >
-                        {t}
                       </button>
                     ))}
                   </motion.div>

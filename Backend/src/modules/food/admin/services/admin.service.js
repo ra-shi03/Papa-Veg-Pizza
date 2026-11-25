@@ -1345,7 +1345,8 @@ export async function getCustomers(query = {}, { storeIds = null } = {}) {
                 $group: {
                     _id: '$userId',
                     totalOrder: { $sum: 1 },
-                    totalOrderAmount: { $sum: { $ifNull: ['$pricing.total', 0] } }
+                    totalOrderAmount: { $sum: { $ifNull: ['$pricing.total', 0] } },
+                    orderDates: { $push: '$createdAt' }
                 }
             }
         ])
@@ -1356,7 +1357,8 @@ export async function getCustomers(query = {}, { storeIds = null } = {}) {
             String(x._id),
             {
                 totalOrder: Number(x.totalOrder || 0),
-                totalOrderAmount: Number(x.totalOrderAmount || 0)
+                totalOrderAmount: Number(x.totalOrderAmount || 0),
+                ordersList: (x.orderDates || []).slice(-200).map((date) => ({ date }))
             }
         ])
     );
@@ -1377,6 +1379,7 @@ export async function getCustomers(query = {}, { storeIds = null } = {}) {
             totalOrder: stats.totalOrder,
             totalOrderAmount: stats.totalOrderAmount,
             joiningDate: u.createdAt,
+            ordersList: stats.ordersList || [],   // for the "ordered on" filter
             createdAt: u.createdAt
         });
     });

@@ -70,10 +70,12 @@ export default function OverviewPage({ title, subtitle, query, rows, columns, se
       </div>
       {summary}
       <div className="flex flex-wrap gap-2">
-        <select className={field} value={storeId} onChange={(e) => setStoreId(e.target.value)}>
-          <option value="all">All stores</option>
-          {(data.stores || []).map((s) => <option key={s._id} value={s._id}>{s.storeName}</option>)}
-        </select>
+        {data.stores && (
+          <select className={field} value={storeId} onChange={(e) => setStoreId(e.target.value)}>
+            <option value="all">All stores</option>
+            {data.stores.map((s) => <option key={s._id} value={s._id}>{s.storeName}</option>)}
+          </select>
+        )}
         {searchKeys.length > 0 && <input className={`${field} w-56`} placeholder="Search" value={search} onChange={(e) => setSearch(e.target.value)} />}
         {filter && (
           <select className={field} value={picked} onChange={(e) => setPicked(e.target.value)}>

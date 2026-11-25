@@ -286,7 +286,7 @@ export default function RefundRequests() {
             <span>Refund Claims Central Panel</span>
           </h1>
           <p className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">
-            Monitor, approve, and audit customer cashbacks across Razorpay, Stripe, and Paytm integrations.
+            Monitor, approve, and audit customer cashbacks to the wallet or back through Razorpay.
           </p>
         </div>
 
@@ -470,10 +470,7 @@ export default function RefundRequests() {
             >
               <option value="All">All Gateways</option>
               <option value="Razorpay">Razorpay</option>
-              <option value="Stripe">Stripe</option>
-              <option value="Paytm">Paytm</option>
-              <option value="Cashfree">Cashfree</option>
-              <option value="PhonePe">PhonePe</option>
+              <option value="Wallet">Wallet</option>
             </select>
 
             <select 

@@ -41,7 +41,7 @@ export default function RejectRefundModal({ isOpen, onClose, refund, onSuccess }
         onClose();
       }
     } catch (err) {
-      toast.error('Failed to update rejection log');
+      toast.error(err?.message || 'Failed to reject the refund');
     } finally {
       setIsProcessing(false);
     }

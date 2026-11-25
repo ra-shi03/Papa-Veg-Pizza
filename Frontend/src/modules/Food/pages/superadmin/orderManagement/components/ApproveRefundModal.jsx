@@ -30,7 +30,7 @@ export default function ApproveRefundModal({ isOpen, onClose, refund, onSuccess 
   useEffect(() => {
     if (!refund) return;
     if (refundType === 'full') {
-      setRefundAmount(refund.order?.grandTotal || refund.refundAmount || 0);
+      setRefundAmount(refund.refundAmount || 0); // the server pays exactly what was asked for
     }
   }, [refundType, refund]);
 
@@ -61,7 +61,7 @@ export default function ApproveRefundModal({ isOpen, onClose, refund, onSuccess 
         onClose();
       }
     } catch (err) {
-      toast.error('Failed to process refund through gateway');
+      toast.error(err?.message || 'Failed to process the refund');
     } finally {
       setIsProcessing(false);
     }
@@ -102,44 +102,6 @@ export default function ApproveRefundModal({ isOpen, onClose, refund, onSuccess 
         <form onSubmit={handleProcessRefund}>
           {/* Body */}
           <div className="p-4 space-y-4 text-xs font-semibold">
-            {/* Refund Type Selection */}
-            <div>
-              <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-2">Refund Type</label>
-              <div className="grid grid-cols-2 gap-3">
-                <label className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border-2 cursor-pointer transition-all ${
-                  refundType === 'full' 
-                    ? 'border-[var(--primary)] bg-red-500/5 text-[var(--primary)]' 
-                    : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/30'
-                }`}>
-                  <input 
-                    type="radio" 
-                    name="refundType" 
-                    value="full"
-                    checked={refundType === 'full'}
-                    onChange={() => setRefundType('full')}
-                    className="sr-only"
-                  />
-                  <span className="text-xs font-bold">Full Refund</span>
-                </label>
-
-                <label className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border-2 cursor-pointer transition-all ${
-                  refundType === 'partial' 
-                    ? 'border-[var(--primary)] bg-red-500/5 text-[var(--primary)]' 
-                    : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/30'
-                }`}>
-                  <input 
-                    type="radio" 
-                    name="refundType" 
-                    value="partial"
-                    checked={refundType === 'partial'}
-                    onChange={() => setRefundType('partial')}
-                    className="sr-only"
-                  />
-                  <span className="text-xs font-bold">Partial Refund</span>
-                </label>
-              </div>
-            </div>
-
             {/* Input Refund Amount */}
             <div>
               <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Refund Amount (INR)</label>

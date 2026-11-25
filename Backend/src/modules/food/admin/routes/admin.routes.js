@@ -2,6 +2,7 @@ import express from 'express';
 import { requireSuperAdmin } from '../../../../core/auth/auth.middleware.js';
 import { attachFranchiseScope } from '../../shared/franchiseScope.js';
 import * as adminController from '../controllers/admin.controller.js';
+import * as superAdminDesk from '../services/superAdminDesk.service.js';
 import * as staffController from '../controllers/staff.controller.js';
 import * as complaintDesk from '../controllers/complaintDesk.controller.js';
 import * as riderApproval from '../controllers/riderApproval.controller.js';
@@ -132,6 +133,14 @@ router.get('/franchises', franchiseController.getFranchises);
 router.get('/franchises/:id', franchiseController.getFranchiseById);
 router.patch('/franchises/:id', franchiseController.updateFranchise);
 router.delete('/franchises/:id', franchiseController.deleteFranchise);
+
+// ----- Kitchen staff of every store, and one customer's history (read only) -----
+router.get('/kitchen-staff', async (req, res, next) => {
+    try { res.json({ success: true, message: 'Kitchen staff fetched', data: await superAdminDesk.kitchenStaffList() }); } catch (err) { next(err); }
+});
+router.get('/customers/:id/history', async (req, res, next) => {
+    try { res.json({ success: true, message: 'Customer history fetched', data: await superAdminDesk.customerHistory(req.params.id) }); } catch (err) { next(err); }
+});
 
 // ----- Customers (account status is platform-wide) -----
 router.patch('/customers/:id/status', adminController.updateCustomerStatus);

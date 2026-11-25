@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  X, History, FileText, FileDown, TableProperties, 
-  Calendar, ChevronDown, Download, CheckCircle, Loader2 
+  X, History, FileText, Calendar, ChevronDown, Download, CheckCircle, Loader2 
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getRefundRequests } from '../RefundRequestsData';
 
 export default function ExportRefundsModal({ isOpen, onClose, activeFilters }) {
   const [isVisible, setIsVisible] = useState(false);
   const [isRendered, setIsRendered] = useState(isOpen);
-  const [format, setFormat] = useState('CSV'); // CSV, PDF, Excel
+  const [format, setFormat] = useState('CSV'); // CSV only
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadComplete, setDownloadComplete] = useState(false);
   const [columns, setColumns] = useState([
@@ -20,7 +20,6 @@ export default function ExportRefundsModal({ isOpen, onClose, activeFilters }) {
     { key: 'gateway', label: 'Gateway Name', checked: true },
     { key: 'reason', label: 'Reason Code', checked: false },
     { key: 'createdAt', label: 'Requested Date', checked: true },
-    { key: 'approvedBy', label: 'Approved By', checked: false }
   ]);
 
   useEffect(() => {
@@ -55,14 +54,23 @@ export default function ExportRefundsModal({ isOpen, onClose, activeFilters }) {
     }
 
     setIsDownloading(true);
-    setTimeout(() => {
-      setIsDownloading(false);
-      setDownloadComplete(true);
-      toast.success(`Successfully exported refund records as ${format}`);
-      setTimeout(() => {
-        onClose();
-      }, 1000);
-    }, 1800);
+    getRefundRequests()
+      .then((all) => {
+        const rows = all.filter((r) => !activeFilters?.status || activeFilters.status === 'All' || r.status === activeFilters.status);
+        if (!rows.length) { toast.error('No refund records to export.'); return; }
+        const picked = columns.filter(c => c.checked);
+        const cell = (v) => `"${String(v ?? '').replace(/"/g, '""').replace(/^([=+\-@])/, "'$1")}"`;
+        const csv = [picked.map(c => cell(c.label)).join(','), ...rows.map(r => picked.map(c => cell(c.key === 'createdAt' ? new Date(r.createdAt).toLocaleString('en-IN') : r[c.key])).join(','))].join('\n');
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        link.download = `refunds_${Date.now()}.csv`;
+        link.click();
+        setDownloadComplete(true);
+        toast.success(`Exported ${rows.length} refund records`);
+        setTimeout(() => onClose(), 800);
+      })
+      .catch((e) => toast.error(e?.message || 'Could not export'))
+      .finally(() => setIsDownloading(false));
   };
 
   return (
@@ -124,7 +132,7 @@ export default function ExportRefundsModal({ isOpen, onClose, activeFilters }) {
             {/* File format */}
             <section>
               <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 mb-2 block uppercase tracking-wider">File Format</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 gap-2">
                 <button 
                   type="button"
                   onClick={() => setFormat('CSV')}
@@ -136,30 +144,6 @@ export default function ExportRefundsModal({ isOpen, onClose, activeFilters }) {
                 >
                   <FileText size={16} className="mb-1" />
                   <span className="text-[9px] font-bold">CSV</span>
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => setFormat('PDF')}
-                  className={`flex flex-col items-center justify-center p-2.5 rounded-xl border-2 transition-all cursor-pointer ${
-                    format === 'PDF' 
-                      ? 'border-[var(--primary)] bg-red-500/5 text-[var(--primary)] font-bold' 
-                      : 'border-zinc-255 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-850/50'
-                  }`}
-                >
-                  <FileDown size={16} className="mb-1" />
-                  <span className="text-[9px] font-bold">PDF</span>
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => setFormat('Excel')}
-                  className={`flex flex-col items-center justify-center p-2.5 rounded-xl border-2 transition-all cursor-pointer ${
-                    format === 'Excel' 
-                      ? 'border-[var(--primary)] bg-red-500/5 text-[var(--primary)] font-bold' 
-                      : 'border-zinc-255 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-850/50'
-                  }`}
-                >
-                  <TableProperties size={16} className="mb-1" />
-                  <span className="text-[9px] font-bold">Excel</span>
                 </button>
               </div>
             </section>

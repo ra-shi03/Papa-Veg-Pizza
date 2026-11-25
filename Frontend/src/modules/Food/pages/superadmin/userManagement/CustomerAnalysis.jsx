@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react"
+import React, { useEffect, useState, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -12,15 +12,14 @@ import {
   RefreshCw
 } from "lucide-react"
 import UserDetailsModal from "./UserDetailsModal"
-
-// Rich Customers Data matching UserProfile and CustomerList
-const INITIAL_CUSTOMERS = []
+import { useCustomerList, setCustomerActive, errText } from "./customersApi"
 
 export default function CustomerAnalysis() {
   const navigate = useNavigate()
 
   // State Management
-  const [customers, setCustomers] = useState(INITIAL_CUSTOMERS)
+  const { customers, setCustomers, error: loadError } = useCustomerList()
+  useEffect(() => { if (loadError) showToast(loadError, "warning") }, [loadError])
   const [searchQuery, setSearchQuery] = useState("")
   const [showExportDropdown, setShowExportDropdown] = useState(false)
   const [toast, setToast] = useState(null)
@@ -56,17 +55,17 @@ export default function CustomerAnalysis() {
   }
 
   // Toggle active status
-  const handleToggleStatus = (id) => {
-    setCustomers((prev) =>
-      prev.map((c) => {
-        if (c.id === id) {
-          const nextStatus = c.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE"
-          showToast(`${c.name} is now ${nextStatus === "ACTIVE" ? "Active" : "Inactive"}.`)
-          return { ...c, status: nextStatus }
-        }
-        return c
-      })
-    )
+  const handleToggleStatus = async (id) => {
+    const current = customers.find((c) => c.id === id)
+    if (!current) return
+    const isActive = current.status !== "ACTIVE"
+    try {
+      await setCustomerActive(id, isActive)   // a blocked customer is signed out
+      setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, status: isActive ? "ACTIVE" : "SUSPENDED" } : c)))
+      showToast(`${current.name} is now ${isActive ? "Active" : "Inactive"}.`)
+    } catch (e) {
+      showToast(errText(e), "warning")
+    }
   }
 
   // Filter and Sort Customers logic
