@@ -138,7 +138,7 @@ describe('numbers', () => {
         );
         const today = ok(await get(`${SP}?dateRange=today&storeId=${A.storeId}`, A.adminToken)).list[0];
         assert.deepEqual([today.totalOrders, today.revenue, today.performanceScore], [3, 700, 67]);
-        assert.equal(ok(await get(`${SP}?search=a2`, A.adminToken)).totalCount, 1);
+        assert.equal(ok(await get(`${SP}?search=store%20a2`, A.adminToken)).totalCount, 1);   // not just "a2": that also matches ids, which hold the time
         assert.deepEqual(ok(await get(`${SP}?sort=revenue&order=asc`, A.adminToken)).list.map((r) => r.revenue), [800, 1700]);
         assert.deepEqual(ok(await get(`/v1/stores/${A.storeId}/performance`, A.adminToken)), a);
     });

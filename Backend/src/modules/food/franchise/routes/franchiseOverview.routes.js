@@ -21,6 +21,7 @@ router.get('/alerts', send((req) => overview.alerts(req.user, req.query)));
 router.get('/restock-requests', send((req) => overview.restockRequests(req.user, req.query)));
 router.patch('/restock-requests/:id', send((req) => overview.decideRestock(req.user, req.params.id, req.body), 'Restock request answered'));
 router.get('/customers', send((req) => overview.customers(req.user, req.query)));
+router.get('/loyalty', send((req) => overview.loyalty(req.user, req.query)));
 router.get('/reviews', send((req) => overview.reviews(req.user, req.query)));
 router.get('/order-issues', send((req) => overview.orderIssues(req.user, req.query)));
 

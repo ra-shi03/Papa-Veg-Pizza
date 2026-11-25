@@ -5,6 +5,9 @@ import { IngredientShortage } from '../../store/models/ingredientShortage.model.
 import { DeliveryIssue } from '../../store/models/deliveryIssue.model.js';
 import { KitchenIssue } from '../../store/models/kitchenIssue.model.js';
 import { FoodOrder } from '../../orders/models/order.model.js';
+import { RewardMembership } from '../../user/models/rewardMembership.model.js';
+import { RewardLedger } from '../../user/models/rewardLedger.model.js';
+import { RewardRedemption } from '../../user/models/rewardRedemption.model.js';
 import { User } from '../../../../core/users/models/user.model.js';
 import { storeManagerUserIds } from '../../../../core/notifications/firebase.service.js';
 import { notifyUsers } from '../../store/services/kitchenTasks.service.js';
@@ -148,6 +151,60 @@ export async function reviews(user, query = {}) {
   }));
   const average = rows.length ? Math.round((rows.reduce((n, r) => n + r.rating, 0) / rows.length) * 10) / 10 : 0;
   return { stores: s.stores, rows, average };
+}
+
+/**
+ * Cheesy Rewards members who have ordered from this franchise's stores. View only: the programme is one company-wide
+ * scheme run by the super admin, so the points balance is the customer's whole balance, while orders, points earned and
+ * rewards handed out count this franchise's stores only.
+ */
+export async function loyalty(user, query = {}) {
+  const s = await scope(user, query);
+  const grouped = await FoodOrder.aggregate([
+    { $match: { storeId: { $in: s.ids }, userId: { $ne: null } } },
+    { $sort: { createdAt: -1 } },
+    { $group: { _id: '$userId', orderIds: { $push: '$_id' }, lastOrderDate: { $first: '$createdAt' }, name: { $first: '$customerName' }, phone: { $first: '$customerPhone' } } },
+  ]);
+  const byUser = new Map(grouped.map((g) => [String(g._id), g]));
+  const members = await RewardMembership.find({ userId: { $in: grouped.map((g) => g._id) } }).sort({ enrolledAt: -1 }).limit(LIMIT).lean();
+  const ids = members.map((m) => m.userId);
+  const orderIds = ids.flatMap((id) => byUser.get(String(id)).orderIds);
+  const [users, earned, claimed] = await Promise.all([
+    User.find({ _id: { $in: ids } }).select('name phone mobile').lean(),
+    RewardLedger.aggregate([
+      { $match: { userId: { $in: ids }, orderId: { $in: orderIds }, type: { $in: ['EARN', 'REVERSAL'] } } },
+      { $group: { _id: '$userId', points: { $sum: { $cond: [{ $eq: ['$direction', 'CREDIT'] }, '$points', { $multiply: ['$points', -1] }] } } } },
+    ]),
+    // rewards handed over at this franchise's stores (at the counter, or inside one of their online orders)
+    RewardRedemption.aggregate([
+      { $match: { userId: { $in: ids }, status: 'REDEEMED', $or: [{ storeId: { $in: s.ids } }, { orderId: { $in: orderIds } }] } },
+      { $group: { _id: '$userId', count: { $sum: 1 } } },
+    ]),
+  ]);
+  const userOf = new Map(users.map((u) => [String(u._id), u]));
+  const earnedOf = new Map(earned.map((e) => [String(e._id), e.points]));
+  const claimedOf = new Map(claimed.map((c) => [String(c._id), c.count]));
+  const rows = members.map((m) => {
+    const key = String(m.userId);
+    const u = userOf.get(key) || {};
+    const g = byUser.get(key);
+    return {
+      _id: key, name: u.name || g.name || 'Customer', phone: u.phone || u.mobile || g.phone || '',
+      status: m.status === 'ACTIVE' ? 'active' : 'left', enrolledAt: m.enrolledAt,
+      pointsBalance: m.status === 'ACTIVE' ? m.pointsBalance : 0, pointsEarnedHere: earnedOf.get(key) || 0,
+      orders: g.orderIds.length, lastOrderDate: g.lastOrderDate, rewardsClaimedHere: claimedOf.get(key) || 0,
+    };
+  });
+  const active = rows.filter((r) => r.status === 'active');
+  return {
+    stores: s.stores, rows,
+    totals: {
+      activeMembers: active.length,
+      pointsHeld: active.reduce((n, r) => n + r.pointsBalance, 0),
+      pointsEarnedHere: rows.reduce((n, r) => n + r.pointsEarnedHere, 0),
+      rewardsClaimedHere: rows.reduce((n, r) => n + r.rewardsClaimedHere, 0),
+    },
+  };
 }
 
 /** Delivery issues the store managers logged and kitchen issues the stations reported, newest first. */

@@ -35,8 +35,20 @@ describe('franchise overview', () => {
         assert.deepEqual((await rows('/order-issues')).map((r) => [r.source, r.issueType]), [['delivery', 'Late'], ['kitchen', 'Burnt Crust']]);
         assert.equal((await rows('/order-issues?source=kitchen')).length, 1);
     });
+    test('loyalty: members who ordered here, points earned and rewards claimed at its stores only', async () => {
+        const userId = oid(A.customerId);
+        await col('rewardMemberships').insertOne({ userId, status: 'ACTIVE', pointsBalance: 250, lifetimeEarned: 300, enrolledAt: new Date() });
+        await col('rewardMemberships').insertOne({ userId: new mongoose.Types.ObjectId(), status: 'ACTIVE', pointsBalance: 999, enrolledAt: new Date() });   // never ordered here
+        await col('rewardLedger').insertOne({ userId, orderId: oid(A.orderId), type: 'EARN', direction: 'CREDIT', points: 100, idempotencyKey: 'l1', createdAt: new Date() });
+        await col('rewardLedger').insertOne({ userId, orderId: new mongoose.Types.ObjectId(), type: 'EARN', direction: 'CREDIT', points: 200, idempotencyKey: 'l2', createdAt: new Date() });   // another franchise's order
+        await col('rewardRedemptions').insertOne({ userId, code: 'AAA111', points: 50, status: 'REDEEMED', storeId: oid(A.storeId), product: { name: 'Garlic Bread' } });
+        await col('rewardRedemptions').insertOne({ userId, code: 'BBB222', points: 50, status: 'REDEEMED', storeId: oid(B.storeId), product: { name: 'Garlic Bread' } });
+        const data = (await get('/loyalty')).body.data;
+        assert.deepEqual(data.rows.map((r) => [r._id, r.pointsBalance, r.pointsEarnedHere, r.rewardsClaimedHere, r.orders, r.status]), [[A.customerId, 250, 100, 1, 1, 'active']]);
+        assert.deepEqual(data.totals, { activeMembers: 1, pointsHeld: 250, pointsEarnedHere: 100, rewardsClaimedHere: 1 });
+    });
     test('another franchise sees none of it; its store id is 404; other roles 403', async () => {
-        for (const path of ['/stock', '/alerts', '/restock-requests', '/customers', '/reviews', '/order-issues']) {
+        for (const path of ['/stock', '/alerts', '/restock-requests', '/loyalty', '/customers', '/reviews', '/order-issues']) {
             const mine = await rows(path, B.adminToken);
             assert.ok(!mine.some((r) => r.storeName === 'TEST STORE A'), path);
             assert.equal((await get(`${path}?storeId=${A.storeId}`, B.adminToken)).status, 404, path);

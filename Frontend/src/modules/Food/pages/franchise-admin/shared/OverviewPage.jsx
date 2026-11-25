@@ -16,7 +16,7 @@ const TONES = {
   grey: "bg-zinc-50 text-zinc-500 border-zinc-200",
 }
 const TONE_OF = {
-  available: "green", approved: "green", resolved: "green", closed: "grey", low_stock: "amber", pending: "amber", open: "amber",
+  available: "green", member: "green", approved: "green", resolved: "green", closed: "grey", low_stock: "amber", pending: "amber", open: "amber",
   in_progress: "amber", reported: "amber", medium: "amber", high: "red", critical: "red", out_of_stock: "red", rejected: "red",
   escalated: "red", active: "red",
 }
