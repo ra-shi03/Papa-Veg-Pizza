@@ -30,7 +30,6 @@ const AllOrders = lazy(() => import("../orderManagement/AllOrders"))
 const BulkOrdersManagement = lazy(() => import("../orderManagement/BulkOrdersManagement"))
 const OrderTracking = lazy(() => import("../orderManagement/OrderTracking"))
 const RefundRequests = lazy(() => import("../orderManagement/RefundRequests"))
-const Disputes = lazy(() => import("../orderManagement/Disputes"))
 
 const CouponsManagement = lazy(() => import("../marketing/CouponsManagement"))
 const Campaign = lazy(() => import("../marketing/Campaign"))
@@ -41,10 +40,7 @@ const Settings = lazy(() => import("../settings/Settings"))
 const AppConfiguration = lazy(() => import("../settings/AppConfiguration"))
 const PaymentGateways = lazy(() => import("../settings/PaymentGateways"))
 const FeesAndCharges = lazy(() => import("../settings/FeesAndCharges"))
-const NotificationsSettings = lazy(() => import("../settings/NotificationsSettings"))
-const AuditLogs = lazy(() => import("../settings/AuditLogs"))
 const ContentManagement = lazy(() => import("../settings/ContentManagement"))
-const FranchiseTicket = lazy(() => import("../support/FranchiseTicket"))
 const SupportRequests = lazy(() => import("../support/SupportRequests"))
 const FeedbackAndReview = lazy(() => import("../support/FeedbackAndReview"))
 const CustomerComplaints = lazy(() => import("../../franchise-admin/customers/CustomerComplaints"))
@@ -107,8 +103,6 @@ function SuperAdminLayout() {
     activeItem = "All Orders"
   } else if (location.pathname.includes("/payouts")) {
     activeItem = "Payouts"
-  } else if (location.pathname.includes("/disputes")) {
-    activeItem = "Disputes"
   } else if (location.pathname.includes("/refund-requests")) {
     activeItem = "Refund Requests"
 
@@ -126,16 +120,10 @@ function SuperAdminLayout() {
     activeItem = "Fees & Charges"
   } else if (location.pathname.includes("/payment-gateways")) {
     activeItem = "Payment Gateways"
-  } else if (location.pathname.includes("/notification-settings")) {
-    activeItem = "Notification Settings"
-  } else if (location.pathname.includes("/audit-logs")) {
-    activeItem = "Audit Logs"
   } else if (location.pathname.includes("/settings")) {
     activeItem = "Settings"
   } else if (location.pathname.includes("/content-management")) {
     activeItem = "Content Management"
-  } else if (location.pathname.includes("/franchise-tickets")) {
-    activeItem = "Franchise Tickets"
   } else if (location.pathname.includes("/support-requests")) {
     activeItem = "Support Requests"
   } else if (location.pathname.includes("/customer-complaints")) {
@@ -240,7 +228,6 @@ export default function SuperAdminRouter() {
             <Route path="/orders" element={<AllOrders />} />
             <Route path="/order-tracking" element={<OrderTracking />} />
             <Route path="/bulk-orders" element={<BulkOrdersManagement />} />
-            <Route path="/disputes" element={<Disputes />} />
             <Route path="/refund-requests" element={<RefundRequests />} />
             <Route path="/payouts" element={<PlatformPayouts />} />
 
@@ -253,10 +240,7 @@ export default function SuperAdminRouter() {
             <Route path="/app-configuration" element={<AppConfiguration />} />
             <Route path="/fees-and-charges" element={<FeesAndCharges />} />
             <Route path="/payment-gateways" element={<PaymentGateways />} />
-            <Route path="/notification-settings" element={<NotificationsSettings />} />
-            <Route path="/audit-logs" element={<AuditLogs />} />
             <Route path="/content-management" element={<ContentManagement />} />
-            <Route path="/franchise-tickets" element={<FranchiseTicket />} />
             <Route path="/support-requests" element={<SupportRequests />} />
             <Route path="/customer-complaints" element={<CustomerComplaints />} />
             <Route path="/feedback-reviews" element={<FeedbackAndReview />} />

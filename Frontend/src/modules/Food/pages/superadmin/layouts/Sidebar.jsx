@@ -112,7 +112,6 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
         { name: "Order Tracking", icon: Truck },
         { name: "Bulk Orders", icon: Users },
         { name: "Refund Requests", icon: FileX },
-        { name: "Disputes", icon: Activity },
         { name: "Payouts", icon: CreditCard }
       ]
     },
@@ -133,8 +132,6 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
         { name: "App Configuration", icon: Settings },
         { name: "Fees & Charges", icon: CreditCard },
         { name: "Payment Gateways", icon: CreditCard },
-        { name: "Notification Settings", icon: Bell },
-        { name: "Audit Logs", icon: ClipboardList },
         { name: "Content Management", icon: FileText }
       ]
     },
@@ -142,7 +139,6 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
       title: "Support",
       items: [
         { name: "Customer Complaints", icon: ShieldAlert },
-        { name: "Franchise Tickets", icon: Ticket },
         { name: "Support Requests", icon: LifeBuoy },
         { name: "Feedback & Reviews", icon: Star }
       ]
@@ -220,12 +216,6 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
         className={`fixed inset-y-0 left-0 z-[60] flex flex-col bg-zinc-950 dark:bg-white border-r border-zinc-800 dark:border-zinc-200 transition-all duration-300 ease-in-out lg:translate-x-0 ${
           displayCollapsed ? "w-[72px]" : "w-[280px]"
         } ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
-        onMouseEnter={() => {
-          if (isCollapsed && window.matchMedia('(min-width: 1024px)').matches) setIsHovered(true)
-        }}
-        onMouseLeave={() => {
-          if (isCollapsed && window.matchMedia('(min-width: 1024px)').matches) setIsHovered(false)
-        }}
       >
         {/* Header / Logo section */}
         <div className={`py-4 flex items-center justify-between border-b border-zinc-800 dark:border-zinc-200 ${displayCollapsed ? "justify-center px-2 flex-col gap-3" : "px-4"}`}>
@@ -357,8 +347,6 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
                                 navigate("/food/superadmin/order-tracking")
                               } else if (item.name === "Bulk Orders") {
                                 navigate("/food/superadmin/bulk-orders")
-                              } else if (item.name === "Disputes") {
-                                navigate("/food/superadmin/disputes")
                               } else if (item.name === "Payouts") {
                                 navigate("/food/superadmin/payouts")
                               } else if (item.name === "Refund Requests") {
@@ -379,14 +367,8 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
                                 navigate("/food/superadmin/fees-and-charges")
                               } else if (item.name === "Payment Gateways") {
                                 navigate("/food/superadmin/payment-gateways")
-                              } else if (item.name === "Notification Settings") {
-                                navigate("/food/superadmin/notification-settings")
-                              } else if (item.name === "Audit Logs") {
-                                navigate("/food/superadmin/audit-logs")
                               } else if (item.name === "Content Management") {
                                 navigate("/food/superadmin/content-management")
-                              } else if (item.name === "Franchise Tickets") {
-                                navigate("/food/superadmin/franchise-tickets")
                               } else if (item.name === "Support Requests") {
                                 navigate("/food/superadmin/support-requests")
                               } else if (item.name === "Customer Complaints") {
