@@ -119,8 +119,6 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
       title: "Marketing",
       items: [
         { name: "Coupons", icon: Ticket },
-        { name: "Campaigns", icon: Megaphone },
-        { name: "Push Notifications", icon: Bell },
 
         { name: "Rewards Program", icon: Trophy },
       ]
@@ -353,10 +351,6 @@ export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem, is
                                 navigate("/food/superadmin/refund-requests")
                               } else if (item.name === "Coupons") {
                                 navigate("/food/superadmin/coupons")
-                              } else if (item.name === "Campaigns") {
-                                navigate("/food/superadmin/campaigns")
-                              } else if (item.name === "Push Notifications") {
-                                navigate("/food/superadmin/push-notifications")
                               } else if (item.name === "Rewards Program") {
                                 navigate("/food/superadmin/rewards")
                               } else if (item.name === "Settings") {

@@ -32,8 +32,6 @@ const OrderTracking = lazy(() => import("../orderManagement/OrderTracking"))
 const RefundRequests = lazy(() => import("../orderManagement/RefundRequests"))
 
 const CouponsManagement = lazy(() => import("../marketing/CouponsManagement"))
-const Campaign = lazy(() => import("../marketing/Campaign"))
-const PushNotification = lazy(() => import("../marketing/PushNotification"))
 
 const RewardsManagement = lazy(() => import("../marketing/RewardsManagement"))
 const Settings = lazy(() => import("../settings/Settings"))
@@ -108,10 +106,6 @@ function SuperAdminLayout() {
 
   } else if (location.pathname.includes("/coupons")) {
     activeItem = "Coupons"
-  } else if (location.pathname.includes("/campaigns")) {
-    activeItem = "Campaigns"
-  } else if (location.pathname.includes("/push-notifications")) {
-    activeItem = "Push Notifications"
   } else if (location.pathname.includes("/rewards")) {
     activeItem = "Rewards Program"
   } else if (location.pathname.includes("/app-configuration")) {
@@ -232,8 +226,6 @@ export default function SuperAdminRouter() {
             <Route path="/payouts" element={<PlatformPayouts />} />
 
             <Route path="/coupons" element={<CouponsManagement />} />
-            <Route path="/campaigns" element={<Campaign />} />
-            <Route path="/push-notifications" element={<PushNotification />} />
 
             <Route path="/rewards" element={<RewardsManagement />} />
             <Route path="/settings" element={<Settings />} />
