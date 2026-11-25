@@ -25,6 +25,15 @@ async function salesSummary(match, from, to) {
   return { revenue: r?.revenue || 0, orders: r?.orders || 0 };
 }
 
+const isSuperRole = (user) => ['SUPERADMIN', 'SUPER_ADMIN'].includes(String(user?.role || '').toUpperCase().replace(/-/g, '_'));
+async function commissionOf(match, from, to) {
+  const [r] = await FoodOrder.aggregate([
+    { $match: { ...match, createdAt: { $gte: from, $lte: to }, ...SALE } },
+    { $group: { _id: null, total: { $sum: { $ifNull: ['$pricing.storeCommission', 0] } } } },
+  ]);
+  return r?.total || 0;
+}
+
 async function avgRating(match, from) {
   const [r] = await FoodOrder.aggregate([
     { $match: { ...match, 'ratings.store.rating': { $gte: 1 }, ...(from ? { 'ratings.store.ratedAt': { $gte: from } } : {}) } },
@@ -52,6 +61,8 @@ export async function summary(user, q) {
     lowStock,
     avgOrderValue: sales.orders ? Math.round(sales.revenue / sales.orders) : 0,
     customerSatisfaction: rating,
+    // the company's commission on these sales: shown on the super admin dashboard only
+    ...(isSuperRole(user) ? { commission: round2(await commissionOf(scope.match, from, to)) } : {}),
   };
 }
 

@@ -7,6 +7,8 @@ import { StoreManager } from '../../franchise/models/storeManager.model.js';
 import { FoodStore } from '../../store/models/store.model.js';
 import { FoodFranchise } from '../../franchise/models/franchise.model.js';
 import { onDutyStaffIds } from '../../store/services/attendancePresence.js';
+import { Role } from '../../../../core/roles/models/role.model.js';
+import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
 import { NotFoundError } from '../../../../core/auth/errors.js';
 
 // Extra facts the super admin screens show next to records the server already has (read only).
@@ -109,5 +111,34 @@ export async function kitchenStaffList() {
         onDuty: present.has(String(p._id)),
       };
     }),
+  };
+}
+
+// What each role may do. The permissions themselves are fixed in the server's route guards; this describes them.
+const ROLES = [
+  ['SUPER_ADMIN', 'Super Admin', 'The whole company: menu, prices, franchises, payouts, refunds, customers and app content.'],
+  ['FRANCHISE_ADMIN', 'Franchise Admin', 'Its own franchise only: stores, store managers, staff approvals and attendance, riders, store pricing, complaints and payouts.'],
+  ['STORE_MANAGER', 'Store Manager', 'One store: accepting orders, stations, delivery, inventory, kitchen staff, attendance and payouts.'],
+  ['KITCHEN_STAFF', 'Kitchen Staff', 'Only the orders where they hold a station, their tasks, attendance and salary.'],
+  ['DELIVERY_PARTNER', 'Delivery Partner', 'The delivery app: their own offers, deliveries, wallet and payouts.'],
+  ['CUSTOMER', 'Customer', 'The user app: their own cart, orders, addresses, wallet and support requests.'],
+];
+
+/** The real roles and how many accounts hold each (riders are counted from their own records). */
+export async function rolesSummary() {
+  const roles = await Role.find({ code: { $in: ROLES.map((r) => r[0]) } }).select('code').lean();
+  const idOf = new Map(roles.map((r) => [r.code, r._id]));
+  return {
+    roles: await Promise.all(ROLES.map(async ([code, name, can]) => {
+      let people = 0;
+      let active = 0;
+      if (code === 'DELIVERY_PARTNER') {
+        [people, active] = await Promise.all([FoodDeliveryPartner.countDocuments({}), FoodDeliveryPartner.countDocuments({ status: 'approved' })]);
+      } else if (idOf.has(code)) {
+        const filter = { primaryRole: idOf.get(code), isDeleted: { $ne: true } };
+        [people, active] = await Promise.all([User.countDocuments(filter), User.countDocuments({ ...filter, isActive: { $ne: false } })]);
+      }
+      return { _id: code, code, name, can, people, active };
+    })),
   };
 }

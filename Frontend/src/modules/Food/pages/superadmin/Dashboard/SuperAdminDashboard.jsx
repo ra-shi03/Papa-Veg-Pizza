@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
 import {
   TrendingUp,
   ShoppingBag,
@@ -68,6 +69,7 @@ export default function SuperAdminDashboard() {
   // Navigation drawer and theme state
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [activeItem, setActiveItem] = useState("Dashboard")
+  const navigate = useNavigate()
   const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem("sa_sidebar_collapsed") === "true")
 
   // Real-time Dynamic Color Theme Settings
@@ -127,74 +129,72 @@ export default function SuperAdminDashboard() {
     window.dispatchEvent(new Event("systemThemeChanged"))
   }
 
-  // KPI cards: platform analytics is not connected yet, so no figures are invented
-  const [kpis, setKpis] = useState([
-    { title: "Net Revenue", val: "—", growth: "", up: true, icon: DollarSign, sparkData: [], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
-    { title: "Live Orders", val: "—", growth: "", up: true, icon: ShoppingBag, sparkData: [], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
-    { title: "Active Riders", val: "—", growth: "", up: true, icon: Truck, sparkData: [], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
-    { title: "New Users", val: "—", growth: "", up: true, icon: Users, sparkData: [], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
-    { title: "Active Stores", val: "—", growth: "", up: true, icon: Store, sparkData: [], color: "text-[var(--primary)] bg-[var(--primary)]/10" },
-    { title: "Comm. Earned", val: "—", growth: "", up: true, icon: Percent, sparkData: [], color: "text-[var(--primary)] bg-[var(--primary)]/10" }
-  ])
+  // Everything on this screen comes from the server (/admin/dashboard/*: the whole company for a super admin)
+  const [dash, setDash] = useState({ summary: null, customers: null, revenue: [], live: [], stores: [], stock: [] })
+  useEffect(() => {
+    let alive = true
+    const load = async () => {
+      const results = await Promise.allSettled([
+        adminAPI.getDashboardSummary({}), adminAPI.getDashboardCustomerActivity({}), adminAPI.getDashboardRevenue({}),
+        adminAPI.getDashboardLiveOrders({}), adminAPI.getDashboardStorePerformance({ date: "month" }), adminAPI.getDashboardInventoryAlerts({}),
+      ])
+      if (!alive) return
+      const [summary, customers, revenue, live, stores, stock] = results.map((r) => (r.status === "fulfilled" ? r.value?.data?.data : null))
+      if (results.every((r) => r.status === "rejected")) toast.error("Could not load the dashboard")
+      setDash({ summary, customers, revenue: revenue || [], live: live || [], stores: stores || [], stock: stock || [] })
+    }
+    load()
+    const timer = setInterval(load, 60000)
+    return () => { alive = false; clearInterval(timer) }
+  }, [])
 
-  // Recharts interactive state: Hourly vs Daily Sales Trend
-  const [chartInterval, setChartInterval] = useState("Hourly")
-  const hourlyData = []
-  const dailyData = []
-  const currentChartData = chartInterval === "Hourly" ? hourlyData : dailyData
+  const money = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`
+  const fig = (v, show = (x) => x) => (v === undefined || v === null ? "—" : show(v))
+  const card = (title, val, icon) => ({ title, val, growth: "", up: true, icon, sparkData: [], color: "text-[var(--primary)] bg-[var(--primary)]/10" })
+  const kpis = [
+    card("Revenue Today", fig(dash.summary?.revenue, money), DollarSign),
+    card("Live Orders", dash.summary ? dash.live.length : "—", ShoppingBag),
+    card("Riders On Orders", fig(dash.summary?.activeRiders), Truck),
+    card("New Customers", fig(dash.customers?.newCustomers), Users),
+    card("Active Stores", fig(dash.summary?.activeStores), Store),
+    card("Comm. Today", fig(dash.summary?.commission, money), Percent),
+  ]
+
+  const currentChartData = dash.revenue.map((d) => ({ time: d.date, revenue: d.revenue }))
 
   // Live monitor order categories & lists
   const [orderFilter, setOrderFilter] = useState("New")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedOrder, setSelectedOrder] = useState(null)
 
-  const liveOrders = []
+  const TAB_OF = { confirmed: "New", preparing: "Prep", baking: "Prep", packed: "Ready", out_for_delivery: "Delivery" }
+  const liveOrders = dash.live.map((o) => ({
+    id: o.id, name: o.customer, time: o.time, status: TAB_OF[o.status] || "New", total: money(o.amount),
+    items: (o.items || []).map((i) => `${i.quantity} x ${i.name}`).join(", "),
+    rider: o.assignedStaff?.rider || "Not assigned", store: o.store,
+  }))
 
   // Filter orders by category and query
   const filteredOrders = liveOrders.filter(order => {
     const matchesTab = order.status === orderFilter
-    const matchesQuery =
-      order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.items.toLowerCase().includes(searchQuery.toLowerCase())
+    const q = searchQuery.toLowerCase()
+    const matchesQuery = [order.id, order.name, order.items].some((v) => String(v || "").toLowerCase().includes(q))
     return matchesTab && matchesQuery
   })
 
-  // Franchise stats state
-  const franchises = []
+  // Best selling stores of the last 30 days
+  const franchises = dash.stores.slice(0, 5).map((s, i) => ({
+    rank: i + 1, name: s.name, rating: s.rating || "-", type: `${s.orders} orders`, rev: money(s.revenue), growth: `${s.completion}% delivered`,
+    color: i === 0 ? "bg-amber-500" : "bg-zinc-500",
+  }))
 
-  // Dynamic inventory warnings state
-  const [inventory, setInventory] = useState([])
+  // Alerts: the stores' open low-stock alerts (dismissing only hides one on this screen)
+  const [dismissed, setDismissed] = useState([])
+  const systemAlerts = dash.stock
+    .filter((a) => !dismissed.includes(a.id))
+    .map((a) => ({ id: a.id, text: `Low stock: ${a.ingredient} at ${a.store} (${a.currentStock} ${a.unit})`, time: a.severity, severity: a.severity === "critical" ? "severe" : "warning" }))
+  const removeAlert = (id) => setDismissed((prev) => [...prev, id])
 
-  // Restocking is done by the stores; nothing to do from here yet
-  const handleRestock = () => {
-    toast.info("Restocking is handled by each store's inventory. It is not available from this dashboard yet.")
-  }
-
-
-  // Payout Settlements state and interactive modal
-  const [showPayoutModal, setShowPayoutModal] = useState(false)
-  const [payoutAmount, setPayoutAmount] = useState("0")
-  const [selectedBank, setSelectedBank] = useState("")
-  const [payoutStatus, setPayoutStatus] = useState("idle") // idle, processing, success
-
-  const handleInitiatePayout = (e) => {
-    e.preventDefault()
-    toast.info("Settlements are not available yet.")
-    setShowPayoutModal(false)
-  }
-
-
-  // System alerts/logs state
-  const [systemAlerts, setSystemAlerts] = useState([])
-
-  const removeAlert = (id) => {
-    setSystemAlerts(prev => prev.filter(alert => alert.id !== id))
-  }
-
-  // Rider tracking radar state (simulated city marker clicking)
-  const [activeRiderDetails, setActiveRiderDetails] = useState(null)
-  const simulatedRiders = []
 
   return (
     <div className="superadmin-theme min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 transition-all duration-300">
@@ -231,7 +231,7 @@ export default function SuperAdminDashboard() {
               </span>
             </div>
             <p className="text-black dark:text-white text-xs font-medium mt-0.5">
-              Currently monitoring 24 pizza store channels across the central region.
+              {dash.summary ? `${dash.summary.activeStores} active stores across the company.` : "Loading the company figures..."}
             </p>
           </div>
 
@@ -405,7 +405,7 @@ export default function SuperAdminDashboard() {
                 </span>
                 <h3 className="font-extrabold text-xs text-black dark:text-white">Live Monitor</h3>
               </div>
-              <span className="text-[9px] font-bold text-black dark:text-white opacity-60">Total Live: 108</span>
+              <span className="text-[9px] font-bold text-black dark:text-white opacity-60">Total Live: {liveOrders.length}</span>
             </div>
 
             {/* Live tabs */}
@@ -445,11 +445,7 @@ export default function SuperAdminDashboard() {
                     onClick={() => setSelectedOrder(order)}
                     className="group flex items-center gap-2.5 p-2 rounded-lg border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/20 hover:bg-white dark:hover:bg-zinc-850 hover:shadow-md hover:border-[var(--primary)]/30 cursor-pointer transition-all duration-300"
                   >
-                    <img
-                      src={order.avatar}
-                      alt={order.name}
-                      className="w-8 h-8 rounded-lg object-cover shadow-sm group-hover:scale-105 transition-transform"
-                    />
+                    <div className="w-8 h-8 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center text-[10px] font-black shrink-0">{String(order.name || "?")[0]}</div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start">
                         <p className="text-[10px] font-bold text-black dark:text-white">{order.id}</p>
@@ -476,26 +472,11 @@ export default function SuperAdminDashboard() {
               <div>
                 <h3 className="font-extrabold text-xs text-black dark:text-white flex items-center gap-1.5">
                   <TrendingUp size={14} className="text-[var(--primary)]" />
-                  Financial Revenue & Traffic Trend
+                  Revenue Trend
                 </h3>
-                <p className="text-[10px] text-black dark:text-white opacity-60 font-semibold mt-0.5">Real-time dynamic sales tracking index</p>
+                <p className="text-[10px] text-black dark:text-white opacity-60 font-semibold mt-0.5">Sales of the last 7 days</p>
               </div>
 
-              {/* Intervals toggles */}
-              <div className="flex bg-zinc-50 dark:bg-zinc-950 p-0.5 rounded-lg self-start sm:self-center">
-                {["Hourly", "Daily"].map((interval) => (
-                  <button
-                    key={interval}
-                    onClick={() => setChartInterval(interval)}
-                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all ${chartInterval === interval
-                      ? "bg-[var(--primary)] text-white shadow-sm"
-                      : "text-black dark:text-white opacity-60 hover:opacity-100"
-                      }`}
-                  >
-                    {interval}
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Responsive Graph Canvas */}
@@ -536,7 +517,7 @@ export default function SuperAdminDashboard() {
                   <Area
                     type="monotone"
                     dataKey="revenue"
-                    name="Revenue Index"
+                    name="Revenue"
                     stroke={primaryColor}
                     strokeWidth={2}
                     fillOpacity={1}
@@ -547,7 +528,7 @@ export default function SuperAdminDashboard() {
             </div>
 
             <div className="flex justify-between items-center border-t border-zinc-50 dark:border-zinc-800 pt-2.5 mt-2.5 text-[9px] text-black dark:text-white opacity-60 font-semibold">
-              <span>*Refreshed in sync with POS systems</span>
+              <span>Refreshes every minute</span>
               <span className="flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] animate-ping" />
                 Active Sales Channel
@@ -558,18 +539,18 @@ export default function SuperAdminDashboard() {
 
         </section>
 
-        {/* Middle Interactive Column Grid: Franchises & Radar Map */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        {/* Top franchises */}
+        <section className="grid grid-cols-1 gap-4 mb-4">
 
           {/* Top Franchises ranking leaderboard */}
           <div className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 p-4 rounded-xl shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-extrabold text-xs text-black dark:text-white flex items-center gap-1.5">
                 <Trophy size={14} className="text-amber-500" />
-                Top Franchises Leaderboard
+                Top Stores (30 days)
               </h3>
               <span className="text-[9px] font-bold text-emerald-605 bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.2 rounded-full">
-                Revenue Growth Peak
+                By revenue
               </span>
             </div>
 
@@ -598,213 +579,17 @@ export default function SuperAdminDashboard() {
             </div>
           </div>
 
-          {/* Interactive fleet radar map preview */}
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 p-4 rounded-xl shadow-sm relative overflow-hidden flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-3 z-10">
-              <div>
-                <h3 className="font-extrabold text-xs text-black dark:text-white flex items-center gap-1.5">
-                  <Navigation size={14} className="text-[var(--primary)]" />
-                  Rider Radar Fleet Tracking
-                </h3>
-                <p className="text-[9px] text-black dark:text-white opacity-60 font-semibold mt-0.5">Click active coordinate dots to view transit status</p>
-              </div>
-
-              <div className="text-right">
-                <p className="text-xs font-black text-[var(--primary)]">24 mins</p>
-                <p className="text-[8px] text-black dark:text-white opacity-60 font-bold uppercase">Avg Transit time</p>
-              </div>
-            </div>
-
-            {/* Radar layout preview canvas */}
-            <div className="relative h-[180px] bg-zinc-950 rounded-xl overflow-hidden flex items-center justify-center shadow-inner border border-zinc-850">
-
-              {/* Radar circles */}
-              <div className="absolute w-[180px] h-[180px] rounded-full border border-zinc-800/40 animate-pulse" />
-              <div className="absolute w-[120px] h-[120px] rounded-full border border-zinc-800/20" />
-              <div className="absolute w-[60px] h-[60px] rounded-full border border-zinc-800/10" />
-              <div className="absolute w-full h-[1px] bg-zinc-800/25" />
-              <div className="absolute h-full w-[1px] bg-zinc-800/25" />
-
-              {/* Central hub indicator */}
-              <div className="absolute w-3.5 h-3.5 bg-[var(--primary)] border-2 border-white rounded-full z-20 shadow-md">
-                <span className="absolute -top-6 -left-8 text-[9px] bg-white text-zinc-900 border border-zinc-200 font-black px-1 py-0.5 rounded shadow-sm">HQ HUB</span>
-              </div>
-
-              {/* Coordinates representation dots */}
-              {simulatedRiders.map((rider, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setActiveRiderDetails(rider)}
-                  style={{ top: `${rider.lat}%`, left: `${rider.lng}%` }}
-                  className="absolute w-3.5 h-3.5 bg-emerald-500 rounded-full border border-white shadow-lg animate-bounce z-10 transition-transform hover:scale-125 focus:outline-none"
-                  title="Click to view courier info"
-                />
-              ))}
-
-              {/* Rider overlay details modal */}
-              {activeRiderDetails ? (
-                <div className="absolute bottom-3 left-3 right-3 p-3 rounded-xl bg-zinc-900/95 border border-zinc-800 backdrop-blur-md text-white flex items-center justify-between shadow-2xl z-30 animate-fade-down">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-black tracking-tight">{activeRiderDetails.name}</p>
-                    <p className="text-[9px] text-zinc-400 mt-0.5 font-medium">Order: {activeRiderDetails.order} • Status: {activeRiderDetails.status}</p>
-                    <p className="text-[9px] text-emerald-400 font-bold mt-0.5">{activeRiderDetails.phone}</p>
-                  </div>
-                  <button
-                    onClick={() => setActiveRiderDetails(null)}
-                    className="text-[9px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-extrabold px-2 py-1 rounded"
-                  >
-                    Close
-                  </button>
-                </div>
-              ) : (
-                <div className="absolute bottom-3 left-3 bg-zinc-900/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-zinc-800">
-                  <p className="text-[9px] font-black text-white">12 Active Riders live on transit grid</p>
-                </div>
-              )}
-            </div>
-
-          </div>
-
         </section>
 
-        {/* Inventory Critical Widget & Customer Retention Indicators */}
-        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-
-          {/* Inventory warning cards */}
-          {inventory.map((item) => (
-            <div
-              key={item.id}
-              className={`p-4 rounded-xl border-2 border-dashed shadow-sm flex flex-col justify-between transition-colors ${item.resolved
-                ? "border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/5"
-                : item.status === "Critical"
-                  ? "border-rose-500/30 bg-rose-500/5 dark:bg-rose-950/5 text-black dark:text-white"
-                  : "border-amber-500/30 bg-amber-500/5 dark:bg-amber-950/5 text-black dark:text-white"
-                }`}
-            >
-              <div className="flex items-center gap-1.5 mb-2.5">
-                {item.resolved ? (
-                  <CheckCircle size={14} className="text-emerald-500" />
-                ) : (
-                  <AlertTriangle size={14} className={item.status === "Critical" ? "text-rose-500 animate-pulse" : "text-amber-500"} />
-                )}
-                <p className={`font-bold text-[10px] uppercase ${item.resolved ? "text-emerald-605" : item.status === "Critical" ? "text-rose-600" : "text-amber-600"
-                  }`}>
-                  {item.resolved ? "Stock Healthy" : `Inventory ${item.status}`}
-                </p>
-              </div>
-
-              <div>
-                <p className="font-extrabold text-xs text-black dark:text-white">{item.name}</p>
-                <p className="text-[10px] text-black dark:text-white opacity-60 font-semibold mt-0.5">Stock remaining: {item.stock} at {item.branch}</p>
-              </div>
-
-              <div className="mt-3">
-                {item.resolved ? (
-                  <div className="w-full text-center py-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg">
-                    Restocked successfully
-                  </div>
-                ) : (
-                  <button
-                    disabled={item.loading}
-                    onClick={() => handleRestock(item.id)}
-                    className={`w-full py-1.5 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all ${item.status === "Critical"
-                      ? "bg-rose-500 hover:bg-rose-600 text-white shadow-md shadow-rose-500/10"
-                      : "bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-500/10"
-                      }`}
-                  >
-                    {item.loading ? (
-                      <RefreshCw size={11} className="animate-spin" />
-                    ) : (
-                      "Refill & Restock Now"
-                    )}
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-
-          {/* Customer Retention highlight bento card */}
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 p-4 rounded-xl shadow-sm lg:col-span-2 flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h4 className="text-xs font-black text-black dark:text-white">Customer Retention highlights</h4>
-                <p className="text-[9px] text-black dark:text-white opacity-60 font-semibold mt-0.5">Real-time customer feedback sync</p>
-              </div>
-              <span className="text-[9px] font-bold text-[var(--primary)] px-1.5 py-0.2 bg-[var(--primary)]/10 rounded-full border border-[var(--primary)]/15">
-                Active Index
-              </span>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1 p-3 bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-100 dark:border-zinc-850 rounded-xl shadow-inner">
-                <p className="text-[9px] text-black dark:text-white opacity-60 font-bold uppercase tracking-wider">Retention Rate</p>
-                <p className="text-xl font-black text-black dark:text-white mt-0.5">—</p>
-
-                {/* Visual bar */}
-                <div className="w-full h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full mt-2 overflow-hidden">
-                  <div className="h-full bg-[var(--primary)] w-0 rounded-full" />
-                </div>
-              </div>
-
-              <div className="flex-1 p-3 bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-100 dark:border-zinc-855 rounded-xl shadow-inner">
-                <p className="text-[9px] text-black dark:text-white opacity-60 font-bold uppercase tracking-wider">Trending Product</p>
-                <p className="text-xs font-bold text-black dark:text-white truncate mt-0.5">Paneer Tikka Pizza</p>
-                <p className="text-[10px] text-[var(--primary)] font-bold mt-1 flex items-center gap-1">
-                  <Sparkles size={10} />
-                  Ordered 142 times today
-                </p>
-              </div>
-            </div>
-          </div>
-
-        </section>
-
-        {/* settlements wallet & Payout center */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-          {/* Payout dashboard widget */}
-          <div className="lg:col-span-2 relative overflow-hidden p-5 rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-hover)] text-white shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-
-            <div className="relative z-10">
-              <p className="text-white/80 text-[10px] font-bold uppercase tracking-wider">Pending settlements wallet</p>
-              <h2 className="text-2xl md:text-3xl font-black mt-1 tracking-tight">₹{payoutAmount}</h2>
-
-              <div className="flex flex-wrap sm:flex-nowrap gap-2 mt-3">
-                <div className="bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-md border border-white/10">
-                  <p className="text-[8px] uppercase text-white/70 font-semibold">Next settlement Payout</p>
-                  <p className="text-[10px] font-bold mt-0.5">—</p>
-                </div>
-                <div className="bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-md border border-white/10">
-                  <p className="text-[8px] uppercase text-white/70 font-semibold">Taxes & GST (Accumulated)</p>
-                  <p className="text-[10px] font-bold mt-0.5">—</p>
-                </div>
-              </div>
-            </div>
-
-            {payoutAmount !== "0" ? (
-              <button
-                onClick={() => setShowPayoutModal(true)}
-                className="relative z-10 w-full md:w-auto bg-white hover:bg-zinc-50 text-[var(--primary)] px-4 py-2.5 rounded-lg font-bold shadow-lg active:scale-95 transition-all text-xs text-center"
-              >
-                Initiate Bank Payout
-              </button>
-            ) : (
-              <div className="relative z-10 w-full md:w-auto bg-white/10 border border-white/20 text-white/70 px-4 py-2.5 rounded-lg font-bold text-xs text-center">
-                All Payouts Settled
-              </div>
-            )}
-
-            {/* Background design elements */}
-            <div className="absolute -bottom-20 -right-20 w-48 h-48 bg-white/10 rounded-full blur-3xl" />
-            <div className="absolute -top-10 -left-10 w-36 h-36 bg-white/5 rounded-full blur-2xl" />
-          </div>
+        {/* Alerts */}
+        <section className="grid grid-cols-1 gap-4">
 
           {/* Alerts & Logs center */}
           <div className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 p-4 rounded-xl shadow-sm">
             <div className="flex items-center justify-between pb-2 border-b border-zinc-50 dark:border-zinc-800 mb-3">
               <h3 className="font-extrabold text-xs text-black dark:text-white flex items-center gap-1.5">
                 <ShieldAlert size={14} className="text-rose-500" />
-                Active Alerts Log Center
+                Low Stock Alerts
               </h3>
               <span className="text-[8px] font-bold text-rose-505 bg-rose-50 dark:bg-rose-950/20 px-1.5 py-0.2 rounded-full">
                 {systemAlerts.length} Active
@@ -844,7 +629,7 @@ export default function SuperAdminDashboard() {
               ) : (
                 <div className="text-center py-4">
                   <CheckCircle size={20} className="mx-auto text-emerald-500 stroke-[1.5] mb-1" />
-                  <p className="text-[10px] text-black dark:text-white opacity-60 font-bold">No active system warning alerts</p>
+                  <p className="text-[10px] text-black dark:text-white opacity-60 font-bold">No low-stock alerts</p>
                 </div>
               )}
             </div>
@@ -874,10 +659,9 @@ export default function SuperAdminDashboard() {
 
             <div className="space-y-4">
               <div className="flex items-center gap-3 bg-zinc-50/50 dark:bg-zinc-950/20 p-3 rounded-xl border border-zinc-100 dark:border-zinc-850">
-                <img src={selectedOrder.avatar} alt={selectedOrder.name} className="w-12 h-12 rounded-xl object-cover" />
                 <div>
                   <p className="text-xs font-bold text-zinc-800 dark:text-zinc-100">{selectedOrder.name}</p>
-                  <p className="text-[10px] text-zinc-400 font-semibold mt-0.5">Location distance: {selectedOrder.distance} • Rating: ★ {selectedOrder.rating}</p>
+                  <p className="text-[10px] text-zinc-400 font-semibold mt-0.5">{selectedOrder.store}</p>
                 </div>
               </div>
 
@@ -906,101 +690,6 @@ export default function SuperAdminDashboard() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">
-              <button
-                onClick={() => {
-                  alert(`Order ${selectedOrder.id} has been force-routed to kitchen prep successfully.`)
-                  setSelectedOrder(null)
-                }}
-                className="py-3 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-850 dark:hover:bg-zinc-800 text-white text-xs font-bold rounded-xl active:scale-95 transition-all text-center"
-              >
-                Approve & Sync kitchen
-              </button>
-              <button
-                onClick={() => {
-                  alert(`Courier mapping for order ${selectedOrder.id} initiated.`)
-                  setSelectedOrder(null)
-                }}
-                className="py-3 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-bold rounded-xl active:scale-95 transition-all text-center"
-              >
-                Auto-assign Courier
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* Payout Transfer simulation modal */}
-      {showPayoutModal && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-850 w-[calc(100%-2rem)] max-w-md mx-4 rounded-2xl shadow-2xl p-6 relative animate-fade-down">
-
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800 mb-5">
-              <h3 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-50">Initiate settlement Bank transfer</h3>
-              <button
-                onClick={() => setShowPayoutModal(false)}
-                className="text-[10px] font-bold text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-              >
-                Close
-              </button>
-            </div>
-
-            {payoutStatus === "idle" && (
-              <form onSubmit={handleInitiatePayout} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-zinc-400 uppercase">Settlement payout Amount</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 font-bold text-zinc-400 text-sm">₹</span>
-                    <input
-                      type="text"
-                      value={payoutAmount}
-                      onChange={(e) => setPayoutAmount(e.target.value)}
-                      className="w-full font-bold text-sm pl-7 pr-4 py-2 border border-zinc-100 dark:border-zinc-800 rounded-xl bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-zinc-400 uppercase">Receiving Corporate Bank</label>
-                  <select
-                    value={selectedBank}
-                    onChange={(e) => setSelectedBank(e.target.value)}
-                    className="w-full text-xs p-2.5 border border-zinc-100 dark:border-zinc-800 rounded-xl bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100"
-                  >
-                    <option value="">No bank account added</option>
-                    <option>SBI Main Vault Account (**** 4402)</option>
-                  </select>
-                </div>
-
-                <div className="p-3 bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-100 dark:border-zinc-850 rounded-xl text-[10px] text-zinc-450 leading-relaxed mt-2">
-                  *Funds will clear in 2-4 hours depending on RBI settlement batch windows. Payouts require dual authentication keys.
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-3 mt-4 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-bold rounded-xl shadow-lg active:scale-95 transition-all text-center"
-                >
-                  Confirm & Transfer ₹{payoutAmount}
-                </button>
-              </form>
-            )}
-
-            {payoutStatus === "processing" && (
-              <div className="text-center py-8 space-y-3.5">
-                <RefreshCw size={36} className="mx-auto text-[var(--primary)] animate-spin" />
-                <p className="text-xs text-zinc-500 font-bold">Initiating settlement security handshake...</p>
-              </div>
-            )}
-
-            {payoutStatus === "success" && (
-              <div className="text-center py-8 space-y-3.5">
-                <CheckCircle size={36} className="mx-auto text-emerald-500" />
-                <p className="text-xs text-emerald-600 dark:text-emerald-450 font-black">Payout Handshake Authorized!</p>
-                <p className="text-[10px] text-zinc-400">Settlements are not available yet.</p>
-              </div>
-            )}
-
           </div>
         </div>
       )}
@@ -1009,7 +698,7 @@ export default function SuperAdminDashboard() {
       <div className="fixed bottom-6 right-6 flex flex-col gap-3.5 z-40">
         <button
           onClick={() => {
-            alert("Create dynamic Coupon template dialog initiated.")
+            navigate("/food/superadmin/coupons")
           }}
           className="w-12 h-12 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all group relative border border-zinc-850"
           title="Create New Coupon code"
@@ -1022,14 +711,14 @@ export default function SuperAdminDashboard() {
 
         <button
           onClick={() => {
-            alert("Create dynamic Franchise application request dialog initiated.")
+            navigate("/food/superadmin/franchise-approvals")
           }}
           className="w-12 h-12 rounded-xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all group relative"
-          title="Register Franchise channel"
+          title="Franchise approvals"
         >
           <Store size={16} />
           <span className="absolute right-14 bg-zinc-900 text-white text-[10px] font-bold py-1 px-2.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-md pointer-events-none">
-            Add Franchise Store
+            Franchise Approvals
           </span>
         </button>
       </div>

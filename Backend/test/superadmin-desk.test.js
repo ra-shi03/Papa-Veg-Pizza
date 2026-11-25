@@ -42,8 +42,14 @@ describe('super admin desk', () => {
         assert.deepEqual([c.name, c.storeName, c.ordersDelivered, c.onDuty], [chef.name, 'TEST STORE A', 1, true]);
         assert.ok(!staff.some((s) => /manager/i.test(s.role)), 'store managers have their own page');
     });
+    test('roles: the real ones with how many hold each; no supervisor', async () => {
+        const { roles } = ok(await fx.call('GET', `${AD}/roles-summary`, fx.SA));
+        assert.deepEqual(roles.map((r) => r.code), ['SUPER_ADMIN', 'FRANCHISE_ADMIN', 'STORE_MANAGER', 'KITCHEN_STAFF', 'DELIVERY_PARTNER', 'CUSTOMER']);
+        const by = Object.fromEntries(roles.map((r) => [r.code, r.people]));
+        assert.deepEqual([by.SUPER_ADMIN, by.FRANCHISE_ADMIN, by.STORE_MANAGER, by.KITCHEN_STAFF], [1, 2, 2, 1]);
+    });
     test('only the super admin', async () => {
-        for (const path of ['/refunds', '/kitchen-staff', `/customers/${A.customerId}/history`]) {
+        for (const path of ['/refunds', '/roles-summary', '/kitchen-staff', `/customers/${A.customerId}/history`]) {
             for (const token of [A.adminToken, A.managerToken, chef.token, A.customerToken]) {
                 assert.equal((await fx.call('GET', `${AD}${path}`, token)).status, 403, path);
             }

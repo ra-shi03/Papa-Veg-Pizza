@@ -17,12 +17,12 @@ export default function DelayAlertModal({ isOpen, onClose, order, onActionComple
     }
     setLoading(true);
     try {
-      await postOrderDelayAlert(order.orderId || order._id, `${type.toUpperCase()} NOTIFICATION: ${reason}`);
-      toast.success(`Escalation triggered: ${type} notified successfully.`);
+      await postOrderDelayAlert(order.orderId || order._id, type.toLowerCase(), reason.trim());
+      toast.success(`Alert sent to the ${type === 'Admin' ? 'franchise admin' : type.toLowerCase()}.`);
       if (onActionComplete) onActionComplete();
       onClose();
     } catch (err) {
-      toast.error('Failed to process escalation');
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
@@ -118,7 +118,7 @@ export default function DelayAlertModal({ isOpen, onClose, order, onActionComple
               className="py-2 px-1 bg-red-650 hover:bg-red-750 text-white rounded-lg text-[10px] font-bold transition-all active:scale-95 flex flex-col items-center gap-1 cursor-pointer disabled:opacity-50"
             >
               <AlertTriangle size={14} />
-              <span>Escalate Admin</span>
+              <span>Alert Franchise</span>
             </button>
           </div>
         </div>

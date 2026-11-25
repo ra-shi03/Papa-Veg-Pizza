@@ -3,6 +3,7 @@ import { requireSuperAdmin } from '../../../../core/auth/auth.middleware.js';
 import { attachFranchiseScope } from '../../shared/franchiseScope.js';
 import * as adminController from '../controllers/admin.controller.js';
 import * as superAdminDesk from '../services/superAdminDesk.service.js';
+import * as orderActions from '../services/adminOrderActions.service.js';
 import * as staffController from '../controllers/staff.controller.js';
 import * as complaintDesk from '../controllers/complaintDesk.controller.js';
 import * as riderApproval from '../controllers/riderApproval.controller.js';
@@ -140,6 +141,10 @@ router.get('/kitchen-staff', async (req, res, next) => {
 });
 router.get('/customers/:id/history', async (req, res, next) => {
     try { res.json({ success: true, message: 'Customer history fetched', data: await superAdminDesk.customerHistory(req.params.id) }); } catch (err) { next(err); }
+});
+
+router.get('/roles-summary', async (req, res, next) => {
+    try { res.json({ success: true, message: 'Roles fetched', data: await superAdminDesk.rolesSummary() }); } catch (err) { next(err); }
 });
 
 // ----- Customers (account status is platform-wide) -----
@@ -334,6 +339,13 @@ router.patch('/territories/:id', geographyController.updateTerritory);
 router.delete('/territories/:id', geographyController.deleteTerritory);
 // ----- Orders -----
 router.delete('/orders/:orderId', orderController.deleteOrderAdminController);
+// All Orders / Order Tracking: cancel, pay back, chase a delay
+const orderAction = (message, fn) => async (req, res, next) => {
+    try { res.json({ success: true, message, data: await fn(req) }); } catch (err) { next(err); }
+};
+router.post('/orders/:orderId/cancel', requireSuperAdmin, orderAction('Order cancelled', (req) => orderActions.cancelByAdmin(req.params.orderId, req.body)));
+router.post('/orders/:orderId/refund', requireSuperAdmin, orderAction('Refund paid', (req) => orderActions.refundByAdmin(req.params.orderId, req.body, req.user?.userId)));
+router.post('/orders/:orderId/delay-alert', requireSuperAdmin, orderAction('Alert sent', (req) => orderActions.delayAlert(req.params.orderId, req.body)));
 
 // ----- Refunds (Super Admin only: approval credits the wallet or refunds the original payment method) -----
 router.get('/refunds', requireSuperAdmin, refundAdminController.listRefundsAdminController);

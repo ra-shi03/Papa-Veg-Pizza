@@ -1266,7 +1266,7 @@ export async function updateOrderStatusStore(
   }
   order.orderStatus = orderStatus;
   pushStatusHistory(order, {
-    byRole: "STORE",
+    byRole: extra.byRole || "STORE",   // 'ADMIN' when the super admin cancels
     byId: storeId,
     from,
     to: orderStatus,
@@ -1304,7 +1304,7 @@ export async function updateOrderStatusStore(
     
     title = "Order Cancelled ❌";
     const why = String(note || "").trim();
-    body = `Unfortunately, your order has been cancelled by the store.${why ? ` Reason: ${why}.` : ""}${customerMessage ? ` ${customerMessage}` : ""}${refundDetail}`;
+    body = `Unfortunately, your order has been cancelled by ${orderStatus === "cancelled_by_admin" ? "Papa Veg Pizza" : "the store"}.${why ? ` Reason: ${why}.` : ""}${customerMessage ? ` ${customerMessage}` : ""}${refundDetail}`;
   }
 
   // Real-time: status update to store room.

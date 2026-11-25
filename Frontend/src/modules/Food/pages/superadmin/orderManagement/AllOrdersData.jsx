@@ -1,6 +1,7 @@
 // Super admin order screens (All Orders, Order Tracking): every value comes from the server (realOrders.js).
 import { useState, useEffect } from 'react';
 import * as real from './realOrders';
+import { adminClient } from '@/services/api/axios';
 
 // Filter options for the franchise / store / rider dropdowns, filled from the server when orders load
 export const franchiseOptions = [];
@@ -40,11 +41,18 @@ export const getLiveEventsStream = (orderId) => real.fetchOrderEvents(orderId);
 export const getRiderDetailsApi = (riderId) => real.fetchRiderDetails(riderId);
 export const getCustomerDetailsApi = (customerId) => real.fetchCustomerDetails(customerId);
 
-// No server endpoint for these yet: say so instead of pretending it worked
-const notAvailable = (what) => Promise.reject(new Error(`${what} is not available from this screen yet.`));
-export const cancelOrderApi = () => notAvailable('Cancelling an order');
-export const initiateRefundApi = () => notAvailable('Starting a refund');
-export const postOrderDelayAlert = () => notAvailable('Sending a delay alert');
+// Cancel, refund and delay alert (super admin; the server checks the order's state and pays money at most once)
+const act = async (orderId, action, body) => {
+  try {
+    const res = await adminClient.post(`/food/admin/orders/${orderId}/${action}`, body);
+    return { success: true, data: res?.data?.data };
+  } catch (e) {
+    throw new Error(e?.response?.data?.message || e?.response?.data?.error || e?.message || 'Could not reach the server');
+  }
+};
+export const cancelOrderApi = (orderId, reason) => act(orderId, 'cancel', { reason });
+export const initiateRefundApi = (orderId, amount, reason) => act(orderId, 'refund', { amount, reason });
+export const postOrderDelayAlert = (orderId, target, message) => act(orderId, 'delay-alert', { target, message });
 
 export function useDebounce(value, delay) {
   const [debouncedValue, setDebouncedValue] = useState(value);

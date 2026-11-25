@@ -123,7 +123,6 @@ export default function RiderDetailsModal({ isOpen, onClose, riderId }) {
             <div className="pt-2 flex gap-3 border-t border-zinc-150 dark:border-zinc-800">
               <a 
                 href={`tel:${rider.phone}`}
-                onClick={() => toast.success(`Simulating call connection to ${rider.name}...`)}
                 className="flex-1 bg-[var(--primary)] text-white h-9 rounded-lg text-xs font-bold hover:opacity-90 shadow-sm active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Phone size={13} />

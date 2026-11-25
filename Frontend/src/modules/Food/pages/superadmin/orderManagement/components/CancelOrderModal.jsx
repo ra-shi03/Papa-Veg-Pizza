@@ -1,21 +1,12 @@
 // CancelOrderModal.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { toast } from 'sonner';
 import { X, AlertTriangle, RefreshCw } from 'lucide-react';
 import { cancelOrderApi } from '../AllOrdersData';
 
 export default function CancelOrderModal({ isOpen, onClose, order, onSuccess }) {
   const [reason, setReason] = useState('');
-  const [refundRequired, setRefundRequired] = useState(false);
-  const [refundAmount, setRefundAmount] = useState('0');
   const [loading, setLoading] = useState(false);
-
-  // Initialize refund amount to grand total if order payment is Paid
-  useEffect(() => {
-    if (order) {
-      setRefundRequired(order.paymentStatus === 'Paid');
-      setRefundAmount(order.grandTotal ? order.grandTotal.toString() : '0');
-    }
-  }, [order, isOpen]);
 
   if (!isOpen || !order) return null;
 
@@ -25,13 +16,13 @@ export default function CancelOrderModal({ isOpen, onClose, order, onSuccess }) 
 
     setLoading(true);
     try {
-      const result = await cancelOrderApi(order._id, reason, refundRequired, parseFloat(refundAmount));
+      const result = await cancelOrderApi(order._id, reason);
       if (result.success) {
         onSuccess(`Order ${order.orderNumber} cancelled successfully.`);
         onClose();
       }
     } catch (err) {
-      console.error(err);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
@@ -82,41 +73,9 @@ export default function CancelOrderModal({ isOpen, onClose, order, onSuccess }) 
           </div>
 
           {order.paymentStatus === 'Paid' && (
-            <div className="space-y-3 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-              <div className="flex items-center gap-2">
-                <input 
-                  type="checkbox"
-                  id="refundCheck"
-                  checked={refundRequired}
-                  onChange={(e) => setRefundRequired(e.target.checked)}
-                  className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-700 text-[var(--primary)] focus:ring-[var(--primary)]"
-                />
-                <label htmlFor="refundCheck" className="text-xs font-bold text-zinc-800 dark:text-zinc-200 cursor-pointer">
-                  Auto-Trigger Payment Refund
-                </label>
-              </div>
-
-              {refundRequired && (
-                <div className="space-y-1 animate-fade-down duration-200">
-                  <label className="block text-[10px] font-bold text-zinc-550 dark:text-zinc-455 uppercase tracking-widest">
-                    Refund Amount (INR)
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">₹</span>
-                    <input 
-                      type="number"
-                      value={refundAmount}
-                      onChange={(e) => setRefundAmount(e.target.value)}
-                      max={order.grandTotal}
-                      className="w-full pl-7 pr-3 h-9 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent transition-all font-mono font-bold"
-                    />
-                  </div>
-                  <span className="text-[9px] text-zinc-400 font-semibold">
-                    Maximum refundable amount: ₹{order.grandTotal} (Grand Total)
-                  </span>
-                </div>
-              )}
-            </div>
+            <p className="pt-2 border-t border-zinc-100 dark:border-zinc-800 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+              This order is paid (₹{order.grandTotal}). Cancelling it refunds the customer in full, automatically.
+            </p>
           )}
 
           <div className="pt-3 border-t border-zinc-150 dark:border-zinc-800 flex gap-3">

@@ -1,5 +1,6 @@
 // InitiateRefundModal.jsx
 import React, { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { X, CreditCard, RefreshCw } from 'lucide-react';
 import { initiateRefundApi } from '../AllOrdersData';
 
@@ -30,14 +31,14 @@ export default function InitiateRefundModal({ isOpen, onClose, order, onSuccess 
 
     setLoading(true);
     try {
-      const gateway = order.payment?.gateway || 'Razorpay';
-      const result = await initiateRefundApi(order._id, refundType, parseFloat(refundAmount), reason, gateway);
+      // 'Full' sends no amount: the server pays whatever has not been refunded yet
+      const result = await initiateRefundApi(order._id, refundType === 'Full' ? undefined : parseFloat(refundAmount), reason);
       if (result.success) {
-        onSuccess(`Refund of ₹${refundAmount} initiated successfully via ${gateway}.`);
+        onSuccess(`Refund of ₹${result.data?.refund?.amount ?? refundAmount} paid to the customer.`);
         onClose();
       }
     } catch (err) {
-      console.error(err);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
