@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react"
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom"
 import {
-  Menu, Bell, Store, ChevronDown, User, LogOut, Settings as SettingsIcon,
+  Menu, Store, ChevronDown, User, LogOut, Settings as SettingsIcon,
   AlertCircle, Search, Calendar, Clock, X, Trash2, Plus, Megaphone,
   BarChart3, Sun, Moon, Laptop, Shield, Activity, FileText, Check, CheckCircle2,
   AlertTriangle, ArrowRight, Smartphone
@@ -35,7 +35,6 @@ export default function Navbar({ onToggleSidebar }) {
 
   // Dropdown UI toggles
   const [showProfileMenu, setShowProfileMenu] = useState(false)
-  const [showNotifications, setShowNotifications] = useState(false)
   const [selectedStore, setSelectedStore] = useState("All Stores")
   const [showStoreDropdown, setShowStoreDropdown] = useState(false)
   const [showActionsDropdown, setShowActionsDropdown] = useState(false)
@@ -44,8 +43,6 @@ export default function Navbar({ onToggleSidebar }) {
   const { themeMode } = useSystemTheme()
 
   // Modals visibility
-  const [showAddStoreModal, setShowAddStoreModal] = useState(false)
-  const [showBroadcastModal, setShowBroadcastModal] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [showSecurityModal, setShowSecurityModal] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
@@ -53,9 +50,6 @@ export default function Navbar({ onToggleSidebar }) {
   // Session Data & Logs
   const [adminData, setAdminData] = useState(null)
   const [franchiseData, setFranchiseData] = useState(null)
-  const [notifications, setNotifications] = useState([])
-  const [notificationTab, setNotificationTab] = useState("all") 
-
   const [newOrdersCount, setNewOrdersCount] = useState((0))
 
   const handleConfirmLogout = async () => {
@@ -74,10 +68,6 @@ export default function Navbar({ onToggleSidebar }) {
 
   // Store List
   const [storeList, setStoreList] = useState(([]))
-
-  // Modals form state
-  const [storeForm, setStoreForm] = useState({ name: "", address: "", location: "Indore", manager: "", hours: "11:00 AM - 11:00 PM" })
-  const [broadcastForm, setBroadcastForm] = useState({ title: "", message: "", targetStore: "All Stores", priority: "medium" })
 
   // The real stores of this franchise; the sample orders, customers and products are for 
   const searchCollection = (storeList.map((s) => ({
@@ -131,9 +121,6 @@ export default function Navbar({ onToggleSidebar }) {
       setRecentSearches(JSON.parse(savedSearches))
     }
 
-    const defaultNotifications = []
-    // There is no franchise notification feed on the server yet: outside standalone mode the list stays empty
-    
   }, [])
 
   useEffect(() => {
@@ -161,48 +148,6 @@ export default function Navbar({ onToggleSidebar }) {
       document.removeEventListener("keydown", handleKeyDown)
     }
   }, [])
-
-  // Simulated Socket Events 
-  useEffect(() => {
-    return undefined
-    const socketInterval = setInterval(() => {
-      const events = []
-
-      const randomEvent = events[Math.floor(Math.random() * events.length)]
-      
-      if (randomEvent.event === "orderCreated") {
-        setNewOrdersCount(prev => prev + 1)
-        toast.info(`[Socket: orderCreated] ${randomEvent.title}`, {
-          description: randomEvent.message,
-          action: {
-            label: "View Orders",
-            onClick: () => navigate("/franchise-admin/live-orders")
-          }
-        })
-      } else {
-        const newNotif = {
-          id: Date.now(),
-          title: randomEvent.title,
-          message: randomEvent.message,
-          time: "Just now",
-          type: randomEvent.type,
-          unread: true
-        }
-
-        setNotifications(prev => {
-          const updated = [newNotif, ...prev]
-          localStorage.setItem("franchise_notifications", JSON.stringify(updated))
-          return updated
-        })
-
-        toast.success(`[Socket: ${randomEvent.event}] ${randomEvent.title}`, {
-          description: randomEvent.message
-        })
-      }
-    }, 50000)
-
-    return () => clearInterval(socketInterval)
-  }, [navigate])
 
   // Global Search Debounce
   useEffect(() => {
@@ -282,83 +227,6 @@ export default function Navbar({ onToggleSidebar }) {
     toast.success(`Theme mode switched to ${mode}`)
   }
 
-  const handleAddStoreSubmit = (e) => {
-    e.preventDefault()
-    if (!storeForm.name || !storeForm.address || !storeForm.manager) {
-      toast.error("Please fill in all required fields")
-      return
-    }
-
-    const newStore = {
-      id: Date.now(),
-      name: storeForm.name,
-      address: storeForm.address,
-      location: storeForm.location,
-      manager: storeForm.manager,
-      hours: storeForm.hours
-    }
-
-    const updatedStores = [...storeList, newStore]
-    setStoreList(updatedStores)
-    localStorage.setItem("franchise_stores", JSON.stringify(updatedStores))
-
-    setStoreForm({ name: "", address: "", location: "Indore", manager: "", hours: "11:00 AM - 11:00 PM" })
-    setShowAddStoreModal(false)
-    toast.success(`Store '${newStore.name}' created!`)
-  }
-
-  const handleBroadcastSubmit = (e) => {
-    e.preventDefault()
-    if (!broadcastForm.title || !broadcastForm.message) {
-      toast.error("Title and message are required")
-      return
-    }
-
-    const newBroadcast = {
-      id: Date.now(),
-      title: `Broadcast: ${broadcastForm.title}`,
-      message: `${broadcastForm.message} (${broadcastForm.targetStore})`,
-      time: "Just now",
-      type: "complaints", 
-      unread: true
-    }
-
-    const updatedNotifs = [newBroadcast, ...notifications]
-    setNotifications(updatedNotifs)
-    localStorage.setItem("franchise_notifications", JSON.stringify(updatedNotifs))
-
-    setBroadcastForm({ title: "", message: "", targetStore: "All Stores", priority: "medium" })
-    setShowBroadcastModal(false)
-    toast.success("Broadcast sent successfully!")
-  }
-
-  const markAsRead = (id) => {
-    const updated = notifications.map(n => n.id === id ? { ...n, unread: false } : n)
-    setNotifications(updated)
-    localStorage.setItem("franchise_notifications", JSON.stringify(updated))
-  }
-
-  const markAllRead = () => {
-    const updated = notifications.map(n => ({ ...n, unread: false }))
-    setNotifications(updated)
-    localStorage.setItem("franchise_notifications", JSON.stringify(updated))
-    toast.success("All alerts marked as read")
-  }
-
-  const clearNotification = (id) => {
-    const updated = notifications.filter(n => n.id !== id)
-    setNotifications(updated)
-    localStorage.setItem("franchise_notifications", JSON.stringify(updated))
-  }
-
-  const getFilteredNotifications = () => {
-    if (notificationTab === "unread") return notifications.filter(n => n.unread)
-    if (notificationTab === "all") return notifications
-    return notifications.filter(n => n.type === notificationTab)
-  }
-
-  const unreadCount = notifications.filter(n => n.unread).length
-
   return (
     <>
       <header className="sticky top-0 w-full flex justify-between items-center px-4 md:px-6 h-16 bg-white dark:bg-zinc-900 border-b border-zinc-150 dark:border-zinc-800 z-40 transition-all duration-300">
@@ -389,7 +257,6 @@ export default function Navbar({ onToggleSidebar }) {
                 onClick={() => {
                   setShowStoreDropdown(!showStoreDropdown)
                   setShowDateDropdown(false)
-                  setShowNotifications(false)
                   setShowProfileMenu(false)
                   setShowActionsDropdown(false)
                 }}
@@ -443,7 +310,6 @@ export default function Navbar({ onToggleSidebar }) {
               onClick={() => {
                 setShowDateDropdown(!showDateDropdown)
                 setShowStoreDropdown(false)
-                setShowNotifications(false)
                 setShowProfileMenu(false)
                 setShowActionsDropdown(false)
               }}
@@ -520,108 +386,11 @@ export default function Navbar({ onToggleSidebar }) {
 
           {/* Minimal Quick Actions Trigger Removed */}
 
-          {/* Notifications Trigger */}
-          <div className="relative">
-            <button
-              onClick={() => {
-                setShowNotifications(!showNotifications)
-                setShowStoreDropdown(false)
-                setShowDateDropdown(false)
-                setShowProfileMenu(false)
-                setShowActionsDropdown(false)
-              }}
-              className="p-1 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-150 transition-colors cursor-pointer relative"
-            >
-              <Bell size={17} />
-              {unreadCount > 0 && (
-                <span className="absolute top-0 right-0 w-2 h-2 bg-[var(--primary)]/100 rounded-full ring-2 ring-white dark:ring-slate-950"></span>
-              )}
-            </button>
-
-            {showNotifications && (
-              <div className="absolute right-0 mt-2.5 w-[360px] rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 shadow-xl p-3 z-50 animate-in fade-in duration-100">
-                <div className="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800">
-                  <span className="text-xs font-bold text-zinc-900 dark:text-white">System Alerts</span>
-                  {unreadCount > 0 && (
-                    <button onClick={markAllRead} className="text-[10px] font-bold text-[var(--primary)] hover:underline">Mark all read</button>
-                  )}
-                </div>
-
-                <div className="flex gap-1 border-b border-zinc-100 dark:border-zinc-800 mt-1.5 pb-1 overflow-x-auto scrollbar-none">
-                  {[
-                    { id: "all", label: "All" },
-                    { id: "unread", label: "Unread" },
-                    { id: "orders", label: "Orders" },
-                    { id: "inventory", label: "Inventory" },
-                    { id: "complaints", label: "Complaints" }
-                  ].map(tab => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setNotificationTab(tab.id)}
-                      className={`px-2 py-0.5 text-[9px] font-bold rounded transition-all ${
-                        notificationTab === tab.id
-                          ? "bg-zinc-100 dark:bg-zinc-800 text-[var(--primary)]"
-                          : "text-zinc-450 hover:text-zinc-650"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="space-y-1.5 mt-2.5 max-h-56 overflow-y-auto scrollbar-thin">
-                  {/* Dynamic Notification and Simulated Socket updates */}
-                  {newOrdersCount > 0 && (
-                    <div 
-                      onClick={() => { setNewOrdersCount(0); navigate("/franchise-admin/live-orders"); setShowNotifications(false); }}
-                      className="p-2 bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/10 rounded-xl flex items-center justify-between cursor-pointer animate-pulse text-[11px]"
-                    >
-                      <span className="font-bold text-blue-600 dark:text-blue-400">Incoming Orders Active: {newOrdersCount}</span>
-                      <ArrowRight size={12} className="text-blue-500" />
-                    </div>
-                  )}
-
-                  {getFilteredNotifications().length > 0 ? (
-                    getFilteredNotifications().map((n) => (
-                      <div 
-                        key={n.id} 
-                        onClick={() => markAsRead(n.id)}
-                        className={`group flex gap-2.5 items-start p-2.5 rounded-xl border relative transition-colors ${
-                          n.unread ? "bg-[var(--primary)]/[0.02] border-[var(--primary)]/5" : "bg-zinc-50/30 dark:bg-zinc-900 border-zinc-100 dark:border-zinc-850"
-                        }`}
-                      >
-                        <div className="flex-1 min-w-0 pr-4">
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] font-black text-zinc-900 dark:text-white leading-tight">{n.title}</span>
-                            {n.unread && <span className="w-1 h-1 rounded-full bg-[var(--primary)]" />}
-                          </div>
-                          <p className="text-[9px] text-zinc-500 dark:text-zinc-450 mt-0.5 break-words">{n.message}</p>
-                          <span className="text-[8px] text-zinc-400 mt-1 block font-bold">{n.time}</span>
-                        </div>
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); clearNotification(n.id); }}
-                          className="absolute right-1 top-1 p-0.5 text-zinc-350 hover:text-[var(--primary)] opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <X size={10} />
-                        </button>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8 text-zinc-400 text-[10px]">No alerts</div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <span className="text-zinc-200 dark:text-zinc-800">|</span>
-
           {/* Profile Section (Sleek Avatar with Minimalist Profile Menu) */}
           <div className="relative">
             <button
               onClick={() => {
                 setShowProfileMenu(!showProfileMenu)
-                setShowNotifications(false)
                 setShowStoreDropdown(false)
                 setShowDateDropdown(false)
                 setShowActionsDropdown(false)

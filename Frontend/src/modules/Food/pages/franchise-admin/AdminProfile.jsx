@@ -25,6 +25,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { adminAPI, userAPI } from "@food/api"
+import { adminClient } from "@/services/api/axios"
 import { useAuthStore } from "@/core/auth/auth.store"
 
 // Custom reusable components for clean UI architecture
@@ -80,7 +81,7 @@ export default function AdminProfile() {
 
   const { user } = useAuthStore()
   // Profile Photo states
-  const [profileImage, setProfileImage] = useState(() => localStorage.getItem("admin_profile_image") || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150")
+  const [profileImage, setProfileImage] = useState("") // the saved photo link; initials are shown without one
   const [showPhotoModal, setShowPhotoModal] = useState(false)
   const [selectedPhotoFile, setSelectedPhotoFile] = useState(null)
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState("")
@@ -374,21 +375,39 @@ export default function AdminProfile() {
     }
   }
 
-  const handleUploadPhoto = () => {
-    if (!photoPreviewUrl) return
-    setProfileImage(photoPreviewUrl)
-    localStorage.setItem("admin_profile_image", photoPreviewUrl)
-    setShowPhotoModal(false)
-    setSelectedPhotoFile(null)
-    setPhotoPreviewUrl("")
-    toast.success("Profile photo updated successfully")
+  // The photo is uploaded first; the profile keeps the link, so it shows on every device
+  const savePhoto = async (url, message) => {
+    await adminAPI.updateAdminProfile({ profileImage: url })
+    setProfileImage(url)
+    toast.success(message)
+  }
+  const photoError = (err) => toast.error(err?.response?.data?.message || err?.response?.data?.error || "Could not save the photo")
+
+  const handleUploadPhoto = async () => {
+    if (!selectedPhotoFile) return
+    if (!String(selectedPhotoFile.type).startsWith("image/")) return toast.error("Choose an image file")
+    if (selectedPhotoFile.size > 5 * 1024 * 1024) return toast.error("The photo must be under 5 MB")
+    try {
+      const fd = new FormData()
+      fd.append("file", selectedPhotoFile)
+      const res = await adminClient.post("/uploads/image", fd, { headers: { "Content-Type": "multipart/form-data" } })
+      const url = res?.data?.data?.url || res?.data?.url || ""
+      if (!url) throw new Error("Upload failed")
+      await savePhoto(url, "Profile photo updated successfully")
+      setShowPhotoModal(false)
+      setSelectedPhotoFile(null)
+      setPhotoPreviewUrl("")
+    } catch (err) {
+      photoError(err)
+    }
   }
 
-  const handleRemovePhoto = () => {
-    const fallbackImage = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150"
-    setProfileImage(fallbackImage)
-    localStorage.removeItem("admin_profile_image")
-    toast.success("Profile photo removed")
+  const handleRemovePhoto = async () => {
+    try {
+      await savePhoto("", "Profile photo removed")
+    } catch (err) {
+      photoError(err)
+    }
   }
 
   // Toggle Theme (Immediately updates DOM, localStorage, and Backend)
@@ -442,11 +461,17 @@ export default function AdminProfile() {
               <div className="relative group mb-4">
                 {/* Profile circular webp/image */}
                 <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-zinc-100 dark:border-zinc-800 shadow-md">
-                  <img
-                    src={profileImage}
-                    alt={`${personalInfo.firstName || "Admin"} ${personalInfo.lastName || ""}`.trim()}
-                    className="w-full h-full object-cover"
-                  />
+                  {profileImage ? (
+                    <img
+                      src={profileImage}
+                      alt={`${personalInfo.firstName || "Admin"} ${personalInfo.lastName || ""}`.trim()}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 text-2xl font-black text-zinc-500">
+                      {`${(personalInfo.firstName || "A")[0]}${(personalInfo.lastName || "")[0] || ""}`.toUpperCase()}
+                    </div>
+                  )}
                 </div>
                 <button
                   onClick={() => setShowPhotoModal(true)}

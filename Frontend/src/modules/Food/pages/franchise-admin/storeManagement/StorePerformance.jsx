@@ -63,6 +63,7 @@ export default function StorePerformance() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [drawerDefaultTab, setDrawerDefaultTab] = useState("revenue")
   const [isCompareOpen, setIsCompareOpen] = useState(false)
+  const [compareStoreId, setCompareStoreId] = useState("") // the store picked from a row's "Compare Store"
   const [isExportOpen, setIsExportOpen] = useState(false)
   const [isRevenueModalOpen, setIsRevenueModalOpen] = useState(false)
   const [isOrdersModalOpen, setIsOrdersModalOpen] = useState(false)
@@ -811,7 +812,7 @@ export default function StorePerformance() {
                               </div>
                               <div className="py-1">
                                 <button
-                                  onClick={() => { setSelectedStoreIds([store._id]); setIsCompareOpen(true); setActiveMenuId(null); }}
+                                  onClick={() => { setCompareStoreId(store._id); setIsCompareOpen(true); setActiveMenuId(null); }}
                                   className="w-full px-4 py-1.5 text-xs text-slate-700 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-850 flex items-center gap-1.5 cursor-pointer"
                                 >
                                   <Sliders className="w-3.5 h-3.5 text-slate-450" />
@@ -890,8 +891,9 @@ export default function StorePerformance() {
       {/* COMPARE STORES MODAL */}
       <CompareStoresModal
         isOpen={isCompareOpen}
-        onClose={() => setIsCompareOpen(false)}
+        onClose={() => { setIsCompareOpen(false); setCompareStoreId("") }}
         stores={liveStores}
+        initialStoreId={compareStoreId}
       />
 
       {/* EXPORT REPORT MODAL */}

@@ -10,14 +10,13 @@ import { toast } from "sonner";
 // Queries and Mutations
 import { 
   useRefundRequests, useStores, useRefundAnalytics, 
-  useApproveRefund, useRejectRefund, useProcessRefund 
+  useApproveRefund, useRejectRefund 
 } from "./ordersQuery";
 
 // Overlays
 import RefundDetailsDrawer from "./components/RefundDetailsDrawer";
 import ApproveRefundModal from "./components/ApproveRefundModal";
 import RejectRefundModal from "./components/RejectRefundModal";
-import ProcessRefundModal from "./components/ProcessRefundModal";
 import RefundAnalysisModal from "./components/RefundAnalysisModal";
 
 export default function RefundRequests() {
@@ -617,21 +616,6 @@ export default function RefundRequests() {
                                 </button>
                               </>
                             )}
-
-                            {r.refundStatus === "Approved" && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedRequestId(r.requestId);
-                                  setActiveDropdownId(null);
-                                  setActiveOverlay("process");
-                                }}
-                                className="w-full px-3.5 py-2 text-left hover:bg-emerald-50/55 dark:hover:bg-emerald-950/20 text-emerald-600 flex items-center gap-2 cursor-pointer"
-                              >
-                                <CreditCard size={12} />
-                                <span>Process Refund</span>
-                              </button>
-                            )}
                           </div>
                         )}
                       </div>
@@ -734,16 +718,6 @@ export default function RefundRequests() {
       {/* 3. Reject modal */}
       <RejectRefundModal
         isOpen={activeOverlay === "reject"}
-        onClose={() => {
-          setActiveOverlay(null);
-          setSelectedRequestId(null);
-        }}
-        request={selectedRequest}
-      />
-
-      {/* 4. Process Payout modal */}
-      <ProcessRefundModal
-        isOpen={activeOverlay === "process"}
         onClose={() => {
           setActiveOverlay(null);
           setSelectedRequestId(null);

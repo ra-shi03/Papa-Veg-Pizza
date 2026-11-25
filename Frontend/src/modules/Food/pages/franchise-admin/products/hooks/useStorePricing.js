@@ -1,22 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
 import { adminAPI } from "@food/api";
-import { subscribeToPricingChanges } from "../services/storePricingService";
 import { adminClient } from "@/services/api/axios";
 import { throwApiError } from "@/services/api/apiError";
-import { categoryService } from "../categoryService";
-import { productService } from "../productService";
 
 export function useStorePricing(filters = {}) {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const unsubscribe = subscribeToPricingChanges(() => {
-      queryClient.invalidateQueries({ queryKey: ["store-pricing"] });
-    });
-    return unsubscribe;
-  }, [queryClient]);
-
   return useQuery({
     queryKey: ["store-pricing", filters],
     queryFn: () => adminAPI.getStorePricing(filters).then((res) => res.data.data),

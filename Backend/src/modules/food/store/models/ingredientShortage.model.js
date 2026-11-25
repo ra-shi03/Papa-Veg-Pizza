@@ -30,6 +30,11 @@ const ingredientShortageSchema = new mongoose.Schema(
         resolvedBy: { type: String, default: '', trim: true },
         resolvedAt: { type: Date, default: null },
         resolutionNote: { type: String, default: '', trim: true, maxlength: 600 },
+        // the franchise admin's answer to a restock request (the dashboard "Reorder"); '' while waiting
+        franchiseDecision: { type: String, enum: ['', 'approved', 'rejected'], default: '' },
+        franchiseNote: { type: String, default: '', trim: true, maxlength: 300 },
+        franchiseDecidedBy: { type: String, default: '', trim: true },
+        franchiseDecidedAt: { type: Date, default: null },
         timeline: { type: [timelineSchema], default: [] }
     },
     { collection: 'food_ingredient_shortages', timestamps: true }

@@ -35,6 +35,7 @@ import { optionalCustomer } from '../core/auth/optionalCustomer.js';
 import { bulkOrderLimiters } from '../middleware/rateLimit.js';
 import storeRewardsRoutes from '../modules/food/store/routes/storeRewards.routes.js';
 import franchiseRefundsRoutes from '../modules/food/franchise/routes/franchiseRefunds.routes.js';
+import franchiseOverviewRoutes from '../modules/food/franchise/routes/franchiseOverview.routes.js';
 import { riderPayoutsRouter, storePayoutsRouter, mySalaryRouter, franchisePayoutsRouter, platformPayoutsRouter } from '../modules/food/payouts/routes/payout.routes.js';
 import storeOrderRoutes from '../modules/food/store/routes/storeOrders.routes.js';
 import storeOpenStatusRoutes from '../modules/food/store/routes/storeOpenStatus.routes.js';
@@ -94,6 +95,7 @@ router.use('/v1/food/store/rewards', storeRewardsRoutes);
 router.use('/v1/food/store/bulk-orders', storeBulkOrdersRoutes);
 router.use('/v1/food/franchise/bulk-orders', franchiseBulkOrdersRoutes);
 router.use('/v1/food/franchise/refunds', franchiseRefundsRoutes);
+router.use('/v1/food/franchise/overview', franchiseOverviewRoutes);
 // Payouts: super admin -> franchise -> store -> riders / kitchen staff (modules/food/payouts)
 router.use('/v1/food/store/payouts', storePayoutsRouter);
 router.use('/v1/food/store/my-salary', mySalaryRouter);

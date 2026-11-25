@@ -48,11 +48,8 @@ export const franchiseAdminSidebarMenu = [
   },
   {
     type: "section",
-    label: "PRODUCTS",
+    label: "PRICING",
     items: [
-      { type: "link", label: "Products", path: "/franchise-admin/products", icon: "Pizza" },
-      { type: "link", label: "Categories", path: "/franchise-admin/categories", icon: "Grid" },
-      { type: "link", label: "Add-ons", path: "/franchise-admin/addons", icon: "Sparkles" },
       { type: "link", label: "Store Pricing", path: "/franchise-admin/store-pricing", icon: "DollarSign" },
     ],
   },

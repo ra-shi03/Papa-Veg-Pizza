@@ -3,7 +3,7 @@ import { X, Sliders, ArrowUpDown, Star, TrendingUp, ShoppingBag, Clock, AlertTri
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Cell } from "recharts"
 import { adminAPI } from "@food/api"
 
-export default function CompareStoresModal({ isOpen, onClose, stores = [] }) {
+export default function CompareStoresModal({ isOpen, onClose, stores = [], initialStoreId = "" }) {
   const [selectedStoreIds, setSelectedStoreIds] = useState([])
   const [comparisonData, setComparisonData] = useState([])
   const [loading, setLoading] = useState(false)
@@ -13,10 +13,12 @@ export default function CompareStoresModal({ isOpen, onClose, stores = [] }) {
   useEffect(() => {
     if (isOpen && stores.length > 0) {
       const activeStores = stores.filter(s => s.status === "Active")
-      const initial = activeStores.slice(0, 2).map(s => s._id)
+      const ids = activeStores.map(s => s._id)
+      // the row's store first, then others to compare it with
+      const initial = (initialStoreId ? [initialStoreId, ...ids.filter(id => id !== initialStoreId)] : ids).slice(0, 2)
       setSelectedStoreIds(initial)
     }
-  }, [isOpen, stores])
+  }, [isOpen, stores, initialStoreId])
 
   // Fetch comparison data when selected stores change
   useEffect(() => {

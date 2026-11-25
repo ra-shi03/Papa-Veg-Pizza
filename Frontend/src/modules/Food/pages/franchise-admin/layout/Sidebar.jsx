@@ -100,12 +100,6 @@ export default function Sidebar({ isOpen, onClose, isCollapsed = false, onToggle
         className={`fixed inset-y-0 left-0 z-[60] flex flex-col bg-zinc-950 dark:bg-white border-r border-zinc-800 dark:border-zinc-200 transition-all duration-300 ease-in-out lg:translate-x-0 ${
           displayCollapsed ? "w-[72px]" : "w-[280px]"
         } ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
-        onMouseEnter={() => {
-          if (isCollapsed && window.matchMedia('(min-width: 1024px)').matches) setIsHovered(true)
-        }}
-        onMouseLeave={() => {
-          if (isCollapsed && window.matchMedia('(min-width: 1024px)').matches) setIsHovered(false)
-        }}
       >
         {/* Header / Logo section */}
         <div className={`py-4 flex items-center justify-between border-b border-zinc-800 dark:border-zinc-200 ${displayCollapsed ? "justify-center px-2 flex-col gap-3" : "px-4"}`}>

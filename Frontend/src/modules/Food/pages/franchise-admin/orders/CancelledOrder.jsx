@@ -22,8 +22,6 @@ import {
 
 // Connected Modals & Drawers
 import CancellationDetailsDrawer from "./components/CancellationDetailsDrawer";
-import InitiateRefundModal from "./components/InitiateRefundModal";
-import ReopenInvestigationModal from "./components/ReopenInvestigationModal";
 import CancellationAnalysisModal from "./components/CancellationAnalysisModal";
 
 export default function CancelledOrder() {
@@ -723,32 +721,6 @@ export default function CancelledOrder() {
                               </button>
                             </div>
 
-                            <div className="py-1">
-                              <button
-                                disabled={order.cancellation?.refundStatus === "Completed" || order.cancellation?.refundRequired === false}
-                                onClick={() => {
-                                  setSelectedOrderId(order.id);
-                                  setActiveOverlay("refund");
-                                  setActiveDropdownId(null);
-                                }}
-                                className="w-full px-3 py-2 text-left text-[11px] font-bold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-900 disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1.5 transition-colors cursor-pointer"
-                              >
-                                <Wallet size={12} className="text-emerald-500" />
-                                Initiate Refund
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  setSelectedOrderId(order.id);
-                                  setActiveOverlay("reopen");
-                                  setActiveDropdownId(null);
-                                }}
-                                className="w-full px-3 py-2 text-left text-[11px] font-bold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-900 flex items-center gap-1.5 transition-colors cursor-pointer"
-                              >
-                                <ShieldAlert size={12} className="text-rose-500" />
-                                Reopen Investigation
-                              </button>
-                            </div>
                           </div>
                         )}
                       </div>
@@ -802,22 +774,6 @@ export default function CancelledOrder() {
       </section>      {/* Render Modals and Drawers */}
       {activeOverlay === "details" && (
         <CancellationDetailsDrawer
-          isOpen={true}
-          onClose={() => { setActiveOverlay(null); setSelectedOrderId(null); }}
-          order={selectedOrder}
-        />
-      )}
-
-      {activeOverlay === "refund" && (
-        <InitiateRefundModal
-          isOpen={true}
-          onClose={() => { setActiveOverlay(null); setSelectedOrderId(null); }}
-          order={selectedOrder}
-        />
-      )}
-
-      {activeOverlay === "reopen" && (
-        <ReopenInvestigationModal
           isOpen={true}
           onClose={() => { setActiveOverlay(null); setSelectedOrderId(null); }}
           order={selectedOrder}

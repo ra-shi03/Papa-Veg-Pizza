@@ -663,6 +663,7 @@ export async function notifyAdminOfShortage(user, body = {}, q = {}) {
   const message = str(body.message, 600);
   if (!message) throw new ValidationError('A message is required');
   const name = await actorName(ctx);
+  s.franchiseDecision = ''; s.franchiseNote = ''; // asking (again) waits for a fresh answer from the franchise
   s.timeline.push({ user: name, action: 'admin_notified', remarks: `${str(body.type, 40) || 'update'} (${str(body.priority, 20) || 'normal'}): ${message}`, createdAt: new Date() });
   await s.save();
 
