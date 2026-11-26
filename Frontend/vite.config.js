@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { ViteImageOptimizer } from 'vite-plugin-image-optimizer';
@@ -13,7 +13,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const foodSrc = path.resolve(__dirname, './src/modules/Food')
 const servicesApi = path.resolve(__dirname, './src/services/api')
 
-export default defineConfig({
+// loadEnv: Frontend/.env is not in process.env while this config is read.
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     tailwindcss(),
@@ -84,9 +85,9 @@ export default defineConfig({
     proxy: {
       // Backend API (default 5005)
       '/api/v1': {
-        target: process.env.VITE_BACKEND_PROXY_TARGET || 'http://localhost:5005',
+        target: loadEnv(mode, __dirname).VITE_BACKEND_PROXY_TARGET || 'http://localhost:5005',
         changeOrigin: true,
       },
     },
   },
-});
+}));
