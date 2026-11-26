@@ -1,7 +1,8 @@
 // Store inventory (/v1/food/store/inventory): stock levels, alerts, stock requests, waste, shortages, recipes, transfers.
 //
-//   store manager  -> whole store          kitchen staff -> read stock + shortages, file waste / shortage
-//   franchise admin-> read only, own store  reports and stock requests (staff see only their own waste + requests)
+//   store manager  -> whole store, and files the kitchen's waste / shortage reports and stock requests (kitchen staff have
+//                     no login, docs/kitchen-staff-removal.md: an old kitchen staff token is refused, 403)
+//   franchise admin-> read only, own store
 //   another store / franchise              -> 404 for records, 403 for actions they have no role for
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,9 +20,11 @@ const KITCHEN = '/v1/food/store/kitchen';
 const login = async (email) => (await fx.call('POST', '/v1/auth/store/login', null, { email, password: PASSWORD })).body.data.accessToken;
 // created by the store manager and approved by the franchise admin (fx.staff); a 'Kitchen Supervisor' is a legacy
 // account (the role is no longer used and cannot be created). Clocking in is left to the tests.
+// Kitchen staff have no login: what the kitchen reports is filed by the store manager. A staff member's `token` here is a
+// kitchen staff token from before the change, which every route refuses (403).
 const makeStaff = (managerToken, role, tag) => {
     const k = managerToken === fx.F.B.managerToken ? 'B' : 'A';
-    return /supervisor/i.test(role) ? fx.legacySupervisor(k, tag) : fx.staff(k, role, tag);   // clocked in: kitchen writes need attendance
+    return /supervisor/i.test(role) ? fx.legacySupervisor(k, tag) : fx.staff(k, role, tag);
 };
 const asManager = (f) => ({ token: f.managerToken, id: f.managerUserId });
 const call = (who, method, path, body) => fx.call(method, `${INV}${path}`, who.token, body);
@@ -84,10 +87,9 @@ describe('authentication and roles', () => {
             for (const token of [A.customerToken, fx.SA]) assert.equal((await fx.call('GET', `${INV}${path}`, token)).status, 403, path);
         });
     }
-    test('every store role can read every list', async () => {
-        for (const who of [MGR_A(), packer, chef]) {
-            for (const path of READS) assert.equal((await get(who, path)).status, 200, `${path}`);
-        }
+    test('the store manager can read every list; an old kitchen staff token none', async () => {
+        for (const path of READS) assert.equal((await get(MGR_A(), path)).status, 200, `${path}`);
+        for (const who of [packer, chef]) for (const path of READS) assert.equal((await get(who, path)).status, 403, `${path}`);
     });
     test('a franchise admin must name a store of its own franchise; other franchises\' stores are 404', async () => {
         assert.equal((await fx.call('GET', INV, A.adminToken)).status, 400, 'no storeId');
@@ -150,7 +152,7 @@ describe('ingredient list and details', () => {
         assert.deepEqual({ t: d.totalIngredients, a: d.availableIngredients, l: d.lowStockCount, o: d.outOfStockCount, v: d.inventoryValue }, { t: 17, a: 0, l: 0, o: 17, v: 0 });
     });
     test('the kitchen picker lists id, name, stock, unit and availability', async () => {
-        const res = await get(chef, '/ingredients');
+        const res = await get(MGR_A(), '/ingredients');
         assert.equal(res.body.data.length, 17);
         assert.deepEqual(Object.keys(res.body.data[0]).sort(), ['_id', 'availability', 'currentStock', 'name', 'unit']);
         assert.equal(res.body.data[0].availability, 'Out of Stock');
@@ -163,12 +165,13 @@ describe('ingredient list and details', () => {
     });
     test('details: shape; another store, a franchise admin of another franchise, unknown and malformed ids are 404', async () => {
         const ing = await byName(MGR_A(), 'Capsicum');
-        const d = await get(chef, `/${ing._id}`);
+        const d = await get(MGR_A(), `/${ing._id}`);
         assert.equal(d.status, 200);
         assert.equal(d.body.ingredient.ingredientName, 'Capsicum');
         assert.deepEqual(Object.keys(d.body.consumption).sort(), ['averageDaily', 'month', 'today', 'week']);
         assert.deepEqual(d.body.recentTransactions, []);
-        for (const who of [MGR_B(), bPacker, bStaff]) assert.equal((await get(who, `/${ing._id}`)).status, 404);
+        assert.equal((await get(MGR_B(), `/${ing._id}`)).status, 404);
+        for (const who of [bPacker, bStaff]) assert.equal((await get(who, `/${ing._id}`)).status, 403, 'an old kitchen staff token');
         assert.equal((await fx.call('GET', `${INV}/${ing._id}?storeId=${A.storeId}`, B.adminToken)).status, 404);
         assert.equal((await get(MGR_A(), '/64b000000000000000000001')).status, 404);
         assert.equal((await get(MGR_A(), '/not-an-id')).status, 404);
@@ -202,14 +205,14 @@ describe('changing stock', () => {
         await call(MGR_A(), 'POST', '/update-stock', body({ type: 'adjustment', quantity: 40, reason: 'Audit', notes: 'recount' }));
         assert.equal((await fresh(MGR_A(), cheese.ingredientName)).currentStock, 40);
 
-        const h = await get(chef, `/${cheese._id}/history?limit=10`);
+        const h = await get(MGR_A(), `/${cheese._id}/history?limit=10`);
         assert.equal(h.status, 200);
         assert.equal(h.body.data.length, 3);
         assert.deepEqual(h.body.data.map((t) => [t.type, t.previousStock, t.newStock]), [['adjustment', 44.5, 40], ['stock_out', 50, 44.5], ['stock_in', 0, 50]]);
         assert.match(h.body.data[0].reason, /Audit \(Notes: recount\)/);
         assert.ok(h.body.data[0].createdBy);
-        assert.equal((await get(chef, `/${cheese._id}/history?type=stock_in`)).body.data.length, 1);
-        assert.equal((await get(chef, `/${cheese._id}/history?search=prep`)).body.data.length, 1);
+        assert.equal((await get(MGR_A(), `/${cheese._id}/history?type=stock_in`)).body.data.length, 1);
+        assert.equal((await get(MGR_A(), `/${cheese._id}/history?search=prep`)).body.data.length, 1);
         assert.equal((await get(MGR_B(), `/${cheese._id}/history`)).status, 404);
         const d = await get(MGR_A(), `/${cheese._id}`);
         assert.equal(d.body.consumption.today, 5.5);
@@ -275,23 +278,24 @@ describe('low-stock alerts and automatic shortages', () => {
         assert.equal(s.severity, 'critical');
         assert.equal(s.status, 'active');
     });
-    test('alerts are readable by every store role, and only by their own store', async () => {
-        for (const who of [packer, chef, MGR_A()]) assert.equal((await alertsFor(who)).length, 1);
-        for (const who of [MGR_B(), bPacker, bStaff]) assert.equal((await alertsFor(who)).length, 0);
-        const d = (await get(packer, '/alerts/dashboard')).body;
+    test('alerts are readable by the store manager, and only by their own store', async () => {
+        assert.equal((await alertsFor(MGR_A())).length, 1);
+        assert.equal((await alertsFor(MGR_B())).length, 0);
+        for (const who of [packer, bStaff]) assert.equal((await get(who, '/alerts')).status, 403);
+        const d = (await get(MGR_A(), '/alerts/dashboard')).body;
         assert.deepEqual(Object.keys(d).filter((k) => k !== 'success').sort(), ['activeAlerts', 'criticalAlerts', 'ingredientsAffected', 'resolvedAlerts']);
         assert.ok(d.activeAlerts >= 1 && d.criticalAlerts >= 1);
         assert.equal((await get(MGR_B(), '/alerts/dashboard')).body.activeAlerts, 0);
     });
     test('alert details: shape, depletion text, other store 404', async () => {
         const [a] = await alertsFor(MGR_A());
-        const d = await get(chef, `/alerts/${a._id}`);
+        const d = await get(MGR_A(), `/alerts/${a._id}`);
         assert.equal(d.status, 200);
         assert.equal(d.body.ingredientName, 'Onion');
         assert.equal(d.body.unit, 'KG');
         assert.equal(d.body.depletionEstimation, 'Out of Stock / Depleted');
         assert.ok(d.body.consumption.month >= 20);
-        for (const who of [MGR_B(), bStaff]) assert.equal((await get(who, `/alerts/${a._id}`)).status, 404);
+        assert.equal((await get(MGR_B(), `/alerts/${a._id}`)).status, 404);
         assert.equal((await get(MGR_A(), '/alerts/junk')).status, 404);
     });
     test('filters', async () => {
@@ -329,48 +333,42 @@ describe('stock requests', () => {
     const create = (who, extra = {}) => call(who, 'POST', '/stock-requests', { ingredientId: sauce._id, requestedQty: 12, urgency: 'high', reason: 'Saturday rush', ...extra });
     const list = async (who, q = '') => (await get(who, `/stock-requests?limit=50${q}`)).body.data;
 
-    test('anyone in the store can ask; the number, owner and status are set by the server', async () => {
-        const res = await create(chef, { requestedBy: 'Someone Else', status: 'approved', approvedQty: 99 });
+    test('the store manager asks (for the kitchen); the number, owner and status are set by the server', async () => {
+        const res = await create(MGR_A(), { requestedBy: 'Someone Else', status: 'approved', approvedQty: 99 });
         assert.equal(res.status, 201, JSON.stringify(res.body));
         r1 = res.body.data;
         assert.match(r1.requestNo, new RegExp(`^SR-${new Date().getFullYear()}-\\d{3}$`));
         assert.equal(r1.status, 'pending');
         assert.equal(r1.approvedQty, 0);
-        assert.equal(r1.requestedBy, 'Name ichef');
-        r2 = (await create(packer, { requestedQty: 40, urgency: 'low' })).body.data;
+        assert.equal(r1.requestedBy, 'Manager A');
+        r2 = (await create(MGR_A(), { requestedQty: 40, urgency: 'low' })).body.data;
         assert.notEqual(r1.requestNo, r2.requestNo);
         assert.equal((await create(MGR_A())).status, 201);
+        assert.equal((await create(chef)).status, 403, 'an old kitchen staff token cannot ask');
     });
     test('validation', async () => {
-        for (const bad of [{ requestedQty: 0 }, { requestedQty: -1 }, { requestedQty: 'x' }, { reason: '' }, { ingredientId: 'junk' }]) assert.equal((await create(chef, bad)).status, 400, JSON.stringify(bad));
-        assert.equal((await create(chef, { ingredientId: (await byName(MGR_B(), 'Onion'))._id })).status, 400, 'an ingredient of another store');
+        for (const bad of [{ requestedQty: 0 }, { requestedQty: -1 }, { requestedQty: 'x' }, { reason: '' }, { ingredientId: 'junk' }]) assert.equal((await create(MGR_A(), bad)).status, 400, JSON.stringify(bad));
+        assert.equal((await create(MGR_A(), { ingredientId: (await byName(MGR_B(), 'Onion'))._id })).status, 400, 'an ingredient of another store');
     });
-    test('visibility: staff see only their own; the manager sees the store\'s; other store and others none', async () => {
-        assert.deepEqual((await list(chef)).map((r) => r._id), [r1._id]);
-        assert.equal((await list(chef2)).length, 0);
-        assert.deepEqual((await list(packer)).map((r) => r._id), [r2._id], 'kitchen staff: their own only');
+    test('visibility: the manager sees the store\'s; another store none', async () => {
         assert.equal((await list(MGR_A())).length, 3);
-        for (const who of [MGR_B(), bPacker, bStaff]) assert.equal((await list(who)).length, 0);
+        assert.equal((await list(MGR_B())).length, 0);
         assert.equal((await list(MGR_A(), '&status=pending')).length, 3);
         assert.equal((await list(MGR_A(), '&urgency=low')).length, 1);
         assert.equal((await list(MGR_A(), `&search=${r1.requestNo}`)).length, 1);
         const d = (await get(MGR_A(), '/stock-requests/dashboard')).body;
         assert.deepEqual({ p: d.pendingRequests, a: d.approvedRequests, r: d.rejectedRequests, u: d.urgentRequests }, { p: 3, a: 0, r: 0, u: 2 });
-        assert.equal((await get(chef, '/stock-requests/dashboard')).body.pendingRequests, 1);
     });
-    test('details: your own, or any as the manager; another person\'s request is 404 for staff, and any request of another store', async () => {
-        const d = await get(chef, `/stock-requests/${r1._id}`);
+    test('details: the manager opens any of the store\'s; another store\'s manager gets 404', async () => {
+        const d = await get(MGR_A(), `/stock-requests/${r1._id}`);
         assert.equal(d.status, 200);
         assert.equal(d.body.request.requestNo, r1.requestNo);
         assert.equal(d.body.ingredient.ingredientName, 'Classic Tomato Pizza Sauce');
-        assert.equal(d.body.requestedBy.name, 'Name ichef');
+        assert.equal(d.body.requestedBy.name, 'Manager A');
         assert.equal(d.body.approvedBy, null);
         assert.equal(d.body.timeline[0].title, 'Requested');
-        assert.equal((await get(chef2, `/stock-requests/${r1._id}`)).status, 404);
-        assert.equal((await get(chef, `/stock-requests/${r2._id}`)).status, 404, 'staff cannot open a colleague\'s request');
-        assert.equal((await get(packer, `/stock-requests/${r1._id}`)).status, 404);
-        assert.equal((await get(MGR_A(), `/stock-requests/${r1._id}`)).status, 200);
-        for (const who of [MGR_B(), bPacker]) assert.equal((await get(who, `/stock-requests/${r1._id}`)).status, 404);
+        assert.equal((await get(MGR_B(), `/stock-requests/${r1._id}`)).status, 404);
+        assert.equal((await get(packer, `/stock-requests/${r1._id}`)).status, 403);
     });
     test('approve / reject / fulfil: manager only', async () => {
         for (const who of [packer, chef]) {
@@ -389,17 +387,16 @@ describe('stock requests', () => {
         assert.match(ok.body.message, new RegExp(r1.requestNo));
         assert.equal((await call(MGR_A(), 'PATCH', '/stock-requests/approve', { requestId: r1._id, approvedQty: 10 })).status, 400, 'twice');
         assert.equal((await call(MGR_A(), 'PATCH', '/stock-requests/reject', { requestId: r1._id, remarks: 'late' })).status, 400, 'no longer pending');
-        const d = (await get(chef, `/stock-requests/${r1._id}`)).body;
+        const d = (await get(MGR_A(), `/stock-requests/${r1._id}`)).body;
         assert.equal(d.request.status, 'approved');
         assert.equal(d.request.approvedQty, 10);
         assert.equal(d.request.approvedBy, d.approvedBy.name);
         assert.deepEqual(d.timeline.map((t) => t.title), ['Requested', 'Approved']);
-        assert.ok((await fx.call('GET', '/v1/tasks/notifications', chef.token)).body.data.some((n) => /approved/.test(n.title)), 'the requester is told');
     });
     test('reject needs a reason', async () => {
         assert.equal((await call(MGR_A(), 'PATCH', '/stock-requests/reject', { requestId: r2._id, remarks: '' })).status, 400);
         assert.equal((await call(MGR_A(), 'PATCH', '/stock-requests/reject', { requestId: r2._id, remarks: 'Too much' })).status, 200);
-        const d = (await get(packer, `/stock-requests/${r2._id}`)).body;
+        const d = (await get(MGR_A(), `/stock-requests/${r2._id}`)).body;
         assert.equal(d.request.status, 'rejected');
         assert.equal(d.timeline[1].status, 'failed');
     });
@@ -414,22 +411,22 @@ describe('stock requests', () => {
         const h = (await get(MGR_A(), `/${sauce._id}/history?limit=10`)).body.data[0];
         assert.equal(h.type, 'stock_out');
         assert.match(h.reason, new RegExp(`Stock request ${r1.requestNo} fulfilled`));
-        assert.equal((await get(chef, `/stock-requests/${r1._id}`)).body.request.status, 'fulfilled');
+        assert.equal((await get(MGR_A(), `/stock-requests/${r1._id}`)).body.request.status, 'fulfilled');
     });
     test('a fulfilment the stock cannot cover fails and leaves the request approved', async () => {
-        const big = (await create(packer, { requestedQty: 50 })).body.data;
+        const big = (await create(MGR_A(), { requestedQty: 50 })).body.data;
         await call(MGR_A(), 'PATCH', '/stock-requests/approve', { requestId: big._id, approvedQty: 50 });
         const res = await call(MGR_A(), 'PATCH', '/stock-requests/fulfill', { requestId: big._id, deliveredQty: 50 });
         assert.equal(res.status, 400);
         assert.match(res.body.error, /Insufficient stock/);
-        assert.equal((await get(packer, `/stock-requests/${big._id}`)).body.request.status, 'approved');
+        assert.equal((await get(MGR_A(), `/stock-requests/${big._id}`)).body.request.status, 'approved');
         assert.equal((await fresh(MGR_A(), 'Classic Tomato Pizza Sauce')).currentStock, 20);
     });
 
-    describe('My Tasks "request ingredient" is the same record', () => {
+    describe('Kitchen Tasks "request ingredient" is the same record', () => {
         test('it appears in the stock request list, linked to the stock item when the name matches', async () => {
             const before = (await list(MGR_A())).length;
-            const res = await fx.call('POST', `${KITCHEN}/inventory-requests`, chef.token, { ingredientName: 'Classic Tomato Pizza Sauce', quantity: 3, unit: 'Litre', reason: 'Low on sauce' });
+            const res = await fx.call('POST', `${KITCHEN}/inventory-requests`, A.managerToken, { ingredientName: 'Classic Tomato Pizza Sauce', quantity: 3, unit: 'Litre', reason: 'Low on sauce' });
             assert.equal(res.status, 201, JSON.stringify(res.body));
             assert.equal(res.body.data.status, 'Pending');
             const all = await list(MGR_A());
@@ -438,21 +435,20 @@ describe('stock requests', () => {
             assert.equal(mine.source, 'my_tasks');
             assert.equal(mine.ingredientId, sauce._id);
             assert.equal(mine.requestedQty, 3);
-            assert.equal(mine.requestedBy, 'Name ichef');
-            assert.ok((await list(chef)).some((r) => r._id === mine._id));
-            assert.equal((await list(chef2)).some((r) => r._id === mine._id), false);
+            assert.equal(mine.requestedBy, 'Manager A');
+            assert.equal((await fx.call('POST', `${KITCHEN}/inventory-requests`, chef.token, { ingredientName: 'X', quantity: 1, unit: 'KG' })).status, 403, 'an old kitchen staff token');
         });
         test('the manager can approve and fulfil it from the inventory screen, which updates stock', async () => {
-            const res = await fx.call('POST', `${KITCHEN}/inventory-requests`, chef.token, { ingredientName: 'classic tomato pizza sauce', quantity: 2, unit: 'Litre' });
+            const res = await fx.call('POST', `${KITCHEN}/inventory-requests`, A.managerToken, { ingredientName: 'classic tomato pizza sauce', quantity: 2, unit: 'Litre' });
             const id = res.body.data._id;
             assert.equal((await call(MGR_A(), 'PATCH', '/stock-requests/approve', { requestId: id, approvedQty: 2 })).status, 200);
             assert.equal((await call(MGR_A(), 'PATCH', '/stock-requests/fulfill', { requestId: id, deliveredQty: 2 })).status, 200);
             assert.equal((await fresh(MGR_A(), 'Classic Tomato Pizza Sauce')).currentStock, 18);
-            const mine = (await fx.call('GET', `${KITCHEN}/inventory-requests`, chef.token)).body.data.find((r) => r._id === id);
+            const mine = (await fx.call('GET', `${KITCHEN}/inventory-requests`, A.managerToken)).body.data.find((r) => r._id === id);
             assert.equal(mine.status, 'Fulfilled');
         });
         test('an ingredient that is not in the stock list can be asked for but not fulfilled until it is added', async () => {
-            const res = await fx.call('POST', `${KITCHEN}/inventory-requests`, chef.token, { ingredientName: 'Truffle Oil', quantity: 1, unit: 'Litre' });
+            const res = await fx.call('POST', `${KITCHEN}/inventory-requests`, A.managerToken, { ingredientName: 'Truffle Oil', quantity: 1, unit: 'Litre' });
             assert.equal(res.status, 201);
             const id = res.body.data._id;
             assert.equal((await call(MGR_A(), 'PATCH', '/stock-requests/approve', { requestId: id, approvedQty: 1 })).status, 200);
@@ -482,12 +478,12 @@ describe('waste', () => {
         await call(MGR_A(), 'POST', '/update-stock', { ingredientId: paneer._id, type: 'adjustment', quantity: 20, reason: 'Opening count' });
     });
 
-    test('anyone in the store can report; stock drops at once; photos go to a server-chosen folder; the reporter is the caller', async () => {
+    test('the store manager reports for the kitchen; stock drops at once; photos go to a server-chosen folder; the reporter is the caller', async () => {
         uploaded.length = 0;
-        const res = await report(chef, {}, 2);
+        const res = await report(MGR_A(), {}, 2);
         assert.equal(res.status, 201, JSON.stringify(res.body));
         assert.equal(res.body.data.status, 'pending');
-        assert.equal(res.body.data.reportedBy, 'Name ichef', 'a name sent in the form is ignored');
+        assert.equal(res.body.data.reportedBy, 'Manager A', 'a name sent in the form is ignored');
         assert.equal(res.body.data.estimatedLoss, 200);
         assert.equal(res.body.data.images.length, 2);
         assert.deepEqual(uploaded, [`stores/${A.storeId}/waste`, `stores/${A.storeId}/waste`]);
@@ -495,63 +491,58 @@ describe('waste', () => {
         const h = (await get(MGR_A(), `/${paneer._id}/history?limit=5`)).body.data[0];
         assert.equal(h.type, 'stock_out');
         assert.match(h.reason, /Ingredient Waste \(burnt\)/);
-        assert.equal((await report(packer)).status, 201);
+        assert.equal((await report(MGR_A(), { remarks: 'second' })).status, 201);
         assert.equal((await report(MGR_A())).status, 201);
+        assert.equal((await report(packer)).status, 403, 'an old kitchen staff token cannot report');
     });
     test('validation: type, quantity, reason, more than is in stock, other store\'s ingredient, photos', async () => {
-        for (const bad of [{ wasteType: 'stolen' }, { quantity: 0 }, { quantity: 'x' }, { reason: '' }, { ingredientId: 'junk' }]) assert.equal((await report(chef, bad)).status, 400, JSON.stringify(bad));
-        const tooMuch = await report(chef, { quantity: 500 });
+        for (const bad of [{ wasteType: 'stolen' }, { quantity: 0 }, { quantity: 'x' }, { reason: '' }, { ingredientId: 'junk' }]) assert.equal((await report(MGR_A(), bad)).status, 400, JSON.stringify(bad));
+        const tooMuch = await report(MGR_A(), { quantity: 500 });
         assert.equal(tooMuch.status, 400);
         assert.match(tooMuch.body.error, /exceeds current stock/);
-        assert.equal((await report(bStaff, { ingredientId: paneer._id })).status, 404, 'another store\'s ingredient');
-        assert.equal((await report(chef, {}, 6)).status, 400, 'at most 5 photos');
-        const notImage = await fx.api.post(`/api${INV}/waste/report`).set(fx.bearer(chef.token)).field('ingredientId', paneer._id).field('quantity', '1').field('wasteType', 'burnt').field('reason', 'x')
+        assert.equal((await report(MGR_B(), { ingredientId: paneer._id })).status, 404, 'another store\'s ingredient');
+        assert.equal((await report(MGR_A(), {}, 6)).status, 400, 'at most 5 photos');
+        const notImage = await fx.api.post(`/api${INV}/waste/report`).set(fx.bearer(A.managerToken)).field('ingredientId', paneer._id).field('quantity', '1').field('wasteType', 'burnt').field('reason', 'x')
             .attach('images[]', Buffer.from('<?php echo 1;'), { filename: 'a.png', contentType: 'image/png' });
         assert.equal(notImage.status, 400);
         assert.equal((await fresh(MGR_A(), 'Fresh Paneer Cubes')).currentStock, 14, 'three accepted reports of 2 kg from 20 kg; the failed ones took nothing out');
     });
-    test('visibility: staff see only their own; the manager the whole store; other stores none', async () => {
-        assert.equal((await logs(chef)).length, 1);
-        assert.equal((await logs(chef2)).length, 0);
-        assert.equal((await logs(packer)).length, 1, 'kitchen staff: their own only');
+    test('visibility: the manager sees the whole store; other stores none', async () => {
         assert.equal((await logs(MGR_A())).length, 3);
-        for (const who of [MGR_B(), bPacker, bStaff]) assert.equal((await logs(who)).length, 0);
+        assert.equal((await logs(MGR_B())).length, 0);
         assert.equal((await logs(MGR_A(), '&wasteType=burnt')).length, 3);
         assert.equal((await logs(MGR_A(), '&wasteType=expired')).length, 0);
-        assert.equal((await logs(MGR_A(), '&reportedBy=Name%20ipack')).length, 1);
+        assert.equal((await logs(MGR_A(), '&reportedBy=Manager%20A')).length, 3);
         assert.equal((await logs(MGR_A(), '&search=calibration')).length, 3);
         assert.equal((await get(MGR_A(), '/waste?limit=2')).body.pagination.totalPages, 2);
     });
     test('the dashboard counts what the caller can see', async () => {
         const m = (await get(MGR_A(), '/waste/dashboard')).body;
         assert.deepEqual({ t: m.totalWasteToday, w: m.weeklyWaste, l: m.lossAmount, top: m.topWastedIngredient }, { t: 6, w: 6, l: 600, top: 'Fresh Paneer Cubes' });
-        assert.equal((await get(chef, '/waste/dashboard')).body.totalWasteToday, 2);
         assert.equal((await get(MGR_B(), '/waste/dashboard')).body.topWastedIngredient, 'None');
     });
-    test('details: shape; staff cannot open a colleague\'s report; other stores 404', async () => {
-        const [mine] = await logs(chef);
-        const d = await get(chef, `/waste/${mine._id}`);
+    test('details: shape; other stores 404', async () => {
+        const mine = (await logs(MGR_A())).find((l) => l.images?.length === 2) || (await logs(MGR_A()))[0];
+        const d = await get(MGR_A(), `/waste/${mine._id}`);
         assert.equal(d.status, 200);
         assert.equal(d.body.wasteLog.wasteType, 'burnt');
         assert.equal(d.body.ingredient.ingredientName, 'Fresh Paneer Cubes');
-        assert.equal(d.body.reportedBy.name, 'Name ichef');
+        assert.equal(d.body.reportedBy.name, 'Manager A');
         assert.equal(d.body.approvedBy, null);
         assert.equal(d.body.images.length, 2);
         assert.equal(d.body.timeline[0].action, 'reported');
-        const packerLog = (await logs(packer)).find((l) => l.reportedBy === 'Name ipack');
-        assert.equal((await get(chef, `/waste/${packerLog._id}`)).status, 404);
-        assert.equal((await get(packer, `/waste/${packerLog._id}`)).status, 200);
-        for (const who of [MGR_B(), bPacker]) assert.equal((await get(who, `/waste/${mine._id}`)).status, 404);
+        assert.equal((await get(MGR_B(), `/waste/${mine._id}`)).status, 404);
+        assert.equal((await get(packer, `/waste/${mine._id}`)).status, 403);
     });
     test('approve: manager only, once', async () => {
-        const [mine] = await logs(chef);
+        const [mine] = await logs(MGR_A());
         for (const who of [packer, chef]) assert.equal((await call(who, 'PATCH', `/waste/${mine._id}/approve`, { remarks: 'ok' })).status, 403);
         assert.equal((await call(MGR_B(), 'PATCH', `/waste/${mine._id}/approve`, {})).status, 404);
         assert.equal((await call(MGR_A(), 'PATCH', `/waste/${mine._id}/approve`, { remarks: 'Approved, retrain team' })).status, 200);
         assert.equal((await call(MGR_A(), 'PATCH', `/waste/${mine._id}/approve`, {})).status, 400);
         const d = (await get(MGR_A(), `/waste/${mine._id}`)).body;
         assert.equal(d.wasteLog.status, 'approved');
-        assert.equal(d.approvedBy.name, d.wasteLog.approvedBy);   // (read by the manager: it is the chef's report)
+        assert.equal(d.approvedBy.name, d.wasteLog.approvedBy);
         assert.deepEqual(d.timeline.map((t) => t.action), ['reported', 'approved']);
     });
     test('delete: manager only; a withdrawn (unapproved) report puts the stock back, an approved one does not', async () => {
@@ -588,7 +579,7 @@ describe('recipes and shortages', () => {
         assert.equal((await call(MGR_A(), 'POST', '/recipes', recipeBody({ name: 'margherita' }))).status, 400, 'duplicate name');
         assert.equal((await call(MGR_A(), 'POST', '/recipes', recipeBody({ name: '' }))).status, 400);
         assert.equal((await call(MGR_A(), 'POST', '/recipes', recipeBody({ name: 'Other', ingredients: [{ ingredientId: (await byName(MGR_B(), 'Onion'))._id, quantity: 1 }] }))).status, 400, 'ingredient of another store');
-        const list = (await get(chef, '/recipes')).body.data;
+        const list = (await get(MGR_A(), '/recipes')).body.data;
         assert.equal(list.length, 1);
         assert.deepEqual(Object.keys(list[0]).sort(), ['difficulty', 'image', 'ingredients', 'instructions', '_id', 'name', 'prepTime', 'recipeCode'].sort());
         assert.equal((await get(MGR_B(), '/recipes')).body.data.length, 0);
@@ -609,45 +600,44 @@ describe('recipes and shortages', () => {
                 items: [{ itemId: 'x', name: 'Margherita (Medium)', quantity: 2, price: 200 }], createdAt: new Date(), updatedAt: new Date(),
             });
             liveOrder = { id: String(r.insertedId), ref };
-            // The packer and the chef hold stations of this order: kitchen staff see only the orders they are on
+            // The packer and the chef hold stations of this order (staff records)
             await fx.models.FoodOrder.collection.updateOne({ _id: r.insertedId }, { $set: {
-                'kitchen.staff.packaging_staff.userId': new mongoose.Types.ObjectId(packer.id),
-                'kitchen.staff.pizza_chef.userId': new mongoose.Types.ObjectId(chef.id),
+                'kitchen.staff.packaging_staff': { staffId: new mongoose.Types.ObjectId(packer.staffId), name: packer.name },
+                'kitchen.staff.pizza_chef': { staffId: new mongoose.Types.ObjectId(chef.staffId), name: chef.name },
             } });
         });
         const report = (who, extra = {}) => call(who, 'POST', '/ingredient-shortages', { ingredientId: mozzarella._id, missingQuantity: 4, urgency: 'high', remarks: 'Bag ripped', notifyManager: true, ...extra });
 
-        test('kitchen staff report; validation; only own-store ingredients and pizzas', async () => {
-            const res = await report(chef);
+        test('the store manager reports for the kitchen; validation; only own-store ingredients and pizzas', async () => {
+            assert.equal((await report(chef)).status, 403, 'an old kitchen staff token');
+            const res = await report(MGR_A());
             assert.equal(res.status, 201, JSON.stringify(res.body));
             shortage = res.body.data;
-            for (const bad of [{ missingQuantity: 0 }, { missingQuantity: 'x' }, { ingredientId: 'junk' }]) assert.equal((await report(chef, bad)).status, 400, JSON.stringify(bad));
-            assert.equal((await report(bStaff)).status, 404, 'ingredient of another store');
-            assert.equal((await report(chef, { orderItemId: '64b000000000000000000001' })).status, 404);
-            assert.equal((await report(chef, { orderItemId: 'junk' })).status, 404);
-            assert.ok((await fx.call('GET', '/v1/tasks/notifications', A.managerToken)).body.data.some((n) => /Shortage: Premium Mozzarella/.test(n.title)));
+            for (const bad of [{ missingQuantity: 0 }, { missingQuantity: 'x' }, { ingredientId: 'junk' }]) assert.equal((await report(MGR_A(), bad)).status, 400, JSON.stringify(bad));
+            assert.equal((await report(MGR_B())).status, 404, 'ingredient of another store');
+            assert.equal((await report(MGR_A(), { orderItemId: '64b000000000000000000001' })).status, 404);
+            assert.equal((await report(MGR_A(), { orderItemId: 'junk' })).status, 404);
         });
         test('a second report for the same ingredient joins the open shortage and can only raise it', async () => {
-            const res = await report(packer, { missingQuantity: 9, urgency: 'critical' });
+            const res = await report(MGR_A(), { missingQuantity: 9, urgency: 'critical' });
             assert.equal(res.status, 201);
             assert.equal(res.body.data._id, shortage._id);
             const rows = (await get(MGR_A(), '/ingredient-shortages?limit=50&search=Mozzarella')).body.data;
             assert.equal(rows.length, 1);
             assert.equal(rows[0].shortageQty, 9);
             assert.equal(rows[0].severity, 'critical');
-            await report(packer, { missingQuantity: 1, urgency: 'low' });
+            await report(MGR_A(), { missingQuantity: 1, urgency: 'low' });
             assert.equal((await get(MGR_A(), '/ingredient-shortages?search=Mozzarella')).body.data[0].severity, 'critical', 'severity never goes down');
         });
         test('the list, dashboard and details show the orders it holds up (through recipes), only for this store', async () => {
-            const row = (await get(packer, '/ingredient-shortages?search=Mozzarella')).body.data[0];
+            const row = (await get(MGR_A(), '/ingredient-shortages?search=Mozzarella')).body.data[0];
             assert.equal(row.affectedOrders, 1);
-            assert.equal(row.createdBy, 'Name ichef');
-            const dash = (await get(chef, '/ingredient-shortages/dashboard')).body;
+            assert.equal(row.createdBy, 'Manager A');
+            const dash = (await get(MGR_A(), '/ingredient-shortages/dashboard')).body;
             assert.ok(dash.activeShortages >= 1 && dash.criticalShortages >= 1);
             assert.equal(dash.affectedOrders, 1);
             assert.equal(dash.estimatedRevenueLoss, 400);
-            assert.equal((await get(chef2, '/ingredient-shortages/dashboard')).body.affectedOrders, 0, 'not on this order');
-            const d = (await get(packer, `/ingredient-shortages/${shortage._id}`)).body;
+            const d = (await get(MGR_A(), `/ingredient-shortages/${shortage._id}`)).body;
             assert.equal(d.shortage.status, 'active');
             assert.equal(d.affectedOrders[0]._id, liveOrder.ref);
             assert.equal(d.affectedOrders[0].customer, 'Asha Rao');
@@ -655,10 +645,8 @@ describe('recipes and shortages', () => {
             assert.ok(Array.isArray(d.analytics.alternatives) && Array.isArray(d.analytics.stores));
             assert.equal(d.ingredient.ingredientName, 'Premium Mozzarella Cheese');
             assert.equal(d.timeline[0].action, 'reported');
-            for (const who of [MGR_B(), bPacker, bStaff]) {
-                assert.equal((await get(who, `/ingredient-shortages/${shortage._id}`)).status, 404);
-                assert.equal((await get(who, '/ingredient-shortages?search=Mozzarella')).body.data.length, 0);
-            }
+            assert.equal((await get(MGR_B(), `/ingredient-shortages/${shortage._id}`)).status, 404);
+            assert.equal((await get(MGR_B(), '/ingredient-shortages?search=Mozzarella')).body.data.length, 0);
             assert.equal((await get(MGR_B(), '/ingredient-shortages/dashboard')).body.affectedOrders, 0);
         });
         test('the recipe link is what makes it affect an order: a deleted recipe means none', async () => {
@@ -674,11 +662,11 @@ describe('recipes and shortages', () => {
             assert.equal((await call(MGR_A(), 'PATCH', `/ingredient-shortages/${shortage._id}/resolve`, { actionTaken: '' })).status, 400);
             assert.equal((await call(MGR_A(), 'PATCH', `/ingredient-shortages/${shortage._id}/resolve`, { actionTaken: 'Emergency purchase', notes: 'From the market' })).status, 200);
             assert.equal((await call(MGR_A(), 'PATCH', `/ingredient-shortages/${shortage._id}/resolve`, { actionTaken: 'again' })).status, 400);
-            const d = (await get(packer, `/ingredient-shortages/${shortage._id}`)).body;
+            const d = (await get(MGR_A(), `/ingredient-shortages/${shortage._id}`)).body;
             assert.equal(d.shortage.status, 'resolved');
             assert.equal(d.shortage.actionTaken, 'Emergency purchase');
             assert.equal(d.timeline.at(-1).action, 'resolved');
-            const next = (await report(chef)).body.data;
+            const next = (await report(MGR_A())).body.data;
             assert.notEqual(next._id, shortage._id, 'once resolved, a new report opens a new shortage');
             shortage = next;
         });
@@ -717,7 +705,7 @@ describe('transfers between stores of one franchise', () => {
         assert.equal(res.body[0].storeId, a2StoreId);
         assert.equal(res.body[0].availableQty, 30);
         assert.equal(res.body[0].managerName, 'Manager A2');
-        assert.equal((await get(packer, `/available-stores?ingredientId=${mine._id}`)).body.length, 1);
+        assert.equal((await get(packer, `/available-stores?ingredientId=${mine._id}`)).status, 403, 'an old kitchen staff token');
         assert.equal((await get(MGR_B(), `/available-stores?ingredientId=${(await byName(MGR_B(), 'Sweet Corn'))._id}`)).body.length, 0, 'B has no sister store');
         assert.equal((await get(MGR_B(), `/available-stores?ingredientId=${mine._id}`)).status, 404, 'A\'s ingredient id from store B');
     });

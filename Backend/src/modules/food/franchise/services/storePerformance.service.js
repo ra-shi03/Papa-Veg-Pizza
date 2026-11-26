@@ -496,7 +496,7 @@ export async function storeStaff(user, storeId, q = {}) {
   for (const o of orders) {
     for (const [slot, label] of Object.entries(STATION)) {
       const person = o.kitchen?.staff?.[slot];
-      if (person?.name) credit(`${slot}:${person.userId || person.name}`, `${person.name} (${label})`, o.ratings?.store?.rating);
+      if (person?.name) credit(`${slot}:${person.staffId || person.userId || person.name}`, `${person.name} (${label})`, o.ratings?.store?.rating);
     }
   }
   const delivered = orders.filter((o) => o.orderStatus === 'delivered' && o.dispatch?.deliveryPartnerId);

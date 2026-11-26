@@ -4,7 +4,8 @@ import { toast } from "sonner"
 import { adminClient } from "@/services/api/axios"
 
 // Attendance actions for the people who manage it (the server decides what each may do):
-//   store manager   -> mark a kitchen staff member absent or on leave (staff mark themselves present by clocking in)
+//   store manager   -> mark a kitchen staff member present (hours worked), absent or on leave. Kitchen staff have no
+//                      login: the manager also clocks them in / out from Staff > Attendance (StaffClockPanel)
 //   franchise admin -> mark the store manager or any staff member present (on behalf, e.g. the clock-in failed), absent
 //                      or on leave, and decide leave requests (the store manager's own, and staff ones when the manager is away)
 // `storeId` is sent only by the franchise admin; the store manager's store comes from their sign-in.
@@ -36,7 +37,7 @@ export function MarkAttendanceModal({ open, onClose, onDone, storeId, admin = fa
 
   if (!open) return null
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
-  const statuses = admin ? [["present", "Present (on behalf)"], ["absent", "Absent"], ["leave", "On leave"]] : [["absent", "Absent"], ["leave", "On leave"]]
+  const statuses = admin ? [["present", "Present (on behalf)"], ["absent", "Absent"], ["leave", "On leave"]] : [["present", "Present (hours worked)"], ["absent", "Absent"], ["leave", "On leave"]]
 
   const save = async () => {
     setBusy(true)
@@ -45,7 +46,7 @@ export function MarkAttendanceModal({ open, onClose, onDone, storeId, admin = fa
         staffId: form.staffId, date: form.date, status: form.status, notes: form.notes.trim(),
         ...(form.status === "present" ? { checkIn: to12(form.checkIn), ...(form.checkOut ? { checkOut: to12(form.checkOut) } : {}) } : {}),
       }, { params })
-      toast.success("Attendance marked. The person has been told.")
+      toast.success(admin ? "Attendance marked. The person has been told." : "Attendance marked.")
       onDone?.()
       onClose()
     } catch (e) {
@@ -63,7 +64,7 @@ export function MarkAttendanceModal({ open, onClose, onDone, storeId, admin = fa
           <div>
             <h2 className="text-base font-black text-zinc-900 dark:text-white inline-flex items-center gap-2"><UserCheck size={16} />Mark attendance</h2>
             <p className="text-[11px] text-zinc-500 font-medium">
-              {admin ? "For a store manager or staff member who could not clock in, or is absent / on leave." : "Kitchen staff mark themselves present by clocking in. Here you mark them absent or on leave."}
+              {admin ? "For a store manager or staff member who could not clock in, or is absent / on leave." : "For a past day or a missed clock-in (give the hours), or to mark someone absent or on leave. For today, use Clock in / Clock out on the Attendance page."}
             </p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"><X size={16} /></button>

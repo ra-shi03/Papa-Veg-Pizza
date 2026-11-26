@@ -23,7 +23,6 @@ import DeliveryTracking from "../deliveryOperations/DeliveryTracking"
 import DeliveryIssue from "../deliveryOperations/DeliveryIssue"
 import RiderTickets from "../deliveryOperations/RiderTickets"
 import StorePayouts from "../payouts/StorePayouts"
-import MySalary from "../payouts/MySalary"
 import IngredientStock from "../inventory/IngredientStock"
 import StockRequests from "../inventory/StockRequests"
 import WasteManagement from "../inventory/WasteManagement"
@@ -42,16 +41,16 @@ import Profile from "../profile/Profile"
 import MyTasks from "../myTasks/MyTasks"
 import MyAttendance from "../attendance/MyAttendance"
 import LeaveRequests from "../staffManagement/LeaveRequests"
+import PetPoojaSettings from "../integrations/PetPoojaSettings"
 
 
 
 
 
 
-// Where each role lands: kitchen staff have no store dashboard (the server refuses it), their home is My Tasks
+// The store manager is the only store role that signs in (kitchen staff have no login); home is the dashboard
 function HomeRedirect() {
-  const { role } = useOutletContext()
-  return <Navigate to={role === "kitchen_staff" ? "tasks" : "dashboard"} replace />
+  return <Navigate to="dashboard" replace />
 }
 
 // A role-based routing wrapper that prevents unauthorized roles from viewing pages
@@ -136,7 +135,7 @@ export default function StoreManagerRouter() {
 
         <Route
           element={
-            <ProtectedRoute module="admin" requiredRole={["store-manager", "kitchen-staff"]} loginPath="/store-operation/login">
+            <ProtectedRoute module="admin" requiredRole={["store-manager"]} loginPath="/store-operation/login">
               <StoreOperationsLayout />
             </ProtectedRoute>
           }
@@ -166,7 +165,7 @@ export default function StoreManagerRouter() {
           <Route
             path="orders/active"
             element={
-              <RoleProtectedRoute allowedRoles={["store_manager", "kitchen_staff", "packaging_staff"]}>
+              <RoleProtectedRoute allowedRoles={["store_manager"]}>
                 <ActiveOrders />
               </RoleProtectedRoute>
             }
@@ -174,7 +173,7 @@ export default function StoreManagerRouter() {
           <Route
             path="orders/ready"
             element={
-              <RoleProtectedRoute allowedRoles={["store_manager", "delivery_coordinator", "kitchen_staff", "packaging_staff"]}>
+              <RoleProtectedRoute allowedRoles={["store_manager", "delivery_coordinator"]}>
                 <ReadyOrders />
               </RoleProtectedRoute>
             }
@@ -200,7 +199,7 @@ export default function StoreManagerRouter() {
           <Route
             path="kitchen/queue"
             element={
-              <RoleProtectedRoute allowedRoles={["store_manager", "kitchen_staff"]}>
+              <RoleProtectedRoute allowedRoles={["store_manager"]}>
                 <KitchenQueue />
               </RoleProtectedRoute>
             }
@@ -208,7 +207,7 @@ export default function StoreManagerRouter() {
           <Route
             path="kitchen/preparation"
             element={
-              <RoleProtectedRoute allowedRoles={["store_manager", "kitchen_staff"]}>
+              <RoleProtectedRoute allowedRoles={["store_manager"]}>
                 <PreparationBoard />
               </RoleProtectedRoute>
             }
@@ -216,7 +215,7 @@ export default function StoreManagerRouter() {
           <Route
             path="kitchen/pizza-station"
             element={
-              <RoleProtectedRoute allowedRoles={["store_manager", "kitchen_staff"]}>
+              <RoleProtectedRoute allowedRoles={["store_manager"]}>
                 <PizzaStation />
               </RoleProtectedRoute>
             }
@@ -224,7 +223,7 @@ export default function StoreManagerRouter() {
           <Route
             path="kitchen/baking-station"
             element={
-              <RoleProtectedRoute allowedRoles={["store_manager", "kitchen_staff"]}>
+              <RoleProtectedRoute allowedRoles={["store_manager"]}>
                 <BakingStation />
               </RoleProtectedRoute>
             }
@@ -232,7 +231,7 @@ export default function StoreManagerRouter() {
           <Route
             path="kitchen/packaging-station"
             element={
-              <RoleProtectedRoute allowedRoles={["store_manager", "kitchen_staff"]}>
+              <RoleProtectedRoute allowedRoles={["store_manager"]}>
                 <PackagingStation />
               </RoleProtectedRoute>
             }
@@ -292,7 +291,7 @@ export default function StoreManagerRouter() {
           <Route
             path="inventory/stock"
             element={
-              <RoleProtectedRoute allowedRoles={["store_manager", "kitchen_staff"]}>
+              <RoleProtectedRoute allowedRoles={["store_manager"]}>
                 <IngredientStock />
               </RoleProtectedRoute>
             }
@@ -300,7 +299,7 @@ export default function StoreManagerRouter() {
           <Route
             path="inventory/requests"
             element={
-              <RoleProtectedRoute allowedRoles={["store_manager", "kitchen_staff"]}>
+              <RoleProtectedRoute allowedRoles={["store_manager"]}>
                 <StockRequests />
               </RoleProtectedRoute>
             }
@@ -308,7 +307,7 @@ export default function StoreManagerRouter() {
           <Route
             path="inventory/waste"
             element={
-              <RoleProtectedRoute allowedRoles={["store_manager", "kitchen_staff"]}>
+              <RoleProtectedRoute allowedRoles={["store_manager"]}>
                 <WasteManagement />
               </RoleProtectedRoute>
             }
@@ -324,7 +323,7 @@ export default function StoreManagerRouter() {
           <Route
             path="inventory/shortages"
             element={
-              <RoleProtectedRoute allowedRoles={["store_manager", "kitchen_staff"]}>
+              <RoleProtectedRoute allowedRoles={["store_manager"]}>
                 <IngredientShortages />
               </RoleProtectedRoute>
             }
@@ -406,11 +405,11 @@ export default function StoreManagerRouter() {
             }
           />
 
-          {/* My Tasks */}
+          {/* Kitchen Tasks: every task of the store, run by the store manager for the person on each station */}
           <Route
             path="tasks"
             element={
-              <RoleProtectedRoute allowedRoles={["store_manager", "kitchen_staff"]}>
+              <RoleProtectedRoute allowedRoles={["store_manager"]}>
                 <MyTasks />
               </RoleProtectedRoute>
             }
@@ -426,11 +425,11 @@ export default function StoreManagerRouter() {
             }
           />
 
-          {/* Attendance: kitchen staff AND the store manager check in / out and see their own days */}
+          {/* Attendance: the store manager checks in / out and sees their own days (kitchen staff are clocked in from Staff > Attendance) */}
           <Route
             path="attendance"
             element={
-              <RoleProtectedRoute allowedRoles={["kitchen_staff", "store_manager"]}>
+              <RoleProtectedRoute allowedRoles={["store_manager"]}>
                 <MyAttendance />
               </RoleProtectedRoute>
             }
@@ -440,20 +439,13 @@ export default function StoreManagerRouter() {
           <Route
             path="profile"
             element={
-              <RoleProtectedRoute allowedRoles={["store_manager", "kitchen_staff"]}>
+              <RoleProtectedRoute allowedRoles={["store_manager"]}>
                 <Profile />
               </RoleProtectedRoute>
             }
           />
-          <Route
-            path="profile/staff"
-            element={
-              <Profile forcedRole="kitchen_staff" />
-            }
-          />
 
-          {/* Unknown routes redirect to dashboard */}
-          {/* Payouts: the store manager pays riders and staff; kitchen staff see their salary */}
+          {/* Payouts: the store manager pays riders and kitchen staff (kitchen staff have no login) */}
           <Route
             path="payouts"
             element={
@@ -462,14 +454,16 @@ export default function StoreManagerRouter() {
               </RoleProtectedRoute>
             }
           />
+          {/* Pet Pooja: this store's own POS connection (each store has its own Pet Pooja account) */}
           <Route
-            path="my-salary"
+            path="integrations/petpooja"
             element={
-              <RoleProtectedRoute allowedRoles={["kitchen_staff"]}>
-                <MySalary />
+              <RoleProtectedRoute allowedRoles={["store_manager"]}>
+                <PetPoojaSettings />
               </RoleProtectedRoute>
             }
           />
+          {/* Unknown routes redirect to dashboard */}
           <Route path="*" element={<HomeRedirect />} />
         </Route>
       </Routes>

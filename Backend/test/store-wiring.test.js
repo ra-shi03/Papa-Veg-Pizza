@@ -87,7 +87,7 @@ describe('dashboard lists behind the cards', () => {
         assert.equal(rows.filter((r) => r.status === 'Idle').length, card.availableRiders);
     });
     test('staff-roster: the kitchen team with today\'s real attendance', async () => {
-        ok(await fx.call('POST', '/v1/store/attendance/clock-in', packer.token), 201);
+        ok(await fx.call('POST', `/v1/store/attendance/staff/${packer.staffId}/clock-in`, A.managerToken), 201);
         const rows = ok(await get(A.managerToken, 'staff-roster'));
         assert.deepEqual(Object.keys(rows[0]).sort(), ['employee', 'role', 'shift', 'status']);
         assert.equal(rows.find((r) => r.employee === 'Name swpack').status, 'Present');
@@ -203,6 +203,6 @@ describe('profile: the store\'s real hours (never a made-up "11 AM - 11 PM")', (
         assert.deepEqual([s.openingTime, s.closingTime], ['10:00 AM', '10:00 PM']);
         const closed = Object.fromEntries(Object.keys(week).map((d) => [d, { ...day, isClosed: true }]));
         await StoreHours.updateOne({ storeId: oid(A.storeId) }, { $set: { week: closed } });
-        assert.deepEqual(Object.values((({ openingTime, closingTime }) => ({ openingTime, closingTime }))(ok(await fx.call('GET', '/v1/profile', packer.token)).store)), ['Closed', 'today']);
+        assert.deepEqual(Object.values((({ openingTime, closingTime }) => ({ openingTime, closingTime }))(ok(await fx.call('GET', '/v1/profile', A.managerToken)).store)), ['Closed', 'today']);
     });
 });

@@ -40,12 +40,21 @@ const storeManagerSchema = new mongoose.Schema({
     required: [true, 'Name is required'],
     trim: true,
   },
+  // Required for store managers (they sign in). Kitchen staff have no login (docs/kitchen-staff-removal.md), so theirs is
+  // optional; the index is unique only among records that have one (scripts/convert-kitchen-staff.js rebuilds it).
   email: {
     type: String,
-    required: [true, 'Email is required'],
-    unique: true,
+    required: [function () { return this.staffKind !== 'kitchen_staff'; }, 'Email is required'],
     lowercase: true,
     trim: true,
+  },
+  // 'kitchen_staff' = a record the store manager runs (no login). Records made before this field existed are recognised
+  // by their KITCHEN_STAFF role link (store/services/kitchenStaffDirectory.js).
+  staffKind: {
+    type: String,
+    enum: ['kitchen_staff'],
+    default: undefined,
+    index: true,
   },
   phone: {
     type: String,
@@ -113,4 +122,22 @@ const storeManagerSchema = new mongoose.Schema({
   timestamps: true,
 });
 
+// One email per person, but kitchen staff may have none: unique only where an email is set.
+storeManagerSchema.index({ email: 1 }, { unique: true, partialFilterExpression: { email: { $type: 'string' } } });
+
 export const StoreManager = mongoose.model('StoreManager', storeManagerSchema);
+
+/**
+ * The email index used to be unique over every record (a missing email counted as one shared value, so a second staff
+ * member without an email was refused). Replaces it with the partial one above. Safe to run on every start.
+ */
+export async function fixStaffEmailIndex() {
+  try {
+    const indexes = await StoreManager.collection.indexes();
+    const old = indexes.find((ix) => ix.name === 'email_1' && !ix.partialFilterExpression);
+    if (old) await StoreManager.collection.dropIndex('email_1');
+  } catch {
+    // no collection yet (new database)
+  }
+  await StoreManager.createIndexes().catch(() => {});
+}

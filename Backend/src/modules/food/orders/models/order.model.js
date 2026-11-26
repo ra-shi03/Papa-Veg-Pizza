@@ -214,8 +214,11 @@ const statusHistorySchema = new mongoose.Schema(
     { _id: false }
 );
 
+// Who holds a station. `staffId` is the staff record (kitchen staff have no login since 2026-11-26,
+// docs/kitchen-staff-removal.md); `userId` is only set on orders from before that (or for a converted record).
 const kitchenPersonSchema = new mongoose.Schema(
     {
+        staffId: { type: mongoose.Schema.Types.ObjectId, ref: 'StoreManager' },
         userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
         name: { type: String, default: '', trim: true },
         assignedAt: { type: Date, default: Date.now }
@@ -424,6 +427,19 @@ const orderSchema = new mongoose.Schema(
         kitchen: {
             type: kitchenSchema,
             default: () => ({})
+        },
+        // The store's POS (Pet Pooja), when the store runs its orders there (modules/food/pos). Information only: the order
+        // flow is the same with or without it.
+        pos: {
+            type: new mongoose.Schema({
+                provider: { type: String, enum: ['petpooja'], default: 'petpooja' },
+                status: { type: String, enum: ['pending', 'sent', 'failed', 'skipped', 'cancelled'], default: 'pending' },
+                posOrderId: { type: String, default: '', trim: true },
+                lastPosStatus: { type: String, default: '', trim: true },
+                lastSyncAt: { type: Date, default: null },
+                note: { type: String, default: '', trim: true, maxlength: 300 },
+            }, { _id: false }),
+            default: undefined,
         },
         ratings: {
             type: orderRatingsSchema,

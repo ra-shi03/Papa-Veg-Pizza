@@ -21,7 +21,8 @@ const roleCodeOf = (role) => normalizeRole(role).toUpperCase().replace(/-/g, '_'
 const MANAGEABLE = {
     superadmin: { roles: ['franchise-admin'], scope: 'all', denyCreate: 'Super admin can only create franchise admins.' },
     'franchise-admin': { roles: ['store-manager'], scope: 'franchise', denyCreate: 'Franchise admin can only create store managers.' },
-    'store-manager': { roles: ['kitchen-staff'], scope: 'store', denyCreate: 'Store managers can only create kitchen staff.' }
+    // kitchen staff have no login any more: the store manager adds them as staff records (/v1/food/store/staff)
+    'store-manager': { roles: [], scope: 'store', denyCreate: 'Kitchen staff no longer get a login. Add them under Staff Management > Kitchen Staff.' }
 };
 
 const ROLE_LABELS = {

@@ -37,6 +37,7 @@ import storeRewardsRoutes from '../modules/food/store/routes/storeRewards.routes
 import franchiseRefundsRoutes from '../modules/food/franchise/routes/franchiseRefunds.routes.js';
 import franchiseOverviewRoutes from '../modules/food/franchise/routes/franchiseOverview.routes.js';
 import { riderPayoutsRouter, storePayoutsRouter, mySalaryRouter, franchisePayoutsRouter, platformPayoutsRouter } from '../modules/food/payouts/routes/payout.routes.js';
+import { storePosRouter, posCallbackRouter } from '../modules/food/pos/routes/pos.routes.js';
 import storeOrderRoutes from '../modules/food/store/routes/storeOrders.routes.js';
 import storeOpenStatusRoutes from '../modules/food/store/routes/storeOpenStatus.routes.js';
 import kitchenTaskRoutes from '../modules/food/store/routes/kitchenTasks.routes.js';
@@ -96,9 +97,13 @@ router.use('/v1/food/store/bulk-orders', storeBulkOrdersRoutes);
 router.use('/v1/food/franchise/bulk-orders', franchiseBulkOrdersRoutes);
 router.use('/v1/food/franchise/refunds', franchiseRefundsRoutes);
 router.use('/v1/food/franchise/overview', franchiseOverviewRoutes);
-// Payouts: super admin -> franchise -> store -> riders / kitchen staff (modules/food/payouts)
+// Payouts: super admin -> franchise -> store -> riders / kitchen staff (modules/food/payouts). my-salary is retired (410):
+// kitchen staff have no login, the store manager records their salary.
 router.use('/v1/food/store/payouts', storePayoutsRouter);
 router.use('/v1/food/store/my-salary', mySalaryRouter);
+// Pet Pooja, one setup per store (modules/food/pos): the store manager's settings, and Pet Pooja's status callbacks
+router.use('/v1/food/store/pos', storePosRouter);
+router.use('/v1/pos', posCallbackRouter);
 router.use('/v1/food/franchise/payouts', franchisePayoutsRouter);
 router.use('/v1/food/admin/payouts', platformPayoutsRouter);
 router.use('/v1/food/delivery/payouts', riderPayoutsRouter);
@@ -107,7 +112,7 @@ router.use('/v1/food/store/rider-tickets', storeRiderTicketsRoutes);
 router.use('/v1/food/store/reviews', storeReviewsRoutes);
 router.use('/v1/complaints', dashboardComplaintsRouter);
 router.use('/v1/store/dashboard', storeDashboardRouter);
-// Shifts and attendance (guards per route) must come before the delivery router, whose router-wide guard would turn kitchen staff away
+// Shifts and attendance (guards per route) must come before the delivery router, whose router-wide guard would turn the franchise admin away
 router.use('/v1/store', storeAttendanceRouter);
 router.use('/v1/store', storeDeliveryRouter);
 router.use('/v1/profile', storeProfileRouter);

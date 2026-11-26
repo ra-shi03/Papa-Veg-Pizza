@@ -8,6 +8,7 @@ import { getDeliveryCashLimitSettings } from '../../admin/services/admin.service
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 import { riderBalances, storeBalance, storeBalances, franchiseBalance, HOLD_HOURS } from './payoutBalance.service.js';
 import { notifyPayout } from './payoutNotify.service.js';
+import { findKitchenStaffRecord, kitchenStaffFilter } from '../../store/services/kitchenStaffDirectory.js';
 
 // Requests, payments, rejections and "not received" disputes for every level (see models/payout.model.js).
 // Every list and action is scoped from the signed-in token: a store manager only sees and pays its own store's riders and
@@ -135,10 +136,12 @@ async function franchiseOf(user) {
 }
 
 const STAFF_MANAGER_ROLES = ['STORE_MANAGER', 'store-manager', 'Store Manager'];
-async function myStaffRecord(user) {
-  if (roleOf(user) !== 'KITCHEN_STAFF') throw new ForbiddenError('Only kitchen staff can do this.');
-  const staff = await StoreManager.findOne({ userId: user.userId, status: { $ne: 'DELETED' } }).select('+payoutAccount').lean();
-  if (!staff || !isId(staff.storeId)) throw new ForbiddenError('No store is linked to your account.');
+
+/** A kitchen staff record of the manager's store (kitchen staff have no login: the manager acts for them), or 404. */
+async function storeStaffRecord(store, staffId) {
+  if (!isId(staffId)) throw new NotFoundError('Staff member not found');
+  const staff = await findKitchenStaffRecord(store._id, staffId);
+  if (!staff || !isStaffRole(staff.role)) throw new NotFoundError('Staff member not found');
   return staff;
 }
 
@@ -268,8 +271,10 @@ function salaryMonths(staff, now = new Date()) {
 /** Store manager: every kitchen staff member with their salary and each month's state (paid / waiting / due / overdue). */
 export async function storeStaffSalaries(user) {
   const store = await managerStore(user);
-  const staff = (await StoreManager.find({ storeId: String(store._id), status: { $nin: ['DELETED', 'Rejected', 'Pending Approval'] } })
-    .select('name role employeeCode personalDetails.salary personalDetails.salaryType joinedDate createdAt userId status').lean())
+  // kitchen staff records only (a store manager made by store approval has no title, so the title alone is not enough)
+  const kitchen = await kitchenStaffFilter([store._id]);
+  const staff = (await StoreManager.find({ $and: [kitchen, { storeId: String(store._id), status: { $nin: ['DELETED', 'Rejected', 'Pending Approval'] } }] })
+    .select('name role employeeCode personalDetails.salary personalDetails.salaryType joinedDate createdAt userId status staffKind +payoutAccount').lean())
     .filter((s) => isStaffRole(s.role));
   const payouts = await FoodPayout.find({ kind: 'staff_salary', storeId: store._id }).sort({ createdAt: -1 }).lean();
   const now = new Date();
@@ -283,6 +288,8 @@ export async function storeStaffSalaries(user) {
     return {
       staffId: String(s._id), name: s.name, role: s.role, employeeCode: s.employeeCode, status: s.status,
       salary: Number(s.personalDetails?.salary) || 0, salaryType: s.personalDetails?.salaryType || 'Monthly',
+      // where the salary goes: kept by the store manager (kitchen staff have no login)
+      account: accountView(s.payoutAccount),
       months, payouts: mine.map((p) => shapePayout(p, { fullBank: true })),
     };
   });
@@ -292,7 +299,7 @@ export async function storeStaffSalaries(user) {
 export async function recordStaffSalary(user, { staffId, period, amount, method, reference, proofUrl, note } = {}) {
   const store = await managerStore(user);
   if (!isId(staffId)) throw new NotFoundError('Staff member not found');
-  const staff = await StoreManager.findOne({ _id: staffId, storeId: String(store._id), status: { $ne: 'DELETED' } }).select('name role userId +payoutAccount').lean();
+  const staff = await StoreManager.findOne({ $and: [await kitchenStaffFilter([store._id]), { _id: staffId, storeId: String(store._id), status: { $ne: 'DELETED' } }] }).select('name role userId +payoutAccount').lean();
   if (!staff || !isStaffRole(staff.role)) throw new NotFoundError('Staff member not found');
   if (!PERIOD_RE.test(String(period || ''))) throw new ValidationError('Choose the month the salary is for.');
   if (String(period) > ymNow()) throw new ValidationError('You cannot pay a salary for a month that has not started.');
@@ -322,48 +329,11 @@ export async function recordStaffSalary(user, { staffId, period, amount, method,
   return shapePayout(p.toObject(), { fullBank: true });
 }
 
-/** Kitchen staff: their salary months and payouts. */
-export async function mySalary(user) {
-  const staff = await myStaffRecord(user);
-  const payouts = await FoodPayout.find({ kind: 'staff_salary', payeeId: staff._id }).sort({ createdAt: -1 }).lean();
-  const now = new Date();
-  const months = salaryMonths(staff, now).map((period) => {
-    const live = payouts.find((p) => p.period === period && ['pending', 'paid'].includes(p.status));
-    const overdue = !live && now >= dueDate(period);
-    return { period, state: live ? live.status : overdue ? 'overdue' : 'not_due', canRequest: overdue, dueBy: dueDate(period) };
-  });
-  return {
-    salary: Number(staff.personalDetails?.salary) || 0, salaryType: staff.personalDetails?.salaryType || 'Monthly',
-    account: accountView(staff.payoutAccount), months, payouts: payouts.map((p) => shapePayout(p)),
-    rules: { dueDay: SALARY_DUE_DAY, bankChangeHoldHours: BANK_CHANGE_HOLD_HOURS, disputeDays: DISPUTE_DAYS },
-  };
-}
-
-/** Kitchen staff ask for a month's salary once it is overdue (not paid by the due day of the next month). */
-export async function requestMySalary(user, { period, note } = {}) {
-  const staff = await myStaffRecord(user);
-  if (!PERIOD_RE.test(String(period || ''))) throw new ValidationError('Choose the month.');
-  if (!salaryMonths(staff).includes(String(period))) throw new ValidationError('You can only ask for a month you worked in (the last 12 months).');
-  if (new Date() < dueDate(period)) throw new ValidationError(`The salary for ${period} is due by ${dueDate(period).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}. You can ask after that date if it is not paid.`);
-  assertNoBankHold(staff.payoutAccount?.changedAt);
-  const store = await FoodStore.findById(staff.storeId).select('franchiseId').lean();
-  const monthly = (staff.personalDetails?.salaryType || 'Monthly') === 'Monthly' ? Number(staff.personalDetails?.salary) || 0 : 0;
-  let p;
-  try {
-    p = await FoodPayout.create({
-      kind: 'staff_salary', payeeType: 'staff', payeeId: staff._id, payeeName: staff.name || '', staffUserId: staff.userId || null,
-      payerType: 'store', payerId: oid(staff.storeId), storeId: oid(staff.storeId), franchiseId: store?.franchiseId || null, period: String(period),
-      amount: monthly, status: 'pending', origin: 'request', note: String(note || '').slice(0, 500), bank: snapshot(staff.payoutAccount),
-      requestedBy: actorOf(user, staff.name),
-      activity: [{ action: 'requested', byRole: 'KITCHEN_STAFF', byName: staff.name || '', note: `Salary for ${period}${note ? ` · ${note}` : ''}` }],
-      activeKey: salaryKey(staff._id, period),
-    });
-  } catch (err) {
-    if (err?.code === 11000) throw conflict(`The salary for ${period} is already paid or requested.`);
-    throw err;
-  }
-  await notifyPayout(p, 'requested');
-  return shapePayout(p.toObject());
+/** Store manager saves a kitchen staff member's bank / UPI details (same 24 h hold after a change as everyone else). */
+export async function saveStaffAccount(user, staffId, body) {
+  const store = await managerStore(user);
+  const staff = await storeStaffRecord(store, staffId);
+  return saveAccount(StoreManager, staff._id, body);
 }
 
 // ----- paying and rejecting ------------------------------------------------------------------------------------------
@@ -467,7 +437,6 @@ export async function rejectPayout(user, id, { reason } = {}) {
 async function payeeScope(user) {
   const role = roleOf(user);
   if (role === 'DELIVERY_PARTNER') return { kind: 'rider_withdrawal', payeeId: oid(user.userId) };
-  if (role === 'KITCHEN_STAFF') return { kind: 'staff_salary', payeeId: (await myStaffRecord(user))._id };
   if (role === 'STORE_MANAGER') return { kind: 'store_payout', payeeId: (await managerStore(user))._id };
   if (role === 'FRANCHISE_ADMIN') return { kind: 'franchise_payout', payeeId: (await franchiseOf(user))._id };
   throw new ForbiddenError('You do not receive payouts.');
@@ -639,9 +608,5 @@ export async function saveStoreAccount(user, body) {
 export async function saveFranchiseAccount(user, body) {
   const franchise = await franchiseOf(user);
   return saveAccount(FoodFranchise, franchise._id, body);
-}
-export async function saveMyStaffAccount(user, body) {
-  const staff = await myStaffRecord(user);
-  return saveAccount(StoreManager, staff._id, body);
 }
 

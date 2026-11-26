@@ -203,7 +203,6 @@ describe('order events reach only the right rooms', () => {
             adminA: await client(as.adminA()),
             managerB: await client(as.managerB()),
             adminB: await client(as.adminB()),
-            staffA: await client(fx.tokenFor(new mongoose.Types.ObjectId(), 'KITCHEN_STAFF', scopeA)),
             customerA: await client(as.customerA()),
             rider: await client(as.rider()),
         };
@@ -278,23 +277,15 @@ describe('order events reach only the right rooms', () => {
         const r = await watch(() => fx.models.FoodOrder.updateOne({ _id: o.id }, { $set: { orderStatus: 'preparing' } }));
         assert.deepEqual(got(r), insideA);
     });
-    test('kitchen staff: no order event, only an id-free "an order changed" signal of their own store; store notices too', async () => {
-        const staffB = await client(fx.tokenFor(new mongoose.Types.ObjectId(), 'KITCHEN_STAFF', { franchiseId: B.franchiseId, storeId: B.storeId }));
-        const o = await order({ customerName: 'Asha' });
-        const sigA = next(who.staffA, 'store_event', 1800);
-        const sigB = next(staffB, 'store_event', 1200);
-        const r = await watch(() => fx.models.FoodOrder.updateOne({ _id: o.id }, { $set: { 'kitchen.stage': 'baking' } }));
-        assert.equal(r.staffA, null, 'kitchen staff never get the store\'s order events');
-        const s = await sigA;
-        assert.deepEqual(Object.keys(s).sort(), ['at', 'storeId', 'type'], 'no order id or details');
-        assert.deepEqual([s.type, s.storeId], ['order', A.storeId]);
-        assert.equal(await sigB, null, 'another store\'s staff hear nothing');
-        // tasks / attendance / payout notices reach the manager and the kitchen staff of that store only
+    test('kitchen staff no longer sign in: an old kitchen staff token gets no socket; store notices reach the manager only', async () => {
+        const scopeA = { franchiseId: A.franchiseId, storeId: A.storeId };
+        await assert.rejects(client(fx.tokenFor(new mongoose.Types.ObjectId(), 'KITCHEN_STAFF', scopeA)), /AUTH_INVALID/);
+        // tasks / attendance / payout / Pet Pooja notices reach the store's manager, not another store's
         const { emitStoreEvent } = await import('../src/config/socket.js');
-        const heard = [next(who.staffA, 'store_event', 1500), next(who.managerA, 'store_event', 1500), next(staffB, 'store_event', 1000)];
+        const heard = [next(who.managerA, 'store_event', 1500), next(who.managerB, 'store_event', 1000)];
         emitStoreEvent(A.storeId, 'payout', { payoutId: 'p1' });
-        const [staff, manager, other] = await Promise.all(heard);
-        assert.deepEqual([staff?.type, manager?.type, other], ['payout', 'payout', null]);
+        const [manager, other] = await Promise.all(heard);
+        assert.deepEqual([manager?.type, other], ['payout', null]);
     });
 });
 

@@ -59,6 +59,7 @@ const startServer = async () => {
         // 1. Connect to Database (MongoDB)
         await connectDB();
         await (await import('./src/core/notifications/models/notification.model.js')).dropLegacyNotificationIndex();
+        await (await import('./src/modules/food/franchise/models/storeManager.model.js')).fixStaffEmailIndex();   // kitchen staff may have no email
 
         // Saved gateway secrets need PAYMENT_SECRETS_KEY in production (exits if missing)
         await validatePaymentSecrets(() => FoodPaymentGateway.countDocuments({}));
@@ -75,6 +76,7 @@ const startServer = async () => {
         // 3. Initialize Socket.IO with the HTTP server (Redis adapter when Redis enabled)
         await initSocket(httpServer);
         if (isJobWorker()) startOrderEventStream(); // order events to the store and franchise rooms (once for the whole system)
+        if (isJobWorker()) (await import('./src/modules/food/pos/services/posOutbox.service.js')).startPosOutbox(); // orders out to each store's Pet Pooja
 
         if (config.redisEnabled) {
             await connectRedis();

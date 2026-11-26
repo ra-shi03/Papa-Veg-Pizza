@@ -24,6 +24,7 @@ import ViewDetailsModal from "./components/ViewDetailsModal";
 import AcceptOrderModal from "./components/AcceptOrderModal";
 import RejectOrderModal from "./components/RejectOrderModal";
 import PrintReceiptModal from "./components/PrintReceiptModal";
+import PetPoojaModeBanner from "./components/PetPoojaModeBanner";
 
 export default function IncomingOrders() {
   const { role } = useOutletContext();
@@ -342,6 +343,7 @@ export default function IncomingOrders() {
       }}
     >
       <div className="superadmin-theme p-4 md:p-6 space-y-4 max-w-full bg-background text-foreground transition-colors duration-300">
+        <PetPoojaModeBanner />
         {/* 1. Header Area */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-card p-4 rounded-2xl border border-border shadow-sm">
           <div>

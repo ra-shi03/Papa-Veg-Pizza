@@ -25,7 +25,6 @@ import CompletedTasksTable from "./components/CompletedTasksTable";
 import DelayedTasksTable from "./components/DelayedTasksTable";
 import TaskHistoryTable from "./components/TaskHistoryTable";
 import TeamTasksWidget from "./components/TeamTasksWidget";
-import ClockInOutButton from "./components/ClockInOutButton";
 
 // Modals
 import StartTaskModal from "./modals/StartTaskModal";
@@ -40,7 +39,8 @@ import { useQueryClient } from "@tanstack/react-query";
 
 export default function MyTasks() {
   // 1. Get role from layout context
-  const { role = "kitchen_staff" } = useOutletContext();
+  // the store manager runs every kitchen task of the store (kitchen staff have no login)
+  const { role = "store_manager" } = useOutletContext();
   const isManager = role === "store_manager";
 
   // 2. Fetch Tasks Data
@@ -204,16 +204,14 @@ export default function MyTasks() {
         <div>
           <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white uppercase flex items-center gap-2">
             <ClipboardList className="text-[var(--primary)]" />
-            <span>Kitchen My Tasks</span>
+            <span>Kitchen Tasks</span>
           </h1>
           <p className="text-xs font-semibold text-slate-500 dark:text-zinc-400 mt-1">
-            Real-time station order queue, delay controls, and quality verification logs.
+            Every station task of the store. Kitchen staff do not sign in: you start, finish and reassign their tasks here.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Kitchen staff clock themselves in and out here */}
-          {role === "kitchen_staff" && <ClockInOutButton />}
           {/* Quick action: request ingredient replenishment */}
           <button
             onClick={() => openModal("ingredient")}

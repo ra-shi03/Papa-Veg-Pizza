@@ -1,24 +1,25 @@
 // Feature 7: shifts and attendance (/v1/store/shifts, /v1/store/attendance) and the dashboard staff widgets that read them.
-// Role and scope come from the token only: kitchen staff clock themselves in and out and read only their own records; the
-// store manager manages shifts and marks only leave (by approving a leave request, or cancelling a leave day); worked days
-// are never written by the manager. The kitchen supervisor role is no longer used: refused. franchise admin reads one of its own stores, and
-// anything of another store or franchise is 404.
+// Role and scope come from the token only. Kitchen staff have no login (docs/kitchen-staff-removal.md): the store manager
+// clocks them in and out, marks them present (with hours) / absent / on leave, and manages shifts; an old kitchen staff token
+// is refused everywhere. The kitchen supervisor role is no longer used: refused. The franchise admin reads one of its own
+// stores, and anything of another store or franchise is 404.
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createFixture, mongoose, PASSWORD } from './helpers/fixture.js';
 import { formatClock, dateKeyOf, parseClock, atClock } from '../src/modules/food/store/services/attendanceTime.js';
 
 let fx; let A; let B;
-let packer; let pizza; let baker; let bPacker; let bStaff;   // { id (user id), staffId (StoreManager id), token }
+let packer; let pizza; let baker; let bPacker; let bStaff;   // { id = staffId (StoreManager id), token (an old, refused one), mgr }
 let phoneSeq = 0;
 const objectId = (v) => new mongoose.Types.ObjectId(String(v));
 
 const login = async (email) => (await fx.call('POST', '/v1/auth/store/login', null, { email, password: PASSWORD })).body.data.accessToken;
 // created by the store manager and approved by the franchise admin (fx.staff); a 'Kitchen Supervisor' is a legacy
 // account (the role is no longer used and cannot be created). Clocking in is left to the tests.
-const makeStaff = (manager, role, tag) => {
+const makeStaff = async (manager, role, tag) => {
     const k = manager === fx.F.B.managerToken ? 'B' : 'A';
-    return /supervisor/i.test(role) ? fx.legacySupervisor(k, tag) : fx.staff(k, role, tag, { clockIn: false });
+    const s = /supervisor/i.test(role) ? await fx.legacySupervisor(k, tag) : await fx.staff(k, role, tag, { clockIn: false });
+    return { ...s, mgr: manager };
 };
 const ok = (res, status = 200) => { assert.equal(res.status, status, JSON.stringify(res.body)); return res.body.data; };
 const call = (method, path, token, body) => fx.call(method, `/v1/store${path}`, token, body);
@@ -41,13 +42,17 @@ const seedDay = async (f, staff, { date, checkIn = '09:00 AM', checkOut = '05:00
     const r = await att().insertOne(doc);
     return { _id: String(r.insertedId), ...doc };
 };
-/** kitchen staff ask for leave; the store manager decides */
-const requestLeave = (staff, startDate, endDate = startDate, extra = {}) =>
-    call('POST', '/leave-requests', staff.token, { category: 'Sick', startDate, endDate, reason: 'Fever and rest', ...extra });
-const approvedLeave = async (staff, startDate, endDate = startDate) => {
-    const r = ok(await requestLeave(staff, startDate, endDate), 201);
-    return ok(await call('PATCH', `/leave-requests/${r._id}/approve`, A.managerToken, {}));
-};
+/** the store manager asks the franchise admin for their own leave */
+const requestLeave = (who, startDate, endDate = startDate, extra = {}) =>
+    call('POST', '/leave-requests', who.token, { category: 'Sick', startDate, endDate, reason: 'Fever and rest', ...extra });
+/** the store manager records a kitchen staff member's leave (staff have no login, so they do not ask) */
+const markLeave = (staff, from, to = from, reason = 'Sick: fever and rest') =>
+    call('POST', '/attendance/leave', staff.mgr, { staffId: staff.staffId, from, to, reason });
+const approvedLeave = async (staff, from, to = from) => ok(await markLeave(staff, from, to), 201);
+/** the store manager clocks a kitchen staff member in / out */
+const clockIn = (staff, body) => call('POST', `/attendance/staff/${staff.staffId}/clock-in`, staff.mgr, body);
+const clockOut = (staff) => call('POST', `/attendance/staff/${staff.staffId}/clock-out`, staff.mgr);
+const todayOf = async (staff) => ok(await call('GET', '/attendance/people', staff.mgr)).find((p) => p.staffId === staff.staffId)?.today || null;
 /** "hh:mm AM" for `minutes` minutes ago */
 const clockAgo = (minutes) => { const d = new Date(Date.now() - minutes * 60000); return formatClock(d.getHours() * 60 + d.getMinutes()); };
 const att = () => fx.models.FoodOrder.db.collection('food_store_attendance');
@@ -98,12 +103,15 @@ describe('authentication and roles', () => {
         const legacy = await fx.legacySupervisor('A', 'alegacy');
         for (const [m, p] of endpoints) assert.equal((await call(m, p, legacy.token, {})).status, 403, `${m} ${p}`);
     });
-    test('kitchen staff cannot change shifts or attendance', async () => {
-        const writes = [['POST', '/shifts'], ['PUT', `/shifts/${ID}`], ['DELETE', `/shifts/${ID}`], ['POST', `/shifts/${ID}/assign`],
-            ['DELETE', `/attendance/${ID}`], ['GET', '/leave-requests'], ['PATCH', `/leave-requests/${ID}/approve`], ['PATCH', `/leave-requests/${ID}/reject`]];
-        for (const token of [packer.token, pizza.token]) for (const [m, p] of writes) assert.equal((await call(m, p, token, {})).status, 403, `${m} ${p}`);
+    test('an old kitchen staff token is refused everywhere (403): kitchen staff no longer sign in', async () => {
+        const all = [...endpoints, ['PATCH', `/leave-requests/${ID}/reject`], ['POST', '/leave-requests'], ['POST', `/attendance/staff/${packer.staffId}/clock-in`]];
+        for (const token of [packer.token, pizza.token]) for (const [m, p] of all) assert.equal((await call(m, p, token, {})).status, 403, `${m} ${p}`);
     });
-    test('the store manager clocks in like the kitchen staff; the franchise admin and super admin do not', async () => {
+    test('only the store manager clocks kitchen staff in; the franchise admin and super admin do not', async () => {
+        assert.equal((await call('POST', `/attendance/staff/${packer.staffId}/clock-in`, A.adminToken)).status, 403);
+        assert.equal((await call('POST', `/attendance/staff/${packer.staffId}/clock-in`, fx.SA)).status, 403);
+    });
+    test('the store manager clocks in themselves; the franchise admin and super admin do not', async () => {
         assert.equal(ok(await call('GET', '/attendance/today', A.managerToken)).state, 'clocked_in', 'the manager clocked in at the start of the shift');
         assert.equal((await call('POST', '/attendance/clock-in', A.managerToken)).status, 409, 'already clocked in');
         for (const token of [A.adminToken, fx.SA]) {
@@ -202,15 +210,11 @@ describe('shifts: store manager', () => {
 });
 
 describe('shifts: who sees what, and other stores', () => {
-    test('the manager sees every shift of the store; kitchen staff only the one they are on', async () => {
-        assert.equal(ok(await call('GET', '/shifts', A.managerToken)).length, 2);
-        assert.deepEqual(ok(await call('GET', '/shifts', packer.token)).map((x) => x.shiftName), ['Morning']);
-        const mine = ok(await call('GET', '/shifts', pizza.token));
-        assert.deepEqual(mine.map((s) => s.shiftName), ['Evening']);
-        const morning = ok(await call('GET', '/shifts', A.managerToken)).find((s) => s.shiftName === 'Morning');
-        assert.equal((await call('GET', `/shifts/${morning._id}`, pizza.token)).status, 404, 'a shift they are not on');
-        assert.equal((await call('GET', `/shifts/${morning._id}`, baker.token)).status, 200);
-        assert.equal((await call('GET', '/shifts', bStaff.token)).body.data.length, 0);
+    test('the manager sees every shift of the store, with who is on it; old kitchen staff tokens see nothing', async () => {
+        const all = ok(await call('GET', '/shifts', A.managerToken));
+        assert.equal(all.length, 2);
+        assert.deepEqual(all.find((s) => s.shiftName === 'Evening').assignedStaff, [pizza.staffId]);
+        for (const token of [packer.token, pizza.token, bStaff.token]) assert.equal((await call('GET', '/shifts', token)).status, 403);
     });
     test('the bulk attendance modal can build its roster from the staff list and each shift\'s assignedStaff', async () => {
         const staff = ok(await fx.call('GET', '/v1/food/store/staff', A.managerToken));
@@ -224,14 +228,13 @@ describe('shifts: who sees what, and other stores', () => {
     });
     test('another store\'s manager and staff cannot read or change these shifts (404)', async () => {
         const [morning] = ok(await call('GET', '/shifts', A.managerToken));
-        for (const token of [B.managerToken, bPacker.token, bStaff.token]) assert.equal((await call('GET', `/shifts/${morning._id}`, token)).status, 404);
+        assert.equal((await call('GET', `/shifts/${morning._id}`, B.managerToken)).status, 404);
         assert.equal((await call('PUT', `/shifts/${morning._id}`, B.managerToken, { shiftName: 'Hijacked' })).status, 404);
         assert.equal((await call('DELETE', `/shifts/${morning._id}`, B.managerToken)).status, 404);
         assert.equal((await call('POST', `/shifts/${morning._id}/assign`, B.managerToken, { staffIds: [bStaff.staffId] })).status, 404);
         assert.deepEqual(ok(await call('GET', '/shifts', B.managerToken)).map((s) => s.shiftName), ['Morning']);   // B's own, not A's
         assert.equal(ok(await call('GET', '/shifts', B.managerToken))[0].storeId, B.storeId);
         assert.equal((await call('GET', `/shifts?storeId=${A.storeId}`, B.managerToken)).status, 404);
-        assert.equal((await call('GET', `/shifts?storeId=${B.storeId}`, packer.token)).status, 404);
     });
     test('franchise admin: read only, one of its own stores; another franchise\'s store is 404', async () => {
         assert.equal((await call('GET', '/shifts', A.adminToken)).status, 400, 'must name the store');
@@ -252,7 +255,7 @@ describe('shifts: who sees what, and other stores', () => {
     });
 });
 
-describe('attendance: staff clock in themselves; the store manager only marks leave', () => {
+describe('attendance: the store manager marks kitchen staff (they have no login)', () => {
     let worked; let morning;
     before(async () => {
         await resetAttendance();
@@ -260,8 +263,10 @@ describe('attendance: staff clock in themselves; the store manager only marks le
         worked = await seedDay(A, baker, { date: daysBack(1), checkIn: '09:05 AM', checkOut: '06:05 PM', shiftId: morning._id, totalHours: 9 });
         await seedDay(A, packer, { date: daysBack(2), checkIn: '09:40 AM', checkOut: '05:00 PM', shiftId: morning._id, totalHours: 7.33, late: true, lateMinutes: 40 });
     });
-    test('the manager cannot write a worked day: present is refused (403), bulk marking and editing are gone (404); a worked day cannot be deleted (403)', async () => {
-        assert.equal((await call('POST', '/attendance', A.managerToken, { staffId: baker.staffId, date: daysBack(3), checkIn: '09:00 AM', status: 'present', notes: 'forgot to clock in' })).status, 403);
+    test('the manager marks a past day present (hours, a reason); bulk marking and editing are gone (404); a self-clocked day cannot be deleted (403)', async () => {
+        const marked = ok(await call('POST', '/attendance', A.managerToken, { staffId: baker.staffId, date: daysBack(3), checkIn: '09:00 AM', checkOut: '05:00 PM', status: 'present', notes: 'forgot to clock in' }), 201);
+        assert.deepEqual([marked.status, marked.source, marked.totalHours, marked.markedBy], ['present', 'manager', 8, 'Manager A']);
+        ok(await call('DELETE', `/attendance/${marked._id}`, A.managerToken));   // the manager's own mark can be taken back
         assert.equal((await call('POST', '/attendance/bulk', A.managerToken, { date: daysBack(3), attendances: [{ staffId: baker.staffId, status: 'present' }] })).status, 404);
         assert.equal((await call('PUT', `/attendance/${worked._id}`, A.managerToken, { checkOut: '05:00 PM', totalHours: 1 })).status, 404);
         const del = await call('DELETE', `/attendance/${worked._id}`, A.managerToken);
@@ -270,32 +275,34 @@ describe('attendance: staff clock in themselves; the store manager only marks le
         const stored = await att().findOne({ _id: objectId(worked._id) });
         assert.deepEqual([stored.totalHours, stored.status], [9, 'present'], 'unchanged');
     });
-    test('leave: a kitchen staff request the manager approves becomes one leave day per day, with no times or hours', async () => {
+    test('leave: the manager records a kitchen staff member\'s leave, one leave day per day, with no times or hours', async () => {
         const [d1, d2] = [daysAhead(1), daysAhead(2)];
-        const req = ok(await requestLeave(pizza, d1, d2), 201);
-        assert.deepEqual([req.status, req.days, req.staffId], ['pending', 2, pizza.staffId]);
-        assert.equal(ok(await call('GET', '/attendance?status=leave', A.managerToken)).length, 0, 'nothing before the approval');
-        ok(await call('PATCH', `/leave-requests/${req._id}/approve`, A.managerToken, {}));
+        assert.equal((await markLeave(pizza, d1, d2, 'x')).status, 400, 'a reason');
+        assert.equal((await markLeave(pizza, d2, d1)).status, 400, 'ends before it starts');
+        const res = ok(await markLeave(pizza, d1, d2), 201);
+        assert.equal(res.days, 2);
         const days = ok(await call('GET', '/attendance?status=leave', A.managerToken));
         assert.deepEqual(days.map((r) => r.date).sort(), [d1, d2]);
         for (const r of days) {
             assert.deepEqual([r.staffId, r.checkIn, r.checkOut, r.totalHours, r.markedBy, r.source], [pizza.staffId, '', '', 0, 'Manager A', 'manager']);
-            assert.deepEqual([r.leave.category, r.leave.approvedBy], ['Sick', 'Manager A']);
         }
-        assert.equal((await call('PATCH', `/leave-requests/${req._id}/approve`, A.managerToken, {})).status, 409, 'decided once');
+        assert.equal((await markLeave({ ...bStaff, mgr: A.managerToken }, d1)).status, 404, 'another store\'s staff');
     });
-    test('leave requests: validation; an overlap is 409; only kitchen staff ask and only their own store manager decides', async () => {
-        assert.equal((await requestLeave(pizza, daysBack(1))).status, 400, 'in the past');
-        assert.equal((await requestLeave(pizza, daysAhead(6), daysAhead(5))).status, 400, 'ends before it starts');
-        assert.equal((await requestLeave(pizza, daysAhead(5), daysAhead(5), { reason: 'x' })).status, 400, 'reason');
-        assert.equal((await requestLeave(pizza, daysAhead(5), daysAhead(5), { category: 'Holiday' })).status, 400, 'category');
-        assert.equal((await requestLeave(pizza, daysAhead(2), daysAhead(3))).status, 409, 'overlaps the approved leave');
-        // the store manager asks too; only the franchise admin decides it, never the manager themselves
+    test('leave requests: the manager\'s own go to the franchise admin; a kitchen staff request from before the change is still decided by the manager', async () => {
+        assert.equal((await requestLeave({ token: A.managerToken }, daysBack(1))).status, 400, 'in the past');
+        assert.equal((await requestLeave({ token: A.managerToken }, daysAhead(6), daysAhead(5))).status, 400, 'ends before it starts');
+        assert.equal((await requestLeave({ token: A.managerToken }, daysAhead(5), daysAhead(5), { reason: 'x' })).status, 400, 'reason');
+        assert.equal((await requestLeave({ token: A.managerToken }, daysAhead(5), daysAhead(5), { category: 'Holiday' })).status, 400, 'category');
+        // only the franchise admin decides the manager's own request, never the manager themselves
         const mine = ok(await requestLeave({ token: A.managerToken }, daysAhead(5)), 201);
+        assert.equal((await requestLeave({ token: A.managerToken }, daysAhead(5), daysAhead(6))).status, 409, 'overlaps their own request');
         assert.equal((await call('PATCH', `/leave-requests/${mine._id}/approve`, A.managerToken, {})).status, 403, 'not their own');
         assert.ok(!ok(await call('GET', '/leave-requests?status=pending', A.managerToken)).requests.some((q) => q._id === mine._id), 'not in the manager\'s queue');
         ok(await call('PATCH', `/leave-requests/${mine._id}/cancel`, A.managerToken, {}));
-        const r = ok(await requestLeave(baker, daysAhead(5)), 201);
+        // a request a kitchen staff member made before they lost their login
+        const LeaveRequest = mongoose.model('LeaveRequest');
+        const old = await LeaveRequest.create({ storeId: A.storeId, franchiseId: A.franchiseId, staffId: baker.staffId, staffName: baker.name, role: 'Baker', category: 'Sick', startDate: daysAhead(5), endDate: daysAhead(5), days: 1, reason: 'Fever and rest' });
+        const r = { _id: String(old._id) };
         for (const token of [pizza.token, baker.token]) assert.equal((await call('PATCH', `/leave-requests/${r._id}/approve`, token, {})).status, 403);
         assert.equal((await call('PATCH', `/leave-requests/${r._id}/approve`, A.adminToken, {})).status, 400, 'the franchise admin names the store');
         assert.equal((await call('PATCH', `/leave-requests/${r._id}/approve`, B.managerToken, {})).status, 404, 'another store');
@@ -330,13 +337,12 @@ describe('attendance: staff clock in themselves; the store manager only marks le
 });
 
 describe('attendance: other stores and franchises', () => {
-    test('another store\'s manager and staff see none of it and cannot touch it', async () => {
+    test('another store\'s manager sees none of it and cannot touch it; old staff tokens are refused', async () => {
         const [one] = ok(await call('GET', '/attendance', A.managerToken));
-        for (const token of [B.managerToken, bPacker.token, bStaff.token]) {
-            assert.equal((await call('GET', `/attendance/${one._id}`, token)).status, 404);
-        }
+        assert.equal((await call('GET', `/attendance/${one._id}`, B.managerToken)).status, 404);
+        for (const token of [bPacker.token, bStaff.token]) assert.equal((await call('GET', `/attendance/${one._id}`, token)).status, 403);
         assert.equal(staffRows(ok(await call('GET', '/attendance', B.managerToken))).length, 0);
-        assert.equal(ok(await call('GET', '/attendance', bPacker.token)).length, 0);
+        assert.equal((await call('POST', `/attendance/staff/${pizza.staffId}/clock-in`, B.managerToken)).status, 404, 'cannot clock in another store\'s staff');
         assert.equal((await call('DELETE', `/attendance/${one._id}`, B.managerToken)).status, 404);
         assert.equal((await call('GET', `/attendance?storeId=${A.storeId}`, B.managerToken)).status, 404);
         assert.ok(await att().findOne({ _id: objectId(one._id) }), 'still there');
@@ -355,25 +361,22 @@ describe('attendance: other stores and franchises', () => {
     });
 });
 
-describe('attendance: kitchen staff clock in and out', () => {
+describe('attendance: the store manager clocks kitchen staff in and out', () => {
     before(resetAttendance);
 
     test('today: not clocked in yet', async () => {
-        const t = ok(await call('GET', '/attendance/today', pizza.token));
-        assert.equal(t.state, 'not_clocked_in');
-        assert.equal(t.clockedIn, false);
-        assert.equal(t.record, null);
-        assert.equal(t.shift.shiftName, 'Evening');
+        assert.equal(await todayOf(pizza), null);
     });
     test('clock out before clocking in is refused (409)', async () => {
-        assert.equal((await call('POST', '/attendance/clock-out', pizza.token)).status, 409);
+        assert.equal((await clockOut(pizza)).status, 409);
     });
-    test('clock in: the record is the caller\'s own, whatever the body says', async () => {
-        const rec = ok(await call('POST', '/attendance/clock-in', pizza.token, { storeId: B.storeId, userId: bStaff.id, staffId: bStaff.staffId, status: 'absent', checkIn: '01:00 AM', franchiseId: B.franchiseId }), 201);
+    test('clock in: the record is that person\'s, in the manager\'s store, whatever the body says', async () => {
+        const rec = ok(await clockIn(pizza, { storeId: B.storeId, userId: bStaff.id, staffId: bStaff.staffId, status: 'absent', checkIn: '01:00 AM', franchiseId: B.franchiseId }), 201);
         assert.equal(rec.storeId, A.storeId);
         assert.equal(rec.staffId, pizza.staffId);
         assert.equal(rec.status, 'present');
-        assert.equal(rec.source, 'self');
+        assert.equal(rec.source, 'manager');
+        assert.equal(rec.markedBy, 'Manager A');
         assert.equal(rec.date, todayKey());
         assert.equal(rec.checkOut, '');
         assert.ok(rec.checkInAt);
@@ -381,94 +384,74 @@ describe('attendance: kitchen staff clock in and out', () => {
         assert.equal(rec.shiftName, 'Evening');
         assert.equal((await fx.models.FoodOrder.db.collection('food_store_attendance').countDocuments({ staffId: objectId(bStaff.staffId) })), 0);
     });
-    test('clocking in again while clocked in is refused (409); today shows clocked_in', async () => {
-        assert.equal((await call('POST', '/attendance/clock-in', pizza.token)).status, 409);
-        const t = ok(await call('GET', '/attendance/today', pizza.token));
-        assert.equal(t.state, 'clocked_in');
-        assert.equal(t.clockedIn, true);
+    test('clocking in again while clocked in is refused (409); today shows clocked in', async () => {
+        assert.equal((await clockIn(pizza)).status, 409);
+        assert.equal((await todayOf(pizza)).clockedIn, true);
     });
     test('clock out: hours are worked out from the real times', async () => {
         // pretend the shift began three and a half hours ago
         await fx.models.FoodOrder.db.collection('food_store_attendance').updateOne({ staffId: objectId(pizza.staffId) }, { $set: { checkInAt: new Date(Date.now() - 3.5 * 3600000) } });
-        const rec = ok(await call('POST', '/attendance/clock-out', pizza.token));
+        const rec = ok(await clockOut(pizza));
         assert.equal(rec.totalHours, 3.5);
         assert.equal(rec.overtimeHours, 0);
         assert.ok(rec.checkOut);
-        const t = ok(await call('GET', '/attendance/today', pizza.token));
-        assert.equal(t.state, 'clocked_out');
-        assert.equal((await call('POST', '/attendance/clock-out', pizza.token)).status, 409, 'already clocked out');
-        assert.equal((await call('POST', '/attendance/clock-in', pizza.token)).status, 409, 'one record per day');
+        assert.equal((await todayOf(pizza)).clockedIn, false);
+        assert.equal((await clockOut(pizza)).status, 409, 'already clocked out');
+        assert.equal((await clockIn(pizza)).status, 409, 'one record per day');
     });
     test('lateness against the person\'s shift', async () => {
         const late = ok(await call('POST', '/shifts', A.managerToken, { shiftName: 'Late test', startTime: clockAgo(120), endTime: '11:59 PM' }), 201);
         ok(await call('POST', `/shifts/${late._id}/assign`, A.managerToken, { staffIds: [baker.staffId] }));
-        const rec = ok(await call('POST', '/attendance/clock-in', baker.token), 201);
+        const rec = ok(await clockIn(baker), 201);
         assert.equal(rec.late, true);
         assert.ok(rec.lateMinutes >= 119 && rec.lateMinutes <= 122, `lateMinutes ${rec.lateMinutes}`);
-        ok(await call('POST', '/attendance/clock-out', baker.token));
+        ok(await clockOut(baker));
         // on time: a shift that starts now
         const sched = ok(await call('POST', '/shifts', A.managerToken, { shiftName: 'On time', startTime: clockAgo(2), endTime: '11:59 PM' }), 201);
         ok(await call('POST', `/shifts/${sched._id}/assign`, A.managerToken, { staffIds: [packer.staffId] }));
-        const onTime = ok(await call('POST', '/attendance/clock-in', packer.token), 201);
+        const onTime = ok(await clockIn(packer), 201);
         assert.equal(onTime.late, false);
         assert.equal(onTime.lateMinutes, 0);
     });
-    test('an account on leave or suspended cannot clock in (403)', async () => {
+    test('a person on leave or suspended cannot be clocked in (403)', async () => {
         await fx.models.FoodOrder.db.collection('food_store_attendance').deleteMany({ staffId: objectId(packer.staffId) });
         for (const status of ['On Leave', 'Suspended']) {
             await fx.models.StoreManager.updateOne({ _id: packer.staffId }, { $set: { status } });
-            assert.equal((await call('POST', '/attendance/clock-in', packer.token)).status, 403, status);
+            assert.equal((await clockIn(packer)).status, 403, status);
         }
         await fx.models.StoreManager.updateOne({ _id: packer.staffId }, { $set: { status: 'Active' } });
-        assert.equal((await call('POST', '/attendance/clock-in', packer.token)).status, 201);
+        assert.equal((await clockIn(packer)).status, 201);
     });
-    test('an approved leave day cannot be clocked in over (409); once the manager cancels it, they can clock in', async () => {
+    test('a leave day cannot be clocked in over (409); once the manager cancels it, they can be clocked in', async () => {
         await resetAttendance();
         await approvedLeave(baker, todayKey());
-        const res = await call('POST', '/attendance/clock-in', baker.token);
+        const res = await clockIn(baker);
         assert.equal(res.status, 409);
         assert.match(res.body.message || res.body.error, /on leave today/);
-        assert.equal(ok(await call('GET', '/attendance/today', baker.token)).state, 'on_leave');
+        assert.equal((await todayOf(baker)).status, 'leave');
         const [day] = ok(await call('GET', `/attendance?date=${todayKey()}&status=leave`, A.managerToken));
         ok(await call('DELETE', `/attendance/${day._id}`, A.managerToken));
-        ok(await call('POST', '/attendance/clock-in', baker.token), 201);
+        ok(await clockIn(baker), 201);
         await resetAttendance();
     });
-    test('another store\'s staff clock in to their own store', async () => {
-        const rec = ok(await call('POST', '/attendance/clock-in', bStaff.token), 201);
+    test('another store\'s manager clocks in their own staff, to their own store', async () => {
+        const rec = ok(await clockIn(bStaff), 201);
         assert.equal(rec.storeId, B.storeId);
         assert.equal(staffRows(ok(await call('GET', '/attendance', A.managerToken))).length, 0, 'store A does not see it');
     });
 });
 
-describe('attendance: kitchen staff read only their own', () => {
-    let pizzaRec; let bakerRec;
+describe('attendance: old kitchen staff tokens read nothing', () => {
+    let pizzaRec;
     before(async () => {
         await resetAttendance();
         pizzaRec = await seedDay(A, pizza, { date: daysBack(1) });
-        bakerRec = await seedDay(A, baker, { date: daysBack(1) });
-        await seedDay(A, pizza, { date: daysBack(2), status: 'leave' });
     });
-    test('kitchen staff: list is their own whatever the query says; another person\'s record is 404', async () => {
-        const own = ok(await call('GET', '/attendance', pizza.token));
-        assert.deepEqual(own.map((r) => r.staffId), [pizza.staffId, pizza.staffId]);
-        assert.equal(ok(await call('GET', '/attendance?search=abaker', pizza.token)).every((r) => r.staffId === pizza.staffId), true);
-        assert.equal(ok(await call('GET', '/attendance?role=Baker', pizza.token)).every((r) => r.staffId === pizza.staffId), true, 'filters never widen what they can see');
-        assert.equal((await call('GET', `/attendance/${bakerRec._id}`, pizza.token)).status, 404);
-        assert.equal((await call('GET', `/attendance/${pizzaRec._id}`, pizza.token)).status, 200);
-    });
-    test('/me is always the caller\'s own history', async () => {
-        await seedDay(A, packer, { date: daysBack(1), checkIn: '08:00 AM', checkOut: '04:00 PM' });
-        assert.deepEqual(ok(await call('GET', '/attendance/me', packer.token)).map((r) => r.staffId), [packer.staffId]);
-        assert.equal(ok(await call('GET', '/attendance/me', pizza.token)).length, 2);
-        assert.equal(ok(await call('GET', `/attendance/me?from=${daysBack(1)}`, pizza.token)).length, 1);
-        assert.equal(ok(await call('GET', '/attendance/me?status=leave', pizza.token)).length, 1);
-    });
-    test('kitchen staff read only their own, never write', async () => {
-        assert.ok(ok(await call('GET', '/attendance', packer.token)).every((r) => r.staffId === packer.staffId));
-        assert.equal((await call('GET', `/attendance/${bakerRec._id}`, packer.token)).status, 404);
-        assert.equal((await call('DELETE', `/attendance/${bakerRec._id}`, packer.token)).status, 403);
-        assert.equal((await call('DELETE', `/attendance/${pizzaRec._id}`, pizza.token)).status, 403, 'not even their own');
+    test('list, one record, history and delete are all refused (403)', async () => {
+        for (const [m, p] of [['GET', '/attendance'], ['GET', `/attendance/${pizzaRec._id}`], ['GET', '/attendance/me'], ['DELETE', `/attendance/${pizzaRec._id}`]]) {
+            assert.equal((await call(m, p, pizza.token)).status, 403, `${m} ${p}`);
+        }
+        assert.equal(ok(await call('GET', `/attendance/${pizzaRec._id}`, A.managerToken)).staffId, pizza.staffId, 'the manager reads it');
     });
 });
 
@@ -484,12 +467,12 @@ describe('dashboard: staff widgets use real clock-in data', () => {
         ok(await call('POST', '/shifts', A.managerToken, { shiftName: 'Dash late', startTime: clockAgo(90), endTime: '11:59 PM' }), 201);
         const dash = ok(await call('GET', '/shifts', A.managerToken)).find((s) => s.shiftName === 'Dash late');
         ok(await call('POST', `/shifts/${dash._id}/assign`, A.managerToken, { staffIds: [pizza.staffId] }));
-        ok(await call('POST', '/attendance/clock-in', packer.token), 201);
+        ok(await clockIn(packer), 201);
         assert.deepEqual(await widget(A.managerToken, 'staff-duty'), { staffOnDuty: 1 });
-        ok(await call('POST', '/attendance/clock-in', pizza.token), 201);
+        ok(await clockIn(pizza), 201);
         assert.deepEqual(await widget(A.managerToken, 'staff-duty'), { staffOnDuty: 2 });
         assert.deepEqual(await widget(A.managerToken, 'staff-overview'), { present: 2, late: 1, absent: 0 });
-        ok(await call('POST', '/attendance/clock-out', pizza.token));
+        ok(await clockOut(pizza));
         assert.deepEqual(await widget(A.managerToken, 'staff-duty'), { staffOnDuty: 1 });
         assert.deepEqual(await widget(A.managerToken, 'staff-overview'), { present: 2, late: 1, absent: 0 });
     });
@@ -508,7 +491,7 @@ describe('dashboard: staff widgets use real clock-in data', () => {
         assert.deepEqual(await widget(A.managerToken, 'staff-overview'), { present: 3, late: 1, absent: 0 });
         assert.deepEqual(await widget(A.managerToken, 'staff-duty'), { staffOnDuty: 1 });
     });
-    test('other stores and franchises: own numbers only; kitchen staff do not get the staff widgets', async () => {
+    test('other stores and franchises: own numbers only; old kitchen staff tokens do not get the staff widgets', async () => {
         assert.deepEqual(await widget(B.managerToken, 'staff-duty'), { staffOnDuty: 0 });
         assert.deepEqual(await widget(B.managerToken, 'staff-overview'), { present: 0, late: 0, absent: 0 });
         assert.equal((await fx.call('GET', `/v1/store/dashboard/staff-duty?storeId=${A.storeId}`, B.managerToken)).status, 404);

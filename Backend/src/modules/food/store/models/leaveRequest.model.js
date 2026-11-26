@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
-// A kitchen staff member asks for leave; the store manager of their store accepts or rejects it.
+// The store manager asks the franchise admin for leave (kitchen staff asked their store manager before they lost their
+// logins; those requests are kept and can still be decided).
 // An accepted request becomes 'leave' attendance records, one per day (see leaveRequests.service.js).
 export const LEAVE_CATEGORIES = ['Sick', 'Personal', 'Emergency', 'Vacation', 'Other'];
 
@@ -9,7 +10,7 @@ const leaveRequestSchema = new mongoose.Schema(
         storeId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodStore', required: true, index: true },
         franchiseId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodFranchise', default: null },
         staffId: { type: mongoose.Schema.Types.ObjectId, ref: 'StoreManager', required: true, index: true },
-        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
         staffName: { type: String, trim: true, default: '' },
         role: { type: String, trim: true, default: '' },
         category: { type: String, enum: LEAVE_CATEGORIES, required: true },

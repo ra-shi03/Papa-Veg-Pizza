@@ -9,30 +9,31 @@ import { requestIngredientFromTask, taskRequestView } from './inventoryOps.servi
 import { StockRequest } from '../models/stockRequest.model.js';
 import { QualityCheck } from '../models/qualityCheck.model.js';
 import {
-  normalizeRole, requireStore, requireManager, staffSlotsOf, findOrder, logStep, toObjectId, idStr, toOpsOrder,
-  assignStaff, moveToStage, holdsStation, mustManagerOrStation, mustManagerOrPacker,
+  normalizeRole, requireStore, requireManager, findOrder, logStep, toObjectId, idStr, toOpsOrder,
+  assignStaff, moveToStage, mustManagerOrStation, mustManagerOrPacker,
 } from './storeOrders.service.js';
+import { personKey } from './kitchenStaffDirectory.js';
 import { notifyUsers } from './kitchenTasks.service.js';
 import { ensureItems, lineOf, syncOrderStage, visibleKitchenOrders, priorityLabel, isDelayed, IN_KITCHEN } from './kitchenItems.service.js';
 import { notifyOwnersSafely } from '../../orders/services/order.helpers.js';
 import { applyItemRejection } from './itemRejectionPricing.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 
-// Kitchen Queue, Delayed Orders, Packaging Station and the two My Tasks modals (ingredient request,
+// Kitchen Queue, Delayed Orders, Packaging Station and the two Kitchen Tasks modals (ingredient request,
 // quality check). Role and store scope are decided here from the token, never from the request:
-//   store manager    -> everything in their store; the only one who assigns staff or rejects items
-//   kitchen staff    -> only the orders where they hold a station; the packaging-station holder checks quality and marks ready
-// (There is no kitchen supervisor any more. `kitchen.supervisor` on older orders is information only.)
+//   store manager    -> everything in their store: assigns staff, works each station for the person on it, checks
+//                       quality and marks orders ready
+// Kitchen staff have no login (docs/kitchen-staff-removal.md) and there is no kitchen supervisor any more
+// (`kitchen.supervisor` on older orders is information only).
 
 const asRole = (user) => normalizeRole(user?.role);
 const isManager = (user) => asRole(user) === 'STORE_MANAGER';
-const isStaff = (user) => asRole(user) === 'KITCHEN_STAFF';
 const str = (v, max) => String(v ?? '').trim().slice(0, max);
 const isId = (v) => mongoose.Types.ObjectId.isValid(String(v || ''));
 
-/** The store manager or kitchen staff (who see only their own orders); anyone else is refused. */
+/** The store manager runs the kitchen; anyone else is refused. */
 const mustBeKitchenRole = (user) => {
-  if (!isManager(user) && !isStaff(user)) throw new ForbiddenError('Only the store manager or kitchen staff can do this.');
+  if (!isManager(user)) throw new ForbiddenError('Only the store manager can do this.');
 };
 
 /** An order the caller may see at all. Others get a 404, so its existence is not revealed. */
@@ -40,8 +41,7 @@ async function findVisibleOrder(user, orderId) {
   const storeId = requireStore(user);
   if (!isId(orderId)) throw new NotFoundError('Order not found');
   const order = await findOrder(orderId, storeId);
-  const seen = isManager(user) || (isStaff(user) && holdsStation(order, user.userId));
-  if (!seen) throw new NotFoundError('Order not found');
+  if (!isManager(user)) throw new NotFoundError('Order not found');
   return { order, storeId };
 }
 
@@ -51,7 +51,7 @@ async function findVisibleOrder(user, orderId) {
 
 const queueStatus = (o) => (o.orderStatus === 'preparing' ? 'preparing' : o.kitchen?.queuedAt ? 'queued' : 'confirmed');
 
-const pizzaChefId = (o) => idStr(o.kitchen?.staff?.pizza_chef?.userId) || null;
+const pizzaChefId = (o) => personKey(o.kitchen?.staff?.pizza_chef) || null;
 
 function toQueueOrder(order, itemRows) {
   const ops = toOpsOrder(order);
@@ -200,7 +200,7 @@ const delayStage = (o) => {
 
 const staffOfStage = (o) => {
   const slot = { queued: 'pizza_chef', preparing: 'pizza_chef', baking: 'baking_chef', packaging: 'packaging_staff' }[delayStage(o)];
-  return idStr(o.kitchen?.staff?.[slot]?.userId) || null;
+  return personKey(o.kitchen?.staff?.[slot]) || null;
 };
 
 function toDelayedOrder(order) {
@@ -252,7 +252,7 @@ export async function escalateOrder(user, orderId, { severity, reason, assignedT
   let assignee = null;
   if (assignedTo) {
     if (!isId(assignedTo)) throw new ValidationError('Choose who to escalate to');
-    assignee = await StoreManager.findOne({ userId: toObjectId(assignedTo), storeId: String(storeId), status: 'Active' }).select('userId name').lean();
+    assignee = await StoreManager.findOne({ $or: [{ _id: toObjectId(assignedTo) }, { userId: toObjectId(assignedTo) }], storeId: String(storeId), status: 'Active' }).select('userId name').lean();
     if (!assignee) throw new ValidationError('That person is not an active member of this store');
   }
   const esc = await KitchenEscalation.create({
@@ -267,13 +267,13 @@ export async function escalateOrder(user, orderId, { severity, reason, assignedT
   if (!order.kitchen.delayReason) order.kitchen.delayReason = str(why, 80);
   logStep(order, user, `Escalated (${esc.severity}): ${why}`);
   await order.save();
-  if (assignee) {
+  if (assignee?.userId) {
     await notifyUsers({
       userIds: [assignee.userId], storeId, type: 'task_delayed', title: `Escalation: order ${order.order_id || order._id}`,
       message: `${esc.severity}: ${why}`,
     });
   }
-  return { _id: String(esc._id), orderId: String(order._id), severity: esc.severity, reason: esc.reason, assignedTo: assignee ? String(assignee.userId) : null, notes: esc.notes, createdAt: esc.createdAt };
+  return { _id: String(esc._id), orderId: String(order._id), severity: esc.severity, reason: esc.reason, assignedTo: assignee ? String(assignee.userId || assignee._id) : null, notes: esc.notes, createdAt: esc.createdAt };
 }
 
 export async function reassignOrderStaff(user, orderId, { staffId } = {}) {
@@ -333,7 +333,7 @@ function toPackagingOrder(order) {
     deliveryType: 'Delivery',
     packaging_status: packStatus(order),
     status: order.orderStatus === 'ready_for_pickup' ? 'ready' : 'preparing',
-    assigned_staff: idStr(p.staff?.userId || order.kitchen?.staff?.packaging_staff?.userId) || null,
+    assigned_staff: personKey(p.staff) || personKey(order.kitchen?.staff?.packaging_staff) || null,
     packaging_start_time: p.startedAt || null,
     packaging_end_time: p.sealedAt || null,
     pickup_number: `P-${String(order.order_id || order._id).replace(/\D/g, '').slice(-3) || String(order._id).slice(-3)}`,
@@ -352,13 +352,12 @@ export async function packagingOrders(user, q = {}) {
       { orderStatus: 'ready_for_pickup', 'kitchen.packaging.status': 'ready_for_pickup', updatedAt: { $gte: recent } },
     ],
   };
-  if (isStaff(user)) filter['kitchen.staff.packaging_staff.userId'] = toObjectId(user.userId);
   let list = await FoodOrder.find(filter).sort({ createdAt: 1 }).limit(200).lean();
 
   const search = String(q.search || '').trim().toLowerCase();
   if (search) list = list.filter((o) => [o.order_id, o.customerName, o.customerPhone].some((v) => String(v || '').toLowerCase().includes(search)));
   if (q.status && q.status !== 'All') list = list.filter((o) => packStatus(o) === q.status);
-  if (q.staff && q.staff !== 'All') list = list.filter((o) => idStr(o.kitchen?.packaging?.staff?.userId || o.kitchen?.staff?.packaging_staff?.userId) === q.staff);
+  if (q.staff && q.staff !== 'All') list = list.filter((o) => (personKey(o.kitchen?.packaging?.staff) || personKey(o.kitchen?.staff?.packaging_staff)) === q.staff);
   if (String(q.readyForPickup) === 'true') list = list.filter((o) => packStatus(o) === 'ready_for_pickup');
   if (String(q.pendingPackaging) === 'true') list = list.filter((o) => packStatus(o) === 'ready_for_packaging');
   return list.map(toPackagingOrder);
@@ -381,10 +380,9 @@ export async function startPackaging(user, { orderId } = {}) {
   if (p.status !== 'ready_for_packaging') throw new ValidationError('Packaging has already started');
   p.status = 'packaging_started';
   p.startedAt = new Date();
-  if (isStaff(user)) {
-    const slot = order.kitchen.staff.packaging_staff;
-    p.staff = { userId: toObjectId(user.userId), name: slot?.name || '', assignedAt: new Date() };
-  }
+  // packed by the person on the packaging station (the manager presses the button for them)
+  const slot = order.kitchen.staff?.packaging_staff;
+  if (personKey(slot)) p.staff = { ...(slot.toObject?.() || slot), assignedAt: new Date() };
   order.markModified('kitchen');
   logStep(order, user, 'Packaging started');
   await order.save();
@@ -436,12 +434,11 @@ export async function markReady(user, orderId) {
 // My Tasks: ingredient request + quality check
 // ---------------------------------------------------------------------------------------------
 
-/** A task of the caller's own store; staff may only use their own tasks, the manager any task of the store. */
+/** A task of the caller's own store (the store manager runs every task of the store). */
 async function findScopedTask(user, taskId, storeId) {
   if (!isId(taskId)) throw new NotFoundError('Task not found');
   const task = await KitchenTask.findOne({ _id: toObjectId(taskId), storeId: toObjectId(storeId) }).lean();
   if (!task) throw new NotFoundError('Task not found');
-  if (isStaff(user) && String(task.assignedTo) !== String(user.userId)) throw new NotFoundError('Task not found');
   return task;
 }
 
@@ -495,8 +492,6 @@ export async function submitQualityCheck(user, payload = {}) {
     order = await FoodOrder.findOne({ storeId: toObjectId(storeId), order_id: str(payload.orderId, 60) });
   }
   if (!order) throw new NotFoundError('Order not found');
-  // staff: only an order where they hold a station is visible at all (404), and only its packer may sign it off (403)
-  if (isStaff(user) && !holdsStation(order, user.userId)) throw new NotFoundError('Order not found');
   mustManagerOrPacker(user, order);
   // A task can only vouch for its own order.
   if (task && payload.orderId && String(payload.orderId) !== String(order.order_id) && String(payload.orderId) !== String(order._id)) {
@@ -526,7 +521,6 @@ export async function listQualityChecks(user) {
   const storeId = toObjectId(requireStore(user));
   mustBeKitchenRole(user);
   const filter = { storeId };
-  if (isStaff(user)) filter.checkedBy = toObjectId(user.userId);   // staff see the checks they did
   const rows = await QualityCheck.find(filter).sort({ createdAt: -1 }).limit(200).lean();
   return rows.map((r) => ({
     _id: String(r._id), orderId: String(r.orderId), rating: r.rating, temperature: r.temperature,

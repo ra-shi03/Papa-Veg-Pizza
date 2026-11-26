@@ -7,7 +7,7 @@ import * as c from '../controllers/storeOrders.controller.js';
 const router = express.Router();
 
 router.use(authMiddleware);
-router.use(requireRoles('STORE_MANAGER', 'KITCHEN_STAFF'));   // the kitchen supervisor role is no longer used (403)
+router.use(requireRoles('STORE_MANAGER'));   // kitchen supervisor and kitchen staff no longer sign in (403)
 router.use(requireOnDuty);   // kitchen roles: attendance first, then work (reads stay open)
 
 router.get('/', c.listOrders);                              // ?view=incoming|active|ready|completed|cancelled
@@ -18,9 +18,9 @@ router.patch('/:orderId/reject', c.rejectOrder);            // manager
 router.post('/:orderId/reorder', c.reorderOrder);          // manager: the same items again for that customer (today's prices, COD)
 router.patch('/:orderId/reopen', c.reopenOrder);            // manager, within 5 minutes of the store's own cancellation
 router.patch('/:orderId/assign-staff', c.assignStaff);      // manager only; the person must be active and clocked in
-router.patch('/:orderId/stage', c.updateStage);             // station holders / manager; 'ready' only the packer or the manager
-router.patch('/:orderId/priority', c.setPriority);          // manager / a station holder of the order
-router.patch('/:orderId/pause', c.pauseOrder);              // manager / a station holder of the order
+router.patch('/:orderId/stage', c.updateStage);             // store manager (for the station holders: kitchen staff have no login)
+router.patch('/:orderId/priority', c.setPriority);          // store manager
+router.patch('/:orderId/pause', c.pauseOrder);              // store manager
 router.patch('/:orderId/delay', c.delayOrder);              // manager / a station holder of the order
 
 export default router;

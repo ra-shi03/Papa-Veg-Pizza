@@ -11,16 +11,9 @@ let chef; let baker; let packer; let rider; let p1; let p2; let combo; let Kitch
 let phoneSeq = 0;
 const ADDRESS = { street: '1 Test Street', city: 'Indore', state: 'MP' };
 
-const login = async (email) => (await fx.call('POST', '/v1/auth/store/login', null, { email, password: PASSWORD })).body.data.accessToken;
-const makeStaff = async (role, tag) => {
-    const email = `${tag}${fx.ts}@example.invalid`;
-    const res = await fx.call('POST', '/v1/food/store/staff', A.managerToken, { fullName: `Name ${tag}`, email, phone: `6${String(++phoneSeq).padStart(2, '0')}${String(fx.ts).slice(-7)}`, password: PASSWORD, role });
-    assert.equal(res.status, 201, JSON.stringify(res.body));
-    assert.equal((await fx.call('PATCH', `/v1/staff-approvals/${res.body.data._id}/approve`, A.adminToken, {})).status, 200);
-    const token = await login(email);
-    await fx.call('POST', '/v1/store/attendance/clock-in', token);
-    return { id: res.body.data.userId, token };
-};
+// kitchen staff have no login: the store manager adds them, the franchise admin approves, the manager clocks them in and
+// works the stations for them (fx.staff)
+const makeStaff = (role, tag) => fx.staff('A', role, tag);
 
 before(async () => {
     fx = await createFixture(); A = fx.F.A;
@@ -83,18 +76,18 @@ describe('a combo order, leg by leg', () => {
         }
     });
 
-    test('4 kitchen: one card per pizza (2 + 1), none for the dip or the drink; the chef sees them', async () => {
-        const board = (await fx.call('GET', `${S}/kitchen/preparation-board`, chef.token)).body.data;
+    test('4 kitchen: one card per pizza (2 + 1), none for the dip or the drink; the board shows them', async () => {
+        const board = (await fx.call('GET', `${S}/kitchen/preparation-board`, A.managerToken)).body.data;
         const mine = await KitchenItem.find({ orderId: id }).sort({ index: 1 }).lean();
         assert.deepEqual(mine.map((r) => [r.name, r.quantity, r.comboName]), [
             ['Classic Margherita', 2, '1 PLUS 1 Offer'], ['Paneer Tikka', 2, '1 PLUS 1 Offer'], ['Corn Paneer', 1, 'Double Veg Pizza Meal'],
         ]);
-        assert.ok(board.length >= 3, 'the chef\'s board has the cards');
+        assert.ok(board.length >= 3, 'the preparation board has the cards');
     });
 
     test('5 packaging: the packer sees the combos with the dip and the drink to put in the bag', async () => {
         for (const s of ['preparing', 'baking', 'packaging']) assert.equal((await fx.call('PATCH', `${S}/orders/${id}/stage`, A.managerToken, { stage: s })).status, 200, s);
-        const pack = await fx.call('GET', `${S}/kitchen/packaging`, packer.token);
+        const pack = await fx.call('GET', `${S}/kitchen/packaging`, A.managerToken);
         assert.equal(pack.status, 200);
         const row = JSON.stringify(pack.body).includes('Chatpati Chilli Dip');
         assert.ok(row, 'the packaging list has the dip and the drink');
@@ -102,7 +95,7 @@ describe('a combo order, leg by leg', () => {
     });
 
     test('6 delivery: the store hands over, the rider sees the order with its contents, picks up and delivers', async () => {
-        assert.equal((await fx.call('PATCH', `${S}/orders/${id}/stage`, packer.token, { stage: 'ready' })).status, 200, 'the packer marks it ready');
+        assert.equal((await fx.call('PATCH', `${S}/orders/${id}/stage`, A.managerToken, { stage: 'ready' })).status, 200, 'the manager marks it ready for the packer');
         assert.equal((await fx.call('POST', '/v1/store/delivery/assign', A.managerToken, { orderId: id, riderId: rider.id })).status, 200);
         const R = (p) => `/v1/food/delivery/orders/${p}`;
         assert.equal((await fx.call('PATCH', R(`${id}/accept`), rider.token, {})).status, 200);

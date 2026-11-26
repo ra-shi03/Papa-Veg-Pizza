@@ -6,6 +6,7 @@ import { NotFoundError } from '../../../../core/auth/errors.js';
 import { isId, toId } from '../../dashboard/services/dashboardAccess.js';
 import { escapeRegex } from '../../../../utils/helpers.js';
 import { attendanceScope, kitchenStaffRecords } from './attendanceAccess.js';
+import { personKey } from './kitchenStaffDirectory.js';
 import { dateKeyOf, round2 } from './attendanceTime.js';
 
 // Staff performance (/v1/store/performance), worked out from what really happened in the period:
@@ -33,7 +34,11 @@ function periodRange(period) {
 
 const minutesBetween = (a, b) => (a && b ? Math.max(0, (new Date(b) - new Date(a)) / 60000) : null);
 
-/** Per staff user id: { orders: [order], prep: [minutes], delayed: n } over finished kitchen orders of the period. */
+/**
+ * Per person on a station: { orders: [order], prep: [minutes], delayed: n } over finished kitchen orders of the period.
+ * Keyed by the staff record id (orders since kitchen staff lost their logins) or the User id (older orders); factsFor()
+ * adds the two up for one staff record.
+ */
 async function orderFacts(storeId, from, to) {
   const orders = await FoodOrder.find({
     storeId: toId(storeId),
@@ -42,7 +47,7 @@ async function orderFacts(storeId, from, to) {
   const byUser = new Map();
   for (const o of orders) {
     const k = o.kitchen || {};
-    const users = new Set(STATIONS.map((s) => k.staff?.[s]?.userId).filter(Boolean).map(String));
+    const users = new Set(STATIONS.map((s) => personKey(k.staff?.[s])).filter(Boolean));
     const prep = minutesBetween(k.acceptedAt || o.createdAt, k.readyAt);
     const delayed = Boolean(k.delayReason) || (k.expectedReadyAt && k.readyAt && new Date(k.readyAt) > new Date(k.expectedReadyAt));
     for (const u of users) {
@@ -51,10 +56,19 @@ async function orderFacts(storeId, from, to) {
       row.orders.push(o);
       if (prep !== null) row.prep.push(prep);
       if (delayed) row.delayed += 1;
-      for (const s of STATIONS) if (String(k.staff?.[s]?.userId || '') === u) row.stations[s] = (row.stations[s] || 0) + 1;
+      for (const s of STATIONS) if (personKey(k.staff?.[s]) === u) row.stations[s] = (row.stations[s] || 0) + 1;
     }
   }
   return byUser;
+}
+
+/** One staff record's facts: its own key plus, for a record from before the change, its old User id. */
+function factsFor(facts, s) {
+  const parts = [facts.get(String(s._id)), s.userId ? facts.get(String(s.userId)) : null].filter(Boolean);
+  if (parts.length < 2) return parts[0];
+  const stations = { ...parts[0].stations };
+  for (const [k, n] of Object.entries(parts[1].stations)) stations[k] = (stations[k] || 0) + n;
+  return { orders: [...parts[0].orders, ...parts[1].orders], prep: [...parts[0].prep, ...parts[1].prep], delayed: parts[0].delayed + parts[1].delayed, stations };
 }
 
 async function attendanceFacts(storeId, staffIds, fromKey, toKey) {
@@ -87,12 +101,12 @@ async function rowsFor(store, staff, period) {
   const allOrderIds = [...new Set([...facts.values()].flatMap((f) => f.orders.map((o) => o._id)))];
   const complaints = await complaintCounts(allOrderIds);
 
-  const maxOrders = Math.max(0, ...staff.map((s) => facts.get(String(s.userId))?.orders.length || 0));
+  const maxOrders = Math.max(0, ...staff.map((s) => factsFor(facts, s)?.orders.length || 0));
   const allPrep = [...facts.values()].flatMap((f) => f.prep);
   const storeAvgPrep = allPrep.length ? allPrep.reduce((a, b) => a + b, 0) / allPrep.length : 0;
 
   const rows = staff.map((s) => {
-    const f = facts.get(String(s.userId)) || { orders: [], prep: [], delayed: 0, stations: {} };
+    const f = factsFor(facts, s) || { orders: [], prep: [], delayed: 0, stations: {} };
     const a = attendance.get(String(s._id)) || { worked: 0, absent: 0, late: 0 };
     const totalOrders = f.orders.length;
     const avgPrep = f.prep.length ? f.prep.reduce((x, y) => x + y, 0) / f.prep.length : 0;
@@ -152,7 +166,7 @@ export async function staffPerformance(user, staffId, query = {}) {
     .sort((a, b) => new Date(b.kitchen?.readyAt || 0) - new Date(a.kitchen?.readyAt || 0))
     .slice(0, 10)
     .map((o) => {
-      const mine = STATIONS.filter((s) => String(o.kitchen?.staff?.[s]?.userId || '') === String(person.userId)).map((s) => label[s]).join(', ');
+      const mine = STATIONS.filter((s) => [String(person._id), String(person.userId || '')].includes(personKey(o.kitchen?.staff?.[s]))).map((s) => label[s]).join(', ');
       const late = Boolean(o.kitchen?.delayReason);
       return {
         id: String(o._id),

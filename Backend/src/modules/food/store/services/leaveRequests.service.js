@@ -2,7 +2,7 @@ import { LeaveRequest, LEAVE_CATEGORIES } from '../models/leaveRequest.model.js'
 import { StoreManager } from '../../franchise/models/storeManager.model.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 import { isId, toId } from '../../dashboard/services/dashboardAccess.js';
-import { attendanceScope, conflict, KITCHEN_ROLE_CODES } from './attendanceAccess.js';
+import { attendanceScope, conflict } from './attendanceAccess.js';
 import { markLeaveRange } from './attendance.service.js';
 import { dateKeyOf } from './attendanceTime.js';
 import { notifyUsers } from './kitchenTasks.service.js';
@@ -20,10 +20,11 @@ const dto = (r) => ({
     skippedDays: r.skippedDays || [], createdAt: r.createdAt,
 });
 
-// Kitchen staff and the store manager ask for leave (their own record, from the token)
+// The store manager asks the franchise admin for leave (their own record, from the token). Kitchen staff have no login:
+// the store manager records their leave directly (attendance.service markLeaveRange). Their older requests are still decided below.
 async function kitchenSelf(user) {
     const scope = await attendanceScope(user, {});
-    if (!KITCHEN_ROLE_CODES.includes(scope.role) && scope.role !== 'STORE_MANAGER') throw new ForbiddenError('Only the store team requests leave.');
+    if (scope.role !== 'STORE_MANAGER') throw new ForbiddenError('Only the store manager requests leave here.');
     if (!scope.me) throw new ForbiddenError('Your staff record was not found.');
     return scope;
 }
@@ -128,7 +129,7 @@ async function decide(user, id, approve, reason, query = {}) {
     const by = (await StoreManager.findOne({ userId: toId(user.userId) }).select('name').lean())?.name || (isAdmin ? 'Franchise admin' : 'Store Manager');
     Object.assign(rec, { status: approve ? 'approved' : 'rejected', decidedBy: toId(user.userId), decidedByName: by, decidedAt: new Date(), rejectionReason: approve ? '' : note, skippedDays: skipped });
     await rec.save();
-    await notifyUsers({
+    if (rec.userId) await notifyUsers({
         userIds: [rec.userId], storeId: store._id, type: approve ? 'leave_approved' : 'leave_rejected',
         title: approve ? 'Your leave was approved' : 'Your leave was rejected',
         message: approve ? `${rec.startDate}${rec.endDate !== rec.startDate ? ` to ${rec.endDate}` : ''}` : note,

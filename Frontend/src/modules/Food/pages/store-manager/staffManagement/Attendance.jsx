@@ -32,6 +32,7 @@ import AttendanceStatsCards from "./components/AttendanceStatsCards";
 import AttendanceDetailsModal from "./components/AttendanceDetailsModal";
 import DeleteAttendanceDialog from "./components/DeleteAttendanceDialog";
 import { MarkAttendanceModal } from "@food/components/attendance/AttendanceActions";
+import StaffClockPanel from "./components/StaffClockPanel";
 
 // Simple state debounce helper hook
 function useDebounce(value, delay = 300) {
@@ -140,7 +141,7 @@ export default function Attendance() {
             Staff Attendance
           </h1>
           <p className="text-zinc-500 dark:text-zinc-450 text-xs mt-1">
-            Check in and check out are marked by the staff themselves. Mark someone absent or on leave here; approved leave requests show as leave days.
+            Kitchen staff do not sign in: clock them in and out below. Mark a past day, an absence or leave with Mark attendance; approved leave requests show as leave days.
           </p>
         </div>
         <button
@@ -149,11 +150,14 @@ export default function Attendance() {
           className="flex items-center justify-center gap-1.5 px-4 py-2 bg-primary text-white text-xs font-bold rounded-full shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
         >
           <UserCheck size={14} />
-          <span>Mark absent / leave</span>
+          <span>Mark attendance</span>
         </button>
         <MarkAttendanceModal open={isMarkOpen} onClose={() => setIsMarkOpen(false)} onDone={() => refetch()} />
 
       </header>
+
+      {/* Clock the kitchen team in and out (they have no login) */}
+      <StaffClockPanel onChanged={() => refetch()} />
 
       {/* Stats Summary cards */}
       <AttendanceStatsCards records={attendanceList} isLoading={isLoading} />

@@ -8,7 +8,8 @@ import {
 } from "@food/components/payouts/PayoutKit"
 
 // Store manager: pay the store's riders (their withdrawal requests) and kitchen staff (salaries), and ask the franchise
-// for what the store is owed. Every amount comes from the server.
+// for what the store is owed. Every amount comes from the server. Kitchen staff have no login, so the manager also keeps
+// each staff member's bank / UPI details here.
 const BASE = "/food/store/payouts"
 const input = "w-full h-10 px-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs font-semibold outline-none"
 const STATE = {
@@ -78,7 +79,7 @@ export default function StorePayouts() {
         <div className="space-y-3">
           {salaryRows.some((p) => p.status === "pending") && (
             <div className="space-y-2">
-              <p className="text-xs font-bold text-rose-600">Salary requests from staff (overdue)</p>
+              <p className="text-xs font-bold text-rose-600">Salary requests made by staff before they lost their logins (overdue)</p>
               <PayoutList rows={salaryRows.filter((p) => p.status === "pending")} onOpen={(p) => setOpenId(p.id)} />
             </div>
           )}
@@ -101,6 +102,9 @@ export default function StorePayouts() {
                   </button>
                 ))}
               </div>
+              {/* where the salary goes (kept by the manager: kitchen staff have no login) */}
+              <AccountCard account={s.account} title="Salary payout details"
+                onSave={async (body) => { await adminClient.put(`${BASE}/staff/${s.staffId}/account`, body, REAL); await load() }} />
             </div>
           ))}
         </div>

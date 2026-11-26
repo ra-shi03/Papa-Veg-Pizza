@@ -5,9 +5,10 @@ import { KitchenItem, ITEM_STAGES } from '../models/kitchenItem.model.js';
 import { KitchenOven } from '../models/kitchenOven.model.js';
 import { KitchenIssue } from '../models/kitchenIssue.model.js';
 import {
-  STAGE_ORDER, normalizeRole, requireStore, requireManager, holdsStation, findKitchenStaff, findOrder, moveToStage,
+  STAGE_ORDER, normalizeRole, requireStore, requireManager, findKitchenStaff, findOrder, moveToStage,
   toObjectId, idStr,
 } from './storeOrders.service.js';
+import { personKey } from './kitchenStaffDirectory.js';
 import { notifyUsers } from './kitchenTasks.service.js';
 import { recipeIndex } from './inventoryOps.service.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
@@ -19,8 +20,8 @@ import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core
 //
 // Preparation board and pizza station show the first five stages, the baking station the last three.
 // When pizzas move, the order's own kitchen stage follows (preparing -> baking -> packaging), so the
-// Orders screens, My Tasks and the rider hand-off stay in step. Every query is scoped by the storeId in
-// the token; a person only ever sees or changes what their role allows.
+// Orders screens, Kitchen Tasks and the rider hand-off stay in step. Every query is scoped by the storeId in
+// the token. Kitchen staff have no login: the store manager works every station on behalf of the person on it.
 
 const IN_KITCHEN = ['confirmed', 'preparing'];
 const PREP_STAGES = ['assigned', 'dough_prep', 'sauce', 'toppings', 'ready_for_baking'];
@@ -28,7 +29,6 @@ const DEFAULT_OVENS = 5;
 
 const asRole = (user) => normalizeRole(user?.role);
 const isManager = (user) => asRole(user) === 'STORE_MANAGER';
-const isStaff = (user) => asRole(user) === 'KITCHEN_STAFF';
 const str = (v, max) => String(v ?? '').trim().slice(0, max);
 const isId = (v) => mongoose.Types.ObjectId.isValid(String(v || ''));
 
@@ -38,20 +38,10 @@ export const priorityLabel = (order) => (order?.kitchen?.priority === 'urgent' ?
 // Which orders / items the caller may see
 // ---------------------------------------------------------------------------------------------
 
-/** Orders in the kitchen that this person may see. Manager: the store. Staff: own stations. */
+/** Orders in the kitchen of the caller's store (the store manager sees them all). */
 export async function visibleKitchenOrders(user, extra = {}) {
   const storeId = toObjectId(requireStore(user));
   const filter = { storeId, orderStatus: { $in: IN_KITCHEN }, ...extra };
-  if (isStaff(user)) {
-    const me = toObjectId(user.userId);
-    const ownItems = await KitchenItem.distinct('orderId', { storeId, $or: [{ chefId: me }, { bakerId: me }] });
-    filter.$or = [
-      { 'kitchen.staff.pizza_chef.userId': me },
-      { 'kitchen.staff.baking_chef.userId': me },
-      { 'kitchen.staff.packaging_staff.userId': me },
-      { _id: { $in: ownItems } },
-    ];
-  }
   return FoodOrder.find(filter).sort({ createdAt: -1 }).limit(200).lean();
 }
 
@@ -112,23 +102,18 @@ export async function ensureItems(orders) {
   if (ops.length) await KitchenItem.bulkWrite(ops, { ordered: false });
 }
 
+/** Who makes (chef) or bakes (baker) this pizza: the one chosen for the card, else the order's station holder. */
 const ownerOf = (item, order, kind) => {
-  if (kind === 'baker') {
-    const slot = order?.kitchen?.staff?.baking_chef;
-    return item.bakerId ? { id: idStr(item.bakerId), name: item.bakerName } : slot?.userId ? { id: idStr(slot.userId), name: slot.name } : null;
-  }
-  const slot = order?.kitchen?.staff?.pizza_chef;
-  return item.chefId ? { id: idStr(item.chefId), name: item.chefName } : slot?.userId ? { id: idStr(slot.userId), name: slot.name } : null;
+  const [staffId, userId, name, slot] = kind === 'baker'
+    ? [item.bakerStaffId, item.bakerId, item.bakerName, order?.kitchen?.staff?.baking_chef]
+    : [item.chefStaffId, item.chefId, item.chefName, order?.kitchen?.staff?.pizza_chef];
+  if (staffId || userId) return { id: idStr(staffId || userId), name };
+  return personKey(slot) ? { id: personKey(slot), name: slot.name } : null;
 };
 
-/** Does this person own this pizza's current station? The manager always may; staff only their own. */
-function canWorkOnItem(user, item, order, station) {
-  if (isManager(user)) return true;
-  if (isStaff(user)) {
-    const owner = ownerOf(item, order, station === 'bake' ? 'baker' : 'chef');
-    return !!owner && owner.id === String(user.userId);
-  }
-  return false;
+/** The store manager works every pizza, for whoever is on that station (kitchen staff have no login). */
+function canWorkOnItem(user) {
+  return isManager(user);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -218,11 +203,7 @@ async function loadItems(user, stages, station, extraOrderFilter = {}) {
   const items = await KitchenItem.find({ orderId: { $in: orders.map((o) => o._id) }, rejected: false, stage: { $in: stages } })
     .sort({ createdAt: 1, index: 1 }).lean();
   const byOrder = new Map(orders.map((o) => [String(o._id), o]));
-  // Staff only see the pizzas that are theirs, not every pizza of an order they hold a station on.
-  const visible = isStaff(user)
-    ? items.filter((it) => canWorkOnItem(user, it, byOrder.get(String(it.orderId)), station))
-    : items;
-  return { items: visible, byOrder, recipeFor: await recipeIndex(toObjectId(requireStore(user))) };
+  return { items, byOrder, recipeFor: await recipeIndex(toObjectId(requireStore(user))) };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -244,19 +225,13 @@ export async function preparationBoard(user, q = {}) {
 
 /**
  * The "Avg Prep Time" card of the Preparation Board and Pizza Station: the real average, in minutes, from starting a pizza
- * to finishing its assembly, over the pizzas finished in the last 24 hours. Kitchen staff: only their own pizzas (the
- * same rule as the station lists). null when nothing was finished yet.
+ * to finishing its assembly, over the pizzas the store finished in the last 24 hours. null when nothing was finished yet.
  */
 export async function prepTimes(user) {
   const storeId = toObjectId(requireStore(user));
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  let done = await KitchenItem.find({ storeId, rejected: false, prepStartedAt: { $ne: null }, assemblyCompletedAt: { $gte: since } })
-    .select('orderId chefId chefName prepStartedAt assemblyCompletedAt').lean();
-  if (isStaff(user)) {
-    const orders = await FoodOrder.find({ _id: { $in: [...new Set(done.map((it) => String(it.orderId)))] } }).select('kitchen.staff').lean();
-    const byOrder = new Map(orders.map((o) => [String(o._id), o]));
-    done = done.filter((it) => ownerOf(it, byOrder.get(String(it.orderId)), 'chef')?.id === String(user.userId));
-  }
+  const done = await KitchenItem.find({ storeId, rejected: false, prepStartedAt: { $ne: null }, assemblyCompletedAt: { $gte: since } })
+    .select('orderId prepStartedAt assemblyCompletedAt').lean();
   const minutes = done
     .map((it) => (new Date(it.assemblyCompletedAt) - new Date(it.prepStartedAt)) / 60000)
     .filter((m) => m >= 0 && m < 24 * 60);
@@ -342,16 +317,14 @@ async function loadItemForAction(user, itemId) {
   if (!item) throw new NotFoundError('Pizza not found');
   const order = await findOrder(item.orderId, storeId).catch(() => null);
   if (!order || !IN_KITCHEN.includes(order.orderStatus)) throw new ValidationError('This order is not in the kitchen');
-  // A person who may not see the order cannot learn that the pizza exists.
-  const seen = isManager(user) ||
-    (isStaff(user) && (holdsStation(order, user.userId) || [idStr(item.chefId), idStr(item.bakerId)].includes(String(user.userId))));
-  if (!seen) throw new NotFoundError('Pizza not found');
+  // Only the store manager works the kitchen screens; anyone else cannot learn that the pizza exists.
+  if (!isManager(user)) throw new NotFoundError('Pizza not found');
   if (item.rejected) throw new ValidationError('This item was rejected');
   return { item, order, storeId };
 }
 
-const mustWork = (user, item, order, station) => {
-  if (!canWorkOnItem(user, item, order, station)) throw new ForbiddenError('This pizza is not assigned to you.');
+const mustWork = (user) => {
+  if (!canWorkOnItem(user)) throw new ForbiddenError('Only the store manager can do this.');
 };
 
 /** After pizzas move, bring the order's own kitchen stage in line. Never moves an order backwards. */
@@ -389,7 +362,7 @@ const done = async (user, storeId, item) => {
 export async function moveItemStage(user, itemId, stage) {
   if (!PREP_STAGES.includes(stage)) throw new ValidationError('Invalid preparation stage');
   const { item, order, storeId } = await loadItemForAction(user, itemId);
-  mustWork(user, item, order, 'prep');
+  mustWork(user);
   if (ITEM_STAGES.indexOf(item.stage) >= ITEM_STAGES.indexOf('baking')) throw new ValidationError('This pizza has already gone to baking');
   if (ITEM_STAGES.indexOf(stage) <= ITEM_STAGES.indexOf(item.stage)) throw new ValidationError(`Pizza is already at '${item.stage}'`);
   if (item.paused) throw new ValidationError('Resume the pizza before moving it');
@@ -403,7 +376,7 @@ export async function moveItemStage(user, itemId, stage) {
 
 export async function pauseItem(user, itemId, { reason, notes } = {}, station = 'prep', { toggle = false } = {}) {
   const { item, order, storeId } = await loadItemForAction(user, itemId);
-  mustWork(user, item, order, station);
+  mustWork(user);
   // The preparation board has a single pause button: pressing it on a paused pizza resumes it.
   if (toggle && item.paused) {
     item.paused = false; item.pauseReason = ''; item.pauseNotes = '';
@@ -427,14 +400,11 @@ export async function reassignItemChef(user, itemId, chefId) {
   if (!isManager(user)) throw new ForbiddenError('Only the store manager can reassign a pizza.');
   if (ITEM_STAGES.indexOf(item.stage) >= ITEM_STAGES.indexOf('baking')) throw new ValidationError('This pizza has already gone to baking');
   if (!isId(chefId)) throw new ValidationError('Choose a chef');
-  const { member: chef } = await findKitchenStaff(chefId, storeId);   // active, clocked in, kitchen staff
-  item.chefId = chef.userId;
+  const { member: chef } = await findKitchenStaff(chefId, storeId);   // active, marked present, kitchen staff
+  item.chefStaffId = chef._id;
+  item.chefId = chef.userId || null;
   item.chefName = chef.name;
   await item.save();
-  await notifyUsers({
-    userIds: [chef.userId], storeId, type: 'task_assigned', title: 'Pizza Reassigned To You',
-    message: `${item.name} (order ${order.order_id || order._id}) is now yours.`,
-  });
   return toPrepItem(item.toObject(), order.toObject());
 }
 
@@ -442,7 +412,7 @@ export async function reassignItemChef(user, itemId, chefId) {
 
 export async function startAssembly(user, itemId) {
   const { item, order, storeId } = await loadItemForAction(user, itemId);
-  mustWork(user, item, order, 'prep');
+  mustWork(user);
   if (item.paused) {
     item.paused = false; item.pauseReason = ''; item.pauseNotes = '';
   } else if (item.stage === 'assigned') {
@@ -469,7 +439,7 @@ export async function togglePausePrep(user, itemId, payload) {
 
 export async function completeAssembly(user, itemId, { notes } = {}) {
   const { item, order, storeId } = await loadItemForAction(user, itemId);
-  mustWork(user, item, order, 'prep');
+  mustWork(user);
   if (item.stage === 'assigned') throw new ValidationError('Start the assembly first');
   if (ITEM_STAGES.indexOf(item.stage) >= ITEM_STAGES.indexOf('ready_for_baking')) throw new ValidationError('Assembly is already complete');
   if (item.paused) throw new ValidationError('Resume the pizza before completing it');
@@ -498,7 +468,7 @@ async function ovenFor(storeId, ovenId, exceptItemId = null) {
 
 export async function startBaking(user, { orderItemId, ovenId, temperature, expectedDuration, remarks } = {}) {
   const { item, order, storeId } = await loadItemForAction(user, orderItemId);
-  mustWork(user, item, order, 'bake');
+  mustWork(user);
   if (item.stage === 'baking' && item.paused) {
     item.paused = false; item.pauseReason = ''; item.pauseNotes = '';
     await item.save();
@@ -510,7 +480,6 @@ export async function startBaking(user, { orderItemId, ovenId, temperature, expe
     item.bakeStartedAt = new Date();
     item.stage = 'baking';
     if (remarks) item.remarks = str(remarks, 500);
-    if (isStaff(user)) { item.bakerId = toObjectId(user.userId); item.bakerName = (await myName(user, storeId)) || item.bakerName; }
     await item.save();
   } else {
     throw new ValidationError(item.stage === 'baking' ? 'Baking has already started' : 'This pizza is not ready for baking yet');
@@ -521,7 +490,7 @@ export async function startBaking(user, { orderItemId, ovenId, temperature, expe
 
 export async function moveOven(user, { orderItemId, newOvenId, remarks } = {}) {
   const { item, order, storeId } = await loadItemForAction(user, orderItemId);
-  mustWork(user, item, order, 'bake');
+  mustWork(user);
   if (item.stage !== 'baking') throw new ValidationError('Only a pizza in the oven can be moved');
   if (idStr(item.ovenId) === String(newOvenId)) throw new ValidationError('The pizza is already in this oven');
   const oven = await ovenFor(storeId, newOvenId, item._id);
@@ -538,7 +507,7 @@ export async function pauseBaking(user, payload) {
 
 export async function completeBaking(user, { orderItemId, remarks } = {}) {
   const { item, order, storeId } = await loadItemForAction(user, orderItemId);
-  mustWork(user, item, order, 'bake');
+  mustWork(user);
   if (item.stage !== 'baking') throw new ValidationError('This pizza is not in the oven');
   if (item.paused) throw new ValidationError('Resume baking before completing it');
   item.stage = 'baked';
@@ -548,9 +517,6 @@ export async function completeBaking(user, { orderItemId, remarks } = {}) {
   const out = await done(user, storeId, item);
   return toBakingItem(out.item, out.order.toObject());
 }
-
-const myName = async (user, storeId) =>
-  (await StoreManager.findOne({ userId: toObjectId(user.userId), storeId: String(storeId) }).select('name').lean())?.name || '';
 
 // ---- Kitchen issues -------------------------------------------------------------------------
 

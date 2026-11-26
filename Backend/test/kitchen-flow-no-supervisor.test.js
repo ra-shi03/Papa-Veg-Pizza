@@ -1,6 +1,7 @@
-// The kitchen flow without a kitchen supervisor (client decision, docs/supervisor-removal.md):
-//   manager accepts -> manager assigns kitchen staff to stations -> staff prepare ->
-//   the packaging-station staff member does the quality check and marks ready (the manager can override) -> rider.
+// The kitchen flow without a kitchen supervisor (client decision, docs/supervisor-removal.md), and since 2026-11-26 without
+// kitchen staff logins (docs/kitchen-staff-removal.md):
+//   manager accepts -> manager assigns kitchen staff (staff records) to stations -> the manager moves each station's work
+//   along and does the quality check and marks ready, for the person on the station -> rider.
 // Orders accepted earlier with a supervisor keep working; the stored supervisor is information only, never a permission.
 // The supervisor role is deactivated (never deleted): those accounts cannot sign in and nobody can create one.
 // Another store or franchise gets 404; a role the route is not for gets 403.
@@ -98,13 +99,13 @@ describe('accept and assign', () => {
     test('the manager assigns staff to stations; each assignee gets a task for that station', async () => {
         const o = await staffedOrder();
         const doc = await dbOrder(o);
-        assert.equal(String(doc.kitchen.staff.pizza_chef.userId), chef.id);
-        assert.equal(String(doc.kitchen.staff.baking_chef.userId), baker.id);
-        assert.equal(String(doc.kitchen.staff.packaging_staff.userId), packer.id);
-        const tasks = (await fx.call('GET', '/v1/tasks', packer.token)).body.data;
-        assert.ok(tasks.some((t) => t.orderId === o.ref && t.taskType === 'pack'));
+        assert.equal(String(doc.kitchen.staff.pizza_chef.staffId), chef.id);
+        assert.equal(String(doc.kitchen.staff.baking_chef.staffId), baker.id);
+        assert.equal(String(doc.kitchen.staff.packaging_staff.staffId), packer.id);
+        const tasks = (await fx.call('GET', '/v1/tasks', A.managerToken)).body.data;
+        assert.ok(tasks.some((t) => t.orderId === o.ref && t.taskType === 'pack' && t.assignedToId === packer.id));
     });
-    test('staff cannot assign anyone, not even on an order where they hold a station (403)', async () => {
+    test('an old kitchen staff token cannot assign anyone (403)', async () => {
         const o = await staffedOrder();
         assert.equal((await assign(chef.token, o, baker, 'pizza_chef')).status, 403, 'station holder');
         assert.equal((await assign(spare.token, o, chef, 'baking_chef')).status, 403, 'not on the order');
@@ -121,28 +122,27 @@ describe('accept and assign', () => {
         assert.equal((await assign(A.managerToken, o, bStaff, 'pizza_chef')).status, 400, 'another franchise\'s staff');
         assert.equal((await dbOrder(o)).kitchen.staff?.pizza_chef?.userId, undefined);
     });
-    test('staff see only the orders where they hold a station', async () => {
+    test('the manager opens the order; old kitchen staff tokens cannot (403)', async () => {
         const o = await staffedOrder();
         const seen = async (who) => fx.call('GET', `${O}/${o.id}`, who.token);
-        assert.equal((await seen(chef)).status, 200);
-        assert.equal((await seen(packer)).status, 200);
-        assert.equal((await seen(spare)).status, 404);
+        assert.equal((await seen({ token: A.managerToken })).status, 200);
+        for (const who of [chef, packer, spare]) assert.equal((await seen(who)).status, 403);
     });
 });
 
 describe('quality check and mark ready', () => {
-    test('the packaging-station staff member marks the order ready', async () => {
+    test('the manager moves it along and marks it ready for the packer', async () => {
         const o = await staffedOrder();
-        assert.equal((await stage(chef.token, o, 'preparing')).status, 200, 'the chef moves it along');
-        const res = await stage(packer.token, o, 'ready');
+        assert.equal((await stage(A.managerToken, o, 'preparing')).status, 200);
+        const res = await stage(A.managerToken, o, 'ready');
         assert.equal(res.status, 200, JSON.stringify(res.body));
         const doc = await dbOrder(o);
         assert.equal(doc.kitchen.stage, 'ready');
         assert.equal(doc.orderStatus, 'ready_for_pickup');
     });
-    test('staff not at the packaging station cannot mark it ready (403), and nothing changes', async () => {
+    test('old kitchen staff tokens cannot mark it ready (403), and nothing changes', async () => {
         const o = await staffedOrder();
-        await stage(chef.token, o, 'preparing');
+        assert.equal((await stage(A.managerToken, o, 'preparing')).status, 200);
         assert.equal((await stage(chef.token, o, 'ready')).status, 403, 'chef');
         assert.equal((await stage(baker.token, o, 'ready')).status, 403, 'baker');
         assert.equal((await stage(spare.token, o, 'ready')).status, 403, 'not on the order');
@@ -156,15 +156,14 @@ describe('quality check and mark ready', () => {
         assert.equal(res.status, 200, JSON.stringify(res.body));
         assert.equal((await dbOrder(o)).orderStatus, 'ready_for_pickup');
     });
-    test('quality check: the packer and the manager may; other staff on the order may not (403)', async () => {
+    test('quality check: the manager; old kitchen staff tokens may not (403)', async () => {
         const o = await staffedOrder();
         const qc = (who, rating) => fx.call('POST', `${K}/quality-checks`, who.token, { orderId: o.ref, rating });
         assert.equal((await qc(chef, 4)).status, 403);
         assert.equal((await qc(baker, 4)).status, 403);
-        assert.equal((await qc(spare, 4)).status, 404, 'not on the order: not even visible');
-        assert.equal((await qc(idle, 4)).status, 403, 'not clocked in: no kitchen work at all');
-        assert.equal((await qc(packer, 5)).status, 201);
-        assert.equal((await qc({ token: A.managerToken }, 4)).status, 201);
+        assert.equal((await qc(spare, 4)).status, 403);
+        assert.equal((await qc(packer, 5)).status, 403);
+        assert.equal((await qc({ token: A.managerToken }, 5)).status, 201);
     });
 });
 
@@ -174,11 +173,10 @@ describe('priority, pause and delay', () => {
         fx.call('PATCH', `${O}/${o.id}/pause`, token, { isPaused: true, reason: 'Oven' }),
         fx.call('PATCH', `${O}/${o.id}/delay`, token, { minutes: 5, reason: 'Rush' }),
     ];
-    test('the manager and any station holder of the order may; staff not on it may not (403)', async () => {
+    test('the manager may; old kitchen staff tokens (on the order or not) may not (403)', async () => {
         const o = await staffedOrder();
         for (const r of await Promise.all(calls(A.managerToken, o))) assert.equal(r.status, 200, JSON.stringify(r.body));
-        for (const who of [chef, baker, packer]) for (const r of await Promise.all(calls(who.token, o))) assert.equal(r.status, 200, who.name);
-        for (const r of await Promise.all(calls(spare.token, o))) assert.equal(r.status, 403);
+        for (const who of [chef, baker, packer, spare]) for (const r of await Promise.all(calls(who.token, o))) assert.equal(r.status, 403, who.name);
     });
 });
 
@@ -197,13 +195,13 @@ describe('another store, another franchise', () => {
             assert.equal((await fx.call('POST', `${K}/quality-checks`, token, { orderId: o.ref, rating: 4 })).status, 404, 'quality check');
             assert.equal((await fx.call('PUT', `${K}/orders/${o.id}/ready`, token, {})).status, 404, 'packaging ready');
         }
-        for (const s of ['pizza_chef', 'baking_chef', 'packaging_staff']) assert.equal(String((await dbOrder(o)).kitchen.staff[s].userId), { pizza_chef: chef, baking_chef: baker, packaging_staff: packer }[s].id);
+        for (const s of ['pizza_chef', 'baking_chef', 'packaging_staff']) assert.equal(String((await dbOrder(o)).kitchen.staff[s].staffId), { pizza_chef: chef, baking_chef: baker, packaging_staff: packer }[s].id);
         assert.equal((await dbOrder(fresh)).orderStatus, 'created');
     });
-    test('another franchise\'s kitchen staff get 404 on A\'s order', async () => {
+    test('another franchise\'s old kitchen staff token is refused on A\'s order (403)', async () => {
         const o = await staffedOrder();
-        assert.equal((await fx.call('GET', `${O}/${o.id}`, bStaff.token)).status, 404);
-        assert.equal((await fx.call('PATCH', `${O}/${o.id}/priority`, bStaff.token, { priority: 'urgent' })).status, 404);
+        assert.equal((await fx.call('GET', `${O}/${o.id}`, bStaff.token)).status, 403);
+        assert.equal((await fx.call('PATCH', `${O}/${o.id}/priority`, bStaff.token, { priority: 'urgent' })).status, 403);
     });
     test('customers, franchise admins and the super admin are refused (403)', async () => {
         const o = await staffedOrder();
@@ -220,13 +218,13 @@ describe('orders accepted with a supervisor (before the role was removed)', () =
         sup = await fx.legacySupervisor('A', 'nslegacy');
         o = await newOrder(A, {
             orderStatus: 'confirmed',
-            kitchen: { stage: 'pending', priority: 'normal', supervisor: { userId: new mongoose.Types.ObjectId(sup.id), name: sup.name }, staff: {} },
+            kitchen: { stage: 'pending', priority: 'normal', supervisor: { userId: new mongoose.Types.ObjectId(sup.userId), name: sup.name }, staff: {} },
         });
     });
     test('the stored supervisor is kept, and the manager runs the order as usual', async () => {
         for (const [who, slot] of [[chef, 'pizza_chef'], [packer, 'packaging_staff']]) assert.equal((await assign(A.managerToken, o, who, slot)).status, 200);
-        assert.equal((await stage(chef.token, o, 'preparing')).status, 200);
-        assert.equal((await fx.call('PATCH', `${O}/${o.id}/priority`, packer.token, { priority: 'urgent' })).status, 200);
+        assert.equal((await stage(A.managerToken, o, 'preparing')).status, 200);
+        assert.equal((await fx.call('PATCH', `${O}/${o.id}/priority`, A.managerToken, { priority: 'urgent' })).status, 200);
         const view = (await fx.call('GET', `${O}/${o.id}`, A.managerToken)).body.data;
         assert.equal(view.kitchenSupervisor?.name || view.kitchenSupervisor, sup.name, 'shown as information');
     });
@@ -239,11 +237,11 @@ describe('orders accepted with a supervisor (before the role was removed)', () =
         assert.equal((await fx.call('GET', '/v1/tasks', sup.token)).status, 403);
         assert.equal((await fx.call('GET', '/v1/store/dashboard/today-orders', sup.token)).status, 403);
     });
-    test('the packer marks it ready and the order leaves the kitchen', async () => {
-        assert.equal((await stage(packer.token, o, 'ready')).status, 200);
+    test('the manager marks it ready and the order leaves the kitchen', async () => {
+        assert.equal((await stage(A.managerToken, o, 'ready')).status, 200);
         const doc = await dbOrder(o);
         assert.equal(doc.orderStatus, 'ready_for_pickup');
-        assert.equal(String(doc.kitchen.supervisor.userId), sup.id, 'still recorded');
+        assert.equal(String(doc.kitchen.supervisor.userId), sup.userId, 'still recorded');
     });
 });
 
@@ -260,7 +258,9 @@ describe('the supervisor role is deactivated, not deleted', () => {
         assert.notEqual(msg(wrong), SUPERVISOR_RETIRED_MESSAGE);
     });
     test('the migration: dry run writes nothing; --apply deactivates, suspends and revokes; records are kept', async () => {
-        const uid = new mongoose.Types.ObjectId(sup.id);
+        const uid = new mongoose.Types.ObjectId(sup.userId);
+        // an open session from before the change (the account can no longer sign in to make one)
+        await fx.models.RefreshToken.create({ userId: uid, tokenHash: `legacy-${fx.ts}`, familyId: `legacy-${fx.ts}`, expiresAt: new Date(Date.now() + 86400000) });
         const dry = await deactivateSupervisors();
         assert.equal(dry.applied, false);
         assert.ok(dry.supervisorAccounts >= 1 && dry.usersToDeactivate >= 1 && dry.staffRecordsToSuspend >= 1 && dry.sessionsToRevoke >= 1, JSON.stringify(dry));
@@ -276,8 +276,8 @@ describe('the supervisor role is deactivated, not deleted', () => {
         assert.equal(rec.status, 'Suspended');
         assert.equal(await fx.models.RefreshToken.countDocuments({ userId: uid, revoked: false }), 0);
         assert.ok(await fx.models.UserRole.countDocuments({ userId: uid }) >= 1, 'the role link is kept');
-        // kitchen staff are untouched
-        assert.equal((await fx.models.User.findById(chef.id).lean()).isActive, true);
+        // kitchen staff records are untouched
+        assert.equal((await fx.models.StoreManager.findById(chef.staffId).lean()).status, 'Active');
 
         const again = await deactivateSupervisors({ apply: true });
         assert.equal(again.usersDeactivated, 0, 'running it twice changes nothing more');
@@ -292,7 +292,7 @@ describe('the supervisor role is deactivated, not deleted', () => {
             const res = await fx.call('PATCH', path, A.managerToken, { status: 'Active' });
             assert.equal(res.status, 400, `${path} ${JSON.stringify(res.body)}`);
         }
-        assert.equal((await fx.models.User.findById(sup.id).lean()).isActive, false);
+        assert.equal((await fx.models.User.findById(sup.userId).lean()).isActive, false);
         assert.equal((await fx.models.StoreManager.findById(sup.staffId).lean()).status, 'Suspended');
     });
 });
@@ -311,18 +311,17 @@ describe('nobody can create or approve a kitchen supervisor', () => {
         const res = await fx.call('PATCH', `/v1/food/store/staff/${chef.staffId}`, A.managerToken, { role: 'Kitchen Supervisor' });
         assert.equal(res.status, 400);
     });
-    test('the admin staff API offers the store manager kitchen staff only (403 for the supervisor role)', async () => {
+    test('the admin staff API gives the store manager no roles to create (403 for the supervisor role)', async () => {
         const res = await fx.call('POST', '/v1/food/admin/staff', A.managerToken, { email: `nsadm${fx.ts}@example.invalid`, phone: '6400000099', role: 'kitchen-supervisor' });
         assert.equal(res.status, 403);
     });
     test('a supervisor waiting for approval is not offered to the franchise admin, and approving one is 404', async () => {
-        const s = await fx.call('POST', '/v1/food/store/staff', A.managerToken, payload('nspend', 'Pizza Maker'));
-        assert.equal(s.status, 201);
         // a supervisor record left from before the change, still waiting
-        await fx.models.UserRole.updateMany({ userId: new mongoose.Types.ObjectId(s.body.data.userId) }, { $set: { roleId: fx.roles.KITCHEN_SUPERVISOR._id } });
+        const old = await fx.legacySupervisor('A', 'nspend');
+        await fx.models.StoreManager.updateOne({ _id: new mongoose.Types.ObjectId(old.staffId) }, { $set: { status: 'Pending Approval' } });
         const list = await fx.call('GET', '/v1/staff-approvals', A.adminToken);
         assert.equal(list.status, 200);
-        assert.equal(JSON.stringify(list.body.data).includes(s.body.data._id), false);
-        assert.equal((await fx.call('PATCH', `/v1/staff-approvals/${s.body.data._id}/approve`, A.adminToken, {})).status, 404);
+        assert.equal(JSON.stringify(list.body.data).includes(old.staffId), false);
+        assert.equal((await fx.call('PATCH', `/v1/staff-approvals/${old.staffId}/approve`, A.adminToken, {})).status, 404);
     });
 });

@@ -59,8 +59,6 @@ export function emitOrderEvents(change) {
     if (doc.franchiseId) targets.push(rooms.franchise(doc.franchiseId));
     if (targets.length) io.to(targets).emit('order_event', event);
   }
-  // the store's kitchen staff: just "an order changed" (no order id or details); their screens re-read what they may see
-  if (types.length && doc.storeId) io.to(rooms.storeTeam(doc.storeId)).emit('store_event', { type: 'order', storeId: String(doc.storeId), at: new Date().toISOString() });
 }
 
 let stream = null;
@@ -78,6 +76,10 @@ export function startOrderEventStream() {
       );
       stream.on('change', (change) => {
         try { emitOrderEvents(change); } catch (err) { logger.error(`Order event emit failed: ${err.message}`); }
+        // a store that runs its orders in Pet Pooja gets the order there (modules/food/pos; never blocks the order flow)
+        import('../../pos/services/posOutbox.service.js')
+          .then((m) => m.onOrderChanged(change))
+          .catch((err) => logger.warn(`Pet Pooja queue failed: ${err.message}`));
       });
       stream.on('error', (err) => {
         logger.error(`Order event stream error: ${err.message}`);

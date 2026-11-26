@@ -51,6 +51,9 @@ export const markAttendance = wrap('Attendance marked', 201, (req) => attendance
 export const markLeave = wrap('Leave marked', 201, (req) => attendance.markLeaveRange(req.user, req.body, storeQuery(req)));
 export const deleteAttendance = wrap('Attendance deleted', 200, (req) => attendance.deleteAttendance(req.user, req.params.id, storeQuery(req)));
 export const clockIn = wrap('Clocked in', 201, (req) => attendance.clockIn(req.user));
+// the store manager clocks a kitchen staff member in / out (kitchen staff have no login)
+export const clockInStaff = wrap('Clocked in', 201, (req) => attendance.clockInStaff(req.user, req.params.staffId));
+export const clockOutStaff = wrap('Clocked out', 200, (req) => attendance.clockOutStaff(req.user, req.params.staffId));
 export const clockOut = wrap('Clocked out', 200, (req) => attendance.clockOut(req.user));
 export const todayStatus = wrap('Today fetched', 200, (req) => attendance.todayStatus(req.user));
 export const myHistory = wrap('Attendance history fetched', 200, (req) => attendance.myHistory(req.user, validateAttendanceQuery(req.query)));

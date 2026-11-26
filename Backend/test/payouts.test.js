@@ -170,24 +170,35 @@ describe('kitchen staff salaries', () => {
         assert.equal((await fx.call('POST', `${S}/salaries`, B.managerToken, { staffId: kitchen.staffId, period: month, amount: 15000, method: 'cash', reference: 'RCPT0001' })).status, 404, 'another store cannot pay this staff member');
         ok(await rec('SALUTR0001'), 201);
         assert.equal((await rec('SALUTR0002')).status, 409);
-        const mine = ok(await fx.call('GET', '/v1/food/store/my-salary', kitchen.token));
-        assert.ok(mine.payouts.some((p) => p.period === month && p.status === 'paid'));
+        const desk = ok(await fx.call('GET', `${S}/staff`, A.managerToken)).staff.find((s) => s.staffId === kitchen.staffId);
+        assert.ok(desk.payouts.some((p) => p.period === month && p.status === 'paid'));
+        assert.equal(desk.months.find((m) => m.period === month).state, 'paid');
     });
-    test('staff can ask only once a month is overdue; the manager pays it (a changed amount needs a reason)', async () => {
-        const month = ym(new Date());
-        assert.equal((await fx.call('POST', '/v1/food/store/my-salary/request', kitchen.token, { period: month })).status, 400);
+    test('the manager keeps the staff member\'s payout details (they have no login); other stores cannot', async () => {
+        ok(await fx.call('PUT', `${S}/staff/${kitchen.staffId}/account`, A.managerToken, BANK));
+        assert.equal((await fx.call('PUT', `${S}/staff/${kitchen.staffId}/account`, B.managerToken, BANK)).status, 404);
+        assert.equal((await fx.call('PUT', `${S}/staff/${A.managerId}/account`, A.managerToken, BANK)).status, 404, 'the manager is not kitchen staff');
+        const desk = ok(await fx.call('GET', `${S}/staff`, A.managerToken)).staff.find((s) => s.staffId === kitchen.staffId);
+        assert.equal(desk.account.accountHolderName, BANK.accountHolderName);
+    });
+    test('a salary request a staff member made before the change is still paid by the manager (a changed amount needs a reason)', async () => {
         await mongoose.connection.collection('storemanagers').updateOne({ _id: oid(kitchen.staffId) }, { $set: { joinedDate: new Date(Date.now() - 120 * DAY), 'personalDetails.salary': 12000, 'personalDetails.salaryType': 'Monthly' } });
         const old = lastMonth();
-        const req = ok(await fx.call('POST', '/v1/food/store/my-salary/request', kitchen.token, { period: old }), 201).payout;
-        assert.deepEqual([req.status, req.amount], ['pending', 12000]);
-        assert.equal((await fx.call('POST', '/v1/food/store/my-salary/request', kitchen.token, { period: old })).status, 409);
-        assert.equal((await pay(A.managerToken, S, req.id, 'SALUTR0100', { amount: 11000 })).status, 400);
-        const paid = ok(await pay(A.managerToken, S, req.id, 'SALUTR0101', { amount: 11000, note: '2 days unpaid leave' })).payout;
+        const { FoodPayout } = await import('../src/modules/food/payouts/models/payout.model.js');
+        const made = await FoodPayout.create({
+            kind: 'staff_salary', payeeType: 'staff', payeeId: oid(kitchen.staffId), payeeName: kitchen.name, payerType: 'store', payerId: oid(A.storeId),
+            storeId: oid(A.storeId), franchiseId: oid(A.franchiseId), period: old, amount: 12000, status: 'pending', origin: 'request',
+            activity: [{ action: 'requested', byRole: 'KITCHEN_STAFF', byName: kitchen.name }], activeKey: `salary:${kitchen.staffId}:${old}`,
+        });
+        assert.equal(ok(await fx.call('GET', `${S}/staff`, A.managerToken)).staff.find((s) => s.staffId === kitchen.staffId).months.find((m) => m.period === old).state, 'pending');
+        assert.equal((await pay(A.managerToken, S, String(made._id), 'SALUTR0100', { amount: 11000 })).status, 400);
+        const paid = ok(await pay(A.managerToken, S, String(made._id), 'SALUTR0101', { amount: 11000, note: '2 days unpaid leave' })).payout;
         assert.deepEqual([paid.status, paid.amount], ['paid', 11000]);
     });
-    test('kitchen staff cannot use the manager\'s payouts and a manager cannot use My salary', async () => {
+    test('My salary is retired (410) and an old kitchen staff token cannot use the manager\'s payouts (403)', async () => {
         assert.equal((await fx.call('GET', S, kitchen.token)).status, 403);
-        assert.equal((await fx.call('GET', '/v1/food/store/my-salary', A.managerToken)).status, 403);
+        assert.equal((await fx.call('GET', '/v1/food/store/my-salary', A.managerToken)).status, 410);
+        assert.equal((await fx.call('POST', '/v1/food/store/my-salary/request', kitchen.token, { period: ym(new Date()) })).status, 410);
     });
 });
 

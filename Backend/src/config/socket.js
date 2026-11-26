@@ -36,7 +36,7 @@ function maskToken(token) {
 
 const roomNames = {
     store: (id) => `store:${String(id)}`,
-    // kitchen staff of a store: only "something changed" signals (store_event), never the store's order events
+    // left from when kitchen staff signed in (they no longer do, docs/kitchen-staff-removal.md); nobody joins it now
     storeTeam: (id) => `store-team:${String(id)}`,
     user: (id) => `user:${String(id)}`,
     delivery: (id) => `delivery:${String(id)}`,
@@ -85,6 +85,8 @@ export const initSocket = async (server) => {
                 tokenPreview: maskToken(token),
             });
             const decoded = verifyAccessToken(token);
+            // Kitchen staff no longer sign in: a token issued before the change gets no socket
+            if (String(decoded.role || '').replace(/-/g, '_').toUpperCase() === 'KITCHEN_STAFF') return next(new Error('AUTH_INVALID'));
             // Scope travels with the user so ownership checks need no client input.
             socket.user = {
                 userId: decoded.userId,
@@ -144,11 +146,6 @@ export const initSocket = async (server) => {
             const scopeRole = String(role).replace(/-/g, '_').toUpperCase();
             if (scopeRole === 'STORE_MANAGER' && socket.user.storeId) {
                 socket.join(roomNames.store(socket.user.storeId));
-            }
-            // Kitchen staff see only the orders they hold a station on, so they never get the store's order events. Their
-            // room gets id-free "something changed" signals and each screen re-reads its own (scoped) data from the API.
-            if (scopeRole === 'KITCHEN_STAFF' && socket.user.storeId) {
-                socket.join(roomNames.storeTeam(socket.user.storeId));
             }
             if (scopeRole === 'FRANCHISE_ADMIN' && socket.user.franchiseId) {
                 socket.join(roomNames.franchise(socket.user.franchiseId));
@@ -459,7 +456,7 @@ export const getIO = () => {
 export const rooms = roomNames;
 
 /**
- * A small "something changed" signal to a store's panel (store manager and kitchen staff sockets), so the open screens
+ * A small "something changed" signal to a store's panel (the store manager's sockets), so the open screens
  * refresh at once. Ids and a type only: never personal details. type: complaint | task | attendance | leave | payout | issue
  */
 export function emitStoreEvent(storeId, type, extra = {}) {

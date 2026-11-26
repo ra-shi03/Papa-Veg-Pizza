@@ -8,8 +8,7 @@ import { isProductionDefaultOtpOn } from '../src/core/otp/otp.service.js';
 import { FoodStore } from '../src/modules/food/store/models/store.model.js';
 import { StoreManager } from '../src/modules/food/franchise/models/storeManager.model.js';
 import { FoodDeliveryPartner } from '../src/modules/food/delivery/models/deliveryPartner.model.js';
-import { Role } from '../src/core/roles/models/role.model.js';
-import { UserRole } from '../src/core/roles/models/userRole.model.js';
+import { kitchenStaffFilter } from '../src/modules/food/store/services/kitchenStaffDirectory.js';
 import { openStoreIds } from '../src/modules/food/franchise/services/storeHours.js';
 
 const LOCAL = /^(localhost|127\.|0\.0\.0\.0|\[?::1\]?$)/i;
@@ -55,17 +54,11 @@ async function storeChecks() {
 
   const open = await openStoreIds(ids);
 
-  // An order needs active kitchen staff to be assigned to its stations (the kitchen supervisor role is no longer used).
-  const staffRole = await Role.findOne({ code: 'KITCHEN_STAFF' }).select('_id').lean();
-  const links = staffRole ? await UserRole.find({ storeId: { $in: ids }, roleId: staffRole._id }).select('userId storeId').lean() : [];
-  const staff = links.length
-    ? await StoreManager.find({ userId: { $in: links.map((l) => l.userId) }, status: 'Active' }).select('userId').lean()
-    : [];
-  const activeUsers = new Set(staff.map((s) => String(s.userId)));
+  // An order needs active kitchen staff to be assigned to its stations (staff records without a login, which the store
+  // manager runs; the kitchen supervisor role is no longer used).
+  const staff = await StoreManager.find({ $and: [await kitchenStaffFilter(ids), { status: 'Active', storeId: { $in: ids.map(String) } }] }).select('storeId').lean();
   const kitchenStaff = new Map();
-  for (const l of links) {
-    if (activeUsers.has(String(l.userId))) kitchenStaff.set(String(l.storeId), (kitchenStaff.get(String(l.storeId)) || 0) + 1);
-  }
+  for (const s of staff) kitchenStaff.set(String(s.storeId), (kitchenStaff.get(String(s.storeId)) || 0) + 1);
 
   // Riders are not tied to a store: dispatch offers an order to any approved, online rider.
   const riders = await FoodDeliveryPartner.countDocuments({ status: 'approved', availabilityStatus: 'online' });

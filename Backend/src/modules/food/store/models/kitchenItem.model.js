@@ -25,6 +25,10 @@ const kitchenItemSchema = new mongoose.Schema(
 
         stage: { type: String, enum: ITEM_STAGES, default: 'assigned', index: true },
         // A specific chef / baker chosen for this item; otherwise the order's pizza_chef / baking_chef slot applies.
+        // chefStaffId / bakerStaffId are staff records; chefId / bakerId are User ids on cards from before kitchen staff
+        // lost their logins (kept for history only).
+        chefStaffId: { type: mongoose.Schema.Types.ObjectId, ref: 'StoreManager', default: null },
+        bakerStaffId: { type: mongoose.Schema.Types.ObjectId, ref: 'StoreManager', default: null },
         chefId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
         chefName: { type: String, default: '', trim: true },
         bakerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },

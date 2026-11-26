@@ -1,13 +1,12 @@
 import { FoodStore } from '../models/store.model.js';
 import { StoreManager } from '../../franchise/models/storeManager.model.js';
-import { Role } from '../../../../core/roles/models/role.model.js';
-import { UserRole } from '../../../../core/roles/models/userRole.model.js';
+import { kitchenStaffOf } from './kitchenStaffDirectory.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 import { isId, toId } from '../../dashboard/services/dashboardAccess.js';
 
 // Who may do what with shifts and attendance, decided from the token alone:
-//   store manager      -> own store: manage shifts, read attendance, mark leave / absent for kitchen staff, clock in / out themselves
-//   kitchen staff      -> clock in / out, and read only their own attendance and shifts
+//   store manager      -> own store: manage shifts, read attendance, clock kitchen staff in and out and mark them present /
+//                         absent / on leave (kitchen staff have no login), clock in / out themselves
 //   franchise admin    -> one store of their own franchise (?storeId=): read everything (managers and staff), mark leave /
 //                         absent / present on behalf (with a reason) and decide leave requests when the manager is away;
 //                         another franchise's store is 404
@@ -16,18 +15,16 @@ import { isId, toId } from '../../dashboard/services/dashboardAccess.js';
 
 const normalize = (role) => String(role || '').trim().replace(/-/g, '_').toUpperCase();
 const isSuper = (role) => role === 'SUPERADMIN' || role === 'SUPER_ADMIN';
-export const KITCHEN_ROLE_CODES = ['KITCHEN_STAFF'];   // (the kitchen supervisor role is no longer used)
-const STORE_ROLES = ['STORE_MANAGER', ...KITCHEN_ROLE_CODES];
+// Store roles that sign in and clock themselves. Kitchen staff no longer sign in (docs/kitchen-staff-removal.md) and the
+// kitchen supervisor role is no longer used, so only the store manager is left.
+export const KITCHEN_ROLE_CODES = [];
+const STORE_ROLES = ['STORE_MANAGER'];
 
 /** Class-less 409 (errorHandler reads statusCode) */
 export const conflict = (message) => Object.assign(new Error(message), { name: 'ConflictError', statusCode: 409 });
 
 /** The kitchen staff of one store (StoreManager records, lean), optionally narrowed by `extra`. */
-export async function kitchenStaffRecords(storeId, extra = {}) {
-    const roles = await Role.find({ code: { $in: KITCHEN_ROLE_CODES } }).select('_id').lean();
-    const links = await UserRole.find({ storeId, roleId: { $in: roles.map((r) => r._id) } }).select('userId').lean();
-    return StoreManager.find({ storeId: String(storeId), userId: { $in: links.map((l) => l.userId) }, status: { $ne: 'DELETED' }, ...extra }).lean();
-}
+export const kitchenStaffRecords = (storeId, extra = {}) => kitchenStaffOf(storeId, extra);
 
 /** Everyone on the payroll of one store (the manager and the kitchen staff), optionally narrowed by `extra`. */
 export const storePeopleRecords = (storeId, extra = {}) =>
@@ -52,7 +49,7 @@ export async function attendanceScope(user, query = {}) {
         if (!store) throw new NotFoundError('Store not found');
         const me = await myStaffRecord(user, store._id);
         if (!me && role !== 'STORE_MANAGER') throw new ForbiddenError('Your staff record was not found.');
-        return { role, store, me, canWrite: role === 'STORE_MANAGER', canMark: role === 'STORE_MANAGER', isAdmin: false, ownOnly: role === 'KITCHEN_STAFF' };
+        return { role, store, me, canWrite: role === 'STORE_MANAGER', canMark: role === 'STORE_MANAGER', isAdmin: false, ownOnly: false };
     }
     if (role === 'FRANCHISE_ADMIN' || isSuper(role)) {
         if (!isId(query.storeId)) throw new ValidationError('Choose a store (storeId).');

@@ -5,15 +5,13 @@ import { StoreIngredient } from '../models/storeIngredient.model.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 
 // Who is calling, and which store they are looking at. Everything comes from the token:
-//   store manager      -> their store, full access
-//   kitchen staff      -> their store: read stock / shortages, file waste + shortage reports + stock requests (only their own)
+//   store manager      -> their store, full access (kitchen staff have no login: the manager files their reports)
 //   franchise admin    -> read-only, for ONE store of their own franchise (?storeId=...)
 //   anyone else        -> 403.   A record of another store / franchise is simply not found (404).
 
 const normalize = (role) => String(role || '').trim().replace(/-/g, '_').toUpperCase();
 const ROLE = {
   STORE_MANAGER: 'manager',
-  KITCHEN_STAFF: 'staff',
   FRANCHISE_ADMIN: 'franchise_admin',
 };
 

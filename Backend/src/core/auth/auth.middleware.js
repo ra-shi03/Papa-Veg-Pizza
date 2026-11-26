@@ -8,8 +8,12 @@ const normalizeRole = (role) => String(role || '').trim().replace(/_/g, '-').toU
 const ADMIN_PANEL_ROLES = new Set([
     'SUPERADMIN',
     'FRANCHISE-ADMIN',
-    'STORE-MANAGER',
-    'KITCHEN-STAFF'
+    'STORE-MANAGER'
+]);
+
+// Roles that no longer sign in. A token issued before the change is refused on every route (403), whatever the route allows.
+const RETIRED_ROLES = new Map([
+    ['KITCHEN-STAFF', 'Kitchen staff no longer sign in. Your store manager runs the kitchen from the store panel.'],
 ]);
 
 // ─── Require any admin panel role ─────────────────────────────────────────────
@@ -51,6 +55,7 @@ export const authMiddleware = async (req, res, next) => {
         };
 
         const role = normalizeRole(decoded.role);
+        if (RETIRED_ROLES.has(role)) return sendError(res, 403, RETIRED_ROLES.get(role));
 
         // For all roles: enforce real-time account status check
         // This ensures deactivated accounts are locked out on the very next request

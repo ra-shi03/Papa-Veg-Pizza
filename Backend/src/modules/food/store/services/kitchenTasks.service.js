@@ -9,9 +9,11 @@ import { config } from '../../../../config/env.js';
 import { requirePresent } from './attendancePresence.js';
 import { notifyOwnersSafely } from '../../../../core/notifications/firebase.service.js';
 import { emitStoreEvent } from '../../../../config/socket.js';
+import { kitchenStaffOf, personKey, slotOf } from './kitchenStaffDirectory.js';
 
-// My Tasks: the work items behind an order in the kitchen. A task (kind 'staff', one per slot) is created when
-// the store manager assigns a station. Everything is scoped by the storeId and userId in the token.
+// Kitchen Tasks: the work items behind an order in the kitchen. A task (kind 'staff', one per slot) is created when
+// the store manager assigns a station. Kitchen staff have no login (docs/kitchen-staff-removal.md): the store manager
+// sees and runs every task of the store, for the person it is assigned to (task.staffId). Scoped by the storeId in the token.
 // Orders accepted before the kitchen supervisor role was removed may still have a kind 'supervisor' task: it is
 // kept and closed with the order, but it is never counted as station work and nobody acts on it.
 
@@ -122,7 +124,8 @@ export const notifyUsers = async ({ userIds, storeId, taskId = null, type, title
     );
     const link = LINK_BY_TYPE[type] || '/store-operations/tasks';
     await notifyOwnersSafely(
-      unique.filter((id) => !optedOut.has(id)).map((ownerId) => ({ ownerType: 'KITCHEN_STAFF', ownerId })),
+      // store-panel accounts are Users; only store managers sign in now (kitchen staff have no login)
+      unique.filter((id) => !optedOut.has(id)).map((ownerId) => ({ ownerType: 'STORE_MANAGER', ownerId })),
       { title, body: message || title, data: { type: `store_${type}`, taskId: taskId ? String(taskId) : '', storeId: String(storeId), link, targetUrl: link } },
     );
   } catch {
@@ -160,7 +163,7 @@ const toUiTask = (t, order, names, items = []) => {
     const assignedStaff = {};
     const stations = STAFF_SLOTS.map((slot) => {
       const s = order?.kitchen?.staff?.[slot];
-      const staff = s?.userId ? { _id: idStr(s.userId), name: s.name || '' } : null;
+      const staff = personKey(s) ? { _id: personKey(s), name: s.name || '' } : null;
       if (staff) assignedStaff[slot] = staff;
       return { slot, station: SLOT_INFO[slot].station, staff };
     });
@@ -205,8 +208,8 @@ const toUiTask = (t, order, names, items = []) => {
     taskType: info.type,
     title: `${info.verb} ${itemsSummary(order?.items) || `order ${orderNumber}`}`,
     description: [`Order ${orderNumber}`, stationFlow.progress || '', order?.note ? `Note: ${order.note}` : ''].filter(Boolean).join(' · '),
-    assignedTo: names.get(idStr(t.assignedTo)) || '',
-    assignedToId: idStr(t.assignedTo),
+    assignedTo: names.get(idStr(t.staffId)) || names.get(idStr(t.assignedTo)) || '',
+    assignedToId: idStr(t.staffId) || idStr(t.assignedTo),
     assignedBy: names.get(idStr(t.assignedBy)) || '',
     station: info.station,
     priority: order?.kitchen?.priority === 'urgent' ? 'high' : 'medium',
@@ -236,9 +239,12 @@ const serialise = async (tasks) => {
   const itemRows = stationOrderIds.length ? await KitchenItem.find({ orderId: { $in: stationOrderIds.map(toId) } }).sort({ index: 1 }).lean() : [];
   const itemsByOrder = new Map();
   itemRows.forEach((i) => itemsByOrder.set(idStr(i.orderId), [...(itemsByOrder.get(idStr(i.orderId)) || []), i]));
+  // names by staff record id (tasks now) and by User id (who assigned it; tasks from before the change)
   const userIds = [...new Set(tasks.flatMap((t) => [idStr(t.assignedTo), idStr(t.assignedBy)]).filter(Boolean))];
-  const people = await StoreManager.find({ userId: { $in: userIds } }).select('userId name').lean();
-  const names = new Map(people.map((p) => [String(p.userId), p.name]));
+  const staffIds = [...new Set(tasks.map((t) => idStr(t.staffId)).filter(Boolean))];
+  const people = await StoreManager.find({ $or: [{ userId: { $in: userIds } }, { _id: { $in: staffIds } }] }).select('userId name').lean();
+  const names = new Map();
+  people.forEach((p) => { names.set(String(p._id), p.name); if (p.userId) names.set(String(p.userId), p.name); });
   return tasks.map((t) => toUiTask(t, orderById.get(idStr(t.orderId)), names, itemsByOrder.get(idStr(t.orderId)) || []));
 };
 
@@ -282,9 +288,11 @@ async function syncStaffTasks(tasks) {
   return tasks;
 }
 
+/** GET /tasks : the store manager's Kitchen Tasks board, every task of the store (kitchen staff have no login). */
 export async function listMyTasks(user) {
+  requireManagerRole(user);
   const storeId = requireStore(user);
-  const tasks = await KitchenTask.find({ storeId: toId(storeId), assignedTo: toId(user.userId) })
+  const tasks = await KitchenTask.find({ storeId: toId(storeId) })
     .sort({ createdAt: -1 }).limit(300).lean();
   return serialise(await syncStaffTasks(tasks));
 }
@@ -310,11 +318,11 @@ const taskStats = (tasks, since) => {
 };
 
 export async function myTaskStats(user) {
+  requireManagerRole(user);
   const storeId = requireStore(user);
   const week = new Date(Date.now() - 7 * 86400000);
   const tasks = await syncStaffTasks(await KitchenTask.find({
     storeId: toId(storeId),
-    assignedTo: toId(user.userId),
     $or: [{ status: { $ne: 'completed' } }, { completedAt: { $gte: week } }],
   }).lean());
   const s = taskStats(tasks, startOfToday());
@@ -341,13 +349,13 @@ export async function teamTasks(user) {
       kind: { $ne: 'supervisor' },   // legacy supervisor tasks are not station work
       $or: [{ status: { $ne: 'completed' } }, { completedAt: { $gte: week } }],
     }).lean(),
-    StoreManager.find({ storeId, status: 'Active', userId: { $ne: null }, role: { $not: /manager|supervisor/i } })
-      .select('userId name').lean(),
+    kitchenStaffOf(storeId, { status: 'Active', role: { $not: /manager|supervisor/i } }),
   ]);
   const s = taskStats(tasks, startOfToday());
+  const isFor = (t, m) => idStr(t.staffId) === String(m._id) || (!t.staffId && m.userId && idStr(t.assignedTo) === String(m.userId));
   const staffList = staff.map((m) => {
-    const active = tasks.filter((t) => idStr(t.assignedTo) === String(m.userId) && ['pending', 'in_progress'].includes(t.status)).length;
-    return { _id: String(m.userId), name: m.name, activeTasks: active, status: active ? 'Active' : 'Idle' };
+    const active = tasks.filter((t) => isFor(t, m) && ['pending', 'in_progress'].includes(t.status)).length;
+    return { _id: String(m._id), name: m.name, activeTasks: active, status: active ? 'Active' : 'Idle' };
   });
   return {
     activeStaffCount: staffList.filter((m) => m.activeTasks > 0).length,
@@ -370,9 +378,11 @@ const findTask = async (id, query) => {
   return task;
 };
 
-// The assignee's own task
-const findMyTask = (user, id) =>
-  findTask(id, { storeId: toId(requireStore(user)), assignedTo: toId(user.userId) });
+// A task of the caller's store: the store manager starts, finishes and reports tasks for the person on the station
+const findMyTask = (user, id) => {
+  requireManagerRole(user);
+  return findTask(id, { storeId: toId(requireStore(user)) });
+};
 
 const view = async (task) => (await serialise([task.toObject()]))[0];
 
@@ -387,7 +397,7 @@ export async function startTask(user, id, payload = {}) {
   // A supervisor oversees the order: nothing to oversee until every station has a person on it.
   if (task.kind === 'supervisor') {
     const order = await FoodOrder.findById(task.orderId).select('kitchen').lean();
-    const missing = STAFF_SLOTS.filter((slot) => !order?.kitchen?.staff?.[slot]?.userId);
+    const missing = STAFF_SLOTS.filter((slot) => !personKey(order?.kitchen?.staff?.[slot]));
     if (missing.length) {
       const names = missing.map((slot) => SLOT_INFO[slot].station).join(', ');
       throw new ValidationError(`Assign kitchen staff before starting. Still unassigned: ${names}.`);
@@ -476,13 +486,14 @@ export async function requestReassign(user, id, payload = {}) {
   return view(task);
 }
 
-// A kitchen staff member of this store (never the manager or a left-over supervisor record), matched by id or by name
+// A kitchen staff member of this store (never the manager or a left-over supervisor record), matched by staff record id
+// (a pre-change User id also works) or by name
 const findStaffTarget = async (storeId, who) => {
   const key = str(who, 120);
   if (!key) throw new ValidationError('Choose who the task goes to');
-  const filter = { storeId: String(storeId), status: 'Active', userId: { $ne: null }, role: { $not: /manager|supervisor/i } };
-  const members = await StoreManager.find(filter).select('userId name').lean();
-  const match = members.find((m) => String(m.userId) === key) || members.find((m) => m.name.toLowerCase() === key.toLowerCase());
+  const members = await kitchenStaffOf(storeId, { status: 'Active', role: { $not: /manager|supervisor/i } });
+  const match = members.find((m) => String(m._id) === key) || members.find((m) => m.userId && String(m.userId) === key)
+    || members.find((m) => m.name.toLowerCase() === key.toLowerCase());
   if (!match) throw new ValidationError('That person is not an active kitchen staff member of this store');
   await requirePresent(storeId, match);
   return match;
@@ -499,26 +510,22 @@ export async function reassignTask(user, id, payload = {}) {
   if (!order) throw new NotFoundError('Task not found');
 
   const target = await findStaffTarget(storeId, payload.assignedTo ?? payload.staffId);
-  const previous = idStr(task.assignedTo);
-  if (previous === String(target.userId)) throw new ValidationError('The task is already assigned to that person');
+  const previous = idStr(task.staffId) || idStr(task.assignedTo);
+  if (previous === String(target._id) || (target.userId && previous === String(target.userId))) throw new ValidationError('The task is already assigned to that person');
 
-  task.assignedTo = target.userId;
+  task.staffId = target._id;
+  task.assignedTo = target.userId || null;
   task.assignedBy = toId(user.userId);
   task.status = task.status === 'delayed' ? 'pending' : task.status;
   task.reassignRequest = { requested: false, reason: '', preferredStaff: '', requestedAt: null };
   await task.save();
 
-  // Keep the order's station slot in step, so the new person can move the order along
-  if (IN_KITCHEN.includes(order.orderStatus) && STAFF_SLOTS.includes(task.slot)) {
-    await FoodOrder.updateOne(
-      { _id: order._id, [`kitchen.staff.${task.slot}.userId`]: toId(previous) },
-      { $set: { [`kitchen.staff.${task.slot}`]: { userId: target.userId, name: target.name, assignedAt: new Date() } } },
-    );
+  // Keep the order's station slot in step (only if the slot still names the previous person)
+  if (IN_KITCHEN.includes(order.orderStatus) && STAFF_SLOTS.includes(task.slot) && personKey(order.kitchen?.staff?.[task.slot]) === previous) {
+    await FoodOrder.updateOne({ _id: order._id }, { $set: { [`kitchen.staff.${task.slot}`]: slotOf(target) } });
   }
-
-  const label = `order ${order.order_id || idStr(order._id)}`;
-  await notifyUsers({ userIds: [target.userId], storeId, taskId: task._id, type: 'task_reassigned', title: 'Task Reassigned To You', message: `You were given ${label}.` });
-  await notifyUsers({ userIds: [previous], storeId, taskId: task._id, type: 'task_reassigned', title: 'Task Reassigned', message: `${label} was moved to ${target.name}.` });
+  // (kitchen staff have no login, so nobody is notified: the board shows the new assignee)
+  emitStoreEvent(storeId, 'task');
   return view(task);
 }
 

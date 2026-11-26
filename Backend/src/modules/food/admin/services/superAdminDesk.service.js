@@ -7,6 +7,7 @@ import { StoreManager } from '../../franchise/models/storeManager.model.js';
 import { FoodStore } from '../../store/models/store.model.js';
 import { FoodFranchise } from '../../franchise/models/franchise.model.js';
 import { onDutyStaffIds } from '../../store/services/attendancePresence.js';
+import { kitchenStaffFilter } from '../../store/services/kitchenStaffDirectory.js';
 import { Role } from '../../../../core/roles/models/role.model.js';
 import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
 import { NotFoundError } from '../../../../core/auth/errors.js';
@@ -82,9 +83,9 @@ export async function customerHistory(customerId) {
   };
 }
 
-/** Kitchen staff of every store (the store manager creates them; the franchise admin approves them). */
+/** Kitchen staff of every store (records without a login: the store manager adds and runs them; the franchise admin approves them). */
 export async function kitchenStaffList() {
-  const people = await StoreManager.find({ role: { $not: /manager|supervisor/i }, status: { $ne: 'Deleted' } })
+  const people = await StoreManager.find({ $and: [await kitchenStaffFilter(), { role: { $not: /manager|supervisor/i }, status: { $nin: ['Deleted', 'DELETED'] } }] })
     .select('userId name email phone employeeCode role status storeId joinedDate personalDetails.shiftType profileImage').sort({ createdAt: -1 }).limit(2000).lean();
   const stores = await FoodStore.find({ _id: { $in: ids(people.map((p) => p.storeId)).filter((s) => mongoose.isValidObjectId(s)) } }).select('storeName franchiseId').lean();
   const franchises = await FoodFranchise.find({ _id: { $in: ids(stores.map((s) => s.franchiseId)) } }).select('name franchiseName').lean();
@@ -93,7 +94,12 @@ export async function kitchenStaffList() {
   const [handled, onDuty] = await Promise.all([
     FoodOrder.aggregate([
       { $match: { orderStatus: 'delivered' } },
-      { $project: { who: [ '$kitchen.staff.pizza_chef.userId', '$kitchen.staff.baking_chef.userId', '$kitchen.staff.packaging_staff.userId' ] } },
+      // the staff record on newer orders, the User id on older ones
+      { $project: { who: [
+        { $ifNull: ['$kitchen.staff.pizza_chef.staffId', '$kitchen.staff.pizza_chef.userId'] },
+        { $ifNull: ['$kitchen.staff.baking_chef.staffId', '$kitchen.staff.baking_chef.userId'] },
+        { $ifNull: ['$kitchen.staff.packaging_staff.staffId', '$kitchen.staff.packaging_staff.userId'] },
+      ] } },
       { $unwind: '$who' }, { $match: { who: { $ne: null } } }, { $group: { _id: { order: '$_id', who: '$who' } } },
       { $group: { _id: '$_id.who', n: { $sum: 1 } } },
     ]),
@@ -107,7 +113,8 @@ export async function kitchenStaffList() {
       return {
         _id: String(p._id), name: p.name, email: p.email, phone: p.phone, employeeCode: p.employeeCode, role: p.role, status: p.status,
         storeName: store?.storeName || '', franchiseName: franchiseOf.get(String(store?.franchiseId)) || '',
-        shift: p.personalDetails?.shiftType || '', joinedDate: p.joinedDate || null, ordersDelivered: orderCount.get(String(p.userId)) || 0,
+        shift: p.personalDetails?.shiftType || '', joinedDate: p.joinedDate || null,
+        ordersDelivered: (orderCount.get(String(p._id)) || 0) + (p.userId ? orderCount.get(String(p.userId)) || 0 : 0),
         onDuty: present.has(String(p._id)),
       };
     }),
@@ -119,7 +126,7 @@ const ROLES = [
   ['SUPER_ADMIN', 'Super Admin', 'The whole company: menu, prices, franchises, payouts, refunds, customers and app content.'],
   ['FRANCHISE_ADMIN', 'Franchise Admin', 'Its own franchise only: stores, store managers, staff approvals and attendance, riders, store pricing, complaints and payouts.'],
   ['STORE_MANAGER', 'Store Manager', 'One store: accepting orders, stations, delivery, inventory, kitchen staff, attendance and payouts.'],
-  ['KITCHEN_STAFF', 'Kitchen Staff', 'Only the orders where they hold a station, their tasks, attendance and salary.'],
+  ['KITCHEN_STAFF', 'Kitchen Staff', 'No login: staff records the store manager runs (stations, tasks, attendance and salary); the franchise admin approves new ones.'],
   ['DELIVERY_PARTNER', 'Delivery Partner', 'The delivery app: their own offers, deliveries, wallet and payouts.'],
   ['CUSTOMER', 'Customer', 'The user app: their own cart, orders, addresses, wallet and support requests.'],
 ];
@@ -134,6 +141,11 @@ export async function rolesSummary() {
       let active = 0;
       if (code === 'DELIVERY_PARTNER') {
         [people, active] = await Promise.all([FoodDeliveryPartner.countDocuments({}), FoodDeliveryPartner.countDocuments({ status: 'approved' })]);
+      } else if (code === 'KITCHEN_STAFF') {
+        // staff records, not accounts (kitchen staff have no login)
+        const kitchen = await kitchenStaffFilter();
+        const base = { $and: [kitchen, { status: { $nin: ['DELETED', 'Rejected'] } }] };
+        [people, active] = await Promise.all([StoreManager.countDocuments(base), StoreManager.countDocuments({ $and: [base, { status: 'Active' }] })]);
       } else if (idOf.has(code)) {
         const filter = { primaryRole: idOf.get(code), isDeleted: { $ne: true } };
         [people, active] = await Promise.all([User.countDocuments(filter), User.countDocuments({ ...filter, isActive: { $ne: false } })]);

@@ -2,11 +2,8 @@ import { loadMethods } from '../../settings/services/orderMethods.service.js';
 import mongoose from 'mongoose';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { KitchenTask } from '../models/kitchenTask.model.js';
-import { notifyUsers } from './kitchenTasks.service.js';
 import { FoodStore } from '../../store/models/store.model.js';
-import { StoreManager } from '../../franchise/models/storeManager.model.js';
-import { UserRole } from '../../../../core/roles/models/userRole.model.js';
-import { Role } from '../../../../core/roles/models/role.model.js';
+import { kitchenStaffOf, findKitchenStaffRecord, personKey, slotOf } from './kitchenStaffDirectory.js';
 import { updateOrderStatusStore } from '../../orders/services/order.service.js';
 import { pushStatusHistory } from '../../orders/services/order.helpers.js';
 import { Refund } from '../../../../core/payments/models/refund.model.js';
@@ -38,7 +35,8 @@ const VIEW_STATUSES = {
 
 // Staff titles are free text on the staff profile; map them onto the three kitchen stations.
 // 'kitchen_supervisor' is still recognised so a left-over supervisor record is refused as an assignee; the role itself is
-// no longer part of the flow (docs/supervisor-removal.md).
+// no longer part of the flow (docs/supervisor-removal.md). Kitchen staff have no login either: they are staff records the
+// store manager puts on stations and works for (docs/kitchen-staff-removal.md).
 export const uiRoleOf = (title) => {
   const t = String(title || '').toLowerCase();
   if (t.includes('supervisor')) return 'kitchen_supervisor';
@@ -46,25 +44,6 @@ export const uiRoleOf = (title) => {
   if (t.includes('bak')) return 'baking_chef';
   if (t.includes('packag')) return 'packaging_staff';
   return 'pizza_chef';
-};
-
-// System role code per user (STORE_MANAGER / KITCHEN_STAFF; KITCHEN_SUPERVISOR for left-over records) from the roles collections.
-const systemRoleCodes = async (userIds) => {
-  const links = await UserRole.find({ userId: { $in: userIds } }).select('userId roleId').lean();
-  const roles = await Role.find({ _id: { $in: links.map((l) => l.roleId) } }).select('code').lean();
-  const codeById = new Map(roles.map((r) => [String(r._id), normalizeRole(r.code)]));
-  const byUser = new Map();
-  links.forEach((l) => {
-    const code = codeById.get(String(l.roleId));
-    if (code) byUser.set(String(l.userId), code);
-  });
-  return byUser;
-};
-
-const resolveUiRole = (code, title) => {
-  if (code === 'KITCHEN_SUPERVISOR') return 'kitchen_supervisor';
-  if (code === 'STORE_MANAGER') return 'store_manager';
-  return uiRoleOf(title || (code === 'KITCHEN_STAFF' ? 'Kitchen Staff' : 'store manager'));
 };
 
 export const toObjectId = (id) => new mongoose.Types.ObjectId(String(id));
@@ -93,7 +72,8 @@ const uiStatus = (order) => {
   return s;
 };
 
-const person = (p) => (p?.userId ? { _id: String(p.userId), name: p.name || '' } : null);
+// The station holder as the screens show it: the staff record id (the User id on orders from before the change)
+const person = (p) => (personKey(p) ? { _id: personKey(p), name: p.name || '' } : null);
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const GATEWAY_LABEL = { razorpay: 'Razorpay', razorpay_qr: 'Razorpay QR', wallet: 'Wallet', cash: 'Cash on Delivery' };
@@ -377,30 +357,30 @@ export const requireManager = (user) => {
   if (normalizeRole(user?.role) !== 'STORE_MANAGER') throw new ForbiddenError('Only the store manager can do this.');
 };
 
-export const staffSlotsOf = (order, userId) =>
-  STAFF_SLOTS.filter((slot) => idStr(order.kitchen?.staff?.[slot]?.userId) === String(userId));
+/** The stations of the order held by this staff record (or, on older orders, this User id). */
+export const staffSlotsOf = (order, staffKey) =>
+  STAFF_SLOTS.filter((slot) => personKey(order.kitchen?.staff?.[slot]) === String(staffKey));
 
 /** Does this person hold a station of the order (pizza chef, baker or packer)? */
-export const holdsStation = (order, userId) => staffSlotsOf(order, userId).length > 0;
+export const holdsStation = (order, staffKey) => staffSlotsOf(order, staffKey).length > 0;
 
-/** Does this person hold the packaging station of the order? Only they (or the manager) check quality and mark it ready. */
-export const holdsPackaging = (order, userId) => staffSlotsOf(order, userId).includes('packaging_staff');
+/** Does this person hold the packaging station of the order? */
+export const holdsPackaging = (order, staffKey) => staffSlotsOf(order, staffKey).includes('packaging_staff');
 
 /**
- * The store manager, or a person holding a station of this order. Used for priority, pause and delay.
- * `kitchen.supervisor` on older orders is information only and never a permission.
+ * Kitchen staff have no login: the store manager does every kitchen action, on behalf of the person holding the station
+ * (the order still records who held it). Used for priority, pause and delay. `kitchen.supervisor` on older orders is
+ * information only and never a permission.
  */
 export const mustManagerOrStation = (user, order, what) => {
   if (normalizeRole(user?.role) === 'STORE_MANAGER') return;
-  if (normalizeRole(user?.role) === 'KITCHEN_STAFF' && holdsStation(order, user.userId)) return;
-  throw new ForbiddenError(`Only the store manager or the staff working on this order can ${what}.`);
+  throw new ForbiddenError(`Only the store manager can ${what}.`);
 };
 
-/** The store manager, or the person holding the packaging station of this order: quality check and mark ready. */
+/** Quality check and mark ready: the store manager (for the packaging station of the order). */
 export const mustManagerOrPacker = (user, order) => {
   if (normalizeRole(user?.role) === 'STORE_MANAGER') return;
-  if (normalizeRole(user?.role) === 'KITCHEN_STAFF' && holdsPackaging(order, user.userId)) return;
-  throw new ForbiddenError('Only the store manager or the staff member at the packaging station of this order can do this.');
+  throw new ForbiddenError('Only the store manager can do this.');
 };
 
 export const findOrder = async (orderId, storeId) => {
@@ -412,22 +392,19 @@ export const findOrder = async (orderId, storeId) => {
   return order;
 };
 
-const findStaffMember = async (userId, storeId, expectRole) => {
-  if (!mongoose.Types.ObjectId.isValid(userId)) throw new ValidationError('Invalid staff member');
-  const member = await StoreManager.findOne({ userId: toObjectId(userId), storeId: String(storeId), status: 'Active' }).lean();
+/**
+ * An active, present kitchen staff member of this store, by staff record id (the User id of a pre-change record is also
+ * accepted). Never the manager or a left-over supervisor record. Attendance is mandatory: only people the store manager
+ * has marked present (clocked in) can be given work.
+ */
+export const findKitchenStaff = async (staffId, storeId) => {
+  if (!mongoose.Types.ObjectId.isValid(staffId)) throw new ValidationError('Invalid staff member');
+  const member = await findKitchenStaffRecord(storeId, staffId, { status: 'Active' });
   if (!member) throw new ValidationError('Staff member not found in this store, or is not active');
-  const codes = await systemRoleCodes([member.userId]);
-  const uiRole = resolveUiRole(codes.get(String(member.userId)), member.role);
-  if (expectRole && uiRole !== expectRole) throw new ValidationError(`Selected person is not a ${expectRole.replace(/_/g, ' ')}`);
-  await requirePresent(storeId, member); // attendance is mandatory: only people who have clocked in can be given work
+  const uiRole = uiRoleOf(member.role);
+  if (uiRole === 'kitchen_supervisor' || uiRole === 'store_manager') throw new ValidationError('Choose a kitchen staff member');
+  await requirePresent(storeId, member);
   return { member, uiRole };
-};
-
-/** An active, clocked-in kitchen staff member of this store (never a manager or a left-over supervisor record). */
-export const findKitchenStaff = async (userId, storeId) => {
-  const found = await findStaffMember(userId, storeId);
-  if (found.uiRole === 'kitchen_supervisor' || found.uiRole === 'store_manager') throw new ValidationError('Choose a kitchen staff member');
-  return found;
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -452,6 +429,7 @@ export async function listStoreOrders(user, query = {}) {
   const view = VIEW_STATUSES[query.view] ? query.view : 'active';
 
   if (view === 'incoming' && role !== 'STORE_MANAGER') return [];
+  // (kitchen staff have no login any more: the store manager sees every order of the store)
 
   const filter = { storeId: toObjectId(storeId), orderStatus: { $in: VIEW_STATUSES[view] } };
 
@@ -461,13 +439,6 @@ export async function listStoreOrders(user, query = {}) {
       { 'payment.method': { $in: ['cash', 'wallet'] } },
       { 'payment.status': { $in: ['paid', 'authorized'] } },
     ];
-  }
-
-  if (role === 'KITCHEN_STAFF') {
-    const me = toObjectId(user.userId);
-    filter.$and = [...(filter.$and || []), {
-      $or: STAFF_SLOTS.map((slot) => ({ [`kitchen.staff.${slot}.userId`]: me })),
-    }];
   }
 
   // order type: collected at the store or delivered; method: the exact order method
@@ -487,7 +458,7 @@ export async function listStoreOrders(user, query = {}) {
   if (query.assignedStaff && query.assignedStaff !== 'All' && mongoose.Types.ObjectId.isValid(query.assignedStaff)) {
     const who = toObjectId(query.assignedStaff);
     filter.$and = [...(filter.$and || []), {
-      $or: STAFF_SLOTS.map((slot) => ({ [`kitchen.staff.${slot}.userId`]: who })),
+      $or: STAFF_SLOTS.flatMap((slot) => [{ [`kitchen.staff.${slot}.staffId`]: who }, { [`kitchen.staff.${slot}.userId`]: who }]),
     }];
   }
   if (String(query.delayedOnly) === 'true') filter['kitchen.expectedReadyAt'] = { $lt: new Date() };
@@ -511,9 +482,6 @@ export async function listStoreOrders(user, query = {}) {
 export async function getStoreOrder(user, orderId) {
   const storeId = requireStore(user);
   const order = await findOrder(orderId, storeId);
-  // Kitchen roles open only the orders they are on, the same rule as the lists.
-  const role = normalizeRole(user.role);
-  if (role === 'KITCHEN_STAFF' && staffSlotsOf(order, user.userId).length === 0) throw new NotFoundError('Order not found');
   const [enriched] = await enrichOpsOrders(user, [toOpsOrder(order)], [order.toObject ? order.toObject() : order]);
   return enriched;
 }
@@ -521,11 +489,7 @@ export async function getStoreOrder(user, orderId) {
 // Kitchen team of the caller's store, with how many live orders each person holds.
 export async function listTeam(user, { role, q } = {}) {
   const storeId = requireStore(user);
-  const members = await StoreManager.find({
-    storeId,
-    status: 'Active',
-    userId: { $ne: null },
-  }).lean();
+  const members = await kitchenStaffOf(storeId, { status: 'Active' });
 
   const live = await FoodOrder.find({
     storeId: toObjectId(storeId),
@@ -535,28 +499,29 @@ export async function listTeam(user, { role, q } = {}) {
   const load = new Map();
   const bump = (id) => id && load.set(String(id), (load.get(String(id)) || 0) + 1);
   live.forEach((o) => {
-    STAFF_SLOTS.forEach((slot) => bump(o.kitchen?.staff?.[slot]?.userId));
+    STAFF_SLOTS.forEach((slot) => bump(personKey(o.kitchen?.staff?.[slot])));
   });
+  // an older order names the person by their User id: count it for their record too
+  const loadOf = (m) => (load.get(String(m._id)) || 0) + (m.userId ? load.get(String(m.userId)) || 0 : 0);
 
-  const codes = await systemRoleCodes(members.map((m) => m.userId));
   const onDuty = await onDutyStaffIds(toObjectId(storeId), members.map((m) => m._id));
   const wanted = String(role || '').toLowerCase();
   const needle = String(q || '').trim().toLowerCase();
   return members
     .map((m) => ({
-      _id: String(m.userId),
+      _id: String(m._id),   // the staff record: what the pickers send back as staffId
       employeeId: m.employeeCode,
       name: m.name,
-      role: resolveUiRole(codes.get(String(m.userId)), m.role),
+      role: uiRoleOf(m.role),
       title: m.role,
       status: 'active',
-      currentActiveOrders: load.get(String(m.userId)) || 0,
+      currentActiveOrders: loadOf(m),
       // The chef / baker / packer pickers show load against capacity
-      currentWorkload: load.get(String(m.userId)) || 0,
+      currentWorkload: loadOf(m),
       maxWorkload: MAX_WORKLOAD,
       present: onDuty.has(String(m._id)),
       attendance: onDuty.has(String(m._id)) ? 'present' : 'absent',
-      availability: !onDuty.has(String(m._id)) ? 'absent' : (load.get(String(m.userId)) || 0) >= MAX_WORKLOAD ? 'busy' : 'available',
+      availability: !onDuty.has(String(m._id)) ? 'absent' : loadOf(m) >= MAX_WORKLOAD ? 'busy' : 'available',
       avatar: m.profileImage && !m.profileImage.startsWith('data:') ? m.profileImage : '',
     }))
     // the store manager, and left-over kitchen supervisor records, are not kitchen staff to pick
@@ -568,7 +533,8 @@ export async function listTeam(user, { role, q } = {}) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Workflow: manager accepts -> manager assigns staff to stations -> staff prepare -> packer checks and marks ready
+// Workflow: manager accepts -> manager assigns staff to stations -> the manager moves each station's work along for the
+// person on it -> the manager checks quality and marks it ready (kitchen staff have no login)
 // ---------------------------------------------------------------------------------------------
 
 export const logStep = (order, user, note) => {
@@ -669,30 +635,28 @@ export async function assignStaff(user, orderId, payload = {}) {
     throw new ValidationError('Staff can only be assigned to orders in the kitchen');
   }
 
-  // Active in this store and clocked in (findStaffMember -> requirePresent), and a kitchen staff member
+  // An active kitchen staff record of this store, clocked in by the manager (findKitchenStaff -> requirePresent)
   const { member, uiRole } = await findKitchenStaff(payload.staffId, storeId);
   const slot = STAFF_SLOTS.includes(payload.role) ? payload.role : uiRole;
 
   order.kitchen.staff = order.kitchen.staff || {};
-  order.kitchen.staff[slot] = { userId: member.userId, name: member.name, assignedAt: new Date() };
+  order.kitchen.staff[slot] = slotOf(member);
   order.markModified('kitchen');
   logStep(order, user, `${member.name} assigned as ${slot.replace(/_/g, ' ')}`);
   await order.save();
 
-  // Someone else's unstarted task for this station is withdrawn when the station changes hands
-  await KitchenTask.deleteMany({ orderId: order._id, kind: 'staff', slot, status: 'pending', assignedTo: { $ne: member.userId } });
-  if (!(await KitchenTask.exists({ orderId: order._id, assignedTo: member.userId }))) {
-    const task = await KitchenTask.create({
+  // Someone else's unstarted task for this station is withdrawn when the station changes hands. (Kitchen staff have no
+  // login, so nobody is notified: the task is on the store manager's Kitchen Tasks board.)
+  await KitchenTask.deleteMany({ orderId: order._id, kind: 'staff', slot, status: 'pending', staffId: { $ne: member._id } });
+  if (!(await KitchenTask.exists({ orderId: order._id, kind: 'staff', slot, staffId: member._id }))) {
+    await KitchenTask.create({
       orderId: order._id,
       storeId: toObjectId(storeId),
-      assignedTo: member.userId,
+      staffId: member._id,
+      assignedTo: member.userId || null,
       assignedBy: toObjectId(user.userId),
       kind: 'staff',
       slot,
-    });
-    await notifyUsers({
-      userIds: [member.userId], storeId, taskId: task._id, type: 'task_assigned',
-      title: 'New Task Assigned', message: `Order ${order.order_id || order._id} was assigned to your station.`,
     });
   }
   return toOpsOrder(await reload(order._id, storeId));
@@ -709,10 +673,8 @@ export async function updateKitchenStage(user, orderId, payload = {}) {
     throw new ValidationError('This order is not in the kitchen');
   }
 
-  const allowed = role === 'STORE_MANAGER' || (role === 'KITCHEN_STAFF' && holdsStation(order, user.userId));
-  if (!allowed) throw new ForbiddenError('This order is not assigned to you.');
-  // Ready closes the kitchen: the quality check and hand-off belong to the packer of this order (or the manager)
-  if (stage === 'ready') mustManagerOrPacker(user, order);
+  // The store manager moves the kitchen along (kitchen staff have no login)
+  if (role !== 'STORE_MANAGER') throw new ForbiddenError('Only the store manager can do this.');
 
   const current = order.kitchen?.stage || 'pending';
   if (STAGE_ORDER.indexOf(stage) <= STAGE_ORDER.indexOf(current)) {

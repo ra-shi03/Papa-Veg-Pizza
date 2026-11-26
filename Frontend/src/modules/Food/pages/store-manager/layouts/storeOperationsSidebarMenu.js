@@ -9,7 +9,7 @@ export const storeOperationsSidebarMenu = [
   {
     type: "section",
     label: "Orders",
-    allowedRoles: ["store_manager", "kitchen_staff"],
+    allowedRoles: ["store_manager"],
     items: [
       {
         type: "link",
@@ -30,14 +30,14 @@ export const storeOperationsSidebarMenu = [
         label: "Ready Orders",
         path: "/store-operations/orders/ready",
         icon: "CheckCircle2",
-        allowedRoles: ["store_manager", "kitchen_staff"]
+        allowedRoles: ["store_manager"]
       },
       {
         type: "link",
         label: "Completed Orders",
         path: "/store-operations/orders/completed",
         icon: "CheckCircle",
-        allowedRoles: ["store_manager", "kitchen_staff"]
+        allowedRoles: ["store_manager"]
       },
       {
         type: "link",
@@ -58,48 +58,56 @@ export const storeOperationsSidebarMenu = [
   {
     type: "section",
     label: "Kitchen Operations",
-    allowedRoles: ["store_manager", "kitchen_staff"],
+    allowedRoles: ["store_manager"],
     items: [
       {
         type: "link",
         label: "Kitchen Queue",
         path: "/store-operations/kitchen/queue",
         icon: "ListOrdered",
-        allowedRoles: ["store_manager", "kitchen_staff"]
+        allowedRoles: ["store_manager"]
       },
       {
         type: "link",
         label: "Preparation Board",
         path: "/store-operations/kitchen/preparation",
         icon: "KanbanSquare",
-        allowedRoles: ["store_manager", "kitchen_staff"]
+        allowedRoles: ["store_manager"]
       },
       {
         type: "link",
         label: "Pizza Station",
         path: "/store-operations/kitchen/pizza-station",
         icon: "Pizza",
-        allowedRoles: ["store_manager", "kitchen_staff"]
+        allowedRoles: ["store_manager"]
       },
       {
         type: "link",
         label: "Baking Station",
         path: "/store-operations/kitchen/baking-station",
         icon: "CookingPot",
-        allowedRoles: ["store_manager", "kitchen_staff"]
+        allowedRoles: ["store_manager"]
       },
       {
         type: "link",
         label: "Packaging Station",
         path: "/store-operations/kitchen/packaging-station",
         icon: "Package",
-        allowedRoles: ["store_manager", "kitchen_staff"]
+        allowedRoles: ["store_manager"]
       },
       {
         type: "link",
         label: "Delayed Orders",
         path: "/store-operations/kitchen/delayed-orders",
         icon: "Hourglass",
+        allowedRoles: ["store_manager"]
+      },
+      {
+        // every station task of the store: kitchen staff have no login, the manager runs their tasks
+        type: "link",
+        label: "Kitchen Tasks",
+        path: "/store-operations/tasks",
+        icon: "ListTodo",
         allowedRoles: ["store_manager"]
       }
     ]
@@ -149,7 +157,7 @@ export const storeOperationsSidebarMenu = [
   {
     type: "section",
     label: "Inventory",
-    allowedRoles: ["store_manager", "kitchen_staff"],
+    allowedRoles: ["store_manager"],
     items: [
       {
         type: "link",
@@ -163,14 +171,14 @@ export const storeOperationsSidebarMenu = [
         label: "Stock Requests",
         path: "/store-operations/inventory/requests",
         icon: "FileText",
-        allowedRoles: ["store_manager", "kitchen_staff"]
+        allowedRoles: ["store_manager"]
       },
       {
         type: "link",
         label: "Waste Management",
         path: "/store-operations/inventory/waste",
         icon: "Trash2",
-        allowedRoles: ["store_manager", "kitchen_staff"]
+        allowedRoles: ["store_manager"]
       },
       {
         type: "link",
@@ -273,18 +281,19 @@ export const storeOperationsSidebarMenu = [
     allowedRoles: ["store_manager"]
   },
   {
-    type: "link",
-    label: "My Salary",
-    path: "/store-operations/my-salary",
-    icon: "Wallet",
-    allowedRoles: ["kitchen_staff"]
-  },
-  {
-    type: "link",
-    label: "Attendance",
-    path: "/store-operations/attendance",
-    icon: "CalendarCheck",
-    allowedRoles: ["kitchen_staff"]
+    type: "section",
+    label: "Integrations",
+    allowedRoles: ["store_manager"],
+    items: [
+      {
+        // this store's own Pet Pooja POS (each store has its own Pet Pooja account)
+        type: "link",
+        label: "Pet Pooja",
+        path: "/store-operations/integrations/petpooja",
+        icon: "Plug",
+        allowedRoles: ["store_manager"]
+      }
+    ]
   },
   {
     type: "link",
@@ -295,16 +304,9 @@ export const storeOperationsSidebarMenu = [
   },
   {
     type: "link",
-    label: "My Tasks",
-    path: "/store-operations/tasks",
-    icon: "ListTodo",
-    allowedRoles: ["kitchen_staff"]
-  },
-  {
-    type: "link",
     label: "Profile",
     path: "/store-operations/profile",
     icon: "User",
-    allowedRoles: ["store_manager", "kitchen_staff"]
+    allowedRoles: ["store_manager"]
   }
 ];

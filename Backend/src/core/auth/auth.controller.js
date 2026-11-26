@@ -80,7 +80,8 @@ export const franchiseAdminLoginController = async (req, res, next) => {
 export const storeLoginController = async (req, res, next) => {
   try {
     const payload = validateAdminLoginDto(req.body);
-    const result = await adminLogin(payload, ["store-manager", "kitchen-staff"]);
+    // kitchen staff no longer sign in (adminLogin tells them why)
+    const result = await adminLogin(payload, ["store-manager"]);
     return sendResponse(res, 200, "Store Login successful", result);
   } catch (error) {
     next(error);

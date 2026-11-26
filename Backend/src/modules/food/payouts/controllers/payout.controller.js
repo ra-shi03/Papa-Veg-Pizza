@@ -20,11 +20,8 @@ export const storeStaff = handle('Staff salaries', async (req) => ({ staff: awai
 export const storeRequest = handle('Payout requested from the franchise', async (req) => ({ payout: await svc.requestStorePayout(req.user, body('request', req.body)) }), 201);
 export const storeAccount = handle('Payout account saved', async (req) => ({ account: await svc.saveStoreAccount(req.user, body('account', req.body)) }));
 export const recordSalary = handle('Salary recorded as paid', async (req) => ({ payout: await svc.recordStaffSalary(req.user, body('salary', req.body)) }), 201);
-
-// Kitchen staff
-export const myDesk = handle('My salary', (req) => svc.mySalary(req.user));
-export const myAccount = handle('Payout account saved', async (req) => ({ account: await svc.saveMyStaffAccount(req.user, body('account', req.body)) }));
-export const myRequest = handle('Salary requested', async (req) => ({ payout: await svc.requestMySalary(req.user, body('staffRequest', req.body)) }), 201);
+// the store manager keeps a kitchen staff member's payout details (kitchen staff have no login)
+export const staffAccount = handle('Payout account saved', async (req) => ({ account: await svc.saveStaffAccount(req.user, req.params.staffId, body('account', req.body)) }));
 
 // Franchise admin
 export const franchiseDesk = handle('Payouts', (req) => svc.franchisePayoutDesk(req.user, req.query));

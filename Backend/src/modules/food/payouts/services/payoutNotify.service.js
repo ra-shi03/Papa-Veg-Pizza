@@ -33,7 +33,8 @@ async function payerTargets(p) {
 
 async function payeeTargets(p) {
   if (p.payeeType === 'rider') return { targets: [{ ownerType: 'DELIVERY_PARTNER', ownerId: String(p.payeeId) }], link: LINKS.rider, rider: true };
-  if (p.payeeType === 'staff') return { targets: p.staffUserId ? [{ ownerType: 'KITCHEN_STAFF', ownerId: String(p.staffUserId) }] : [], link: LINKS.staff };
+  // kitchen staff have no login (docs/kitchen-staff-removal.md): nobody to push a salary notice to
+  if (p.payeeType === 'staff') return { targets: [], link: LINKS.staff };
   if (p.payeeType === 'store') return { targets: users(await storeManagerUserIds(String(p.payeeId)), 'STORE_MANAGER'), link: LINKS.store };
   return { targets: users(await franchiseAdminUserIds(String(p.payeeId)), 'FRANCHISE_ADMIN'), link: LINKS.franchise };
 }

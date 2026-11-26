@@ -36,16 +36,21 @@ const normalizeAdminRole = (role) => {
 };
 
 // The kitchen supervisor role was removed from the order flow: those accounts are deactivated (never deleted, see
-// scripts/deactivate-supervisors.js) and cannot sign in or refresh a token.
+// scripts/deactivate-supervisors.js) and cannot sign in or refresh a token. Kitchen staff lost their logins too
+// (2026-11-26, docs/kitchen-staff-removal.md): the store manager runs them from the store panel, their old accounts are
+// switched off by scripts/convert-kitchen-staff.js, and they are told why when they try to sign in.
 const ADMIN_PANEL_ROLES = new Set([
   'superadmin',
   'franchise-admin',
-  'store-manager',
-  'kitchen-staff'
+  'store-manager'
 ]);
 const RETIRED_ROLE = 'kitchen-supervisor';
+const RETIRED_STAFF_ROLE = 'kitchen-staff';
 export const SUPERVISOR_RETIRED_MESSAGE =
   'The kitchen supervisor role is no longer used, so this account has been deactivated. Ask your store manager to add you as kitchen staff.';
+export const KITCHEN_STAFF_RETIRED_MESSAGE =
+  'Kitchen staff no longer sign in. Your store manager runs the kitchen, your attendance and your salary from the store panel.';
+const retiredMessageOf = (role) => (role === RETIRED_ROLE ? SUPERVISOR_RETIRED_MESSAGE : role === RETIRED_STAFF_ROLE ? KITCHEN_STAFF_RETIRED_MESSAGE : null);
 
 const toSafeImageUrl = (value) => {
   if (!value) return "";
@@ -316,9 +321,9 @@ export const adminLogin = async ({ email, mobile, password } = {}, allowedRoles 
 
   // Account state checks. A former kitchen supervisor (deactivated by the migration) is told why, but only once the
   // password is right, so the message does not reveal which emails belong to such accounts.
-  const retiredSupervisor = normalizeAdminRole(user.primaryRole?.code) === RETIRED_ROLE;
+  const retiredMessage = retiredMessageOf(normalizeAdminRole(user.primaryRole?.code));
   if (user.isDeleted === true)                      throw new AuthError("Account not found");
-  if (!retiredSupervisor && (user.isActive === false || user.isBlocked === true)) throw new AuthError("Your account is inactive. Please contact support.");
+  if (!retiredMessage && (user.isActive === false || user.isBlocked === true)) throw new AuthError("Your account is inactive. Please contact support.");
   if (user.isLocked && user.isLocked())             throw new AuthError("Too many failed attempts. Account locked for 30 minutes.");
 
   const isMatch = await user.comparePassword(password);
@@ -331,7 +336,7 @@ export const adminLogin = async ({ email, mobile, password } = {}, allowedRoles 
   // Reset failed attempts on successful login
   await user.resetFailedLogin();
 
-  if (retiredSupervisor) throw new AuthError(SUPERVISOR_RETIRED_MESSAGE);
+  if (retiredMessage) throw new AuthError(retiredMessage);
 
   if (!user.primaryRole) {
     throw new AuthError("This account has no roles assigned. Contact Super Admin.");
@@ -1079,8 +1084,9 @@ export const refreshAccessToken = async (token) => {
     if (!u || u.isActive === false || u.isBlocked === true || u.isDeleted === true) {
       await revoke("Account is deactivated. Please contact support.");
     }
-    if (tokenKind === RETIRED_ROLE || normalizeAdminRole(u?.primaryRole?.code) === RETIRED_ROLE) {
-      await revoke(SUPERVISOR_RETIRED_MESSAGE);
+    const retired = retiredMessageOf(tokenKind) || retiredMessageOf(normalizeAdminRole(u?.primaryRole?.code));
+    if (retired) {
+      await revoke(retired);
     }
     if (ADMIN_PANEL_ROLES.has(tokenKind)) {
       const adminRole = adminRoleOf(u);

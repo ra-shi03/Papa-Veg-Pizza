@@ -6,7 +6,7 @@ import * as c from '../controllers/storeProfile.controller.js';
 
 // /v1/profile/* : the store manager and kitchen staff reading and editing their OWN profile.
 export const storeProfileRouter = express.Router();
-storeProfileRouter.use(authMiddleware, requireRoles('STORE_MANAGER', 'KITCHEN_STAFF'));
+storeProfileRouter.use(authMiddleware, requireRoles('STORE_MANAGER'));
 
 storeProfileRouter.get('/', c.getProfile);
 storeProfileRouter.put('/personal', c.updatePersonal);

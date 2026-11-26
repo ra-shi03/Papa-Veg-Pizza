@@ -1,171 +1,84 @@
 import { FoodUser } from '../../../../core/users/user.model.js';
 import { Profile } from '../../../../core/users/models/profile.model.js';
-import { Role } from '../../../../core/roles/models/role.model.js';
 import { UserRole } from '../../../../core/roles/models/userRole.model.js';
+import { FoodRefreshToken as RefreshToken } from '../../../../core/refreshTokens/refreshToken.model.js';
 import { StoreManager } from '../../franchise/models/storeManager.model.js';
-import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
-import { assertPasswordStrength } from '../../../../utils/password.js';
 import { escapeRegex } from '../../../../utils/helpers.js';
+import { kitchenStaffFilter, KITCHEN_STAFF_KIND } from '../services/kitchenStaffDirectory.js';
 
-// Role code → DB role mapping for kitchen staff. The kitchen supervisor role is no longer used: asking for it is a 400.
+// Kitchen staff are staff records the store manager runs from the store panel: no email needed, no password, no login
+// (client decision 2026-11-26, docs/kitchen-staff-removal.md). The franchise admin still approves a new record before the
+// manager can put the person on a station. The kitchen supervisor role is no longer used: asking for it is a 400.
 const SUPERVISOR_REFUSED = 'The kitchen supervisor role is no longer used. Add the person as kitchen staff (Pizza Maker, Baker or Packager).';
 const isSupervisorTitle = (title) => /supervisor/i.test(String(title || ''));
-const ALLOWED_STAFF_ROLES = {
-  'Kitchen Staff': 'KITCHEN_STAFF',
-  'Pizza Maker': 'KITCHEN_STAFF',
-  'Baker': 'KITCHEN_STAFF',
-  'Packager': 'KITCHEN_STAFF',
-};
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_RE = /^[0-9+\-\s]{7,15}$/;
 
 /**
  * The staff a store manager may look at and change: the kitchen staff of the manager's own store (and the
- * deactivated records of former kitchen supervisors, which are kept, never deleted), never the manager themselves and never another manager of the store (their records sit in the same store).
- * Without this a manager could suspend or hard-delete themselves, a peer manager, or the account the franchise
- * admin created for the store.
+ * deactivated records of former kitchen supervisors, which are kept, never deleted), never the manager themselves and
+ * never another manager of the store (their records sit in the same store).
  */
-const KITCHEN_ROLE_CODES = ['KITCHEN_SUPERVISOR', 'KITCHEN_STAFF'];
 async function manageableStaff(req, extra = {}) {
-  const roles = await Role.find({ code: { $in: KITCHEN_ROLE_CODES } }).select('_id').lean();
-  const links = await UserRole.find({ storeId: req.user.storeId, roleId: { $in: roles.map((r) => r._id) } }).select('userId').lean();
-  const ids = links.map((l) => l.userId).filter((id) => String(id) !== String(req.user.userId));
-  return { storeId: req.user.storeId, userId: { $in: ids }, ...extra };
+  const kitchen = await kitchenStaffFilter([req.user.storeId], { retired: true });
+  return { $and: [kitchen, { storeId: String(req.user.storeId), userId: { $ne: req.user.userId ? new mongoose.Types.ObjectId(String(req.user.userId)) : null } }, extra] };
 }
 
 /**
  * POST /v1/food/store/staff
- * Create a new kitchen staff member.
- * Saves in: users + profiles + userRoles + storemanagers
+ * Adds a kitchen staff member: one staff record, no login (any email / password sent by an older screen is not used to
+ * make an account). Waits as 'Pending Approval' until the franchise admin approves it.
  * Caller must be a logged-in store manager (role: STORE_MANAGER).
  */
 export const createKitchenStaff = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
     const {
-      fullName, email, phone, password, role: staffRole,
+      fullName, email, phone, role: staffRole,
       employeeId, joiningDate, salaryType, salary, experience,
       emergencyContact, address, skills, weeklyWorkingDays,
-      shiftType, startTime, endTime, status, profileImage,
+      shiftType, startTime, endTime, profileImage,
     } = req.body;
 
     const callerStoreId = req.user?.storeId;
-    const callerFranchiseId = req.user?.franchiseId;
     const callerUserId = req.user?.userId;
 
-    if (!fullName || !email || !phone || !password) {
-      await session.abortTransaction();
-      return res.status(400).json({ success: false, message: 'Full name, email, phone, and password are required.' });
+    const name = String(fullName || '').trim();
+    const mobile = String(phone || '').trim();
+    const mail = String(email || '').trim().toLowerCase();
+    if (!name || !mobile) {
+      return res.status(400).json({ success: false, message: 'Full name and phone are required.' });
     }
+    if (!PHONE_RE.test(mobile)) return res.status(400).json({ success: false, message: 'Enter a valid phone number.' });
+    if (mail && !EMAIL_RE.test(mail)) return res.status(400).json({ success: false, message: 'Enter a valid email address, or leave it empty.' });
     if (isSupervisorTitle(staffRole)) {
-      await session.abortTransaction();
       return res.status(400).json({ success: false, message: SUPERVISOR_REFUSED });
     }
-
-    try {
-      assertPasswordStrength(password);
-    } catch (passwordError) {
-      await session.abortTransaction();
-      return res.status(400).json({ success: false, message: passwordError.message });
-    }
-
     if (!callerStoreId) {
-      await session.abortTransaction();
       return res.status(403).json({ success: false, message: 'You are not assigned to a store.' });
     }
 
-    const roleCode = ALLOWED_STAFF_ROLES[staffRole] || 'KITCHEN_STAFF';
-
-    // Check duplicate email in users collection
-    const existingUser = await FoodUser.findOne({ email: email.toLowerCase().trim() }).session(session);
-    if (existingUser) {
-      await session.abortTransaction();
-      return res.status(409).json({ success: false, message: 'A user with this email already exists.' });
+    // the same phone twice in one store is almost always the same person added again
+    if (await StoreManager.exists({ storeId: String(callerStoreId), phone: mobile, status: { $nin: ['DELETED', 'Rejected'] } })) {
+      return res.status(409).json({ success: false, message: 'A staff member with this phone number already exists in your store.' });
     }
 
-    // Check duplicate mobile
-    const existingMobile = await FoodUser.findOne({ mobile: phone.trim() }).session(session);
-    if (existingMobile) {
-      await session.abortTransaction();
-      return res.status(409).json({ success: false, message: 'A user with this phone number already exists.' });
-    }
+    const callerManager = callerUserId ? await StoreManager.findOne({ userId: callerUserId }).select('name').lean() : null;
+    const employeeCode = String(employeeId || '').trim() || `PVK-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 90 + 10)}`;
 
-    // Ensure role exists in the roles collection
-    let roleDoc = await Role.findOne({ code: roleCode }).session(session);
-    if (!roleDoc) {
-      roleDoc = await Role.create([{
-        code: roleCode,
-        name: staffRole || roleCode,
-        description: `Kitchen staff role: ${staffRole}`,
-        isSystemRole: true,
-      }], { session });
-      roleDoc = roleDoc[0];
-    }
-
-    // Hash password since the model no longer auto-hashes
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    // Step 1: Create User record
-    const [newUser] = await FoodUser.create([{
-      email: email.toLowerCase().trim(),
-      mobile: phone.trim(),
-      password: hashedPassword,
-      loginType: 'PASSWORD',
-      primaryRole: roleDoc._id,
-      emailVerified: true,
-      mobileVerified: true,
-      // The franchise admin approves new staff first; until then the account cannot sign in
-      isActive: false,
-    }], { session });
-
-    // Step 2: Create Profile record
-    const nameParts = fullName.trim().split(' ');
-    const firstName = nameParts[0];
-    const lastName = nameParts.slice(1).join(' ') || '';
-    await Profile.create([{
-      userId: newUser._id,
-      firstName,
-      lastName,
-      phone: phone.trim(),
-      addressLine1: address || '',
-    }], { session });
-
-    // Step 3: Create UserRole mapping (RBAC — links user to store)
-    await UserRole.create([{
-      userId: newUser._id,
-      roleId: roleDoc._id,
-      storeId: callerStoreId,
-      franchiseId: callerFranchiseId || null,
-      assignedBy: callerUserId || null,
-      isPrimary: true,
-      status: 'ACTIVE',
-    }], { session });
-    
-    // Resolve reporting manager name
-    let reportingManagerName = null;
-    if (callerUserId) {
-        const callerManager = await StoreManager.findOne({ userId: callerUserId }).session(session).lean();
-        if (callerManager) {
-            reportingManagerName = callerManager.name;
-        }
-    }
-
-    // Step 4: Create StoreManager/Staff operational record
-    const employeeCode = employeeId || `PVK-${Date.now().toString().slice(-6)}`;
-
-    const [newStoreManager] = await StoreManager.create([{
-      userId: newUser._id,
-      name: fullName.trim(),
-      email: email.toLowerCase().trim(),
-      phone: phone.trim(),
-      role: staffRole,
+    const record = await StoreManager.create({
+      staffKind: KITCHEN_STAFF_KIND,
+      userId: null,
+      name,
+      ...(mail ? { email: mail } : {}),
+      phone: mobile,
+      role: String(staffRole || 'Kitchen Staff').trim(),
       employeeCode,
-      storeId: callerStoreId,
+      storeId: String(callerStoreId),
       joinedDate: joiningDate ? new Date(joiningDate) : new Date(),
       status: 'Pending Approval',
       profileImage: profileImage || '',
-      reportingManager: reportingManagerName,
+      reportingManager: callerManager?.name || null,
       personalDetails: {
         address: address || '',
         emergencyContact: emergencyContact || '',
@@ -175,30 +88,24 @@ export const createKitchenStaff = async (req, res) => {
         shiftType: shiftType || 'Morning',
         startTime: startTime || '',
         endTime: endTime || '',
-        skills: skills || [],
-        weeklyWorkingDays: weeklyWorkingDays || [],
+        skills: Array.isArray(skills) ? skills : [],
+        weeklyWorkingDays: Array.isArray(weeklyWorkingDays) ? weeklyWorkingDays : [],
       },
-    }], { session });
-
-    await session.commitTransaction();
-    session.endSession();
+    });
 
     return res.status(201).json({
       success: true,
-      message: `${staffRole || 'Kitchen staff'} added. They can sign in once the franchise admin approves.`,
-      data: newStoreManager,
+      message: `${record.role} added. You can put them on stations once the franchise admin approves.`,
+      data: record,
     });
   } catch (err) {
-    await session.abortTransaction();
-    session.endSession();
-
     if (err.code === 11000) {
       const field = Object.keys(err.keyPattern || {})[0] || 'field';
-      return res.status(409).json({ success: false, message: `Duplicate value: ${field} already exists.` });
+      return res.status(409).json({ success: false, message: field === 'email' ? 'A staff member with this email already exists.' : `Duplicate value: ${field} already exists.` });
     }
-
+    if (err.name === 'ValidationError') return res.status(400).json({ success: false, message: Object.values(err.errors || {})[0]?.message || err.message });
     console.error('[createKitchenStaff]', err);
-    return res.status(500).json({ success: false, message: err.message || 'Failed to create staff member.' });
+    return res.status(500).json({ success: false, message: 'Failed to add the staff member.' });
   }
 };
 
@@ -216,7 +123,6 @@ export const getKitchenStaff = async (req, res) => {
     const { search, status } = req.query;
     // Kitchen staff of this store only: not the manager, not other managers
     const query = await manageableStaff(req, { status: { $ne: 'DELETED' } });
-    console.log("getKitchenStaff Query:", query);
 
     if (status && status !== 'All') query.status = status;
     if (search) {
@@ -284,11 +190,6 @@ export const getKitchenStaffById = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Staff member not found.' });
     }
 
-    // Attach user email/mobile from users collection
-    if (staff.userId) {
-      const user = await FoodUser.findById(staff.userId).select('email mobile').lean();
-      if (user) { staff.userEmail = user.email; staff.userMobile = user.mobile; }
-    }
 
     // Attach store and franchise names
     try {
@@ -333,7 +234,7 @@ export const updateKitchenStaff = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Staff member not found.' });
     }
 
-    const { fullName, phone, role, joiningDate, salaryType, salary, experience, skills, emergencyContact, address, shiftType, status, profileImage } = req.body;
+    const { fullName, email, phone, role, joiningDate, salaryType, salary, experience, skills, emergencyContact, address, shiftType, status, profileImage } = req.body;
 
     if (isSupervisorTitle(role)) return res.status(400).json({ success: false, message: SUPERVISOR_REFUSED });
     // A former kitchen supervisor stays deactivated: the record is kept for history but never switched back on
@@ -343,6 +244,12 @@ export const updateKitchenStaff = async (req, res) => {
 
     if (fullName) staff.name = fullName.trim();
     if (phone) staff.phone = phone.trim();
+    // email is optional for kitchen staff (no login); an empty value removes it
+    if (email !== undefined) {
+      const mail = String(email || '').trim().toLowerCase();
+      if (mail && !EMAIL_RE.test(mail)) return res.status(400).json({ success: false, message: 'Enter a valid email address, or leave it empty.' });
+      staff.email = mail || undefined;
+    }
     if (role) staff.role = role.trim();
     if (joiningDate) staff.joinedDate = new Date(joiningDate);
     // Approval is the franchise admin's call: nobody waiting for it (or turned down) can be activated from here
@@ -361,36 +268,13 @@ export const updateKitchenStaff = async (req, res) => {
       };
     }
 
-    await staff.save();
-
-    // Sync name/phone to profile and role to UserRole if userId exists
-    if (staff.userId) {
-      const nameParts = (fullName || staff.name).split(' ');
-      await Profile.findOneAndUpdate(
-        { userId: staff.userId },
-        { $set: { firstName: nameParts[0], lastName: nameParts.slice(1).join(' '), ...(phone && { phone }) } }
-      );
-      
-      if (role) {
-        const ALLOWED_STAFF_ROLES = {
-          'Pizza Maker': 'KITCHEN_STAFF',
-          'Baker': 'KITCHEN_STAFF',
-          'Packager': 'KITCHEN_STAFF',
-        };
-        const roleCode = ALLOWED_STAFF_ROLES[role.trim()] || 'KITCHEN_STAFF';
-        const roleDoc = await Role.findOne({ code: roleCode });
-        
-        if (roleDoc) {
-          await UserRole.findOneAndUpdate(
-            { userId: staff.userId, storeId: callerStoreId },
-            { $set: { roleId: roleDoc._id } }
-          );
-          await FoodUser.findOneAndUpdate(
-            { _id: staff.userId },
-            { $set: { primaryRole: roleDoc._id } }
-          );
-        }
-      }
+    // a record from before the change is marked as kitchen staff on its first edit (its old login stays switched off)
+    if (!staff.staffKind && !isSupervisorTitle(staff.role)) staff.staffKind = KITCHEN_STAFF_KIND;
+    try {
+      await staff.save();
+    } catch (err) {
+      if (err.code === 11000) return res.status(409).json({ success: false, message: 'A staff member with this email already exists.' });
+      throw err;
     }
 
     return res.status(200).json({ success: true, message: 'Staff profile updated.', data: staff });
@@ -435,10 +319,7 @@ export const updateStaffStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Staff member not found.' });
     }
 
-    // Also sync isActive on the user record
-    if (staff.userId) {
-      await FoodUser.findByIdAndUpdate(staff.userId, { $set: { isActive: status === 'Active' } });
-    }
+    // (kitchen staff have no login: a pre-change account stays switched off whatever the status)
 
     return res.status(200).json({ success: true, message: `Staff status updated to "${status}".`, data: staff });
   } catch (err) {
@@ -507,11 +388,12 @@ export const deleteKitchenStaff = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Staff member not found.' });
     }
 
-    // Hard delete the associated user account, profile, and RBAC role
+    // A record from before kitchen staff lost their logins: remove its old (switched off) account too
     if (staff.userId) {
       await FoodUser.findByIdAndDelete(staff.userId);
       await Profile.findOneAndDelete({ userId: staff.userId });
       await UserRole.findOneAndDelete({ userId: staff.userId, storeId: callerStoreId });
+      await RefreshToken.deleteMany({ userId: staff.userId }).catch(() => {});
     }
 
     return res.status(200).json({ success: true, message: 'Staff member hard deleted successfully.' });

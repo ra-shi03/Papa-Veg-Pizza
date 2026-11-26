@@ -14,7 +14,14 @@ const kitchenTaskSchema = new mongoose.Schema(
             required: true,
             index: true
         },
-        // Staff accounts are User documents (the old 'FoodAdmin' ref pointed at a collection nobody writes to)
+        // The staff record the task is for (kitchen staff have no login: the store manager runs their tasks)
+        staffId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'StoreManager',
+            default: null,
+            index: true
+        },
+        // Tasks from before kitchen staff lost their logins: the staff member's User id (kept for history)
         assignedTo: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',

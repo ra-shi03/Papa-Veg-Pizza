@@ -1,4 +1,5 @@
-// Feature 7: /v1/profile/* for the store manager and kitchen staff (the kitchen supervisor role is no longer used). Everything is about the caller's own
+// Feature 7: /v1/profile/* for the store manager (kitchen staff have no login, docs/kitchen-staff-removal.md; the kitchen
+// supervisor role is no longer used). The people here are store managers (a store can have more than one). Everything is about the caller's own
 // account (taken from the token): view, edit a whitelist of fields, change password (and sign the other logins out), photo
 // upload (images only), permissions, performance, attendance, notification settings, activity and sessions.
 import { test, before, after, describe } from 'node:test';
@@ -6,16 +7,32 @@ import assert from 'node:assert/strict';
 import { createFixture, mongoose, PASSWORD } from './helpers/fixture.js';
 
 let fx; let A; let B; let uploadPhoto;
-let sup; let chef; let bChef;   // { id (user id), staffId, email, token }
+let sup; let chef; let bChef;   // extra store managers: { id (user id), staffId, email, phone, token }
 let phoneSeq = 0;
 const objectId = (v) => new mongoose.Types.ObjectId(String(v));
 const NEW_PASSWORD = 'Brand#New-Pass9';
 
-// created by the store manager and approved by the franchise admin (fx.staff); a 'Kitchen Supervisor' is a legacy
-// account (the role is no longer used and cannot be created). Clocking in is left to the tests.
-const makeStaff = (manager, role, tag) => {
-    const k = manager === fx.F.B.managerToken ? 'B' : 'A';
-    return /supervisor/i.test(role) ? fx.legacySupervisor(k, tag) : fx.staff(k, role, tag, { clockIn: false });
+// A store manager of a new store of franchise `k`, created the way the panels do it (a store has one manager); clocking
+// in is left to the tests.
+const makeManager = async (k, tag) => {
+    const f = fx.F[k];
+    const seq = ++phoneSeq;
+    const st = await fx.call('POST', '/v1/stores', f.adminToken, {
+        storeName: `TEST STORE ${tag}`, storeCode: `P${seq}${fx.ts}`, storeType: 'DELIVERY_CARRYOUT', phone: `98888${String(seq).padStart(2, '0')}${String(fx.ts).slice(-3)}`,
+        email: `store-${tag}${fx.ts}@example.invalid`, address: { line1: 'a', city: 'c', state: 's', pincode: '110001', coordinates: [77.2, 28.6] }, status: 'Active',
+    });
+    assert.equal(st.status, 201, JSON.stringify(st.body));
+    const storeId = st.body.data._id;
+    assert.equal((await fx.call('PATCH', `/v1/store-approvals/${storeId}/approve`, fx.SA, {})).status, 200);
+    const email = `${tag}${fx.ts}@example.invalid`;
+    const phone = `53${String(seq).padStart(2, '0')}${String(fx.ts).slice(-6)}`;
+    const mc = await fx.api.post('/api/v1/store-managers').set(fx.bearer(f.adminToken))
+        .field('name', `Name ${tag}`).field('email', email).field('phone', phone)
+        .field('employeeCode', `EP${tag}${fx.ts}`).field('storeId', storeId).field('password', PASSWORD).field('status', 'Active').field('salary', '1000');
+    assert.equal(mc.status, 201, JSON.stringify(mc.body));
+    const lg = await fx.call('POST', '/v1/auth/store/login', null, { email, password: PASSWORD });
+    assert.equal(lg.status, 200, JSON.stringify(lg.body));
+    return { id: String(mc.body.data.userId), staffId: String(mc.body.data._id), storeId, email, phone, name: `Name ${tag}`, token: lg.body.data.accessToken };
 };
 const login = async (email, password = PASSWORD) => {
     const res = await fx.call('POST', '/v1/auth/store/login', null, { email, password });
@@ -30,9 +47,9 @@ before(async () => {
     fx = await createFixture(); A = fx.F.A; B = fx.F.B;
     // after the fixture: importing the service earlier would load the app config before the test database is set
     ({ uploadPhoto } = await import('../src/modules/food/store/services/storeProfile.service.js'));
-    sup = await makeStaff(A.managerToken, 'Packager', 'psup');   // a second kitchen staff member
-    chef = await makeStaff(A.managerToken, 'Pizza Maker', 'pchef');
-    bChef = await makeStaff(B.managerToken, 'Pizza Maker', 'pbchef');
+    sup = await makeManager('A', 'psup');   // managers of two more stores of franchise A, and one of franchise B
+    chef = await makeManager('A', 'pchef');
+    bChef = await makeManager('B', 'pbchef');
 });
 after(async () => { await fx?.teardown(); });
 
@@ -50,11 +67,14 @@ describe('authentication and roles', () => {
             for (const [m, p] of endpoints) assert.equal((await call(m, p, token, {})).status, 403, `${m} ${p}`);
         }
     });
-    test('both store roles are allowed; a (removed) kitchen supervisor is refused (403)', async () => {
+    test('store managers are allowed; an old kitchen staff token and a (removed) kitchen supervisor are refused (403)', async () => {
         for (const token of [A.managerToken, sup.token, chef.token]) assert.equal((await call('GET', '/', token)).status, 200);
         const legacy = await fx.legacySupervisor('A', 'plegacy');
-        assert.equal((await call('GET', '/', legacy.token)).status, 403);
-        assert.equal((await call('GET', '/permissions', legacy.token)).status, 403);
+        const oldStaff = await fx.staff('A', 'Pizza Maker', 'pstaff', { clockIn: false });
+        for (const token of [legacy.token, oldStaff.token]) {
+            assert.equal((await call('GET', '/', token)).status, 403);
+            assert.equal((await call('GET', '/permissions', token)).status, 403);
+        }
     });
 });
 
@@ -74,15 +94,14 @@ describe('view profile', () => {
         assert.deepEqual(d.notifications, { orderAlerts: true, inventoryAlerts: true, shiftAlerts: false, complaintAlerts: true, dailyReports: true, smsAlerts: false, pushNotifications: true });
         assert.equal(JSON.stringify(d).includes('password'), false, 'no password material anywhere');
     });
-    test('kitchen staff see their own', async () => {
+    test('another store manager sees their own', async () => {
         const s = ok(await call('GET', '/', sup.token));
         assert.equal(s.user.fullName, 'Name psup');
-        assert.equal(s.user.role, 'kitchen_staff');
-        assert.equal(s.user.designation, 'Packager');
+        assert.equal(s.user.role, 'store_manager');
+        assert.equal(s.user.designation, 'Store Operations Manager');
         const c = ok(await call('GET', '/', chef.token));
         assert.equal(c.user.fullName, 'Name pchef');
-        assert.equal(c.user.role, 'kitchen_staff');
-        assert.equal(c.user.designation, 'Pizza Maker');
+        assert.equal(c.user.role, 'store_manager');
     });
     test('it is always the caller\'s own: an id in the query changes nothing; another store\'s staff see their own', async () => {
         assert.equal(ok(await call('GET', `/?userId=${chef.id}&storeId=${B.storeId}&staffId=${chef.staffId}`, sup.token)).user.fullName, 'Name psup');
@@ -123,8 +142,8 @@ describe('update own profile (whitelist)', () => {
         assert.equal(String(account.primaryRole), String((await fx.models.User.findOne({ _id: chef.id }).lean()).primaryRole));
         assert.equal((await login(chef.email)).status, 200, 'can still log in as before');
         assert.equal((await fx.models.StoreManager.findById(sup.staffId).lean()).name, 'Name psup', 'another person is untouched');
-        // the role guard still reads the role from the token, which cannot have changed
-        assert.equal((await fx.call('POST', '/v1/store/shifts', chef.token, { shiftName: 'Nope', startTime: '9:00 AM', endTime: '5:00 PM' })).status, 403);
+        // the role still comes from the token and the account, which cannot have changed
+        assert.equal(ok(await call('GET', '/', chef.token)).user.role, 'store_manager');
     });
     test('validation and a phone number that is already someone else\'s (409)', async () => {
         assert.equal((await call('PUT', '/personal', chef.token, { phone: 'abc' })).status, 400);
@@ -195,14 +214,14 @@ describe('profile photo', () => {
     test('the saved photo goes on the caller\'s own record only', async () => {
         const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
         let seen;
-        const out = await uploadPhoto({ userId: chef.id, role: 'KITCHEN_STAFF', storeId: A.storeId }, { buffer: png }, async (buffer, folder) => { seen = { size: buffer.length, folder }; return 'https://img.example.test/chef.png'; });
+        const out = await uploadPhoto({ userId: chef.id, role: 'STORE_MANAGER', storeId: chef.storeId }, { buffer: png }, async (buffer, folder) => { seen = { size: buffer.length, folder }; return 'https://img.example.test/chef.png'; });
         assert.deepEqual(out, { profileImage: 'https://img.example.test/chef.png' });
         assert.deepEqual(seen, { size: png.length, folder: 'food/staff/profile' });
         assert.equal((await fx.models.StoreManager.findById(chef.staffId).lean()).profileImage, 'https://img.example.test/chef.png');
         assert.notEqual((await fx.models.StoreManager.findById(sup.staffId).lean()).profileImage, 'https://img.example.test/chef.png');
         assert.equal(ok(await call('GET', '/', chef.token)).user.profileImage, 'https://img.example.test/chef.png');
-        await assert.rejects(() => uploadPhoto({ userId: chef.id, role: 'KITCHEN_STAFF', storeId: A.storeId }, null), /image is required/);
-        await assert.rejects(() => uploadPhoto({ userId: chef.id, role: 'KITCHEN_STAFF', storeId: B.storeId }, { buffer: png }, async () => 'x'), /not found/i, 'a token for the wrong store finds no record');
+        await assert.rejects(() => uploadPhoto({ userId: chef.id, role: 'STORE_MANAGER', storeId: chef.storeId }, null), /image is required/);
+        await assert.rejects(() => uploadPhoto({ userId: chef.id, role: 'STORE_MANAGER', storeId: B.storeId }, { buffer: png }, async () => 'x'), /not found/i, 'a token for the wrong store finds no record');
     });
 });
 
@@ -216,26 +235,22 @@ describe('permissions', () => {
         }
         assert.equal(m.StaffManagement, true);
         assert.equal(m.DeliveryOperations, true);
-        assert.equal(s.StaffManagement, false);
-        assert.deepEqual(s, c, 'every kitchen staff member has the same permissions');
-        assert.equal(c.IncomingOrders, false);
-        assert.equal(c.Inventory, true, 'kitchen staff read stock and file stock requests and waste (their own)');
-        assert.equal(c.Dashboard, false);
-        assert.equal(c.PizzaStation, true);
+        assert.ok(Object.values(m).every((v) => v === true), 'the store manager runs the whole panel (kitchen staff have no login)');
+        assert.deepEqual(s, m, 'every store manager has the same permissions');
+        assert.deepEqual(c, m);
     });
 });
 
 describe('attendance, performance and activity (own data only)', () => {
     before(async () => {
-        // Worked days are the staff's own clock-ins and clock-outs (the manager cannot write them), so the history is put in
-        // place as clock-ins of earlier days left it; a leave day is what an approved leave request leaves.
+        // The history is put in place as clock-ins of earlier days left it; a leave day is what an approved leave request leaves.
         const { parseClock, atClock } = await import('../src/modules/food/store/services/attendanceTime.js');
         const day = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
         const shift = (await fx.call('POST', '/v1/store/shifts', A.managerToken, { shiftName: 'Profile shift', startTime: '09:00 AM', endTime: '05:00 PM' })).body.data;
         await fx.call('POST', `/v1/store/shifts/${shift._id}/assign`, A.managerToken, { staffIds: [chef.staffId] });
         const seed = (staff, date, { checkIn, checkOut, totalHours = 0, lateMinutes = 0, status = 'present', shiftId = shift._id } = {}) =>
             mongoose.connection.collection('food_store_attendance').insertOne({
-                storeId: objectId(A.storeId), franchiseId: objectId(A.franchiseId), staffId: objectId(staff.staffId), userId: objectId(staff.id),
+                storeId: objectId(staff.storeId), franchiseId: objectId(A.franchiseId), staffId: objectId(staff.staffId), userId: objectId(staff.id),
                 shiftId: status === 'leave' ? null : objectId(shiftId), date,
                 checkInAt: checkIn ? atClock(date, parseClock(checkIn)) : null, checkOutAt: checkOut ? atClock(date, parseClock(checkOut)) : null,
                 totalHours, overtimeHours: 0, status, late: lateMinutes > 0, lateMinutes, source: status === 'leave' ? 'manager' : 'self',
@@ -293,7 +308,7 @@ describe('notification settings', () => {
         assert.deepEqual(ok(await call('GET', '/', chef.token)).notifications, n);
         const rec = await fx.models.StoreManager.findById(chef.staffId).lean();
         assert.equal(rec.status, 'Active');
-        assert.equal(String(rec.storeId), A.storeId);
+        assert.equal(String(rec.storeId), chef.storeId);
     });
     test('other people\'s settings are untouched; wrong types are refused', async () => {
         assert.equal(ok(await call('GET', '/', sup.token)).notifications.orderAlerts, true);

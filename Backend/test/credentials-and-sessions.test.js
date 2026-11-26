@@ -124,18 +124,15 @@ describe('staff accounts can log in (no default password)', () => {
         assert.equal((await fx.call('POST', '/v1/food/admin/staff', fx.SA, { role: 'store-manager', email: 'x3@example.invalid', phone: '4500000003', franchiseId: A.franchiseId })).status, 403);
         assert.equal((await fx.call('POST', '/v1/food/admin/staff', managerToken, { role: 'franchise-admin', email: 'x4@example.invalid', phone: '4500000004', franchiseId: A.franchiseId })).status, 403);
     });
-    test('kitchen staff creation rejects a 7-char password and stores a hash otherwise', async () => {
+    test('kitchen staff get no login: a password sent by an old screen makes no account, before or after approval', async () => {
         const mk = (password, phone, email) => fx.call('POST', '/v1/food/store/staff', A.managerToken, { fullName: 'Kitchen', email, phone, password, role: 'Kitchen Staff' });
-        assert.equal((await mk('short7!', '4600000001', 'k0@example.invalid')).status, 400);
         const ok = await mk(PASSWORD, '4600000002', 'k1@example.invalid');
         assert.equal(ok.status, 201);
-        assert.ok(isHash((await rawUser(ok.body.data.userId)).password));
-        // they sign in once the franchise admin approves them
+        assert.equal(ok.body.data.userId, null);
+        assert.equal(await fx.models.User.countDocuments({ email: 'k1@example.invalid' }), 0);
         assert.equal((await login('/v1/auth/store/login', 'k1@example.invalid', PASSWORD)).status, 401, 'not before approval');
         assert.equal((await fx.call('PATCH', `/v1/staff-approvals/${ok.body.data._id}/approve`, A.adminToken, {})).status, 200);
-        const lg = await login('/v1/auth/store/login', 'k1@example.invalid', PASSWORD);
-        assert.equal(lg.status, 200);
-        assert.equal(decode(lg.body.data.accessToken).storeId, A.storeId);
+        assert.equal((await login('/v1/auth/store/login', 'k1@example.invalid', PASSWORD)).status, 401, 'nor after (kitchen staff have no login)');
     });
 });
 

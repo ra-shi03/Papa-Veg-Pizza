@@ -75,6 +75,7 @@ import http from 'node:http';
 import mongoose from 'mongoose';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 
 /** Complete bank and payment details for a test rider (riders need them to go online and accept orders). */
 export const PAYOUT = { bankAccountHolderName: 'Test Rider', bankAccountNumber: '123456789012', bankIfscCode: 'HDFC0001234', bankName: 'HDFC', upiId: 'rider@upi' };
@@ -185,38 +186,61 @@ async function build(ctx) {
 
     let staffSeq = 0;
     /**
-     * A kitchen staff member of franchise `k`'s store, the way the app makes one: created by the store manager, approved
-     * by the franchise admin (new staff wait in 'Pending Approval' until then), signed in, and clocked in unless
-     * `clockIn: false` (kitchen work is refused before attendance). -> { id (userId), staffId, email, name, token }
+     * A kitchen staff member of franchise `k`'s store, the way the app makes one now (docs/kitchen-staff-removal.md): the
+     * store manager adds a staff record (no email, no password, no login), the franchise admin approves it, and the store
+     * manager clocks the person in unless `clockIn: false` (only people marked present can be given work).
+     * -> { id, staffId (both the staff record id: what the panel sends as staffId), name, phone, token }
+     * `token` is a kitchen staff token like one issued before the change: every route refuses it (403). Tests use it to
+     * prove kitchen staff can no longer act; the work itself is done with the store manager's token.
      */
     const staff = async (k, role = 'Pizza Maker', tag = 'staff', { clockIn = true } = {}) => {
         const f = F[k];
         const seq = ++staffSeq;
-        const email = `${tag}-${seq}-${ts}@example.invalid`;
         const name = `Name ${tag}`;   // tags are unique within a test file
         const phone = `7${String(seq).padStart(3, '0')}${String(ts).slice(-6)}`;
-        const res = await call('POST', '/v1/food/store/staff', f.managerToken, { fullName: name, email, phone, password: PASSWORD, role });
+        const res = await call('POST', '/v1/food/store/staff', f.managerToken, { fullName: name, phone, role });
         if (res.status !== 201) throw new Error(`fixture: create staff ${tag} -> ${res.status} ${JSON.stringify(res.body)}`);
-        const ok = await call('PATCH', `/v1/staff-approvals/${res.body.data._id}/approve`, f.adminToken, {});
+        const staffId = String(res.body.data._id);
+        const ok = await call('PATCH', `/v1/staff-approvals/${staffId}/approve`, f.adminToken, {});
         if (ok.status !== 200) throw new Error(`fixture: approve staff ${tag} -> ${ok.status} ${JSON.stringify(ok.body)}`);
-        const signIn = await call('POST', '/v1/auth/store/login', null, { email, password: PASSWORD });
-        if (signIn.status !== 200) throw new Error(`fixture: staff ${tag} login -> ${signIn.status} ${JSON.stringify(signIn.body)}`);
-        const token = signIn.body.data.accessToken;
         if (clockIn) {
-            const ci = await call('POST', '/v1/store/attendance/clock-in', token);
-            if (ci.status !== 200 && ci.status !== 201) throw new Error(`fixture: staff ${tag} clock-in -> ${ci.status} ${JSON.stringify(ci.body)}`);
+            const ci = await call('POST', `/v1/store/attendance/staff/${staffId}/clock-in`, f.managerToken);
+            if (ci.status !== 201) throw new Error(`fixture: staff ${tag} clock-in -> ${ci.status} ${JSON.stringify(ci.body)}`);
         }
-        return { id: String(res.body.data.userId), staffId: String(res.body.data._id), email, phone, name, token };
+        const token = tokenFor(new mongoose.Types.ObjectId(), 'KITCHEN_STAFF', { storeId: f.storeId, franchiseId: f.franchiseId });
+        return { id: staffId, staffId, name, phone, token };
     };
 
     /**
-     * A kitchen supervisor account as it was before the role was removed (the app can no longer create one): an approved
-     * staff member whose role is switched to KITCHEN_SUPERVISOR in the database. `token` is a signed supervisor token, like
-     * one issued before the change. -> { id, staffId, email, name, token }
+     * A kitchen staff member as they were before kitchen staff lost their logins: a staff record with a User account and a
+     * KITCHEN_STAFF role link (the app can no longer make one), and a signed token like one issued before the change.
+     * -> { id (staff record), staffId, userId, email, name, token }
+     */
+    const legacyStaff = async (k, tag = 'legacystaff', { password = PASSWORD } = {}) => {
+        const f = F[k];
+        const seq = ++staffSeq;
+        const email = `${tag}-${seq}-${ts}@example.invalid`;
+        const user = await User.create({
+            email, mobile: `8${String(seq).padStart(3, '0')}${String(ts).slice(-6)}`, password: await bcrypt.hash(password, 4),
+            loginType: 'PASSWORD', primaryRole: roles.KITCHEN_STAFF._id, isActive: true, emailVerified: true,
+        });
+        await UserRole.create({ userId: user._id, roleId: roles.KITCHEN_STAFF._id, storeId: f.storeId, franchiseId: f.franchiseId, isPrimary: true, status: 'ACTIVE' });
+        const rec = await StoreManager.create({
+            userId: user._id, name: `Name ${tag}`, email, phone: user.mobile, role: 'Pizza Maker', employeeCode: `LEG${seq}${ts}`,
+            storeId: String(f.storeId), status: 'Active',
+        });
+        const staffId = String(rec._id);
+        return { id: staffId, staffId, userId: String(user._id), email, password, name: rec.name, token: tokenFor(user._id, 'KITCHEN_STAFF', { storeId: f.storeId, franchiseId: f.franchiseId }) };
+    };
+
+    /**
+     * A kitchen supervisor account as it was before the role was removed (the app can no longer create one): a pre-change
+     * staff account whose role is switched to KITCHEN_SUPERVISOR. `token` is a signed supervisor token, like one issued
+     * before the change. -> { id, staffId, email, name, token }
      */
     const legacySupervisor = async (k, tag = 'legacysup') => {
-        const s = await staff(k, 'Pizza Maker', tag, { clockIn: false });
-        const userId = new mongoose.Types.ObjectId(s.id);
+        const s = await legacyStaff(k, tag);
+        const userId = new mongoose.Types.ObjectId(s.userId);
         await User.updateOne({ _id: userId }, { $set: { primaryRole: roles.KITCHEN_SUPERVISOR._id } });
         await UserRole.updateMany({ userId }, { $set: { roleId: roles.KITCHEN_SUPERVISOR._id } });
         await StoreManager.updateOne({ _id: new mongoose.Types.ObjectId(s.staffId) }, { $set: { role: 'Kitchen Supervisor' } });
@@ -224,7 +248,7 @@ async function build(ctx) {
     };
 
     return {
-        api, baseUrl: `http://127.0.0.1:${ctx.server.address().port}`, call, bearer, tokenFor, models, ts, F, SA, superUser, roles, staff, legacySupervisor,
+        api, baseUrl: `http://127.0.0.1:${ctx.server.address().port}`, call, bearer, tokenFor, models, ts, F, SA, superUser, roles, staff, legacyStaff, legacySupervisor,
         /** A real delivery partner record (status: approved | suspended | rejected | pending) and a token for it. */
         // with bank and payment details (needed to go online and accept); pass { payout: false } for a rider without them
         partner: async (status = 'approved', { payout = true, ...extra } = {}) => {

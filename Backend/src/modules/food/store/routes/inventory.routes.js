@@ -11,7 +11,7 @@ import * as c from '../controllers/inventory.controller.js';
 const router = express.Router();
 
 router.use(authMiddleware);
-router.use(requireRoles('STORE_MANAGER', 'KITCHEN_STAFF', 'FRANCHISE_ADMIN'));
+router.use(requireRoles('STORE_MANAGER', 'FRANCHISE_ADMIN'));
 router.use(requireOnDuty);   // attendance first, then work (reads stay open)
 
 // Stock levels (static paths first, then /:id)

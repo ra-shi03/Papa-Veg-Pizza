@@ -17,17 +17,8 @@ let both;                             // a customer who ordered at A and at B: {
 let phoneSeq = 0; let orderSeq = 0;
 const orders = {};                    // name -> { id, ref }
 
-const login = async (email) => (await fx.call('POST', '/v1/auth/store/login', null, { email, password: PASSWORD })).body.data.accessToken;
-const makeStaff = async (managerToken, role, tag) => {
-    const email = `${tag}${fx.ts}@example.invalid`;
-    const res = await fx.call('POST', '/v1/food/store/staff', managerToken, { fullName: `Name ${tag}`, email, phone: `7${String(++phoneSeq).padStart(2, '0')}${String(fx.ts).slice(-7)}`, password: PASSWORD, role });
-    assert.equal(res.status, 201, `create ${tag}: ${JSON.stringify(res.body)}`);
-    // New staff sign in only after their franchise admin approves them
-    const adminToken = managerToken === A.managerToken ? A.adminToken : B.adminToken;
-    const ok = await fx.call('PATCH', `/v1/staff-approvals/${res.body.data._id}/approve`, adminToken, {});
-    assert.equal(ok.status, 200, `approve ${tag}: ${JSON.stringify(ok.body)}`);
-    return { id: res.body.data.userId, token: await login(email) };
-};
+// kitchen staff have no login: fx.staff gives a staff record and an old-style kitchen staff token, which is refused (403)
+const makeStaff = (managerToken, role, tag) => fx.staff(managerToken === B.managerToken ? 'B' : 'A', role, tag, { clockIn: false });
 /** An order at store `f` for customer `userId`. */
 async function order(f, userId, { total = 400, status = 'delivered', rating, comment = '', name = 'Test Customer', phone = '9000000000', daysAgo = 1, items } = {}) {
     const ref = `CC${fx.ts}${orderSeq++}`;

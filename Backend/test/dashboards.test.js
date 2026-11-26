@@ -50,7 +50,7 @@ before(async () => {
     cook = await makeStaff('Baker', 'dcook');
     chef = await makeStaff('Pizza Maker', 'dchef');
     const onLeave = await makeStaff('Pizza Maker', 'dleave');
-    await fx.models.StoreManager.updateOne({ userId: new mongoose.Types.ObjectId(onLeave.id) }, { $set: { status: 'On Leave' } });
+    await fx.models.StoreManager.updateOne({ _id: new mongoose.Types.ObjectId(onLeave.staffId) }, { $set: { status: 'On Leave' } });
 
     O.o1 = await seed(A, {
         status: 'delivered', total: 500, rating: 4, at: minsAgo(60),
@@ -202,19 +202,19 @@ describe('store dashboard: numbers', () => {
         const start = formatClock((now.getHours() * 60 + now.getMinutes() - 120 + 1440) % 1440);
         const shift = await fx.call('POST', '/v1/store/shifts', A.managerToken, { shiftName: 'Dash shift', startTime: start, endTime: '11:59 PM', maxStaff: 5 });
         assert.equal(shift.status, 201, JSON.stringify(shift.body));
-        const staffRec = await fx.models.StoreManager.findOne({ userId: new mongoose.Types.ObjectId(chef.id) }).lean();
-        assert.equal((await fx.call('POST', `/v1/store/shifts/${shift.body.data._id}/assign`, A.managerToken, { staffIds: [String(staffRec._id)] })).status, 200);
+        assert.equal((await fx.call('POST', `/v1/store/shifts/${shift.body.data._id}/assign`, A.managerToken, { staffIds: [chef.staffId] })).status, 200);
 
-        assert.equal((await fx.call('POST', '/v1/store/attendance/clock-in', cook.token)).status, 201);
+        // kitchen staff have no login: the manager clocks them in and out
+        assert.equal((await fx.call('POST', `/v1/store/attendance/staff/${cook.staffId}/clock-in`, A.managerToken)).status, 201);
         assert.deepEqual(await sdata(M(), 'staff-duty'), { staffOnDuty: 1 });
-        assert.equal((await fx.call('POST', '/v1/store/attendance/clock-in', chef.token)).status, 201);
+        assert.equal((await fx.call('POST', `/v1/store/attendance/staff/${chef.staffId}/clock-in`, A.managerToken)).status, 201);
         assert.deepEqual(await sdata(M(), 'staff-duty'), { staffOnDuty: 2 });
         assert.deepEqual(await sdata(M(), 'staff-overview'), { present: 2, late: 1, absent: 1 });
 
-        assert.equal((await fx.call('POST', '/v1/store/attendance/clock-out', chef.token)).status, 200);   // finished: worked today, no longer on duty
+        assert.equal((await fx.call('POST', `/v1/store/attendance/staff/${chef.staffId}/clock-out`, A.managerToken)).status, 200);   // finished: worked today, no longer on duty
         assert.deepEqual(await sdata(M(), 'staff-duty'), { staffOnDuty: 1 });
         assert.deepEqual(await sdata(M(), 'staff-overview'), { present: 2, late: 1, absent: 1 });
-        // staff-duty is the manager's: kitchen staff are refused
+        // staff-duty is the manager's: an old kitchen staff token is refused
         assert.equal((await sget(cook.token, 'staff-duty')).status, 403);
         // store B has nobody clocked in
         assert.deepEqual(await sdata(B.managerToken, 'staff-duty'), { staffOnDuty: 0 });

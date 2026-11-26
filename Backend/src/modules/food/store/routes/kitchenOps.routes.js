@@ -10,7 +10,7 @@ import * as c from '../controllers/kitchenOps.controller.js';
 const router = express.Router();
 
 router.use(authMiddleware);
-router.use(requireRoles('STORE_MANAGER', 'KITCHEN_STAFF'));
+router.use(requireRoles('STORE_MANAGER'));   // kitchen staff have no login: the store manager works the stations
 router.use(requireOnDuty);   // kitchen roles: attendance first, then work (reads stay open)
 
 // Kitchen queue

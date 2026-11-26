@@ -18,10 +18,12 @@ import {
 import { NotFoundError, ValidationError } from '../../../../core/auth/errors.js';
 
 // Stock requests, waste, shortages and recipes. Same rules as inventory.service.js: the store comes from the token,
-// the manager changes things, kitchen staff report and read, a franchise admin only reads one of its stores.
+// the manager changes things and files the kitchen's reports (kitchen staff have no login), a franchise admin only reads
+// one of its stores.
 
 const URGENCIES = ['low', 'medium', 'high', 'critical'];
-const mine = (ctx, field) => (ctx.role === 'staff' ? { [field]: toId(ctx.user.userId) } : {});
+// (kitchen staff used to see only their own reports; every caller now sees the whole store)
+const mine = () => ({});
 
 const managersOf = async (ctx) => (await StoreManager.find({ storeId: String(ctx.storeId), status: 'Active', role: /manager/i, userId: { $ne: null } }).select('userId').lean()).map((m) => m.userId);
 const tellManagers = async (ctx, { title, message, taskId = null }) => {
@@ -490,8 +492,6 @@ async function affectedOrdersOf(ctx, ingredientIds) {
   const recipes = await Recipe.find({ storeId: ctx.storeId, 'ingredients.ingredientId': { $in: ingredientIds } }).select('nameKey ingredients.ingredientId').lean();
   if (!recipes.length) return new Map();
   const filter = { storeId: ctx.storeId, orderStatus: { $in: ['confirmed', 'preparing'] } };
-  // Kitchen roles see only the orders they are on.
-  if (ctx.role === 'staff') filter.$or = ['pizza_chef', 'baking_chef', 'packaging_staff'].map((slot) => ({ [`kitchen.staff.${slot}.userId`]: toId(ctx.user.userId) }));
   const orders = await FoodOrder.find(filter)
     .select('order_id customerName items orderStatus kitchen.expectedReadyAt').lean();
   const out = new Map(ingredientIds.map((id) => [String(id), []]));

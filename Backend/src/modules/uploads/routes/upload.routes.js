@@ -10,11 +10,11 @@ const router = express.Router();
 // and delivery partners (pickup proof). Anonymous requests are rejected.
 router.use(
     authMiddleware,
-    requireRoles('ADMIN', 'STORE-MANAGER', 'KITCHEN-STAFF', 'USER', 'DELIVERY_PARTNER')
+    requireRoles('ADMIN', 'STORE-MANAGER', 'USER', 'DELIVERY_PARTNER')
 );
 
 const normalizeRole = (role) => String(role || '').trim().replace(/_/g, '-').toUpperCase();
-const STORE_ROLES = new Set(['STORE-MANAGER', 'KITCHEN-STAFF']);
+const STORE_ROLES = new Set(['STORE-MANAGER']);   // (kitchen staff no longer sign in)
 const SUFFIX = { image: '', pdf: '/files', video: '/videos' };
 
 // Folders the admin panels and the rider app ask for today. Only these are honoured, and only for the

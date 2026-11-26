@@ -1,7 +1,5 @@
 import mongoose from 'mongoose';
-import { FoodUser } from '../../../../core/users/user.model.js';
-import { Role } from '../../../../core/roles/models/role.model.js';
-import { UserRole } from '../../../../core/roles/models/userRole.model.js';
+import { kitchenStaffFilter } from '../../store/services/kitchenStaffDirectory.js';
 import { StoreManager } from '../models/storeManager.model.js';
 import { FoodStore } from '../../store/models/store.model.js';
 import { StoreAttendance } from '../../store/models/attendance.model.js';
@@ -11,27 +9,19 @@ import { sendError, sendResponse } from '../../../../utils/response.js';
 
 // Kitchen staff added by a store manager wait here for the franchise admin (or the super admin).
 // The scope comes from the token: a franchise admin only ever sees and decides on the staff of its own franchise's stores.
+// Kitchen staff are staff records with no login (docs/kitchen-staff-removal.md): approving one lets the store manager put
+// the person on stations; it never switches an account on. The kitchen supervisor role is no longer used: never approved.
 
-const KITCHEN_ROLE_CODES = ['KITCHEN_STAFF'];   // the kitchen supervisor role is no longer used: never approved
 const isId = (v) => mongoose.Types.ObjectId.isValid(String(v || ''));
-
-async function kitchenUserIds(storeIds) {
-    const roles = await Role.find({ code: { $in: KITCHEN_ROLE_CODES } }).select('_id').lean();
-    const filter = { roleId: { $in: roles.map((r) => r._id) } };
-    if (storeIds) filter.storeId = { $in: storeIds };
-    const links = await UserRole.find(filter).select('userId').lean();
-    return links.map((l) => l.userId);
-}
 
 // A staff record inside the caller's scope, or null (reported as 404 so another franchise's staff is not revealed)
 async function findScopedStaff(req, id) {
     if (!isId(id)) return null;
     const storeIds = await scopedStoreIds(req);
-    const staff = await StoreManager.findById(id);
-    if (!staff || !staff.userId) return null;
+    const staff = await StoreManager.findOne({ $and: [{ _id: new mongoose.Types.ObjectId(String(id)) }, await kitchenStaffFilter(storeIds)] });
+    if (!staff) return null;
     if (storeIds && !storeIds.some((s) => String(s) === String(staff.storeId))) return null;
-    const kitchen = await kitchenUserIds(storeIds);
-    return kitchen.some((u) => String(u) === String(staff.userId)) ? staff : null;
+    return staff;
 }
 
 const escapeRx = (v) => String(v).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -73,8 +63,8 @@ async function storeNamesOf(rows) {
 // the caller's kitchen people, narrowed by ?storeId= (inside the scope) and ?search=
 async function baseFilter(req) {
     const storeIds = await scopedStoreIds(req);
-    const userIds = await kitchenUserIds(storeIds);
-    const filter = { userId: { $in: userIds } };
+    const kitchen = await kitchenStaffFilter(storeIds);
+    const filter = {};
     let allowed = storeIds ? storeIds.map(String) : null;
     const wanted = req.query.storeId && req.query.storeId !== 'All' ? String(req.query.storeId) : null;
     if (wanted) allowed = allowed ? allowed.filter((id) => id === wanted) : [wanted];
@@ -84,8 +74,9 @@ async function baseFilter(req) {
         const rx = { $regex: escapeRx(search), $options: 'i' };
         filter.$or = [{ name: rx }, { email: rx }, { phone: rx }, { employeeCode: rx }];
     }
-    return filter;
+    return { $and: [kitchen, filter] };
 }
+const and = (base, ...more) => ({ $and: [base, ...more] });
 
 const DECISION_FILTER = {
     'Pending Approval': { status: 'Pending Approval' },
@@ -100,11 +91,11 @@ export const listStaffApprovals = async (req, res, next) => {
         const base = await baseFilter(req);
         const status = String(req.query.status || 'Pending Approval');
         const filter = status === 'All'
-            ? { ...base, $and: [{ $or: [{ status: { $in: ['Pending Approval', 'Rejected'] } }, { 'approval.decidedAt': { $ne: null } }] }, { status: { $ne: 'DELETED' } }] }
-            : { ...base, ...(DECISION_FILTER[status] || DECISION_FILTER['Pending Approval']) };
+            ? and(base, { $or: [{ status: { $in: ['Pending Approval', 'Rejected'] } }, { 'approval.decidedAt': { $ne: null } }] }, { status: { $ne: 'DELETED' } })
+            : and(base, DECISION_FILTER[status] || DECISION_FILTER['Pending Approval']);
         const rows = await StoreManager.find(filter).sort({ createdAt: -1 }).limit(300).lean();
         const names = await storeNamesOf(rows);
-        const count = (extra) => StoreManager.countDocuments({ ...base, ...extra });
+        const count = (extra) => StoreManager.countDocuments(and(base, extra));
         const [pending, approved, rejected] = await Promise.all([count(DECISION_FILTER['Pending Approval']), count(DECISION_FILTER.Approved), count(DECISION_FILTER.Rejected)]);
         return sendResponse(res, 200, 'Staff approvals', { staff: rows.map((r) => rowOf(r, names)), counts: { pending, approved, rejected } });
     } catch (err) {
@@ -116,14 +107,14 @@ export const listStaffApprovals = async (req, res, next) => {
 export const listKitchenStaff = async (req, res, next) => {
     try {
         const base = await baseFilter(req);
-        const filter = { ...base, status: { $nin: ['Pending Approval', 'Rejected', 'DELETED'] } };
-        if (req.query.status && req.query.status !== 'All') filter.status = String(req.query.status);
-        if (req.query.role && req.query.role !== 'All') filter.role = String(req.query.role);
-        const rows = await StoreManager.find(filter).sort({ createdAt: -1 }).limit(500).lean();
+        const extra = { status: { $nin: ['Pending Approval', 'Rejected', 'DELETED'] } };
+        if (req.query.status && req.query.status !== 'All') extra.status = String(req.query.status);
+        if (req.query.role && req.query.role !== 'All') extra.role = String(req.query.role);
+        const rows = await StoreManager.find(and(base, extra)).sort({ createdAt: -1 }).limit(500).lean();
         const names = await storeNamesOf(rows);
         const today = await StoreAttendance.find({ date: dateKeyOf(), staffId: { $in: rows.map((r) => r._id) } }).select('staffId status checkInAt checkOutAt').lean();
         const todayBy = new Map(today.map((a) => [String(a.staffId), a]));
-        const all = await StoreManager.find({ ...base, status: { $nin: ['Pending Approval', 'Rejected', 'DELETED'] } }).select('status').lean();
+        const all = await StoreManager.find(and(base, { status: { $nin: ['Pending Approval', 'Rejected', 'DELETED'] } })).select('status').lean();
         return sendResponse(res, 200, 'Kitchen staff', {
             staff: rows.map((r) => {
                 const a = todayBy.get(String(r._id));
@@ -157,8 +148,7 @@ async function decide(req, res, next, approve) {
             rejectionReason: approve ? '' : reason,
         };
         await staff.save();
-        // The account can sign in only once approved
-        await FoodUser.findByIdAndUpdate(staff.userId, { $set: { isActive: approve } });
+        // (no account to switch on: kitchen staff have no login; the store manager can now put them on stations)
         return sendResponse(res, 200, approve ? 'Staff member approved' : 'Staff request rejected', { id: String(staff._id), status: staff.status });
     } catch (err) {
         return next(err);

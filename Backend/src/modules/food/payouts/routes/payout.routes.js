@@ -22,17 +22,21 @@ storePayoutsRouter.get('/staff', c.storeStaff);
 storePayoutsRouter.post('/request', c.storeRequest);
 storePayoutsRouter.put('/account', c.storeAccount);
 storePayoutsRouter.post('/salaries', c.recordSalary);
+storePayoutsRouter.put('/staff/:staffId/account', c.staffAccount);   // kitchen staff have no login: the manager keeps their bank / UPI details
 storePayoutsRouter.post('/:id/pay', c.pay);
 storePayoutsRouter.post('/:id/reject', c.reject);
 storePayoutsRouter.post('/:id/not-received', c.notReceived);
 
-/** /v1/food/store/my-salary : kitchen staff. */
+/**
+ * /v1/food/store/my-salary : retired (410). Kitchen staff have no login since 2026-11-26 (docs/kitchen-staff-removal.md):
+ * the store manager records their salary and keeps their payout details (/v1/food/store/payouts).
+ */
 export const mySalaryRouter = express.Router();
-mySalaryRouter.use(authMiddleware, requireRoles('KITCHEN_STAFF'));
-mySalaryRouter.get('/', c.myDesk);
-mySalaryRouter.put('/account', c.myAccount);
-mySalaryRouter.post('/request', c.myRequest);
-mySalaryRouter.post('/:id/not-received', c.notReceived);
+mySalaryRouter.use((req, res) => res.status(410).json({
+  success: false,
+  error: 'Kitchen staff no longer sign in. The store manager records salaries and payout details.',
+  message: 'Kitchen staff no longer sign in. The store manager records salaries and payout details.',
+}));
 
 /** /v1/food/franchise/payouts : franchise admin (the service refuses the super admin here). */
 export const franchisePayoutsRouter = express.Router();

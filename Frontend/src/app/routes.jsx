@@ -119,7 +119,7 @@ export function AppRoutes() {
         
         {/* Unified Store Operations Panel (Role-Based) */}
         <Route path="/store-operations/*" element={
-          <ProtectedRoute module="admin" requiredRole={["store-manager", "kitchen-staff"]} loginPath="/store-operation/login">
+          <ProtectedRoute module="admin" requiredRole={["store-manager"]} loginPath="/store-operation/login">
             <Suspense fallback={<PageLoader />}>
               <StoreManagerRouter />
             </Suspense>

@@ -103,12 +103,14 @@ describe('delivery issue photo', () => {
 });
 
 describe('push for store notices', () => {
-    test('notifyUsers sends a push to the person\'s saved devices (and keeps the in-app record)', async () => {
+    test('notifyUsers sends a push to the store manager\'s saved devices (and keeps the in-app record)', async () => {
         const { notifyUsers } = await import('../src/modules/food/store/services/kitchenTasks.service.js');
         const fb = await import('../src/core/notifications/firebase.service.js');
-        ok(await fx.call('POST', '/v1/fcm-tokens/save', baker.token, { token: 'baker-device-token-01' }));
-        assert.deepEqual(await fb.listOwnerTokens({ ownerType: 'KITCHEN_STAFF', ownerId: baker.id }), ['baker-device-token-01']);
-        await notifyUsers({ userIds: [baker.id], storeId: A.storeId, type: 'task_assigned', title: 'New Task Assigned', message: 'Pizza station' });
-        assert.equal(await mongoose.connection.collection('food_task_notifications').countDocuments({ userId: oid(baker.id), title: 'New Task Assigned' }), 1);
+        ok(await fx.call('POST', '/v1/fcm-tokens/save', A.managerToken, { token: 'manager-device-token-01' }));
+        assert.deepEqual(await fb.listOwnerTokens({ ownerType: 'STORE_MANAGER', ownerId: A.managerUserId }), ['manager-device-token-01']);
+        await notifyUsers({ userIds: [A.managerUserId], storeId: A.storeId, type: 'task_delayed', title: 'Task Delayed', message: 'Pizza station' });
+        assert.equal(await mongoose.connection.collection('food_task_notifications').countDocuments({ userId: oid(A.managerUserId), title: 'Task Delayed' }), 1);
+        // kitchen staff have no login: an old kitchen staff token cannot save a device
+        assert.equal((await fx.call('POST', '/v1/fcm-tokens/save', baker.token, { token: 'baker-device-token-01' })).status, 403);
     });
 });

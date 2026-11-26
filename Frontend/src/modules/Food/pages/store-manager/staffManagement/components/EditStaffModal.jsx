@@ -37,7 +37,8 @@ const skillsOptions = [
 
 const staffSchema = z.object({
   fullName: z.string().min(1, "Full name is required"),
-  email: z.string().email("Invalid email address"),
+  // optional: kitchen staff have no login
+  email: z.union([z.literal(""), z.string().email("Invalid email address")]).optional(),
   phone: z.string().regex(/^(?:\+91)?(?:[6-9]\d{9})$/, "Invalid Indian phone number. Enter 10 digits."),
   role: z.enum(["Pizza Maker", "Baker", "Packager"], {
     errorMap: () => ({ message: "Please select a valid role" })
@@ -71,7 +72,7 @@ export default function EditStaffModal({ isOpen, onClose, staffId }) {
   useEffect(() => {
     if (staff && isOpen) {
       setValue("fullName", staff.name || staff.fullName);
-      setValue("email", staff.email);
+      setValue("email", staff.email || "");
       setValue("phone", staff.phone);
       setValue("role", staff.role || "Pizza Maker");
       setValue("experience", staff.personalDetails?.experience ?? staff.experience ?? 0);
@@ -243,7 +244,7 @@ export default function EditStaffModal({ isOpen, onClose, staffId }) {
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
                     <Mail size={12} className="text-slate-400" />
-                    Email Address <span className="text-red-500">*</span>
+                    Email Address <span className="text-zinc-400 font-semibold">(optional)</span>
                   </label>
                   <input
                     type="email"

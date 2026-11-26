@@ -33,7 +33,7 @@ export default function DeactivateStaffDialog({ isOpen, onClose, staffId }) {
             Deactivate Kitchen Staff
           </DialogTitle>
           <p className="text-xs text-zinc-400 dark:text-zinc-550 font-semibold mt-0.5">
-            Temporarily disable staff member login and operations.
+            Temporarily take this staff member off the roster (they cannot be put on stations or clocked in).
           </p>
         </DialogHeader>
 
@@ -42,7 +42,7 @@ export default function DeactivateStaffDialog({ isOpen, onClose, staffId }) {
             Are you sure you want to deactivate <strong className="text-slate-900 dark:text-white">{staff?.fullName}</strong>?
           </p>
           <p className="text-[11px] text-zinc-400 dark:text-zinc-500 font-semibold">
-            Deactivating this user will suspend their daily roster operations, prevent them from logging in, and mark their status as inactive. You can reactivate their profile at any time.
+            Deactivating this user will suspend their daily roster operations and mark their status as inactive. You can reactivate their profile at any time.
           </p>
         </div>
 

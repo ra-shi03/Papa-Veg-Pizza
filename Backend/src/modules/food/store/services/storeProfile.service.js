@@ -16,12 +16,12 @@ import { conflict } from './attendanceAccess.js';
 import { clockOf, dateKeyOf } from './attendanceTime.js';
 import { hoursByStore, windowOn, closureCovers, to12 } from '../../franchise/services/storeHours.js';
 
-// The profile screens of the store manager and kitchen staff (/v1/profile/*). Every call is about the
-// caller's own account: the user id and store come from the token, never from the request.
+// The profile screens of the store manager (/v1/profile/*). Every call is about the caller's own account: the user id and
+// store come from the token, never from the request. (Kitchen staff have no login, so no profile: docs/kitchen-staff-removal.md.)
 
 const normalize = (role) => String(role || '').trim().replace(/-/g, '_').toUpperCase();
-const ROLE_KEY = { STORE_MANAGER: 'store_manager', KITCHEN_STAFF: 'kitchen_staff' };
-const DESIGNATION = { STORE_MANAGER: 'Store Operations Manager', KITCHEN_STAFF: 'Kitchen Staff' };
+const ROLE_KEY = { STORE_MANAGER: 'store_manager' };
+const DESIGNATION = { STORE_MANAGER: 'Store Operations Manager' };
 const PREF_DEFAULTS = { orderAlerts: true, inventoryAlerts: true, shiftAlerts: false, complaintAlerts: true, dailyReports: true, smsAlerts: false, pushNotifications: true };
 
 /** The caller's own staff record (a StoreManager document) in their own store. */
@@ -40,7 +40,7 @@ function userDto(role, staff, store, lastLoginAt) {
     const p = staff.personalDetails || {};
     return {
         fullName: staff.name, email: staff.email, phone: staff.phone, gender: p.gender || '', dateOfBirth: p.dateOfBirth || '', address: p.address || '',
-        employeeId: staff.employeeCode, designation: role === 'KITCHEN_STAFF' ? staff.role || DESIGNATION[role] : DESIGNATION[role], role: ROLE_KEY[role],
+        employeeId: staff.employeeCode, designation: DESIGNATION[role], role: ROLE_KEY[role],
         storeName: store?.storeName || staff.storeName || '', joiningDate: iso(staff.joinedDate), status: staff.status, lastLogin: iso(lastLoginAt),
         profileImage: staff.profileImage && !/placeholder/.test(staff.profileImage) ? staff.profileImage : '', reportingManager: staff.reportingManager || '',
         emergencyContact: { name: p.emergencyContactName || '', phone: p.emergencyContact || '', relation: p.emergencyContactRelation || '' },
@@ -255,12 +255,10 @@ export async function updateNotifications(user, body) {
 export async function permissions(user) {
     const role = normalize(user?.role);
     if (!ROLE_KEY[role]) throw new ForbiddenError('This is for the store team.');
-    const manager = role === 'STORE_MANAGER'; const staff = role === 'KITCHEN_STAFF';
-    // Same rules as the sidebar and the server: kitchen staff have no dashboard, incoming or active order lists; they do
-    // work the stations and file stock requests and waste reports (their own).
+    // Same rules as the sidebar and the server: the store manager runs the whole store panel (kitchen staff have no login)
     return {
-        Dashboard: !staff, IncomingOrders: !staff, ActiveOrders: !staff, KitchenQueue: true, PizzaStation: true, BakingStation: true, PackagingStation: true,
-        DeliveryOperations: manager, Inventory: true, StockRequests: true, WasteManagement: true, StaffManagement: manager, Reports: manager,
+        Dashboard: true, IncomingOrders: true, ActiveOrders: true, KitchenQueue: true, PizzaStation: true, BakingStation: true, PackagingStation: true,
+        DeliveryOperations: true, Inventory: true, StockRequests: true, WasteManagement: true, StaffManagement: true, Reports: true,
     };
 }
 

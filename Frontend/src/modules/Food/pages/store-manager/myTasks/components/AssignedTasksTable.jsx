@@ -134,7 +134,7 @@ export default function AssignedTasksTable({ tasks = [], onStartTask = () => {},
               <th className="py-3 px-3 whitespace-nowrap">Station</th>
               <th className="py-3 px-3 whitespace-nowrap">Priority</th>
               <th className="py-3 px-3 whitespace-nowrap">Est. Duration</th>
-              <th className="py-3 px-3 whitespace-nowrap">Assigned By</th>
+              <th className="py-3 px-3 whitespace-nowrap">Assigned To</th>
               <th className="py-3 px-3 whitespace-nowrap">Assigned At</th>
               <th className="py-3 px-4 text-right whitespace-nowrap">Action</th>
             </tr>
@@ -173,7 +173,7 @@ export default function AssignedTasksTable({ tasks = [], onStartTask = () => {},
                   {task.estimatedMinutes} mins
                 </td>
                 <td className="py-3 px-3 text-slate-500 dark:text-zinc-450 font-medium min-w-[110px]">
-                  {task.assignedBy}
+                  {task.assignedTo || "-"}
                 </td>
                 <td className="py-3 px-3 whitespace-nowrap text-slate-500 dark:text-zinc-450 font-mono font-semibold">
                   {formatTime(task.createdAt)}
@@ -232,7 +232,7 @@ export default function AssignedTasksTable({ tasks = [], onStartTask = () => {},
               </div>
               <div className="flex items-center gap-1 col-span-2">
                 <User size={10} className="text-slate-450" />
-                <span>Assigned By: <strong className="text-slate-750 dark:text-zinc-350">{task.assignedBy}</strong></span>
+                <span>Assigned To: <strong className="text-slate-750 dark:text-zinc-350">{task.assignedTo || "-"}</strong></span>
               </div>
             </div>
 

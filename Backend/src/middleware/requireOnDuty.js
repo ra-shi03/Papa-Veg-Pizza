@@ -3,14 +3,15 @@ import { StoreManager } from '../modules/food/franchise/models/storeManager.mode
 import { dateKeyOf } from '../modules/food/store/services/attendanceTime.js';
 import { isId, toId } from '../modules/food/dashboard/services/dashboardAccess.js';
 
-// Everyone who works in the store: kitchen staff and the store manager. (The franchise admin and super admin are not gated.)
-const GATED_ROLES = new Set(['KITCHEN_STAFF', 'STORE_MANAGER']);
+// The store manager, the only store role that signs in (kitchen staff have no login since 2026-11-26; the store manager
+// clocks them in). The franchise admin and super admin are not gated.
+const GATED_ROLES = new Set(['STORE_MANAGER']);
 const ON_DUTY = ['present', 'half_day'];
 const OPEN_SESSION_HOURS = 20;
 
 /**
- * Kitchen staff AND the store manager must have marked attendance (clocked in, or been marked present on their behalf by the
- * franchise admin) and not yet clocked out before they do any work in the store. Reads (GET) stay open so a person can still
+ * The store manager must have marked attendance (clocked in, or been marked present on their behalf by the franchise admin)
+ * and not yet clocked out before they do any work in the store. Reads (GET) stay open so a person can still
  * see their screens and the clock-in button before they start. A manager who cannot clock in asks the franchise admin to
  * mark them present.
  */

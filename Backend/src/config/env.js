@@ -79,6 +79,12 @@ export const config = {
     // BullMQ
     bullmqEnabled: process.env.BULLMQ_ENABLED === 'true',
 
+    // Pet Pooja POS (each store saves its own restaurant ID and keys in the store panel). The API address comes from
+    // Pet Pooja with the integration documents; while it is unset nothing is sent. PUBLIC_API_URL is this server's
+    // public address, used to build each store's status callback link (falls back to the request's host).
+    petpoojaApiBaseUrl: process.env.PETPOOJA_API_BASE_URL || '',
+    publicApiUrl: process.env.PUBLIC_API_URL || '',
+
     // Cloudinary
     cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME,
     cloudinaryApiKey: process.env.CLOUDINARY_API_KEY,
