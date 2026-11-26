@@ -87,6 +87,9 @@ export default defineConfig(({ mode }) => ({
       '/api/v1': {
         target: loadEnv(mode, __dirname).VITE_BACKEND_PROXY_TARGET || 'http://localhost:5005',
         changeOrigin: true,
+        // Not a route of this app, but something outside it keeps polling it. Answer 404 here so it is
+        // never proxied (and never logs ECONNREFUSED while the backend is starting or stopped).
+        bypass: (req) => (req.url.startsWith('/api/v1/public/live') ? false : undefined),
       },
     },
   },
