@@ -92,36 +92,8 @@ export default function SearchConfig() {
           await handleAutoSyncFromAddons(false);
         }
 
-        if (Array.isArray(cfg.newLaunches) && cfg.newLaunches.length > 0) {
-          setNewLaunches([...cfg.newLaunches].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
-        } else {
-          setNewLaunches([
-            {
-              _id: 'launch-1',
-              title: 'Paneer Maxxx',
-              image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80',
-              searchQuery: 'paneer',
-              sortOrder: 1,
-              isActive: true
-            },
-            {
-              _id: 'launch-2',
-              title: 'Four Cheese Sourdough Pizza',
-              image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800&auto=format&fit=crop&q=80',
-              searchQuery: 'cheese',
-              sortOrder: 2,
-              isActive: true
-            },
-            {
-              _id: 'launch-3',
-              title: 'Big Pizza Bonanza',
-              image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&auto=format&fit=crop&q=80',
-              searchQuery: 'pizza',
-              sortOrder: 3,
-              isActive: true
-            }
-          ]);
-        }
+        // an empty list stays empty (nothing invented); the super admin adds the posters
+        setNewLaunches(Array.isArray(cfg.newLaunches) ? [...cfg.newLaunches].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)) : []);
         setToggles({
           isPopularEnabled: cfg.isPopularEnabled !== false,
           isSearchByEnabled: cfg.isSearchByEnabled !== false,
@@ -133,41 +105,8 @@ export default function SearchConfig() {
       if (data?.availableAddonTypes) setAvailableAddonTypes(data.availableAddonTypes);
       if (data?.availableAddons) setAvailableAddons(data.availableAddons);
     } catch (err) {
-      console.warn('Failed to load search config from API, loading defaults', err);
-      // Fallback defaults
-      setPopularSearches([
-        { _id: '1', text: 'Maxxx', sortOrder: 1, isActive: true, searchQuery: 'Maxxx' },
-        { _id: '2', text: 'more paneer', sortOrder: 2, isActive: true, searchQuery: 'paneer' },
-        { _id: '3', text: 'more chicken', sortOrder: 3, isActive: true, searchQuery: 'chicken' },
-        { _id: '4', text: 'Big Big Pizza', sortOrder: 4, isActive: true, searchQuery: 'Big Big Pizza' },
-        { _id: '5', text: 'Ultimate Pizza Feast', sortOrder: 5, isActive: true, searchQuery: 'Feast' }
-      ]);
-      setNewLaunches([
-        {
-          _id: 'launch-1',
-          title: 'Paneer Maxxx',
-          image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80',
-          searchQuery: 'paneer',
-          sortOrder: 1,
-          isActive: true
-        },
-        {
-          _id: 'launch-2',
-          title: 'Four Cheese Sourdough Pizza',
-          image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800&auto=format&fit=crop&q=80',
-          searchQuery: 'cheese',
-          sortOrder: 2,
-          isActive: true
-        },
-        {
-          _id: 'launch-3',
-          title: 'Big Pizza Bonanza',
-          image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&auto=format&fit=crop&q=80',
-          searchQuery: 'pizza',
-          sortOrder: 3,
-          isActive: true
-        }
-      ]);
+      // never show (and so never save) invented searches or posters when the server cannot be reached
+      toast.error('Could not load the search settings: ' + (err?.response?.data?.message || err.message));
     } finally {
       setLoading(false);
     }

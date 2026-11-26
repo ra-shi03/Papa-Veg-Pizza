@@ -475,24 +475,6 @@ export default function MenuList() {
           }
         } catch (_) {}
 
-        if (fetchedCats.length === 0) {
-          try {
-            const cRes = await apiClient.get('/food/admin/category-products?sort=sort_asc');
-            if (Array.isArray(cRes?.data?.data) && cRes.data.data.length > 0) {
-              fetchedCats = cRes.data.data;
-            }
-          } catch (_) {}
-        }
-
-        if (fetchedCats.length === 0) {
-          try {
-            const cRes = await apiClient.get('/food/admin/category-products/public?sort=sort_asc');
-            if (Array.isArray(cRes?.data?.data) && cRes.data.data.length > 0) {
-              fetchedCats = cRes.data.data;
-            }
-          } catch (_) {}
-        }
-
         // 2. Products come from the store-priced public endpoints only (never the admin catalogue list)
         let productsFailed = false;
         try {

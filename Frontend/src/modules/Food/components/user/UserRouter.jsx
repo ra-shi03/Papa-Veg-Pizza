@@ -13,8 +13,6 @@ const WelcomeScreen = lazy(() => import("@food/pages/user/WelcomeScreen"))
 const Home = lazy(() => import("@food/pages/user/home/Home"))
 const MenuList = lazy(() => import("@food/pages/user/home/MenuList"))
 const Under250 = lazy(() => import("@food/pages/user/Under250"))
-const Categories = lazy(() => import("@food/pages/user/Categories"))
-const CategoryPage = lazy(() => import("@food/pages/user/CategoryPage"))
 const SearchResults = lazy(() => import("@food/pages/user/search/UserSearchPage"))
 const ProductDetail = lazy(() => import("@food/pages/user/ProductDetail"))
 
@@ -100,8 +98,9 @@ export default function UserRouter() {
           <Route path="promise" element={<PromisePage />} />
 
           <Route path="under-250" element={<Under250 />} />
-          <Route path="categories" element={<Categories />} />
-          <Route path="category/:category" element={<CategoryPage />} />
+          {/* old category links (the screens were removed): the menu lists every category */}
+          <Route path="categories" element={<Navigate to="/food/user/menu" replace />} />
+          <Route path="category/:category" element={<Navigate to="/food/user/menu" replace />} />
           <Route path="search" element={<SearchResults />} />
           <Route path="product/:id" element={<ProductDetail />} />
 
@@ -204,30 +203,10 @@ export default function UserRouter() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="account/profile-details/addresses"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <LocationSetup />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="profile/addresses"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <LocationSetup />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="addresses"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <LocationSetup />
-              </ProtectedRoute>
-            }
-          />
+          {/* old address links: the address is picked on Home / at checkout */}
+          <Route path="account/profile-details/addresses" element={<Navigate to="/food/user" replace />} />
+          <Route path="profile/addresses" element={<Navigate to="/food/user" replace />} />
+          <Route path="addresses" element={<Navigate to="/food/user" replace />} />
           <Route path="account/coupons" element={<Coupons />} />
           <Route path="account/coupons/all" element={<Coupons />} />
           <Route path="profile/coupons" element={<Coupons />} />
