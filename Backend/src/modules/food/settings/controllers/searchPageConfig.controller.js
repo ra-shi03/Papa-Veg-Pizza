@@ -19,146 +19,27 @@ const sanitizeSubdocIds = (arr) => {
     });
 };
 
-// Default initial seed data matching user's exact specification & screenshot
+// A fresh database starts with nothing invented: no popular searches or launch posters until the super admin adds
+// them, and the Search By tabs come from the real crusts / toppings / add-ons (buildDynamicSearchByFromAddons).
 const defaultSearchConfig = {
     isPopularEnabled: true,
     isSearchByEnabled: true,
     isRecentlyViewedEnabled: true,
     isNewLaunchesEnabled: true,
-    popularSearches: [
-        { text: 'Maxxx', sortOrder: 1, isActive: true, searchQuery: 'Maxxx' },
-        { text: 'more paneer', sortOrder: 2, isActive: true, searchQuery: 'paneer' },
-        { text: 'more chicken', sortOrder: 3, isActive: true, searchQuery: 'chicken' },
-        { text: 'Big Big Pizza', sortOrder: 4, isActive: true, searchQuery: 'Big Big Pizza' },
-        { text: 'Ultimate Pizza Feast', sortOrder: 5, isActive: true, searchQuery: 'Feast' }
-    ],
-    searchByTabs: [
-        {
-            name: 'Crusts',
-            key: 'crust',
-            sortOrder: 1,
-            isActive: true,
-            items: [
-                {
-                    title: 'Double Cheeseburst',
-                    image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=160&auto=format&fit=crop&q=80',
-                    query: 'Double Cheeseburst',
-                    sortOrder: 1,
-                    isActive: true
-                },
-                {
-                    title: 'Cheese Volcano Crust',
-                    image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=160&auto=format&fit=crop&q=80',
-                    query: 'Volcano',
-                    sortOrder: 2,
-                    isActive: true
-                },
-                {
-                    title: 'Creamy Makhani Cheese Burst',
-                    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=160&auto=format&fit=crop&q=80',
-                    query: 'Makhani',
-                    sortOrder: 3,
-                    isActive: true
-                },
-                {
-                    title: 'Korean Sweet Chilli Crust',
-                    image: 'https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?w=160&auto=format&fit=crop&q=80',
-                    query: 'Chilli',
-                    sortOrder: 4,
-                    isActive: true
-                }
-            ]
-        },
-        {
-            name: 'Toppings',
-            key: 'topping',
-            sortOrder: 2,
-            isActive: true,
-            items: [
-                {
-                    title: 'Fresh Paneer',
-                    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=160&auto=format&fit=crop&q=80',
-                    query: 'paneer',
-                    sortOrder: 1,
-                    isActive: true
-                },
-                {
-                    title: 'Crispy Onion & Capsicum',
-                    image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=160&auto=format&fit=crop&q=80',
-                    query: 'capsicum',
-                    sortOrder: 2,
-                    isActive: true
-                },
-                {
-                    title: 'Golden Sweet Corn',
-                    image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=160&auto=format&fit=crop&q=80',
-                    query: 'corn',
-                    sortOrder: 3,
-                    isActive: true
-                },
-                {
-                    title: 'Black Olives & Jalapenos',
-                    image: 'https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?w=160&auto=format&fit=crop&q=80',
-                    query: 'jalapeno',
-                    sortOrder: 4,
-                    isActive: true
-                }
-            ]
-        },
-        {
-            name: 'Flavours',
-            key: 'flavour',
-            sortOrder: 3,
-            isActive: true,
-            items: [
-                {
-                    title: 'Creamy Makhani',
-                    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=160&auto=format&fit=crop&q=80',
-                    query: 'makhani',
-                    sortOrder: 1,
-                    isActive: true
-                },
-                {
-                    title: 'Peri Peri Spice',
-                    image: 'https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?w=160&auto=format&fit=crop&q=80',
-                    query: 'peri peri',
-                    sortOrder: 2,
-                    isActive: true
-                },
-                {
-                    title: 'Smoky Barbeque',
-                    image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=160&auto=format&fit=crop&q=80',
-                    query: 'barbeque',
-                    sortOrder: 3,
-                    isActive: true
-                }
-            ]
-        }
-    ],
-    newLaunches: [
-        {
-            title: 'Paneer Maxxx',
-            image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80',
-            searchQuery: 'paneer',
-            sortOrder: 1,
-            isActive: true
-        },
-        {
-            title: 'Four Cheese Sourdough Pizza',
-            image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800&auto=format&fit=crop&q=80',
-            searchQuery: 'cheese',
-            sortOrder: 2,
-            isActive: true
-        },
-        {
-            title: 'Big Pizza Bonanza',
-            image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&auto=format&fit=crop&q=80',
-            searchQuery: 'pizza',
-            sortOrder: 3,
-            isActive: true
-        }
-    ]
+    popularSearches: [],
+    searchByTabs: [],
+    newLaunches: []
 };
+
+// What older builds seeded on their own (not the brand's products). Removed from a saved config the next time it is read.
+const OLD_SEED_POPULAR = new Set(['Maxxx|Maxxx', 'more paneer|paneer', 'more chicken|chicken', 'Big Big Pizza|Big Big Pizza', 'Ultimate Pizza Feast|Feast']);
+const OLD_SEED_LAUNCHES = new Set([
+    'Paneer Maxxx|https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80',
+    'Four Cheese Sourdough Pizza|https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800&auto=format&fit=crop&q=80',
+    'Big Pizza Bonanza|https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&auto=format&fit=crop&q=80'
+]);
+const isOldSeedPopular = (p) => OLD_SEED_POPULAR.has(`${p?.text}|${p?.searchQuery}`);
+const isOldSeedLaunch = (l) => OLD_SEED_LAUNCHES.has(`${l?.title}|${l?.image}`);
 
 // Helper to assign matching food thumbnail if addon does not have an image
 export const getImageForAddon = (addon) => {
@@ -266,25 +147,32 @@ const hasOldMockTabs = (tabs) => {
 };
 
 // Helper: Ensure config document exists and has real addon data
+const FIRST_CONFIG_ID = new mongoose.Types.ObjectId('5ea4c0f16000000000000001');
 async function getOrCreateConfig() {
     let config = await SearchPageConfig.findOne();
-    const realTabs = await buildDynamicSearchByFromAddons();
+    const realTabs = sanitizeSubdocIds(await buildDynamicSearchByFromAddons());   // built tabs may carry 'tab-0' ids
 
     if (!config) {
-        config = await SearchPageConfig.create({
-            ...defaultSearchConfig,
-            searchByTabs: realTabs.length > 0 ? realTabs : defaultSearchConfig.searchByTabs,
-            newLaunches: defaultSearchConfig.newLaunches
-        });
+        try {
+            // a fixed id, so when several first visits arrive at once the database lets only one of them create it
+            config = await SearchPageConfig.create({ _id: FIRST_CONFIG_ID, ...defaultSearchConfig, searchByTabs: realTabs });
+        } catch (error) {
+            // another first visit created it a moment earlier
+            config = await SearchPageConfig.findOne();
+            if (!config) throw error;
+        }
     } else {
         let changed = false;
         if (hasOldMockTabs(config.searchByTabs) && realTabs.length > 0) {
             config.searchByTabs = realTabs;
             changed = true;
         }
-        // If newLaunches is missing or empty, ensure default launch posters are available
-        if (!Array.isArray(config.newLaunches) || config.newLaunches.length === 0) {
-            config.newLaunches = defaultSearchConfig.newLaunches;
+        if ((config.popularSearches || []).some(isOldSeedPopular)) {
+            config.popularSearches = config.popularSearches.filter((p) => !isOldSeedPopular(p));
+            changed = true;
+        }
+        if ((config.newLaunches || []).some(isOldSeedLaunch)) {
+            config.newLaunches = config.newLaunches.filter((l) => !isOldSeedLaunch(l));
             changed = true;
         }
         if (changed) {
@@ -329,13 +217,9 @@ export async function getPublicSearchConfig(req, res, next) {
         }
 
         // Filter and sort New Launches
-        let newLaunches = (config.newLaunches || [])
+        const newLaunches = (config.newLaunches || [])
             .filter(item => item.isActive !== false)
             .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-
-        if (newLaunches.length === 0 && config.isNewLaunchesEnabled !== false) {
-            newLaunches = defaultSearchConfig.newLaunches;
-        }
 
         return res.status(200).json({
             success: true,
@@ -372,7 +256,7 @@ export async function getAdminSearchConfig(req, res, next) {
 
         // If stored config has old mock data, sync it with real tabs immediately
         if (hasOldMockTabs(config.searchByTabs) && realTabs.length > 0) {
-            config.searchByTabs = realTabs;
+            config.searchByTabs = sanitizeSubdocIds(realTabs);
             await config.save();
         }
 
@@ -398,7 +282,7 @@ export async function syncRealAddonsToSearchConfig(req, res, next) {
         const realTabs = await buildDynamicSearchByFromAddons();
         const config = await getOrCreateConfig();
 
-        config.searchByTabs = realTabs;
+        config.searchByTabs = sanitizeSubdocIds(realTabs);
         await config.save();
 
         return res.status(200).json({

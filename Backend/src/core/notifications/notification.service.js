@@ -14,7 +14,8 @@ const normalizePagination = ({ page = 1, limit = 20 } = {}) => {
 
 const normalizeOwnerType = (role) => {
     const normalized = String(role || '').trim().toUpperCase();
-    if (normalized === 'USER') return 'USER';
+    // customer sign-in tokens carry role CUSTOMER; their inbox rows are saved as USER
+    if (normalized === 'USER' || normalized === 'CUSTOMER') return 'USER';
     if (normalized === 'STORE') return 'STORE';
     if (normalized === 'DELIVERY_PARTNER') return 'DELIVERY_PARTNER';
     return null;
