@@ -1,4 +1,5 @@
 import { HomePage } from '../models/homePage.model.js';
+import { deleteLocalImage } from '../../../../services/imageStorage.service.js';
 import { sendResponse, sendError } from '../../../../utils/response.js';
 import { uploadImageBufferDetailed, uploadVideoBuffer } from '../../../../services/cloudinary.service.js';
 import { v2 as cloudinary } from 'cloudinary';
@@ -239,9 +240,10 @@ export const deleteHomePageBanner = async (req, res, next) => {
 
         const banner = config.banners[bannerIndex];
 
-        // Delete from Cloudinary
+        // Delete from Cloudinary (or this server's disk, for an image stored locally: Developer > Image Setting)
         try {
-            await cloudinary.uploader.destroy(banner.publicId, { resource_type: banner.resourceType });
+            if (String(banner.publicId || '').startsWith('local:')) await deleteLocalImage(banner.publicId);
+            else await cloudinary.uploader.destroy(banner.publicId, { resource_type: banner.resourceType });
         } catch (err) {
             console.error('Failed to delete asset from Cloudinary:', err);
         }

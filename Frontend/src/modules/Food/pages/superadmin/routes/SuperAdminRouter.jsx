@@ -54,6 +54,18 @@ const HeroBannersConfig = lazy(() => import("../user-app/HeroBannersConfig"))
 const NutritionConfig = lazy(() => import("../user-app/NutritionConfig"))
 const DeliveryWelcomePageConfig = lazy(() => import("../delivery-app/DeliveryWelcomePageConfig"))
 const DeliveryLoginPageConfig = lazy(() => import("../delivery-app/DeliveryLoginPageConfig"))
+// Report Management (ported from the Jharkhand Rasoi admin)
+const DailySales = lazy(() => import("../reports/DailySales"))
+const TransactionReport = lazy(() => import("../reports/TransactionReport"))
+const RegularOrderReport = lazy(() => import("../reports/RegularOrderReport"))
+const TaxReport = lazy(() => import("../reports/TaxReport"))
+const StoreReport = lazy(() => import("../reports/StoreReport"))
+const FeedbackExperienceReport = lazy(() => import("../reports/FeedbackExperienceReport"))
+// Developer (ported from the Jharkhand Rasoi admin)
+const EnvManagements = lazy(() => import("../developer/EnvManagements"))
+const ImageSetting = lazy(() => import("../developer/ImageSetting"))
+const DeveloperSettings = lazy(() => import("../developer/DeveloperSettings"))
+const PaymentReconciliation = lazy(() => import("../developer/PaymentReconciliation"))
 // System Settings (ported from the Jharkhand Rasoi admin)
 const NotificationBroadcast = lazy(() => import("../system/NotificationBroadcast"))
 const StoreDelayAlerts = lazy(() => import("../system/StoreDelayAlerts"))
@@ -121,6 +133,16 @@ export default function SuperAdminRouter() {
 
           {/* Customer Management module routes wrapped in the shared Layout */}
           <Route element={<SuperAdminLayout />}>
+            <Route path="/reports/daily-sales" element={<DailySales />} />
+            <Route path="/reports/transactions" element={<TransactionReport />} />
+            <Route path="/reports/orders" element={<RegularOrderReport />} />
+            <Route path="/reports/tax" element={<TaxReport />} />
+            <Route path="/reports/stores" element={<StoreReport />} />
+            <Route path="/reports/feedback-experience" element={<FeedbackExperienceReport />} />
+            <Route path="/developer/env" element={<EnvManagements />} />
+            <Route path="/developer/image-setting" element={<ImageSetting />} />
+            <Route path="/developer/settings" element={<DeveloperSettings />} />
+            <Route path="/developer/payment-reconciliation" element={<PaymentReconciliation />} />
             <Route path="/system/broadcast-notification" element={<NotificationBroadcast />} />
             <Route path="/system/store-delay-alerts" element={<StoreDelayAlerts />} />
             <Route path="/system/toggle-management" element={<ToggleManagement />} />

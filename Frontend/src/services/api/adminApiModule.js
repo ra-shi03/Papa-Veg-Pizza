@@ -398,8 +398,32 @@ export const adminAPI = {
   getZones: (params = {}) =>
     adminClient.get("/food/admin/zones", { params: { limit: 1000, ...params } }),
   /** Restaurant report (admin). */
-  getRestaurantReport: (params = {}) =>
-    adminClient.get("/food/admin/reports/restaurants", { params: { page: 1, limit: 1000, ...params } }),
+  /** Developer (super admin) */
+  getEnvSettings: () => adminClient.get("/food/admin/env"),
+  updateEnvSettings: (data) => adminClient.put("/food/admin/env", data),
+  getUploadSettings: () => adminClient.get("/food/admin/upload-settings"),
+  updateUploadSettings: (data) => adminClient.put("/food/admin/upload-settings", data),
+  getOperationalDataCounts: () => adminClient.get("/food/admin/operational-data"),
+  clearOperationalData: (data) => adminClient.post("/food/admin/operational-data/clear", data),
+  getReconciliationLatest: (kind) =>
+    adminClient.get("/food/admin/payments/reconciliation/report/latest", { params: kind ? { kind } : {} }),
+  getReconciliationReports: (limit = 20) =>
+    adminClient.get("/food/admin/payments/reconciliation/reports", { params: { limit } }),
+  runReconciliationNow: () =>
+    adminClient.post("/food/admin/payments/reconciliation/run", {}, { timeout: 300000 }),
+  getOrderReconciliation: (params = {}) =>
+    adminClient.get("/food/admin/payments/reconciliation/orders", { params, timeout: 120000 }),
+  getWalletReconciliation: () =>
+    adminClient.get("/food/admin/payments/reconciliation", { timeout: 120000 }),
+  repairOrderPayment: (orderId) =>
+    adminClient.post(`/food/admin/payments/reconciliation/orders/${orderId}/repair`, {}, { timeout: 120000 }),
+  /** Report Management (super admin) */
+  getStoreReport: (params = {}) =>
+    adminClient.get("/food/admin/reports/stores", { params: { page: 1, limit: 1000, ...params } }),
+  getDailySales: (date) =>
+    adminClient.get("/food/admin/reports/daily-sales", { params: date ? { date } : {} }),
+  getOrderReport: (params = {}) =>
+    adminClient.get("/food/admin/reports/orders", { params }),
   getTransactionReport: (params = {}) =>
     adminClient.get("/food/admin/reports/transactions", { params: { page: 1, limit: 1000, ...params } }),
   getTaxReport: (params = {}) =>

@@ -11,6 +11,7 @@ import { responseTimeLogger } from './middleware/responseTimeLogger.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { healthCheck } from './config/health.js';
 import { config } from './config/env.js';
+import { localUploadRoot } from './services/imageStorage.service.js';
 import mongoose from 'mongoose';
 
 const app = express();
@@ -62,6 +63,15 @@ app.use(cors({
     }
 }));
 app.use(morgan('dev'));
+
+// Developer > Image Setting: images stored on this server's disk. The apps load them from other domains, so they are
+// marked cross-origin (helmet's default would block them); no directory listings, no dotfiles.
+app.use('/uploads', express.static(localUploadRoot(), {
+    index: false,
+    dotfiles: 'deny',
+    maxAge: '30d',
+    setHeaders: (res) => res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin'),
+}));
 app.use(express.json({
     verify: (req, res, buf) => {
         // ✅ Store rawBody for signature verification (Razorpay Webhooks)

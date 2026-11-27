@@ -845,328 +845,7 @@ function formatTimeAgo(date) {
 }
 
 
-export async function getTransactionReport(query = {}) {
-    const { fromDate, toDate, zone, store, search } = query;
-    const match = {};
 
-    if (fromDate && toDate) {
-        match.createdAt = { $gte: new Date(fromDate), $lte: new Date(toDate) };
-    }
-
-    if (search) {
-        const searchRegex = new RegExp(String(search).trim(), "i");
-        const matchingOrders = await FoodOrder.find({ orderId: { $regex: searchRegex } })
-            .select('_id')
-            .lean();
-
-        match.$or = [
-            { orderReadableId: { $regex: searchRegex } },
-            { orderId: { $in: matchingOrders.map((order) => order._id) } }
-        ];
-    }
-
-    let storeIds = null;
-    if (zone || store) {
-        const restFilter = {};
-        if (zone) restFilter.zoneId = zone; // Assuming zone is an ID or we need to lookup
-        if (store && store !== 'All stores') {
-            const restDoc = await mongoose.model('FoodStore').findOne({ storeName: store }).lean();
-            if (restDoc) restFilter._id = restDoc._id;
-        }
-
-        if (Object.keys(restFilter).length > 0) {
-            const storesList = await mongoose.model('FoodStore').find(restFilter).select('_id').lean();
-            storeIds = storesList.map(r => r._id);
-            match.storeId = { $in: storeIds };
-        }
-    }
-
-    // Include only resolved transactions for reports (or all to match orders)
-    // We will query the FoodTransaction table directly as it is the ledger
-    const transactionRows = await FoodTransaction.find(match)
-        .populate('orderId')
-        .populate('userId', 'name')
-        .populate('storeId', 'storeName')
-        .sort({ createdAt: -1 })
-        .lean();
-
-    const transactions = transactionRows.map((tx) => {
-        const order = tx.orderId || {};
-        const pricing = order.pricing || {};
-        const subtotal = Number(pricing.subtotal || 0) || 0;
-        const packagingFee = Number(pricing.packagingFee || 0) || 0;
-        const deliveryFee = Number(pricing.deliveryFee || 0) || 0;
-        const tax = Number(pricing.tax || 0) || 0;
-        const discount = Number(pricing.discount || 0) || 0;
-        const total = Number(pricing.total || 0) || 0;
-
-        // "Platform fee" should come from pricing.platformFee when available.
-        // For older orders where pricing.platformFee isn't stored, derive it from the pricing equation:
-        // total = subtotal + packagingFee + deliveryFee + platformFee + tax - discount
-        const platformFeeDerived = Math.max(
-            0,
-            total - subtotal - packagingFee - deliveryFee - tax + discount
-        );
-        const platformFee =
-            pricing.platformFee !== undefined && pricing.platformFee !== null
-                ? Number(pricing.platformFee || 0) || 0
-                : platformFeeDerived;
-        return {
-            id: tx._id,
-            orderId: tx.orderReadableId || order.orderId || 'N/A',
-            store: tx.storeId?.storeName || 'N/A',
-            customerName: tx.userId?.name || 'Guest',
-            totalItemAmount: subtotal,
-            itemDiscount: pricing.discount || 0,
-            couponDiscount: 0, // Placeholder if you add coupon logic
-            referralDiscount: 0, // Placeholder
-            discountedAmount: Math.max(0, (pricing.subtotal || 0) - (pricing.discount || 0)),
-            vatTax: tx.amounts?.taxAmount || pricing.tax || 0,
-            deliveryCharge: pricing.deliveryFee || 0,
-            platformFee,
-            orderAmount: tx.amounts?.totalCustomerPaid || pricing.total || 0,
-            status: tx.status
-        };
-    });
-
-    let completedTransaction = 0;
-    let refundedTransaction = 0;
-    let adminEarning = 0;
-    let storeEarning = 0;
-    let deliverymanEarning = 0;
-
-    for (const tx of transactionRows) {
-        // Calculate Summary
-        if (tx.status === 'captured' || tx.status === 'settled' || (tx.orderId && tx.orderId.orderStatus === 'delivered')) {
-            completedTransaction += tx.amounts?.totalCustomerPaid || 0;
-            adminEarning += tx.amounts?.platformNetProfit || 0;
-            storeEarning += tx.amounts?.storeShare || 0;
-            deliverymanEarning += tx.amounts?.riderShare || 0;
-        }
-        if (tx.status === 'refunded' || (tx.orderId && tx.orderId.orderStatus === 'cancelled_by_admin')) {
-            // Count number of refunded transactions according to old logic or sum them
-            refundedTransaction += tx.amounts?.totalCustomerPaid || 0;
-        }
-    }
-
-    const summary = {
-        completedTransaction,
-        refundedTransaction, // Returning amount instead of count for consistency, frontend might expect count though
-        adminEarning,
-        storeEarning,
-        deliverymanEarning,
-    };
-
-    return { transactions, summary };
-}
-
-export async function getStoreReport(query = {}) {
-    const parseTimeRange = (timeLabel) => {
-        const now = new Date();
-        const start = new Date(now);
-        const end = new Date(now);
-
-        const value = String(timeLabel || '').trim().toLowerCase();
-        if (!value || value === 'all time') return null;
-
-        if (value === 'today') {
-            start.setHours(0, 0, 0, 0);
-            end.setHours(23, 59, 59, 999);
-            return { $gte: start, $lte: end };
-        }
-
-        if (value === 'this week') {
-            const day = start.getDay(); // 0=Sun
-            const diffToMonday = day === 0 ? 6 : day - 1;
-            start.setDate(start.getDate() - diffToMonday);
-            start.setHours(0, 0, 0, 0);
-            end.setHours(23, 59, 59, 999);
-            return { $gte: start, $lte: end };
-        }
-
-        if (value === 'this month') {
-            start.setDate(1);
-            start.setHours(0, 0, 0, 0);
-            end.setHours(23, 59, 59, 999);
-            return { $gte: start, $lte: end };
-        }
-
-        if (value === 'this year') {
-            start.setMonth(0, 1);
-            start.setHours(0, 0, 0, 0);
-            end.setHours(23, 59, 59, 999);
-            return { $gte: start, $lte: end };
-        }
-
-        return null;
-    };
-
-    const formatCurrency = (value) => `\u20B9${Number(value || 0).toFixed(2)}`;
-
-    const limit = Math.min(Math.max(parseInt(query.limit, 10) || 1000, 1), 5000);
-    const page = Math.max(parseInt(query.page, 10) || 1, 1);
-    const skip = (page - 1) * limit;
-
-    const storeFilter = {};
-    const allFilter = String(query.all || '').trim().toLowerCase();
-    if (allFilter === 'active') {
-        storeFilter.status = 'approved';
-    } else if (allFilter === 'inactive') {
-        storeFilter.status = { $ne: 'approved' };
-    }
-
-    const zoneRaw = String(query.zone || '').trim();
-    if (zoneRaw) {
-        if (mongoose.Types.ObjectId.isValid(zoneRaw)) {
-            storeFilter.zoneId = new mongoose.Types.ObjectId(zoneRaw);
-        } else {
-            const matchedZone = await FoodZone.findOne({
-                $or: [{ name: zoneRaw }, { zoneName: zoneRaw }]
-            })
-                .select('_id')
-                .lean();
-            if (matchedZone?._id) {
-                storeFilter.zoneId = matchedZone._id;
-            } else {
-                return { stores: [], total: 0, page, limit };
-            }
-        }
-    }
-
-    const typeRaw = String(query.type || '').trim().toLowerCase();
-    if (typeRaw === 'commission') {
-        const commissionRows = await FoodStoreCommission.find({ status: { $ne: false } })
-            .select('storeId')
-            .lean();
-        const commissionStoreIds = commissionRows
-            .map((row) => row?.storeId)
-            .filter((id) => mongoose.Types.ObjectId.isValid(id))
-            .map((id) => new mongoose.Types.ObjectId(id));
-
-        if (!commissionStoreIds.length) {
-            return { stores: [], total: 0, page, limit };
-        }
-        storeFilter._id = { $in: commissionStoreIds };
-    }
-
-    const searchRaw = String(query.search || '').trim();
-    if (searchRaw) {
-        const escaped = searchRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        storeFilter.$or = [
-            { storeName: { $regex: escaped, $options: 'i' } },
-            { managerName: { $regex: escaped, $options: 'i' } },
-            { phone: { $regex: escaped, $options: 'i' } },
-            { city: { $regex: escaped, $options: 'i' } },
-            { area: { $regex: escaped, $options: 'i' } }
-        ];
-    }
-
-    const [storeDocs, total] = await Promise.all([
-        FoodStore.find(storeFilter)
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .select('storeName profileImage rating totalRatings status zoneId')
-            .populate('zoneId', 'name zoneName')
-            .lean(),
-        FoodStore.countDocuments(storeFilter)
-    ]);
-
-    const storeIds = storeDocs.map((r) => r._id).filter(Boolean);
-    if (!storeIds.length) {
-        return { stores: [], total, page, limit };
-    }
-
-    const orderCreatedAtFilter = parseTimeRange(query.time);
-    const orderMatch = {
-        storeId: { $in: storeIds },
-        $or: [
-            { "payment.method": { $in: ["cash", "wallet"] } },
-            { "payment.status": { $in: ["paid", "authorized", "captured", "settled", "refunded"] } },
-        ],
-    };
-    if (orderCreatedAtFilter) {
-        orderMatch.createdAt = orderCreatedAtFilter;
-    }
-
-    const [foodsAgg, ordersAgg] = await Promise.all([
-        FoodItem.aggregate([
-            {
-                $match: {
-                    storeId: { $in: storeIds },
-                    approvalStatus: 'approved'
-                }
-            },
-            {
-                $group: {
-                    _id: '$storeId',
-                    totalFood: { $sum: 1 }
-                }
-            }
-        ]),
-        FoodOrder.aggregate([
-            { $match: orderMatch },
-            {
-                $group: {
-                    _id: '$storeId',
-                    totalOrder: { $sum: 1 },
-                    totalOrderAmount: { $sum: { $ifNull: ['$pricing.total', 0] } },
-                    totalDiscountGiven: { $sum: { $ifNull: ['$pricing.discount', 0] } },
-                    totalVATTAX: { $sum: { $ifNull: ['$pricing.tax', 0] } },
-                    totalAdminCommissionFromPlatformProfit: { $sum: { $ifNull: ['$platformProfit', 0] } },
-                    totalAdminCommissionFromPlatformFee: { $sum: { $ifNull: ['$pricing.platformFee', 0] } }
-                }
-            }
-        ])
-    ]);
-
-    const foodMap = new Map(foodsAgg.map((x) => [String(x._id), Number(x.totalFood || 0)]));
-    const orderMap = new Map(
-        ordersAgg.map((x) => [
-            String(x._id),
-            {
-                totalOrder: Number(x.totalOrder || 0),
-                totalOrderAmount: Number(x.totalOrderAmount || 0),
-                totalDiscountGiven: Number(x.totalDiscountGiven || 0),
-                totalVATTAX: Number(x.totalVATTAX || 0),
-                totalAdminCommission:
-                    Number(x.totalAdminCommissionFromPlatformProfit || 0) > 0
-                        ? Number(x.totalAdminCommissionFromPlatformProfit || 0)
-                        : Number(x.totalAdminCommissionFromPlatformFee || 0)
-            }
-        ])
-    );
-
-    const stores = storeDocs.map((store, index) => {
-        const key = String(store._id);
-        const counts = orderMap.get(key) || {
-            totalOrder: 0,
-            totalOrderAmount: 0,
-            totalDiscountGiven: 0,
-            totalVATTAX: 0,
-            totalAdminCommission: 0
-        };
-
-        return {
-            _id: store._id,
-            sl: skip + index + 1,
-            icon: store.profileImage || '',
-            storeName: store.storeName || '',
-            totalFood: foodMap.get(key) || 0,
-            totalOrder: counts.totalOrder,
-            totalOrderAmount: formatCurrency(counts.totalOrderAmount),
-            totalDiscountGiven: formatCurrency(counts.totalDiscountGiven),
-            totalAdminCommission: formatCurrency(counts.totalAdminCommission),
-            totalVATTAX: formatCurrency(counts.totalVATTAX),
-            averageRatings: Number(store.rating || 0),
-            reviews: Number(store.totalRatings || 0),
-            status: store.status || 'pending',
-            zoneName: store.zoneId?.name || store.zoneId?.zoneName || ''
-        };
-    });
-
-    return { stores, total, page, limit };
-}
 
 export async function getTaxReport(query = {}) {
     const { fromDate, toDate, search } = query;
@@ -1179,8 +858,8 @@ export async function getTaxReport(query = {}) {
     }
 
     if (search) {
-        // Search by order ID if provided
-        match.orderId = { $regex: search, $options: 'i' };
+        // Search by order ID if provided (the readable id is order_id)
+        match.order_id = { $regex: String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
     }
 
     // Aggregate tax by income source (Stores, Delivery, Platform)
@@ -1258,7 +937,7 @@ export async function getTaxReportDetail(storeId, query = {}) {
     }
 
     const orders = await FoodOrder.find(match)
-        .select('orderId pricing createdAt orderStatus')
+        .select('order_id pricing createdAt orderStatus')
         .sort({ createdAt: -1 })
         .lean();
 
@@ -1268,7 +947,7 @@ export async function getTaxReportDetail(storeId, query = {}) {
         storeName: store?.storeName || 'Unknown Store',
         orders: orders.map(o => ({
             id: o._id,
-            orderId: o.orderId,
+            orderId: o.order_id || String(o._id),
             totalAmount: `\u20B9${(o.pricing?.total || 0).toFixed(2)}`,
             taxAmount: `\u20B9${(o.pricing?.tax || 0).toFixed(2)}`,
             date: o.createdAt
@@ -2066,8 +1745,9 @@ export async function getContactMessages(query = {}) {
     const page = Math.max(parseInt(query.page, 10) || 1, 1);
     const skip = (page - 1) * limit;
 
-    // Fix old records with 'User' instead of 'FoodUser' for population to work
-    await FeedbackExperience.updateMany({ userModel: 'User' }, { $set: { userModel: 'FoodUser' } });
+    // Old records point at 'FoodUser', which is not a registered model (the customer model is 'User'): rewrite them so
+    // populating the customer works
+    await FeedbackExperience.updateMany({ userModel: 'FoodUser' }, { $set: { userModel: 'User' } });
 
     const filter = {};
     if (query.rating && !isNaN(query.rating)) {

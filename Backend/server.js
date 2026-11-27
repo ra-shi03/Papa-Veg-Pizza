@@ -13,6 +13,8 @@ import mongoose from 'mongoose';
 import { isJobWorker } from './src/config/jobRole.js';
 import { dispatchDueScheduledOrders } from './src/modules/food/orders/services/order-dispatch.service.js';
 import { sweepStoreDelayAlerts } from './src/modules/food/admin/services/storeDelayAlert.service.js';
+import { loadEnvOverrides } from './src/modules/food/admin/services/envSettings.service.js';
+import { runFullReconciliation } from './src/core/payments/reconciliation.job.js';
 
 import { logger } from './src/utils/logger.js';
 import { initializeFirebaseRealtime } from './src/config/firebase.js';
@@ -23,6 +25,7 @@ let server = null;
 let expireOffersInterval = null;
 let scheduledDispatchInterval = null;
 let storeDelayAlertInterval = null;
+let reconciliationInterval = null;
 
 const gracefulShutdown = async (signal) => {
     logger.info(`${signal} received, starting graceful shutdown`);
@@ -39,6 +42,7 @@ const gracefulShutdown = async (signal) => {
             if (expireOffersInterval) clearInterval(expireOffersInterval);
             if (scheduledDispatchInterval) clearInterval(scheduledDispatchInterval);
             if (storeDelayAlertInterval) clearInterval(storeDelayAlertInterval);
+            if (reconciliationInterval) clearInterval(reconciliationInterval);
             await stopOrderEventStream();
 
             logger.info('Graceful shutdown complete');
@@ -61,6 +65,13 @@ const startServer = async () => {
 
         // 1. Connect to Database (MongoDB)
         await connectDB();
+        // Developer > Env Managements: values saved from the admin override the .env (encrypted in the database)
+        try {
+            const applied = await loadEnvOverrides();
+            if (applied) logger.info(`Env Managements: ${applied} setting(s) loaded from the database`);
+        } catch (err) {
+            logger.error(`Env Managements: could not load saved settings: ${err.message}`);
+        }
         await (await import('./src/core/notifications/models/notification.model.js')).dropLegacyNotificationIndex();
         await (await import('./src/modules/food/franchise/models/storeManager.model.js')).fixStaffEmailIndex();   // kitchen staff may have no email
 
@@ -160,6 +171,13 @@ const startServer = async () => {
             }
         };
         if (isJobWorker()) storeDelayAlertInterval = setInterval(runStoreDelayAlerts, 60 * 1000);
+
+        // Payment reconciliation: check every hour and keep a report (repairs are made by an admin, per order)
+        if (isJobWorker()) {
+            reconciliationInterval = setInterval(() => {
+                runFullReconciliation('full').catch((err) => logger.error(`Payment reconciliation error: ${err.message}`));
+            }, 60 * 60 * 1000);
+        }
 
         process.on('SIGINT', () => gracefulShutdown('SIGINT'));
         process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

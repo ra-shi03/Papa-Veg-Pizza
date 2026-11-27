@@ -43,6 +43,10 @@ import {
   BellRing,
   ToggleLeft,
   Palette,
+  KeyRound,
+  Image as ImageIcon,
+  Code,
+  ListChecks,
 } from "lucide-react"
 
 const BASE = "/food/superadmin"
@@ -146,6 +150,18 @@ const menu = [
   // Sections ported from the Jharkhand Rasoi admin
   {
     type: "section",
+    label: "Report Management",
+    items: [
+      { label: "Daily Sales & Cash Audit", icon: Receipt, path: "/reports/daily-sales" },
+      { label: "Transaction Report", icon: FileText, path: "/reports/transactions" },
+      { label: "Order Report", icon: ClipboardList, path: "/reports/orders" },
+      { label: "Tax Report", icon: Receipt, path: "/reports/tax" },
+      { label: "Store Report", icon: Store, path: "/reports/stores" },
+      { label: "Customer Feedback", icon: Star, path: "/reports/feedback-experience" },
+    ],
+  },
+  {
+    type: "section",
     label: "System Settings",
     items: [
       { label: "Broadcast Notification", icon: Bell, path: "/system/broadcast-notification" },
@@ -165,6 +181,16 @@ const menu = [
       { label: "Refund Policy", icon: Receipt, path: "/pages-social-media/refund" },
       { label: "Shipping Policy", icon: Truck, path: "/pages-social-media/shipping" },
       { label: "Cancellation Policy", icon: X, path: "/pages-social-media/cancellation" },
+    ],
+  },
+  {
+    type: "section",
+    label: "Developer",
+    items: [
+      { label: "Env Managements", icon: KeyRound, path: "/developer/env" },
+      { label: "Image Setting", icon: ImageIcon, path: "/developer/image-setting" },
+      { label: "Developer Settings", icon: Code, path: "/developer/settings" },
+      { label: "Payment Reconciliation", icon: ListChecks, path: "/developer/payment-reconciliation" },
     ],
   },
 ]

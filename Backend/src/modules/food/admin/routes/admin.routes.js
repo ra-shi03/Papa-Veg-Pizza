@@ -11,6 +11,9 @@ import * as foodApprovalController from '../controllers/foodApproval.controller.
 import * as addonsApprovalController from '../controllers/addonsApproval.controller.js';
 import * as businessSettingsController from '../controllers/businessSettings.controller.js';
 import * as storeDelayAlertController from '../controllers/storeDelayAlert.controller.js';
+import * as reportsController from '../controllers/reports.controller.js';
+import * as developerController from '../controllers/developer.controller.js';
+import * as paymentReconciliationController from '../controllers/paymentReconciliation.controller.js';
 import * as feedbackExperienceController from '../controllers/feedbackExperience.controller.js';
 import * as notificationBroadcastController from '../controllers/notificationBroadcast.controller.js';
 import * as franchiseController from '../controllers/franchise.controller.js';
@@ -165,8 +168,11 @@ router.get('/global-search', adminController.globalSearch);
 
 // ----- Stores (list + single read are in the franchise-scoped section above) -----
 router.get('/dashboard-stats', adminController.getDashboardStats);
-router.get('/reports/stores', adminController.getStoreReport);
-router.get('/reports/transactions', adminController.getTransactionReport);
+// Report Management (reports.service.js, built on Papa Veg's orders and their ledger)
+router.get('/reports/daily-sales', reportsController.dailySales);
+router.get('/reports/stores', reportsController.stores);
+router.get('/reports/transactions', reportsController.transactions);
+router.get('/reports/orders', reportsController.orders);
 router.get('/reports/tax', adminController.getTaxReport);
 router.get('/reports/tax/:id', adminController.getTaxReportDetail);
 router.get('/stores/pending', adminController.getPendingStores);
@@ -283,6 +289,20 @@ router.put('/referral-settings', adminController.createOrUpdateReferralSettings)
 // ----- Business Settings -----
 router.get('/business-settings', businessSettingsController.getBusinessSettings);
 router.patch('/business-settings/toggles', businessSettingsController.updateBusinessToggles);
+
+// ----- Developer -----
+router.get('/env', developerController.getEnv);
+router.put('/env', developerController.updateEnv);
+router.get('/upload-settings', developerController.getUploadSettings);
+router.put('/upload-settings', developerController.updateUploadSettings);
+router.get('/operational-data', developerController.operationalCounts);
+router.post('/operational-data/clear', developerController.clearOperationalData);
+router.get('/payments/reconciliation', paymentReconciliationController.getWalletReconciliation);
+router.get('/payments/reconciliation/orders', paymentReconciliationController.getOrderReconciliation);
+router.post('/payments/reconciliation/orders/:orderId/repair', paymentReconciliationController.repairOrderFinance);
+router.get('/payments/reconciliation/report/latest', paymentReconciliationController.getLatestReconciliationReport);
+router.get('/payments/reconciliation/reports', paymentReconciliationController.listReconciliationReports);
+router.post('/payments/reconciliation/run', paymentReconciliationController.runReconciliationNow);
 
 // ----- System Settings > Store Delay Alerts -----
 router.get('/store-delay-alerts', storeDelayAlertController.getSettings);

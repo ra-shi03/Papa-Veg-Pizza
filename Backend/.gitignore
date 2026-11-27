@@ -43,3 +43,6 @@ script/
 .claude
 .gemini/
 .gemini
+
+# Developer > Image Setting: images stored on the server disk
+uploads/

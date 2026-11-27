@@ -2,6 +2,8 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+/** Builds the config from process.env (again after Developer > Env Managements changes a value). */
+function buildConfig() {
 const nodeEnv = process.env.NODE_ENV || 'development';
 
 // FRONTEND_URL may hold several comma-separated origins (admin panel, user app, ...).
@@ -10,7 +12,7 @@ const corsOrigins = String(process.env.FRONTEND_URL || '')
     .map((o) => o.trim().replace(/\/+$/, ''))
     .filter(Boolean);
 
-export const config = {
+return {
     // Basic server config
     port: process.env.PORT || 5000,
     host: process.env.HOST || '0.0.0.0',
@@ -127,3 +129,15 @@ export const config = {
     emailPass: process.env.EMAIL_PASS ? String(process.env.EMAIL_PASS).replace(/\s/g, '') : '',
     emailFrom: process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@example.com'
 };
+}
+
+export const config = buildConfig();
+
+/**
+ * Re-reads process.env into the same config object (every module that imported `config` sees the new values).
+ * Used after Developer > Env Managements loads or saves database overrides.
+ */
+export function refreshConfig() {
+    Object.assign(config, buildConfig());
+    return config;
+}

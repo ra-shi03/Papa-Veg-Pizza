@@ -1,4 +1,5 @@
 import { FeedbackExperience } from '../models/feedbackExperience.model.js';
+import { Profile } from '../../../../core/users/models/profile.model.js';
 import { sendResponse, sendError } from '../../../../utils/response.js';
 
 /**
@@ -32,7 +33,7 @@ export const createFeedbackExperience = async (req, res) => {
         } else if (req.user?.role === 'DELIVERY_PARTNER') {
             feedbackData.userModel = 'FoodDeliveryPartner';
         } else {
-            feedbackData.userModel = 'FoodUser';
+            feedbackData.userModel = 'User'; // the customer model's registered name
         }
 
         const feedback = await FeedbackExperience.create(feedbackData);
@@ -89,9 +90,12 @@ export const getFeedbackExperiences = async (req, res) => {
         }
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
-        
+
+        // Records saved under the unregistered 'FoodUser' name cannot be populated: point them at 'User' first
+        await FeedbackExperience.updateMany({ userModel: 'FoodUser' }, { $set: { userModel: 'User' } });
+
         const feedbacks = await FeedbackExperience.find(query)
-            .populate('userId', 'name phone email storeName phone email')
+            .populate('userId', 'name phone mobile email storeName')
             .populate('storeId', 'storeName')
             .sort({ createdAt: -1 })
             .skip(skip)
@@ -121,14 +125,21 @@ export const getFeedbackExperiences = async (req, res) => {
             maxRating
         };
 
+        // A customer (User) has no name or phone field: the name is on the profile and the phone is `mobile`
+        const customerIds = feedbacks.filter((fb) => fb.userModel === 'User' && fb.userId?._id).map((fb) => fb.userId._id);
+        const profiles = customerIds.length
+            ? await Profile.find({ userId: { $in: customerIds } }).select('userId firstName lastName').lean()
+            : [];
+        const customerName = new Map(profiles.map((p) => [String(p.userId), [p.firstName, p.lastName].filter(Boolean).join(' ')]));
+
         // Normalize the feedback data to have consistent user fields
         const normalizedFeedbacks = feedbacks.map(fb => {
             const user = fb.userId || {};
             return {
                 ...fb.toObject(),
-                userName: user.name || user.storeName || 'N/A',
-                userPhone: user.phone || user.phone || 'N/A',
-                userEmail: user.email || user.email || 'N/A'
+                userName: customerName.get(String(user._id)) || user.name || user.storeName || 'N/A',
+                userPhone: user.mobile || user.phone || 'N/A',
+                userEmail: user.email || 'N/A'
             };
         });
 

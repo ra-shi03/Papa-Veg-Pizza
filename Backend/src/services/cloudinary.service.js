@@ -1,5 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { config } from '../config/env.js';
+import { saveImageLocally } from './imageStorage.service.js';
 
 cloudinary.config({
     cloud_name: config.cloudinaryCloudName,
@@ -11,6 +12,10 @@ export const uploadImageBuffer = async (buffer, folder = 'uploads') => {
     if (!buffer) {
         throw new Error('File buffer is required');
     }
+
+    // Developer > Image Setting: stored on this server's disk when the admin chose "local"
+    const local = await saveImageLocally(buffer, folder);
+    if (local) return local.secure_url;
 
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
@@ -31,6 +36,10 @@ export const uploadImageBufferDetailed = async (buffer, folder = 'uploads') => {
     if (!buffer) {
         throw new Error('File buffer is required');
     }
+
+    // Developer > Image Setting: stored on this server's disk when the admin chose "local"
+    const local = await saveImageLocally(buffer, folder);
+    if (local) return local;
 
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(

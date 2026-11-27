@@ -10,8 +10,10 @@ const feedbackExperienceSchema = new mongoose.Schema(
         userModel: {
             type: String,
             required: true,
-            enum: ['FoodUser', 'FoodStore', 'FoodDeliveryPartner'],
-            default: 'FoodUser'
+            // 'User' is the registered customer model name ('FoodUser' is only an import alias, so populate failed on
+            // it); 'FoodUser' stays allowed for old records until they are rewritten
+            enum: ['User', 'FoodUser', 'FoodStore', 'FoodDeliveryPartner'],
+            default: 'User'
         },
         storeId: { 
             type: mongoose.Schema.Types.ObjectId, 

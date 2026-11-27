@@ -151,18 +151,6 @@ export async function getStores(req, res, next) {
     }
 }
 
-export async function getStoreReport(req, res, next) {
-    try {
-        const data = await adminService.getStoreReport(req.query || {});
-        res.status(200).json({
-            success: true,
-            message: 'Store report fetched successfully',
-            data
-        });
-    } catch (error) {
-        next(error);
-    }
-}
 
 export async function getDashboardStats(req, res, next) {
     try {
@@ -177,18 +165,6 @@ export async function getDashboardStats(req, res, next) {
     }
 }
 
-export async function getTransactionReport(req, res, next) {
-    try {
-        const data = await adminService.getTransactionReport(req.query || {});
-        res.status(200).json({
-            success: true,
-            message: 'Transaction report fetched successfully',
-            data
-        });
-    } catch (error) {
-        next(error);
-    }
-}
 
 export async function getTaxReport(req, res, next) {
     try {
