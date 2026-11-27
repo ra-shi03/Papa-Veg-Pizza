@@ -104,7 +104,7 @@ export default function CompareStoresModal({ isOpen, onClose, stores = [], initi
     return item
   })
   return (
-    <div className="fixed inset-0 lg:left-[280px] z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 lg:left-[var(--panel-sidebar-w,320px)] z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="relative w-full lg:max-w-[calc(100vw-320px)] xl:max-w-5xl h-[85vh] flex flex-col bg-white dark:bg-slate-950 rounded-2xl border border-slate-150 dark:border-slate-800 shadow-2xl overflow-hidden transition-all scale-in duration-200">
         
         {/* Modal Header */}

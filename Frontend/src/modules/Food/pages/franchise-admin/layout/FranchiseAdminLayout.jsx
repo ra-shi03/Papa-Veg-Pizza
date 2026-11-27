@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom"
 import AdminSidebar from "./Sidebar"
 import AdminNavbar from "./Navbar"
 import { API_BASE_URL } from "@food/api/config"
+import "@food/styles/admin-jr.css" // Jharkhand Rasoi admin look for every Franchise Admin page
 
 export default function FranchiseAdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -24,7 +25,7 @@ export default function FranchiseAdminLayout() {
       />
 
       {/* Main Content Area */}
-      <div id="admin-main-content" className={`flex-1 flex min-h-0 flex-col transition-all duration-300 ease-in-out min-w-0 relative lg:ml-[280px]`}>
+      <div id="admin-main-content" className={`flex-1 flex min-h-0 flex-col transition-all duration-300 ease-in-out min-w-0 relative lg:ml-[var(--panel-sidebar-w,320px)]`}>
         {/* Top Navbar */}
         <AdminNavbar onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
 
@@ -36,7 +37,7 @@ export default function FranchiseAdminLayout() {
         )}
 
         {/* Page Content */}
-        <main className="flex-1 min-h-0 w-full max-w-full overflow-x-hidden overflow-y-auto bg-neutral-100 relative pt-0">
+        <main className="jr-admin flex-1 min-h-0 w-full max-w-full overflow-x-hidden overflow-y-auto bg-neutral-100 relative pt-0">
           <Outlet />
         </main>
       </div>

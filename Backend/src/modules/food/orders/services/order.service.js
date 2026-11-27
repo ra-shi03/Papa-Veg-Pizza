@@ -10,6 +10,7 @@ import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model
 import { FoodZone } from '../../admin/models/zone.model.js';
 import { FoodFeeSettings } from '../../admin/models/feeSettings.model.js';
 import { ValidationError, ForbiddenError, NotFoundError } from '../../../../core/auth/errors.js';
+import { isMaintenanceMode } from '../../admin/services/businessSettings.service.js';
 import { assertMethodAllowed, isPickupMethod } from '../../settings/services/orderMethods.service.js';
 import { buildPaginationOptions, buildPaginatedResult } from '../../../../utils/helpers.js';
 import { FoodCoupon } from '../../settings/models/foodCoupon.model.js';
@@ -174,6 +175,8 @@ function withTrainDelivery(dto, { store, station }) {
 }
 
 export async function createOrder(userId, dto) {
+  // Maintenance mode (super admin header switch): no new customer orders until it is turned off
+  if (await isMaintenanceMode()) throw new ValidationError('We are not taking orders right now. Please try again in a little while.');
   // A train order: the super admin's station mapping decides the store, whatever the client sent
   const trainStore = dto.train ? await resolveTrainStore(dto.train.stationCode, { at: dto.scheduledAt }) : null;
   if (trainStore) dto = withTrainDelivery(dto, trainStore);

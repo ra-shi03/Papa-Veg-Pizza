@@ -145,7 +145,7 @@ export default function AddFranchiseStores({ isOpen, onClose, store, onSave }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-3 lg:pl-[280px]">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-3 lg:pl-[var(--panel-sidebar-w,320px)]">
       <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl h-[85vh] md:h-[580px] rounded-xl shadow-2xl flex flex-col overflow-hidden border border-zinc-200 dark:border-zinc-800 animate-in zoom-in-95">
         
         {/* Modal Header */}

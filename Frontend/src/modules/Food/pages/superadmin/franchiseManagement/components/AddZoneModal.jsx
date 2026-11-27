@@ -141,7 +141,7 @@ export default function AddZoneModal({ isOpen, onClose, onSubmit, regions = [], 
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm lg:pl-[280px]" id="add-zone-modal">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm lg:pl-[var(--panel-sidebar-w,320px)]" id="add-zone-modal">
       <div className="bg-white dark:bg-zinc-950 w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-900 animate-scaleUp">
         {/* Header */}
         <div className="p-4 border-b border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-900/40 flex justify-between items-center">

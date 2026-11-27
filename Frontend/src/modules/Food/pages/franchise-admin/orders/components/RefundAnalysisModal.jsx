@@ -20,7 +20,7 @@ export default function RefundAnalysisModal({ isOpen, onClose }) {
       />
 
       {/* Modal Positioning Container (shifted to avoid sidebar) */}
-      <div className="fixed inset-0 lg:left-[280px] flex items-center justify-center p-4 z-10 pointer-events-none">
+      <div className="fixed inset-0 lg:left-[var(--panel-sidebar-w,320px)] flex items-center justify-center p-4 z-10 pointer-events-none">
         
         {/* Modal Container (1200px Max Width) */}
         <div className="relative w-full max-w-[1200px] h-[90vh] bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col pointer-events-auto animate-scale-up text-xs font-semibold text-zinc-700 dark:text-zinc-350">

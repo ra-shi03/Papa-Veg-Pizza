@@ -34,7 +34,7 @@ export default function RefundHistoryModal({ visible, onClose, orderId, userRole
   };
 
   return (
-    <div className="fixed inset-y-0 left-0 right-0 lg:left-[280px] z-50 flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-y-0 left-0 right-0 lg:left-[var(--panel-sidebar-w,320px)] z-50 flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
         className="w-full max-w-3xl bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}

@@ -52,6 +52,7 @@ const schema = z.object({
     secondaryColor: color('Secondary colour'),
     accentColor: color('Accent colour'),
     themeMode: z.enum(['light', 'dark']),
+    maintenanceMode: z.boolean(),
     trainDelivery,
 }).partial();
 

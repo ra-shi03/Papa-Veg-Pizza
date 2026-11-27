@@ -5,6 +5,7 @@ import { useStoreLiveRefresh } from "../api/storeOrdersApi"
 import Sidebar from "./Sidebar"
 import Navbar from "./Navbar"
 import { API_BASE_URL } from "@food/api/config"
+import "@food/styles/admin-jr.css" // Jharkhand Rasoi admin look for every Store Manager page
 
 export default function StoreOperationsLayout() {
   useStoreLiveRefresh()   // orders, kitchen, tasks, complaints and attendance update the moment they change
@@ -46,7 +47,7 @@ export default function StoreOperationsLayout() {
       {/* Main Content Area */}
       <div 
         id="store-ops-main-content" 
-        className={`flex-1 flex min-h-0 flex-col transition-all duration-300 ease-in-out min-w-0 relative lg:ml-[280px]`}
+        className={`flex-1 flex min-h-0 flex-col transition-all duration-300 ease-in-out min-w-0 relative lg:ml-[var(--panel-sidebar-w,320px)]`}
       >
         {/* Top Navbar */}
         <Navbar 
@@ -65,7 +66,7 @@ export default function StoreOperationsLayout() {
         <AttendanceBanner role={role} />
 
         {/* Page Content */}
-        <main className="flex-1 min-h-0 w-full max-w-full overflow-x-hidden overflow-y-auto bg-neutral-100 relative pt-0">
+        <main className="jr-admin flex-1 min-h-0 w-full max-w-full overflow-x-hidden overflow-y-auto bg-neutral-100 relative pt-0">
           <Outlet context={{ role, onRoleChange: handleRoleChange }} />
         </main>
       </div>

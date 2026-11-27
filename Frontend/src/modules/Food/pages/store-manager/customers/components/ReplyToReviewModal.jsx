@@ -83,7 +83,7 @@ export default function ReplyToReviewModal({
 
   return (
     <div 
-      className="fixed inset-y-0 left-0 right-0 lg:left-[280px] z-60 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-y-0 left-0 right-0 lg:left-[var(--panel-sidebar-w,320px)] z-60 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div 

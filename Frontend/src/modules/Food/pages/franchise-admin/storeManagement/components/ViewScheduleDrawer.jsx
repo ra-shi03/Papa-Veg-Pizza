@@ -72,7 +72,7 @@ export default function ViewScheduleDrawer({ isOpen, onClose, store }) {
   }
 
   return (
-    <div className="fixed inset-0 lg:left-[280px] z-50 flex justify-end bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 lg:left-[var(--panel-sidebar-w,320px)] z-50 flex justify-end bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
       {/* Backdrop overlay click */}
       <div className="absolute inset-0 cursor-pointer" onClick={onClose} />
 

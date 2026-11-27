@@ -51,7 +51,7 @@ export default function CloneCoupon({ isOpen, onClose, coupon, onSuccess }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center lg:pl-[280px] p-4">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center lg:pl-[var(--panel-sidebar-w,320px)] p-4">
       <div className="bg-white dark:bg-zinc-950 w-full max-w-md rounded-xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
         
         {/* Header */}

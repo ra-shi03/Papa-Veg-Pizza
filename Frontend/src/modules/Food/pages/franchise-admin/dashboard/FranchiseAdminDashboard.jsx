@@ -201,37 +201,6 @@ export default function FranchiseAdminDashboard() {
   return (
     <div className="px-4 pb-12 pt-4 bg-zinc-55 dark:bg-zinc-950/20">
       
-      {/* Upper Status Line */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 mt-1">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl md:text-2xl font-black tracking-tight text-zinc-900 dark:text-white">
-              Franchise Operations Console
-            </h2>
-            <span className="animate-pulse bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-emerald-500/20">
-              Live Radar
-            </span>
-          </div>
-          <p className="text-zinc-450 dark:text-zinc-500 text-xs font-semibold mt-0.5">
-            Currently monitoring live operational feeds from your franchise store network.
-          </p>
-        </div>
-
-        {/* Dynamic Filters summary */}
-        <div className="flex items-center gap-1.5 self-start sm:self-center">
-          <div className="flex items-center gap-1 px-2.5 py-1 text-[10px] bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 font-bold rounded-lg shadow-sm">
-            <Calendar size={12} className="text-[var(--primary)] shrink-0" />
-            <span>Range: {dateFilter === "custom" ? `${startDate} to ${endDate}` : dateFilter.toUpperCase()}</span>
-          </div>
-          {searchQuery && (
-            <div className="flex items-center gap-1 px-2.5 py-1 text-[10px] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20 border border-[var(--primary)]/30 dark:border-[var(--primary)]/20 text-[var(--primary)] font-bold rounded-lg shadow-sm">
-              <Search size={12} className="shrink-0" />
-              <span>Query: "{searchQuery}"</span>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Stats cards (Jharkhand Rasoi admin layout); they follow the header's date filter */}
       <StatsPanel
         eyebrow="Franchise Overview"

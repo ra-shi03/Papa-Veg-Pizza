@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom"
 import { useSystemTheme } from "@/shared/utils/themeSync"
 import ProtectedRoute from "@food/components/ProtectedRoute"
 import Sidebar from "../layouts/Sidebar"
+import "@food/styles/admin-jr.css" // Jharkhand Rasoi admin look for every Super Admin page
 import Navbar from "../layouts/Navbar"
 
 // Lazy load components for optimal bundle splitting
@@ -154,8 +155,8 @@ function SuperAdminLayout() {
         activeItem={activeItem}
         setActiveItem={() => { }}
       />
-      {/* 280px left padding on desktop to clear the fixed Sidebar */}
-      <div className="pt-16 min-h-screen lg:pl-[280px]">
+      {/* Left padding on desktop = the sidebar's width (320px, 80px collapsed) */}
+      <div className="jr-admin pt-16 min-h-screen lg:pl-[var(--panel-sidebar-w,320px)]">
         <Outlet />
       </div>
     </div>

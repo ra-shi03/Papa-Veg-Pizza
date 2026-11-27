@@ -548,7 +548,7 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center lg:pl-[280px] p-4">
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center lg:pl-[var(--panel-sidebar-w,320px)] p-4">
         {/* Broad 1380px Width Container for maximum readability */}
         <div className="bg-white dark:bg-zinc-955 w-full max-w-[1380px] h-[780px] max-h-[92vh] overflow-hidden rounded-2xl shadow-2xl flex flex-col border border-zinc-200 dark:border-zinc-800 animate-in fade-in zoom-in-95 duration-200">
           
@@ -1233,7 +1233,7 @@ export default function EditCoupon({ isOpen, onClose, coupon, onSuccess }) {
 
       {/* Discard Warning Sub-Modal */}
       {showExitWarning && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center lg:pl-[280px] p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center lg:pl-[var(--panel-sidebar-w,320px)] p-4">
           <div className="bg-white dark:bg-zinc-950 w-full max-w-sm rounded-xl p-5 border border-zinc-250 dark:border-zinc-800 shadow-2xl animate-in fade-in zoom-in-95 duration-155">
             <div className="flex items-center gap-3 text-amber-500 mb-3">
               <AlertCircle size={22} className="shrink-0" />

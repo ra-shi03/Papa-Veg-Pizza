@@ -1,156 +1,59 @@
 import { authKey } from "@/shared/utils/authNamespace";
-import React, { useState, useEffect, useRef } from "react"
-import { useNavigate, useSearchParams } from "react-router-dom"
-import {
-  Menu, Store, ChevronDown, User, LogOut, Settings as SettingsIcon,
-  AlertCircle, Search, Calendar, Clock, X, Trash2, Plus, Megaphone,
-  BarChart3, Sun, Moon, Laptop, Shield, Activity, FileText, Check, CheckCircle2,
-  AlertTriangle, ArrowRight, ClipboardList, ShieldAlert, Star
-} from "lucide-react"
-import { toast } from "sonner"
+import React, { useState, useEffect, useMemo } from "react"
+import { useNavigate } from "react-router-dom"
+import { User, ClipboardList, Flame, Package, Users, Sun, Moon } from "lucide-react"
+import PanelNavbar, { searchMenuPages } from "@food/components/PanelNavbar"
 import StoreOpenToggle from "./StoreOpenToggle"
+import { storeOperationsSidebarMenu } from "./storeOperationsSidebarMenu"
 import { useSystemTheme } from "@/shared/utils/themeSync"
 import { adminAPI } from "@food/api"
+import apiClient from "@/services/api/axios"
 
-export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
+// Store manager top bar (Jharkhand Rasoi admin header): maintenance status, search over the pages this role can
+// open, the store's low-stock alerts, the store open / closed switch, and the profile menu.
+
+const SO = "/store-operations"
+const isManager = (role) => !role || ["store_manager", "store-manager", "STORE_MANAGER"].includes(role)
+
+export default function Navbar({ onToggleSidebar, role }) {
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
-
-  // ----------------------------------------------------
-  // States & Refs
-  // ----------------------------------------------------
-  const [searchVal, setSearchVal] = useState(searchParams.get("q") || "")
-  const [recentSearches, setRecentSearches] = useState([])
-  const [showRecent, setShowRecent] = useState(false)
-  const [searchResults, setSearchResults] = useState([])
-  const searchRef = useRef(null)
-
-  // Date states
-  const currentDateParam = searchParams.get("date") || "today"
-  const [dateFilter, setDateFilter] = useState(currentDateParam)
-  const [showDateDropdown, setShowDateDropdown] = useState(false)
-
-  // Dropdown UI toggles
-  const [showProfileMenu, setShowProfileMenu] = useState(false)
-  const [selectedStore, setSelectedStore] = useState("")
-  const [showStoreDropdown, setShowStoreDropdown] = useState(false)
-  const [showRoleDropdown, setShowRoleDropdown] = useState(false)
-  const [showActionsDropdown, setShowActionsDropdown] = useState(false)
-
-  // Theme state
   const { themeMode } = useSystemTheme()
-
-  // Session Data & Alerts
-  const [userData, setUserData] = useState({ name: "Loading...", email: "Loading..." })
-  const [franchiseData, setFranchiseData] = useState(null)
-  const [storeData, setStoreData] = useState(null)
-
-  // A store team member works in the one store on their sign-in; the list holds only that store (sample stores are for
-  // standalone mode).
-  const storeList = (storeData ? [{ id: storeData.code || storeData._id, name: storeData.storeName || storeData.name || "", location: "" }] : [])
-
-  const dateLabels = {
-    today: "Today",
-    yesterday: "Yesterday",
-    week: "This Week",
-    month: "This Month"
-  }
-
-  const roleLabels = {
-    store_manager: "Store Manager",
-    kitchen_staff: "Kitchen Staff",
-    assistant_manager: "Assistant Manager",
-    store_owner: "Store Owner"
-  }
+  const [userData, setUserData] = useState({ name: "", email: "" })
+  const [storeName, setStoreName] = useState("")
 
   useEffect(() => {
-    const savedSearches = localStorage.getItem("store_recent_searches")
-    if (savedSearches) {
-      try { setRecentSearches(JSON.parse(savedSearches)) } catch (_) {}
-    }
-
-    // Immediately seed from cached local session
-    const localUser = localStorage.getItem(authKey("admin", "user"))
-    if (localUser) {
-      try {
-        const parsed = JSON.parse(localUser)
-        setUserData({
-          name: parsed.fullName || parsed.name || "Store Manager",
-          email: parsed.email || "No Email"
-        })
-        // Always set storeData if any store info exists
-        const sName = parsed.storeName || parsed.store?.name || null;
-        const sId   = parsed.storeId   || parsed.store?._id  || null;
-        const sCode = parsed.storeCode || parsed.store?.code || null;
-        if (sName || sId) {
-          setStoreData({ _id: sId, name: sName, code: sCode })
-        }
-        const fName = parsed.franchiseName || parsed.storeDetails?.franchiseName || parsed.franchise?.name || null;
-        if (fName) {
-          setFranchiseData({ name: fName })
-        }
-      } catch (_) {}
-    }
-
-    // Always fetch fresh authoritative data from /auth/me
-    adminAPI.getAdminProfile().then(res => {
-      // The getAdminProfile wraps the result, so try multiple paths
-      const user =
-        res?.data?.data?.user ??
-        res?.data?.user ??
-        res?.data?.data?.admin ??
-        res?.data?.admin ??
-        res;
-      if (!user) return;
-      setUserData({
-        name: user.name || user.fullName || "Store Manager",
-        email: user.email || "No Email"
-      });
-      // storeName comes directly on the user object from /auth/me
-      const sName = user.storeName || user.storeDetails?.name || user.store?.name || null;
-      const sId   = user.storeId   || user.store?._id  || null;
-      const sCode = user.storeCode || user.storeDetails?.storeCode || user.store?.code || null;
-      if (sName || sId) {
-        setStoreData({ _id: sId, name: sName, code: sCode })
+    // Seed from the cached sign-in, then refresh from /auth/me
+    try {
+      const parsed = JSON.parse(localStorage.getItem(authKey("admin", "user")) || "null")
+      if (parsed) {
+        setUserData({ name: parsed.fullName || parsed.name || "Store Manager", email: parsed.email || "" })
+        setStoreName(parsed.storeName || parsed.store?.name || "")
       }
-      const fName = user.franchiseName || user.storeDetails?.franchiseName || user.franchise?.name || null;
-      if (fName) {
-        setFranchiseData({ name: fName })
-      }
-    }).catch(() => {});
-
+    } catch (_) {}
+    adminAPI.getAdminProfile().then((res) => {
+      const user = res?.data?.data?.user ?? res?.data?.user ?? res?.data?.data?.admin ?? res?.data?.admin
+      if (!user) return
+      setUserData({ name: user.name || user.fullName || "Store Manager", email: user.email || "" })
+      const sName = user.storeName || user.storeDetails?.name || user.store?.name
+      if (sName) setStoreName(sName)
+    }).catch(() => {})
   }, [])
 
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (searchRef.current && !searchRef.current.contains(event.target)) {
-        setShowRecent(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
-
-  const handleDateSelect = (filter) => {
-    setDateFilter(filter)
-    setShowDateDropdown(false)
-    toast.success(`Date filter: ${dateLabels[filter]}`)
-  }
-
-  const toggleTheme = (mode) => {
-    localStorage.setItem("sa_themeMode", mode)
-    window.dispatchEvent(new Event("systemThemeChanged"))
-    toast.success(`Theme mode: ${mode}`)
-  }
+  // The pages this role can open (same filter as the sidebar)
+  const rolePages = useMemo(
+    () =>
+      storeOperationsSidebarMenu
+        .filter((entry) => entry.allowedRoles.includes(role))
+        .map((entry) => (entry.type === "section" ? { ...entry, items: entry.items.filter((i) => i.allowedRoles.includes(role)) } : entry)),
+    [role]
+  )
 
   const handleLogout = async () => {
     try {
-      const refreshToken = localStorage.getItem(authKey("admin", "refreshToken"));
-      if (refreshToken) {
-        await adminAPI.logout(refreshToken);
-      }
-    } catch (error) {
-      console.error("Logout API failed", error);
+      const refreshToken = localStorage.getItem(authKey("admin", "refreshToken"))
+      if (refreshToken) await adminAPI.logout(refreshToken)
+    } catch (_) {
+      // signing out locally even if the server call fails
     } finally {
       localStorage.removeItem(authKey("admin", "accessToken"))
       localStorage.removeItem(authKey("admin", "refreshToken"))
@@ -161,203 +64,45 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
     }
   }
 
-  const handleRoleChange = (newRole) => {
-    onRoleChange(newRole)
-    setShowRoleDropdown(false)
-    toast.success(`Role switched to ${roleLabels[newRole]}`)
+  const toggleTheme = () => {
+    const next = themeMode === "dark" ? "light" : "dark"
+    localStorage.setItem("sa_themeMode", next)
+    window.dispatchEvent(new Event("systemThemeChanged"))
   }
 
   return (
-    <>
-      <header className="sticky top-0 w-full flex justify-between items-center px-4 md:px-6 h-16 bg-white dark:bg-zinc-900 border-b border-zinc-150 dark:border-zinc-800 z-40 transition-all duration-300">
-        
-        {/* LEFT SECTION: Hamburger & Store Selector */}
-        <div className="flex items-center gap-4 shrink-0">
-          <button
-            onClick={onToggleSidebar}
-            className="p-1.5 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-900 rounded-lg transition-all lg:hidden"
-            aria-label="Toggle Sidebar"
-          >
-            <Menu size={18} />
-          </button>
-          
-          <div className="flex items-center gap-3">
-            {/* Brand / Store Name — RBAC: store manager & kitchen staff see only store name */}
-            <span
-              onClick={() => navigate("/store-operations/dashboard")}
-              className="text-xs font-black tracking-wider text-zinc-900 dark:text-white uppercase cursor-pointer select-none hover:text-[var(--primary)] transition-colors hidden sm:inline"
-            >
-              {(role === "kitchen_staff" || role === "store_manager")
-                ? (storeData?.name || "")
-                : (franchiseData?.name || "PAPA VEG OPS")}
-            </span>
-
-            {/* Separator + Store Switcher — hidden for kitchen staff */}
-            {role !== "kitchen_staff" && (
-              <>
-                <span className="text-zinc-300 dark:text-zinc-700 hidden sm:inline">|</span>
-                
-                {/* Store Selector */}
-                <div className="relative">
-              <button
-                onClick={() => {
-                  setShowStoreDropdown(!showStoreDropdown)
-                  setShowDateDropdown(false)
-                    setShowProfileMenu(false)
-                  setShowActionsDropdown(false)
-                  setShowRoleDropdown(false)
-                }}
-                className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors cursor-pointer"
-              >
-                <span>
-                  {storeData
-                    ? `Store #${storeData.code || selectedStore} (${storeData.storeName || storeData.name || ''})`
-                    : selectedStore
-                  }
-                </span>
-                <ChevronDown size={10} className={`text-zinc-400 transition-transform duration-150 ${showStoreDropdown ? "rotate-180" : ""}`} />
-              </button>
-
-              {showStoreDropdown && (
-                <div className="absolute left-0 mt-2 w-52 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 shadow-xl py-1.5 z-50 animate-in fade-in duration-100">
-                  {storeList.map((store) => (
-                    <button
-                      key={store.id}
-                      onClick={() => {
-                        setShowStoreDropdown(false)
-                        
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs font-bold text-zinc-650 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
-                    >
-                      Store #{store.id} - {store.name}{store.location ? ` (${store.location})` : ""}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            </>
-          )}
-          </div>
-        </div>
-
-        {/* MIDDLE SECTION: Search Bar Removed */}
-
-        {/* RIGHT SECTION: Quick Actions, Role Switcher, Alerts & User Profile */}
-        <div className="flex items-center gap-3 shrink-0 text-xs font-bold text-zinc-650 dark:text-zinc-300">
-          
-          {/* Store time: the store manager opens / closes the store for customer orders */}
-          {(!role || ["store_manager", "store-manager", "STORE_MANAGER"].includes(role)) && (
-            <StoreOpenToggle variant="compact" storeName={storeData?.name || storeData?.storeName || ""} />
-          )}
-
-          {/* PREMIUM DEMO ROLE SWITCHER REMOVED */}
-
-          {/* Quick Actions & Theme Toggle Removed */}
-
-          {/* Date Filter */}
-          <div className="relative">
-            <button
-              onClick={() => {
-                setShowDateDropdown(!showDateDropdown)
-                setShowStoreDropdown(false)
-                setShowProfileMenu(false)
-                setShowRoleDropdown(false)
-                setShowActionsDropdown(false)
-              }}
-              className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors cursor-pointer"
-            >
-              <Calendar size={12} className="text-zinc-400" />
-              <span className="hidden sm:inline">{dateLabels[dateFilter]}</span>
-              <ChevronDown size={10} className={`text-zinc-400 transition-transform duration-150 ${showDateDropdown ? "rotate-180" : ""}`} />
-            </button>
-            
-            {showDateDropdown && (
-              <div className="absolute right-0 mt-2 w-36 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 shadow-xl py-1.5 z-50 animate-in fade-in duration-100">
-                {Object.keys(dateLabels).map((filter) => (
-                  <button
-                    key={filter}
-                    onClick={() => handleDateSelect(filter)}
-                    className={`w-full text-left px-3.5 py-1.5 text-xs font-bold transition-colors ${
-                      dateFilter === filter
-                        ? "text-[var(--primary)] bg-zinc-50 dark:bg-zinc-800/50"
-                        : "text-zinc-650 dark:text-zinc-450 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                    }`}
-                  >
-                    {dateLabels[filter]}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <span className="text-zinc-200 dark:text-zinc-800">|</span>
-
-          {/* User Profile */}
-          <div className="relative">
-            <button
-              onClick={() => {
-                setShowProfileMenu(!showProfileMenu)
-                setShowStoreDropdown(false)
-                setShowDateDropdown(false)
-                setShowRoleDropdown(false)
-                setShowActionsDropdown(false)
-              }}
-              className="flex items-center focus:outline-none"
-            >
-              <div className="w-7 h-7 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-150 flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-90 transition-all">
-                <span className="text-[10px] font-black text-zinc-700 dark:text-zinc-350">
-                  {userData.name.split(" ").map(n => n[0]).join("").toUpperCase().substring(0, 2)}
-                </span>
-              </div>
-            </button>
-
-            {showProfileMenu && (
-              <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 shadow-xl py-1.5 z-50 animate-in fade-in duration-100 text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                <div className="px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 mb-1.5">
-                  <p className="font-extrabold text-zinc-800 dark:text-white truncate">{userData.name}</p>
-                  <p className="text-[9px] text-zinc-400 font-semibold truncate mt-0.5">{userData.email}</p>
-                </div>
-                
-                {/* Theme Selector Inside Profile Dropdown */}
-                <div className="px-3 py-1 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-850">
-                  <span className="text-zinc-500 font-semibold text-[11px]">Theme</span>
-                  <div className="flex gap-1 border border-zinc-200 dark:border-zinc-800 p-0.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 scale-90 origin-right">
-                    {[
-                      { id: "light", icon: <Sun size={10} /> },
-                      { id: "dark", icon: <Moon size={10} /> }
-                    ].map(t => (
-                      <button
-                        key={t.id}
-                        onClick={() => toggleTheme(t.id)}
-                        className={`p-1 rounded-md transition-colors ${
-                          themeMode === t.id ? "bg-[var(--primary)] text-white" : "text-zinc-405 hover:text-zinc-700 dark:hover:text-zinc-300"
-                        }`}
-                      >
-                        {t.icon}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <button
-                  onClick={() => { setShowProfileMenu(false); navigate("/store-operations/profile"); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-left transition-colors"
-                >
-                  <User size={13} className="text-zinc-400" />
-                  <span>My Profile</span>
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-left text-[var(--primary)] transition-colors border-t border-zinc-100 dark:border-zinc-800 mt-1 pt-2"
-                >
-                  <LogOut size={13} className="text-[var(--primary)]" />
-                  <span>Sign Out</span>
-                </button>
-              </div>
-            )}
-          </div>
-
-        </div>
-      </header>
-    </>
+    <PanelNavbar
+      onToggleSidebar={onToggleSidebar}
+      homePath={`${SO}/dashboard`}
+      title={storeName || undefined}
+      recentKey="store_recent_searches"
+      search={async (q) => searchMenuPages(rolePages, q)}
+      quickActions={[
+        { icon: ClipboardList, label: "Incoming Orders", path: `${SO}/orders/incoming` },
+        { icon: Flame, label: "Kitchen Queue", path: `${SO}/kitchen/queue` },
+        { icon: Package, label: "Stock", path: `${SO}/inventory/stock` },
+        { icon: Users, label: "Staff", path: `${SO}/staff/list` },
+      ]}
+      loadAlerts={async () => {
+        const res = await apiClient.get("/store/dashboard/inventory-alerts")
+        const list = res?.data?.data?.lowStock || res?.data?.lowStock || []
+        return list.map((a) => ({
+          id: a.ingredientId,
+          title: `Low stock: ${a.ingredient}`,
+          detail: `${a.availableQty} ${a.unit} left (reorder at ${a.reorderLevel})`,
+          tag: a.severity || "alert",
+          critical: String(a.severity).toLowerCase() === "critical",
+        }))
+      }}
+      alertsSubtitle="Low-stock alerts for this store"
+      alertsPath={`${SO}/inventory/low-stock`}
+      user={userData}
+      menuItems={[
+        { icon: User, label: "Profile", onClick: () => navigate(`${SO}/profile`) },
+        { icon: themeMode === "dark" ? Sun : Moon, label: themeMode === "dark" ? "Light mode" : "Dark mode", onClick: toggleTheme },
+      ]}
+      onLogout={handleLogout}
+      extra={isManager(role) ? <StoreOpenToggle variant="compact" storeName={storeName} /> : null}
+    />
   )
 }

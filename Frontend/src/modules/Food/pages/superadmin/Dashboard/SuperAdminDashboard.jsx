@@ -226,25 +226,11 @@ export default function SuperAdminDashboard() {
       />
 
       {/* Main Container Area */}
-      <main className={`pt-16 pb-12 px-3 md:px-4 transition-all duration-300 lg:ml-[280px]`}>
+      <main className="jr-admin pt-16 pb-12 px-3 md:px-4 transition-all duration-300 lg:ml-[var(--panel-sidebar-w,320px)]">
 
-        {/* Dynamic Navigation Header */}
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl md:text-2xl font-extrabold tracking-tight text-black dark:text-white">
-                {activeItem === "Dashboard" ? "SuperAdmin Dashboard" : activeItem}
-              </h2>
-              <span className="animate-pulse bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-bold px-1.5 py-0.2 rounded-full border border-emerald-500/20">
-                Live Feed
-              </span>
-            </div>
-            <p className="text-black dark:text-white text-xs font-medium mt-0.5">
-              {dash.summary ? `${dash.summary.activeStores} active stores across the company.` : "Loading the company figures..."}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-1.5 w-full sm:flex sm:items-center sm:gap-2 sm:w-auto">
+        {/* Page actions */}
+        <header className="flex items-center justify-end gap-3 mt-4 mb-4">
+          <div className="flex items-center gap-2">
             {/* Quick Settings Customizer Toggle */}
             <button
               onClick={() => setShowThemePanel(!showThemePanel)}
@@ -253,13 +239,6 @@ export default function SuperAdminDashboard() {
               <Sliders size={12} className="text-[var(--primary)] shrink-0" />
               <span className="hidden sm:inline">Theme Controls</span>
               <span className="sm:hidden">Theme</span>
-            </button>
-
-            {/* Datepicker Simulation */}
-            <button className="flex items-center justify-center gap-1 px-2.5 py-1.5 text-[10px] sm:text-xs font-bold bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-sm hover:bg-zinc-50 text-[var(--primary)] dark:text-white w-full whitespace-nowrap">
-              <Calendar size={12} className="shrink-0" />
-              <span>Today: {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-              <ChevronDown size={10} className="opacity-60 shrink-0 hidden sm:block" />
             </button>
           </div>
         </header>

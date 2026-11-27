@@ -62,7 +62,7 @@ export default function PointAdjustmentModal({ isOpen, onClose, customerData, on
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 lg:left-[280px] z-[65] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 lg:left-[var(--panel-sidebar-w,320px)] z-[65] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="w-full max-w-[500px] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col text-zinc-850 dark:text-zinc-100 animate-in zoom-in-95 duration-200">
         
         {/* Header */}

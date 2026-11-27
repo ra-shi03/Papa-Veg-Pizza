@@ -301,7 +301,7 @@ export default function EditTerritoryModal({
   const selectedZoneCoordinates = selectedZone ? selectedZone.coordinates : [];
 
   return (
-    <div className="fixed inset-0 bg-black/55 backdrop-blur-sm z-[70] flex items-center justify-center p-3 sm:p-4 lg:pl-[280px] select-none">
+    <div className="fixed inset-0 bg-black/55 backdrop-blur-sm z-[70] flex items-center justify-center p-3 sm:p-4 lg:pl-[var(--panel-sidebar-w,320px)] select-none">
       <div className="bg-white dark:bg-zinc-950 w-full max-w-lg rounded-xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-900 flex flex-col max-h-[90vh] animate-scaleUp">
         {/* Header */}
         <div className="p-4 border-b border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-900/40 flex justify-between items-center">

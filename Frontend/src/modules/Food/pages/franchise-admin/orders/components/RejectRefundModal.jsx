@@ -50,7 +50,7 @@ export default function RejectRefundModal({ isOpen, onClose, request }) {
       />
 
       {/* Center Wrapper shifted to prevent sidebar overlap */}
-      <div className="fixed inset-0 lg:left-[280px] flex items-center justify-center p-4 z-10 pointer-events-none">
+      <div className="fixed inset-0 lg:left-[var(--panel-sidebar-w,320px)] flex items-center justify-center p-4 z-10 pointer-events-none">
         
         {/* Modal Container: 600px Max Width */}
         <form 

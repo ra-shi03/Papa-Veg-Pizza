@@ -495,7 +495,7 @@ export default function CreateCoupon({ isOpen, onClose, onSuccess }) {
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center lg:pl-[280px] p-4">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center lg:pl-[var(--panel-sidebar-w,320px)] p-4">
       {/* Broad 1380px Width Container for maximum readability */}
       <div className="bg-white dark:bg-zinc-950 w-full max-w-[1380px] h-[780px] max-h-[92vh] overflow-hidden rounded-2xl shadow-2xl flex flex-col border border-zinc-200 dark:border-zinc-800 animate-in fade-in zoom-in-95 duration-200">
         

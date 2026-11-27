@@ -73,7 +73,7 @@ export default function CustomerDetailsDrawer({ customerId, isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 lg:left-[280px] z-50 overflow-hidden select-none">
+    <div className="fixed inset-0 lg:left-[var(--panel-sidebar-w,320px)] z-50 overflow-hidden select-none">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300"

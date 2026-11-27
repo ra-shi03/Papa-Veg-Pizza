@@ -75,7 +75,7 @@ export default function EditTierModal({ isOpen, onClose, tierData, onSaveSuccess
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 lg:left-[280px] z-[65] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 lg:left-[var(--panel-sidebar-w,320px)] z-[65] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="w-full max-w-[600px] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col text-zinc-850 dark:text-zinc-100 max-h-[85vh]">
         
         {/* Header */}

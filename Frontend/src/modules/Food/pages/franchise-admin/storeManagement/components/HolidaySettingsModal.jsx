@@ -92,7 +92,7 @@ export default function HolidaySettingsModal({ isOpen, onClose, store, onSaveSuc
   }
 
   return (
-    <div className="fixed inset-0 lg:left-[280px] z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 lg:left-[var(--panel-sidebar-w,320px)] z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="relative w-full max-w-xl max-h-[85vh] bg-white dark:bg-slate-950 rounded-2xl border border-slate-150 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden transition-all scale-in duration-200">
         
         {/* Close Button */}

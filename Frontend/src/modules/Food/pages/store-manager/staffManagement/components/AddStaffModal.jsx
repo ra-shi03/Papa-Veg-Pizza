@@ -65,28 +65,6 @@ export default function AddStaffModal({ isOpen, onClose }) {
   const [imageError, setImageError] = useState("");
   const fileInputRef = useRef(null);
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    return localStorage.getItem("store_sidebar_collapsed") === "true";
-  });
-
-  useEffect(() => {
-    const handleCollapse = (e) => {
-      if (e && e.detail !== undefined) {
-        setSidebarCollapsed(e.detail);
-      } else {
-        setSidebarCollapsed(localStorage.getItem("store_sidebar_collapsed") === "true");
-      }
-    };
-
-    window.addEventListener("sidebarCollapseChanged", handleCollapse);
-    window.addEventListener("click", handleCollapse);
-
-    return () => {
-      window.removeEventListener("sidebarCollapseChanged", handleCollapse);
-      window.removeEventListener("click", handleCollapse);
-    };
-  }, []);
-
   const {
     register,
     handleSubmit,
@@ -210,14 +188,15 @@ export default function AddStaffModal({ isOpen, onClose }) {
   const contentStyle = {
     maxWidth: "56rem", // 4xl
     ...(isDesktop && {
-      left: sidebarCollapsed ? "calc(50% + 36px)" : "calc(50% + 140px)",
-      width: sidebarCollapsed ? "calc(100vw - 72px - 2rem)" : "calc(100vw - 280px - 2rem)"
+      left: "calc(50% + var(--panel-sidebar-w, 320px) / 2)",
+      width: "calc(100vw - var(--panel-sidebar-w, 320px) - 2rem)"
     })
   };
 
+  // The sidebar's current width (wide or collapsed) comes from the CSS variable the sidebar sets
   const overlayStyle = {
     ...(isDesktop && {
-      left: sidebarCollapsed ? "72px" : "280px"
+      left: "var(--panel-sidebar-w, 320px)"
     })
   };
 

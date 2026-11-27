@@ -43,7 +43,7 @@ export default function ComplaintDetailsModal({
 
   return (
     <div 
-      className="fixed inset-y-0 left-0 right-0 lg:left-[280px] z-50 flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-y-0 left-0 right-0 lg:left-[var(--panel-sidebar-w,320px)] z-50 flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div 

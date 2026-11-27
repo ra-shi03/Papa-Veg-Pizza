@@ -315,7 +315,7 @@ export default function FranchiseApprovals() {
         onPreviewDocument={handlePreviewDocClick}
       />
 
-      {/* MODALS WITH SIDEBAR OFFSET lg:pl-[280px] */}
+      {/* MODALS WITH SIDEBAR OFFSET lg:pl-[var(--panel-sidebar-w,320px)] */}
 
       {/* Modal 1: Approve Franchise 3-Step Wizard */}
       <AppFranchiseModal
@@ -343,7 +343,7 @@ export default function FranchiseApprovals() {
 
       {/* Modal 4: Interactive Document Preview Modal */}
       {isPreviewOpen && previewDoc && (
-        <div className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[80] flex items-center justify-center p-4 lg:pl-[280px]" id="preview-modal">
+        <div className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[80] flex items-center justify-center p-4 lg:pl-[var(--panel-sidebar-w,320px)]" id="preview-modal">
           <div className="bg-white dark:bg-zinc-950 w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-900 animate-scaleUp">
             {/* Header with actions */}
             <div className="p-4 border-b border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-900/40 flex justify-between items-center">
@@ -424,7 +424,7 @@ export default function FranchiseApprovals() {
 
       {/* Modal: All Documents Viewer */}
       {isDocsViewerOpen && (
-        <div className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[70] flex items-center justify-center p-4 lg:pl-[280px]">
+        <div className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[70] flex items-center justify-center p-4 lg:pl-[var(--panel-sidebar-w,320px)]">
           <div className="bg-white dark:bg-zinc-950 w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-900 flex flex-col max-h-[80vh]">
             <div className="p-4 border-b border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-900/40 flex justify-between items-center shrink-0">
               <h3 className="text-sm font-black uppercase tracking-wider text-black dark:text-zinc-100">Uploaded Documents</h3>

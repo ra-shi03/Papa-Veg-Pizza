@@ -8,6 +8,7 @@ import { FoodZone } from '../models/zone.model.js';
 import { FoodCategory } from '../models/category.model.js';
 import { FoodItem } from '../models/food.model.js';
 import { Product } from '../models/product.model.js';
+import { CategoryProduct } from '../models/categoryProduct.model.js';
 import { DeliveryBonusTransaction } from '../models/deliveryBonusTransaction.model.js';
 import { FoodEarningAddon } from '../models/earningAddon.model.js';
 import { Addon as FoodAddon } from '../models/addon.model.js';
@@ -257,35 +258,37 @@ export async function globalSearch(query = '') {
     const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = { $regex: escaped, $options: 'i' };
 
-    const [orders, users, stores, items, categories, addons] = await Promise.all([
-        FoodOrder.find({
-            $or: [{ orderId: regex }, { orderStatus: regex }]
-        })
+    // Customers: users with the CUSTOMER role, matched on mobile / email or on the name in their profile
+    const [customerRole, profiles] = await Promise.all([
+        Role.findOne({ code: 'CUSTOMER' }).select('_id').lean(),
+        Profile.find({ $or: [{ firstName: regex }, { lastName: regex }] }).limit(20).select('userId firstName lastName').lean(),
+    ]);
+    const nameOf = new Map(profiles.map((p) => [String(p.userId), [p.firstName, p.lastName].filter(Boolean).join(' ')]));
+
+    const [orders, users, stores, products, categories, addons] = await Promise.all([
+        FoodOrder.find({ $or: [{ order_id: regex }, { customerName: regex }] })
+            .sort({ createdAt: -1 })
             .limit(5)
-            .select('orderId orderStatus createdAt')
+            .select('order_id orderStatus customerName')
             .lean(),
         FoodUser.find({
-            $or: [{ name: regex }, { email: regex }, { phone: regex }],
-            role: 'USER'
+            primaryRole: customerRole?._id ?? null,
+            $or: [{ mobile: regex }, { email: regex }, { _id: { $in: profiles.map((p) => p.userId) } }],
         })
             .limit(5)
-            .select('name email phone')
+            .select('mobile email')
             .lean(),
-        FoodStore.find({
-            $or: [{ storeName: regex }, { managerName: regex }, { city: regex }]
-        })
+        FoodStore.find({ $or: [{ storeName: regex }, { city: regex }] })
             .limit(5)
-            .select('storeName city area status')
+            .select('storeName city approvalStatus')
             .lean(),
-        FoodItem.find({
-            $or: [{ name: regex }, { description: regex }]
-        })
+        Product.find({ name: regex })
             .limit(5)
-            .select('name description price')
+            .select('name status')
             .lean(),
-        FoodCategory.find({ name: regex })
+        CategoryProduct.find({ label: regex })
             .limit(3)
-            .select('name image')
+            .select('label')
             .lean(),
         FoodAddon.find({ name: regex })
             .limit(3)
@@ -293,54 +296,56 @@ export async function globalSearch(query = '') {
             .lean()
     ]);
 
+    // Paths are the super admin panel's pages (the only panel this search is open to)
+    const SA = '/food/superadmin';
     const results = [];
 
     orders.forEach(o => results.push({
         id: o._id,
         type: 'Order',
-        title: `#${o.orderId}`,
-        description: `Status: ${o.orderStatus}`,
-        path: `/admin/food/orders/all?orderId=${o._id}`
+        title: `#${o.order_id}`,
+        description: `${o.customerName || 'Customer'} · ${String(o.orderStatus || '').replace(/_/g, ' ')}`,
+        path: `${SA}/orders`
     }));
 
     users.forEach(u => results.push({
         id: u._id,
         type: 'User',
-        title: u.name || 'Unnamed',
-        description: `${u.email || u.phone || ''}`,
-        path: `/admin/food/customers?userId=${u._id}`
+        title: nameOf.get(String(u._id)) || u.mobile || 'Customer',
+        description: [u.mobile, u.email].filter(Boolean).join(' · '),
+        path: `${SA}/customers?userId=${u._id}`
     }));
 
     stores.forEach(r => results.push({
         id: r._id,
         type: 'Store',
         title: r.storeName,
-        description: `${r.area || ''}, ${r.city || ''} (${r.status})`,
-        path: `/admin/food/stores?storeId=${r._id}`
+        description: [r.city, r.approvalStatus].filter(Boolean).join(' · '),
+        path: `${SA}/franchise-stores`
     }));
 
-    items.forEach(i => results.push({
+    products.forEach(i => results.push({
         id: i._id,
         type: 'Product',
         title: i.name,
-        description: `Price: â‚¹${i.price}`,
-        path: `/admin/food/foods?productId=${i._id}`
+        description: i.status || 'Product',
+        path: `${SA}/products`
     }));
 
     categories.forEach(c => results.push({
         id: c._id,
         type: 'Category',
-        title: c.name,
-        description: 'Menu Category',
-        path: `/admin/food/categories`
+        title: c.label,
+        description: 'Menu category',
+        path: `${SA}/categories`
     }));
 
     addons.forEach(a => results.push({
         id: a._id,
         type: 'Addon',
         title: a.name,
-        description: `Price: â‚¹${a.price}`,
-        path: `/admin/food/addons`
+        description: `Price: ₹${a.price ?? 0}`,
+        path: `${SA}/addons`
     }));
 
     return results;

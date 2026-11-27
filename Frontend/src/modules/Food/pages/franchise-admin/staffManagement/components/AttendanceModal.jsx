@@ -22,7 +22,7 @@ export default function AttendanceModal({ isOpen, onClose, manager }) {
   }
 
   return (
-    <div className="fixed lg:left-[280px] left-0 top-[64px] right-0 bottom-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed lg:left-[var(--panel-sidebar-w,320px)] left-0 top-[64px] right-0 bottom-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity" 

@@ -426,7 +426,7 @@ export default function FranchiseStores() {
 
       {/* INLINE MODAL 1: Reassign Store Manager */}
       {isReassignOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-3 lg:pl-[280px]">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-3 lg:pl-[var(--panel-sidebar-w,320px)]">
           <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 animate-in zoom-in-95">
             <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-zinc-55 dark:bg-zinc-950">
               <h3 className="text-xs font-bold text-black dark:text-white uppercase tracking-wider">Reassign Store Manager</h3>
@@ -496,7 +496,7 @@ export default function FranchiseStores() {
 
       {/* INLINE MODAL 2: Change Franchise */}
       {isChangeFranchiseOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-3 lg:pl-[280px]">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-3 lg:pl-[var(--panel-sidebar-w,320px)]">
           <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 animate-in zoom-in-95">
             <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-zinc-55 dark:bg-zinc-955">
               <h3 className="text-xs font-bold text-black dark:text-white uppercase tracking-wider">Change Store Franchise</h3>
@@ -577,7 +577,7 @@ export default function FranchiseStores() {
 
       {/* INLINE MODAL 3: Suspend / Activate Confirmation */}
       {isSuspendActivateOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-3 lg:pl-[280px]">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-3 lg:pl-[var(--panel-sidebar-w,320px)]">
           <div className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 animate-in zoom-in-95">
             <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-zinc-55 dark:bg-zinc-950">
               <h3 className="text-xs font-bold text-black dark:text-white uppercase tracking-wider">
@@ -623,7 +623,7 @@ export default function FranchiseStores() {
 
       {/* INLINE MODAL 4: Close Confirmation */}
       {isCloseStoreOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-3 lg:pl-[280px]">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-3 lg:pl-[var(--panel-sidebar-w,320px)]">
           <div className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 animate-in zoom-in-95">
             <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-zinc-55 dark:bg-zinc-950">
               <h3 className="text-xs font-bold text-black dark:text-white uppercase tracking-wider">

@@ -1,0 +1,236 @@
+/*
+ * Super Admin, Franchise Admin and Store Manager pages in the Jharkhand Rasoi admin style (each panel puts the
+ * class jr-admin on its page area and imports this file): plain slate greys, normal-case semibold labels, roomy
+ * inputs, rounded-lg medium-weight buttons, white rounded-xl cards with a soft shadow, readable text sizes.
+ * Buttons and focus rings keep the brand colour (var(--primary), set in Theme Controls).
+ *
+ * How it works: the pages are written with Tailwind classes, and Tailwind v4 keeps all its utilities in a cascade
+ * layer. Plain (unlayered) CSS always wins over a layer, so these rules restyle the existing classes on every page
+ * without touching the pages. Everything is scoped to .jr-admin (the page area): the sidebar and top bar are not
+ * affected. Colour rules are light-mode only (html:not(.dark)) so dark mode keeps its own colours.
+ */
+
+/* ---- Page ------------------------------------------------------------------------------------ */
+
+html:not(.dark) :is(.superadmin-theme, main.jr-admin) {
+  background-color: #f8fafc; /* slate-50 */
+}
+
+/* ---- Type ------------------------------------------------------------------------------------ */
+
+/* The tiny 8-11px text is the main "generated" look: bring it up to Jharkhand's readable sizes */
+.jr-admin :is([class*="text-[8px]"], [class*="text-[9px]"]) {
+  font-size: 0.6875rem; /* 11px */
+}
+.jr-admin [class*="text-[10px]"] {
+  font-size: 0.75rem; /* 12px */
+}
+.jr-admin [class*="text-[11px]"] {
+  font-size: 0.8125rem; /* 13px */
+}
+
+/* Bold / black / extra-bold on ordinary text -> semibold; only headings stay bold (Jharkhand: bold titles and figures,
+   semibold names and values, regular body text) */
+.jr-admin :is(.font-black, .font-extrabold, .font-bold):not(h1, h2, h3, h4, th) {
+  font-weight: 600;
+}
+.jr-admin :is(h1, h2, h3, h4):is(.font-black, .font-extrabold) {
+  font-weight: 700;
+}
+
+/* The "code" font used for numbers, IDs and amounts -> the normal font, with even-width digits so columns line up */
+.jr-admin .font-mono {
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+/* SHOUTY UPPERCASE labels and badges -> normal case. Table headers keep Jharkhand's uppercase, and so do the dashboard
+   stats cards (they use Jharkhand's tracking-[0.18em] / [0.2em] caption style). */
+.jr-admin .uppercase:not(th, .jr-keep-case, [class*="tracking-[0.1"], [class*="tracking-[0.2"]) {
+  text-transform: none;
+}
+
+/* Wide letter-spacing and tight headings */
+.jr-admin :is(.tracking-widest, .tracking-wider):not(th) {
+  letter-spacing: normal;
+}
+.jr-admin .tracking-tight {
+  letter-spacing: normal;
+}
+
+/* Pulsing text -> still text (loading skeletons and status dots keep their pulse: they carry no text size) */
+.jr-admin .animate-pulse:is([class*="text-["], .text-xs, .text-sm, .text-base, .text-lg, .text-xl) {
+  animation: none;
+}
+
+/* Italic notes -> upright, as in Jharkhand */
+.jr-admin .italic {
+  font-style: normal;
+}
+
+/* Pale zinc greys -> Jharkhand's slate text colours (light mode) */
+html:not(.dark) .jr-admin :is(.text-zinc-400, .text-zinc-450, .text-zinc-500) {
+  color: #64748b; /* slate-500 */
+}
+html:not(.dark) .jr-admin :is(.text-zinc-600, .text-zinc-650, .text-zinc-700) {
+  color: #475569; /* slate-600 */
+}
+html:not(.dark) .jr-admin :is(.text-zinc-800, .text-zinc-900) {
+  color: #0f172a; /* slate-900 */
+}
+
+.jr-admin h1 {
+  font-size: 1.25rem; /* text-xl */
+  font-weight: 700;
+  line-height: 1.75rem;
+}
+html:not(.dark) .jr-admin :is(h1, h2, h3) {
+  color: #0f172a; /* slate-900 */
+}
+html:not(.dark) .jr-admin .text-black {
+  color: #0f172a;
+}
+
+/* ---- Labels ---------------------------------------------------------------------------------- */
+
+/* (label[class] so this wins over the general text-size / weight rules above) */
+.jr-admin label,
+.jr-admin label[class] {
+  font-size: 0.8125rem; /* Jharkhand's text-sm in its compact admin scale (~13px) */
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+}
+html:not(.dark) .jr-admin label {
+  color: #334155; /* slate-700 */
+}
+
+/* ---- Inputs, selects, textareas -------------------------------------------------------------- */
+
+/* Text-like fields only; fields drawn inside a styled wrapper (border-0 / bg-transparent) keep their look */
+.jr-admin
+  :is(
+    input:not([type="checkbox"], [type="radio"], [type="color"], [type="range"], [type="file"], [type="hidden"]),
+    select,
+    textarea
+  ):not([class*="border-0"], [class*="border-none"], [class*="bg-transparent"]) {
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 0.5rem; /* rounded-lg */
+  padding: 0.625rem 1rem; /* py-2.5 px-4 */
+  font-size: 0.875rem; /* text-sm */
+  font-weight: 400;
+  line-height: 1.25rem;
+  box-shadow: none; /* drops shadow-inner */
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+html:not(.dark)
+  .jr-admin
+  :is(
+    input:not([type="checkbox"], [type="radio"], [type="color"], [type="range"], [type="file"], [type="hidden"]),
+    select,
+    textarea
+  ):not([class*="border-0"], [class*="border-none"], [class*="bg-transparent"]) {
+  border-color: #cbd5e1; /* slate-300 */
+  background-color: #ffffff;
+  color: #0f172a;
+}
+.jr-admin :is(input, select, textarea)::placeholder {
+  color: #94a3b8; /* slate-400 */
+  font-weight: 400;
+}
+
+/* Keep the room left for icons (search icon on the left, chevron on the right) and fixed heights */
+.jr-admin :is(input, select, textarea)[class*="pl-"] {
+  padding-left: revert-layer;
+}
+.jr-admin :is(input, select, textarea)[class*="pr-"] {
+  padding-right: revert-layer;
+}
+.jr-admin :is(input, select)[class*=" h-"],
+.jr-admin :is(input, select)[class^="h-"] {
+  padding-top: revert-layer;
+  padding-bottom: revert-layer;
+}
+
+/* Focus: brand-coloured border with a soft ring (Jharkhand uses border + ring-2) */
+.jr-admin
+  :is(
+    input:not([type="checkbox"], [type="radio"], [type="color"], [type="range"], [type="file"], [type="hidden"]),
+    select,
+    textarea
+  ):not([class*="border-0"], [class*="border-none"], [class*="bg-transparent"]):focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+/* ---- Buttons --------------------------------------------------------------------------------- */
+
+.jr-admin button {
+  text-transform: none;
+  letter-spacing: normal;
+}
+/* Jharkhand buttons are medium weight */
+.jr-admin button:is(.font-bold, .font-black, .font-extrabold, .font-semibold) {
+  font-weight: 500;
+}
+/* rounded-lg corners (pills and round icon buttons stay round) */
+.jr-admin button:is(.rounded-md, .rounded-xl, .rounded-2xl, .rounded-3xl) {
+  border-radius: 0.5rem;
+}
+/* No shrinking on click, no coloured glow under primary buttons */
+.jr-admin button:active {
+  scale: none;
+}
+.jr-admin button[class*="bg-[var(--primary)]"] {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+}
+/* Text buttons get Jharkhand's button text size */
+.jr-admin button:is([class*="bg-[var(--primary)]"], .border):is([class*="text-[9px]"], [class*="text-[10px]"], [class*="text-[11px]"], .text-xs) {
+  font-size: 0.8125rem; /* 13px */
+}
+
+/* ---- Cards ----------------------------------------------------------------------------------- */
+
+/* White bordered boxes -> Jharkhand card: rounded-xl, slate-200 border, soft shadow (the dashboard's rounded-3xl
+   stats panel is left as it is) */
+.jr-admin :is(div, section, form).border:is(.rounded-xl, .rounded-2xl).bg-white {
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+}
+html:not(.dark) .jr-admin :is(div, section, form).border:is(.rounded-xl, .rounded-2xl).bg-white {
+  border-color: #e2e8f0; /* slate-200 */
+}
+/* ...and Jharkhand's roomier card padding */
+.jr-admin :is(div, section, form).border:is(.rounded-xl, .rounded-2xl).bg-white:is(.p-3, .p-4) {
+  padding: 1.25rem;
+}
+@media (min-width: 768px) {
+  .jr-admin :is(div, section, form).border:is(.rounded-xl, .rounded-2xl).bg-white:is(.p-3, .p-4) {
+    padding: 1.5rem; /* p-6 */
+  }
+}
+
+/* ---- Tables ---------------------------------------------------------------------------------- */
+
+.jr-admin th,
+.jr-admin th[class] {
+  padding: 0.875rem 1.25rem;
+  font-size: 0.6875rem; /* Jharkhand: 10-11px bold uppercase headers */
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+html:not(.dark) .jr-admin th {
+  color: #334155; /* slate-700 */
+}
+html:not(.dark) .jr-admin thead {
+  background-color: #f8fafc; /* slate-50 */
+}
+.jr-admin td {
+  padding: 0.875rem 1.25rem;
+}
+html:not(.dark) .jr-admin tbody tr {
+  border-color: #f1f5f9; /* slate-100 */
+}

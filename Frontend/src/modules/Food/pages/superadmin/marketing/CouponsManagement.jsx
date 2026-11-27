@@ -1163,7 +1163,7 @@ export default function CouponsManagement() {
 
       {/* 5. Disable Coupon Confirmation Dialog */}
       {isDisableConfirmOpen && selectedCoupon && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center lg:pl-[280px] p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center lg:pl-[var(--panel-sidebar-w,320px)] p-4">
           <div className="bg-white dark:bg-zinc-950 w-full max-w-sm rounded-xl p-5 border border-zinc-250 dark:border-zinc-800 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center gap-3 text-amber-500 mb-3 select-none">
               <EyeOff size={22} className="shrink-0" />
@@ -1195,7 +1195,7 @@ export default function CouponsManagement() {
 
       {/* 6. Delete Coupon Confirmation Danger Dialog */}
       {isDeleteConfirmOpen && selectedCoupon && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center lg:pl-[280px] p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center lg:pl-[var(--panel-sidebar-w,320px)] p-4">
           <div className="bg-white dark:bg-zinc-955 w-full max-w-sm rounded-xl p-5 border border-zinc-250 dark:border-zinc-800 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center gap-3 text-rose-500 mb-3 select-none">
               <Trash2 size={22} className="shrink-0 animate-pulse" />

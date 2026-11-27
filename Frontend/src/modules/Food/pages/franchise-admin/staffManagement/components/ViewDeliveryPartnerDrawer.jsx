@@ -77,7 +77,7 @@ export default function ViewDeliveryPartnerDrawer({ isOpen, onClose, rider, defa
     <>
       {/* Backdrop restricted to content area */}
       <div
-        className="fixed lg:left-[280px] left-0 top-[64px] right-0 bottom-0 z-40 bg-black/60 backdrop-blur-xs transition-opacity"
+        className="fixed lg:left-[var(--panel-sidebar-w,320px)] left-0 top-[64px] right-0 bottom-0 z-40 bg-black/60 backdrop-blur-xs transition-opacity"
         onClick={onClose}
       />
 

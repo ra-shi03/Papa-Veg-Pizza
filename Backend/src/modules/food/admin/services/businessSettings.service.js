@@ -39,7 +39,11 @@ export const toPublicBusinessInfo = (doc) => ({
     primaryColor: doc?.primaryColor || '',
     secondaryColor: doc?.secondaryColor || '',
     themeMode: doc?.themeMode || 'light',
+    maintenanceMode: Boolean(doc?.maintenanceMode),
 });
+
+/** True while the super admin has maintenance mode on: customer ordering is suspended. */
+export const isMaintenanceMode = async () => Boolean((await getBusinessInfo()).maintenanceMode);
 
 let cached = null;
 let cachedStations = null;

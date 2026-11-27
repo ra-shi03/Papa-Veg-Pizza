@@ -470,7 +470,7 @@ export default function TerritoryManagement() {
 
       {/* Activate / Deactivate Confirmation dialog */}
       {isStatusConfirmOpen && statusChangeTarget && (
-        <div className="fixed inset-0 bg-black/55 backdrop-blur-sm z-[70] flex items-center justify-center p-4 lg:pl-[280px]" id="status-confirm-modal">
+        <div className="fixed inset-0 bg-black/55 backdrop-blur-sm z-[70] flex items-center justify-center p-4 lg:pl-[var(--panel-sidebar-w,320px)]" id="status-confirm-modal">
           <div className="bg-white dark:bg-zinc-950 w-full max-w-sm rounded-xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-900 animate-scaleUp">
             <div className="p-4 border-b border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-900/40 flex justify-between items-center">
               <h3 className="text-xs font-black uppercase tracking-wider text-black dark:text-zinc-200">

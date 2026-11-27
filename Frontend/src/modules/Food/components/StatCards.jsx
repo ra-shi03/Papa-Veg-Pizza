@@ -37,7 +37,7 @@ export function StatSection({ title, subtitle, className, children }) {
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="text-sm font-semibold tracking-wide uppercase text-neutral-500 dark:text-zinc-400">{title}</h3>
+        <h3 className="jr-keep-case text-sm font-semibold tracking-wide uppercase text-neutral-500 dark:text-zinc-400">{title}</h3>
         <p className="text-xs text-neutral-400 dark:text-zinc-500">{subtitle}</p>
       </div>
       <div className={`grid gap-4 ${className}`}>{children}</div>

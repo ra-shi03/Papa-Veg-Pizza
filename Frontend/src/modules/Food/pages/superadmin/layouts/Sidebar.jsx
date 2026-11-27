@@ -40,11 +40,7 @@ import {
 const BASE = "/food/superadmin"
 
 const menu = [
-  {
-    type: "section",
-    label: "Core Dashboard",
-    items: [{ label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" }],
-  },
+  { type: "link", label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
   {
     type: "section",
     label: "User Management",

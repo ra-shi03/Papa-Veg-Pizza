@@ -116,7 +116,7 @@ export default function BulkUpdateHoursModal({ isOpen, onClose, stores = [], onS
 
   return (
     <>
-      <div className="fixed inset-0 lg:left-[280px] z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="fixed inset-0 lg:left-[var(--panel-sidebar-w,320px)] z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
         <div className="relative w-full max-w-3xl max-h-[90vh] bg-white dark:bg-slate-950 rounded-2xl border border-slate-150 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden transition-all scale-in duration-200">
           
           {/* Close Header Button */}
@@ -332,7 +332,7 @@ export default function BulkUpdateHoursModal({ isOpen, onClose, stores = [], onS
 
       {/* Confirmation Step */}
       {showConfirm && (
-        <div className="fixed inset-0 lg:left-[280px] z-55 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-100">
+        <div className="fixed inset-0 lg:left-[var(--panel-sidebar-w,320px)] z-55 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-100">
           <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-2xl p-5">
             <div className="flex items-start gap-3">
               <div className="p-2 bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-500 rounded-lg">

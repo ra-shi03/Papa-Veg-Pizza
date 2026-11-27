@@ -46,7 +46,9 @@ const businessSettingsSchema = new mongoose.Schema(
         // Theme / branding colors set by Superadmin — applied across all panels
         primaryColor: { type: String, default: '#a43c12' },
         secondaryColor: { type: String, default: '#ff7f50' },
-        themeMode: { type: String, enum: ['light', 'dark'], default: 'light' }
+        themeMode: { type: String, enum: ['light', 'dark'], default: 'light' },
+        // Super admin header switch: while on, customers cannot place orders (the apps stay open to browse)
+        maintenanceMode: { type: Boolean, default: false }
     },
     { timestamps: true }
 );
