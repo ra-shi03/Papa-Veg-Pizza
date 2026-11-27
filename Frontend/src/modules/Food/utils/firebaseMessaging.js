@@ -758,6 +758,31 @@ async function attachForegroundListener(firebaseAppInstance) {
   foregroundListenerAttached = true;
 }
 
+/**
+ * This browser's Firebase push token, for registering it as an admin alert device (System Settings > Store Delay
+ * Alerts). Asks for notification permission if needed and throws a readable error when push cannot work here.
+ */
+export async function getWebPushToken() {
+  initPushNotificationClient();
+  if (!isSupportedBrowser() || !isSecureContextForPush()) {
+    throw new Error("This browser cannot receive push notifications (it needs HTTPS and a browser that supports web push).");
+  }
+  const firebasePublicEnv = await getFirebasePublicEnv();
+  if (!firebasePublicEnv?.vapidKey) throw new Error("Firebase Web Push VAPID key is missing on the server.");
+  const app = getMessagingFirebaseApp(firebasePublicEnv);
+  if (!app) throw new Error("Firebase public web configuration is incomplete on the server.");
+
+  const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
+  if (permission !== "granted") throw new Error("Notification permission was not granted. Allow notifications for this site and try again.");
+
+  const { getMessaging, getToken, isSupported } = await import("firebase/messaging");
+  if (!(await isSupported().catch(() => false))) throw new Error("This browser does not support Firebase push notifications.");
+  const registration = await navigator.serviceWorker.register(serviceWorkerUrl(firebasePublicEnv));
+  const token = await getToken(getMessaging(app), { vapidKey: firebasePublicEnv.vapidKey, serviceWorkerRegistration: registration });
+  if (!token) throw new Error("Could not get a push token for this browser.");
+  return token;
+}
+
 export async function registerWebPushForCurrentModule(pathname = window.location.pathname) {
   const moduleName = normalizeModuleFromPath(pathname);
   initPushNotificationClient();

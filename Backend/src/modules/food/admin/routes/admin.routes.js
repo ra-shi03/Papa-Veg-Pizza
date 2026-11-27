@@ -10,6 +10,7 @@ import * as riderApproval from '../controllers/riderApproval.controller.js';
 import * as foodApprovalController from '../controllers/foodApproval.controller.js';
 import * as addonsApprovalController from '../controllers/addonsApproval.controller.js';
 import * as businessSettingsController from '../controllers/businessSettings.controller.js';
+import * as storeDelayAlertController from '../controllers/storeDelayAlert.controller.js';
 import * as feedbackExperienceController from '../controllers/feedbackExperience.controller.js';
 import * as notificationBroadcastController from '../controllers/notificationBroadcast.controller.js';
 import * as franchiseController from '../controllers/franchise.controller.js';
@@ -126,6 +127,7 @@ router.put('/rewards/config', rewardConfigController.updateRewardConfig);
 // ----- Broadcast Notifications -----
 router.post('/notifications/broadcast', notificationBroadcastController.createBroadcastNotificationController);
 router.get('/notifications/broadcast', notificationBroadcastController.getBroadcastNotificationsController);
+router.get('/notifications/broadcast/recipients', notificationBroadcastController.getBroadcastRecipientsController);
 router.delete('/notifications/broadcast/:id', notificationBroadcastController.deleteBroadcastNotificationController);
 
 // ----- Franchises -----
@@ -280,6 +282,14 @@ router.put('/referral-settings', adminController.createOrUpdateReferralSettings)
 
 // ----- Business Settings -----
 router.get('/business-settings', businessSettingsController.getBusinessSettings);
+router.patch('/business-settings/toggles', businessSettingsController.updateBusinessToggles);
+
+// ----- System Settings > Store Delay Alerts -----
+router.get('/store-delay-alerts', storeDelayAlertController.getSettings);
+router.patch('/store-delay-alerts', storeDelayAlertController.updateSettings);
+router.post('/store-delay-alerts/devices', storeDelayAlertController.registerDevice);
+router.delete('/store-delay-alerts/devices/:deviceId', storeDelayAlertController.removeDevice);
+router.post('/store-delay-alerts/devices/:deviceId/test', storeDelayAlertController.testDevice);
 router.patch('/business-settings', safeUpload('image', [
     { name: 'logo', maxCount: 1 },
     { name: 'favicon', maxCount: 1 }

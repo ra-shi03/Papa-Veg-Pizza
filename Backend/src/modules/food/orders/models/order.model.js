@@ -412,6 +412,9 @@ const orderSchema = new mongoose.Schema(
             ],
             default: 'created'
         },
+        // System Settings > Store Delay Alerts: when admins were alerted that the store had not accepted this order
+        // (set once, so a slow order is reported only one time)
+        storeDelayAlertAt: { type: Date, default: null },
         dispatch: {
             type: dispatchSchema,
             default: () => ({})

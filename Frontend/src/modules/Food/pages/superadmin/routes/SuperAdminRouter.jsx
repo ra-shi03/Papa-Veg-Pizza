@@ -54,6 +54,12 @@ const HeroBannersConfig = lazy(() => import("../user-app/HeroBannersConfig"))
 const NutritionConfig = lazy(() => import("../user-app/NutritionConfig"))
 const DeliveryWelcomePageConfig = lazy(() => import("../delivery-app/DeliveryWelcomePageConfig"))
 const DeliveryLoginPageConfig = lazy(() => import("../delivery-app/DeliveryLoginPageConfig"))
+// System Settings (ported from the Jharkhand Rasoi admin)
+const NotificationBroadcast = lazy(() => import("../system/NotificationBroadcast"))
+const StoreDelayAlerts = lazy(() => import("../system/StoreDelayAlerts"))
+const ToggleManagement = lazy(() => import("../system/ToggleManagement"))
+const BusinessSetup = lazy(() => import("../system/BusinessSetup"))
+const ThemeSettings = lazy(() => import("../system/ThemeSettings"))
 // Pages & Social Media (ported from the Jharkhand Rasoi admin)
 const AboutUs = lazy(() => import("../pages-social-media/AboutUs"))
 const LegalTerms = lazy(() => import("../pages-social-media/LegalTerms"))
@@ -115,6 +121,11 @@ export default function SuperAdminRouter() {
 
           {/* Customer Management module routes wrapped in the shared Layout */}
           <Route element={<SuperAdminLayout />}>
+            <Route path="/system/broadcast-notification" element={<NotificationBroadcast />} />
+            <Route path="/system/store-delay-alerts" element={<StoreDelayAlerts />} />
+            <Route path="/system/toggle-management" element={<ToggleManagement />} />
+            <Route path="/system/business-setup" element={<BusinessSetup />} />
+            <Route path="/system/theme-settings" element={<ThemeSettings />} />
             <Route path="/pages-social-media/about" element={<AboutUs />} />
             <Route path="/pages-social-media/terms" element={<LegalTerms />} />
             <Route path="/pages-social-media/privacy" element={<LegalPrivacy />} />

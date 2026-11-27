@@ -1,10 +1,11 @@
 import { FoodBusinessSettings } from '../models/businessSettings.model.js';
 import { sendResponse } from '../../../../utils/response.js';
 import { uploadImageBufferDetailed } from '../../../../services/cloudinary.service.js';
-import { validateBusinessSettingsDto } from '../validators/businessSettings.validator.js';
+import { validateBusinessSettingsDto, TOGGLE_FIELDS } from '../validators/businessSettings.validator.js';
 import { clearBusinessInfoCache, findBusinessSettings, getBusinessInfo, getTrainStations } from '../services/businessSettings.service.js';
 import { openStoreIds } from '../../franchise/services/storeHours.js';
 import { FoodStore } from '../../store/models/store.model.js';
+import { FoodAppConfig } from '../../settings/models/appConfig.model.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 
 /** Public: display fields only, briefly cached. Reading never creates a record. */
@@ -51,10 +52,16 @@ async function checkTrainStores(trainDelivery) {
 }
 
 /** Super admin: the record itself. */
+/**
+ * "Online payment only" (Toggle Management) is App Configuration's Cash on Delivery switch, inverted: one switch, which
+ * the cart and order placement already obey.
+ */
+const onlinePaymentOnlyNow = async () => (await FoodAppConfig.findOne().select('codEnabled').lean())?.codEnabled === false;
+
 export async function getBusinessSettings(req, res, next) {
     try {
         const settings = (await findBusinessSettings().lean()) || (await FoodBusinessSettings.create({})).toObject();
-        return sendResponse(res, 200, 'Business settings fetched successfully', settings);
+        return sendResponse(res, 200, 'Business settings fetched successfully', { ...settings, onlinePaymentOnly: await onlinePaymentOnlyNow() });
     } catch (error) {
         next(error);
     }
@@ -78,7 +85,16 @@ export async function updateBusinessSettings(req, res, next) {
         }
 
         const settings = (await findBusinessSettings()) || new FoodBusinessSettings();
-        settings.set(fields);
+        // Theme Settings saves one app at a time: merge it into the other apps' themes instead of replacing them all
+        const { appThemes, ...rest } = fields;
+        settings.set(rest);
+        if (appThemes) {
+            if (!settings.appThemes) settings.appThemes = new Map();
+            for (const [app, theme] of Object.entries(appThemes)) {
+                const current = settings.appThemes.get(app)?.toObject?.() || settings.appThemes.get(app) || {};
+                settings.appThemes.set(app, { ...current, ...theme });
+            }
+        }
         if (phoneCountryCode !== undefined || phoneNumber !== undefined) {
             settings.phone = {
                 countryCode: phoneCountryCode ?? settings.phone?.countryCode ?? '+91',
@@ -99,7 +115,40 @@ export async function updateBusinessSettings(req, res, next) {
 
         await settings.save();
         clearBusinessInfoCache();
-        return sendResponse(res, 200, 'Business settings updated successfully', { ...settings.toObject(), warnings });
+        return sendResponse(res, 200, 'Business settings updated successfully', { ...settings.toObject({ flattenMaps: true }), warnings });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * System Settings > Toggle Management: PATCH /food/admin/business-settings/toggles with any of maintenanceMode,
+ * onlinePaymentOnly, maxCodAmount, customerRegistration, storeRegistration, deliveryRegistration.
+ */
+export async function updateBusinessToggles(req, res, next) {
+    try {
+        const validated = validateBusinessSettingsDto(req.body || {});
+        const { onlinePaymentOnly, ...toggles } = Object.fromEntries(
+            TOGGLE_FIELDS.filter((key) => validated[key] !== undefined).map((key) => [key, validated[key]])
+        );
+        if (!Object.keys(toggles).length && onlinePaymentOnly === undefined) throw new ValidationError('Nothing to update');
+
+        if (onlinePaymentOnly !== undefined) {
+            const appConfig = (await FoodAppConfig.findOne()) || new FoodAppConfig({});
+            appConfig.codEnabled = !onlinePaymentOnly;
+            appConfig.updatedBy = req.user?.name || req.user?.email || 'Super Admin';
+            await appConfig.save();
+        }
+        const settings = (await findBusinessSettings()) || new FoodBusinessSettings();
+        if (Object.keys(toggles).length) {
+            settings.set(toggles);
+            await settings.save();
+            clearBusinessInfoCache();
+        }
+        return sendResponse(res, 200, 'Toggles updated successfully', {
+            ...settings.toObject({ flattenMaps: true }),
+            onlinePaymentOnly: await onlinePaymentOnlyNow(),
+        });
     } catch (error) {
         next(error);
     }

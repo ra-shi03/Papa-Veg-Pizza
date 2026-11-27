@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import { ValidationError, NotFoundError } from '../../../../core/auth/errors.js';
 import { FoodUser } from '../../../../core/users/user.model.js';
+import { Profile } from '../../../../core/users/models/profile.model.js';
+import { Role } from '../../../../core/roles/models/role.model.js';
 import { FoodStore as FoodStore } from '../../store/models/store.model.js';
 import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
 import { BroadcastNotification } from '../../../../core/notifications/models/notificationBroadcast.model.js';
@@ -68,16 +70,28 @@ const buildDeliveryLabel = (doc) => ({
     subLabel: [doc?.phone, doc?.email].filter(Boolean).join(' • ')
 });
 
+/**
+ * Customers only: users whose primary role is CUSTOMER (staff and admins are users too). A user has no name or phone
+ * field: the name is on the profile and the phone is `mobile`.
+ */
+const loadCustomers = async (extraFilter = {}) => {
+    const role = await Role.findOne({ code: 'CUSTOMER' }).select('_id').lean();
+    const users = await FoodUser.find({ ...extraFilter, primaryRole: role?._id ?? null, isActive: { $ne: false }, isDeleted: { $ne: true } })
+        .select('_id mobile email')
+        .lean();
+    const profiles = await Profile.find({ userId: { $in: users.map((u) => u._id) } }).select('userId firstName lastName').lean();
+    const nameOf = new Map(profiles.map((p) => [String(p.userId), [p.firstName, p.lastName].filter(Boolean).join(' ')]));
+    return users.map((u) => ({ _id: u._id, name: nameOf.get(String(u._id)) || '', phone: u.mobile || '', email: u.email || '' }));
+};
+
 const modelConfigMap = {
     USER: {
-        model: FoodUser,
-        query: { isActive: true },
-        select: '_id name phone email',
+        load: () => loadCustomers(),
         buildLabel: buildUserLabel
     },
     STORE: {
         model: FoodStore,
-        query: { status: 'approved' },
+        query: { approvalStatus: 'Approved', isActive: { $ne: false } },
         select: '_id storeName managerName phone email',
         buildLabel: buildStoreLabel
     },
@@ -109,7 +123,7 @@ const loadTargetsByOwnerType = async (ownerType) => {
     const config = modelConfigMap[ownerType];
     if (!config) return [];
 
-    const rows = await config.model.find(config.query).select(config.select).lean();
+    const rows = config.load ? await config.load() : await config.model.find(config.query).select(config.select).lean();
     return rows.map((row) => ({
         ownerType,
         ownerId: String(row._id),
@@ -126,7 +140,7 @@ const resolveCustomTargets = async ({ targets = [], targetIds = [] } = {}) => {
         throw new ValidationError('Please select at least one recipient for custom broadcast');
     }
 
-    const users = await FoodUser.find({ _id: { $in: ids }, isActive: true }).select('_id name phone email').lean();
+    const users = await loadCustomers({ _id: { $in: ids.filter((id) => mongoose.Types.ObjectId.isValid(id)) } });
     return users.map((row) => ({
         ownerType: 'USER',
         ownerId: String(row._id),
@@ -273,6 +287,16 @@ export const createBroadcastNotification = async ({ body = {}, adminId } = {}) =
         broadcast,
         targetPreview: resolvedTargets.slice(0, 10)
     };
+};
+
+/** Everyone a "Particular persons" broadcast can go to: customers, approved stores and approved delivery partners. */
+export const getBroadcastRecipients = async () => {
+    const [users, stores, deliveryPartners] = await Promise.all([
+        loadTargetsByOwnerType('USER'),
+        loadTargetsByOwnerType('STORE'),
+        loadTargetsByOwnerType('DELIVERY_PARTNER')
+    ]);
+    return { items: [...users, ...stores, ...deliveryPartners] };
 };
 
 export const getBroadcastNotifications = async ({ page = 1, limit = 10 } = {}) => {

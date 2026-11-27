@@ -1,5 +1,6 @@
 // Shared by the cart and checkout: delivery location, delivery time slots, coupons and the order item payload.
 import { readSavedCoords } from "../../../utils/savedLocation"
+import { getCachedSettings } from "../../../utils/businessSettings"
 
 /** The confirmed delivery point: the same reader the menu uses (utils/savedLocation.js), so both price for one store. */
 export function getCartCoords() {
@@ -147,10 +148,21 @@ export const onlineMethod = (gateway) => {
   }
 }
 
+/**
+ * Whether this order can be paid in cash: App Configuration's Cash on Delivery switch, and (Toggle Management) the
+ * super admin's cash limit, when the order total is known. The server checks both again when the order is placed.
+ */
+export function cashAllowedFor(appConfig, total) {
+  if (appConfig?.codEnabled === false) return false
+  const maxCod = Number(getCachedSettings()?.maxCodAmount) || 0
+  return !(maxCod > 0 && Number(total) > maxCod)
+}
+
 // What the customer pays with: their saved choice when it is still on offer, otherwise the best available method.
-// Cash is switched off by `codEnabled`, online payment by `paymentOptionEnabled` or by having no active gateway.
-export function readPaymentMethod(appConfig, gateways = []) {
-  const cashOn = appConfig?.codEnabled !== false
+// Cash is switched off by `codEnabled` (or the cash limit, when `total` is given), online payment by
+// `paymentOptionEnabled` or by having no active gateway.
+export function readPaymentMethod(appConfig, gateways = [], total) {
+  const cashOn = cashAllowedFor(appConfig, total)
   const online = appConfig?.paymentOptionEnabled === false ? [] : gateways
   const fallbackOnline = online.find((g) => g.isDefault) || online[0]
   let saved = ""

@@ -29,7 +29,6 @@ import {
   ExternalLink,
   Laptop
 } from 'lucide-react';
-import UpdateCompanyModal from './UpdateCompanyModal';
 import { applySystemTheme } from '@/shared/utils/themeSync';
 import { adminAPI } from '@/services/api';
 import { setCachedSettings } from '@food/utils/businessSettings';
@@ -73,7 +72,6 @@ export default function Settings() {
   const { toasts, addToast } = useToast();
   
   // Modals state
-  const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
 
   // Search & Debouncing
   const [searchQuery, setSearchQuery] = useState('');
@@ -85,7 +83,7 @@ export default function Settings() {
   const [isSavingAll, setIsSavingAll] = useState(false);
   
   // Tab control
-  const [activeTab, setActiveTab] = useState('company');
+  const [activeTab, setActiveTab] = useState('localization');
 
   const [trainDelivery, setTrainDelivery] = useState(() => fromTrainDelivery());
   const [trainStores, setTrainStores] = useState([]);
@@ -148,16 +146,6 @@ export default function Settings() {
     } catch (err) {
       addToast(err?.response?.data?.error || err?.response?.data?.message || 'Could not save train delivery.', 'error');
     }
-  };
-
-  const saveCompanyInformation = async (data, files = {}) => {
-    const { logo, favicon, ...fields } = data;
-    const res = await adminAPI.updateBusinessSettings(fields, files);
-    const saved = res?.data?.data || {};
-    setSettings((prev) => ({ ...prev, ...fromBusinessSettings(saved) }));
-    setOriginalSettings((prev) => ({ ...prev, ...fromBusinessSettings(saved) }));
-    setCachedSettings(saved);
-    addToast('Company information saved.', 'success');
   };
 
   // Debouncing Search Query
@@ -305,14 +293,6 @@ export default function Settings() {
         ))}
       </div>
 
-      {/* Connected Modals */}
-      <UpdateCompanyModal 
-        isOpen={isCompanyModalOpen} 
-        onClose={() => setIsCompanyModalOpen(false)}
-        initialData={settings}
-        onSave={saveCompanyInformation}
-      />
-
       {/* Unsaved Changes Banner */}
       {hasUnsavedChanges && (
         <div className="bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 p-3 rounded-lg flex items-center justify-between text-xs font-semibold animate-in slide-in-from-top-3">
@@ -446,7 +426,6 @@ export default function Settings() {
           {/* Settings Tabs Navigator */}
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1 rounded-xl flex gap-1 overflow-x-auto shrink-0 scrollbar-none shadow-sm">
             {[
-              { id: 'company', label: 'Company Info', icon: Briefcase },
               { id: 'localization', label: 'Localization', icon: Globe },
               { id: 'orders', label: 'Order Settings', icon: Clock },
               { id: 'invoices', label: 'Invoice Settings', icon: FileText },
@@ -506,101 +485,7 @@ export default function Settings() {
             /* ACTIVE TAB CONTENT */
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm overflow-hidden transition-all duration-300">
               
-              {/* Tab: Company Info */}
-              {activeTab === 'company' && matchesSearch('Company Information') && (
-                <div className="p-4 space-y-4">
-                  <header className="flex justify-between items-center pb-2 border-b border-zinc-200 dark:border-zinc-800">
-                    <div>
-                      <h2 className="text-xs font-black uppercase text-black dark:text-zinc-100 tracking-wider">Company Information</h2>
-                      <p className="text-[10px] text-black dark:text-zinc-100 mt-0.5">Manage global business identifiers and channels</p>
-                    </div>
-                    <button 
-                      onClick={() => setIsCompanyModalOpen(true)}
-                      className="px-2.5 py-1 text-[10px] font-bold text-[var(--primary)] hover:bg-[var(--primary)]/5 rounded border border-[var(--primary)]/20 transition-all"
-                    >
-                      Update Branding
-                    </button>
-                  </header>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">Company Name</span>
-                      <p className="text-xs font-black text-zinc-900 dark:text-zinc-50">{settings.companyName}</p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">Website URL</span>
-                      <a href={settings.website} target="_blank" rel="noreferrer" className="text-xs font-bold text-[var(--primary)] hover:underline flex items-center gap-1">
-                        {settings.website}
-                        <ExternalLink size={10} />
-                      </a>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">Support Email</span>
-                      <p className="text-xs font-bold text-zinc-900 dark:text-zinc-50">{settings.supportEmail}</p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">Support Phone</span>
-                      <p className="text-xs font-bold text-zinc-900 dark:text-zinc-50">{settings.supportPhone}</p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">Catering / Bulk-Order Phone</span>
-                      <p className="text-xs font-bold text-zinc-900 dark:text-zinc-50">{settings.cateringPhone || '-'}</p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">Catering / Bulk-Order Email</span>
-                      <p className="text-xs font-bold text-zinc-900 dark:text-zinc-50">{settings.cateringEmail || '-'}</p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">WhatsApp Number</span>
-                      <p className="text-xs font-bold text-zinc-900 dark:text-zinc-50">{settings.whatsappNumber || '-'}</p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">FAQ Contact Text</span>
-                      <p className="text-xs font-bold text-zinc-900 dark:text-zinc-50">{settings.faqContactText || '-'}</p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">Logo Preview</span>
-                      <div className="w-16 h-16 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850 flex items-center justify-center overflow-hidden">
-                        {settings.logo && <img src={settings.logo} alt="Brand Logo" className="w-full h-full object-contain" />}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">Favicon Preview</span>
-                      <div className="w-8 h-8 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850 flex items-center justify-center overflow-hidden">
-                        {settings.favicon && <img src={settings.favicon} alt="Favicon" className="w-full h-full object-contain" />}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">GST Number</span>
-                      <input 
-                        type="text"
-                        value={settings.gstin || ''}
-                        disabled
-                        className="w-full h-8 px-3 border border-zinc-200 dark:border-zinc-800 rounded bg-zinc-50 dark:bg-zinc-900 text-xs text-black dark:text-zinc-100 cursor-not-allowed outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-black dark:text-zinc-100 uppercase tracking-wider block">Store Location / Address</span>
-                      <p className="text-xs text-zinc-900 dark:text-zinc-50">{settings.address || '-'}</p>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 flex justify-between items-center text-[10px] text-black dark:text-zinc-100 border-t border-zinc-150 dark:border-zinc-800">
-                                        <span>Last saved: {settings.updatedAt ? new Date(settings.updatedAt).toLocaleString('en-IN') : '-'}</span>
-                  </div>
-                </div>
-              )}
+              {/* Company information moved to System Settings > Business Setup */}
 
               {/* Tab: Train delivery (saved on the server) */}
               {activeTab === 'train' && (

@@ -11,7 +11,7 @@ import { usePaymentGateways } from "./usePaymentGateways"
 import apiClient from "@/services/api/axios"
 import { orderAPI, userAPI } from "@food/api"
 import { toast } from "sonner"
-import { slotLabel, toOrderItems, readPaymentMethod } from "./cartHelpers"
+import { slotLabel, toOrderItems, readPaymentMethod, cashAllowedFor } from "./cartHelpers"
 import CheckoutStepper from "./CheckoutStepper"
 import PaymentSuccessScreen from "../orders/PaymentSuccessScreen"
 import { readTrainJourney, trainOrderFields, trainStoreQuery } from "@food/utils/trainJourney"
@@ -53,7 +53,9 @@ export default function CheckoutModal({
   const { config: appConfig } = useAppConfig()
   const isPaymentOptionDisabled = appConfig?.paymentOptionEnabled === false
   // Chosen on the Payment Options page
-  const payMethod = readPaymentMethod(appConfig, usePaymentGateways())
+  const payMethod = readPaymentMethod(appConfig, usePaymentGateways(), total)
+  // Cash on Delivery: switched on in App Configuration and within the super admin's cash limit for this total
+  const cashOk = cashAllowedFor(appConfig, total)
   const isLoggedIn = localStorage.getItem("user_authenticated") === "true" || !!localStorage.getItem("user_accessToken")
   const isGuestCheckoutBlocked = appConfig?.guestCheckoutEnabled === false && !isLoggedIn
 
@@ -744,7 +746,7 @@ export default function CheckoutModal({
                             Online Payments Disabled
                           </p>
                           <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 font-medium">
-                            {appConfig?.codEnabled !== false 
+                            {cashOk 
                               ? "Order will be placed via Cash on Delivery" 
                               : "Store payment options currently unavailable"}
                           </p>
@@ -803,7 +805,7 @@ export default function CheckoutModal({
                       <span>Sign In to Place Order</span>
                     </button>
                   ) : isPaymentOptionDisabled ? (
-                    appConfig?.codEnabled !== false ? (
+                    cashOk ? (
                       <button 
                         onClick={handleSaveAddressAndCheckout}
                         className="w-full h-12 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border-0 bg-primary hover:bg-primary-hover text-white active:scale-95 cursor-pointer shadow-md shadow-primary/10 flex items-center justify-center gap-2"

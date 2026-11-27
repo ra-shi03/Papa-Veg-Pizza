@@ -21,6 +21,10 @@ const color = (label) => z.string().trim().regex(/^#[0-9a-fA-F]{3,8}$/, `${label
 
 const storeId = z.string().regex(/^[a-f0-9]{24}$/i, 'Choose a store from the list');
 
+/** Theme Settings: the apps that can have their own colours / font / logo, and the fonts on offer (loaded in index.html). */
+export const APP_THEME_KEYS = ['user_app', 'delivery_app', 'admin_app'];
+export const THEME_FONTS = ["'Poppins', sans-serif", "'Inter', sans-serif", "'Outfit', sans-serif", 'system-ui, sans-serif'];
+
 const trainDelivery = z.object({
     defaultStoreId: z.union([storeId, z.literal(''), z.null()]).optional(),
     stations: z.array(z.object({
@@ -53,8 +57,26 @@ const schema = z.object({
     accentColor: color('Accent colour'),
     themeMode: z.enum(['light', 'dark']),
     maintenanceMode: z.boolean(),
+    onlinePaymentOnly: z.boolean(),
+    maxCodAmount: z.coerce.number({ invalid_type_error: 'COD limit must be a number' }).min(0, 'COD limit cannot be negative').max(1000000, 'COD limit is too high'),
+    customerRegistration: z.boolean(),
+    storeRegistration: z.boolean(),
+    deliveryRegistration: z.boolean(),
+    fssai: text('FSSAI number', 20).refine((v) => !v || /^\d{14}$/.test(v), 'FSSAI number must be 14 digits'),
+    appThemes: z.record(
+        z.enum(APP_THEME_KEYS),
+        z.object({
+            primaryColor: z.union([color('Primary colour'), z.literal('')]),
+            secondaryColor: z.union([color('Secondary colour'), z.literal('')]),
+            fontFamily: z.union([z.enum(THEME_FONTS), z.literal('')]),
+            logoUrl: text('Logo URL', 500).refine((v) => !v || /^https?:\/\/[^\s]+$/i.test(v), 'Logo must be an http(s) URL'),
+        }).partial()
+    ),
     trainDelivery,
 }).partial();
+
+/** The toggles Toggle Management can change (PATCH /business-settings/toggles accepts only these). */
+export const TOGGLE_FIELDS = ['maintenanceMode', 'onlinePaymentOnly', 'maxCodAmount', 'customerRegistration', 'storeRegistration', 'deliveryRegistration'];
 
 /** Only the fields above survive; everything else in the request is ignored. */
 export function validateBusinessSettingsDto(body) {

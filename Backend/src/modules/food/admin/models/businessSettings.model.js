@@ -48,7 +48,30 @@ const businessSettingsSchema = new mongoose.Schema(
         secondaryColor: { type: String, default: '#ff7f50' },
         themeMode: { type: String, enum: ['light', 'dark'], default: 'light' },
         // Super admin header switch: while on, customers cannot place orders (the apps stay open to browse)
-        maintenanceMode: { type: Boolean, default: false }
+        maintenanceMode: { type: Boolean, default: false },
+        // System Settings > Toggle Management (enforced on the server: order placement and sign-ups). 'Online payment
+        // only' is not stored here: it is App Configuration's codEnabled (the cart and order placement already use it).
+        maxCodAmount: { type: Number, default: 0, min: 0 }, // 0 = no limit on cash-on-delivery orders
+        customerRegistration: { type: Boolean, default: true },
+        storeRegistration: { type: Boolean, default: true },
+        deliveryRegistration: { type: Boolean, default: true },
+        // Food licence number, shown with the business details
+        fssai: { type: String, default: '', trim: true },
+        // System Settings > Theme Settings: per app overrides of the brand colours, font and logo (empty = use the
+        // brand colours above)
+        appThemes: {
+            type: Map,
+            of: new mongoose.Schema(
+                {
+                    primaryColor: { type: String, default: '' },
+                    secondaryColor: { type: String, default: '' },
+                    fontFamily: { type: String, default: '' },
+                    logoUrl: { type: String, default: '' },
+                },
+                { _id: false }
+            ),
+            default: undefined,
+        }
     },
     { timestamps: true }
 );

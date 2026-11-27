@@ -1,6 +1,7 @@
 import ms from "ms";
 import { FoodDeliveryPartner } from "../../modules/food/delivery/models/deliveryPartner.model.js";
 import { createOrUpdateOtp, verifyOtp } from "../otp/otp.service.js";
+import { assertRegistrationOpen } from "../../modules/food/admin/services/businessSettings.service.js";
 import { signAccessToken, signRefreshToken } from "./token.util.js";
 import { RefreshToken } from "./models/refreshToken.model.js";
 import { AuthError } from "./errors.js";
@@ -65,6 +66,8 @@ export const verifyDeliveryOtpAndLogin = async (phone, otp, fcmToken, platform) 
   let deliveryPartner = await FoodDeliveryPartner.findOne({ phone });
 
   if (!deliveryPartner) {
+    // Toggle Management: the super admin can pause new delivery partner sign-ups (existing partners still sign in)
+    await assertRegistrationOpen('delivery');
     deliveryPartner = new FoodDeliveryPartner({
       phone,
       status: "pending", // require admin approval

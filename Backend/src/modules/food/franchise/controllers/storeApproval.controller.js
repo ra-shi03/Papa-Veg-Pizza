@@ -1,3 +1,5 @@
+import { assertRegistrationOpen } from '../../admin/services/businessSettings.service.js';
+const isSuperAdminUser = (user) => ['SUPERADMIN', 'SUPER_ADMIN'].includes(String(user?.role || '').toUpperCase().replace(/-/g, '_'));
 import { FoodStore } from '../../store/models/store.model.js';
 import { StoreManager } from '../models/storeManager.model.js';
 import '../../admin/models/region.model.js';
@@ -152,6 +154,12 @@ export const getStoreApprovalDocuments = async (req, res) => {
 
 // Submit for Approval
 export const submitStoreApproval = async (req, res) => {
+  // Toggle Management: the super admin can pause new store registrations
+  try {
+    if (!isSuperAdminUser(req.user)) await assertRegistrationOpen('store'); // head office can always add stores
+  } catch (error) {
+    return res.status(403).json({ success: false, message: error.message });
+  }
   try {
     const storeId = req.params.id;
     const store = await FoodStore.findOne(withFranchiseScope(req, { _id: storeId }));

@@ -1,6 +1,6 @@
 import { FoodBusinessSettings } from '../models/businessSettings.model.js';
 import { isValidEmail, isValidPhone } from '../validators/businessSettings.validator.js';
-import { ValidationError } from '../../../../core/auth/errors.js';
+import { ValidationError, ForbiddenError } from '../../../../core/auth/errors.js';
 import { FoodStore } from '../../store/models/store.model.js';
 import { loadMethods as loadOrderMethods, methodAllowedAt } from '../../settings/services/orderMethods.service.js';
 
@@ -40,7 +40,27 @@ export const toPublicBusinessInfo = (doc) => ({
     secondaryColor: doc?.secondaryColor || '',
     themeMode: doc?.themeMode || 'light',
     maintenanceMode: Boolean(doc?.maintenanceMode),
+    // Toggle Management: the apps use these to hide what is switched off (the server enforces them too)
+    maxCodAmount: Number(doc?.maxCodAmount) || 0,
+    customerRegistration: doc?.customerRegistration !== false,
+    storeRegistration: doc?.storeRegistration !== false,
+    deliveryRegistration: doc?.deliveryRegistration !== false,
+    fssai: real(doc?.fssai),
+    // Theme Settings: per app colours / font / logo ({ user_app, delivery_app, admin_app })
+    appThemes: doc?.appThemes instanceof Map ? Object.fromEntries(doc.appThemes) : (doc?.appThemes || {}),
 });
+
+const REGISTRATION = {
+    customer: ['customerRegistration', 'New customer sign-ups are paused right now. Please try again later.'],
+    store: ['storeRegistration', 'New stores cannot be registered right now. Please contact the head office.'],
+    delivery: ['deliveryRegistration', 'New delivery partner sign-ups are paused right now. Please try again later.'],
+};
+
+/** Toggle Management: refuses a new customer / store / delivery partner while the super admin has that sign-up off. */
+export async function assertRegistrationOpen(kind) {
+    const [field, message] = REGISTRATION[kind];
+    if ((await getBusinessInfo())[field] === false) throw new ForbiddenError(message);
+}
 
 /** True while the super admin has maintenance mode on: customer ordering is suspended. */
 export const isMaintenanceMode = async () => Boolean((await getBusinessInfo()).maintenanceMode);

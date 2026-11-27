@@ -39,6 +39,10 @@ import {
   Lock,
   Receipt,
   X,
+  Bell,
+  BellRing,
+  ToggleLeft,
+  Palette,
 } from "lucide-react"
 
 const BASE = "/food/superadmin"
@@ -140,6 +144,17 @@ const menu = [
     ],
   },
   // Sections ported from the Jharkhand Rasoi admin
+  {
+    type: "section",
+    label: "System Settings",
+    items: [
+      { label: "Broadcast Notification", icon: Bell, path: "/system/broadcast-notification" },
+      { label: "Store Delay Alerts", icon: BellRing, path: "/system/store-delay-alerts" },
+      { label: "Toggle Management", icon: ToggleLeft, path: "/system/toggle-management" },
+      { label: "Business Setup", icon: Settings, path: "/system/business-setup" },
+      { label: "Theme Settings", icon: Palette, path: "/system/theme-settings" },
+    ],
+  },
   {
     type: "section",
     label: "Pages & Social Media",

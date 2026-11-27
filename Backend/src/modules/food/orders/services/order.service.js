@@ -10,7 +10,7 @@ import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model
 import { FoodZone } from '../../admin/models/zone.model.js';
 import { FoodFeeSettings } from '../../admin/models/feeSettings.model.js';
 import { ValidationError, ForbiddenError, NotFoundError } from '../../../../core/auth/errors.js';
-import { isMaintenanceMode } from '../../admin/services/businessSettings.service.js';
+import { isMaintenanceMode, getBusinessInfo } from '../../admin/services/businessSettings.service.js';
 import { assertMethodAllowed, isPickupMethod } from '../../settings/services/orderMethods.service.js';
 import { buildPaginationOptions, buildPaginatedResult } from '../../../../utils/helpers.js';
 import { FoodCoupon } from '../../settings/models/foodCoupon.model.js';
@@ -254,6 +254,15 @@ export async function createOrder(userId, dto) {
   // Only a coupon that was really applied is recorded (a rejected code gives discount 0)
   const appliedCouponCode = discount > 0 ? priced.pricing.appliedCoupon?.code || '' : '';
   const normalizedPricing = { subtotal, tax, packagingFee, deliveryFee, platformFee, handlingFee, cancellationFee, cancellationFreeMinutes, discount, total, currency, gstRate, couponCode: appliedCouponCode };
+
+  // Toggle Management (super admin): a ceiling on cash-on-delivery orders (switching cash off entirely is App
+  // Configuration's codEnabled, checked above)
+  if (isCash) {
+    const { maxCodAmount } = await getBusinessInfo();
+    if (maxCodAmount > 0 && Number(total) > maxCodAmount) {
+      throw new ValidationError(`Cash on Delivery is available for orders up to ₹${maxCodAmount}. Please pay online for this order.`);
+    }
+  }
 
   const payment = {
     method: paymentMethod,

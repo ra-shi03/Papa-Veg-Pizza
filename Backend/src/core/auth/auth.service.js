@@ -17,6 +17,7 @@ import { createOrUpdateOtp, verifyOtp } from "../otp/otp.service.js";
 import { signAccessToken, signRefreshToken } from "./token.util.js";
 import { RefreshToken } from "./models/refreshToken.model.js";
 import { ValidationError, AuthError } from "./errors.js";
+import { assertRegistrationOpen } from "../../modules/food/admin/services/businessSettings.service.js";
 import { config } from "../../config/env.js";
 import { logger } from "../../utils/logger.js";
 import { sendAdminResetOtpEmail } from "../../utils/email.js";
@@ -150,6 +151,8 @@ export const verifyUserOtpAndLogin = async (
   let isNewUser = false;
 
   if (!userDoc) {
+    // Toggle Management: the super admin can pause new customer sign-ups (existing customers still sign in)
+    await assertRegistrationOpen('customer');
     isNewUser = true;
     let customerRole = await Role.findOne({ code: 'CUSTOMER' });
     if (!customerRole) {

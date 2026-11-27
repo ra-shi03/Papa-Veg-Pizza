@@ -7,6 +7,7 @@
 import apiClient from "@food/api/axios";
 import { API_ENDPOINTS } from "@food/api/config";
 import { publicGetOnce } from "@food/api";
+import { currentAppKey } from "@/shared/utils/themeSync";
 
 const SETTINGS_KEY = 'food_business_settings';
 // Only when the super admin has not named the business yet
@@ -29,8 +30,10 @@ let cachedSettings = (() => {
 export const applyThemeColors = (settings) => {
   if (!settings || typeof document === 'undefined') return;
 
-  const primary = settings.primaryColor;
-  const secondary = settings.secondaryColor;
+  // Theme Settings: this app's own colours win over the brand colours
+  const appTheme = settings.appThemes?.[currentAppKey()] || {};
+  const primary = appTheme.primaryColor || settings.primaryColor;
+  const secondary = appTheme.secondaryColor || settings.secondaryColor;
   const themeMode = settings.themeMode;
 
   if (primary) {
@@ -38,17 +41,17 @@ export const applyThemeColors = (settings) => {
     document.documentElement.style.setProperty('--sa-primary-hover', `${primary}cc`);
     document.documentElement.style.setProperty('--primary', primary);
     document.documentElement.style.setProperty('--primary-hover', `${primary}cc`);
-    // Keep localStorage in sync for SuperAdmin's own live preview
-    localStorage.setItem('sa_primary', primary);
   }
+  // Keep the brand colours in localStorage for SuperAdmin's own live preview (not the per-app override)
+  if (settings.primaryColor) localStorage.setItem('sa_primary', settings.primaryColor);
 
   if (secondary) {
     document.documentElement.style.setProperty('--sa-secondary', secondary);
     document.documentElement.style.setProperty('--sa-secondary-hover', `${secondary}cc`);
     document.documentElement.style.setProperty('--secondary', secondary);
     document.documentElement.style.setProperty('--secondary-hover', `${secondary}cc`);
-    localStorage.setItem('sa_secondary', secondary);
   }
+  if (settings.secondaryColor) localStorage.setItem('sa_secondary', settings.secondaryColor);
 
   if (themeMode) {
     if (themeMode === 'dark') {

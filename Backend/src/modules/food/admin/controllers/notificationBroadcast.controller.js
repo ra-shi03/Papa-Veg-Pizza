@@ -2,8 +2,17 @@ import { sendResponse, sendError } from '../../../../utils/response.js';
 import {
     createBroadcastNotification,
     getBroadcastNotifications,
-    deleteBroadcastNotification
+    deleteBroadcastNotification,
+    getBroadcastRecipients
 } from '../services/notificationBroadcast.service.js';
+
+export const getBroadcastRecipientsController = async (req, res) => {
+    try {
+        return sendResponse(res, 200, 'Broadcast recipients fetched successfully', await getBroadcastRecipients());
+    } catch (error) {
+        return sendError(res, error.statusCode || 500, error.message || 'Failed to fetch recipients');
+    }
+};
 
 export const createBroadcastNotificationController = async (req, res) => {
     try {

@@ -6,12 +6,13 @@ import { connectDB, disconnectDB } from './src/config/db.js';
 import { refreshGatewayCredentials } from './src/modules/food/settings/services/paymentGateway.service.js';
 import { FoodPaymentGateway } from './src/modules/food/settings/models/paymentGateway.model.js';
 import { connectRedis, closeRedis } from './src/config/redis.js';
-import { initSocket } from './src/config/socket.js';
+import { initSocket } from './src/config/socket.js';
 import { startOrderEventStream, stopOrderEventStream } from './src/modules/food/orders/services/order-events.service.js';
 import { initializeQueues, closeBullMQConnection } from './src/queues/index.js';
 import mongoose from 'mongoose';
 import { isJobWorker } from './src/config/jobRole.js';
 import { dispatchDueScheduledOrders } from './src/modules/food/orders/services/order-dispatch.service.js';
+import { sweepStoreDelayAlerts } from './src/modules/food/admin/services/storeDelayAlert.service.js';
 
 import { logger } from './src/utils/logger.js';
 import { initializeFirebaseRealtime } from './src/config/firebase.js';
@@ -21,6 +22,7 @@ const SHUTDOWN_TIMEOUT_MS = 10000;
 let server = null;
 let expireOffersInterval = null;
 let scheduledDispatchInterval = null;
+let storeDelayAlertInterval = null;
 
 const gracefulShutdown = async (signal) => {
     logger.info(`${signal} received, starting graceful shutdown`);
@@ -36,6 +38,7 @@ const gracefulShutdown = async (signal) => {
             await closeBullMQConnection();
             if (expireOffersInterval) clearInterval(expireOffersInterval);
             if (scheduledDispatchInterval) clearInterval(scheduledDispatchInterval);
+            if (storeDelayAlertInterval) clearInterval(storeDelayAlertInterval);
             await stopOrderEventStream();
 
             logger.info('Graceful shutdown complete');
@@ -147,6 +150,16 @@ const startServer = async () => {
             }
         };
         if (isJobWorker()) scheduledDispatchInterval = setInterval(runScheduledDispatch, 60 * 1000);
+
+        // Store Delay Alerts: tell the admins' devices about orders a store has not accepted in time (once a minute)
+        const runStoreDelayAlerts = async () => {
+            try {
+                await sweepStoreDelayAlerts();
+            } catch (err) {
+                logger.error(`Store delay alert sweep error: ${err.message}`);
+            }
+        };
+        if (isJobWorker()) storeDelayAlertInterval = setInterval(runStoreDelayAlerts, 60 * 1000);
 
         process.on('SIGINT', () => gracefulShutdown('SIGINT'));
         process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

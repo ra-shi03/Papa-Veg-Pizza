@@ -272,6 +272,23 @@ export const adminAPI = {
     adminClient.get("/food/admin/notifications/broadcast", { params }),
   deleteBroadcastNotification: (id) =>
     adminClient.delete(`/food/admin/notifications/broadcast/${String(id)}`),
+  /** Customers, approved stores and approved delivery partners a "Particular persons" broadcast can go to. */
+  getBroadcastRecipients: () =>
+    adminClient.get("/food/admin/notifications/broadcast/recipients"),
+  /** System Settings > Toggle Management */
+  updateBusinessToggles: (body = {}) =>
+    adminClient.patch("/food/admin/business-settings/toggles", body ?? {}),
+  /** System Settings > Store Delay Alerts */
+  getStoreDelayAlertSettings: () =>
+    adminClient.get("/food/admin/store-delay-alerts"),
+  updateStoreDelayAlertSettings: (body = {}) =>
+    adminClient.patch("/food/admin/store-delay-alerts", body ?? {}),
+  registerStoreDelayAlertDevice: (body = {}) =>
+    adminClient.post("/food/admin/store-delay-alerts/devices", body ?? {}),
+  removeStoreDelayAlertDevice: (deviceId) =>
+    adminClient.delete(`/food/admin/store-delay-alerts/devices/${String(deviceId)}`),
+  testStoreDelayAlertDevice: (deviceId, body = {}) =>
+    adminClient.post(`/food/admin/store-delay-alerts/devices/${String(deviceId)}/test`, body ?? {}),
   /** List restaurants for admin. Requires admin auth. */
   getRestaurants: (params = {}, config = {}) =>
     adminClient.get("/food/admin/restaurants", {

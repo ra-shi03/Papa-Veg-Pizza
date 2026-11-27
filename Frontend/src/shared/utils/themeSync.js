@@ -5,11 +5,26 @@ import { useEffect, useState } from "react";
  * localStorage keys (sa_primary etc.) are only for live preview within SuperAdmin's own tab.
  * For all other panels, the DB value stored in food_business_settings takes priority.
  */
+/**
+ * Which app this page belongs to, for Theme Settings' per-app overrides: the admin panels (super admin, franchise,
+ * store), the delivery app, or the customer app.
+ */
+export const currentAppKey = () => {
+  if (typeof window === "undefined") return "user_app";
+  const { pathname = "", hash = "" } = window.location;
+  const path = hash.startsWith("#/") ? hash.slice(1) : pathname;
+  if (/^(\/food)?\/(superadmin|franchise-admin|store-operations?|store-manager|admin)(\/|$)/.test(path)) return "admin_app";
+  if (/^(\/food)?\/delivery(\/|$)/.test(path)) return "delivery_app";
+  return "user_app";
+};
+
 const getResolvedColors = () => {
   let dbPrimary = null;
   let dbSecondary = null;
   let dbThemeMode = null;
   let dbName = null;
+  let dbLogo = null;
+  let appTheme = {};
   try {
     const settingsStr = localStorage.getItem("food_business_settings");
     if (settingsStr) {
@@ -18,16 +33,19 @@ const getResolvedColors = () => {
       dbSecondary = s.secondaryColor || null;
       dbThemeMode = s.themeMode || null;
       dbName = s.companyName || null;
+      dbLogo = s.logo?.url || null;
+      appTheme = s.appThemes?.[currentAppKey()] || {};
     }
   } catch (e) {}
 
   return {
-    // DB value wins; sa_ keys only used as live-preview override (SA panel only)
-    primaryColor: dbPrimary || localStorage.getItem("sa_primary") || "#a43c12",
-    secondaryColor: dbSecondary || localStorage.getItem("sa_secondary") || "#ff7f50",
+    // This app's own colours (Theme Settings) first, then the brand colours from the DB; sa_ keys only as a fallback
+    primaryColor: appTheme.primaryColor || dbPrimary || localStorage.getItem("sa_primary") || "#a43c12",
+    secondaryColor: appTheme.secondaryColor || dbSecondary || localStorage.getItem("sa_secondary") || "#ff7f50",
     themeMode: localStorage.getItem("sa_themeMode") || dbThemeMode || "light",
+    fontFamily: appTheme.fontFamily || null,
     favicon: localStorage.getItem("sa_favicon") || null,
-    logo: localStorage.getItem("sa_logo") || null,
+    logo: appTheme.logoUrl || localStorage.getItem("sa_logo") || dbLogo || null,
     companyName: localStorage.getItem("sa_companyName") || dbName || "Papa Veg Pizza India Ltd.",
   };
 };
@@ -37,7 +55,16 @@ const getResolvedColors = () => {
  */
 export const applySystemTheme = () => {
   if (typeof window === "undefined") return;
-  const { primaryColor, secondaryColor, themeMode, favicon, companyName } = getResolvedColors();
+  const { primaryColor, secondaryColor, themeMode, fontFamily, favicon, companyName } = getResolvedColors();
+
+  // This app's font (Theme Settings); the page body reads --font-poppins
+  if (fontFamily) {
+    document.documentElement.style.setProperty("--font-poppins", fontFamily);
+    document.documentElement.style.fontFamily = fontFamily;
+  } else {
+    document.documentElement.style.removeProperty("--font-poppins");
+    document.documentElement.style.removeProperty("font-family");
+  }
 
   // Apply light/dark mode class
   if (themeMode === "dark") {
