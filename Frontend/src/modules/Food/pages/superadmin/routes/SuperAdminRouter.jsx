@@ -54,106 +54,28 @@ const HeroBannersConfig = lazy(() => import("../user-app/HeroBannersConfig"))
 const NutritionConfig = lazy(() => import("../user-app/NutritionConfig"))
 const DeliveryWelcomePageConfig = lazy(() => import("../delivery-app/DeliveryWelcomePageConfig"))
 const DeliveryLoginPageConfig = lazy(() => import("../delivery-app/DeliveryLoginPageConfig"))
+// Pages & Social Media (ported from the Jharkhand Rasoi admin)
+const AboutUs = lazy(() => import("../pages-social-media/AboutUs"))
+const LegalTerms = lazy(() => import("../pages-social-media/LegalTerms"))
+const LegalPrivacy = lazy(() => import("../pages-social-media/LegalPrivacy"))
+const RefundPolicy = lazy(() => import("../pages-social-media/RefundPolicy"))
+const ShippingPolicy = lazy(() => import("../pages-social-media/ShippingPolicy"))
+const CancellationPolicy = lazy(() => import("../pages-social-media/CancellationPolicy"))
 
 // Shared layout shell for user management pages to inherit Sidebar and Navbar
 function SuperAdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const location = useLocation()
-  
+
   // Enforce Superadmin Theme settings
   useSystemTheme()
 
-  // Sync active sidebar state based on route path
-  let activeItem = "Dashboard"
-  if (location.pathname.includes("/customers")) {
-    activeItem = "Customers"
-  } else if (location.pathname.includes("/franchise-stores")) {
-    activeItem = "Franchise Stores"
-  } else if (location.pathname.includes("/franchise-approvals")) {
-    activeItem = "Franchise Approvals"
-  } else if (location.pathname.includes("/regions-zones")) {
-    activeItem = "Regions & Zones"
-  } else if (location.pathname.includes("/territory-management")) {
-    activeItem = "Territory Management"
-  } else if (location.pathname.includes("/franchises")) {
-    activeItem = "Franchise Owners"
-  } else if (location.pathname.includes("/managers")) {
-    activeItem = "Store Managers"
-  } else if (location.pathname.includes("/delivery-partners")) {
-    activeItem = "Delivery Partners"
-  } else if (location.pathname.includes("/kitchen-staff")) {
-    activeItem = "Kitchen Staff"
-  } else if (location.pathname.includes("/roles-permissions")) {
-    activeItem = "Roles & Permissions"
-  } else if (location.pathname.includes("/products")) {
-    activeItem = "Products"
-  } else if (location.pathname.includes("/categories")) {
-    activeItem = "Categories"
-
-  } else if (location.pathname.includes("/addons")) {
-    activeItem = "Add-ons / Toppings"
-  } else if (location.pathname.includes("/combos-deals")) {
-    activeItem = "Combos & Deals"
-  } else if (location.pathname.includes("/order-tracking")) {
-    activeItem = "Order Tracking"
-  } else if (location.pathname.includes("/bulk-orders")) {
-    activeItem = "Bulk Orders"
-  } else if (location.pathname.includes("/orders")) {
-    activeItem = "All Orders"
-  } else if (location.pathname.includes("/payouts")) {
-    activeItem = "Payouts"
-  } else if (location.pathname.includes("/refund-requests")) {
-    activeItem = "Refund Requests"
-
-  } else if (location.pathname.includes("/coupons")) {
-    activeItem = "Coupons"
-  } else if (location.pathname.includes("/rewards")) {
-    activeItem = "Rewards Program"
-  } else if (location.pathname.includes("/app-configuration")) {
-    activeItem = "App Configuration"
-  } else if (location.pathname.includes("/fees-and-charges")) {
-    activeItem = "Fees & Charges"
-  } else if (location.pathname.includes("/payment-gateways")) {
-    activeItem = "Payment Gateways"
-  } else if (location.pathname.includes("/settings")) {
-    activeItem = "Settings"
-  } else if (location.pathname.includes("/content-management")) {
-    activeItem = "Content Management"
-  } else if (location.pathname.includes("/support-requests")) {
-    activeItem = "Support Requests"
-  } else if (location.pathname.includes("/customer-complaints")) {
-    activeItem = "Customer Complaints"
-  } else if (location.pathname.includes("/feedback-reviews")) {
-    activeItem = "Feedback & Reviews"
-  } else if (location.pathname.includes("/user-app/welcome-page")) {
-    activeItem = "Welcome Page"
-  } else if (location.pathname.includes("/user-app/home-page")) {
-    activeItem = "Home Page"
-  } else if (location.pathname.includes("/user-app/promise-campaign")) {
-    activeItem = "Promise Campaign"
-  } else if (location.pathname.includes("/user-app/showcase-sections")) {
-    activeItem = "Showcase Sections"
-  } else if (location.pathname.includes("/user-app/cart-config")) {
-    activeItem = "Cart & Upsell"
-  } else if (location.pathname.includes("/user-app/hero-banners")) {
-    activeItem = "Hero Banners"
-  } else if (location.pathname.includes("/user-app/nutrition")) {
-    activeItem = "Nutrition Info"
-  } else if (location.pathname.includes("/delivery-app/welcome-page")) {
-    activeItem = "Delivery Welcome Page"
-  } else if (location.pathname.includes("/delivery-app/login-page")) {
-    activeItem = "Delivery Login Page"
-  }
-
-
+  // The sidebar highlights the open page from the URL itself
   return (
     <div className="superadmin-theme min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 transition-all duration-300">
       <Navbar onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        activeItem={activeItem}
-        setActiveItem={() => { }}
       />
       {/* Left padding on desktop = the sidebar's width (320px, 80px collapsed) */}
       <div className="jr-admin pt-16 min-h-screen lg:pl-[var(--panel-sidebar-w,320px)]">
@@ -193,6 +115,12 @@ export default function SuperAdminRouter() {
 
           {/* Customer Management module routes wrapped in the shared Layout */}
           <Route element={<SuperAdminLayout />}>
+            <Route path="/pages-social-media/about" element={<AboutUs />} />
+            <Route path="/pages-social-media/terms" element={<LegalTerms />} />
+            <Route path="/pages-social-media/privacy" element={<LegalPrivacy />} />
+            <Route path="/pages-social-media/refund" element={<RefundPolicy />} />
+            <Route path="/pages-social-media/shipping" element={<ShippingPolicy />} />
+            <Route path="/pages-social-media/cancellation" element={<CancellationPolicy />} />
             <Route path="/customers" element={<CustomerAnalysis />} />
             <Route path="/customers/list" element={<CustomerList />} />
             <Route path="/customers/profile/:id" element={<UserProfile />} />

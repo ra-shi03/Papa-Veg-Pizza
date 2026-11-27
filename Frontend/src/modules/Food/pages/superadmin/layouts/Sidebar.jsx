@@ -1,5 +1,5 @@
 import React from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import PanelSidebar from "@food/components/PanelSidebar"
 import {
   Home,
@@ -35,6 +35,10 @@ import {
   ShoppingCart,
   Apple,
   LogIn,
+  Globe,
+  Lock,
+  Receipt,
+  X,
 } from "lucide-react"
 
 const BASE = "/food/superadmin"
@@ -135,21 +139,45 @@ const menu = [
       { label: "Delivery Login Page", icon: LogIn, path: "/delivery-app/login-page" },
     ],
   },
+  // Sections ported from the Jharkhand Rasoi admin
+  {
+    type: "section",
+    label: "Pages & Social Media",
+    items: [
+      { label: "About Us", icon: Globe, path: "/pages-social-media/about" },
+      { label: "Terms & Conditions", icon: FileText, path: "/pages-social-media/terms" },
+      { label: "Privacy Policy", icon: Lock, path: "/pages-social-media/privacy" },
+      { label: "Refund Policy", icon: Receipt, path: "/pages-social-media/refund" },
+      { label: "Shipping Policy", icon: Truck, path: "/pages-social-media/shipping" },
+      { label: "Cancellation Policy", icon: X, path: "/pages-social-media/cancellation" },
+    ],
+  },
 ]
 
-export default function Sidebar({ isOpen, onClose, activeItem, setActiveItem }) {
+// Every menu path, longest first: the current page is the item whose path matches the URL most specifically
+const ALL_PATHS = menu
+  .flatMap((entry) => (entry.type === "section" ? entry.items : [entry]))
+  .map((item) => item.path)
+  .sort((a, b) => b.length - a.length)
+
+/** The menu path of the page that is open (the URL without its /superadmin or /food/superadmin prefix). */
+function activePathOf(pathname) {
+  const rel = pathname.replace(/^(\/food)?\/superadmin/, "").replace(/\/+$/, "") || "/dashboard"
+  return ALL_PATHS.find((p) => rel === p || rel.startsWith(`${p}/`)) || null
+}
+
+export default function Sidebar({ isOpen, onClose }) {
   const navigate = useNavigate()
+  const location = useLocation()
+  const activePath = activePathOf(location.pathname)
   return (
     <PanelSidebar
       isOpen={isOpen}
       onClose={onClose}
       panelLabel="Super Admin Panel"
       menu={menu}
-      isActive={(item) => item.label === activeItem}
-      onNavigate={(item) => {
-        setActiveItem?.(item.label)
-        navigate(`${BASE}${item.path}`)
-      }}
+      isActive={(item) => item.path === activePath}
+      onNavigate={(item) => navigate(`${BASE}${item.path}`)}
     />
   )
 }
