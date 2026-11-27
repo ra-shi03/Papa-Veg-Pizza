@@ -1,3 +1,4 @@
+import { authKey } from "@/shared/utils/authNamespace";
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { io } from "socket.io-client";
@@ -62,7 +63,7 @@ let shared = null;
 let users = 0;           // feeds + screen hooks holding the socket
 const listeners = new Set();
 function acquire() {
-  const token = typeof localStorage !== "undefined" ? localStorage.getItem("admin_accessToken") : null;
+  const token = typeof localStorage !== "undefined" ? localStorage.getItem(authKey("admin", "accessToken")) : null;
   if (!token) return null;
   if (!shared) {
     const url = import.meta.env?.VITE_SOCKET_URL || window.location.origin;

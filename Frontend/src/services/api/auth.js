@@ -1,3 +1,4 @@
+import { authKey } from "@/shared/utils/authNamespace";
 /**
  * Auth API – new backend (USER, ADMIN, RESTAURANT, DELIVERY).
  * Food-prefixed: POST /food/auth/...
@@ -210,7 +211,7 @@ const meInFlight = new Map(); // module -> Promise
 
 function hasAccessToken(module) {
   try {
-    return Boolean(localStorage.getItem(`${module}_accessToken`));
+    return Boolean(localStorage.getItem(authKey(module, "accessToken")));
   } catch {
     return false;
   }

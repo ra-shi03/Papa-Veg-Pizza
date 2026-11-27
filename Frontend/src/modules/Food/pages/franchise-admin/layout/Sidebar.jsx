@@ -1,3 +1,4 @@
+import { authKey } from "@/shared/utils/authNamespace";
 import React, { useState, useEffect } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import * as Icons from "lucide-react"
@@ -65,9 +66,9 @@ export default function Sidebar({ isOpen, onClose, isCollapsed = false, onToggle
         await adminAPI.logout()
       } catch (_) {}
       clearModuleAuth("admin")
-      localStorage.removeItem("admin_accessToken")
-      localStorage.removeItem("admin_authenticated")
-      localStorage.removeItem("admin_user")
+      localStorage.removeItem(authKey("admin", "accessToken"))
+      localStorage.removeItem(authKey("admin", "authenticated"))
+      localStorage.removeItem(authKey("admin", "user"))
       localStorage.removeItem("admin_sidebar_state")
       localStorage.removeItem("admin_recent_searches")
       sessionStorage.removeItem("adminAuthData")

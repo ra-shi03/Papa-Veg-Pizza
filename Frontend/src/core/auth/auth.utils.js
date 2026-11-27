@@ -1,3 +1,4 @@
+import { authKey } from "@/shared/utils/authNamespace";
 /**
  * JWT Token Utilities
  * Decode and extract information from JWT tokens
@@ -83,7 +84,7 @@ export function hasModuleAccess(role, module) {
  * @returns {string|null} - Access token or null
  */
 export function getModuleToken(module) {
-  return localStorage.getItem(`${module}_accessToken`);
+  return localStorage.getItem(authKey(module, "accessToken"));
 }
 
 /**
@@ -92,7 +93,7 @@ export function getModuleToken(module) {
  * @returns {string|null} - Refresh token or null
  */
 export function getModuleRefreshToken(module) {
-  return localStorage.getItem(`${module}_refreshToken`);
+  return localStorage.getItem(authKey(module, "refreshToken"));
 }
 
 /**
@@ -150,10 +151,10 @@ export function isModuleAuthenticated(module) {
  * @param {string} module - Module name (admin, store, delivery, user)
  */
 export function clearModuleAuth(module) {
-  localStorage.removeItem(`${module}_accessToken`);
-  localStorage.removeItem(`${module}_refreshToken`);
-  localStorage.removeItem(`${module}_authenticated`);
-  localStorage.removeItem(`${module}_user`);
+  localStorage.removeItem(authKey(module, "accessToken"));
+  localStorage.removeItem(authKey(module, "refreshToken"));
+  localStorage.removeItem(authKey(module, "authenticated"));
+  localStorage.removeItem(authKey(module, "user"));
   if (module === "store") {
     clearStoreSessionCache();
   }
@@ -241,10 +242,10 @@ export function setAuthData(module, token, user, refreshToken = null) {
     });
 
     // Store module-specific token (don't clear other modules)
-    const tokenKey = `${module}_accessToken`;
-    const refreshTokenKey = `${module}_refreshToken`;
-    const authKey = `${module}_authenticated`;
-    const userKey = `${module}_user`;
+    const tokenKey = authKey(module, "accessToken");
+    const refreshTokenKey = authKey(module, "refreshToken");
+    const authFlagKey = authKey(module, "authenticated");
+    const userKey = authKey(module, "user");
 
     // Prevent stale store profile data from previous account after re-login.
     if (module === "store") {
@@ -255,7 +256,7 @@ export function setAuthData(module, token, user, refreshToken = null) {
     if (refreshToken && typeof refreshToken === "string") {
       localStorage.setItem(refreshTokenKey, refreshToken);
     }
-    localStorage.setItem(authKey, 'true');
+    localStorage.setItem(authFlagKey, 'true');
     
     if (user) {
       try {
@@ -268,7 +269,7 @@ export function setAuthData(module, token, user, refreshToken = null) {
 
     // Verify the token was stored correctly
     const storedToken = localStorage.getItem(tokenKey);
-    const storedAuth = localStorage.getItem(authKey);
+    const storedAuth = localStorage.getItem(authFlagKey);
     
     if (storedToken !== token) {
       console.error(`[setAuthData] Token mismatch:`, {
@@ -296,17 +297,17 @@ export function setAuthData(module, token, user, refreshToken = null) {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('user');
         // Retry storing
-        localStorage.setItem(`${module}_accessToken`, token);
+        localStorage.setItem(authKey(module, "accessToken"), token);
         if (refreshToken && typeof refreshToken === "string") {
-          localStorage.setItem(`${module}_refreshToken`, refreshToken);
+          localStorage.setItem(authKey(module, "refreshToken"), refreshToken);
         }
-        localStorage.setItem(`${module}_authenticated`, 'true');
+        localStorage.setItem(authKey(module, "authenticated"), 'true');
         if (user) {
-          localStorage.setItem(`${module}_user`, JSON.stringify(user));
+          localStorage.setItem(authKey(module, "user"), JSON.stringify(user));
         }
         
         // Verify again after retry
-        const storedToken = localStorage.getItem(`${module}_accessToken`);
+        const storedToken = localStorage.getItem(authKey(module, "accessToken"));
         if (storedToken !== token) {
           throw new Error('Token storage failed even after clearing space');
         }

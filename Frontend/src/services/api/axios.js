@@ -1,3 +1,4 @@
+import { authKey } from "@/shared/utils/authNamespace";
 /**
  * Central API client for backend (auth and future APIs).
  * - baseURL from VITE_API_BASE_URL (e.g. http://localhost:5000/api/v1)
@@ -20,11 +21,11 @@ const baseURL =
 
 function getAccessToken(module) {
   try {
-    const key = `${module}_accessToken`;
+    const key = authKey(module, "accessToken");
     const moduleToken = localStorage.getItem(key);
     if (moduleToken) return moduleToken;
 
-    // If request originates from an admin/superadmin route in the browser, fallback to admin_accessToken
+    // If request originates from an admin/superadmin route in the browser, fallback to the admin sign-in of this panel
     if (typeof window !== "undefined") {
       const path = window.location.pathname || "";
       if (
@@ -34,7 +35,7 @@ function getAccessToken(module) {
         path.includes("/store-manager") ||
         path.includes("/store-operations")
       ) {
-        const adminTok = localStorage.getItem("admin_accessToken") || localStorage.getItem("accessToken") || localStorage.getItem("token");
+        const adminTok = localStorage.getItem(authKey("admin", "accessToken")) || localStorage.getItem("accessToken") || localStorage.getItem("token");
         if (adminTok) return adminTok;
       }
     }
@@ -44,7 +45,7 @@ function getAccessToken(module) {
     }
     // Also allow admin module to fall back to general accessToken or token
     if (module === "admin") {
-      return localStorage.getItem("admin_accessToken") || localStorage.getItem("accessToken") || localStorage.getItem("token") || null;
+      return localStorage.getItem("accessToken") || localStorage.getItem("token") || null;
     }
     return null;
   } catch {
@@ -64,7 +65,7 @@ function msUntilExpiry(token) {
 
 function getRefreshToken(module) {
   try {
-    const moduleRefreshToken = localStorage.getItem(`${module}_refreshToken`);
+    const moduleRefreshToken = localStorage.getItem(authKey(module, "refreshToken"));
     if (moduleRefreshToken) return moduleRefreshToken;
 
     if (module === "user") {
@@ -78,10 +79,10 @@ function getRefreshToken(module) {
 
 function clearModuleAuth(module) {
   try {
-    localStorage.removeItem(`${module}_accessToken`);
-    localStorage.removeItem(`${module}_refreshToken`);
-    localStorage.removeItem(`${module}_authenticated`);
-    localStorage.removeItem(`${module}_user`);
+    localStorage.removeItem(authKey(module, "accessToken"));
+    localStorage.removeItem(authKey(module, "refreshToken"));
+    localStorage.removeItem(authKey(module, "authenticated"));
+    localStorage.removeItem(authKey(module, "user"));
   } catch (_) {}
 }
 
@@ -118,10 +119,10 @@ function createModuleClient(moduleName) {
         const { data } = await axios.post(refreshUrl, { refreshToken }, { timeout: 10000 });
         const newAccessToken = data?.data?.accessToken || data?.accessToken;
         if (!newAccessToken) return null;
-        localStorage.setItem(`${moduleName}_accessToken`, newAccessToken);
+        localStorage.setItem(authKey(moduleName, "accessToken"), newAccessToken);
         // The response carries the new refresh token; the old one stops working shortly
         const newRefreshToken = data?.data?.refreshToken || data?.refreshToken;
-        if (newRefreshToken) localStorage.setItem(`${moduleName}_refreshToken`, newRefreshToken);
+        if (newRefreshToken) localStorage.setItem(authKey(moduleName, "refreshToken"), newRefreshToken);
         window.dispatchEvent(new CustomEvent("authRefreshed", { detail: { module: moduleName, token: newAccessToken } }));
         return newAccessToken;
       } catch (_) {

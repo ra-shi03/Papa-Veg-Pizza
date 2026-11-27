@@ -1,3 +1,4 @@
+import { authKey } from "@/shared/utils/authNamespace";
 import React, { useState, useEffect } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import * as Icons from "lucide-react"
@@ -61,9 +62,9 @@ export default function Sidebar({ isOpen, onClose, role, isCollapsed = false, on
 
   const handleLogout = async () => {
     try {
-      localStorage.removeItem("admin_accessToken")
-      localStorage.removeItem("admin_refreshToken")
-      localStorage.removeItem("admin_user")
+      localStorage.removeItem(authKey("admin", "accessToken"))
+      localStorage.removeItem(authKey("admin", "refreshToken"))
+      localStorage.removeItem(authKey("admin", "user"))
       localStorage.removeItem("store_role")
       window.dispatchEvent(new Event("storeAuthChanged"))
       navigate("/store-operation/login", { replace: true })

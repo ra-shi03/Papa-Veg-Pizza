@@ -1,3 +1,4 @@
+import { authKey } from "@/shared/utils/authNamespace";
 import React, { useState, useEffect, useRef } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import {
@@ -69,7 +70,7 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
     }
 
     // Immediately seed from cached local session
-    const localUser = localStorage.getItem("admin_user")
+    const localUser = localStorage.getItem(authKey("admin", "user"))
     if (localUser) {
       try {
         const parsed = JSON.parse(localUser)
@@ -144,17 +145,17 @@ export default function Navbar({ onToggleSidebar, role, onRoleChange }) {
 
   const handleLogout = async () => {
     try {
-      const refreshToken = localStorage.getItem("admin_refreshToken");
+      const refreshToken = localStorage.getItem(authKey("admin", "refreshToken"));
       if (refreshToken) {
         await adminAPI.logout(refreshToken);
       }
     } catch (error) {
       console.error("Logout API failed", error);
     } finally {
-      localStorage.removeItem("admin_accessToken")
-      localStorage.removeItem("admin_refreshToken")
-      localStorage.removeItem("admin_authenticated")
-      localStorage.removeItem("admin_user")
+      localStorage.removeItem(authKey("admin", "accessToken"))
+      localStorage.removeItem(authKey("admin", "refreshToken"))
+      localStorage.removeItem(authKey("admin", "authenticated"))
+      localStorage.removeItem(authKey("admin", "user"))
       localStorage.removeItem("admin_role")
       navigate("/store-operation/login", { replace: true })
     }

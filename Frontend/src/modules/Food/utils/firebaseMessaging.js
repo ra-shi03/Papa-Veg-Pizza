@@ -1,3 +1,4 @@
+import { authKey, authNamespace } from "@/shared/utils/authNamespace";
 import { toast } from "sonner";
 import { userAPI, restaurantAPI, deliveryAPI, adminAPI } from "@food/api";
 import { initializeApp, getApp, getApps } from "firebase/app";
@@ -456,11 +457,11 @@ function getMessagingFirebaseApp(config) {
 }
 
 function getSavedToken(moduleName) {
-  return localStorage.getItem(`${tokenCachePrefix}${moduleName}`) || "";
+  return localStorage.getItem(`${tokenCachePrefix}${authNamespace(moduleName)}`) || "";
 }
 
 function setSavedToken(moduleName, token) {
-  localStorage.setItem(`${tokenCachePrefix}${moduleName}`, token);
+  localStorage.setItem(`${tokenCachePrefix}${authNamespace(moduleName)}`, token);
 }
 
 async function saveTokenByModule(moduleName, token, platform = "web") {
@@ -761,7 +762,7 @@ export async function registerWebPushForCurrentModule(pathname = window.location
   const moduleName = normalizeModuleFromPath(pathname);
   initPushNotificationClient();
 
-  const accessToken = localStorage.getItem(`${moduleName}_accessToken`);
+  const accessToken = localStorage.getItem(authKey(moduleName, "accessToken"));
   if (!accessToken) return;
 
   const supportsBrowserPush = isSupportedBrowser() && isSecureContextForPush();

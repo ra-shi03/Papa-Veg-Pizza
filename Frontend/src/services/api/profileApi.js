@@ -1,3 +1,4 @@
+import { authKey } from "@/shared/utils/authNamespace";
 /**
  * API client endpoints for Store Operations Profile Module.
  * Integrates with standard apiClient and provides robust local-storage-based fallback
@@ -12,7 +13,7 @@ import { throwApiError } from "./apiError.js";
 // Session calls carry this device's refresh token in a header, so the server can tell "this device" from the others.
 const refreshHeader = () => {
   try {
-    const token = localStorage.getItem("admin_refreshToken");
+    const token = localStorage.getItem(authKey("admin", "refreshToken"));
     return token ? { "X-Refresh-Token": token } : {};
   } catch {
     return {};

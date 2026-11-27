@@ -1,3 +1,4 @@
+import { authKey, authNamespace } from "@/shared/utils/authNamespace";
 import apiClient, { userClient, restaurantClient, deliveryClient, adminClient } from "./axios.js";
 import { API_ENDPOINTS } from "./config.js";
 import * as authService from "./auth.js";
@@ -166,9 +167,9 @@ export const adminAPI = {
     const token =
       refreshToken ||
       (typeof localStorage !== "undefined"
-        ? localStorage.getItem("admin_refreshToken")
+        ? localStorage.getItem(authKey("admin", "refreshToken"))
         : null);
-    const fcmToken = typeof localStorage !== "undefined" ? localStorage.getItem("fcm_web_registered_token_admin") : null;
+    const fcmToken = typeof localStorage !== "undefined" ? localStorage.getItem(`fcm_web_registered_token_${authNamespace("admin")}`) : null;
     return authService.logout(token, fcmToken, "web");
   },
   /** Register this browser for push notifications for the signed-in panel user. */

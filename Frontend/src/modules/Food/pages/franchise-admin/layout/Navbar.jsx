@@ -1,3 +1,4 @@
+import { authKey } from "@/shared/utils/authNamespace";
 import React, { useState, useEffect, useRef } from "react"
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom"
 import {
@@ -84,7 +85,7 @@ export default function Navbar({ onToggleSidebar }) {
   }
 
   useEffect(() => {
-    const adminUserStr = localStorage.getItem("admin_user")
+    const adminUserStr = localStorage.getItem(authKey("admin", "user"))
     if (adminUserStr) {
       setAdminData(JSON.parse(adminUserStr))
     } else {
