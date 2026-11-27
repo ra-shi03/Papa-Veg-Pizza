@@ -30,7 +30,13 @@ import {
   Smartphone,
   Trophy,
   Activity,
-  HeartHandshake
+  HeartHandshake,
+  Clock,
+  Package,
+  Plus,
+  UserCircle,
+  CreditCard,
+  Receipt
 } from "lucide-react"
 import {
   ResponsiveContainer,
@@ -46,20 +52,7 @@ import {
 import Sidebar from "../layouts/Sidebar"
 import Navbar from "../layouts/Navbar"
 
-// Custom sparkline representation helper for Bento cards
-const Sparkline = ({ data, stroke, className = "w-full h-8 overflow-visible opacity-40" }) => {
-  return (
-    <svg className={className} viewBox="0 0 100 30" preserveAspectRatio="none">
-      <path
-        d={`M ${data.map((val, idx) => `${(idx / (data.length - 1)) * 100} ${30 - val}`).join(" L ")}`}
-        fill="none"
-        stroke={stroke}
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
+import { StatsPanel, StatSection, MetricCard } from "@food/components/StatCards"
 
 import { useSystemTheme } from "@/shared/utils/themeSync"
 import { adminAPI } from "@/services/api"
@@ -149,15 +142,38 @@ export default function SuperAdminDashboard() {
 
   const money = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`
   const fig = (v, show = (x) => x) => (v === undefined || v === null ? "—" : show(v))
-  const card = (title, val, icon) => ({ title, val, growth: "", up: true, icon, sparkData: [], color: "text-[var(--primary)] bg-[var(--primary)]/10" })
-  const kpis = [
-    card("Revenue Today", fig(dash.summary?.revenue, money), DollarSign),
-    card("Live Orders", dash.summary ? dash.live.length : "—", ShoppingBag),
-    card("Riders On Orders", fig(dash.summary?.activeRiders), Truck),
-    card("New Customers", fig(dash.customers?.newCustomers), Users),
-    card("Active Stores", fig(dash.summary?.activeStores), Store),
-    card("Comm. Today", fig(dash.summary?.commission, money), Percent),
-  ]
+
+  // Company-wide stats for the chosen period and zone (/food/admin/dashboard-stats)
+  const [statsPeriod, setStatsPeriod] = useState("overall")
+  const [statsZone, setStatsZone] = useState("all")
+  const [zones, setZones] = useState([])
+  const [stats, setStats] = useState(null)
+  const [statsLoading, setStatsLoading] = useState(true)
+
+  useEffect(() => {
+    adminAPI.getZones()
+      .then((res) => setZones(Array.isArray(res?.data?.data) ? res.data.data : []))
+      .catch(() => setZones([]))
+  }, [])
+
+  useEffect(() => {
+    let alive = true
+    setStatsLoading(true)
+    adminAPI.getDashboardStats({ period: statsPeriod, ...(statsZone !== "all" ? { zoneId: statsZone } : {}) })
+      .then((res) => { if (alive) setStats(res?.data?.data || null) })
+      .catch(() => { if (alive) setStats(null) })
+      .finally(() => { if (alive) setStatsLoading(false) })
+    return () => { alive = false }
+  }, [statsPeriod, statsZone])
+
+  const periodLabel = { overall: "Overall", today: "Today's", week: "This week's", month: "This month's", year: "This year's" }[statsPeriod]
+  const count = (n) => Number(n || 0).toLocaleString("en-IN")
+  const commissionTotal = stats?.commission?.total || 0
+  const deliveryFeeTotal = stats?.deliveryFee?.total || 0
+  const platformFeeTotal = stats?.platformFee?.total || 0
+  const gstTotal = stats?.gst?.total || 0
+  const platformTotal = Number(deliveryFeeTotal) + Number(commissionTotal) + Number(platformFeeTotal) + Number(gstTotal)
+  const SA = "/food/superadmin"
 
   const currentChartData = dash.revenue.map((d) => ({ time: d.date, revenue: d.revenue }))
 
@@ -345,45 +361,79 @@ export default function SuperAdminDashboard() {
           </section>
         )}
 
-        {/* KPI Bento Grid */}
-        <section className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-4">
-          {kpis.map((kpi, index) => {
-            const Icon = kpi.icon
-            return (
-              <div
-                key={index}
-                className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-855 p-3 rounded-lg flex items-center justify-between hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 shadow-sm cursor-pointer"
+        {/* Stats cards (Jharkhand Rasoi admin layout) */}
+        <StatsPanel
+          eyebrow="Admin Overview"
+          title="Operations Command"
+          loading={statsLoading}
+          actions={
+            <>
+              <select
+                value={statsZone}
+                onChange={(e) => setStatsZone(e.target.value)}
+                className="min-w-[160px] rounded-md border border-neutral-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-neutral-300"
               >
-                <div className="flex flex-col gap-0.5 min-w-0">
-                  <span className="text-[10px] font-bold text-black dark:text-white uppercase tracking-wider truncate">
-                    {kpi.title}
-                  </span>
-                  <div className="flex items-baseline gap-1.5 flex-wrap">
-                    <span className="text-lg font-black text-black dark:text-white">{kpi.val}</span>
-                    <span
-                      className={`text-[8px] font-extrabold px-1 py-0.2 rounded-full flex items-center gap-0.5 ${
-                        kpi.growth.startsWith("-")
-                          ? "text-rose-600 bg-rose-50 dark:bg-rose-950/20"
-                          : kpi.growth === "0%"
-                            ? "text-black bg-zinc-100 dark:bg-zinc-800 dark:text-white"
-                            : "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20"
-                      }`}
-                    >
-                      {kpi.growth}
-                    </span>
-                  </div>
-                  <div className="w-16 mt-1 opacity-60">
-                    <Sparkline data={kpi.sparkData} stroke={kpi.up ? primaryColor : "#ef4444"} className="w-full h-4 overflow-visible" />
-                  </div>
-                </div>
+                <option value="all">All zones</option>
+                {zones.map((z) => (
+                  <option key={z._id || z.id} value={z._id || z.id}>{z.name || z.zoneName || "Unnamed Zone"}</option>
+                ))}
+              </select>
+              <select
+                value={statsPeriod}
+                onChange={(e) => setStatsPeriod(e.target.value)}
+                className="min-w-[140px] rounded-md border border-neutral-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-neutral-300"
+              >
+                <option value="overall">Overall</option>
+                <option value="today">Today</option>
+                <option value="week">This week</option>
+                <option value="month">This month</option>
+                <option value="year">This year</option>
+              </select>
+            </>
+          }
+        >
+            {/* Live right now (same figures as before, refreshed every minute) */}
+            <StatSection title="Live Today" subtitle="What is happening across the company right now" className="sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              <MetricCard title="Revenue today" value={fig(dash.summary?.revenue, money)} helper="Sales so far today" icon={DollarSign} iconClass="text-emerald-600" accent="bg-emerald-200/40" path={`${SA}/orders`} />
+              <MetricCard title="Live orders" value={dash.summary ? count(dash.live.length) : "—"} helper="Being prepared or delivered" icon={ShoppingBag} iconClass="text-amber-600" accent="bg-amber-200/40" path={`${SA}/order-tracking`} />
+              <MetricCard title="Riders on orders" value={fig(dash.summary?.activeRiders)} helper="Out on a delivery now" icon={Truck} iconClass="text-indigo-600" accent="bg-indigo-200/40" path={`${SA}/delivery-partners`} />
+              <MetricCard title="New customers" value={fig(dash.customers?.newCustomers)} helper="Signed up today" icon={Users} iconClass="text-cyan-600" accent="bg-cyan-200/40" path={`${SA}/customers`} />
+              <MetricCard title="Active stores" value={fig(dash.summary?.activeStores)} helper="Open for orders" icon={Store} iconClass="text-blue-600" accent="bg-blue-200/40" path={`${SA}/franchise-stores`} />
+              <MetricCard title="Commission today" value={fig(dash.summary?.commission, money)} helper="Store commission earned today" icon={Percent} iconClass="text-purple-600" accent="bg-purple-200/40" path={`${SA}/payouts`} />
+            </StatSection>
 
-                <div className={`p-1.5 rounded-md border border-zinc-100 dark:border-zinc-800 ${kpi.color} flex items-center justify-center shrink-0`}>
-                  <Icon size={14} className="stroke-[2.2]" />
-                </div>
-              </div>
-            )
-          })}
-        </section>
+            {/* Financial Overview (3x2) */}
+            <StatSection title="Financial Overview" subtitle="Revenue, commissions, fees and total platform earnings" className="sm:grid-cols-2 lg:grid-cols-3">
+              <MetricCard title="Gross revenue" value={money(stats?.revenue?.total)} helper={`${periodLabel} delivered order value`} icon={ShoppingBag} iconClass="text-emerald-600" accent="bg-emerald-200/40" path={`${SA}/orders`} />
+              <MetricCard title="Commission earned" value={money(commissionTotal)} helper={`${periodLabel} store commission`} icon={ArrowUpRight} iconClass="text-indigo-600" accent="bg-indigo-200/40" path={`${SA}/payouts`} />
+              <MetricCard title="Delivery fee (from users)" value={money(deliveryFeeTotal)} helper={`Customer paid delivery: ${periodLabel}`} icon={Truck} iconClass="text-blue-600" accent="bg-blue-200/40" path={`${SA}/fees-and-charges`} />
+              <MetricCard title="Platform fee" value={money(platformFeeTotal)} helper={`Platform service fees: ${periodLabel}`} icon={CreditCard} iconClass="text-purple-600" accent="bg-purple-200/40" path={`${SA}/fees-and-charges`} />
+              <MetricCard title="GST" value={money(gstTotal)} helper={`Total tax collected: ${periodLabel}`} icon={Receipt} iconClass="text-orange-600" accent="bg-orange-200/40" path={`${SA}/orders`} />
+              <MetricCard
+                title="Platform total"
+                value={`₹${platformTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                helper={`Delivery: ${money(deliveryFeeTotal)} + Comm: ${money(commissionTotal)} + Platform: ${money(platformFeeTotal)} + GST: ${money(gstTotal)}`}
+                icon={DollarSign}
+                iconClass="text-emerald-600"
+                accent="bg-emerald-200/50 border border-emerald-300/50"
+                path={`${SA}/payouts`}
+              />
+            </StatSection>
+
+            {/* Platform & Operations (5x2) */}
+            <StatSection title="Platform & Operations" subtitle="Order pipelines, partners, catalog, and customers" className="sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
+              <MetricCard title="Orders processing" value={count(stats?.orderStats?.processing)} helper="Being prepared in store kitchens" icon={Activity} iconClass="text-amber-600" accent="bg-amber-200/40" path={`${SA}/orders`} />
+              <MetricCard title="Pending orders" value={count(stats?.orderStats?.pending)} helper="Waiting for the store to start" icon={Clock} iconClass="text-red-600" accent="bg-red-200/40" path={`${SA}/orders`} />
+              <MetricCard title="Completed orders" value={count(stats?.orderStats?.completed)} helper="Successfully delivered" icon={CheckCircle} iconClass="text-emerald-600" accent="bg-emerald-200/40" path={`${SA}/orders`} />
+              <MetricCard title="Total stores" value={count(stats?.stores?.total)} helper="Approved franchise stores" icon={Store} iconClass="text-blue-600" accent="bg-blue-200/40" path={`${SA}/franchise-stores`} />
+              <MetricCard title="Store requests pending" value={count(stats?.stores?.pendingRequests)} helper="Awaiting approval" icon={UserCheck} iconClass="text-orange-600" accent="bg-orange-200/40" path={`${SA}/franchise-approvals`} />
+              <MetricCard title="Total delivery partners" value={count(stats?.deliveryBoys?.total)} helper="Approved riders" icon={Truck} iconClass="text-indigo-600" accent="bg-indigo-200/40" path={`${SA}/delivery-partners`} />
+              <MetricCard title="Rider requests pending" value={count(stats?.deliveryBoys?.pendingRequests)} helper="Awaiting verification" icon={Clock} iconClass="text-yellow-600" accent="bg-yellow-200/40" path={`${SA}/delivery-partners`} />
+              <MetricCard title="Total products" value={count(stats?.foods?.total)} helper="Active menu items" icon={Package} iconClass="text-purple-600" accent="bg-purple-200/40" path={`${SA}/products`} />
+              <MetricCard title="Total add-ons" value={count(stats?.addons?.total)} helper="Active add-ons & toppings" icon={Plus} iconClass="text-pink-600" accent="bg-pink-200/40" path={`${SA}/addons`} />
+              <MetricCard title="Total customers" value={count(stats?.customers?.total)} helper="Registered customers" icon={UserCircle} iconClass="text-cyan-600" accent="bg-cyan-200/40" path={`${SA}/customers`} />
+            </StatSection>
+        </StatsPanel>
 
         {/* Charts & Monitoring Columns */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">

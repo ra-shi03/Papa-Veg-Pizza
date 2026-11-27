@@ -84,6 +84,7 @@ export const adminAPI = {
   getPriceHistory: (productId, params = {}) => adminClient.get(`/price-history/${productId}`, { params }),
   applyBulkPricingAction: (pricingIds, action, payload = {}) => adminClient.put("/store-pricing/bulk-action", { pricingIds, action, payload }),
   getDashboardSummary: (params = {}) => adminClient.get("/admin/dashboard", { params }),
+  getDashboardFranchiseStats: (params = {}) => adminClient.get("/admin/dashboard/stats", { params }),
   getDashboardRevenue: (params = {}) => adminClient.get("/admin/dashboard/revenue", { params }),
   getDashboardLiveOrders: (params = {}) => adminClient.get("/admin/dashboard/live-orders", { params }),
   getDashboardStorePerformance: (params = {}) => adminClient.get("/admin/dashboard/store-performance", { params }),

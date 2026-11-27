@@ -12,6 +12,7 @@ const wrap = (fn) => async (req, res, next) => {
 
 // Store manager dashboard, one handler per widget (path segment -> service function)
 export const storeWidgets = {
+  stats: wrap(store.stats),
   'today-sales': wrap(store.todaySales),
   'today-orders': wrap(store.todayOrders),
   'active-orders': wrap(store.activeOrders),
@@ -39,6 +40,7 @@ export const storeWidgets = {
 
 // Franchise admin dashboard
 export const summary = wrap(franchise.summary);
+export const stats = wrap(franchise.stats);
 export const revenue = wrap(franchise.revenue);
 export const liveOrders = wrap(franchise.liveOrders);
 export const storePerformance = wrap(franchise.storePerformance);

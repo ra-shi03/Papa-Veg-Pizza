@@ -7,6 +7,7 @@ import { DeliverySupportTicket } from '../../delivery/models/supportTicket.model
 import { FoodZone } from '../models/zone.model.js';
 import { FoodCategory } from '../models/category.model.js';
 import { FoodItem } from '../models/food.model.js';
+import { Product } from '../models/product.model.js';
 import { DeliveryBonusTransaction } from '../models/deliveryBonusTransaction.model.js';
 import { FoodEarningAddon } from '../models/earningAddon.model.js';
 import { Addon as FoodAddon } from '../models/addon.model.js';
@@ -525,12 +526,9 @@ export async function getDashboardStats(query = {}) {
         storeMatch.zoneId = zoneId;
     }
 
-    const zoneStoreIds = zoneId
-        ? await FoodStore.find({ zoneId }).distinct('_id')
-        : null;
-    const zoneScopedStoreMatch = zoneId
-        ? { storeId: { $in: zoneStoreIds || [] } }
-        : {};
+    // Customer accounts are the users whose primary role is CUSTOMER (staff and admins are users too)
+    const customerRole = await Role.findOne({ code: 'CUSTOMER' }).select('_id').lean();
+    const customerMatch = { primaryRole: customerRole?._id ?? null, isDeleted: { $ne: true } };
 
     const [
         orderTotalsAgg,
@@ -648,11 +646,12 @@ export async function getDashboardStats(query = {}) {
         FoodStore.countDocuments({ ...storeMatch, status: 'pending' }),
         FoodDeliveryPartner.countDocuments({ status: 'approved' }),
         FoodDeliveryPartner.countDocuments({ status: 'pending' }),
-        FoodItem.countDocuments({ approvalStatus: 'approved', ...zoneScopedStoreMatch }),
-        FoodAddon.countDocuments({ approvalStatus: 'approved', isDeleted: { $ne: true }, ...zoneScopedStoreMatch }),
+        // The catalogue is company-wide (products / add-ons are not per store), so these ignore the zone filter
+        Product.countDocuments({ status: 'Active' }),
+        FoodAddon.countDocuments({ status: 'Active' }),
         zoneId
             ? FoodOrder.distinct('userId', { ...orderMatch, userId: { $ne: null } }).then((ids) => ids.length)
-            : FoodUser.countDocuments({}),
+            : FoodUser.countDocuments(customerMatch),
         FoodStore.find({ ...storeMatch, status: 'pending' }).sort({ createdAt: -1 }).limit(5).select('storeName createdAt').lean(),
         FoodDeliveryPartner.find({ status: 'pending' }).sort({ createdAt: -1 }).limit(5).select('name createdAt').lean(),
         FoodOrder.find({
@@ -693,7 +692,7 @@ export async function getDashboardStats(query = {}) {
                     }
                 }
             ])
-            : FoodUser.find({}).sort({ createdAt: -1 }).limit(5).select('name createdAt').lean()
+            : FoodUser.find(customerMatch).sort({ createdAt: -1 }).limit(5).select('name createdAt').lean()
     ]);
 
     const liveSignals = [];

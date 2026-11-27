@@ -15,6 +15,7 @@ for (const [widget, handler] of Object.entries(c.storeWidgets)) storeDashboardRo
 export const adminDashboardRouter = express.Router();
 adminDashboardRouter.use(authMiddleware, requireRoles('ADMIN'));
 adminDashboardRouter.get('/', c.summary);
+adminDashboardRouter.get('/stats', c.stats);
 adminDashboardRouter.get('/revenue', c.revenue);
 adminDashboardRouter.get('/live-orders', c.liveOrders);
 adminDashboardRouter.get('/store-performance', c.storePerformance);

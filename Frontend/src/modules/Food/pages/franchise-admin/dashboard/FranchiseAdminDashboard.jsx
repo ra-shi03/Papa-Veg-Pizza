@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from "react"
 import { useSearchParams } from "react-router-dom"
-import { Activity, Sliders, Calendar, ArrowUpRight, Pizza, Search, Star, MessageSquare } from "lucide-react"
+import {
+  Activity, Calendar, ArrowUpRight, Search, Star, ShoppingBag, Scale, Truck, CreditCard, Receipt, Percent,
+  Clock, CheckCircle, XCircle, Store, FileCheck, RotateCcw, AlertTriangle,
+} from "lucide-react"
 import { adminAPI } from "@food/api"
+import { StatsPanel, StatSection, MetricCard } from "@food/components/StatCards"
 
 // Child Widget Components
-import KpiCards from "./components/KpiCards"
 import DashboardCharts from "./components/DashboardCharts"
 import LiveOrders from "./components/LiveOrders"
 import StorePerformance from "./components/StorePerformance"
@@ -27,6 +30,7 @@ export default function FranchiseAdminDashboard() {
   // Operational states
   const [loading, setLoading] = useState(true)
   const [kpiData, setKpiData] = useState(null)
+  const [stats, setStats] = useState(null)
   const [revenueTrend, setRevenueTrend] = useState([])
   const [liveOrders, setLiveOrders] = useState([])
   const [storesPerformance, setStoresPerformance] = useState([])
@@ -61,6 +65,10 @@ export default function FranchiseAdminDashboard() {
     try {
       setLoading(true)
       const params = periodParams()
+      // The stats cards are optional: if they fail, the rest of the dashboard still loads
+      adminAPI.getDashboardFranchiseStats(params)
+        .then((res) => setStats(res.data?.data || null))
+        .catch(() => setStats(null))
       const [kpis, rev, orders, stores, inventory, delivery, customers] = await Promise.all([
         adminAPI.getDashboardSummary(params),
         adminAPI.getDashboardRevenue(params),
@@ -168,6 +176,18 @@ export default function FranchiseAdminDashboard() {
     setNotificationsFeed(prev => [newAlert, ...prev])
   }
 
+  const FA = "/franchise-admin"
+  const money = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`
+  const count = (n) => Number(n || 0).toLocaleString("en-IN")
+  const rangeLabel = {
+    today: "Today",
+    yesterday: "Yesterday",
+    week: "Last 7 days",
+    thirty: "Last 30 days",
+    month: "This month",
+    custom: startDate && endDate ? `${startDate} to ${endDate}` : "Today",
+  }[dateFilter] || "Today"
+
   const orderMixStats = {
     confirmed: getFilteredLiveOrders().filter(o => o.status === "confirmed").length,
     preparing: getFilteredLiveOrders().filter(o => o.status === "preparing").length,
@@ -212,10 +232,42 @@ export default function FranchiseAdminDashboard() {
         </div>
       </div>
 
-      {/* KPI Bento Grid Section */}
-      <section className="mb-6">
-        <KpiCards data={kpiData} loading={loading} />
-      </section>
+      {/* Stats cards (Jharkhand Rasoi admin layout); they follow the header's date filter */}
+      <StatsPanel
+        eyebrow="Franchise Overview"
+        title="Operations Command"
+        loading={loading}
+        actions={
+          <span className="flex items-center gap-1.5 rounded-md border border-neutral-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-neutral-900 dark:text-white">
+            <Calendar size={14} className="text-neutral-500" />
+            {rangeLabel}
+          </span>
+        }
+      >
+        {/* Financial Overview (3x2) */}
+        <StatSection title="Financial Overview" subtitle="Sales, fees and commission from your stores' delivered orders" className="sm:grid-cols-2 lg:grid-cols-3">
+          <MetricCard title="Gross revenue" value={money(stats?.revenue)} helper={`${rangeLabel}: delivered order value`} icon={ShoppingBag} iconClass="text-emerald-600" accent="bg-emerald-200/40" path={`${FA}/completed-orders`} />
+          <MetricCard title="Avg order value" value={money(stats?.avgOrderValue)} helper="Per delivered order" icon={Scale} iconClass="text-indigo-600" accent="bg-indigo-200/40" path={`${FA}/completed-orders`} />
+          <MetricCard title="Delivery fee (from users)" value={money(stats?.deliveryFee)} helper={`Customer paid delivery: ${rangeLabel}`} icon={Truck} iconClass="text-blue-600" accent="bg-blue-200/40" path={`${FA}/completed-orders`} />
+          <MetricCard title="Platform fee" value={money(stats?.platformFee)} helper={`Platform service fees: ${rangeLabel}`} icon={CreditCard} iconClass="text-purple-600" accent="bg-purple-200/40" path={`${FA}/payouts`} />
+          <MetricCard title="GST" value={money(stats?.gst)} helper={`Total tax collected: ${rangeLabel}`} icon={Receipt} iconClass="text-orange-600" accent="bg-orange-200/40" path={`${FA}/completed-orders`} />
+          <MetricCard title="Store commission" value={money(stats?.commission)} helper={`Commission on your sales: ${rangeLabel}`} icon={Percent} iconClass="text-emerald-600" accent="bg-emerald-200/50 border border-emerald-300/50" path={`${FA}/payouts`} />
+        </StatSection>
+
+        {/* Stores & Operations (5x2) */}
+        <StatSection title="Stores & Operations" subtitle="Order pipeline, stores, riders, refunds and stock" className="sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
+          <MetricCard title="Pending orders" value={count(stats?.orders?.pending)} helper="Waiting for the store to start" icon={Clock} iconClass="text-red-600" accent="bg-red-200/40" path={`${FA}/live-orders`} />
+          <MetricCard title="Orders processing" value={count(stats?.orders?.processing)} helper="In the kitchen or on the way" icon={Activity} iconClass="text-amber-600" accent="bg-amber-200/40" path={`${FA}/live-orders`} />
+          <MetricCard title="Completed orders" value={count(stats?.orders?.completed)} helper="Successfully delivered" icon={CheckCircle} iconClass="text-emerald-600" accent="bg-emerald-200/40" path={`${FA}/completed-orders`} />
+          <MetricCard title="Cancelled orders" value={count(stats?.orders?.cancelled)} helper="Cancelled by customer, store or admin" icon={XCircle} iconClass="text-rose-600" accent="bg-rose-200/40" path={`${FA}/cancelled-orders`} />
+          <MetricCard title="Total stores" value={count(stats?.stores?.total)} helper={`${count(stats?.stores?.active)} active now`} icon={Store} iconClass="text-blue-600" accent="bg-blue-200/40" path={`${FA}/stores`} />
+          <MetricCard title="Store approvals pending" value={count(stats?.stores?.pendingApproval)} helper="Awaiting approval" icon={FileCheck} iconClass="text-orange-600" accent="bg-orange-200/40" path={`${FA}/store-approvals`} />
+          <MetricCard title="Riders on orders" value={count(stats?.ridersOnOrders)} helper="Delivering for your stores now" icon={Truck} iconClass="text-indigo-600" accent="bg-indigo-200/40" path={`${FA}/delivery-partners`} />
+          <MetricCard title="Pending refunds" value={count(stats?.pendingRefunds)} helper="Refund requests to review" icon={RotateCcw} iconClass="text-pink-600" accent="bg-pink-200/40" path={`${FA}/refund-requests`} />
+          <MetricCard title="Low stock alerts" value={count(stats?.lowStock)} helper="Ingredients below reorder level" icon={AlertTriangle} iconClass="text-yellow-600" accent="bg-yellow-200/40" path={`${FA}/low-stock-alerts`} />
+          <MetricCard title="Customer rating" value={`${kpiData?.customerSatisfaction || 0} / 5`} helper="Average store rating, last 30 days" icon={Star} iconClass="text-cyan-600" accent="bg-cyan-200/40" path={`${FA}/reviews-ratings`} />
+        </StatSection>
+      </StatsPanel>
 
       {/* 12-Column Widgets Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">

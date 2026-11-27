@@ -27,7 +27,8 @@ function currentPath() {
 /** Namespace of the staff panel open in this tab, or null when the tab is not on a staff panel. */
 export function currentPanelNamespace() {
   const path = currentPath();
-  const hit = PANEL_NAMESPACES.find(([prefix]) => new RegExp(`^${prefix}s?(/|$)`).test(path));
+  // Panels are also served under the food module (/food/superadmin/..., which the super admin sidebar links to)
+  const hit = PANEL_NAMESPACES.find(([prefix]) => new RegExp(`^(/food)?${prefix}s?(/|$)`).test(path));
   return hit ? hit[1] : null;
 }
 

@@ -11,7 +11,7 @@ import { User } from '../../../../core/users/models/user.model.js';
 import { todaySummary, todayRoster } from '../../store/services/attendance.service.js';
 import { clockOf } from '../../store/services/attendanceTime.js';
 import { riderScope, riderAreaOf } from '../../store/services/storeDelivery.service.js';
-import { storeScope, ordersOf, startOfDay, daysAgo, hourLabel, ago, round1, round2, CANCELLED, SALE } from './dashboardAccess.js';
+import { storeScope, ordersOf, periodOf, startOfDay, daysAgo, hourLabel, ago, round1, round2, CANCELLED, SALE } from './dashboardAccess.js';
 
 // Store manager dashboard (/v1/store/dashboard/*). Every widget is computed from live data of ONE store, chosen by
 // storeScope() from the token. Shapes are exactly what the widgets render (see the dashboard components).
@@ -93,6 +93,79 @@ export async function customerRating(user, q) {
     { $group: { _id: null, avg: { $avg: '$ratings.store.rating' } } },
   ]);
   return { rating: r ? round1(r.avg) : 0 };
+}
+
+// ---- Stats cards -------------------------------------------------------------------------------
+
+const sumOf = (field) => ({ $sum: { $ifNull: [field, 0] } });
+const countIf = (statuses) => ({ $sum: { $cond: [{ $in: ['$orderStatus', statuses] }, 1, 0] } });
+
+/**
+ * Headline figures for the stats cards. Money and the order pipeline cover the period (?date=today|yesterday|week|
+ * month|custom, default today); prep time, stock, staff, complaints and rating are the store's state now.
+ */
+export async function stats(user, q) {
+  const store = await storeScope(user, q, 'stats');
+  const { from, to } = periodOf(q);
+  const inPeriod = { ...ordersOf(user, store), createdAt: { $gte: from, $lte: to } };
+  const [[money], [pipeline], prep, lowStockItems, attendance, openComplaints, [rating]] = await Promise.all([
+    FoodOrder.aggregate([
+      { $match: { ...inPeriod, orderStatus: 'delivered' } },
+      {
+        $group: {
+          _id: null,
+          orders: { $sum: 1 },
+          revenue: sumOf('$pricing.total'),
+          deliveryFee: sumOf('$pricing.deliveryFee'),
+          gst: sumOf('$pricing.tax'),
+          discount: sumOf('$pricing.discount'),
+          commission: sumOf('$pricing.storeCommission'),
+        },
+      },
+    ]),
+    FoodOrder.aggregate([
+      { $match: inPeriod },
+      {
+        $group: {
+          _id: null,
+          pending: countIf(['created', 'confirmed']),
+          inKitchen: countIf(['preparing', 'ready_for_pickup', 'reached_pickup']),
+          outForDelivery: countIf(OUT),
+          completed: countIf(['delivered']),
+          cancelled: countIf(CANCELLED),
+        },
+      },
+    ]),
+    avgPrepMinutes(ordersOf(user, store)),
+    StoreIngredient.countDocuments(lowStockFilter(store._id)),
+    todaySummary(store._id),
+    FoodSupportTicket.countDocuments({ storeId: store._id, status: { $in: ['open', 'in-progress'] } }),
+    FoodOrder.aggregate([
+      { $match: { storeId: store._id, 'ratings.store.rating': { $gte: 1 }, 'ratings.store.ratedAt': { $gte: daysAgo(29) } } },
+      { $group: { _id: null, avg: { $avg: '$ratings.store.rating' } } },
+    ]),
+  ]);
+  const delivered = money?.orders || 0;
+  return {
+    revenue: round2(money?.revenue),
+    avgOrderValue: delivered ? Math.round((money?.revenue || 0) / delivered) : 0,
+    deliveryFee: round2(money?.deliveryFee),
+    gst: round2(money?.gst),
+    discount: round2(money?.discount),
+    commission: round2(money?.commission),
+    orders: {
+      pending: pipeline?.pending || 0,
+      inKitchen: pipeline?.inKitchen || 0,
+      outForDelivery: pipeline?.outForDelivery || 0,
+      completed: pipeline?.completed || 0,
+      cancelled: pipeline?.cancelled || 0,
+    },
+    avgPrepTime: prep,
+    lowStockItems,
+    staffOnDuty: attendance?.staffOnDuty || 0,
+    openComplaints,
+    rating: rating ? round1(rating.avg) : 0,
+  };
 }
 
 // ---- Charts and lists -------------------------------------------------------------------------

@@ -66,6 +66,75 @@ export async function summary(user, q) {
   };
 }
 
+const PENDING = ['created', 'confirmed'];
+const PROCESSING = ['preparing', 'ready_for_pickup', 'reached_pickup', 'picked_up', 'reached_drop'];
+const sumOf = (field) => ({ $sum: { $ifNull: [field, 0] } });
+const countIf = (statuses) => ({ $sum: { $cond: [{ $in: ['$orderStatus', statuses] }, 1, 0] } });
+
+/**
+ * Headline figures for the stats cards: money from the period's delivered orders, the period's order pipeline,
+ * and the scope's stores, riders, refunds and stock.
+ */
+export async function stats(user, q) {
+  const scope = await adminScope(user, q);
+  const { from, to } = periodOf(q);
+  const inPeriod = { ...scope.match, createdAt: { $gte: from, $lte: to } };
+  const [[money], [pipeline], riders, refunds, lowStock] = await Promise.all([
+    FoodOrder.aggregate([
+      { $match: { ...inPeriod, orderStatus: 'delivered' } },
+      {
+        $group: {
+          _id: null,
+          orders: { $sum: 1 },
+          revenue: sumOf('$pricing.total'),
+          deliveryFee: sumOf('$pricing.deliveryFee'),
+          platformFee: sumOf('$pricing.platformFee'),
+          gst: sumOf('$pricing.tax'),
+          commission: sumOf('$pricing.storeCommission'),
+        },
+      },
+    ]),
+    FoodOrder.aggregate([
+      { $match: inPeriod },
+      {
+        $group: {
+          _id: null,
+          pending: countIf(PENDING),
+          processing: countIf(PROCESSING),
+          completed: countIf(['delivered']),
+          cancelled: countIf(CANCELLED),
+        },
+      },
+    ]),
+    ridersOnOrders(scope.match),
+    FoodOrder.distinct('_id', scope.match).then((ids) => Refund.countDocuments({ orderId: { $in: ids }, status: { $in: ['pending', 'processing'] } })),
+    InventoryAlert.countDocuments({ storeId: { $in: scope.storeIds }, status: 'active' }),
+  ]);
+  const delivered = money?.orders || 0;
+  return {
+    revenue: round2(money?.revenue),
+    avgOrderValue: delivered ? Math.round((money?.revenue || 0) / delivered) : 0,
+    deliveryFee: round2(money?.deliveryFee),
+    platformFee: round2(money?.platformFee),
+    gst: round2(money?.gst),
+    commission: round2(money?.commission),
+    orders: {
+      pending: pipeline?.pending || 0,
+      processing: pipeline?.processing || 0,
+      completed: pipeline?.completed || 0,
+      cancelled: pipeline?.cancelled || 0,
+    },
+    stores: {
+      total: scope.stores.length,
+      active: scope.stores.filter((s) => s.approvalStatus === 'Approved' && s.isActive !== false).length,
+      pendingApproval: scope.stores.filter((s) => s.approvalStatus === 'Pending').length,
+    },
+    ridersOnOrders: riders.length,
+    pendingRefunds: refunds,
+    lowStock,
+  };
+}
+
 /** Revenue per day across the period (at least the last 7 days). */
 export async function revenue(user, q) {
   const scope = await adminScope(user, q);
