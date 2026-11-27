@@ -81,9 +81,11 @@ return {
     // BullMQ
     bullmqEnabled: process.env.BULLMQ_ENABLED === 'true',
 
-    // Pet Pooja POS (each store saves its own restaurant ID and keys in the store panel). The API address comes from
-    // Pet Pooja with the integration documents; while it is unset nothing is sent. PUBLIC_API_URL is this server's
-    // public address, used to build each store's status callback link (falls back to the request's host).
+    // Pet Pooja POS (API: petpooja-api-docs.pdf). Everything is set per store on the store manager's Pet Pooja page and
+    // saved in the database: restaurant ID, keys, staging / production server, public URL, and the store's own links.
+    // Optional server-wide fallbacks only (none needed): PETPOOJA_API_BASE_URL / PETPOOJA_*_URL / PETPOOJA_ENV for a store
+    // that has not chosen a server, PETPOOJA_WEBHOOK_SECRET for one app-wide set of menu / stock / store links, and
+    // PUBLIC_API_URL for a store that has not saved its public URL (else the request's host).
     petpoojaApiBaseUrl: process.env.PETPOOJA_API_BASE_URL || '',
     publicApiUrl: process.env.PUBLIC_API_URL || '',
 

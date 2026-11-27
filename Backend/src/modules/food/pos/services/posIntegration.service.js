@@ -15,8 +15,7 @@ const normalize = (role) => String(role || '').trim().replace(/-/g, '_').toUpper
 const isId = (v) => mongoose.Types.ObjectId.isValid(String(v || ''));
 const oid = (v) => new mongoose.Types.ObjectId(String(v));
 const SECRET_FIELDS = ['appKey', 'appSecret', 'accessToken'];
-const SWITCHES = ['enabled', 'pushOrders', 'acceptStatusUpdates', 'syncMenu', 'syncStock'];
-const TEST_PATH = process.env.PETPOOJA_TEST_PATH || 'mapped_restaurant_menus';   // a read-only call (confirm with Pet Pooja)
+const SWITCHES = ['enabled', 'pushOrders', 'acceptStatusUpdates', 'syncMenu', 'syncStock', 'syncStoreStatus'];
 
 /** The store manager's own store, or 403. */
 export async function managerStore(user) {
@@ -50,6 +49,13 @@ export const keysOf = (doc) => ({
 /** This server's public address: PUBLIC_API_URL, else the address the request came in on. */
 export const publicBase = (req) => (config.publicApiUrl || (req ? `${req.protocol}://${req.get('host')}` : '')).replace(/\/+$/, '');
 export const callbackUrlOf = (doc, base) => (doc?.callbackKey && base ? `${base}/api/v1/pos/petpooja/callback/${doc.callbackKey}` : '');
+/** The links to give Pet Pooja for this store's menu, stock and store status (same secret key as the callback link). */
+export const HOOKS = ['pushmenu', 'item_stock', 'item_stock_off', 'get_store_status', 'update_store_status'];
+export const hookUrlsOf = (doc, base) => Object.fromEntries(HOOKS.map((h) => [h, doc?.callbackKey && base ? `${base}/api/v1/pos/petpooja/hooks/${doc.callbackKey}/${h}` : '']));
+/** The store's chosen Pet Pooja server (petpooja.adapter.js endpointUrl). */
+export const serverConf = (doc) => ({ apiEnv: doc?.apiEnv || '', apiBaseUrl: doc?.apiBaseUrl || '' });
+/** The address Pet Pooja must use to reach this server for this store: the one the manager saved, else the given one. */
+export const linkBase = (doc, base) => String(doc?.publicUrl || base || '').replace(/\/+$/, '');
 
 /** Is the store set up AND switched on to run its orders in Pet Pooja? (used by the order screens and the outbox) */
 export const runsOrdersInPos = (doc) => !!(doc?.enabled && doc.acceptStatusUpdates);
@@ -78,10 +84,14 @@ export async function view(doc, base) {
     appSecret: secretView(doc.appSecret),
     accessToken: secretView(doc.accessToken),
     mappedItems: doc.itemMap?.size || 0,
-    callbackUrl: callbackUrlOf(doc, base),
+    apiEnv: doc.apiEnv || '',
+    apiBaseUrl: doc.apiBaseUrl || '',
+    publicUrl: doc.publicUrl || '',
+    callbackUrl: callbackUrlOf(doc, linkBase(doc, base)),
+    hookUrls: hookUrlsOf(doc, linkBase(doc, base)),
     setupComplete: missing.length === 0,
     missing,
-    serverReady: petpooja.apiReady(),   // false until PETPOOJA_API_BASE_URL is set (nothing is sent before that)
+    serverReady: petpooja.apiReady(serverConf(doc)),   // false until a Pet Pooja server is chosen (nothing is sent before that)
     runsOrdersInPos: runsOrdersInPos(doc),
     lastTest: doc.lastTest?.at ? { at: doc.lastTest.at, ok: !!doc.lastTest.ok, message: doc.lastTest.message || '' } : null,
     updatedAt: doc.updatedAt || null,
@@ -107,8 +117,8 @@ export async function getSettings(user, base) {
 }
 
 /**
- * PUT /food/store/pos/petpooja { enabled?, pushOrders?, acceptStatusUpdates?, syncMenu?, syncStock?, restaurantId?,
- *   appKey?, appSecret?, accessToken?, clear?: ['appKey', ...] }
+ * PUT /food/store/pos/petpooja { enabled?, pushOrders?, acceptStatusUpdates?, syncMenu?, syncStock?, syncStoreStatus?,
+ *   restaurantId?, appKey?, appSecret?, accessToken?, clear?: ['appKey', ...], apiEnv?, apiBaseUrl?, publicUrl? }
  * A key that is not sent (or sent empty) is kept; `clear` removes one. Pet Pooja cannot be switched on until the
  * restaurant ID and all three keys are saved.
  */
@@ -119,6 +129,11 @@ export async function saveSettings(user, body = {}, base) {
   if (typeof body.restaurantId === 'string') {
     const rid = body.restaurantId.trim();
     if (rid && !/^[A-Za-z0-9_-]{1,60}$/.test(rid)) throw new ValidationError('restaurantId: letters, numbers, - and _ only (up to 60).');
+    // Pet Pooja's menu / stock / store calls name the outlet only by this ID, so two stores cannot share it
+    if (rid && rid !== doc.restaurantId
+      && await StorePosIntegration.exists({ provider: petpooja.PROVIDER, restaurantId: rid, storeId: { $ne: store._id } })) {
+      throw new ValidationError('This Pet Pooja restaurant ID is already used by another store.');
+    }
     doc.restaurantId = rid;
   }
   for (const k of SECRET_FIELDS) {
@@ -129,6 +144,20 @@ export async function saveSettings(user, body = {}, base) {
     }
   }
   for (const k of Array.isArray(body.clear) ? body.clear : []) if (SECRET_FIELDS.includes(k)) doc[k] = sealSecret('');
+
+  // Which Pet Pooja server, and the address Pet Pooja reaches this server on
+  if (typeof body.apiEnv === 'string') doc.apiEnv = body.apiEnv;
+  if (typeof body.apiBaseUrl === 'string') {
+    const url = body.apiBaseUrl.trim().replace(/\/+$/, '');
+    if (url && !petpooja.validApiBaseUrl(url)) throw new ValidationError('Pet Pooja production URL: an https:// address.');
+    doc.apiBaseUrl = url;
+  }
+  if (doc.apiEnv === 'production' && !doc.apiBaseUrl) throw new ValidationError('Add the Pet Pooja production URL (from Pet Pooja).');
+  if (typeof body.publicUrl === 'string') {
+    const url = body.publicUrl.trim().replace(/\/+$/, '');
+    if (url && !/^https?:\/\/[^\s/]+(\/[^\s]*)?$/i.test(url)) throw new ValidationError('Public server URL: an http(s):// address.');
+    doc.publicUrl = url;
+  }
 
   const missing = petpooja.missingSetup(keysOf(doc));
   if (doc.enabled && missing.length) {
@@ -157,9 +186,10 @@ export async function testConnection(user, base) {
   const missing = petpooja.missingSetup(keys);
   let result;
   if (missing.length) result = { ok: false, message: `Missing: ${missing.join(', ')}.` };
-  else if (!petpooja.apiReady()) result = { ok: false, message: 'Your keys are saved. The server is not connected to Pet Pooja yet (PETPOOJA_API_BASE_URL is not set), so nothing is sent.' };
+  else if (!petpooja.endpointUrl('fetch_menu', serverConf(doc))) result = { ok: false, message: 'Your keys are saved. Choose the Pet Pooja server (Staging or Production) to connect.' };
   else {
-    const res = await petpooja.send(TEST_PATH, { app_key: keys.appKey, app_secret: keys.appSecret, access_token: keys.accessToken, restID: keys.restaurantId });
+    // Fetch Menu is read-only: a good answer proves the restaurant ID and the three keys
+    const res = await petpooja.fetchMenu(keys, serverConf(doc));
     result = { ok: res.ok, message: res.ok ? 'Pet Pooja answered: the keys work.' : res.message };
   }
   doc.lastTest = { at: new Date(), ok: result.ok, message: result.message.slice(0, 300) };

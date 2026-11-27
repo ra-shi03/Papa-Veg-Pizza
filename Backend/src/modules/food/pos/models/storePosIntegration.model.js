@@ -10,7 +10,9 @@ import mongoose from 'mongoose';
 //                        Swiggy orders)
 //   acceptStatusUpdates  Pet Pooja's status updates (accepted, food ready, cancelled) move the order here, so the customer
 //                        and the rider see them. The rider flow (assignment, pickup, delivery) always stays in this app.
-//   syncMenu / syncStock reserved for menu and item on/off sync (not built yet: needs Pet Pooja's menu mapping)
+//   syncMenu             Pet Pooja may push its menu here (the manager can always fetch it): used to map items
+//   syncStock            Pet Pooja's item in / out of stock switches the item on / off in this store's menu
+//   syncStoreStatus      Pet Pooja's store on / off opens / closes this store for online orders
 const secretSchema = new mongoose.Schema(
     {
         value: { type: String, default: '' },   // AES-256-GCM, see services/posSecrets.js
@@ -31,15 +33,29 @@ const storePosIntegrationSchema = new mongoose.Schema(
         acceptStatusUpdates: { type: Boolean, default: true },
         syncMenu: { type: Boolean, default: false },
         syncStock: { type: Boolean, default: false },
+        syncStoreStatus: { type: Boolean, default: false },
 
         restaurantId: { type: String, trim: true, default: '', maxlength: 60 },   // Pet Pooja restID (the outlet)
+        // Which Pet Pooja server this store talks to: staging (the docs' URLs) or production (the address Pet Pooja gives).
+        // '' = not chosen (the server's environment decides, see petpooja.adapter.js endpointUrl)
+        apiEnv: { type: String, enum: ['', 'staging', 'production'], default: '' },
+        apiBaseUrl: { type: String, trim: true, default: '', maxlength: 300 },
+        // This server's public address as Pet Pooja must reach it (for the links below); '' = as the panel reached it
+        publicUrl: { type: String, trim: true, default: '', maxlength: 300 },
         appKey: { type: secretSchema, default: () => ({}) },
         appSecret: { type: secretSchema, default: () => ({}) },
         accessToken: { type: secretSchema, default: () => ({}) },
-        // Our item id -> Pet Pooja item id, for the order lines (filled when the menu is mapped)
+        // Our item -> Pet Pooja item, for the order lines (services/posMenu.service.js; key / value format in petpooja.adapter.js)
         itemMap: { type: Map, of: String, default: () => new Map() },
+        // Items Pet Pooja switched off until a set time, and a store closure with a reopening time (released by the outbox sweep)
+        stockHolds: {
+            type: [{ _id: false, productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' }, until: Date }],
+            default: [],
+        },
+        storeHold: { until: { type: Date, default: null } },
 
-        // The secret part of this store's status callback link (/v1/pos/petpooja/callback/<key>). Unguessable, can be rotated.
+        // The secret part of this store's links: status callback (/v1/pos/petpooja/callback/<key>) and menu / stock / store
+        // status (/v1/pos/petpooja/hooks/<key>/...). Unguessable, can be rotated.
         callbackKey: { type: String, required: true },
         // this server's public address as the store manager's panel reached it (used for the callback link that goes out
         // with each order when PUBLIC_API_URL is not set)
@@ -58,6 +74,10 @@ const storePosIntegrationSchema = new mongoose.Schema(
 
 storePosIntegrationSchema.index({ storeId: 1, provider: 1 }, { unique: true });
 storePosIntegrationSchema.index({ callbackKey: 1 }, { unique: true });
+// Pet Pooja's own calls (menu, stock, store status) name the outlet only by its restaurant ID
+storePosIntegrationSchema.index({ restaurantId: 1 });
+storePosIntegrationSchema.index({ 'stockHolds.until': 1 });
+storePosIntegrationSchema.index({ 'storeHold.until': 1 });
 
 export const StorePosIntegration = mongoose.models.StorePosIntegration
     || mongoose.model('StorePosIntegration', storePosIntegrationSchema);

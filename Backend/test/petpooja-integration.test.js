@@ -113,7 +113,7 @@ describe('orders out to Pet Pooja', () => {
         await new Promise((r) => setTimeout(r, 150));
         const row = await lastLog(o, 'save_order');
         assert.equal(row.status, 'skipped');
-        assert.match(row.lastError, /PETPOOJA_API_BASE_URL/);
+        assert.match(row.lastError, /Pet Pooja server is not chosen/);
         assert.equal((await dbOrder(o)).pos.status, 'skipped');
         // the store accepts it as usual
         assert.equal((await fx.call('PATCH', `/v1/food/store/orders/${o.id}/accept`, A.managerToken, { estimatedPreparationTime: 10 })).status, 200);

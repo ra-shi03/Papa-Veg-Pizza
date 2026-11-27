@@ -5,8 +5,9 @@ import { FoodOrder } from '../../orders/models/order.model.js';
 import { FoodStore } from '../../store/models/store.model.js';
 import { emitStoreEvent } from '../../../../config/socket.js';
 import { logger } from '../../../../utils/logger.js';
-import { keysOf, callbackUrlOf, publicBase } from './posIntegration.service.js';
+import { keysOf, callbackUrlOf, publicBase, serverConf, linkBase } from './posIntegration.service.js';
 import * as petpooja from './petpooja.adapter.js';
+import { menuIndexFor } from './posMenu.service.js';
 
 // Orders out to Pet Pooja. Each store that switched Pet Pooja on (and "send orders") gets every new order in its own
 // Pet Pooja, where the manager runs it with the Zomato / Swiggy orders. An order cancelled here after it was sent is
@@ -105,18 +106,22 @@ export async function processRow(id) {
   const keys = keysOf(integ);
   const missing = petpooja.missingSetup(keys);
   if (missing.length) return skip(`Pet Pooja setup is missing: ${missing.join(', ')}`);
-  if (!petpooja.apiReady()) return skip('The server is not connected to Pet Pooja yet (PETPOOJA_API_BASE_URL)');
+  const conf = serverConf(integ);
+  if (!petpooja.apiReady(conf)) return skip('The Pet Pooja server is not chosen yet (Pet Pooja page: Staging or Production)');
 
   let res;
   let note = '';
   if (row.action === 'save_order') {
     if (DONE.includes(order.orderStatus)) return finish(row, { status: 'skipped', lastError: `Not sent: the order is already ${order.orderStatus.replace(/_/g, ' ')}`, nextAttemptAt: null }, { status: 'skipped', lastSyncAt: now });
-    const store = await FoodStore.findById(order.storeId).select('storeName address phone').lean();
-    const built = petpooja.buildSaveOrder(order, store, keys, { callbackUrl: callbackUrlOf(integ, publicBase() || integ.callbackBase), itemMap: integ.itemMap });
+    const [store, menu] = await Promise.all([
+      FoodStore.findById(order.storeId).select('storeName address phone').lean(),
+      menuIndexFor(order.storeId),
+    ]);
+    const built = petpooja.buildSaveOrder(order, store, keys, { callbackUrl: callbackUrlOf(integ, linkBase(integ, publicBase() || integ.callbackBase)), itemMap: integ.itemMap, menu });
     if (built.unmapped.length) note = `${built.unmapped.length} item(s) not mapped to Pet Pooja items yet (sent with this app's ids)`;
-    res = await petpooja.saveOrder(built.body);
+    res = await petpooja.saveOrder(built.body, conf);
   } else {
-    res = await petpooja.cancelOrder(petpooja.buildCancelOrder(order, keys, order.cancellation?.reason));
+    res = await petpooja.cancelOrder(petpooja.buildCancelOrder(order, keys, order.cancellation?.reason), conf);
   }
 
   if (res.skipped) return skip(res.message);
@@ -131,8 +136,12 @@ export async function processRow(id) {
     next ? null : { status: 'failed', note: res.message.slice(0, 300), lastSyncAt: now });
 }
 
-/** Catches orders the event stream missed, then sends every due row. */
+/** Catches orders the event stream missed, then sends every due row (and puts back items / stores Pet Pooja switched off
+ *  until a set time). */
 export async function sweep() {
+  await import('./posPartnerHooks.service.js')
+    .then((m) => m.releaseHolds())
+    .catch((err) => logger.warn(`Pet Pooja hold release failed: ${err.message}`));
   const stores = await StorePosIntegration.find({ enabled: true, pushOrders: true }).select('storeId').lean();
   if (stores.length) {
     const missed = await FoodOrder.find({

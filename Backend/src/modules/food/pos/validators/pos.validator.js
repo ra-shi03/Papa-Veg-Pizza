@@ -7,10 +7,16 @@ const key = z.string().max(300).optional();
 
 const schemas = {
   settings: z.object({
-    enabled: flag, pushOrders: flag, acceptStatusUpdates: flag, syncMenu: flag, syncStock: flag,
+    enabled: flag, pushOrders: flag, acceptStatusUpdates: flag, syncMenu: flag, syncStock: flag, syncStoreStatus: flag,
     restaurantId: z.string().max(60).optional(),
     appKey: key, appSecret: key, accessToken: key,
     clear: z.array(z.enum(['appKey', 'appSecret', 'accessToken'])).max(3).optional(),
+    apiEnv: z.enum(['', 'staging', 'production']).optional(),
+    apiBaseUrl: z.string().max(300).optional(),
+    publicUrl: z.string().max(300).optional(),
+  }).strict(),
+  mapping: z.object({
+    entries: z.array(z.object({ key: z.string().max(120), value: z.string().max(100).optional().default('') })).max(3000),
   }).strict(),
   // Pet Pooja's own callback body: kept loose (their field names), only bounded in size
   callback: z.record(z.any()).refine((b) => JSON.stringify(b).length <= 20000, 'Body too large'),

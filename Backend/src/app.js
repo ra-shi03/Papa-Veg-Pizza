@@ -72,6 +72,9 @@ app.use('/uploads', express.static(localUploadRoot(), {
     maxAge: '30d',
     setHeaders: (res) => res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin'),
 }));
+// Pet Pooja's Push Menu carries a whole menu (items, add-ons, nutrition): it alone gets a larger body limit
+const posMenuJson = express.json({ limit: '5mb' });
+app.use((req, res, next) => (/^\/api\/v1\/pos\/petpooja\/hooks\/[^/]+\/pushmenu\/?$/.test(req.path) ? posMenuJson(req, res, next) : next()));
 app.use(express.json({
     verify: (req, res, buf) => {
         // ✅ Store rawBody for signature verification (Razorpay Webhooks)

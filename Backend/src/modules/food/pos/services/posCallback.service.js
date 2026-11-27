@@ -93,14 +93,17 @@ export async function handleCallback(key, body = {}) {
   if (integ.restaurantId && parsed.restaurantId && integ.restaurantId !== parsed.restaurantId) throw new ForbiddenError('Restaurant does not match');
 
   const storeId = integ.storeId;
-  const or = [];
-  if (parsed.clientOrderId) or.push({ order_id: parsed.clientOrderId });
-  if (parsed.posOrderId) or.push({ 'pos.posOrderId': parsed.posOrderId });
-  const order = or.length ? await FoodOrder.findOne({ storeId, $or: or }) : null;
+  // The docs' callback names the order by OUR id (orderID); older ones also send clientorderID (ours) with orderID being
+  // Pet Pooja's. Either is matched against our order number and the Pet Pooja id we saved.
+  const order = parsed.refs.length
+    ? await FoodOrder.findOne({ storeId, $or: [{ order_id: { $in: parsed.refs } }, { 'pos.posOrderId': { $in: parsed.refs } }] })
+    : null;
+  // Pet Pooja's own id, when the callback carries one that is not our order number
+  const posOrderId = order && parsed.posOrderId && parsed.posOrderId !== order.order_id ? parsed.posOrderId : '';
 
   const log = (status, note, lastError = '') => PosSyncLog.create({
-    storeId, orderId: order?._id || null, orderNumber: order?.order_id || parsed.clientOrderId || '', direction: 'in', action: 'status_callback',
-    status, note: note.slice(0, 500), lastError: lastError.slice(0, 500), posOrderId: parsed.posOrderId, posStatus: parsed.code, attempts: 1,
+    storeId, orderId: order?._id || null, orderNumber: order?.order_id || parsed.refs[0] || '', direction: 'in', action: 'status_callback',
+    status, note: note.slice(0, 500), lastError: lastError.slice(0, 500), posOrderId, posStatus: parsed.code, attempts: 1,
   });
 
   if (!order) {
@@ -108,7 +111,11 @@ export async function handleCallback(key, body = {}) {
     return { applied: false, status: 'ignored', note: 'No order of this store matches' };
   }
   await FoodOrder.updateOne({ _id: order._id }, {
-    $set: { 'pos.provider': petpooja.PROVIDER, 'pos.lastPosStatus': parsed.code, 'pos.lastSyncAt': new Date(), ...(parsed.posOrderId ? { 'pos.posOrderId': parsed.posOrderId } : {}) },
+    $set: {
+      'pos.provider': petpooja.PROVIDER, 'pos.lastPosStatus': parsed.code, 'pos.lastSyncAt': new Date(),
+      ...(posOrderId ? { 'pos.posOrderId': posOrderId } : {}),
+      ...(parsed.modified ? { 'pos.note': 'The order was changed in Pet Pooja: check it there' } : {}),
+    },
   });
   if (!integ.enabled || !integ.acceptStatusUpdates) {
     await log('ignored', 'Pet Pooja status updates are switched off for this store');
