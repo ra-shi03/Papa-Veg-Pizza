@@ -21,13 +21,10 @@ export default function StoreOperationsLayout() {
     window.dispatchEvent(new CustomEvent("storeRoleChanged", { detail: newRole }))
   }
 
-  const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem("store_sidebar_collapsed") === "true")
-  const handleToggleCollapse = () => {
-    const next = !isCollapsed
-    setIsCollapsed(next)
-    localStorage.setItem("store_sidebar_collapsed", next ? "true" : "false")
-    window.dispatchEvent(new CustomEvent("sidebarCollapseChanged", { detail: next }))
-  }
+  // The sidebar no longer collapses: clear any saved collapsed state that modals still read for their offset
+  useEffect(() => {
+    localStorage.removeItem("store_sidebar_collapsed")
+  }, [])
 
   return (
     <div className="h-screen bg-neutral-200 flex overflow-hidden">
@@ -44,14 +41,12 @@ export default function StoreOperationsLayout() {
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         role={role}
-        isCollapsed={isCollapsed}
-        onToggleCollapse={handleToggleCollapse}
       />
 
       {/* Main Content Area */}
       <div 
         id="store-ops-main-content" 
-        className={`flex-1 flex min-h-0 flex-col transition-all duration-300 ease-in-out min-w-0 relative ${isCollapsed ? "lg:ml-[72px]" : "lg:ml-[280px]"}`}
+        className={`flex-1 flex min-h-0 flex-col transition-all duration-300 ease-in-out min-w-0 relative lg:ml-[280px]`}
       >
         {/* Top Navbar */}
         <Navbar 

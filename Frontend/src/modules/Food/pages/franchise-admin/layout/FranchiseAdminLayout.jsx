@@ -6,12 +6,6 @@ import { API_BASE_URL } from "@food/api/config"
 
 export default function FranchiseAdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem("fa_sidebar_collapsed") === "true")
-  const handleToggleCollapse = () => {
-    const next = !isCollapsed
-    setIsCollapsed(next)
-    localStorage.setItem("fa_sidebar_collapsed", next ? "true" : "false")
-  }
 
   return (
     <div className="h-screen bg-neutral-200 flex overflow-hidden">
@@ -27,12 +21,10 @@ export default function FranchiseAdminLayout() {
       <AdminSidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        isCollapsed={isCollapsed}
-        onToggleCollapse={handleToggleCollapse}
       />
 
       {/* Main Content Area */}
-      <div id="admin-main-content" className={`flex-1 flex min-h-0 flex-col transition-all duration-300 ease-in-out min-w-0 relative ${isCollapsed ? "lg:ml-[72px]" : "lg:ml-[280px]"}`}>
+      <div id="admin-main-content" className={`flex-1 flex min-h-0 flex-col transition-all duration-300 ease-in-out min-w-0 relative lg:ml-[280px]`}>
         {/* Top Navbar */}
         <AdminNavbar onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
 

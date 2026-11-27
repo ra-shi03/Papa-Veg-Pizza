@@ -70,7 +70,6 @@ export default function SuperAdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [activeItem, setActiveItem] = useState("Dashboard")
   const navigate = useNavigate()
-  const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem("sa_sidebar_collapsed") === "true")
 
   // Real-time Dynamic Color Theme Settings
   const { themeMode, primaryColor, secondaryColor } = useSystemTheme()
@@ -208,16 +207,10 @@ export default function SuperAdminDashboard() {
         onClose={() => setSidebarOpen(false)}
         activeItem={activeItem}
         setActiveItem={setActiveItem}
-        isCollapsed={isCollapsed}
-        onToggleCollapse={() => {
-          const next = !isCollapsed
-          setIsCollapsed(next)
-          localStorage.setItem("sa_sidebar_collapsed", next ? "true" : "false")
-        }}
       />
 
       {/* Main Container Area */}
-      <main className={`pt-16 pb-12 px-3 md:px-4 transition-all duration-300 ${isCollapsed ? "lg:ml-[72px]" : "lg:ml-[280px]"}`}>
+      <main className={`pt-16 pb-12 px-3 md:px-4 transition-all duration-300 lg:ml-[280px]`}>
 
         {/* Dynamic Navigation Header */}
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">

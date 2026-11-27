@@ -144,26 +144,18 @@ function SuperAdminLayout() {
     activeItem = "Delivery Login Page"
   }
 
-  const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem("sa_sidebar_collapsed") === "true")
-  const handleToggleCollapse = () => {
-    const next = !isCollapsed
-    setIsCollapsed(next)
-    localStorage.setItem("sa_sidebar_collapsed", next ? "true" : "false")
-  }
 
   return (
     <div className="superadmin-theme min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 transition-all duration-300">
-      <Navbar onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} isCollapsed={isCollapsed} />
+      <Navbar onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         activeItem={activeItem}
         setActiveItem={() => { }}
-        isCollapsed={isCollapsed}
-        onToggleCollapse={handleToggleCollapse}
       />
-      {/* 280px left padding on desktop to clear fixed Sidebar (dynamic when collapsed) */}
-      <div className={`pt-16 min-h-screen transition-all duration-300 ${isCollapsed ? "lg:pl-[72px]" : "lg:pl-[280px]"}`}>
+      {/* 280px left padding on desktop to clear the fixed Sidebar */}
+      <div className="pt-16 min-h-screen lg:pl-[280px]">
         <Outlet />
       </div>
     </div>
